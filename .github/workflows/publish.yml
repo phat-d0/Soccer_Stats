@@ -40,6 +40,9 @@ jobs:
         env:
           # DraftKings odds via the-odds-api.com; empty if the secret isn't set yet.
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          # Free allowance assumed to reset on the 5th (key created 5 Oct); the code
+          # learns the real day automatically the first time credits go back up.
+          ODDS_API_RESET_DAY: "5"
         run: |
           uv sync --frozen
           uv run soccer-stats publish --out _site

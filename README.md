@@ -39,8 +39,10 @@ DraftKings via [The Odds API](https://the-odds-api.com) (`src/soccer_stats/odds_
 shown as American odds. Add a free API key as the repo secret `ODDS_API_KEY`
 (Settings → Secrets and variables → Actions). Refreshes are budgeted: each build checks the
 credits left and what the last call cost, and spaces refreshes so the 500 monthly free
-credits last until the reset (1st of the month UTC, or `ODDS_API_RESET_DAY`), keeping 20
-in reserve and never refreshing more than hourly (about every 3 hours in practice).
+credits last until the reset (`ODDS_API_RESET_DAY`, set to the 5th in the workflow; the
+real day is learned automatically when credits go back up), keeping 20 in reserve and
+never refreshing more than hourly (about every 3 hours in practice). If paused on the
+reserve it checks once a day in case the allowance has reset.
 Refreshing the app on your phone never uses credits. Without
 a key the app falls back to football-data's odds. The Record tab still replays against
 football-data's historical odds, since past DraftKings prices aren't available.

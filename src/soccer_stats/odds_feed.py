@@ -11,8 +11,10 @@ does, and it budgets refreshes so the free allowance always lasts the month:
   refreshes still affordable (keeping RESERVE_CREDITS spare), but never more often than
   hourly. Early in the month that's every 2-3 hours; it stretches automatically if
   credits run lower than planned.
-* Below the reserve, fetching stops until the reset date (the 1st of the month UTC by
-  default; set ODDS_API_RESET_DAY if your plan resets on another day).
+* Below the reserve, fetching stops until the reset date, apart from one check a day in
+  case the allowance has reset early. The reset day comes from ODDS_API_RESET_DAY
+  (default the 1st), and is learned automatically the first time a download shows more
+  credits than the previous one.
 """
 
 from __future__ import annotations
@@ -118,6 +120,7 @@ def fetch_odds(
     path = raw_dir / f"odds_api_{league}_{BOOKMAKER}.json"
     meta_path = path.with_suffix(".meta.json")
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    reset_day = int(meta.get("reset_day") or reset_day)  # learned beats configured
     status = OddsStatus(
         fetched_at=meta.get("fetched_at"),
         credits_left=meta.get("credits_left"),
@@ -134,7 +137,11 @@ def fetch_odds(
         credits = None  # the allowance has reset since our last download
     interval = refresh_interval_hours(credits, status.last_cost, now, reset_day)
     status.refresh_hours = None if interval == float("inf") else round(interval, 2)
-    due = last is None or (now - last) / pd.Timedelta(hours=1) >= interval
+    hours_since = (now - last) / pd.Timedelta(hours=1) if last is not None else None
+    # When paused, still check once a day in case the allowance reset on another day.
+    due = (
+        last is None or hours_since >= interval or (interval == float("inf") and hours_since >= 24)
+    )
 
     if due:
         try:
@@ -157,11 +164,18 @@ def fetch_odds(
                 path.write_text(resp.text)
                 remaining = resp.headers.get("x-requests-remaining")
                 cost = resp.headers.get("x-requests-last")
+                learned = meta.get("reset_day")
+                old_left = meta.get("credits_left")
+                new_left = int(float(remaining)) if remaining else None
+                if old_left is not None and new_left is not None and new_left > old_left:
+                    learned = now.day  # credits went up: the allowance reset since last time
                 meta = {
                     "fetched_at": now.isoformat(timespec="seconds"),
-                    "credits_left": int(float(remaining)) if remaining else None,
+                    "credits_left": new_left,
                     "last_cost": int(float(cost)) if cost else None,
+                    "reset_day": learned,
                 }
+                reset_day = int(learned or reset_day)
                 meta_path.write_text(json.dumps(meta))
                 status.fetched_at = meta["fetched_at"]
                 status.credits_left, status.last_cost = meta["credits_left"], meta["last_cost"]

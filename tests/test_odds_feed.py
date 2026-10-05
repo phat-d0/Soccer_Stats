@@ -221,10 +221,44 @@ def test_allowance_reset_resumes_fetching(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(requests, "get", lambda *a, **k: calls.append(1) or FakeResp(left="498"))
     _, status = fetch_odds(
-        raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-10-31 12:00", tz="UTC")
+        raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-10-31 08:00", tz="UTC")
     )
-    assert not calls and "paused" in status.error  # same period: stay paused
+    assert not calls and "paused" in status.error  # same period, <24h: stay paused
     _, status = fetch_odds(
         raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-11-01 00:15", tz="UTC")
     )
     assert calls and status.credits_left == 498  # new month: fetch and learn the new budget
+
+
+def test_paused_checks_daily_and_learns_reset_day(tmp_path, monkeypatch):
+    path = tmp_path / "odds_api_E0_draftkings.json"
+    path.write_text("[]")
+    meta = path.with_suffix(".meta.json")
+    meta.write_text(
+        json.dumps({"fetched_at": "2026-11-01T06:00:00+00:00", "credits_left": 19, "last_cost": 2})
+    )
+    left = {"n": 17}
+
+    def get(*a, **k):
+        r = FakeResp(left=str(left["n"]))
+        r.headers["x-requests-last"] = "2"
+        return r
+
+    calls = []
+    monkeypatch.setattr(requests, "get", lambda *a, **k: calls.append(1) or get())
+    monkeypatch.setenv("ODDS_API_RESET_DAY", "1")
+    # Paused (below reserve, reset assumed on the 1st already passed): only a daily check.
+    fetch_odds(raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-11-01 18:00", tz="UTC"))
+    assert not calls
+    fetch_odds(raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-11-02 06:30", tz="UTC"))
+    assert len(calls) == 1 and json.loads(meta.read_text())["reset_day"] is None  # 17 < 19
+    # The real reset happens on the 5th: the daily check sees credits jump and learns it.
+    left["n"] = 498
+    fetch_odds(raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-11-05 07:00", tz="UTC"))
+    saved = json.loads(meta.read_text())
+    assert saved["credits_left"] == 498 and saved["reset_day"] == 5
+    from soccer_stats.odds_feed import next_reset
+
+    assert next_reset(
+        pd.Timestamp("2026-11-05 07:00", tz="UTC"), saved["reset_day"]
+    ) == pd.Timestamp("2026-12-05", tz="UTC")
