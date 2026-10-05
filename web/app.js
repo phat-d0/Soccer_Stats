@@ -86,6 +86,26 @@ function bestPick(fx, minEdge) {
   return best;
 }
 
+// Which bookmaker the upcoming-match odds come from (DraftKings when configured).
+const isDK = () => state.data?.odds_source?.name === "DraftKings";
+const bookName = () => (isDK() ? "DraftKings" : "Bookmaker");
+
+// Current prices: American odds for DraftKings (+650 / -250), decimal otherwise.
+function price(d) {
+  if (d == null) return "–";
+  if (!isDK()) return d.toFixed(2);
+  const a = d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
+  return a > 0 ? `+${a}` : `−${Math.abs(a)}`;
+}
+
+function oddsAge() {
+  const s = state.data?.odds_source;
+  if (!s || !isDK() || !s.fetched_at) return "";
+  const mins = Math.round((Date.now() - Date.parse(s.fetched_at)) / 60000);
+  const ago = mins < 60 ? `${mins} min` : mins < 1440 ? `${Math.round(mins / 60)} h` : `${Math.round(mins / 1440)} days`;
+  return `DraftKings odds updated ${ago} ago.`;
+}
+
 // Bookmaker odds as probabilities (margin removed). Published data includes these;
 // older data files fall back to simple proportional scaling here.
 function impliedFor(fx) {
@@ -112,7 +132,7 @@ function compareTable(fx, pick) {
     <div class="cmp num" role="table" aria-label="Win, draw and loss chances: model and bookmaker">
       <span></span><span class="h">Home</span><span class="h">Draw</span><span class="h">Away</span>
       <span class="lbl">Model</span>${keys.map((k) => cell(k, fx.p[k], true)).join("")}
-      <span class="lbl">Bookmaker</span>${
+      <span class="lbl">${bookName()}</span>${
         imp.home != null ? keys.map((k) => cell(k, imp[k], false)).join("") : '<span class="none">Odds not out yet</span>'
       }
     </div>`;
@@ -204,11 +224,11 @@ function detailHtml(fx) {
   const hasOdds = o && Object.values(o).some((v) => v != null);
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
-    const price = o?.[k];
-    const edge = price != null ? p[k] * price - 1 : null;
+    const odds_ = o?.[k];
+    const edge = odds_ != null ? p[k] * odds_ - 1 : null;
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
-        ? `<td>${pct(imp[k])}</td><td>${odds(price)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
+        ? `<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
         : `<td>${odds(1 / p[k])}</td>`
     }</tr>`;
   }).join("");
@@ -224,11 +244,11 @@ function detailHtml(fx) {
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
         <table>
-          <thead><tr><th></th><th>Model</th>${hasOdds ? "<th>Bookie</th><th>Odds</th><th>Edge</th>" : "<th>Fair odds</th>"}</tr></thead>
+          <thead><tr><th></th><th>Model</th>${hasOdds ? `<th>${isDK() ? "DK %" : "Bookie"}</th><th>Odds</th><th>Edge</th>` : "<th>Fair odds</th>"}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="note">${hasOdds ? "Bookie = the odds as a chance, margin removed. Edge = model chance × odds − 1." : "Fair odds = the price that would exactly match the model's chance."}</p>
+      <p class="note">${hasOdds ? `${isDK() ? "DK % = DraftKings' odds" : "Bookie = the odds"} as a chance, margin removed. Edge = model chance × payout − 1.` : "Fair odds = the price that would exactly match the model's chance."}</p>
       <div class="section-title">Scorelines</div>
       <div class="card">
         ${heatmap(matrix, home, away)}
@@ -270,7 +290,7 @@ function viewMatches() {
     byDay.get(day).push([fx, idx]);
   });
   const nValue = d.fixtures.filter((fx) => bestPick(fx, state.minEdge)).length;
-  let html = `<p class="note">Chances of each result: the model vs the bookmaker. ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets right now."}</p>`;
+  let html = `<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
@@ -285,14 +305,14 @@ function viewMatches() {
           </div>
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
-          ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${odds(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
+          ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
   }
   html += `
     <div class="section-title">How to read this</div>
-    <p class="note" style="margin-top:0">Bookmaker = Pinnacle's odds turned into chances, with their built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.</p>
+    <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.</p>
     ${edgeControl()}`;
   return html;
 }
@@ -455,7 +475,7 @@ function viewRecord() {
     </div>`).join("");
 
   return `
-    <p class="note">The model replayed week by week since ${esc(since)}, using only data it would have had before each match. 1-unit bets at Pinnacle opening odds.</p>
+    <p class="note">The model replayed week by week since ${esc(since)}, using only data it would have had before each match. 1-unit bets at the historical opening odds in football-data's files (mostly Pinnacle)${isDK() ? "; past DraftKings prices aren't available, so DraftKings' bigger margin would make real results somewhat worse" : ""}.</p>
     ${edgeControl()}
     <div class="tiles" style="margin-top:12px">
       <div class="tile"><div class="label">Profit</div><div class="value">${signed(s.profit)}</div><div class="sub">units from ${s.n} bets</div></div>

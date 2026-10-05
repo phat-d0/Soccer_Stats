@@ -37,6 +37,9 @@ jobs:
           restore-keys: raw-data-
 
       - name: Build site
+        env:
+          # DraftKings odds via the-odds-api.com; empty if the secret isn't set yet.
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           uv sync --frozen
           uv run soccer-stats publish --out _site

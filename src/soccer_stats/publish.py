@@ -22,6 +22,7 @@ from soccer_stats.backtest import simulate_bets
 from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
+from soccer_stats.odds_feed import BOOKMAKER_NAME, apply_odds, fetch_odds, parse_odds
 from soccer_stats.players import (
     TeamNews,
     align_team_names,
@@ -114,6 +115,46 @@ def upcoming_fixtures(
     if len(window) < MIN_FIXTURES:
         window = upcoming.head(MIN_FIXTURES)
     return window.reset_index(drop=True)
+
+
+def with_draftkings(
+    fixtures: pd.DataFrame, league: str, known_teams: set[str], now: pd.Timestamp | None = None
+) -> tuple[pd.DataFrame, dict]:
+    """Swap fixture odds for DraftKings odds when an Odds API key is configured.
+
+    Without a key (or before the first successful download) the football-data odds stay.
+    Matches DraftKings has priced but the schedule lacks are added.
+    """
+    now = now or pd.Timestamp.now(tz="UTC")
+    events, status = fetch_odds(league)
+    source = {
+        "name": "football-data",
+        "format": "decimal",
+        "fetched_at": status.fetched_at,
+        "credits_left": status.credits_left,
+        "error": status.error,
+    }
+    if events is None:
+        return fixtures, source
+    dk = parse_odds(events, known_teams)
+    out = apply_odds(fixtures, dk) if not fixtures.empty else fixtures
+    have = set(zip(out.get("home", []), out.get("away", []), strict=False))
+    horizon = (
+        max(out["kickoff"].max(), now + pd.Timedelta(days=FIXTURE_DAYS))
+        if not out.empty
+        else (now + pd.Timedelta(days=FIXTURE_DAYS))
+    )
+    unscheduled = np.array(
+        [(h, a) not in have for h, a in zip(dk["home"], dk["away"], strict=True)], dtype=bool
+    )
+    in_window = (dk["kickoff"] >= now - pd.Timedelta(hours=2)) & (dk["kickoff"] <= horizon)
+    extra = dk[unscheduled & in_window.to_numpy()]
+    if not extra.empty:
+        out = (
+            pd.concat([out, extra], ignore_index=True).sort_values("kickoff").reset_index(drop=True)
+        )
+    source.update(name=BOOKMAKER_NAME, format="american")
+    return out, source
 
 
 def implied_probs(r: dict) -> dict:
@@ -285,6 +326,8 @@ def publish(out: Path, league: str = "E0") -> Path:
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
+    known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
+    fixtures, odds_source = with_draftkings(fixtures, league, known)
 
     news, news_error, snapshot = None, None, []
     if league == "E0":  # FPL covers the Premier League only
@@ -298,7 +341,17 @@ def publish(out: Path, league: str = "E0") -> Path:
             news_error = f"Team news unavailable: {exc}"
 
     data = build_data(matches, fixtures, xg_error, news, news_error)
+    data["odds_source"] = odds_source
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
+    print(
+        f"Odds: {odds_source['name']}"
+        + (
+            f" (credits left: {odds_source['credits_left']})"
+            if odds_source["credits_left"] is not None
+            else ""
+        )
+        + (f" - {odds_source['error']}" if odds_source["error"] else "")
+    )
     print(
         f"{len(data['fixtures'])} upcoming fixtures ({with_odds} with odds), "
         f"{data['matches_fit']} matches fit, xG coverage {data['xg_coverage']:.0%}"

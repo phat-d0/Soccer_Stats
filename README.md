@@ -34,6 +34,15 @@ absences and the probabilities with and without the adjustment. These adjustment
 can't be backtested yet (FPL keeps no history), so the workflow logs every change to
 the `data-log` branch (`fpl_news/*.jsonl`) to build one.
 
+**DraftKings odds:** upcoming-match odds, bookmaker probabilities and edges come from
+DraftKings via [The Odds API](https://the-odds-api.com) (`src/soccer_stats/odds_feed.py`),
+shown as American odds. Add a free API key as the repo secret `ODDS_API_KEY`
+(Settings → Secrets and variables → Actions). Each refresh costs 2 credits (match result
++ over/under); odds refresh at most every 4 hours (`ODDS_API_MAX_AGE_HOURS`), ~360 of the
+free plan's 500 monthly credits, and pause automatically if fewer than 20 remain. Without
+a key the app falls back to football-data's odds. The Record tab still replays against
+football-data's historical odds, since past DraftKings prices aren't available.
+
 **One-time setup**
 1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. **Actions** tab → *Publish app* → **Run workflow** (or wait for the next scheduled run).
@@ -113,6 +122,7 @@ src/soccer_stats/
   xg.py                 Understat xG download, team-name mapping, merge onto matches
   publish.py            builds the phone app's data.json
   players.py            FPL team news -> attack/defence adjustments, injury history log
+  odds_feed.py          DraftKings odds from The Odds API (cached, credit-aware)
 app/streamlit_app.py    the Premier League dashboard (desktop)
 web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)
 .github/workflows/      scheduled build + deploy to GitHub Pages
