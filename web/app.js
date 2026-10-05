@@ -188,6 +188,7 @@ function detailHtml(fx) {
         ${heatmap(matrix, home, away)}
         <p class="note" style="margin:10px 0 0">Most likely: ${top.map(([s, v]) => `${s} (${pct(v)})`).join(", ")}</p>
       </div>
+      <button class="btn primary ask-btn" data-askmatch="${esc(home)}|${esc(away)}">Ask Claude about this match</button>
     </div>`;
 }
 
@@ -432,7 +433,11 @@ function viewExplore() {
     ${detailHtml({ home, away, xg: [lam, mu], p, top, matrix: m })}`;
 }
 
-const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, explore: viewExplore };
+// The Ask tab lives in chat.js (an ES module) and registers itself once loaded.
+let chatApi = null;
+const viewAsk = () => (chatApi ? chatApi.view() : '<div class="empty">Loading…</div>');
+
+const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, explore: viewExplore, ask: viewAsk };
 
 function render() {
   chartData = null;
@@ -443,6 +448,14 @@ function render() {
     b.setAttribute("aria-current", on ? "page" : "false");
   });
   bindChart();
+  if (state.tab === "ask" && chatApi) chatApi.afterRender();
+}
+
+function setTab(tab) {
+  state.tab = tab;
+  closeSheet();
+  render();
+  window.scrollTo(0, 0);
 }
 
 function setUpdated() {
@@ -450,10 +463,10 @@ function setUpdated() {
   const mins = Math.round((Date.now() - Date.parse(d.generated_at)) / 60000);
   const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
   $("#updated").textContent = `${d.league} ${d.season} · updated ${ago}`;
-  const old = document.querySelector(".banner");
+  const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {
-    $("#view").insertAdjacentHTML("beforebegin", '<div class="banner" style="margin:0 16px">xG was unavailable at the last update, so ratings use goals only.</div>');
+    $("#view").insertAdjacentHTML("beforebegin", '<div id="xg-banner" class="banner" style="margin:0 16px">xG was unavailable at the last update, so ratings use goals only.</div>');
   }
 }
 
@@ -462,8 +475,11 @@ document.addEventListener("click", (ev) => {
   const t = ev.target.closest("button, [data-close]");
   if (!t) return;
   if (t.dataset.tab) {
-    state.tab = t.dataset.tab; store.set("tab", state.tab);
-    render(); window.scrollTo(0, 0);
+    setTab(t.dataset.tab);
+  } else if (t.dataset.askmatch) {
+    const [home, away] = t.dataset.askmatch.split("|");
+    const q = `Talk me through ${home} v ${away}: what does the model expect, how does that compare with the bookmakers, and is there any value?`;
+    if (chatApi) chatApi.askAbout(q);
   } else if (t.dataset.edge !== undefined) {
     state.minEdge = Number(t.dataset.edge); store.set("minEdge", state.minEdge);
     render();
@@ -498,6 +514,12 @@ async function load(force = false) {
     btn.classList.remove("spin");
   }
 }
+
+// Shared with chat.js.
+window.PL = {
+  state, esc, scoreMatrix, marketsFrom, impliedFor, bestPick, summarize, render, setTab,
+  registerChat(api) { chatApi = api; if (state.tab === "ask" && state.data) render(); },
+};
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

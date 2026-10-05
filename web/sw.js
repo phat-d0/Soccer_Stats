@@ -1,7 +1,7 @@
 // Offline support: app shell is cached; data.json is network-first so you always get
 // the latest predictions when online and the last ones when not.
-const CACHE = "pl-model-v2";
-const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icons/icon-192.png"];
+const CACHE = "pl-model-v3";
+const SHELL = ["./", "index.html", "style.css", "app.js", "chat.js", "vendor/anthropic-sdk.mjs", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
