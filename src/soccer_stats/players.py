@@ -39,6 +39,9 @@ TEAM_NAMES = {
     "Man Utd": "Man United",
     "Spurs": "Tottenham",
     "Sheffield Utd": "Sheffield United",
+    "Coventry City": "Coventry",
+    "Hull City": "Hull",
+    "Ipswich Town": "Ipswich",
     "Nott'm Forest": "Nott'm Forest",
 }
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -169,6 +172,22 @@ def team_news(players: pd.DataFrame, games_by_team: dict[str, int]) -> dict[str,
     return out
 
 
+def align_team_names(news: dict[str, TeamNews], teams: list[str]) -> dict[str, TeamNews]:
+    """Rename FPL teams that still don't match football-data names (e.g. 'Hull City' -> 'Hull').
+
+    Only unmatched names are touched, and only when exactly one team is a prefix match.
+    """
+    out = {}
+    for name, n in news.items():
+        if name not in teams:
+            candidates = [t for t in teams if name.startswith(t + " ") or t.startswith(name + " ")]
+            if len(candidates) == 1:
+                name = candidates[0]
+                n.team = name
+        out[name] = n
+    return out
+
+
 def fixture_multipliers(
     fixtures: pd.DataFrame, news: dict[str, TeamNews], now: pd.Timestamp, days: int = 21
 ) -> dict[tuple[str, str], tuple[float, float]]:
@@ -236,9 +255,9 @@ def append_news_log(snapshot: list[dict], log_dir: Path, at: str | None = None) 
         if key not in current:
             changes.append({**old, "at": at, "status": "a", "chance": 100, "news": ""})
 
-    if changes:
+    if changes:  # nothing changed -> leave the files alone so there's nothing to commit
         with open(log_dir / f"{at[:7]}.jsonl", "a") as f:
             for r in changes:
                 f.write(json.dumps(r) + "\n")
-    latest_path.write_text(json.dumps(current, indent=0))
+        latest_path.write_text(json.dumps(current, indent=0))
     return len(changes)

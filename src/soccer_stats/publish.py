@@ -24,6 +24,7 @@ from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
 from soccer_stats.players import (
     TeamNews,
+    align_team_names,
     fetch_fpl,
     fixture_multipliers,
     news_snapshot,
@@ -291,7 +292,7 @@ def publish(out: Path, league: str = "E0") -> Path:
             players = parse_players(fetch_fpl())
             this_season = matches[matches["date"] >= f"{season}-07-01"]
             games = pd.concat([this_season["home"], this_season["away"]]).value_counts().to_dict()
-            news = team_news(players, games)
+            news = align_team_names(team_news(players, games), sorted(set(this_season["home"])))
             snapshot = news_snapshot(players, datetime.now(UTC).isoformat(timespec="minutes"))
         except Exception as exc:  # FPL down or changed: predictions still publish
             news_error = f"Team news unavailable: {exc}"

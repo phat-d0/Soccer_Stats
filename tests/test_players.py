@@ -140,3 +140,31 @@ def test_news_log_records_only_changes(tmp_path):
     assert append_news_log([], tmp_path, at="2026-10-05T10:00") == 1  # recovered -> available
     lines = (tmp_path / "2026-10.jsonl").read_text().splitlines()
     assert [json.loads(x)["chance"] for x in lines] == [50, 75, 100]
+
+
+def test_align_team_names_fixes_unmatched_suffixes():
+    from soccer_stats.players import TeamNews, align_team_names
+
+    news = {n: TeamNews(n) for n in ["Hull City", "Arsenal", "Man City", "Mystery FC"]}
+    out = align_team_names(news, ["Hull", "Arsenal", "Man City", "Man United"])
+    assert set(out) == {"Hull", "Arsenal", "Man City", "Mystery FC"}
+    assert out["Hull"].team == "Hull"
+
+
+def test_news_log_leaves_files_untouched_without_changes(tmp_path):
+    from soccer_stats.players import append_news_log
+
+    snap = [
+        {
+            "at": "2026-10-05T07:00",
+            "team": "A",
+            "name": "X",
+            "status": "i",
+            "chance": 0,
+            "news": "Knee",
+        }
+    ]
+    append_news_log(snap, tmp_path)
+    before = (tmp_path / "latest.json").read_text()
+    append_news_log([{**snap[0], "at": "2026-10-05T08:00"}], tmp_path)
+    assert (tmp_path / "latest.json").read_text() == before
