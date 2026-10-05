@@ -252,6 +252,18 @@ main { padding: 4px 16px 24px; max-width: 640px; margin: 0 auto; outline: none; 
   margin-right: 4px;
   vertical-align: 0;
 }
+.cmp {
+  display: grid;
+  grid-template-columns: 1fr 52px 52px 52px;
+  row-gap: 4px;
+  margin: 12px 0 2px;
+  font-size: 15px;
+  text-align: right;
+}
+.cmp .h { font-size: 12px; color: var(--text-muted); }
+.cmp .lbl { text-align: left; color: var(--text-secondary); font-size: 14px; }
+.cmp .hi { font-weight: 700; color: var(--good-text); }
+.cmp .none { grid-column: span 3; color: var(--text-muted); font-size: 13px; }
 .badge {
   display: inline-flex;
   align-items: center;

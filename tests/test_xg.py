@@ -91,3 +91,12 @@ def test_with_xg_reads_cached_files(tmp_path, season_json):
     out, err = with_xg(matches, raw_dir=tmp_path)
     assert err is None
     assert out.loc[0, "home_xg"] == pytest.approx(1.5)
+
+
+def test_parse_schedule_keeps_only_unplayed_in_utc(season_json):
+    from soccer_stats.xg import parse_schedule
+
+    sched = parse_schedule(season_json)
+    assert list(sched["home"]) == ["Chelsea"]
+    assert list(sched["away"]) == ["Newcastle"]
+    assert str(sched.loc[0, "kickoff"].tz) == "UTC"

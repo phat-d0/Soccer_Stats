@@ -110,6 +110,32 @@ def parse_season(data: dict | list) -> pd.DataFrame:
     return df
 
 
+def parse_schedule(data: dict | list) -> pd.DataFrame:
+    """Understat league JSON -> unplayed fixtures with UTC kick-off times.
+
+    Understat publishes the whole season's schedule, so this covers fixtures weeks
+    ahead (football-data's fixtures file only lists about the next week).
+    """
+    dates = data.get("dates", []) if isinstance(data, dict) else data
+    rows = [
+        {
+            "kickoff": d["datetime"],
+            "home": TEAM_NAMES.get(d["h"]["title"], d["h"]["title"]),
+            "away": TEAM_NAMES.get(d["a"]["title"], d["a"]["title"]),
+        }
+        for d in dates
+        if not d.get("isResult")
+    ]
+    df = pd.DataFrame(rows, columns=["kickoff", "home", "away"])
+    # Understat times are UTC (e.g. a 20:00 BST kick-off is listed as 19:00).
+    df["kickoff"] = pd.to_datetime(df["kickoff"]).dt.tz_localize("UTC")
+    return df.sort_values("kickoff").reset_index(drop=True)
+
+
+def load_schedule(league: str, start_year: int, raw_dir: Path = RAW_DIR) -> pd.DataFrame:
+    return parse_schedule(json.loads(fetch_season(league, start_year, raw_dir).read_text()))
+
+
 def load_xg(
     leagues: Iterable[str], start_years: Iterable[int], raw_dir: Path = RAW_DIR
 ) -> pd.DataFrame:

@@ -8,7 +8,7 @@ const store = {
 };
 const state = {
   data: null,
-  tab: store.get("tab", "matches"),
+  tab: "matches", // the app always opens on upcoming fixtures
   minEdge: store.get("minEdge", 0.03),
   exploreHome: store.get("exploreHome", null),
   exploreAway: store.get("exploreAway", null),
@@ -86,6 +86,38 @@ function bestPick(fx, minEdge) {
   return best;
 }
 
+// Bookmaker odds as probabilities (margin removed). Published data includes these;
+// older data files fall back to simple proportional scaling here.
+function impliedFor(fx) {
+  if (fx.implied && fx.implied.home != null) return fx.implied;
+  const o = fx.odds || {};
+  const out = {};
+  const scale = (keys) => {
+    if (!keys.every((k) => o[k] > 1)) return;
+    const raw = keys.map((k) => 1 / o[k]);
+    const sum = raw.reduce((a, b) => a + b, 0);
+    keys.forEach((k, i) => { out[k] = raw[i] / sum; });
+  };
+  scale(["home", "draw", "away"]);
+  scale(["over25", "under25"]);
+  return out;
+}
+
+function compareTable(fx, pick) {
+  const imp = impliedFor(fx);
+  const keys = ["home", "draw", "away"];
+  const cell = (k, v, isModel) =>
+    `<span class="${isModel && pick?.market === k ? "hi" : ""}">${pct(v)}</span>`;
+  return `
+    <div class="cmp num" role="table" aria-label="Win, draw and loss chances: model and bookmaker">
+      <span></span><span class="h">Home</span><span class="h">Draw</span><span class="h">Away</span>
+      <span class="lbl">Model</span>${keys.map((k) => cell(k, fx.p[k], true)).join("")}
+      <span class="lbl">Bookmaker</span>${
+        imp.home != null ? keys.map((k) => cell(k, imp[k], false)).join("") : '<span class="none">Odds not out yet</span>'
+      }
+    </div>`;
+}
+
 // ---------- rendering helpers ----------
 function probBar(p, home, away) {
   return `
@@ -121,14 +153,18 @@ function heatmap(matrix, home, away) {
     <div class="heat" role="img" aria-label="Chance of each scoreline">${cells}</div>`;
 }
 
-function detailHtml({ home, away, kickoff, xg, p, odds: o, top, matrix, lowData }) {
+function detailHtml(fx) {
+  const { home, away, kickoff, xg, p, odds: o, top, matrix, lowData } = fx;
+  const imp = o ? impliedFor(fx) : {};
   const hasOdds = o && Object.values(o).some((v) => v != null);
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
     const price = o?.[k];
     const edge = price != null ? p[k] * price - 1 : null;
-    return `<tr><td>${name}</td><td>${pct(p[k])}</td><td>${odds(1 / p[k])}</td>${
-      hasOdds ? `<td>${odds(price)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>` : ""
+    return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
+      hasOdds
+        ? `<td>${pct(imp[k])}</td><td>${odds(price)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
+        : `<td>${odds(1 / p[k])}</td>`
     }</tr>`;
   }).join("");
   const when = kickoff ? new Date(kickoff).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Any fixture, first team at home";
@@ -142,11 +178,11 @@ function detailHtml({ home, away, kickoff, xg, p, odds: o, top, matrix, lowData 
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
         <table>
-          <thead><tr><th></th><th>Model</th><th>Fair</th>${hasOdds ? "<th>Odds</th><th>Edge</th>" : ""}</tr></thead>
+          <thead><tr><th></th><th>Model</th>${hasOdds ? "<th>Bookie</th><th>Odds</th><th>Edge</th>" : "<th>Fair odds</th>"}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="note">Fair = the odds that would exactly match the model's chance. Edge = model chance × odds − 1.</p>
+      <p class="note">${hasOdds ? "Bookie = the odds as a chance, margin removed. Edge = model chance × odds − 1." : "Fair odds = the price that would exactly match the model's chance."}</p>
       <div class="section-title">Scorelines</div>
       <div class="card">
         ${heatmap(matrix, home, away)}
@@ -179,7 +215,7 @@ function edgeControl() {
 function viewMatches() {
   const d = state.data;
   if (!d.fixtures.length) {
-    return `${edgeControl()}<div class="empty">No upcoming fixtures published yet.<br>Try the Explore tab.</div>`;
+    return `<div class="empty">No upcoming fixtures found.<br>Try the Explore tab.</div>`;
   }
   const byDay = new Map();
   d.fixtures.forEach((fx, idx) => {
@@ -188,8 +224,7 @@ function viewMatches() {
     byDay.get(day).push([fx, idx]);
   });
   const nValue = d.fixtures.filter((fx) => bestPick(fx, state.minEdge)).length;
-  let html = edgeControl();
-  html += `<p class="note">${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets at this threshold."} Tap a match for details.</p>`;
+  let html = `<p class="note">Chances of each result: the model vs the bookmaker. ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
@@ -197,17 +232,21 @@ function viewMatches() {
       const time = new Date(fx.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
       html += `
         <button class="card match" data-fixture="${idx}">
-          <div class="match-head"><span>${esc(time)}</span><span class="num">${fx.odds.home ? `${odds(fx.odds.home)} · ${odds(fx.odds.draw)} · ${odds(fx.odds.away)}` : ""}</span></div>
+          <div class="match-head"><span>${esc(time)}</span><span>Details ›</span></div>
           <div class="teams">
             <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} xG</span>
             <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} xG</span>
           </div>
-          ${probBar(fx.p, fx.home, fx.away)}
+          ${compareTable(fx, pick)}
           ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${odds(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
   }
+  html += `
+    <div class="section-title">How to read this</div>
+    <p class="note" style="margin-top:0">Bookmaker = Pinnacle's odds turned into chances, with their built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.</p>
+    ${edgeControl()}`;
   return html;
 }
 

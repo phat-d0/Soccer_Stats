@@ -19,14 +19,19 @@ import pandas as pd
 
 from soccer_stats import dashboard
 from soccer_stats.backtest import simulate_bets
-from soccer_stats.data import current_season, load_fixtures, load_matches
+from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
 from soccer_stats.models import DixonColes
-from soccer_stats.xg import with_xg
+from soccer_stats.odds import devig_shin
+from soccer_stats.xg import LEAGUES as XG_LEAGUES
+from soccer_stats.xg import load_schedule, with_xg
 
 WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 TRAIN_SEASONS = 3
 XG_WEIGHT = 0.7
 MATRIX_GOALS = 5  # score grid shown in the app: 0..5 goals each side
+FIXTURE_DAYS = 14  # show fixtures this far ahead...
+MIN_FIXTURES = 10  # ...but always at least the next round
+ODDS_COLS = ["odds_home", "odds_draw", "odds_away", "odds_over25", "odds_under25"]
 
 
 def _clean(obj):
@@ -57,6 +62,64 @@ def model_params(model: DixonColes) -> dict:
     }
 
 
+def upcoming_fixtures(
+    league: str = "E0", now: pd.Timestamp | None = None, raw_dir: Path = RAW_DIR
+) -> pd.DataFrame:
+    """Upcoming fixtures for the next FIXTURE_DAYS (at least MIN_FIXTURES), with odds if posted.
+
+    The schedule comes from Understat (whole season, so it works through international
+    breaks); odds come from football-data's fixtures file, which only covers about the
+    next week. Either source alone is used if the other is unavailable.
+    """
+    now = now or pd.Timestamp.now(tz="UTC")
+    empty = pd.DataFrame(columns=["kickoff", "home", "away"])
+
+    try:
+        fd = load_fixtures([league], raw_dir=raw_dir)
+        # football-data times are UK local time.
+        fd["kickoff"] = (
+            fd["kickoff"]
+            .dt.tz_localize("Europe/London", ambiguous="NaT", nonexistent="shift_forward")
+            .dt.tz_convert("UTC")
+        )
+    except Exception:
+        fd = empty
+    try:
+        sched = load_schedule(league, current_season(), raw_dir) if league in XG_LEAGUES else empty
+    except Exception:
+        sched = empty
+
+    merged = sched.merge(fd, on=["home", "away"], how="outer", suffixes=("_us", ""))
+    if "kickoff_us" in merged:
+        merged["kickoff"] = merged["kickoff"].fillna(merged["kickoff_us"])
+        merged = merged.drop(columns="kickoff_us")
+    for col in ODDS_COLS:
+        if col not in merged:
+            merged[col] = np.nan
+    if merged.empty:
+        return merged
+
+    merged["kickoff"] = pd.to_datetime(merged["kickoff"], utc=True)
+    upcoming = merged[merged["kickoff"] >= now - pd.Timedelta(hours=2)].sort_values("kickoff")
+    window = upcoming[upcoming["kickoff"] <= now + pd.Timedelta(days=FIXTURE_DAYS)]
+    if len(window) < MIN_FIXTURES:
+        window = upcoming.head(MIN_FIXTURES)
+    return window.reset_index(drop=True)
+
+
+def implied_probs(r: dict) -> dict:
+    """Bookmaker odds as probabilities, with the margin removed so each market sums to 1."""
+    out = {k: None for k in ("home", "draw", "away", "over25", "under25")}
+    h2h = [r.get("odds_home"), r.get("odds_draw"), r.get("odds_away")]
+    if all(pd.notna(o) and o > 1 for o in h2h):
+        out["home"], out["draw"], out["away"] = devig_shin(np.array(h2h, dtype=float))
+        out["margin"] = float(sum(1 / o for o in h2h) - 1)
+    ou = [r.get("odds_over25"), r.get("odds_under25")]
+    if all(pd.notna(o) and o > 1 for o in ou):
+        out["over25"], out["under25"] = devig_shin(np.array(ou, dtype=float))
+    return out
+
+
 def fixture_cards(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Series) -> list[dict]:
     if fixtures.empty:
         return []
@@ -85,6 +148,7 @@ def fixture_cards(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Series) 
                     "over25": r["odds_over25"],
                     "under25": r["odds_under25"],
                 },
+                "implied": implied_probs(r),
                 "low_data": bool(r["low_data"]),
                 "top_scores": dashboard.top_scorelines(m),
                 "matrix": m[: MATRIX_GOALS + 1, : MATRIX_GOALS + 1],
@@ -159,12 +223,15 @@ def publish(out: Path, league: str = "E0") -> Path:
     season = current_season()
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
     matches, xg_error = with_xg(matches)
-    try:
-        fixtures = load_fixtures([league])
-    except Exception:
-        fixtures = pd.DataFrame(columns=["kickoff", "home", "away"])
+    fixtures = upcoming_fixtures(league)
 
     data = build_data(matches, fixtures, xg_error)
+    with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
+    print(
+        f"{len(data['fixtures'])} upcoming fixtures ({with_odds} with odds), "
+        f"{data['matches_fit']} matches fit, xG coverage {data['xg_coverage']:.0%}"
+        + (f", xG error: {xg_error}" if xg_error else "")
+    )
     out.mkdir(parents=True, exist_ok=True)
     shutil.copytree(WEB_DIR, out, dirs_exist_ok=True)
     (out / "data.json").write_text(json.dumps(data, separators=(",", ":")))

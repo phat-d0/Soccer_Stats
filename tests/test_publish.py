@@ -43,3 +43,81 @@ def test_build_data_shape(league):
     assert len(fx["matrix"]) == 6 and len(fx["matrix"][0]) == 6
     assert data["ratings"][0]["goal_diff"] >= data["ratings"][-1]["goal_diff"]
     assert {"model", "goals_only"} <= set(data["record"])
+
+
+def test_implied_probs_removes_margin():
+    from soccer_stats.publish import implied_probs
+
+    out = implied_probs(
+        {
+            "odds_home": 1.9,
+            "odds_draw": 3.6,
+            "odds_away": 4.5,
+            "odds_over25": 1.95,
+            "odds_under25": 1.95,
+        }
+    )
+    assert abs(out["home"] + out["draw"] + out["away"] - 1) < 1e-9
+    assert abs(out["over25"] - 0.5) < 1e-9
+    assert out["margin"] > 0
+    missing = implied_probs({"odds_home": float("nan"), "odds_draw": 3.6, "odds_away": 4.5})
+    assert missing["home"] is None and missing["over25"] is None
+
+
+def test_upcoming_fixtures_merges_schedule_and_odds(tmp_path, monkeypatch):
+    import soccer_stats.publish as pub
+
+    dates = [
+        # Understat: UTC times, long names; one played match must be ignored.
+        {
+            "isResult": True,
+            "h": {"title": "Arsenal"},
+            "a": {"title": "Chelsea"},
+            "goals": {"h": "1", "a": "0"},
+            "xG": {"h": "1.2", "a": "0.4"},
+            "datetime": "2026-10-03 14:00:00",
+        },
+        {
+            "isResult": False,
+            "h": {"title": "Manchester City"},
+            "a": {"title": "Wolverhampton Wanderers"},
+            "goals": {"h": None, "a": None},
+            "xG": {"h": None, "a": None},
+            "datetime": "2026-10-18 14:00:00",
+        },
+        {
+            "isResult": False,
+            "h": {"title": "Liverpool"},
+            "a": {"title": "Everton"},
+            "goals": {"h": None, "a": None},
+            "xG": {"h": None, "a": None},
+            "datetime": "2026-10-25 11:30:00",
+        },
+    ]
+    monkeypatch.setattr(pub, "current_season", lambda: 2026)
+    (tmp_path / "understat_EPL_2026.json").write_text(json.dumps({"dates": dates}))
+    # football-data: UK local times, odds for the first fixture only.
+    pd.DataFrame(
+        {
+            "Div": ["E0"],
+            "Date": ["18/10/2026"],
+            "Time": ["15:00"],
+            "HomeTeam": ["Man City"],
+            "AwayTeam": ["Wolves"],
+            "PSH": [1.3],
+            "PSD": [6.0],
+            "PSA": [10.0],
+        }
+    ).to_csv(tmp_path / "fixtures.csv", index=False)
+    import os
+    import time
+
+    now_ts = time.time()
+    for f in tmp_path.iterdir():
+        os.utime(f, (now_ts, now_ts))
+
+    fx = pub.upcoming_fixtures("E0", now=pd.Timestamp("2026-10-05", tz="UTC"), raw_dir=tmp_path)
+    assert list(fx["home"]) == ["Man City", "Liverpool"]
+    assert fx.loc[0, "kickoff"] == pd.Timestamp("2026-10-18 14:00", tz="UTC")  # 15:00 BST
+    assert fx.loc[0, "odds_home"] == 1.3
+    assert np.isnan(fx.loc[1, "odds_home"])
