@@ -103,7 +103,8 @@ function oddsAge() {
   if (!s || !isDK() || !s.fetched_at) return "";
   const mins = Math.round((Date.now() - Date.parse(s.fetched_at)) / 60000);
   const ago = mins < 60 ? `${mins} min` : mins < 1440 ? `${Math.round(mins / 60)} h` : `${Math.round(mins / 1440)} days`;
-  return `DraftKings odds updated ${ago} ago.`;
+  const every = s.refresh_hours ? ` Refreshing about every ${s.refresh_hours < 1.5 ? "hour" : `${Math.round(s.refresh_hours)} h`} to stay on the free plan.` : s.error && s.error.startsWith("paused") ? " Paused until the free allowance resets." : "";
+  return `DraftKings odds updated ${ago} ago.${every}`;
 }
 
 // Bookmaker odds as probabilities (margin removed). Published data includes these;

@@ -163,3 +163,68 @@ def test_with_draftkings_adds_unscheduled_matches(tmp_path, monkeypatch):
     assert source["name"] == "DraftKings" and source["format"] == "american"
     assert list(out["home"]) == ["Man City", "Hull"]
     assert out.loc[1, "odds_away"] == 1.45
+
+
+def test_budget_interval():
+    from soccer_stats.odds_feed import next_reset, refresh_interval_hours
+
+    now = pd.Timestamp("2026-10-05 09:00", tz="UTC")
+    assert next_reset(now) == pd.Timestamp("2026-11-01", tz="UTC")
+    assert next_reset(now, reset_day=10) == pd.Timestamp("2026-10-10", tz="UTC")
+    # 497 credits, 2 per call, 638.9 hours to go -> 238 calls -> ~2.7h apart
+    assert refresh_interval_hours(497, 2, now) == pytest.approx(638.95 / 238, rel=1e-3)
+    assert refresh_interval_hours(497, 3, now) > refresh_interval_hours(497, 2, now)
+    assert refresh_interval_hours(21, 2, now) == float("inf")  # reserve protected
+    assert refresh_interval_hours(None, None, now) == 1.0  # unknown -> find out
+    late = pd.Timestamp("2026-10-31 22:00", tz="UTC")
+    assert refresh_interval_hours(400, 2, late) == 1.0  # spare credits -> hourly cap
+
+
+@pytest.mark.parametrize("cost", [2, 3])
+def test_simulated_month_never_overspends(tmp_path, monkeypatch, cost):
+    """Run the publish job every 15 minutes for a month against a fake API that charges."""
+    credits = {"left": 500}
+
+    def fake_get(url, params, timeout):
+        if credits["left"] < cost:
+            return FakeResp(ok=False, code=429, left="0")
+        credits["left"] -= cost
+        r = FakeResp(body="[]", left=str(credits["left"]))
+        r.headers["x-requests-last"] = str(cost)
+        return r
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    t, end = pd.Timestamp("2026-10-01 00:05", tz="UTC"), pd.Timestamp("2026-10-31 23:50", tz="UTC")
+    fetch_times = []
+    while t <= end:
+        before = credits["left"]
+        _, status = fetch_odds(raw_dir=tmp_path, api_key="k", now=t)
+        if credits["left"] != before:
+            fetch_times.append(t)
+        assert status.error is None or "paused" in status.error
+        t += pd.Timedelta(minutes=15)
+
+    spent = 500 - credits["left"]
+    assert credits["left"] >= feed.RESERVE_CREDITS  # never dipped into the reserve
+    assert spent >= 500 - feed.RESERVE_CREDITS - 2 * cost  # ...but used nearly all of it
+    gaps = pd.Series(fetch_times).diff().dropna() / pd.Timedelta(hours=1)
+    assert gaps.min() >= 1.0  # never more than hourly
+    assert fetch_times[-1] > pd.Timestamp("2026-10-29", tz="UTC")  # still refreshing at month end
+
+
+def test_allowance_reset_resumes_fetching(tmp_path, monkeypatch):
+    path = tmp_path / "odds_api_E0_draftkings.json"
+    path.write_text("[]")
+    path.with_suffix(".meta.json").write_text(
+        json.dumps({"fetched_at": "2026-10-30T12:00:00+00:00", "credits_left": 5, "last_cost": 2})
+    )
+    calls = []
+    monkeypatch.setattr(requests, "get", lambda *a, **k: calls.append(1) or FakeResp(left="498"))
+    _, status = fetch_odds(
+        raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-10-31 12:00", tz="UTC")
+    )
+    assert not calls and "paused" in status.error  # same period: stay paused
+    _, status = fetch_odds(
+        raw_dir=tmp_path, api_key="k", now=pd.Timestamp("2026-11-01 00:15", tz="UTC")
+    )
+    assert calls and status.credits_left == 498  # new month: fetch and learn the new budget

@@ -132,6 +132,8 @@ def with_draftkings(
         "format": "decimal",
         "fetched_at": status.fetched_at,
         "credits_left": status.credits_left,
+        "last_cost": status.last_cost,
+        "refresh_hours": status.refresh_hours,
         "error": status.error,
     }
     if events is None:
@@ -346,7 +348,8 @@ def publish(out: Path, league: str = "E0") -> Path:
     print(
         f"Odds: {odds_source['name']}"
         + (
-            f" (credits left: {odds_source['credits_left']})"
+            f" (credits left: {odds_source['credits_left']}, last call cost "
+            f"{odds_source['last_cost']}, refreshing every ~{odds_source['refresh_hours']}h)"
             if odds_source["credits_left"] is not None
             else ""
         )

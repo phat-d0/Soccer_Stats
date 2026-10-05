@@ -1,17 +1,24 @@
 """DraftKings odds for upcoming Premier League matches, via The Odds API (the-odds-api.com).
 
 Needs an API key in the ODDS_API_KEY environment variable (a GitHub Actions secret in the
-publish workflow). The free plan allows 500 credits a month; each refresh asks for two
-markets (match result and over/under) from one bookmaker, which costs 2 credits, so the
-response is cached and refreshed at most every ODDS_API_MAX_AGE_HOURS (default 4h) and
-never when fewer than MIN_CREDITS_LEFT remain.
+publish workflow). The free plan allows 500 credits a month; a refresh costs a couple of
+credits (two markets, one bookmaker). Phones never call the API: only the publish job
+does, and it budgets refreshes so the free allowance always lasts the month:
+
+* After each download we record the credits left and what that call cost (the API's
+  x-requests-remaining / x-requests-last headers).
+* The refresh interval is the time until the allowance resets divided by the number of
+  refreshes still affordable (keeping RESERVE_CREDITS spare), but never more often than
+  hourly. Early in the month that's every 2-3 hours; it stretches automatically if
+  credits run lower than planned.
+* Below the reserve, fetching stops until the reset date (the 1st of the month UTC by
+  default; set ODDS_API_RESET_DAY if your plan resets on another day).
 """
 
 from __future__ import annotations
 
 import json
 import os
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,7 +31,9 @@ URL = "https://api.the-odds-api.com/v4/sports/{sport}/odds"
 SPORTS = {"E0": "soccer_epl"}
 BOOKMAKER = "draftkings"
 BOOKMAKER_NAME = "DraftKings"
-MIN_CREDITS_LEFT = 20
+RESERVE_CREDITS = 20  # never spend below this
+MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this
+DEFAULT_COST = 2  # credits per refresh until the API tells us
 
 # The Odds API team name -> football-data team name, where they differ.
 TEAM_NAMES = {
@@ -54,6 +63,8 @@ class OddsStatus:
     bookmaker: str = BOOKMAKER_NAME
     fetched_at: str | None = None  # when the cached response was downloaded (UTC ISO)
     credits_left: int | None = None
+    last_cost: int | None = None
+    refresh_hours: float | None = None  # current budgeted refresh interval
     error: str | None = None
 
 
@@ -67,37 +78,65 @@ def _team(name: str, known: set[str] | None = None) -> str:
     return name
 
 
+def next_reset(now: pd.Timestamp, reset_day: int = 1) -> pd.Timestamp:
+    """Next time the monthly allowance resets (midnight UTC on `reset_day`)."""
+    this = now.normalize().replace(day=min(reset_day, 28))
+    return this if this > now else (this + pd.offsets.MonthBegin(1)).replace(day=min(reset_day, 28))
+
+
+def refresh_interval_hours(
+    credits_left: int | None, cost: int | None, now: pd.Timestamp, reset_day: int = 1
+) -> float:
+    """Hours between refreshes so the remaining credits last until the next reset.
+
+    Returns inf when nothing more can be spent this period.
+    """
+    if credits_left is None:
+        return MIN_INTERVAL_HOURS  # unknown budget: fetch once to find out
+    affordable = (credits_left - RESERVE_CREDITS) // max(cost or DEFAULT_COST, 1)
+    if affordable <= 0:
+        return float("inf")
+    hours_left = (next_reset(now, reset_day) - now) / pd.Timedelta(hours=1)
+    return max(MIN_INTERVAL_HOURS, hours_left / affordable)
+
+
 def fetch_odds(
     league: str = "E0",
     raw_dir: Path = RAW_DIR,
     api_key: str | None = None,
-    max_age_hours: float | None = None,
+    now: pd.Timestamp | None = None,
 ) -> tuple[list[dict] | None, OddsStatus]:
     """Cached DraftKings odds JSON for a league, plus status. Never raises.
 
+    Downloads only when the budgeted refresh interval has passed (see module docstring).
     Returns (None, status) when no key is configured or nothing is cached yet and the
     download fails. Error messages never include the API key.
     """
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
-    max_age = max_age_hours or float(os.environ.get("ODDS_API_MAX_AGE_HOURS", 4))
+    reset_day = int(os.environ.get("ODDS_API_RESET_DAY", 1))
+    now = now or pd.Timestamp.now(tz="UTC")
     path = raw_dir / f"odds_api_{league}_{BOOKMAKER}.json"
     meta_path = path.with_suffix(".meta.json")
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
-    status = OddsStatus(fetched_at=meta.get("fetched_at"), credits_left=meta.get("credits_left"))
+    status = OddsStatus(
+        fetched_at=meta.get("fetched_at"),
+        credits_left=meta.get("credits_left"),
+        last_cost=meta.get("last_cost"),
+    )
 
     if not api_key:
         status.error = "no ODDS_API_KEY configured"
         return None, status
 
-    fresh = path.exists() and time.time() - path.stat().st_mtime < max_age * 3600
-    # Credits reset monthly, so a low count only pauses fetching within the same month.
-    this_month = pd.Timestamp.now(tz="UTC").strftime("%Y-%m")
-    low = (
-        status.credits_left is not None
-        and status.credits_left < MIN_CREDITS_LEFT
-        and (status.fetched_at or "")[:7] == this_month
-    )
-    if not fresh and not low:
+    last = pd.Timestamp(status.fetched_at) if status.fetched_at and path.exists() else None
+    credits = status.credits_left
+    if last is not None and last < next_reset(now, reset_day) - pd.DateOffset(months=1):
+        credits = None  # the allowance has reset since our last download
+    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day)
+    status.refresh_hours = None if interval == float("inf") else round(interval, 2)
+    due = last is None or (now - last) / pd.Timedelta(hours=1) >= interval
+
+    if due:
         try:
             resp = requests.get(
                 URL.format(sport=SPORTS[league]),
@@ -117,16 +156,26 @@ def fetch_odds(
                 raw_dir.mkdir(parents=True, exist_ok=True)
                 path.write_text(resp.text)
                 remaining = resp.headers.get("x-requests-remaining")
+                cost = resp.headers.get("x-requests-last")
                 meta = {
-                    "fetched_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
+                    "fetched_at": now.isoformat(timespec="seconds"),
                     "credits_left": int(float(remaining)) if remaining else None,
+                    "last_cost": int(float(cost)) if cost else None,
                 }
                 meta_path.write_text(json.dumps(meta))
-                status.fetched_at, status.credits_left = meta["fetched_at"], meta["credits_left"]
+                status.fetched_at = meta["fetched_at"]
+                status.credits_left, status.last_cost = meta["credits_left"], meta["last_cost"]
+                interval = refresh_interval_hours(
+                    status.credits_left, status.last_cost, now, reset_day
+                )
+                status.refresh_hours = None if interval == float("inf") else round(interval, 2)
             else:
                 status.error = f"The Odds API returned HTTP {resp.status_code}"
-    elif low and not fresh:
-        status.error = f"paused: only {status.credits_left} API credits left this month"
+    elif interval == float("inf"):
+        status.error = (
+            f"paused until the allowance resets: {status.credits_left} credits left "
+            f"(keeping {RESERVE_CREDITS} in reserve)"
+        )
 
     if not path.exists():
         return None, status
