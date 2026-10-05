@@ -2,12 +2,14 @@
 
 soccer-stats backtest --league E0 --seasons 2019-2024
 soccer-stats backtest --league E0 --seasons 2019-2024 --xg-weight 0 0.5 0.7 1
+soccer-stats publish --out _site
 """
 
 from __future__ import annotations
 
 import argparse
 import functools
+from pathlib import Path
 
 import pandas as pd
 
@@ -58,6 +60,16 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         print(f"\nPredictions written to {args.out}")
 
 
+def cmd_publish(args: argparse.Namespace) -> None:
+    from soccer_stats.publish import publish
+
+    out = publish(Path(args.out), league=args.league)
+    print(
+        f"Site written to {out}/ (open index.html via a local server, e.g. "
+        f"python -m http.server -d {out})"
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     pd.set_option("display.width", 120)
     parser = argparse.ArgumentParser(prog="soccer-stats")
@@ -80,6 +92,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     bt.add_argument("--out", help="CSV path for predictions")
     bt.set_defaults(func=cmd_backtest)
+
+    pub = sub.add_parser("publish", help="build the phone web app into a folder")
+    pub.add_argument("--out", default="_site")
+    pub.add_argument("--league", default="E0")
+    pub.set_defaults(func=cmd_publish)
 
     args = parser.parse_args(argv)
     args.func(args)

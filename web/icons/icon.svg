@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1c5cab"/>
+  <!-- probability bar motif: home / draw / away -->
+  <g transform="translate(96 330)">
+    <rect width="150" height="44" rx="22" fill="#ffffff"/>
+    <rect x="158" width="70" height="44" fill="#9ec5f4"/>
+    <rect x="236" width="84" height="44" rx="22" fill="#5598e7"/>
+    <rect x="236" width="30" height="44" fill="#5598e7"/>
+  </g>
+  <!-- ball -->
+  <circle cx="256" cy="200" r="96" fill="#ffffff"/>
+  <path d="M256 152l40 29-15 47h-50l-15-47z" fill="#1c5cab"/>
+  <path d="M256 152v-48M296 181l44-16M281 228l28 40M231 228l-28 40M216 181l-44-16" stroke="#1c5cab" stroke-width="10" stroke-linecap="round"/>
+</svg>

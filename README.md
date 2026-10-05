@@ -14,7 +14,26 @@ uv sync                 # installs deps + dev tools into .venv
 uv run pytest           # run tests
 ```
 
-## Premier League app
+## iPhone app
+
+A phone-first web app you add to your home screen. It opens full-screen with its own
+icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next round
+with value picks; tap for markets and scoreline heatmap), **Teams** (ratings + xG),
+**Record** (replayed profit, closing line value, goals vs xG), **Explore** (any matchup).
+
+A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model at 06:07,
+12:07 and 18:07 UTC and publishes the result to GitHub Pages.
+
+**One-time setup**
+1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. **Actions** tab → *Publish app* → **Run workflow** (or wait for the next scheduled run).
+3. On your iPhone, open `https://phat-d0.github.io/Soccer_Stats/` in **Safari**, tap
+   **Share → Add to Home Screen**.
+
+Build it locally: `uv run soccer-stats publish --out _site && python -m http.server -d _site`.
+The app code lives in `web/`; `src/soccer_stats/publish.py` writes the `data.json` it reads.
+
+## Streamlit app (desktop)
 
 A dashboard to follow the model through the season:
 
@@ -82,7 +101,10 @@ src/soccer_stats/
   cli.py                `soccer-stats` command
   dashboard.py          data shaping for the app (fixtures, ratings, track record)
   xg.py                 Understat xG download, team-name mapping, merge onto matches
-app/streamlit_app.py    the Premier League dashboard
+  publish.py            builds the phone app's data.json
+app/streamlit_app.py    the Premier League dashboard (desktop)
+web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)
+.github/workflows/      scheduled build + deploy to GitHub Pages
 tests/                  unit tests on synthetic leagues with known parameters
 notebooks/              exploration
 ```
