@@ -304,6 +304,10 @@ def publish(out: Path, league: str = "E0") -> Path:
         + (f", xG error: {xg_error}" if xg_error else "")
     )
     adjusted = [f for f in data["fixtures"] if f["news_applied"]]
+    if news:
+        unmatched = sorted(set(data["teams"]) - set(news))
+        if unmatched:  # an FPL spelling missing from players.TEAM_NAMES
+            print(f"WARNING: no FPL team news for {unmatched}; FPL teams: {sorted(news)}")
     print(
         news_error
         or f"Team news: {sum(len(n['absences']) for n in data['team_news'].values())} notable "

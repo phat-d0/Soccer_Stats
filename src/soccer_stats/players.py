@@ -35,7 +35,12 @@ FPL_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_HEADERS = {"User-Agent": "Mozilla/5.0 (soccer-stats)"}
 
 # FPL team name -> football-data team name, where they differ.
-TEAM_NAMES = {"Man Utd": "Man United", "Spurs": "Tottenham", "Nott'm Forest": "Nott'm Forest"}
+TEAM_NAMES = {
+    "Man Utd": "Man United",
+    "Spurs": "Tottenham",
+    "Sheffield Utd": "Sheffield United",
+    "Nott'm Forest": "Nott'm Forest",
+}
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
 
 PRIOR_MINUTES = 600  # shrink per-90 rates toward the position average by this many minutes
