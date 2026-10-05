@@ -12,9 +12,11 @@ import streamlit as st
 
 from soccer_stats import dashboard
 from soccer_stats.data import current_season, load_fixtures, load_matches
+from soccer_stats.xg import with_xg
 
 LEAGUE = "E0"
 TRAIN_SEASONS = 3  # current season plus two before it
+XG_WEIGHT = 0.7  # check with: soccer-stats backtest --xg-weight 0 0.5 0.7 1
 BLUE = "#2a78d6"
 BLUE_RAMP = ["#f4f8fd", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
 
@@ -28,21 +30,22 @@ st.set_page_config(page_title="Premier League Model", page_icon="⚽", layout="w
 def load_data():
     season = current_season()
     matches = load_matches([LEAGUE], range(season - TRAIN_SEASONS + 1, season + 1))
+    matches, xg_error = with_xg(matches)
     try:
         fixtures = load_fixtures([LEAGUE])
     except Exception:  # fixtures file is optional; the app still works without it
         fixtures = pd.DataFrame(columns=["kickoff", "home", "away"])
-    return matches, fixtures, pd.Timestamp.now()
+    return matches, fixtures, xg_error, pd.Timestamp.now()
 
 
 @st.cache_resource(ttl=6 * 3600, show_spinner="Fitting model…")
-def get_model(_matches: pd.DataFrame, key: str):
-    return dashboard.fit_model(_matches)
+def get_model(_matches: pd.DataFrame, key: str, xg_weight: float):
+    return dashboard.fit_model(_matches, xg_weight=xg_weight)
 
 
 @st.cache_data(ttl=12 * 3600, show_spinner="Replaying past matches (first load only)…")
-def get_replay(_matches: pd.DataFrame, key: str, start: pd.Timestamp):
-    return dashboard.replay(_matches, start)
+def get_replay(_matches: pd.DataFrame, key: str, start: pd.Timestamp, xg_weight: float):
+    return dashboard.replay(_matches, start, xg_weight=xg_weight)
 
 
 def pct(x: float) -> str:
@@ -130,18 +133,29 @@ def match_card(model, home: str, away: str, row: pd.Series | None = None) -> Non
 
 # ---------- page ----------
 
-matches, fixtures, loaded_at = load_data()
+matches, fixtures, xg_error, loaded_at = load_data()
 data_key = f"{len(matches)}-{matches['date'].max():%Y%m%d}"
-model = get_model(matches, data_key)
+has_xg = matches["home_xg"].notna().any()
 season = current_season()
 season_matches = matches[matches["date"] >= f"{season}-07-01"]
 teams = sorted(
     set(season_matches["home"]) | set(fixtures["home"]) | set(fixtures["away"])
-) or sorted(model.teams)
+) or sorted(set(matches["home"]) | set(matches["away"]))
 counts = dashboard.match_counts(matches, teams)
 
 with st.sidebar:
     st.header("Settings")
+    use_xg = st.radio(
+        "Rate teams on",
+        ["Goals + expected goals (xG)", "Goals only"],
+        disabled=not has_xg,
+        index=0 if has_xg else 1,
+        help="xG measures the quality of chances created, so it separates good teams from "
+        "lucky ones faster than goals do. Compare both in the Track record tab.",
+    ).startswith("Goals +")
+    xg_weight = XG_WEIGHT if use_xg and has_xg else 0.0
+    if xg_error:
+        st.warning("xG unavailable right now, using goals only.", icon="⚠️")
     min_edge = st.slider(
         "Minimum edge to flag a bet",
         0.0,
@@ -156,14 +170,17 @@ with st.sidebar:
         st.rerun()
     st.caption(
         f"Data loaded {loaded_at:%d %b %H:%M}. Last result in data: "
-        f"{matches['date'].max():%d %b %Y}. Model fit on {len(matches)} matches."
+        f"{matches['date'].max():%d %b %Y}. Model fit on {len(matches)} matches"
+        + (f", {matches['home_xg'].notna().mean():.0%} with xG." if has_xg else ".")
     )
     st.divider()
     st.caption(
-        "Odds are Pinnacle prices from football-data.co.uk. An edge only matters if it holds "
-        "up in the Track record tab: if the model doesn't beat the closing line there, "
-        "treat its picks as entertainment."
+        "Odds are Pinnacle prices from football-data.co.uk; xG from Understat. An edge "
+        "only matters if it holds up in the Track record tab: if the model doesn't beat "
+        "the closing line there, treat its picks as entertainment."
     )
+
+model = get_model(matches, data_key, xg_weight)
 
 st.title("⚽ Premier League model")
 
@@ -218,23 +235,39 @@ with tab_up:
 # --- Ratings ---
 with tab_ratings:
     ratings = dashboard.team_ratings(model, counts, teams)
+    sxg = dashboard.season_xg(matches, f"{season}-07-01")
+    if not sxg.empty:
+        ratings = ratings.join(sxg, on="team")
     st.caption(
         "Goals each team would score and concede per game against an average Premier League "
         "side on a neutral pitch. Recent matches count more."
+        + (" xG columns are this season's raw averages per game." if not sxg.empty else "")
     )
-    c1, c2 = st.columns([1, 1])
+    c1, c2 = st.columns([3, 2])
     with c1:
-        shown = ratings.rename(
+        order = ["team", "goals_for", "goals_against", "goal_diff", "xg_for", "xg_against"]
+        shown = ratings[[c for c in order if c in ratings] + ["matches"]].rename(
             columns={
                 "team": "Team",
                 "goals_for": "Scores",
                 "goals_against": "Concedes",
                 "goal_diff": "Net",
-                "matches": "Matches in data",
+                "matches": "Games",
+                "xg_for": "xG for",
+                "xg_against": "xG against",
             }
         )
         st.dataframe(
-            shown.style.format({"Scores": "{:.2f}", "Concedes": "{:.2f}", "Net": "{:+.2f}"}),
+            shown.style.format(
+                {
+                    "Scores": "{:.2f}",
+                    "Concedes": "{:.2f}",
+                    "Net": "{:+.2f}",
+                    "xG for": "{:.2f}",
+                    "xG against": "{:.2f}",
+                },
+                na_rep="–",
+            ),
             width="stretch",
             height=740,
         )
@@ -270,7 +303,7 @@ with tab_record:
         "edge clears your threshold."
     )
     start = pd.Timestamp(f"{season - 1}-08-01")
-    rec = dashboard.track_record(get_replay(matches, data_key, start), min_edge)
+    rec = dashboard.track_record(get_replay(matches, data_key, start, xg_weight), min_edge)
     if not rec["summary"]:
         st.info("Not enough data to replay yet.")
     else:
@@ -295,6 +328,41 @@ with tab_record:
                 f"(log loss {sc.loc['model', 'log_loss']:.4f} vs "
                 f"{sc.loc['market', 'log_loss']:.4f}, lower is better, "
                 f"over {int(sc.loc['model', 'n'])} matches)."
+            )
+
+        if has_xg:
+            # Same replay for the other rating method, so the xG upgrade is judged on results.
+            other_w = 0.0 if xg_weight else XG_WEIGHT
+            other = dashboard.track_record(get_replay(matches, data_key, start, other_w), min_edge)
+            versions = {"Goals only": 0.0, "Goals + xG": XG_WEIGHT}
+            recs = {xg_weight: rec, other_w: other}
+            st.markdown("**Goals only vs goals + xG** (same matches, same bet rules)")
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        name: {
+                            "Log loss (lower is better)": recs[w]["scores"].loc[
+                                "model", "log_loss"
+                            ],
+                            "vs bookmaker": recs[w]["scores"].loc["model", "log_loss"]
+                            - recs[w]["scores"].loc["market", "log_loss"],
+                            "Bets": recs[w]["summary"].get("bets", 0),
+                            "ROI": recs[w]["summary"].get("roi", np.nan),
+                            "Avg CLV": recs[w]["summary"].get("avg_clv", np.nan),
+                        }
+                        for name, w in versions.items()
+                    }
+                ).T.style.format(
+                    {
+                        "Log loss (lower is better)": "{:.4f}",
+                        "vs bookmaker": "{:+.4f}",
+                        "Bets": "{:.0f}",
+                        "ROI": "{:+.1%}",
+                        "Avg CLV": "{:+.1%}",
+                    },
+                    na_rep="–",
+                ),
+                width="stretch",
             )
 
         bets = rec["bets"]

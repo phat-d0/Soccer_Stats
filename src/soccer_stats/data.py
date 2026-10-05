@@ -71,7 +71,7 @@ def current_season(today: date | None = None) -> int:
     return today.year if today.month >= 7 else today.year - 1
 
 
-def _fetch(url: str, path: Path, max_age_hours: float | None) -> Path:
+def _fetch(url: str, path: Path, max_age_hours: float | None, headers: dict | None = None) -> Path:
     """Download `url` to `path` unless a cached copy is fresh enough.
 
     max_age_hours=None means a cached file never expires (finished seasons).
@@ -81,7 +81,7 @@ def _fetch(url: str, path: Path, max_age_hours: float | None) -> Path:
     ):
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
-    resp = requests.get(url, timeout=30)
+    resp = requests.get(url, headers=headers, timeout=30)
     resp.raise_for_status()
     path.write_bytes(resp.content)
     return path

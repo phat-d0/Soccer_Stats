@@ -13,9 +13,11 @@ from soccer_stats.odds import devig_shin
 LOW_DATA_MATCHES = 6
 
 
-def fit_model(matches: pd.DataFrame, as_of: pd.Timestamp | None = None) -> DixonColes:
+def fit_model(
+    matches: pd.DataFrame, as_of: pd.Timestamp | None = None, xg_weight: float = 0.0
+) -> DixonColes:
     as_of = as_of or matches["date"].max() + pd.Timedelta(days=1)
-    return DixonColes().fit(matches[matches["date"] < as_of], as_of=as_of)
+    return DixonColes(xg_weight=xg_weight).fit(matches[matches["date"] < as_of], as_of=as_of)
 
 
 def match_counts(matches: pd.DataFrame, current_teams: list[str]) -> pd.Series:
@@ -71,6 +73,25 @@ def predict_fixtures(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Serie
     return pd.DataFrame(rows)
 
 
+def season_xg(matches: pd.DataFrame, since: str | pd.Timestamp) -> pd.DataFrame:
+    """Per-team average xG for and against per game since `since` (empty if no xG)."""
+    df = matches[matches["date"] >= pd.Timestamp(since)]
+    if "home_xg" not in df or df["home_xg"].isna().all():
+        return pd.DataFrame(columns=["xg_for", "xg_against"])
+    df = df.dropna(subset=["home_xg", "away_xg"])
+    long = pd.concat(
+        [
+            pd.DataFrame(
+                {"team": df["home"], "xg_for": df["home_xg"], "xg_against": df["away_xg"]}
+            ),
+            pd.DataFrame(
+                {"team": df["away"], "xg_for": df["away_xg"], "xg_against": df["home_xg"]}
+            ),
+        ]
+    )
+    return long.groupby("team")[["xg_for", "xg_against"]].mean()
+
+
 def team_ratings(model: DixonColes, counts: pd.Series, teams: list[str]) -> pd.DataFrame:
     """Goals each team would score / concede per game against an average opponent, neutral venue."""
     c = model.params["intercept"] + model.params["home_adv"] / 2
@@ -88,9 +109,11 @@ def team_ratings(model: DixonColes, counts: pd.Series, teams: list[str]) -> pd.D
     return df
 
 
-def replay(matches: pd.DataFrame, start: pd.Timestamp) -> pd.DataFrame:
+def replay(matches: pd.DataFrame, start: pd.Timestamp, xg_weight: float = 0.0) -> pd.DataFrame:
     """Walk-forward predictions from `start` with de-vigged closing probabilities (slow)."""
-    preds = backtest.walk_forward(matches, start=start)
+    preds = backtest.walk_forward(
+        matches, start=start, model_factory=lambda: DixonColes(xg_weight=xg_weight)
+    )
     return backtest.add_market_probs(preds) if not preds.empty else preds
 
 

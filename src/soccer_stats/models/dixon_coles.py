@@ -7,6 +7,11 @@
 results (0-0, 1-0, 0-1, 1-1) get the Dixon-Coles tau correction controlled by
 `rho`, and each match is weighted by exp(-xi * age_in_days) so recent form
 counts more.
+
+With `xg_weight` > 0, team ratings are fit to a blend of expected goals and real
+goals: target = xg_weight * xG + (1 - xg_weight) * goals (goals alone where a match
+has no xG). Poisson likelihood still works for non-integer targets (it becomes a
+quasi-likelihood); the low-score correction keeps using the real scoreline.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ _ID_PENALTY = 100.0
 @dataclass
 class DixonColes:
     xi: float = 0.0019  # time decay per day (~1 year half-life ≈ 0.0019)
+    xg_weight: float = 0.0  # 0 = goals only, 1 = xG only
     max_goals: int = 10
     teams: list[str] = field(default_factory=list)
     params: dict[str, float] = field(default_factory=dict)
@@ -34,7 +40,10 @@ class DixonColes:
     # ---------- fitting ----------
 
     def fit(self, matches: pd.DataFrame, as_of: pd.Timestamp | None = None) -> DixonColes:
-        """Fit on matches with columns date, home, away, home_goals, away_goals."""
+        """Fit on matches with columns date, home, away, home_goals, away_goals.
+
+        Optional home_xg / away_xg columns are used when xg_weight > 0.
+        """
         self.teams = sorted(set(matches["home"]) | set(matches["away"]))
         idx = {t: i for i, t in enumerate(self.teams)}
         n = len(self.teams)
@@ -43,6 +52,12 @@ class DixonColes:
         ai = matches["away"].map(idx).to_numpy()
         x = matches["home_goals"].to_numpy()
         y = matches["away_goals"].to_numpy()
+        tx, ty = x.astype(float), y.astype(float)
+        if self.xg_weight > 0 and {"home_xg", "away_xg"} <= set(matches.columns):
+            hx, ax = matches["home_xg"].to_numpy(float), matches["away_xg"].to_numpy(float)
+            has = ~(np.isnan(hx) | np.isnan(ax))
+            tx[has] = self.xg_weight * hx[has] + (1 - self.xg_weight) * x[has]
+            ty[has] = self.xg_weight * ax[has] + (1 - self.xg_weight) * y[has]
         as_of = as_of or matches["date"].max()
         age = (as_of - matches["date"]).dt.days.to_numpy()
         w = np.exp(-self.xi * age)
@@ -52,7 +67,7 @@ class DixonColes:
         res = minimize(
             _neg_loglik,
             x0,
-            args=(hi, ai, x, y, w, n),
+            args=(hi, ai, x, y, w, n, tx, ty),
             jac=True,
             method="L-BFGS-B",
             bounds=bounds,
@@ -97,7 +112,14 @@ class DixonColes:
         return m / m.sum()
 
 
-def _neg_loglik(theta, hi, ai, x, y, w, n):
+def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None):
+    """Weighted negative log-likelihood and gradient.
+
+    x, y are real goals (they select the low-score correction); tx, ty are the
+    Poisson targets (goals, or a goals/xG blend). Defaults to tx, ty = x, y.
+    """
+    tx = x if tx is None else tx
+    ty = y if ty is None else ty
     att, dfn = theta[:n], theta[n : 2 * n]
     c, h, rho = theta[2 * n], theta[2 * n + 1], theta[2 * n + 2]
 
@@ -117,7 +139,7 @@ def _neg_loglik(theta, hi, ai, x, y, w, n):
     tau[m11] = 1 - rho
     tau = np.maximum(tau, 1e-10)
 
-    ll = w * (np.log(tau) + x * eta_h - lam + y * eta_a - mu)
+    ll = w * (np.log(tau) + tx * eta_h - lam + ty * eta_a - mu)
 
     # d log(tau) / d eta_h, d eta_a, d rho
     dt_h = np.zeros_like(lam)
@@ -132,8 +154,8 @@ def _neg_loglik(theta, hi, ai, x, y, w, n):
     dt_r[m10] = mu[m10] / tau[m10]
     dt_r[m11] = -1 / tau[m11]
 
-    g_h = w * (x - lam + dt_h)
-    g_a = w * (y - mu + dt_a)
+    g_h = w * (tx - lam + dt_h)
+    g_a = w * (ty - mu + dt_a)
 
     grad = np.empty_like(theta)
     grad[:n] = np.bincount(hi, g_h, n) + np.bincount(ai, g_a, n)

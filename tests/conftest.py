@@ -19,13 +19,19 @@ def simulate_league(n_teams=12, seasons=3, home_adv=0.25, intercept=0.1, seed=0)
         for k, (h, a) in enumerate(fixtures):
             lam = np.exp(intercept + home_adv + att[h] + dfn[a])
             mu = np.exp(intercept + att[a] + dfn[h])
+            # Each match's xG wobbles around the true scoring rate (chance creation
+            # varies game to game); goals are then Poisson around the xG.
+            xg_h = lam * rng.gamma(8, 1 / 8)
+            xg_a = mu * rng.gamma(8, 1 / 8)
             rows.append(
                 {
                     "date": day + pd.Timedelta(days=365 * s + k // (n_teams // 2) * 3),
                     "home": teams[h],
                     "away": teams[a],
-                    "home_goals": rng.poisson(lam),
-                    "away_goals": rng.poisson(mu),
+                    "home_goals": rng.poisson(xg_h),
+                    "away_goals": rng.poisson(xg_a),
+                    "home_xg": xg_h,
+                    "away_xg": xg_a,
                     "lam": lam,
                     "mu": mu,
                 }
