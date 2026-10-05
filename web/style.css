@@ -542,3 +542,22 @@ td.edge-pos { color: var(--good-text); font-weight: 600; }
 }
 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .nowrap { white-space: nowrap; }
+
+/* ---------- team news ---------- */
+.small { font-size: 12px; }
+.news-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.news-icon { color: var(--neg); font-size: 12px; }
+.news-team + .news-team { margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--border); }
+.news-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.absence { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; }
+.pill { flex: none; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.pill.out { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
+.pill.doubtful { background: var(--track); color: var(--text-secondary); }
+.rating-row small.abs { color: var(--neg); }

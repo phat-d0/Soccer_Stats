@@ -99,9 +99,15 @@ class DixonColes:
         mu = np.exp(p["intercept"] + self.attack.get(away, 0.0) + self.defence.get(home, 0.0))
         return float(lam), float(mu)
 
-    def score_matrix(self, home: str, away: str) -> np.ndarray:
-        """P(home scores i, away scores j) for i, j in 0..max_goals."""
+    def score_matrix(
+        self, home: str, away: str, home_mult: float = 1.0, away_mult: float = 1.0
+    ) -> np.ndarray:
+        """P(home scores i, away scores j) for i, j in 0..max_goals.
+
+        `home_mult` / `away_mult` scale each side's expected goals, e.g. for team news.
+        """
         lam, mu = self.expected_goals(home, away)
+        lam, mu = lam * home_mult, mu * away_mult
         goals = np.arange(self.max_goals + 1)
         m = np.outer(poisson.pmf(goals, lam), poisson.pmf(goals, mu))
         rho = self.params["rho"]

@@ -22,6 +22,14 @@ from soccer_stats.backtest import simulate_bets
 from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
+from soccer_stats.players import (
+    TeamNews,
+    fetch_fpl,
+    fixture_multipliers,
+    news_snapshot,
+    parse_players,
+    team_news,
+)
 from soccer_stats.xg import LEAGUES as XG_LEAGUES
 from soccer_stats.xg import load_schedule, with_xg
 
@@ -120,13 +128,32 @@ def implied_probs(r: dict) -> dict:
     return out
 
 
-def fixture_cards(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Series) -> list[dict]:
+def _news_card(news: TeamNews | None) -> dict | None:
+    if news is None:
+        return None
+    return {
+        "attack_mult": news.attack_mult,
+        "defence_mult": news.defence_mult,
+        "absences": [a.__dict__ for a in news.absences],
+    }
+
+
+def fixture_cards(
+    model: DixonColes,
+    fixtures: pd.DataFrame,
+    counts: pd.Series,
+    news: dict[str, TeamNews] | None = None,
+    mults: dict[tuple[str, str], tuple[float, float]] | None = None,
+) -> list[dict]:
     if fixtures.empty:
         return []
-    preds = dashboard.predict_fixtures(model, fixtures, counts)
+    preds = dashboard.predict_fixtures(model, fixtures, counts, mults)
+    news = news or {}
     cards = []
     for r in preds.to_dict("records"):
-        m = model.score_matrix(r["home"], r["away"])
+        mult = r["mults"]
+        m = model.score_matrix(r["home"], r["away"], *mult)
+        adjusted = mult != (1.0, 1.0)
         cards.append(
             {
                 "kickoff": r["kickoff"],
@@ -150,6 +177,23 @@ def fixture_cards(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Series) 
                 },
                 "implied": implied_probs(r),
                 "low_data": bool(r["low_data"]),
+                # Team news: applied only to each team's next match (see players.py).
+                "news_applied": adjusted,
+                "news": {
+                    "home": _news_card(news.get(r["home"])),
+                    "away": _news_card(news.get(r["away"])),
+                }
+                if (r["home"] in news or r["away"] in news)
+                else None,
+                "xg_mult": list(mult),
+                "p_base": {
+                    "home": r["p_home_base"],
+                    "draw": r["p_draw_base"],
+                    "away": r["p_away_base"],
+                    "over25": r["p_over25_base"],
+                }
+                if adjusted
+                else None,
                 "top_scores": dashboard.top_scorelines(m),
                 "matrix": m[: MATRIX_GOALS + 1, : MATRIX_GOALS + 1],
             }
@@ -170,8 +214,16 @@ def bets_rows(preds: pd.DataFrame) -> list[list]:
     ]
 
 
-def build_data(matches: pd.DataFrame, fixtures: pd.DataFrame, xg_error: str | None) -> dict:
+def build_data(
+    matches: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    xg_error: str | None,
+    news: dict[str, TeamNews] | None = None,
+    news_error: str | None = None,
+    now: pd.Timestamp | None = None,
+) -> dict:
     season = current_season()
+    now = now or pd.Timestamp.now(tz="UTC")
     has_xg = bool(matches["home_xg"].notna().any())
     weight = XG_WEIGHT if has_xg else 0.0
     model = dashboard.fit_model(matches, xg_weight=weight)
@@ -212,7 +264,15 @@ def build_data(matches: pd.DataFrame, fixtures: pd.DataFrame, xg_error: str | No
             "record_start": start,
             "teams": teams,
             "params": model_params(model),
-            "fixtures": fixture_cards(model, fixtures, counts),
+            "fixtures": fixture_cards(
+                model,
+                fixtures,
+                counts,
+                news,
+                fixture_multipliers(fixtures, news, now) if news and not fixtures.empty else None,
+            ),
+            "news_error": news_error,
+            "team_news": {t: n.to_dict() for t, n in (news or {}).items() if t in teams},
             "ratings": ratings.to_dict("records"),
             "record": record,
         }
@@ -225,14 +285,33 @@ def publish(out: Path, league: str = "E0") -> Path:
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
 
-    data = build_data(matches, fixtures, xg_error)
+    news, news_error, snapshot = None, None, []
+    if league == "E0":  # FPL covers the Premier League only
+        try:
+            players = parse_players(fetch_fpl())
+            this_season = matches[matches["date"] >= f"{season}-07-01"]
+            games = pd.concat([this_season["home"], this_season["away"]]).value_counts().to_dict()
+            news = team_news(players, games)
+            snapshot = news_snapshot(players, datetime.now(UTC).isoformat(timespec="minutes"))
+        except Exception as exc:  # FPL down or changed: predictions still publish
+            news_error = f"Team news unavailable: {exc}"
+
+    data = build_data(matches, fixtures, xg_error, news, news_error)
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
     print(
         f"{len(data['fixtures'])} upcoming fixtures ({with_odds} with odds), "
         f"{data['matches_fit']} matches fit, xG coverage {data['xg_coverage']:.0%}"
         + (f", xG error: {xg_error}" if xg_error else "")
     )
+    adjusted = [f for f in data["fixtures"] if f["news_applied"]]
+    print(
+        news_error
+        or f"Team news: {sum(len(n['absences']) for n in data['team_news'].values())} notable "
+        f"absences, applied to {len(adjusted)} fixtures"
+    )
     out.mkdir(parents=True, exist_ok=True)
     shutil.copytree(WEB_DIR, out, dirs_exist_ok=True)
     (out / "data.json").write_text(json.dumps(data, separators=(",", ":")))
+    # Picked up by the workflow and appended to the data-log branch (injury history).
+    (out / "news_snapshot.json").write_text(json.dumps(snapshot, separators=(",", ":")))
     return out

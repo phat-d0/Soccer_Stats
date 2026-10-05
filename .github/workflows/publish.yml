@@ -4,14 +4,16 @@ name: Publish app
 
 on:
   schedule:
-    # 06:07, 12:07 and 18:07 UTC: picks up overnight results, midday odds, evening odds.
-    - cron: "7 6,12,18 * * *"
+    # Every hour, plus every 15 minutes from 10:00 to 21:59 UTC when matches, team news
+    # and odds moves happen. (GitHub may start scheduled runs a few minutes late.)
+    - cron: "7 * * * *"
+    - cron: "22,37,52 10-21 * * *"
   workflow_dispatch: # "Run workflow" button in the Actions tab
   push:
     paths: ["src/**", "web/**", ".github/workflows/publish.yml"]
 
 permissions:
-  contents: read
+  contents: write # push team-news history to the data-log branch
   pages: write
   id-token: write
 
@@ -38,6 +40,27 @@ jobs:
         run: |
           uv sync --frozen
           uv run soccer-stats publish --out _site
+
+      # FPL doesn't keep past injury news, so record changes as they happen; the
+      # history lets player adjustments be backtested later.
+      - name: Log team news to data-log branch
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth=1 origin data-log; then
+            git worktree add ../log FETCH_HEAD
+            git -C ../log switch -c data-log
+          else
+            git worktree add --detach ../log
+            git -C ../log switch --orphan data-log
+          fi
+          uv run soccer-stats log-news --snapshot _site/news_snapshot.json --log-dir ../log/fpl_news
+          git -C ../log add fpl_news
+          if ! git -C ../log diff --cached --quiet; then
+            git -C ../log commit -q -m "Team news $(date -u +%Y-%m-%dT%H:%MZ)"
+            git -C ../log push origin data-log
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:

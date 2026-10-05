@@ -121,3 +121,42 @@ def test_upcoming_fixtures_merges_schedule_and_odds(tmp_path, monkeypatch):
     assert fx.loc[0, "kickoff"] == pd.Timestamp("2026-10-18 14:00", tz="UTC")  # 15:00 BST
     assert fx.loc[0, "odds_home"] == 1.3
     assert np.isnan(fx.loc[1, "odds_home"])
+
+
+def test_build_data_applies_team_news(league):
+    from soccer_stats.players import Absence, TeamNews
+
+    df, _ = league
+    df = df.copy()
+    df["date"] = df["date"] + (
+        pd.Timestamp.now().normalize() - pd.Timedelta(days=30) - df["date"].max()
+    )
+    df["league"], df["season"] = "E0", "x"
+    for col in ["odds_home", "odds_draw", "odds_away", "close_home", "close_draw", "close_away"]:
+        df[col] = 3.0
+    now = pd.Timestamp.now(tz="UTC")
+    fixtures = pd.DataFrame(
+        {
+            "kickoff": [now + pd.Timedelta(days=3), now + pd.Timedelta(days=10)],
+            "home": ["T00", "T00"],
+            "away": ["T01", "T02"],
+        }
+    )
+    for col in ["odds_home", "odds_draw", "odds_away", "odds_over25", "odds_under25"]:
+        fixtures[col] = np.nan
+    news = {
+        "T00": TeamNews(
+            "T00",
+            attack_mult=0.8,
+            defence_mult=1.1,
+            absences=[Absence("Star", "FWD", "out", 0, "Hamstring", 0.9, 0.2)],
+        )
+    }
+    data = build_data(df, fixtures, xg_error=None, news=news, now=now)
+    json.dumps(data, allow_nan=False)
+    first, second = data["fixtures"]
+    assert first["news_applied"] and not second["news_applied"]  # next match only
+    assert first["p"]["home"] < first["p_base"]["home"]
+    assert first["xg_mult"] == [0.8, 1.1]
+    assert first["news"]["home"]["absences"][0]["name"] == "Star"
+    assert data["team_news"]["T00"]["attack_mult"] == 0.8

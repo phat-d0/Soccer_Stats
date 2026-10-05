@@ -25,9 +25,12 @@ def match_counts(matches: pd.DataFrame, current_teams: list[str]) -> pd.Series:
     return counts.reindex(current_teams, fill_value=0)
 
 
-def predict_match(model: DixonColes, home: str, away: str) -> dict:
-    m = model.score_matrix(home, away)
+def predict_match(
+    model: DixonColes, home: str, away: str, mults: tuple[float, float] = (1.0, 1.0)
+) -> dict:
+    m = model.score_matrix(home, away, *mults)
     xg_h, xg_a = model.expected_goals(home, away)
+    xg_h, xg_a = xg_h * mults[0], xg_a * mults[1]
     p = match_odds(m)
     return {
         "xg_home": xg_h,
@@ -50,13 +53,27 @@ _PICKS = [
 ]
 
 
-def predict_fixtures(model: DixonColes, fixtures: pd.DataFrame, counts: pd.Series) -> pd.DataFrame:
-    """Model probabilities, edges and the best value pick for each upcoming fixture."""
+def predict_fixtures(
+    model: DixonColes,
+    fixtures: pd.DataFrame,
+    counts: pd.Series,
+    mults: dict[tuple[str, str], tuple[float, float]] | None = None,
+) -> pd.DataFrame:
+    """Model probabilities, edges and the best value pick for each upcoming fixture.
+
+    `mults` optionally maps (home, away) to expected-goals multipliers (team news);
+    the unadjusted probabilities are kept as p_*_base.
+    """
     rows = []
     for fx in fixtures.itertuples(index=False):
-        pred = predict_match(model, fx.home, fx.away)
+        mult = (mults or {}).get((fx.home, fx.away), (1.0, 1.0))
+        pred = predict_match(model, fx.home, fx.away, mult)
         pred.pop("matrix")
-        row = {**fx._asdict(), **pred, "p_under25": 1 - pred["p_over25"]}
+        row = {**fx._asdict(), **pred, "p_under25": 1 - pred["p_over25"], "mults": mult}
+        if mult != (1.0, 1.0):
+            base = predict_match(model, fx.home, fx.away)
+            for k in ("p_home", "p_draw", "p_away", "p_over25"):
+                row[f"{k}_base"] = base[k]
         row["low_data"] = min(counts.get(fx.home, 0), counts.get(fx.away, 0)) < LOW_DATA_MATCHES
         best = ("", 0.0, np.nan)  # no pick
         for label, p_col, o_col in _PICKS:

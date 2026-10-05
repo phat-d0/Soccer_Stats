@@ -29,8 +29,18 @@ call tools that compute any matchup, the track record at any edge, and past bets
 Defaults to Claude Opus 5.5, with Claude Sonnet 5.5 selectable as a cheaper option;
 each answer shows its approximate cost. Code: `web/chat.js` (SDK bundled in `web/vendor/`).
 
-A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model at 06:07,
-12:07 and 18:07 UTC and publishes the result to GitHub Pages.
+A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model every hour,
+and every 15 minutes from 10:00 to 22:00 UTC, and publishes the result to GitHub Pages.
+
+**Team news (player availability):** each run reads injuries, suspensions and "chance of
+playing" from the Fantasy Premier League API (`src/soccer_stats/players.py`). For each
+team's next match, a missing player's share of the team's chance creation (xG + xA per
+90, weighted by his usual minutes and shrunk toward his position's average) is taken off
+its expected goals, with a below-average stand-in replacing him; missing regular
+keepers/defenders raise goals conceded by small fixed amounts. The app shows the
+absences and the probabilities with and without the adjustment. These adjustments
+can't be backtested yet (FPL keeps no history), so the workflow logs every change to
+the `data-log` branch (`fpl_news/*.jsonl`) to build one.
 
 **One-time setup**
 1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
@@ -110,6 +120,7 @@ src/soccer_stats/
   dashboard.py          data shaping for the app (fixtures, ratings, track record)
   xg.py                 Understat xG download, team-name mapping, merge onto matches
   publish.py            builds the phone app's data.json
+  players.py            FPL team news -> attack/defence adjustments, injury history log
 app/streamlit_app.py    the Premier League dashboard (desktop)
 web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)
 .github/workflows/      scheduled build + deploy to GitHub Pages

@@ -48,7 +48,25 @@ function fixtureFacts(fx) {
     odds: imp.home != null ? fx.odds : undefined,
     expected_goals: fx.xg.map((v) => Math.round(v * 100) / 100),
     best_edge: pick ? { market: pick.market, odds: pick.odds, edge_pct: pct(pick.edge) } : null,
+    team_news: fx.news_applied ? newsFacts(fx) : undefined,
     few_matches_warning: fx.low_data || undefined,
+  };
+}
+
+function newsFacts(fx) {
+  const side = (k) => {
+    const n = fx.news?.[k];
+    if (!n) return undefined;
+    return {
+      attack_change_pct: pct(n.attack_mult - 1),
+      goals_conceded_change_pct: pct(n.defence_mult - 1),
+      absences: n.absences.map((a) => `${a.name} (${a.position}) ${a.status === "out" ? "out" : `${a.chance}% to play`}${a.news ? `: ${a.news}` : ""}`),
+    };
+  };
+  return {
+    [fx.home]: side("home"),
+    [fx.away]: side("away"),
+    model_pct_without_team_news: fx.p_base ? { home: pct(fx.p_base.home), draw: pct(fx.p_base.draw), away: pct(fx.p_base.away) } : undefined,
   };
 }
 
@@ -84,7 +102,8 @@ How the numbers work:
 - The model is a Dixon-Coles Poisson model. It rates each team's attack and defence from past results, with recent matches weighted more, and blends expected goals (xG weight ${d.xg_weight}) with real goals. It adds home advantage and predicts each side's expected goals, then the chance of every scoreline, then market probabilities.
 - "Bookmaker %" is Pinnacle's odds (or the market average when Pinnacle's isn't posted) converted to probabilities with the bookmaker's margin removed (Shin's method), so home/draw/away sum to 100%.
 - Edge = model probability x decimal odds - 1. The app flags a value bet when edge clears the user's threshold (default 3%).
-- The model knows nothing about injuries, line-ups, suspensions, motivation or news. Bookmakers do, and Pinnacle's closing line is very hard to beat; a big disagreement is often the model missing information rather than the bookmaker being wrong.
+- Team news: for each team's next match the model adjusts for injuries and suspensions from the official Fantasy Premier League feed. A missing player's share of his team's chance creation (xG + expected assists per 90, weighted by his usual minutes) is taken off the team's expected goals, with a below-average stand-in replacing him; missing regular keepers and defenders raise goals conceded by small fixed amounts. These adjustments are new and untested on past seasons. Where a fixture has team_news, its model_pct already includes it, and model_pct_without_team_news shows the difference.
+- The model doesn't know confirmed line-ups (out about an hour before kick-off), tactics, rotation, motivation or late news. Bookmakers do, and Pinnacle's closing line is very hard to beat; a big disagreement is often the model missing information rather than the bookmaker being wrong.
 - The track record replays the model week by week using only data available before each match. Closing line value (CLV) is the most reliable sign of real edge; profit over a few hundred bets is noisy.
 
 How to answer:
@@ -120,6 +139,18 @@ const TOOLS = [
       type: "object",
       properties: { min_edge: { type: "number", description: "Minimum edge as a fraction, 0 to 0.3" } },
       required: ["min_edge"],
+      additionalProperties: false,
+    },
+    strict: true,
+    eager_input_streaming: true,
+  },
+  {
+    name: "team_news",
+    description: "A team's current injuries and suspensions from the Fantasy Premier League feed (status, chance of playing, news), its key attacking players with xG+xA per 90 and share of minutes, and how much the absences change its attack and goals conceded.",
+    input_schema: {
+      type: "object",
+      properties: { team: { type: "string", description: "Team name, spelled as in team_ratings" } },
+      required: ["team"],
       additionalProperties: false,
     },
     strict: true,
@@ -182,6 +213,19 @@ function runTool(name, input) {
       };
     }
     return { since: d.record_start, min_edge: input.min_edge, ...out };
+  }
+  if (name === "team_news") {
+    const team = findTeam(input?.team);
+    if (!team) throw new Error(`Unknown team. Valid names: ${d.teams.join(", ")}`);
+    const n = d.team_news?.[team];
+    if (!n) return { team, note: d.news_error || "No team news available for this team right now." };
+    return {
+      team,
+      attack_change_pct: pct(n.attack_mult - 1),
+      goals_conceded_change_pct: pct(n.defence_mult - 1),
+      absences: n.absences,
+      key_players: n.key_players,
+    };
   }
   if (name === "past_bets") {
     if (!num(input?.min_edge, 0, 0.3) || !Number.isInteger(input?.limit) || input.limit < 1 || input.limit > 40) {
@@ -336,7 +380,7 @@ const SUGGESTIONS = [
   "Which matches have value this round, and why?",
   "Where does the model disagree most with the bookmakers?",
   "How has the model done against the closing odds?",
-  "Explain the model's numbers for the biggest game this round",
+  "Which injuries matter most this round?",
 ];
 
 function settingsHtml() {

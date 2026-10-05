@@ -153,6 +153,51 @@ function heatmap(matrix, home, away) {
     <div class="heat" role="img" aria-label="Chance of each scoreline">${cells}</div>`;
 }
 
+// ---------- team news (injuries / suspensions from FPL) ----------
+const chanceText = (a) => (a.status === "out" ? "out" : `${a.chance}%`);
+
+function newsLine(fx) {
+  if (!fx.news_applied || !fx.news) return "";
+  const parts = [];
+  for (const side of ["home", "away"]) {
+    const n = fx.news[side];
+    if (!n || !n.absences.length) continue;
+    const who = n.absences.slice(0, 2).map((a) => `${esc(a.name)} ${chanceText(a)}`).join(", ");
+    const more = n.absences.length > 2 ? ` +${n.absences.length - 2}` : "";
+    parts.push(`<b>${esc(fx[side])}:</b> ${who}${more}`);
+  }
+  return parts.length ? `<div class="news-line"><span class="news-icon" aria-hidden="true">✚</span><span>${parts.join(" · ")}</span></div>` : "";
+}
+
+function newsSection(fx) {
+  if (!fx.news) return "";
+  const effect = (n) => {
+    const bits = [];
+    if (n.attack_mult < 0.995) bits.push(`attack ${signedPct(n.attack_mult - 1, 0)}`);
+    if (n.defence_mult > 1.005) bits.push(`conceding ${signedPct(n.defence_mult - 1, 0)}`);
+    return bits.length ? bits.join(", ") : "no change";
+  };
+  const team = (side) => {
+    const n = fx.news[side];
+    if (!n) return "";
+    const rows = n.absences.length
+      ? n.absences.map((a) => `
+          <div class="absence">
+            <div><b>${esc(a.name)}</b> <span class="muted">${esc(a.position)}</span><div class="muted small">${esc(a.news || "")}</div></div>
+            <span class="pill ${a.status}">${a.status === "out" ? "Out" : `${a.chance}%`}</span>
+          </div>`).join("")
+      : '<p class="muted small" style="margin:4px 0">No regular players missing.</p>';
+    return `<div class="news-team"><div class="news-head"><b>${esc(fx[side])}</b><span class="muted small">${fx.news_applied ? effect(n) : ""}</span></div>${rows}</div>`;
+  };
+  const base = fx.p_base
+    ? `<p class="note">Without team news the model had ${esc(fx.home)} ${pct(fx.p_base.home)}, draw ${pct(fx.p_base.draw)}, ${esc(fx.away)} ${pct(fx.p_base.away)}.</p>`
+    : fx.news_applied ? "" : '<p class="note">Team news is applied to each team\'s next match only.</p>';
+  return `
+    <div class="section-title">Team news</div>
+    <div class="card">${team("home")}${team("away")}</div>
+    ${base}`;
+}
+
 function detailHtml(fx) {
   const { home, away, kickoff, xg, p, odds: o, top, matrix, lowData } = fx;
   const imp = o ? impliedFor(fx) : {};
@@ -175,6 +220,7 @@ function detailHtml(fx) {
       <p class="muted" style="margin:0 0 10px">Expected goals <b class="num" style="color:var(--text-primary)">${xg[0].toFixed(2)} – ${xg[1].toFixed(2)}</b></p>
       ${probBar(p, home, away)}
       ${lowData ? '<p class="warn">⚠ One team has few matches in the data, so treat this one with extra caution.</p>' : ""}
+      ${newsSection(fx)}
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
         <table>
@@ -239,6 +285,7 @@ function viewMatches() {
             <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} xG</span>
           </div>
           ${compareTable(fx, pick)}
+          ${newsLine(fx)}
           ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${odds(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
@@ -251,6 +298,15 @@ function viewMatches() {
   return html;
 }
 
+function absText(team) {
+  const n = state.data.team_news?.[team];
+  if (!n || !n.absences.length) return "";
+  const out = n.absences.filter((a) => a.status === "out").length;
+  const doubt = n.absences.length - out;
+  const bits = [out && `${out} out`, doubt && `${doubt} doubtful`].filter(Boolean).join(", ");
+  return `<small class="abs">✚ ${bits}: ${n.absences.slice(0, 3).map((a) => esc(a.name)).join(", ")}</small>`;
+}
+
 function viewRatings() {
   const r = state.data.ratings;
   const maxNet = Math.max(...r.map((t) => Math.abs(t.goal_diff)), 0.01);
@@ -260,7 +316,7 @@ function viewRatings() {
     return `
       <div class="rating-row">
         <span class="rank">${i + 1}</span>
-        <span>${esc(t.team)}${hasXg && t.xg_for != null ? `<small>xG ${t.xg_for.toFixed(2)} – ${t.xg_against.toFixed(2)} a game</small>` : ""}</span>
+        <span>${esc(t.team)}${hasXg && t.xg_for != null ? `<small>xG ${t.xg_for.toFixed(2)} – ${t.xg_against.toFixed(2)} a game</small>` : ""}${absText(t.team)}</span>
         <span class="r">${t.goals_for.toFixed(2)}</span>
         <span class="r">${t.goals_against.toFixed(2)}</span>
         <span class="netbar" title="Net ${signed(t.goal_diff, 2)}"><span class="axis"></span><span class="fill ${t.goal_diff >= 0 ? "pos" : "neg"}" style="width:${w}%"></span></span>

@@ -70,6 +70,16 @@ def cmd_publish(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_log_news(args: argparse.Namespace) -> None:
+    import json
+
+    from soccer_stats.players import append_news_log
+
+    snapshot = json.loads(Path(args.snapshot).read_text())
+    n = append_news_log(snapshot, Path(args.log_dir))
+    print(f"{n} team-news changes logged")
+
+
 def main(argv: list[str] | None = None) -> None:
     pd.set_option("display.width", 120)
     parser = argparse.ArgumentParser(prog="soccer-stats")
@@ -97,6 +107,11 @@ def main(argv: list[str] | None = None) -> None:
     pub.add_argument("--out", default="_site")
     pub.add_argument("--league", default="E0")
     pub.set_defaults(func=cmd_publish)
+
+    log = sub.add_parser("log-news", help="append team-news changes to a history folder")
+    log.add_argument("--snapshot", default="_site/news_snapshot.json")
+    log.add_argument("--log-dir", required=True)
+    log.set_defaults(func=cmd_log_news)
 
     args = parser.parse_args(argv)
     args.func(args)
