@@ -427,3 +427,18 @@ td.edge-pos { color: var(--good-text); font-weight: 600; }
 .pill.out { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
 .pill.doubtful { background: var(--track); color: var(--text-secondary); }
 .rating-row small.abs { color: var(--neg); }
+
+/* ---------- portfolio ---------- */
+.badge.paper { background: var(--track); color: var(--text-secondary); }
+.bet-row.trade { width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; cursor: pointer; }
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.filters select {
+  font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary); min-width: 0;
+}
+.more {
+  display: block; width: 100%; margin-top: 8px; padding: 10px; font: inherit; font-size: 14px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--accent); cursor: pointer;
+}
+table.kv td:first-child { color: var(--text-muted); text-align: left; font-weight: 400; }
+table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }

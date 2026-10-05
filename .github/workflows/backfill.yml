@@ -1,0 +1,72 @@
+# Downloads historical DraftKings odds and runs the DraftKings backtest. Run by hand only
+# (Actions -> "Backfill DraftKings odds" -> Run workflow); never on a schedule.
+# The historical endpoint needs a paid Odds API plan. Start with a dry run.
+name: Backfill DraftKings odds
+
+on:
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: "Seasons to backfill and backtest (start years, e.g. 2025 or 2023-2025)"
+        default: "2025"
+      max_credits:
+        description: "Most credits this run may spend"
+        default: "0"
+      keep_credits:
+        description: "Never let credits left fall below this (keeps live refreshes going)"
+        default: "1500"
+      dry_run:
+        description: "Dry run: print snapshots and credits, spend nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write # writes the backtest summary to the data-log branch
+
+concurrency:
+  group: backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      # Historical snapshots are kept in their own cache, separate from the scheduled
+      # build's, and are not committed (check The Odds API's terms before publishing them).
+      - uses: actions/cache@v4
+        with:
+          path: data/raw/odds_history
+          key: odds-history-${{ github.run_id }}
+          restore-keys: odds-history-
+
+      - name: Download historical odds
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats backfill-odds --seasons "${{ inputs.seasons }}" \
+            --max-credits "${{ inputs.max_credits }}" --keep-credits "${{ inputs.keep_credits }}" \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Run the DraftKings backtest and save it for the app
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}" \
+              --out "../log/backtest/E0_dk_trades.csv" --log-dir ../log
+            git -C ../log add -A backtest
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "DraftKings backtest ${{ inputs.seasons }}"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1

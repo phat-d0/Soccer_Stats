@@ -3,6 +3,9 @@
 soccer-stats backtest --league E0 --seasons 2019-2024
 soccer-stats backtest --league E0 --seasons 2019-2024 --xg-weight 0 0.5 0.7 1
 soccer-stats publish --out _site
+soccer-stats paper --site _site --log-dir ../log
+soccer-stats backfill-odds --seasons 2025 --dry-run
+soccer-stats backtest-dk --seasons 2023-2025 --out dk_trades.csv
 """
 
 from __future__ import annotations
@@ -80,6 +83,207 @@ def cmd_log_news(args: argparse.Namespace) -> None:
     print(f"{n} team-news changes logged")
 
 
+def cmd_paper(args: argparse.Namespace) -> None:
+    import json
+
+    from soccer_stats import paper
+    from soccer_stats.data import current_season
+    from soccer_stats.publish import _clean
+
+    site = Path(args.site)
+    data = json.loads((site / "data.json").read_text())
+    season = current_season()
+    try:
+        results = load_matches([args.league], [season - 1, season])
+    except Exception as exc:  # no results: trades stay open until the next build
+        print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
+        results = pd.DataFrame(columns=["home", "away", "season"])
+    log_dir = Path(args.log_dir) if args.log_dir else None
+    n = paper.run(data, log_dir, results, league=args.league)
+    (site / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
+    live = data["portfolio"]["live"]
+    s = live.get("summary", {})
+    print(
+        live.get("error")
+        or f"Paper trades: {n} ledger events written; {s.get('trades', 0)} trades, "
+        f"{s.get('open', 0)} open"
+        + (f". {live['note']}" if live.get("note") else "")
+    )
+
+
+def _plan(league: str, seasons: list[int], looks: list[float]):
+    from soccer_stats.odds_history import plan_snapshots
+    from soccer_stats.xg import load_schedule
+
+    kickoffs = pd.concat(
+        [load_schedule(league, y, include_played=True)["kickoff"] for y in seasons]
+    )
+    now = pd.Timestamp.now(tz="UTC")
+    return plan_snapshots(kickoffs[kickoffs < now], looks_hours=looks)
+
+
+def cmd_backfill(args: argparse.Namespace) -> None:
+    from soccer_stats.odds_history import backfill
+
+    plan = _plan(args.league, _years(args.seasons), args.looks)
+    print(f"{plan['kickoff'].nunique()} kickoffs played in {args.seasons}")
+    rep = backfill(
+        plan["at"],
+        args.league,
+        max_credits=args.max_credits,
+        keep_credits=args.keep_credits,
+        dry_run=args.dry_run,
+    )
+    for line in rep.lines():
+        print(line)
+    if args.dry_run:
+        print("Dry run: no API calls made.")
+
+
+def cmd_backtest_dk(args: argparse.Namespace) -> None:
+    import json
+
+    from soccer_stats import paper
+    from soccer_stats import trades as tr
+    from soccer_stats.odds_history import coverage, load_history
+    from soccer_stats.publish import _clean
+
+    seasons = _years(args.seasons)
+    matches = load_matches([args.league], range(seasons[0] - args.burn_in, seasons[-1] + 1))
+    matches, err = with_xg(matches)
+    print(err or f"xG attached to {matches['home_xg'].notna().mean():.0%} of matches")
+    known = set(matches["home"])
+    history = load_history(args.league, known)
+    played = matches[matches["season"].isin([f"{y % 100:02d}{(y + 1) % 100:02d}" for y in seasons])]
+    cov = coverage(played, history)
+    print(
+        "DraftKings coverage: "
+        + ", ".join(f"{c['season']}: {c['priced']}/{c['matches']}" for c in cov)
+    )
+    if history.empty:
+        print("No historical snapshots cached: run backfill-odds first.")
+        return
+
+    weight = args.xg_weight if matches["home_xg"].notna().any() else 0.0
+    factory = functools.partial(DixonColes, xg_weight=weight)
+    cands = backtest.dk_candidates(
+        matches,
+        history,
+        start=f"{seasons[0]}-07-01",
+        looks_hours=tuple(args.looks),
+        model_factory=factory,
+    )
+    ref = {"xg_weight": weight, "matches_fit": len(matches)}
+
+    trades = backtest.dk_trades(
+        cands, threshold=args.threshold, max_odds=args.max_odds, league=args.league, model_ref=ref
+    )
+    capped = backtest.dk_trades(
+        cands, threshold=args.threshold, max_odds=tr.CAP_ODDS, league=args.league, model_ref=ref
+    )
+    rep = tr.report(trades)
+    sweep = [
+        {
+            "threshold": t,
+            "max_odds": cap,
+            **tr.summarize(
+                backtest.dk_trades(cands, threshold=t, max_odds=cap, league=args.league)
+            ),
+        }
+        for cap in (None, tr.CAP_ODDS)
+        for t in tr.SWEEP
+    ]
+    out = {
+        "generated_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
+        "seasons": args.seasons,
+        "threshold": args.threshold,
+        "max_odds": args.max_odds,
+        "looks": [f"{h:g}h" for h in args.looks],
+        "coverage": cov,
+        "log_loss": backtest.dk_log_loss(cands),
+        "summary": rep["summary"],
+        "summary_capped": tr.summarize(capped),
+        "breakdowns": rep["breakdowns"],
+        "sweep": sweep,
+        "trades": trades.sort_values("kickoff", ascending=False).to_dict("records")
+        if not trades.empty
+        else [],
+    }
+    _print_report(out)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        trades.to_csv(args.out, index=False)
+        print(f"\nTrades written to {args.out}")
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = paper.backtest_path(Path(args.log_dir), args.league)
+    else:
+        path = None
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"App data written to {path}")
+
+
+def _fmt(v, kind="num"):
+    if v is None:
+        return "–"
+    if kind == "pct":
+        return f"{v:+.1%}"
+    if kind == "usd":
+        return f"${v:+,.2f}"
+    return f"{v:.4f}" if isinstance(v, float) else str(v)
+
+
+def _print_report(out: dict) -> None:
+    s = out["summary"]
+    print(f"\n=== DraftKings backtest, {out['seasons']}, edge >= {out['threshold']:.0%} ===")
+    print(f"Trades: {s.get('trades', 0)} ({s.get('settled', 0)} settled, {s.get('void', 0)} void)")
+    if s.get("settled"):
+        ci = s.get("roi_ci95")
+        print(
+            f"Staked ${s['staked']:,.0f}, profit {_fmt(s['profit'], 'usd')}, ROI "
+            f"{_fmt(s['roi'], 'pct')} (se {s['roi_se'] or 0:.1%}"
+            + (f", 95% interval {ci[0]:+.1%} to {ci[1]:+.1%})" if ci else ")")
+        )
+        print(
+            f"Win rate {s['win_rate']:.1%} vs break-even {s['breakeven']:.1%}; "
+            f"average claimed edge {s['avg_edge']:+.1%}"
+        )
+        print(
+            f"Closing line value: DraftKings {_fmt(s.get('clv_dk'), 'pct')} "
+            f"(beat close {s.get('beat_close_dk') or 0:.0%}), "
+            f"Pinnacle {_fmt(s.get('clv_pinnacle'), 'pct')}"
+        )
+        print(f"Max drawdown ${s['max_drawdown']:,.2f}")
+        c = out["summary_capped"]
+        if c.get("settled"):
+            print(f"With a 6.0 odds cap: {c['trades']} trades, ROI {_fmt(c['roi'], 'pct')}")
+    ll = out.get("log_loss") or {}
+    if ll:
+        print(
+            f"Log loss on {ll['matches']} matches: model {ll['model']:.4f}, "
+            f"DraftKings {ll['draftkings']:.4f}"
+        )
+    for key, rows in out["breakdowns"].items():
+        if not rows:
+            continue
+        print(f"\nBy {key.replace('_', ' ')}:")
+        for r in rows:
+            print(
+                f"  {r['group']:>12}: {r['trades']:>4} trades, ROI {_fmt(r.get('roi'), 'pct')}, "
+                f"CLV {_fmt(r.get('clv_dk'), 'pct')}"
+            )
+    print("\nThreshold sweep (trades / ROI / CLV vs DraftKings close):")
+    for r in out["sweep"]:
+        cap = f"cap {r['max_odds']:g}" if r["max_odds"] else "no cap"
+        print(
+            f"  {r['threshold']:>4.0%} {cap:>7}: {r['trades']:>4} / {_fmt(r.get('roi'), 'pct')} "
+            f"/ {_fmt(r.get('clv_dk'), 'pct')}"
+        )
+
+
 def main(argv: list[str] | None = None) -> None:
     pd.set_option("display.width", 120)
     parser = argparse.ArgumentParser(prog="soccer-stats")
@@ -112,6 +316,45 @@ def main(argv: list[str] | None = None) -> None:
     log.add_argument("--snapshot", default="_site/news_snapshot.json")
     log.add_argument("--log-dir", required=True)
     log.set_defaults(func=cmd_log_news)
+
+    pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
+    pap.add_argument("--site", default="_site", help="folder written by publish")
+    pap.add_argument("--log-dir", help="data-log checkout holding paper_trades/")
+    pap.add_argument("--league", default="E0")
+    pap.set_defaults(func=cmd_paper)
+
+    bf = sub.add_parser("backfill-odds", help="download historical DraftKings odds (paid plan)")
+    bf.add_argument("--league", default="E0")
+    bf.add_argument("--seasons", default="2025", help="start years, e.g. 2023-2025")
+    bf.add_argument(
+        "--looks",
+        type=float,
+        nargs="+",
+        default=[48.0, 3.0],
+        help="look times in hours before kickoff",
+    )
+    bf.add_argument("--max-credits", type=int, default=0, help="stop before spending more")
+    bf.add_argument(
+        "--keep-credits",
+        type=int,
+        default=1500,
+        help="never let credits left fall below this (live refreshes)",
+    )
+    bf.add_argument("--dry-run", action="store_true", help="print the plan; no API calls")
+    bf.set_defaults(func=cmd_backfill)
+
+    dk = sub.add_parser("backtest-dk", help="replay the trade rule on historical DraftKings odds")
+    dk.add_argument("--league", default="E0")
+    dk.add_argument("--seasons", default="2023-2025", help="seasons to predict (start years)")
+    dk.add_argument("--burn-in", type=int, default=2, help="seasons of training data before")
+    dk.add_argument("--looks", type=float, nargs="+", default=[48.0, 3.0])
+    dk.add_argument("--threshold", type=float, default=0.12)
+    dk.add_argument("--max-odds", type=float, default=None)
+    dk.add_argument("--xg-weight", type=float, default=0.7)
+    dk.add_argument("--out", help="CSV path, one row per trade")
+    dk.add_argument("--json", help="path for the app's backtest data")
+    dk.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_dk.json")
+    dk.set_defaults(func=cmd_backtest_dk)
 
     args = parser.parse_args(argv)
     args.func(args)

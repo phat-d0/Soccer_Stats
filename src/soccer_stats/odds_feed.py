@@ -9,8 +9,9 @@ does, and it budgets refreshes so the free allowance always lasts the month:
   x-requests-remaining / x-requests-last headers).
 * The refresh interval is the time until the allowance resets divided by the number of
   refreshes still affordable (keeping RESERVE_CREDITS spare), but never more often than
-  hourly. Early in the month that's every 2-3 hours; it stretches automatically if
-  credits run lower than planned.
+  hourly, or every 30 minutes in the two hours before a kickoff. On the free plan that's
+  every 2-3 hours; a paid plan's larger allowance brings it down to the floor. It
+  stretches automatically if credits run lower than planned.
 * Below the reserve, fetching stops until the reset date, apart from one check a day in
   case the allowance has reset early. The reset day comes from ODDS_API_RESET_DAY
   (default the 1st), and is learned automatically the first time a download shows more
@@ -34,7 +35,9 @@ SPORTS = {"E0": "soccer_epl"}
 BOOKMAKER = "draftkings"
 BOOKMAKER_NAME = "DraftKings"
 RESERVE_CREDITS = 20  # never spend below this
-MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this
+MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this...
+KICKOFF_INTERVAL_HOURS = 0.5  # ...except this close to a kickoff
+KICKOFF_WINDOW_HOURS = 2.0
 DEFAULT_COST = 2  # credits per refresh until the API tells us
 
 # The Odds API team name -> football-data team name, where they differ.
@@ -87,19 +90,35 @@ def next_reset(now: pd.Timestamp, reset_day: int = 1) -> pd.Timestamp:
 
 
 def refresh_interval_hours(
-    credits_left: int | None, cost: int | None, now: pd.Timestamp, reset_day: int = 1
+    credits_left: int | None,
+    cost: int | None,
+    now: pd.Timestamp,
+    reset_day: int = 1,
+    min_hours: float = MIN_INTERVAL_HOURS,
 ) -> float:
     """Hours between refreshes so the remaining credits last until the next reset.
 
     Returns inf when nothing more can be spent this period.
     """
     if credits_left is None:
-        return MIN_INTERVAL_HOURS  # unknown budget: fetch once to find out
+        return min_hours  # unknown budget: fetch once to find out
     affordable = (credits_left - RESERVE_CREDITS) // max(cost or DEFAULT_COST, 1)
     if affordable <= 0:
         return float("inf")
     hours_left = (next_reset(now, reset_day) - now) / pd.Timedelta(hours=1)
-    return max(MIN_INTERVAL_HOURS, hours_left / affordable)
+    return max(min_hours, hours_left / affordable)
+
+
+def floor_hours(events: list[dict] | None, now: pd.Timestamp) -> float:
+    """Minimum refresh interval: shorter when a cached match kicks off within the window."""
+    for ev in events or []:
+        try:
+            k = pd.Timestamp(ev["commence_time"]).tz_convert("UTC")
+        except (KeyError, ValueError, TypeError):
+            continue
+        if pd.Timedelta(0) <= k - now <= pd.Timedelta(hours=KICKOFF_WINDOW_HOURS):
+            return KICKOFF_INTERVAL_HOURS
+    return MIN_INTERVAL_HOURS
 
 
 def fetch_odds(
@@ -135,7 +154,9 @@ def fetch_odds(
     credits = status.credits_left
     if last is not None and last < next_reset(now, reset_day) - pd.DateOffset(months=1):
         credits = None  # the allowance has reset since our last download
-    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day)
+    cached = json.loads(path.read_text()) if path.exists() else None
+    floor = floor_hours(cached, now)
+    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day, floor)
     status.refresh_hours = None if interval == float("inf") else round(interval, 2)
     hours_since = (now - last) / pd.Timedelta(hours=1) if last is not None else None
     # When paused, still check once a day in case the allowance reset on another day.
@@ -180,7 +201,7 @@ def fetch_odds(
                 status.fetched_at = meta["fetched_at"]
                 status.credits_left, status.last_cost = meta["credits_left"], meta["last_cost"]
                 interval = refresh_interval_hours(
-                    status.credits_left, status.last_cost, now, reset_day
+                    status.credits_left, status.last_cost, now, reset_day, floor
                 )
                 status.refresh_hours = None if interval == float("inf") else round(interval, 2)
             else:

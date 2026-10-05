@@ -47,26 +47,38 @@ jobs:
           uv sync --frozen
           uv run soccer-stats publish --out _site
 
-      # FPL doesn't keep past injury news, so record changes as they happen; the
-      # history lets player adjustments be backtested later.
-      - name: Log team news to data-log branch
-        continue-on-error: true
+      # Paper trades and team-news history live on the data-log branch. The ledger step
+      # runs before the Pages upload and is safe to repeat: a trade is opened at most
+      # once, and on a push race the step starts again from the latest data-log.
+      - name: Paper trades and team news (data-log branch)
+        continue-on-error: true # the site still publishes; the Portfolio tab says why
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git fetch --depth=1 origin data-log; then
-            git worktree add ../log FETCH_HEAD
-            git -C ../log switch -c data-log
-          else
-            git worktree add --detach ../log
-            git -C ../log switch --orphan data-log
-          fi
-          uv run soccer-stats log-news --snapshot _site/news_snapshot.json --log-dir ../log/fpl_news
-          git -C ../log add fpl_news
-          if ! git -C ../log diff --cached --quiet; then
-            git -C ../log commit -q -m "Team news $(date -u +%Y-%m-%dT%H:%MZ)"
-            git -C ../log push origin data-log
-          fi
+          checkout_log() {
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            if git fetch --depth=1 origin data-log; then
+              git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            elif git ls-remote --exit-code --heads origin data-log; then
+              echo "data-log exists but couldn't be fetched"; return 1
+            else
+              git worktree add --detach ../log && git -C ../log switch --orphan data-log
+            fi
+          }
+          for attempt in 1 2 3; do
+            if ! checkout_log; then
+              uv run soccer-stats paper --site _site  # no ledger: opens nothing, says why
+              exit 0
+            fi
+            uv run soccer-stats log-news --snapshot _site/news_snapshot.json --log-dir ../log/fpl_news
+            uv run soccer-stats paper --site _site --log-dir ../log
+            git -C ../log add -A
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Data log $(date -u +%Y-%m-%dT%H:%MZ)"
+            if git -C ../log push origin data-log; then exit 0; fi
+            echo "data-log moved on; retrying from the latest ($attempt)"
+          done
 
       - uses: actions/upload-pages-artifact@v3
         with:

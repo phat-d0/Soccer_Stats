@@ -23,6 +23,7 @@ from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_match
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
 from soccer_stats.odds_feed import BOOKMAKER_NAME, apply_odds, fetch_odds, parse_odds
+from soccer_stats.paper import FRESH_HOURS
 from soccer_stats.players import (
     TeamNews,
     align_team_names,
@@ -32,6 +33,7 @@ from soccer_stats.players import (
     parse_players,
     team_news,
 )
+from soccer_stats.trades import DEFAULT_FILTER, FILTER_PRESETS, PAPER_EDGE, STAKE
 from soccer_stats.xg import LEAGUES as XG_LEAGUES
 from soccer_stats.xg import load_schedule, with_xg
 
@@ -323,6 +325,25 @@ def build_data(
     )
 
 
+def portfolio_placeholder() -> dict:
+    """Portfolio data before the ledger step (soccer-stats paper) fills it in."""
+    return {
+        "rule": {
+            "threshold": PAPER_EDGE,
+            "stake": STAKE,
+            "presets": list(FILTER_PRESETS),
+            "default_filter": DEFAULT_FILTER,
+            "fresh_hours": FRESH_HOURS,
+        },
+        "live": {
+            "trades": [],
+            "summary": {"trades": 0},
+            "error": "The paper-trade ledger wasn't updated in this build.",
+        },
+        "backtest": None,
+    }
+
+
 def publish(out: Path, league: str = "E0") -> Path:
     season = current_season()
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
@@ -344,6 +365,7 @@ def publish(out: Path, league: str = "E0") -> Path:
 
     data = build_data(matches, fixtures, xg_error, news, news_error)
     data["odds_source"] = odds_source
+    data["portfolio"] = portfolio_placeholder()
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
     print(
         f"Odds: {odds_source['name']}"

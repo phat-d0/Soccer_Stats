@@ -71,18 +71,30 @@ def current_season(today: date | None = None) -> int:
     return today.year if today.month >= 7 else today.year - 1
 
 
-def _fetch(url: str, path: Path, max_age_hours: float | None, headers: dict | None = None) -> Path:
+def _fetch(
+    url: str,
+    path: Path,
+    max_age_hours: float | None,
+    headers: dict | None = None,
+    stale_ok: bool = False,
+) -> Path:
     """Download `url` to `path` unless a cached copy is fresh enough.
 
-    max_age_hours=None means a cached file never expires (finished seasons).
+    max_age_hours=None means a cached file never expires (finished seasons). With
+    stale_ok, a failed refresh falls back to the cached copy instead of raising.
     """
     if path.exists() and (
         max_age_hours is None or time.time() - path.stat().st_mtime < max_age_hours * 3600
     ):
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException:
+        if stale_ok and path.exists():  # source down: a stale copy beats nothing
+            return path
+        raise
     path.write_bytes(resp.content)
     return path
 
@@ -103,7 +115,10 @@ def download(
     live = start_year >= current_season()
     age = 0 if force else (max_age_hours if live else None)
     return _fetch(
-        BASE_URL.format(season=code, league=league), raw_dir / f"{league}_{code}.csv", age
+        BASE_URL.format(season=code, league=league),
+        raw_dir / f"{league}_{code}.csv",
+        age,
+        stale_ok=True,  # results can't go stale in a harmful way: a refit just lags
     )
 
 

@@ -1,7 +1,10 @@
 "use strict";
 
 // ---------- state ----------
-const EDGE_STEPS = [0, 0.02, 0.03, 0.05, 0.08];
+// Minimum-edge presets and the paper-trade threshold: must match trades.py.
+const EDGE_STEPS = [0.02, 0.05, 0.08, 0.12];
+const DEFAULT_EDGE = 0.05;
+const PAPER_EDGE = 0.12;
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -9,7 +12,11 @@ const store = {
 const state = {
   data: null,
   tab: "matches", // the app always opens on upcoming fixtures
-  minEdge: store.get("minEdge", 0.03),
+  minEdge: EDGE_STEPS.includes(store.get("minEdge", DEFAULT_EDGE)) ? store.get("minEdge", DEFAULT_EDGE) : DEFAULT_EDGE,
+  pfView: "live", // Portfolio: "live" paper trades or "backtest"
+  pfMarket: "",
+  pfSeason: "",
+  pfShown: 25,
   exploreHome: store.get("exploreHome", null),
   exploreAway: store.get("exploreAway", null),
 };
@@ -74,14 +81,15 @@ function marketsFrom(m) {
   return { p, top: top.slice(0, 5) };
 }
 
-// ---------- value picks ----------
+// ---------- value picks (the trade rule in trades.py: best_pick) ----------
+const TRADE_MARKETS = ["home", "draw", "away", "over25", "under25"];
 function bestPick(fx, minEdge) {
   let best = null;
-  for (const [k] of MARKETS) {
-    const o = fx.odds?.[k];
-    if (o == null) continue;
-    const e = fx.p[k] * o - 1;
-    if (e >= minEdge && e > 0 && (!best || e > best.edge)) best = { market: k, odds: o, edge: e };
+  for (const k of TRADE_MARKETS) {
+    const o = fx.odds?.[k], p = fx.p?.[k];
+    if (o == null || p == null || o <= 1) continue;
+    const e = p * o - 1;
+    if (e > 0 && e >= minEdge - 1e-9 && (!best || e > best.edge)) best = { market: k, odds: o, edge: e };
   }
   return best;
 }
@@ -91,11 +99,14 @@ const isDK = () => state.data?.odds_source?.name === "DraftKings";
 const bookName = () => (isDK() ? "DraftKings" : "Bookmaker");
 
 // Current prices: American odds for DraftKings (+650 / -250), decimal otherwise.
-function price(d) {
+function american(d) {
   if (d == null) return "–";
-  if (!isDK()) return d.toFixed(2);
   const a = d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
   return a > 0 ? `+${a}` : `−${Math.abs(a)}`;
+}
+function price(d) {
+  if (d == null) return "–";
+  return isDK() ? american(d) : d.toFixed(2);
 }
 
 function oddsAge() {
@@ -274,7 +285,7 @@ function edgeControl() {
   return `
     <div class="control-label"><span>Flag bets with edge of at least</span></div>
     <div class="segmented" role="group" aria-label="Minimum edge">
-      ${EDGE_STEPS.map((e) => `<button data-edge="${e}" class="${e === state.minEdge ? "on" : ""}" aria-pressed="${e === state.minEdge}">${e === 0 ? "Any" : pct(e)}</button>`).join("")}
+      ${EDGE_STEPS.map((e) => `<button data-edge="${e}" class="${e === state.minEdge ? "on" : ""}" aria-pressed="${e === state.minEdge}">${pct(e)}</button>`).join("")}
     </div>`;
 }
 
@@ -291,6 +302,7 @@ function viewMatches() {
     byDay.get(day).push([fx, idx]);
   });
   const nValue = d.fixtures.filter((fx) => bestPick(fx, state.minEdge)).length;
+  const openTrades = new Map((d.portfolio?.live?.trades || []).filter((t) => t.status === "open").map((t) => [`${t.home}|${t.away}`, t]));
   let html = `<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
@@ -307,6 +319,7 @@ function viewMatches() {
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
           ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
+          ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); return `<span class="badge paper">Paper trade open: ${esc(PICK_LABEL[t.market])} @ ${american(t.odds)}</span>`; })() : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
@@ -365,7 +378,7 @@ function summarize(bets, minEdge) {
   };
 }
 
-function profitChart(sel) {
+function profitChart(sel, unit = "units") {
   if (!sel.length) return "";
   const daily = [];
   let cum = 0;
@@ -401,10 +414,10 @@ function profitChart(sel) {
     dt.setMonth(dt.getMonth() + 3);
   }
   const xl = months.map((t) => `<text class="xlab" x="${x(t)}" y="${H - 6}" text-anchor="middle">${new Date(t).toLocaleDateString(undefined, { month: "short", year: "2-digit" })}</text>`).join("");
-  chartData = { daily, x, y, W };
+  chartData = { daily, x, y, W, unit };
   return `
     <div class="chart" id="profit-chart">
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running profit in units, ending at ${signed(cum)}">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running profit in ${unit === "$" ? "dollars" : "units"}, ending at ${fmtAmount(cum, unit)}">
         <g class="grid">${grid}</g>
         <line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>
         <path class="line" d="${path}" vector-effect="non-scaling-stroke"/>
@@ -415,6 +428,10 @@ function profitChart(sel) {
     </div>`;
 }
 let chartData = null;
+function fmtAmount(v, unit, d = 1) {
+  if (unit !== "$") return `${signed(v, d)} units`;
+  return `${v >= 0 ? "+" : "−"}$${Math.abs(v).toFixed(d === 1 ? 0 : 2)}`;
+}
 function niceStep(raw) {
   const p = 10 ** Math.floor(Math.log10(raw || 1));
   const f = raw / p;
@@ -435,7 +452,8 @@ function bindChart() {
     const px = chartData.x(Date.parse(best.date));
     cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
     tip.hidden = false;
-    tip.innerHTML = `<b>${new Date(best.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</b><br>${best.n} bet${best.n > 1 ? "s" : ""}, ${signed(best.day, 2)} units<br>Running total ${signed(best.cum)} units`;
+    const u = chartData.unit;
+    tip.innerHTML = `<b>${new Date(best.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</b><br>${best.n} ${u === "$" ? "trade" : "bet"}${best.n > 1 ? "s" : ""}, ${fmtAmount(best.day, u, 2)}<br>Running total ${fmtAmount(best.cum, u)}`;
     const left = Math.min(Math.max((px / chartData.W) * rect.width, 70), rect.width - 70);
     tip.style.left = `${left}px`;
   };
@@ -509,7 +527,186 @@ function viewExplore() {
     ${detailHtml({ home, away, xg: [lam, mu], p, top, matrix: m })}`;
 }
 
-const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, explore: viewExplore };
+// ---------- portfolio (paper trades and the DraftKings backtest) ----------
+const usd = (v, d = 0) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`);
+const seasonName = (s) => (s && s.length === 4 ? `20${s.slice(0, 2)}/${s.slice(2)}` : s || "–");
+const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
+const kickoffText = (iso) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function pfSet() {
+  const pf = state.data.portfolio || {};
+  return state.pfView === "backtest" ? pf.backtest : pf.live;
+}
+
+function pfTiles(s) {
+  const se = s.roi_se != null ? ` ± ${(s.roi_se * 100).toFixed(1)}%` : "";
+  return `
+    <div class="tiles" style="margin-top:12px">
+      <div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>
+      <div class="tile"><div class="label">Profit</div><div class="value">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>
+      <div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>
+      <div class="tile"><div class="label">Closing line value</div><div class="value">${signedPct(s.clv_dk)}</div><div class="sub">avg vs DraftKings close</div></div>
+      <div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of trades"}</div></div>
+      <div class="tile"><div class="label">Max drawdown</div><div class="value">${s.max_drawdown != null ? `$${s.max_drawdown.toFixed(0)}` : "–"}</div><div class="sub">peak to trough</div></div>
+    </div>`;
+}
+
+function pfOpen(trades) {
+  const open = trades.filter((t) => t.status === "open");
+  if (!open.length) return "";
+  const fxs = new Map(state.data.fixtures.map((f) => [`${f.home}|${f.away}`, f]));
+  const rows = open.map((t) => {
+    const fx = fxs.get(`${t.home}|${t.away}`);
+    const cur = fx?.odds?.[t.market];
+    const curEdge = cur != null && fx?.p?.[t.market] != null ? fx.p[t.market] * cur - 1 : null;
+    return `
+      <button class="bet-row trade" data-trade="${esc(t.id)}">
+        <span>${esc(t.home)} v ${esc(t.away)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${esc(PICK_LABEL[t.market])} @ ${american(t.odds)} · edge ${signedPct(t.edge)}</div><div class="meta">Now ${american(cur)}${curEdge != null ? `, edge ${signedPct(curEdge)}` : ""}</div></span>
+        <span class="pl">$${t.stake}</span>
+      </button>`;
+  }).join("");
+  return `<div class="section-title">Open positions</div><div class="card">${rows}</div>`;
+}
+
+function pfSettled(trades) {
+  const done = trades.filter((t) => t.status !== "open");
+  if (!done.length) return "";
+  const markets = [...new Set(done.map((t) => t.market))];
+  const seasons = [...new Set(done.map((t) => t.season))].sort().reverse();
+  const sel = done.filter((t) => (!state.pfMarket || t.market === state.pfMarket) && (!state.pfSeason || t.season === state.pfSeason));
+  const shown = sel.slice(0, state.pfShown);
+  const rows = shown.map((t) => `
+    <button class="bet-row trade" data-trade="${esc(t.id)}">
+      <span>${esc(t.home)} v ${esc(t.away)}<div class="meta">${esc(shortDate(t.kickoff))} · ${esc(PICK_LABEL[t.market])} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}</div></span>
+      <span class="pl ${t.profit > 0 ? "win" : ""}">${t.status === "void" ? "Void" : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
+    </button>`).join("");
+  const opt = (vals, cur, label, fmt) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
+  return `
+    <div class="section-title">Settled trades</div>
+    <div class="filters">
+      <select id="pf-market" aria-label="Filter by market">${opt(markets, state.pfMarket, "All markets", (m) => PICK_LABEL[m] || m)}</select>
+      <select id="pf-season" aria-label="Filter by season">${opt(seasons, state.pfSeason, "All seasons", seasonName)}</select>
+    </div>
+    <div class="card">${rows || '<p class="muted">No settled trades match these filters.</p>'}</div>
+    ${sel.length > shown.length ? `<button class="more" id="pf-more">Show more (${sel.length - shown.length} left)</button>` : ""}`;
+}
+
+function pfTable(title, rows, label = (g) => g) {
+  if (!rows || !rows.length) return "";
+  const body = rows.map((r) => `<tr><td>${esc(label(r.group))}</td><td>${r.trades}</td><td>${signedPct(r.roi)}</td><td>${signedPct(r.clv_dk)}</td></tr>`).join("");
+  return `
+    <div class="section-title">${esc(title)}</div>
+    <div class="card" style="padding:8px 14px">
+      <table><thead><tr><th></th><th>Trades</th><th>ROI</th><th>CLV</th></tr></thead><tbody>${body}</tbody></table>
+    </div>`;
+}
+
+function pfBacktestExtras(bt) {
+  let html = "";
+  if (bt.sweep?.length) {
+    const body = bt.sweep.map((r) => `<tr><td>${pct(r.threshold)}${r.max_odds ? ` <span class="muted">≤${r.max_odds}</span>` : ""}</td><td>${r.trades}</td><td>${signedPct(r.roi)}</td><td>${signedPct(r.clv_dk)}</td></tr>`).join("");
+    html += `
+      <div class="section-title">Threshold sweep</div>
+      <div class="card" style="padding:8px 14px">
+        <table><thead><tr><th>Edge ≥</th><th>Trades</th><th>ROI</th><th>CLV</th></tr></thead><tbody>${body}</tbody></table>
+      </div>
+      <p class="note">If ROI falls as the threshold rises, big claimed edges are mostly the model's mistakes. ≤6 = odds capped at 6.0.</p>`;
+  }
+  if (bt.coverage?.length) {
+    const body = bt.coverage.map((c) => `<tr><td>${esc(seasonName(c.season))}</td><td>${c.priced} of ${c.matches}</td><td>${pct(c.share)}</td></tr>`).join("");
+    html += `
+      <div class="section-title">DraftKings coverage</div>
+      <div class="card" style="padding:8px 14px">
+        <table><thead><tr><th>Season</th><th>Priced</th><th>Share</th></tr></thead><tbody>${body}</tbody></table>
+      </div>`;
+  }
+  if (bt.log_loss?.matches) {
+    html += `<p class="note">Forecast error (log loss, lower is better) on ${bt.log_loss.matches} matches: model ${bt.log_loss.model.toFixed(4)}, DraftKings ${bt.log_loss.draftkings.toFixed(4)}.</p>`;
+  }
+  return html;
+}
+
+function viewPortfolio() {
+  const pf = state.data.portfolio || {};
+  const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
+  const set = pfSet();
+  const toggle = `
+    <div class="segmented" role="group" aria-label="Which trades">
+      ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
+    </div>`;
+  const ruleNote = `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge at DraftKings' price, whatever the Matches filter is set to. One per match, on the best edge.</p>`;
+  const foot = `<p class="note">${state.pfView === "live" ? `${oddsAge() || "Odds: DraftKings."}` : `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`} Paper trades: no money is staked.</p>`;
+
+  if (!set) {
+    return `${toggle}${ruleNote}<div class="empty">${state.pfView === "backtest" ? "No backtest yet. It appears after historical DraftKings odds are downloaded and the backtest is run." : "No paper trades yet."}</div>${foot}`;
+  }
+  const trades = set.trades || [];
+  const s = set.summary || { trades: 0 };
+  const banner = set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note ? `<p class="note">${esc(set.note)}</p>` : "";
+  if (!trades.length) {
+    const empty = state.pfView === "live"
+      ? `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`
+      : "The backtest found no trades at this threshold.";
+    return `${toggle}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" ? pfBacktestExtras(set) : ""}${foot}`;
+  }
+  const settled = trades.filter((t) => t.status === "won" || t.status === "lost").slice().reverse()
+    .map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, t.clv_dk, t.profit]);
+  const b = set.breakdowns || {};
+  const ci = s.roi_ci95 ? `<p class="note">95% interval on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Win rate ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
+  return `
+    ${toggle}
+    ${ruleNote}
+    ${banner}
+    ${pfTiles(s)}
+    ${ci}
+    <div class="section-title">Running profit ($)</div>
+    <div class="card">${profitChart(settled, "$") || '<p class="muted">Nothing settled yet.</p>'}</div>
+    ${state.pfView === "live" ? pfOpen(trades) : ""}
+    ${pfSettled(trades)}
+    ${pfTable("By market", b.market, (g) => PICK_LABEL[g] || g)}
+    ${pfTable("By edge at entry", b.edge_bucket)}
+    ${pfTable("By odds", b.odds_bucket)}
+    ${state.pfView === "backtest" ? pfTable("By season", b.season, seasonName) + pfTable("By look", b.look, (g) => `${g} before kickoff`) + pfBacktestExtras(set) : ""}
+    ${foot}`;
+}
+
+const TRADE_FIELDS = [
+  ["Match", (t) => `${t.home} v ${t.away}`],
+  ["Kickoff", (t) => kickoffText(t.kickoff)],
+  ["Pick", (t) => PICK_LABEL[t.market] || t.market],
+  ["Entry odds", (t) => `${american(t.odds)} (${t.odds.toFixed(2)})`],
+  ["Odds fetched", (t) => (t.odds_fetched_at ? kickoffText(t.odds_fetched_at) : "–")],
+  ["Opened", (t) => `${kickoffText(t.opened_at)} (${t.hours_to_kickoff >= 48 ? `${(t.hours_to_kickoff / 24).toFixed(1)} days` : `${t.hours_to_kickoff.toFixed(1)} h`} before kickoff)`],
+  ["Model chance", (t) => pct(t.model_p, 1)],
+  ["Without team news", (t) => pct(t.model_p_base, 1)],
+  ["Team news applied", (t) => (t.news_applied ? "Yes" : "No")],
+  ["Edge at entry", (t) => signedPct(t.edge)],
+  ["Threshold", (t) => pct(t.threshold)],
+  ["Stake", (t) => `$${t.stake}`],
+  ["Closing odds", (t) => (t.close_odds ? `${american(t.close_odds)} (${t.close_odds.toFixed(2)})` : "–")],
+  ["CLV vs DraftKings", (t) => signedPct(t.clv_dk)],
+  ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle)],
+  ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],
+  ["Score", (t) => t.score || "–"],
+  ["Profit", (t) => (t.profit == null ? "–" : usd(t.profit, 2))],
+  ["Season", (t) => seasonName(t.season)],
+  ["Look", (t) => t.look || "–"],
+  ["Model", (t) => [t.model_ref?.commit, t.model_ref?.xg_weight != null ? `xG weight ${t.model_ref.xg_weight}` : null, t.model_ref?.matches_fit ? `${t.model_ref.matches_fit} matches` : null].filter(Boolean).join(" · ") || "–"],
+  ["Trade id", (t) => t.id],
+];
+
+function tradeHtml(t) {
+  return `
+    <div class="detail">
+      <p class="muted" style="margin:0;font-size:13px">${t.source === "live" ? "Live paper trade" : "Backtest trade"}</p>
+      <h2 id="sheet-title">${esc(t.home)} v ${esc(t.away)}</h2>
+      <div class="card" style="padding:8px 14px;margin-top:10px">
+        <table class="kv"><tbody>${TRADE_FIELDS.map(([k, f]) => `<tr><td>${esc(k)}</td><td>${esc(f(t))}</td></tr>`).join("")}</tbody></table>
+      </div>
+    </div>`;
+}
+
+const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, portfolio: viewPortfolio, explore: viewExplore };
 
 function render() {
   chartData = null;
@@ -550,6 +747,15 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.edge !== undefined) {
     state.minEdge = Number(t.dataset.edge); store.set("minEdge", state.minEdge);
     render();
+  } else if (t.dataset.pf) {
+    state.pfView = t.dataset.pf; state.pfShown = 25; state.pfMarket = ""; state.pfSeason = "";
+    render();
+  } else if (t.id === "pf-more") {
+    state.pfShown += 25;
+    render();
+  } else if (t.dataset.trade !== undefined) {
+    const tr = (pfSet()?.trades || []).find((x) => x.id === t.dataset.trade);
+    if (tr) openSheet(tradeHtml(tr));
   } else if (t.dataset.fixture !== undefined) {
     const fx = state.data.fixtures[Number(t.dataset.fixture)];
     openSheet(detailHtml({ ...fx, top: fx.top_scores, lowData: fx.low_data }));
@@ -562,6 +768,8 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("change", (ev) => {
   if (ev.target.id === "ex-home") { state.exploreHome = ev.target.value; store.set("exploreHome", state.exploreHome); render(); }
   if (ev.target.id === "ex-away") { state.exploreAway = ev.target.value; store.set("exploreAway", state.exploreAway); render(); }
+  if (ev.target.id === "pf-market") { state.pfMarket = ev.target.value; state.pfShown = 25; render(); }
+  if (ev.target.id === "pf-season") { state.pfSeason = ev.target.value; state.pfShown = 25; render(); }
 });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); });
 
