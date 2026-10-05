@@ -19,15 +19,7 @@ uv run pytest           # run tests
 A phone-first web app you add to your home screen. It opens full-screen with its own
 icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next round
 with value picks; tap for markets and scoreline heatmap), **Teams** (ratings + xG),
-**Record** (replayed profit, closing line value, goals vs xG), **Ask** (chat with Claude
-about the model and bookmaker odds), **Explore** (any matchup).
-
-**Ask tab:** uses your own Anthropic API key (console.anthropic.com → API Keys; set a
-spend limit). The key stays in the phone's local storage and goes only to
-api.anthropic.com. Claude sees the current fixtures, ratings and track record, and can
-call tools that compute any matchup, the track record at any edge, and past bets.
-Defaults to Claude Opus 5.5, with Claude Sonnet 5.5 selectable as a cheaper option;
-each answer shows its approximate cost. Code: `web/chat.js` (SDK bundled in `web/vendor/`).
+**Record** (replayed profit, closing line value, goals vs xG), **Explore** (any matchup).
 
 A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model every hour,
 and every 15 minutes from 10:00 to 22:00 UTC, and publishes the result to GitHub Pages.

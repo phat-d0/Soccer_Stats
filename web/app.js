@@ -234,7 +234,6 @@ function detailHtml(fx) {
         ${heatmap(matrix, home, away)}
         <p class="note" style="margin:10px 0 0">Most likely: ${top.map(([s, v]) => `${s} (${pct(v)})`).join(", ")}</p>
       </div>
-      <button class="btn primary ask-btn" data-askmatch="${esc(home)}|${esc(away)}">Ask Claude about this match</button>
     </div>`;
 }
 
@@ -489,11 +488,7 @@ function viewExplore() {
     ${detailHtml({ home, away, xg: [lam, mu], p, top, matrix: m })}`;
 }
 
-// The Ask tab lives in chat.js (an ES module) and registers itself once loaded.
-let chatApi = null;
-const viewAsk = () => (chatApi ? chatApi.view() : '<div class="empty">Loading…</div>');
-
-const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, explore: viewExplore, ask: viewAsk };
+const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, explore: viewExplore };
 
 function render() {
   chartData = null;
@@ -504,7 +499,6 @@ function render() {
     b.setAttribute("aria-current", on ? "page" : "false");
   });
   bindChart();
-  if (state.tab === "ask" && chatApi) chatApi.afterRender();
 }
 
 function setTab(tab) {
@@ -532,10 +526,6 @@ document.addEventListener("click", (ev) => {
   if (!t) return;
   if (t.dataset.tab) {
     setTab(t.dataset.tab);
-  } else if (t.dataset.askmatch) {
-    const [home, away] = t.dataset.askmatch.split("|");
-    const q = `Talk me through ${home} v ${away}: what does the model expect, how does that compare with the bookmakers, and is there any value?`;
-    if (chatApi) chatApi.askAbout(q);
   } else if (t.dataset.edge !== undefined) {
     state.minEdge = Number(t.dataset.edge); store.set("minEdge", state.minEdge);
     render();
@@ -571,11 +561,10 @@ async function load(force = false) {
   }
 }
 
-// Shared with chat.js.
-window.PL = {
-  state, esc, scoreMatrix, marketsFrom, impliedFor, bestPick, summarize, render, setTab,
-  registerChat(api) { chatApi = api; if (state.tab === "ask" && state.data) render(); },
-};
+// The Ask (Claude chat) tab was removed: clear the API key and chat it kept on this device.
+for (const k of ["anthropicKey", "chatConv", "chatModel"]) {
+  try { localStorage.removeItem(k); } catch { /* storage blocked */ }
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
