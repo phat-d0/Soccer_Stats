@@ -14,7 +14,30 @@ uv sync                 # installs deps + dev tools into .venv
 uv run pytest           # run tests
 ```
 
-## Quick start
+## Premier League app
+
+A dashboard to follow the model through the season:
+
+- **Upcoming matches**: win/draw/loss and over 2.5 chances for the next round, Pinnacle
+  odds, and any value pick above your edge threshold. Open a match for expected goals,
+  fair odds and a scoreline heatmap.
+- **Team ratings**: how many goals each team scores and concedes against an average side.
+- **Track record**: the model replayed over last season and this one, with profit,
+  closing line value and accuracy against the bookmaker.
+- **Match explorer**: any two teams head to head.
+
+```bash
+uv sync --extra app
+uv run streamlit run app/streamlit_app.py     # opens http://localhost:8501
+```
+
+Data refreshes automatically every few hours (or with the "Refresh data now" button).
+
+**On your phone:** deploy free on [Streamlit Community Cloud](https://share.streamlit.io):
+sign in with GitHub → *Create app* → pick this repo, branch, and `app/streamlit_app.py`.
+It installs from `requirements.txt` and gives you a URL you can bookmark.
+
+## Quick start (backtest from the command line)
 
 ```bash
 # Walk-forward backtest on the Premier League, seasons 2019/20–2024/25,
@@ -40,6 +63,8 @@ src/soccer_stats/
   models/dixon_coles.py Dixon-Coles Poisson model with time decay
   backtest.py           walk-forward predictions, scoring vs. market, bet simulation
   cli.py                `soccer-stats` command
+  dashboard.py          data shaping for the app (fixtures, ratings, track record)
+app/streamlit_app.py    the Premier League dashboard
 tests/                  unit tests on synthetic leagues with known parameters
 notebooks/              exploration
 ```

@@ -8,14 +8,20 @@ is the best evidence of a real edge.
 
 from __future__ import annotations
 
+import os
+import time
 from collections.abc import Iterable
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import requests
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
-RAW_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
+FIXTURES_URL = "https://www.football-data.co.uk/fixtures.csv"
+RAW_DIR = Path(
+    os.environ.get("SOCCER_STATS_DATA_DIR", Path(__file__).resolve().parents[2] / "data" / "raw")
+)
 
 LEAGUES = {
     "E0": "England Premier League",
@@ -59,17 +65,71 @@ def season_code(start_year: int) -> str:
     return f"{start_year % 100:02d}{(start_year + 1) % 100:02d}"
 
 
-def download(league: str, start_year: int, raw_dir: Path = RAW_DIR, force: bool = False) -> Path:
-    """Download one league-season CSV into the raw cache, returning its path."""
-    code = season_code(start_year)
-    path = raw_dir / f"{league}_{code}.csv"
-    if path.exists() and not force:
+def current_season(today: date | None = None) -> int:
+    """Start year of the season in progress (seasons roll over in July)."""
+    today = today or date.today()
+    return today.year if today.month >= 7 else today.year - 1
+
+
+def _fetch(url: str, path: Path, max_age_hours: float | None) -> Path:
+    """Download `url` to `path` unless a cached copy is fresh enough.
+
+    max_age_hours=None means a cached file never expires (finished seasons).
+    """
+    if path.exists() and (
+        max_age_hours is None or time.time() - path.stat().st_mtime < max_age_hours * 3600
+    ):
         return path
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    resp = requests.get(BASE_URL.format(season=code, league=league), timeout=30)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    resp = requests.get(url, timeout=30)
     resp.raise_for_status()
     path.write_bytes(resp.content)
     return path
+
+
+def download(
+    league: str,
+    start_year: int,
+    raw_dir: Path = RAW_DIR,
+    force: bool = False,
+    max_age_hours: float = 12,
+) -> Path:
+    """Download one league-season CSV into the raw cache, returning its path.
+
+    The in-progress season is re-downloaded once the cache is `max_age_hours` old;
+    past seasons are cached forever.
+    """
+    code = season_code(start_year)
+    live = start_year >= current_season()
+    age = 0 if force else (max_age_hours if live else None)
+    return _fetch(
+        BASE_URL.format(season=code, league=league), raw_dir / f"{league}_{code}.csv", age
+    )
+
+
+def load_fixtures(
+    leagues: Iterable[str], raw_dir: Path = RAW_DIR, max_age_hours: float = 6
+) -> pd.DataFrame:
+    """Upcoming fixtures (with current odds where posted) for the given leagues."""
+    path = _fetch(FIXTURES_URL, raw_dir / "fixtures.csv", max_age_hours)
+    raw = pd.read_csv(path, encoding="utf-8-sig", on_bad_lines="skip")
+    raw = raw[raw["Div"].isin(list(leagues))]
+    df = raw.rename(columns=COLUMNS)
+    for col in COLUMNS.values():
+        if col not in df.columns:
+            df[col] = float("nan")
+    df["league"] = raw["Div"]
+    df["kickoff"] = pd.to_datetime(
+        raw["Date"] + " " + raw.get("Time", pd.Series("00:00", index=raw.index)).fillna("00:00"),
+        dayfirst=True,
+        format="mixed",
+    )
+    keep = [
+        "league",
+        "kickoff",
+        *(c for c in COLUMNS.values() if c not in ("home_goals", "away_goals")),
+    ]
+    return df[keep].drop(columns="date").sort_values("kickoff").reset_index(drop=True)
 
 
 def normalize(

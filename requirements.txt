@@ -1,0 +1,2 @@
+# For Streamlit Community Cloud. Locally, prefer: uv sync --extra app
+.[app]

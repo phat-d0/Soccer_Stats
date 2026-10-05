@@ -13,6 +13,10 @@ dependencies = [
 
 [project.optional-dependencies]
 notebook = ["jupyterlab>=4", "matplotlib>=3.8"]
+app = [
+    "plotly>=5.22",
+    "streamlit>=1.38",
+]
 
 [project.scripts]
 soccer-stats = "soccer_stats.cli:main"
