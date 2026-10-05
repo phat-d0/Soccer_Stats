@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -344,6 +345,61 @@ def portfolio_placeholder() -> dict:
     }
 
 
+PLAYER_FETCH_PER_BUILD = 40  # new Understat match files per build (catches up gradually)
+
+
+def player_gate(path: str | None = None) -> dict:
+    """The stage-1 result (backtest-players): player odds and trades only once the model
+    beats its baseline for both shots and shots on target."""
+    path = path or os.environ.get("PLAYER_GATE_FILE")
+    try:
+        g = json.loads(Path(path).read_text()) if path else {}
+    except (OSError, ValueError):
+        g = {}
+    gate = g.get("gate") or {}
+    return {
+        "passed": bool(gate.get("passed")),
+        "shots": gate.get("shots"),
+        "sot": gate.get("sot"),
+        "factors": g.get("factors"),
+        "sot_method": g.get("sot_method", "thin"),
+        "generated_at": g.get("generated_at"),
+    }
+
+
+def add_players(data: dict, league: str, fpl_df, credits_left) -> dict:
+    """Player shot lines for each upcoming fixture (never raises)."""
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.player_live import fpl_players, player_cards
+    from soccer_stats.player_odds import fetch_live
+
+    season = current_season()
+    gate = player_gate()
+    status = {"gate": gate, "error": None, "odds": None}
+    try:
+        apps, missing = load_appearances(
+            league, [season - 1, season], max_new=PLAYER_FETCH_PER_BUILD
+        )
+        status["missing_matches"] = missing
+        events = []
+        if gate["passed"]:
+            events, status["odds"] = fetch_live(league, credits_left=credits_left)
+        cards, st = player_cards(
+            apps,
+            data["fixtures"],
+            fpl_players(fpl_df) if fpl_df is not None else None,
+            events,
+            factors=gate["factors"],
+            sot_method=gate["sot_method"],
+        )
+        status.update(st)
+        for fx in data["fixtures"]:
+            fx["players"] = cards.get((fx["home"], fx["away"]), [])
+    except Exception as exc:  # Understat down or changed: matches still publish
+        status["error"] = f"Player lines unavailable ({type(exc).__name__}: {exc})"[:200]
+    return status
+
+
 def publish(out: Path, league: str = "E0") -> Path:
     season = current_season()
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
@@ -352,7 +408,7 @@ def publish(out: Path, league: str = "E0") -> Path:
     known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
     fixtures, odds_source = with_draftkings(fixtures, league, known)
 
-    news, news_error, snapshot = None, None, []
+    news, news_error, snapshot, players = None, None, [], None
     if league == "E0":  # FPL covers the Premier League only
         try:
             players = parse_players(fetch_fpl())
@@ -366,6 +422,25 @@ def publish(out: Path, league: str = "E0") -> Path:
     data = build_data(matches, fixtures, xg_error, news, news_error)
     data["odds_source"] = odds_source
     data["portfolio"] = portfolio_placeholder()
+    if league == "E0":
+        data["players_status"] = _clean(
+            add_players(data, league, players, odds_source["credits_left"])
+        )
+        ps = data["players_status"]
+        print(
+            ps["error"]
+            or f"Player lines: {ps.get('players', 0)} players, {ps.get('priced', 0)} priced"
+            + (
+                f", {ps['missing_matches']} Understat matches still to download"
+                if ps.get("missing_matches")
+                else ""
+            )
+            + (
+                ""
+                if ps["gate"]["passed"]
+                else " (player odds off until the model beats its baseline)"
+            )
+        )
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
     print(
         f"Odds: {odds_source['name']}"
@@ -394,7 +469,7 @@ def publish(out: Path, league: str = "E0") -> Path:
     )
     out.mkdir(parents=True, exist_ok=True)
     shutil.copytree(WEB_DIR, out, dirs_exist_ok=True)
-    (out / "data.json").write_text(json.dumps(data, separators=(",", ":")))
+    (out / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
     # Picked up by the workflow and appended to the data-log branch (injury history).
     (out / "news_snapshot.json").write_text(json.dumps(snapshot, separators=(",", ":")))
     return out

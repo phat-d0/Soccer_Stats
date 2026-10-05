@@ -34,9 +34,13 @@ CAP_ODDS = 6.0  # the optional cap reported beside the uncapped results
 EPS = 1e-9  # so an edge of exactly the threshold isn't lost to rounding
 
 MARKETS = ("home", "draw", "away", "over25", "under25")
+PLAYER_MARKETS = ("player_shots", "player_shots_on_target")
+MAX_PLAYER_TRADES = 4  # per match: they all ride on the same team's shot volume
 GROUPS = {"home": MARKETS[:3], "draw": MARKETS[:3], "away": MARKETS[:3]}
 GROUPS.update({"over25": MARKETS[3:], "under25": MARKETS[3:]})
 MARKET_LABELS = {
+    "player_shots": "Shots",
+    "player_shots_on_target": "Shots on target",
     "home": "Home",
     "draw": "Draw",
     "away": "Away",
@@ -111,7 +115,8 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
 
 ENTRY_FIELDS = (
     "id source bet_type league season opened_at kickoff hours_to_kickoff home away market "
-    "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look"
+    "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
+    "player player_id team line side position"
 ).split()
 
 
@@ -131,6 +136,7 @@ def new_trade(
     model_ref: dict | None = None,
     look: str | None = None,
     stake: float = STAKE,
+    player: dict | None = None,
 ) -> dict:
     """The record both the backtest and the live ledger store for a trade (one shape).
 
@@ -139,10 +145,11 @@ def new_trade(
     """
     kickoff, opened_at = pd.Timestamp(kickoff), pd.Timestamp(opened_at)
     season = season_label(kickoff)
+    extra = (player["player"], pick["market"]) if player else ()
     return {
-        "id": trade_id(league, season, home, away),
+        "id": trade_id(league, season, home, away, *extra),
         "source": source,
-        "bet_type": "match",
+        "bet_type": "player" if player else "match",
         "league": league,
         "season": season,
         "opened_at": opened_at.isoformat(timespec="seconds"),
@@ -161,6 +168,14 @@ def new_trade(
         "news_applied": bool(news_applied),
         "model_ref": model_ref or {},
         "look": look,
+        "player": player["player"] if player else None,
+        "player_id": player.get("player_id") if player else None,
+        "team": player.get("team") if player else None,
+        "line": pick.get("line"),
+        "side": pick.get("side"),
+        "position": None,
+        "started": None,
+        "actual": None,
         "close_odds": None,
         "close_fetched_at": None,
         "clv_dk": None,
@@ -186,6 +201,50 @@ def won(market: str, home_goals: int, away_goals: int) -> bool:
         "over25": home_goals + away_goals > 2.5,
         "under25": home_goals + away_goals < 2.5,
     }[market]
+
+
+def settle_player(trade: dict, actual: int | None, started: bool | None) -> dict:
+    """Settlement for a player bet: void if he didn't play (actual is None)."""
+    if actual is None:
+        return {"status": "void", "actual": None, "started": None, "profit": 0.0}
+    over = actual > trade["line"]
+    w = over if trade["side"] == "over" else not over
+    return {
+        "status": "won" if w else "lost",
+        "actual": int(actual),
+        "started": bool(started),
+        "profit": round(trade["stake"] * (trade["odds"] - 1), 2) if w else -trade["stake"],
+    }
+
+
+def player_picks(
+    lines: pd.DataFrame, threshold: float = PAPER_EDGE, cap_per_match: int = MAX_PLAYER_TRADES
+) -> pd.DataFrame:
+    """The player trade rule.
+
+    `lines` has one row per priced side: home, away, player, market, line, side
+    ("over"/"under"), odds and p (the model's chance of that side, given he plays).
+    Keeps, per player, match and market, the line and side with the highest edge if it
+    reaches `threshold`; then at most `cap_per_match` per match, the highest edges first.
+    """
+    if lines.empty:
+        return lines.assign(edge=[])
+    df = lines.copy()
+    df["edge"] = df["p"] * df["odds"] - 1
+    df = df[(df["edge"] > 0) & (df["edge"] >= threshold - EPS) & (df["odds"] > 1)]
+    if df.empty:
+        return df
+    df = df.sort_values("edge", ascending=False)
+    df = df.drop_duplicates(["home", "away", "player", "market"])
+    return df.groupby(["home", "away"], sort=False).head(cap_per_match).reset_index(drop=True)
+
+
+def devig_pair(over: float | None, under: float | None) -> tuple[float, float] | None:
+    """Margin-free over/under probabilities, when both sides are priced."""
+    if not (_ok(over) and _ok(under)) or over <= 1 or under <= 1:
+        return None
+    p = devig_shin(np.array([over, under], dtype=float))
+    return float(p[0]), float(p[1])
 
 
 def settle(trade: dict, home_goals: int | None, away_goals: int | None, void: bool = False) -> dict:
@@ -323,7 +382,17 @@ def report(trades: pd.DataFrame) -> dict:
         out["summary"]["roi_ci95"] = list(ci) if ci else None
     out["breakdowns"] = {
         key: breakdown(trades, key)
-        for key in ("market", "edge_bucket", "odds_bucket", "season", "look", "bet_type")
-        if key in trades or key.endswith("_bucket")
+        for key in (
+            "market",
+            "edge_bucket",
+            "odds_bucket",
+            "season",
+            "look",
+            "bet_type",
+            "line",
+            "position",
+            "started",
+        )
+        if (key in trades and trades[key].notna().any()) or key.endswith("_bucket")
     }
     return out

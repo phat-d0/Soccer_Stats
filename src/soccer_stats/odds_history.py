@@ -174,7 +174,6 @@ def backfill(
             )
         )
         rep.fetched += 1
-    rep.estimated_credits = (len(todo) - rep.fetched) * COST_PER_SNAPSHOT
     return rep
 
 

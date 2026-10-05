@@ -53,9 +53,12 @@ def walk_forward(
             m = model.score_matrix(row.home, row.away)
             p = match_odds(m)
             over = over_under(m, 2.5)[0]
+            exp_h, exp_a = model.expected_goals(row.home, row.away)
             out.append(
                 {
                     **row._asdict(),
+                    "exp_home": exp_h,
+                    "exp_away": exp_a,
                     "p_home": p[0],
                     "p_draw": p[1],
                     "p_away": p[2],

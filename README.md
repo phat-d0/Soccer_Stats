@@ -111,6 +111,47 @@ falls as the sweep's threshold rises, big claimed edges are mostly the model's m
 and the next step is blending with the market, not more bets. Tap any trade for every
 stored field.
 
+## Player bets: shots and shots on target
+
+A multi-factor model prices each player's shots and shots on target, and player bets go
+through the same rule, ledger and Portfolio tab as match bets.
+
+- **Data** (`player_data.py`): Understat's per-match files give every shot (player,
+  result) and both rosters (minutes, starter or sub). Shots on target = goals + saved
+  shots. One cached file per match; builds download at most 40 new ones each. Player
+  names are matched across Understat, FPL and The Odds API within a match's teams (exact
+  name first, then a unique surname); anything ambiguous is skipped and counted, never
+  guessed. Fixes go in `src/soccer_stats/player_names.csv`.
+- **Factors** (`factors.py`, one list for future markets): his shots per 90 (recent
+  matches weighted, shrunk to his position), position, penalty duty; team shots per
+  match, team expected goals from the match model, absent team-mates' share of shots;
+  shots the opponent concedes, overall and to his position; home/away, expected game
+  state, days of rest. Every feature uses only earlier kickoffs.
+- **Model** (`models/player_counts.py`): a regularised negative binomial for shots, with
+  minutes ÷ 90 as exposure; shots on target either as a share of his shots or its own
+  count model, whichever tests better. Prices assume he plays (bets on non-players are
+  void), mixing "starts" and "comes on" by his chance of starting.
+- **Testing** (`soccer-stats backtest-players`, or the *Player model* workflow every
+  Monday): walk-forward by week from 2023/24. Stage 1 needs no odds: the chance of over
+  0.5, 1.5 and 2.5 is scored against each player's season average, before lineups and
+  with the lineup known, plus an ablation of each factor group (groups that don't help
+  are dropped) and a check that players' expected shots add up to the team's. **Player
+  odds and player paper trades switch on only when the model beats the baseline for
+  both shots and shots on target.** Stage 2 (`soccer-stats backfill-player-odds`, about
+  20 credits per match per snapshot, roughly 15,000 a season) replays the rule on
+  historical DraftKings player lines and reports the usual metrics by market, line,
+  position, and starter or sub.
+- **Rule for player bets**: 12% edge, $10; per player, match and market, the line and
+  side with the highest edge; at most 4 player trades per match; void if he doesn't play.
+- **In the app**: player lines with model chances and edges in each match's sheet, a
+  *Player picks* list on the Matches tab, and an All / Match / Player filter on the
+  Portfolio tab. Live player lines refresh per match within 30 hours of kickoff (hourly in
+  the last 3 hours) and keep 3,000 credits spare for match odds.
+
+Not automated: DraftKings settles on its own data provider, which can differ from
+Understat on blocked and deflected shots. `player_data.reconcile()` measures the mismatch
+rate against a hand-collected official sample.
+
 **One-time setup**
 1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. **Actions** tab → *Publish app* → **Run workflow** (or wait for the next scheduled run).
@@ -195,6 +236,12 @@ src/soccer_stats/
   trades.py             the trade rule, settlement and metrics (no network or files)
   paper.py              live paper-trade ledger on the data-log branch
   odds_history.py       historical DraftKings snapshots: plan, budget, cache
+  player_data.py        Understat shots/minutes per player per match, name matching
+  factors.py            the player factor list (prior-only features)
+  models/player_counts.py  negative binomial shot models, start/sub mixture
+  player_backtest.py    walk-forward player tests, ablation, priced backtest
+  player_odds.py        DraftKings player shot lines (live budgeted, historical)
+  player_live.py        player lines for upcoming fixtures
 app/streamlit_app.py    the Premier League dashboard (desktop)
 web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)
 .github/workflows/      scheduled build + deploy to GitHub Pages; by-hand odds backfill

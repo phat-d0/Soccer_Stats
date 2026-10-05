@@ -1,0 +1,84 @@
+# Tests the player shot model (stage 1, no odds or credits) every Monday, and on demand.
+# Optionally downloads historical DraftKings player odds first for the priced backtest
+# (stage 2; about 20 credits per match per snapshot). Results go to the data-log branch,
+# where the app and the scheduled build read them: player odds and player paper trades
+# switch on only when the model beats its season-average baseline.
+name: Player model
+
+on:
+  schedule:
+    - cron: "13 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: "Seasons to test (start years)"
+        default: "2023-2025"
+      odds_seasons:
+        description: "Seasons of historical player odds to download (blank = none)"
+        default: ""
+      max_credits:
+        description: "Most credits the player-odds download may spend"
+        default: "0"
+      dry_run:
+        description: "Dry run for the player-odds download (spend nothing)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: players
+  cancel-in-progress: false
+
+jobs:
+  players:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      # Shares the scheduled build's cache, so the Understat match files downloaded
+      # here are there for live player lines too.
+      - uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-data-${{ github.run_id }}
+          restore-keys: raw-data-
+
+      - uses: actions/cache@v4
+        with:
+          path: data/raw/player_odds_history
+          key: player-odds-history-${{ github.run_id }}
+          restore-keys: player-odds-history-
+
+      - name: Download historical player odds
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.odds_seasons != '' }}
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats backfill-player-odds --seasons "${{ inputs.odds_seasons }}" \
+            --max-credits "${{ inputs.max_credits }}" ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Test the player model and save the result
+        run: |
+          uv sync --frozen
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          SEASONS="${{ inputs.seasons || '2023-2025' }}"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            uv run soccer-stats backtest-players --seasons "$SEASONS" \
+              --out ../log/backtest/E0_player_trades.csv --log-dir ../log
+            git -C ../log add -A backtest
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Player model $SEASONS"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1

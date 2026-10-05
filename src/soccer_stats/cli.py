@@ -98,8 +98,16 @@ def cmd_paper(args: argparse.Namespace) -> None:
     except Exception as exc:  # no results: trades stay open until the next build
         print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
         results = pd.DataFrame(columns=["home", "away", "season"])
+    apps = None
+    if args.league == "E0":
+        try:
+            from soccer_stats.player_data import load_appearances
+
+            apps, _ = load_appearances(args.league, [season], max_new=20)
+        except Exception as exc:  # player trades settle on a later build
+            print(f"Player data unavailable ({type(exc).__name__})")
     log_dir = Path(args.log_dir) if args.log_dir else None
-    n = paper.run(data, log_dir, results, league=args.league)
+    n = paper.run(data, log_dir, results, league=args.league, apps=apps)
     (site / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
     live = data["portfolio"]["live"]
     s = live.get("summary", {})
@@ -224,6 +232,153 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(_clean(out), separators=(",", ":")))
         print(f"App data written to {path}")
+
+
+def cmd_backtest_players(args: argparse.Namespace) -> None:
+    import json
+
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import trades as tr
+    from soccer_stats.factors import ALL_FACTORS, build_features
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.player_odds import load_history as load_player_odds
+    from soccer_stats.publish import _clean
+
+    seasons = _years(args.seasons)
+    years = range(seasons[0] - args.burn_in, seasons[-1] + 1)
+    apps, missing = load_appearances(args.league, years)
+    if apps.empty:
+        raise SystemExit(
+            f"No player appearances loaded ({missing} match files missing): Understat's match "
+            "data couldn't be read, so the player model can't be tested."
+        )
+    print(
+        f"{len(apps)} appearances from {apps['match_id'].nunique()} matches"
+        + (f" ({missing} matches couldn't be downloaded)" if missing else "")
+    )
+    matches = load_matches([args.league], years)
+    matches, err = with_xg(matches)
+    preds = backtest.walk_forward(
+        matches,
+        start=f"{seasons[0] - args.burn_in + 1}-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=0.7 if not err else 0.0),
+    )
+    feats = build_features(apps, pb.match_info(preds, apps))
+    start = f"{seasons[0]}-07-01"
+
+    before = pb.walk_forward(feats, start)
+    known = pb.walk_forward(feats, start, lineup_known=True)
+    s_before, s_known = pb.score(before), pb.score(known)
+    sot_count = pb.score(pb.walk_forward(feats, start, sot_method="count"))
+    sot_method = "count" if sot_count["sot"]["model"] < s_before["sot"]["model"] else "thin"
+    ab = pb.ablation(feats, start, s_before)
+    factors = pb.kept_factors(ab["kept_groups"]) or ALL_FACTORS
+    if sot_method == "count" or factors != ALL_FACTORS:  # final model with the choices made
+        before = pb.walk_forward(feats, start, factors, sot_method=sot_method)
+        s_final = pb.score(before)
+    else:
+        s_final = s_before
+    rec = pb.reconcile_team_totals(known)
+    gate = {
+        "shots": s_final["shots"]["beats_baseline"],
+        "sot": s_final["sot"]["beats_baseline"],
+    }
+    gate["passed"] = gate["shots"] and gate["sot"]
+
+    out = {
+        "generated_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
+        "seasons": args.seasons,
+        "gate": gate,
+        "factors": factors,
+        "sot_method": sot_method,
+        "before_lineups": s_final,
+        "lineup_known": s_known,
+        "sot_methods": {"thin": s_before["sot"]["model"], "count": sot_count["sot"]["model"]},
+        "ablation": ab,
+        "team_totals": rec,
+    }
+    hist = load_player_odds(args.league, set(apps["team"]))
+    if not hist.empty:
+        trades, info = pb.priced_trades(before, hist, apps, league=args.league)
+        out["priced"] = {**info, **tr.report(trades)} if not trades.empty else info
+        out["trades"] = (
+            trades.sort_values("kickoff", ascending=False).to_dict("records")
+            if not trades.empty
+            else []
+        )
+        if args.out and not trades.empty:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            trades.to_csv(args.out, index=False)
+
+    print(f"\n=== Player model, {args.seasons} (stage 1: no odds) ===")
+    for name, sc in (("Before lineups", s_final), ("Lineup known", s_known)):
+        for c in ("shots", "sot"):
+            r = sc[c]
+            print(
+                f"{name:>15} {c:>5}: log loss {r['model']:.4f} vs baseline {r['baseline']:.4f}"
+                f" ({'beats' if r['beats_baseline'] else 'does NOT beat'} it)"
+            )
+    print(
+        f"Shots on target method: {sot_method} "
+        f"(thin {out['sot_methods']['thin']:.4f}, count {out['sot_methods']['count']:.4f})"
+    )
+    print("Ablation (log loss without each group; kept if removing it hurts):")
+    for g in ab["groups"]:
+        print(
+            f"  without {g['without']:>9}: {g['log_loss']:.4f} ({g['change']:+.4f}) "
+            f"{'kept' if g['kept'] else 'DROPPED'}"
+        )
+    if rec:
+        print(
+            f"Team totals: players' expected shots / team expected shots = "
+            f"{rec['ratio_to_expected']:.3f} (tolerance ±{rec['tolerance']:.0%})"
+        )
+    print(
+        f"Gate: {'PASSED' if gate['passed'] else 'not passed'}: player odds and trades are "
+        f"{'on' if gate['passed'] else 'off'}"
+    )
+    if "priced" in out:
+        pr = out["priced"]
+        s = pr.get("summary", {})
+        print(
+            f"Stage 2: {s.get('trades', 0)} player trades, ROI {_fmt(s.get('roi'), 'pct')}, "
+            f"CLV {_fmt(s.get('clv_dk'), 'pct')}; {pr['unmatched_names']} names unmatched"
+        )
+
+    path = (
+        Path(args.json)
+        if args.json
+        else (
+            Path(args.log_dir) / "backtest" / f"{args.league}_players.json"
+            if args.log_dir
+            else None
+        )
+    )
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"Saved to {path}")
+
+
+def cmd_backfill_players(args: argparse.Namespace) -> None:
+    from soccer_stats.player_data import season_matches
+    from soccer_stats.player_odds import backfill
+
+    now = pd.Timestamp.now(tz="UTC")
+    ks = pd.concat([season_matches(args.league, y)["kickoff"] for y in _years(args.seasons)])
+    ks = ks[(ks < now) & (ks >= pd.Timestamp("2023-05-03", tz="UTC"))]
+    rep = backfill(
+        ks,
+        args.league,
+        max_credits=args.max_credits,
+        keep_credits=args.keep_credits,
+        dry_run=args.dry_run,
+    )
+    print(f"{len(ks)} matches played in {args.seasons}")
+    for line in rep.lines():
+        print(line)
+    if args.dry_run:
+        print("Dry run: no API calls made.")
 
 
 def _fmt(v, kind="num"):
@@ -355,6 +510,23 @@ def main(argv: list[str] | None = None) -> None:
     dk.add_argument("--json", help="path for the app's backtest data")
     dk.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_dk.json")
     dk.set_defaults(func=cmd_backtest_dk)
+
+    bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
+    bp.add_argument("--league", default="E0")
+    bp.add_argument("--seasons", default="2023-2025", help="seasons to predict (start years)")
+    bp.add_argument("--burn-in", type=int, default=1, help="seasons of data before")
+    bp.add_argument("--out", help="CSV of priced player trades (stage 2)")
+    bp.add_argument("--json", help="path for the results (the gate the app reads)")
+    bp.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_players.json")
+    bp.set_defaults(func=cmd_backtest_players)
+
+    bfp = sub.add_parser("backfill-player-odds", help="historical DraftKings player shot odds")
+    bfp.add_argument("--league", default="E0")
+    bfp.add_argument("--seasons", default="2025")
+    bfp.add_argument("--max-credits", type=int, default=0)
+    bfp.add_argument("--keep-credits", type=int, default=1500)
+    bfp.add_argument("--dry-run", action="store_true")
+    bfp.set_defaults(func=cmd_backfill_players)
 
     args = parser.parse_args(argv)
     args.func(args)
