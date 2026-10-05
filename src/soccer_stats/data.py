@@ -107,6 +107,35 @@ def download(
     )
 
 
+# Odds columns fall back to the market average, then Bet365, when a file has no
+# Pinnacle price (e.g. fixtures posted before Pinnacle's line is in the file).
+FALLBACKS = {
+    "odds_home": ["AvgH", "B365H"],
+    "odds_draw": ["AvgD", "B365D"],
+    "odds_away": ["AvgA", "B365A"],
+    "close_home": ["AvgCH", "B365CH"],
+    "close_draw": ["AvgCD", "B365CD"],
+    "close_away": ["AvgCA", "B365CA"],
+    "odds_over25": ["Avg>2.5", "B365>2.5"],
+    "odds_under25": ["Avg<2.5", "B365<2.5"],
+    "close_over25": ["AvgC>2.5", "B365C>2.5"],
+    "close_under25": ["AvgC<2.5", "B365C<2.5"],
+}
+
+
+def _extract(raw: pd.DataFrame) -> pd.DataFrame:
+    """Pick our columns out of a football-data frame in one go (missing -> NaN)."""
+    nan = pd.Series(float("nan"), index=raw.index)
+    cols = {}
+    for src, dst in COLUMNS.items():
+        col = raw[src] if src in raw.columns else nan
+        for alt in FALLBACKS.get(dst, []):
+            if alt in raw.columns:
+                col = col.fillna(raw[alt]) if col is not nan else raw[alt]
+        cols[dst] = col
+    return pd.DataFrame(cols, index=raw.index)
+
+
 def load_fixtures(
     leagues: Iterable[str], raw_dir: Path = RAW_DIR, max_age_hours: float = 6
 ) -> pd.DataFrame:
@@ -114,10 +143,7 @@ def load_fixtures(
     path = _fetch(FIXTURES_URL, raw_dir / "fixtures.csv", max_age_hours)
     raw = pd.read_csv(path, encoding="utf-8-sig", on_bad_lines="skip")
     raw = raw[raw["Div"].isin(list(leagues))]
-    df = raw.rename(columns=COLUMNS)
-    for col in COLUMNS.values():
-        if col not in df.columns:
-            df[col] = float("nan")
+    df = _extract(raw)
     df["league"] = raw["Div"]
     df["kickoff"] = pd.to_datetime(
         raw["Date"] + " " + raw.get("Time", pd.Series("00:00", index=raw.index)).fillna("00:00"),
@@ -136,11 +162,7 @@ def normalize(
     raw: pd.DataFrame, league: str | None = None, season: str | None = None
 ) -> pd.DataFrame:
     """Rename and type the columns we use; drop unplayed/blank rows."""
-    df = raw.rename(columns=COLUMNS)
-    for col in COLUMNS.values():
-        if col not in df.columns:
-            df[col] = float("nan")
-    df = df[list(COLUMNS.values())].dropna(subset=["home", "away", "home_goals", "away_goals"])
+    df = _extract(raw).dropna(subset=["home", "away", "home_goals", "away_goals"])
     df["date"] = pd.to_datetime(df["date"], dayfirst=True, format="mixed")
     df[["home_goals", "away_goals"]] = df[["home_goals", "away_goals"]].astype(int)
     df.insert(0, "league", league)

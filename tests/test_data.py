@@ -27,3 +27,20 @@ def test_normalize_handles_missing_columns_and_blank_rows():
     assert df["date"].iloc[1] == pd.Timestamp("2023-08-13")
     assert df["close_home"].isna().all()
     assert df["home_goals"].dtype.kind == "i"
+
+
+def test_odds_fall_back_to_average_then_bet365():
+    raw = pd.DataFrame(
+        {
+            "Date": ["12/08/2023", "13/08/2023"],
+            "HomeTeam": ["A", "C"],
+            "AwayTeam": ["B", "D"],
+            "FTHG": [1, 0],
+            "FTAG": [0, 0],
+            "PSH": [2.0, None],  # Pinnacle missing for the second match
+            "AvgH": [1.9, None],
+            "B365H": [1.8, 2.5],
+        }
+    )
+    df = normalize(raw)
+    assert list(df["odds_home"]) == [2.0, 2.5]
