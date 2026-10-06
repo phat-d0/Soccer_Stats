@@ -30,7 +30,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
-| `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots) to ~100 per historical props call |
+| `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots, signals), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots, signals) to ~100 per historical props call |
 | `ci.yml` | On every push and pull request. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. Job `web`: installs Playwright's Chromium (cached) and runs `tests/web/smoke.mjs`; a skip counts as a failure, and screenshots are uploaded when it fails. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml`, dispatch `publish.yml`, so the app picks up the new results.
@@ -95,7 +95,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 - `player_odds.py`: FanDuel live lines (`fetch_live`, keeps 3,000 credits in reserve) and the historical backfill (cached per event; files `{event_id}_{look|close}_fanduel.json`).
 - `player_live.py`: player lines for upcoming fixtures in the app.
   - Candidates are each team's players from its last 5 matches, corrected for transfers with `player_data.active_players` (`active=`): FPL at another club or status "u" drops a player; FPL at this club adds a signing with Premier League history. Players FPL doesn't match are kept.
-  - Promoted teams without Premier League history (Hull, Coventry in 2026/27) get no rows; `players_status` reports `teams_without_history`, `moved_in`/`moved_out`, `unmatched_odds` and a sample of `unmatched_names` (add spellings to `player_names.csv`). The publish log prints them.
+  - A team with no Understat appearances yet (a promoted side before its first match) gets no rows; `players_status` reports `teams_without_history`, `moved_in`/`moved_out`, `unmatched_odds` and a sample of `unmatched_names` (add spellings to `player_names.csv`). The publish log prints them.
   - `publish.add_players` loads three seasons (`PLAYER_SEASONS`), so the model trains on up to two years as in the backtest even at a season's start; `players_stats.json` keeps the last two.
   - Each priced side has `p_model` (raw model, for display) and `p` (the blend, which sets `edge`, the app's player picks and, if the switch is on, the paper trades).
   - The blend coefficients come from `publish.player_gate()` → `calibration` (= `E0_players.json` → `priced.calibration.look.coef`).
@@ -107,11 +107,13 @@ Read its "Status and next steps" section first; this file is the technical map.
 **Edge research**
 - `edge/`: analysis helpers (line shopping on football-data books, two-sided prop probe,
   FanDuel slices, Understat vs ESPN shot counts), run via `python -m soccer_stats.edge.run`
-  and `odds-check.yml` (`task` = props, match, shots). Findings and ranked next experiments: `docs/edge.md`.
+  and `odds-check.yml` (`task` = props, match, shots, signals). Findings and ranked next experiments: `docs/edge.md`.
+- `edge/signals.py`: seven pre-registered free signals (xG form, xG minus goals, rest, model vs early, soft books vs Pinnacle early, two totals signals; 6-match window, earlier matches only) tested against Pinnacle's early-to-close move and as a blend term beside Pinnacle early, season by season on earlier seasons, ranges Bonferroni-widened for 14 tests.
+- **football-data's Asian handicap average and maximum (`AvgAH*`, `MaxAH*`) are unreliable**: often stale or at a different line. Pinnacle's AH prices are fine. Anything using the average/maximum AH columns must run `match_markets.clean_prices` or equivalent, and even then treat the results as suspect.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
-- `cli.py`: the `soccer-stats` commands: `publish`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `log-news`.
+- `cli.py`: the `soccer-stats` commands: `publish`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
@@ -162,7 +164,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - a readout line instead of tooltips over the chart;
   - colour tokens defined for both light and dark themes.
 
-## Status (2026-10-06, after round 1)
+## Status (2026-10-06, after round 2)
 
 **Match bets**
 - DraftKings backtest, 2025/26, raw model at a 12% edge: 173 bets, ROI −13% (95% range −38% to +16%), CLV vs DraftKings −5% to −7%. Every threshold from 2% to 20% loses (−8% to −21%).
@@ -174,6 +176,8 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - Model picks at Pinnacle early, 12%: CLV −4.2% (1X2, 1,419 bets), −2.9% (O/U, 285), −2.0% (AH, 744), worse than a random side. AH blend: CLV −0.2% to +0.8% at 2–8%, no range above 0.
   - xG form, xG-minus-goals and soft-vs-sharp earn no out-of-sample log loss (all ranges include 0). Late team news can't be tested yet (FPL log starts 5 Oct 2026).
   - Verdict: no AH or O/U bets in the live rule; nothing in the live code changed.
+  - The AH rows at football-data's average and maximum prices (avg −3.2%, max blend +1.2% to +2.6%) are unreliable (stale quotes; see the data warning above). The Pinnacle-only AH results stand.
+- Free signals (edge finder, `edge/signals.py`, 2017–2026, 7 signals × 2 tests, Bonferroni 99.64% ranges): none earns blend weight beside Pinnacle early (best gain +0.0002, range −0.0017 to +0.0019). Soft-vs-sharp and xG form predict the early-to-close move a little (R² 0.1–1.6%), but betting them at Pinnacle early gives CLV −1.6% to −3.7%, never positive.
 - Line shopping (edge finder, football-data 2017–2026, ~1,700–2,100 bets): the rule's CLV vs Pinnacle's fair close is −6.6% at the average book, −4.0% at Pinnacle early, −2.3% at the best of seven named books. Only the unbettable market maximum is positive, and it turned negative in the last two seasons. The picks do no better than random against the sharp close.
 - Live: value picks and match paper trades use the blend (`p_bet`) once `E0_dk.json` holds `blend.live`, so they will mostly stop. That is the honest result.
 
@@ -192,9 +196,12 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - No Odds API book prices EPL player shots on both sides (all five regions; 1xBet and the Kambi books are over-only too). No FanDuel slice is close to fair: the best (odds ≤ 1.25 at the close) is −13.8%, −16.6% in the holdout season.
 - Understat's shot counts match ESPN's (99.8% of 617 player-matches identical), so the losses are margin, not a data mismatch.
 - Live: player lines show with the blended chance (3-hour "look" coefficients); `PLAYER_PAPER_TRADES = False`, so no player paper trades open.
-- Season 2026/27 (starts 10 Oct), round 2: live lines handle transfers and promoted teams (above); FanDuel's live fetch keeps 3,000 credits (an unknown balance allows one call, then the headers' balance holds the reserve); the weekly run adds 2026/27 once it has played matches. Nothing was re-run here (the sandbox can't reach the sources): the next `players.yml` run writes the per-strategy trades and `by_season`.
+- Round 2 (`players.yml` run 37528001150, `--seasons 2023-now` = 2023/24–2026/27): stage 1 beats the baseline in every season (shots log loss 0.426 / 0.414 / 0.419 vs 0.507 / 0.491 / 0.491 for 2023/24–2025/26; 2026/27 so far 0.452 vs 0.741 on 1,293 appearances, where the season-average baseline is still thin). Priced, 12% edge: starters after lineups 154 bets −18% (SE ±32 points), blend 3 h before 223 −35%, raw model 3 h before 635 −22%. Every strategy's bets are now in `E0_players.json` (`priced.strategies.<name>.trades`).
+- Live lines correct squads for transfers (FPL); the 6 Oct publish showed 490 players, 0 priced (no FanDuel lines more than 30 hours before kickoff) and no teams without history.
 - No live lineup feed. Build one (ESPN summary API, `rosters[].roster[].starter`) only if a strategy backtests positive.
 
-**Credits**: 22,732 left on 6 Oct after the edge round (220 spent). The key is shared, so check the publish log.
+**Credits**: 22,720 left on 6 Oct after round 2 (publish run 37529138058). Round 2 spent 0 on research; the live DraftKings refreshes cost ~2 each. The key is shared, so check the publish log.
+
+**App (round 2)**: the match sheet shows model, blend and DraftKings side by side, with a plain-English reason when no value bet shows; player lines show the raw model, the blend and FanDuel's implied chance; Record → Match bets has the DraftKings strategy switch and sweep; Portfolio breakdowns are folded. `sw.js` is `pl-model-v20`.
 
 Ranked next steps are in the work plan's "Status and next steps" section and in `docs/edge.md`.

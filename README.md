@@ -159,7 +159,8 @@ through the same rule, ledger and Portfolio tab as match bets.
   count model, whichever tests better. Prices assume he plays (bets on non-players are
   void), mixing "starts" and "comes on" by his chance of starting.
 - **Testing** (`soccer-stats backtest-players`, or the *Player model* workflow every
-  Monday): walk-forward by week from 2023/24. Stage 1 needs no odds: the chance of over
+  Monday): walk-forward by week from 2023/24 to the season in progress (`--seasons
+  2023-now`; a new season joins once it has played matches). Stage 1 needs no odds: the chance of over
   0.5, 1.5 and 2.5 is scored against each player's season average, before lineups and
   with the lineup known, plus an ablation of each factor group (groups that don't help
   are dropped) and a check that players' expected shots add up to the team's. **Player
@@ -187,8 +188,10 @@ counting mismatch.
 
 **Edge research** (`src/soccer_stats/edge/`, findings in `docs/edge.md`): line shopping
 across books, a probe for two-sided player-prop books (none exist on The Odds API for EPL
-shots), FanDuel slices and shot-count checks. Run through the *Player odds check*
-workflow's `task` input.
+shots), FanDuel slices, shot-count checks and a test of free signals (xG form, rest, soft
+books vs Pinnacle) against the closing-line move. Run through the *Player odds check*
+workflow's `task` input. None of it found a bettable edge; football-data's average and
+maximum Asian handicap prices are often stale, so only Pinnacle's AH prices are used.
 
 **One-time setup**
 1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
