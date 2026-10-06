@@ -446,6 +446,49 @@ def portfolio_section(trades: list[dict]) -> dict:
     }
 
 
+def portfolios_section(
+    live: dict, live_trades: list[dict], backtests: dict[str, dict | None]
+) -> list[dict]:
+    """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
+    backtest sections (portfolio_section over that portfolio's trades only).
+
+    `live` carries the ledger's error and note, shared by every portfolio; `backtests`
+    maps a portfolio id to its backtest file's contents (or None).
+    """
+    out = []
+    for p in tr.PORTFOLIOS:
+        mine = [t for t in live_trades if tr.portfolio_of(t) == p["id"]]
+        bt = backtests.get(p["id"])
+        if bt is not None and "summary" not in bt:  # a trades-only file (player backtest)
+            trades = [t for t in bt.get("trades") or [] if tr.portfolio_of(t) == p["id"]]
+            bt = {
+                "generated_at": bt.get("generated_at"),
+                "seasons": bt.get("seasons"),
+                **portfolio_section(trades),
+            }
+        out.append(
+            {
+                **{k: p[k] for k in ("id", "name", "status", "note")},
+                "live": {
+                    **portfolio_section(mine),
+                    "error": live.get("error"),
+                    "note": live.get("note"),
+                },
+                "backtest": bt,
+            }
+        )
+    return out
+
+
+def _read_json(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except ValueError:
+        return None
+
+
 def backtest_path(log_dir: Path, league: str = "E0") -> Path:
     """Where backtest-dk saves the app's backtest section (on the data-log branch)."""
     return Path(log_dir) / "backtest" / f"{league}_dk.json"
@@ -467,6 +510,8 @@ def run(
     portfolio = data.setdefault("portfolio", {})
     live = {"trades": [], "summary": {"trades": 0}, "error": None, "note": None}
     written = 0
+    live_trades: list[dict] = []
+    backtests: dict[str, dict | None] = {}
     if log_dir is None or not Path(log_dir).is_dir():
         live["error"] = "The paper-trade ledger is unavailable, so nothing was opened this update."
     else:
@@ -494,7 +539,12 @@ def run(
                 odds_log=log,
             )
             written = append_events(log_dir, events, league)
-            live.update(portfolio_section(list(ledger.values())), note=note)
+            live_trades = list(ledger.values())
+            live.update(portfolio_section(live_trades), note=note)
+        for p in tr.PORTFOLIOS:
+            backtests[p["id"]] = _read_json(
+                Path(log_dir) / "backtest" / f"{league}_{p['backtest']}.json"
+            )
         bt = backtest_path(log_dir, league)
         if bt.exists():
             try:
@@ -515,4 +565,7 @@ def run(
                 merged = portfolio_section(combined)
                 portfolio["backtest"] = {**b, **merged}
     portfolio["live"] = live
+    # One portfolio per strategy (the app reads these); live, backtest and player_model
+    # above stay for one release.
+    portfolio["portfolios"] = portfolios_section(live, live_trades, backtests)
     return written

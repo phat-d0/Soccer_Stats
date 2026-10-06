@@ -113,6 +113,54 @@ def select_trades(
     return pd.DataFrame(rows, columns=list(dict.fromkeys(cols)))
 
 
+# The portfolios the app shows, one per strategy. Adding a strategy is one entry here:
+# id, display name, status ("live", "testing" or "retired"), a plain-English note, and
+# the stem of its backtest file on data-log (backtest/<league>_<backtest>.json).
+PORTFOLIOS = [
+    {
+        "id": "moneyline",
+        "name": "Moneyline",
+        "status": "live",
+        "note": "Match bets (home, draw, away) at DraftKings' price, one per match on the "
+        "best edge.",
+        "backtest": "dk",
+    },
+    {
+        "id": "goalscorer",
+        "name": "Anytime goalscorer",
+        "status": "testing",
+        "note": "In testing: the model is being built and checked. No odds have been bought "
+        "yet, so there are no trades.",
+        "backtest": "goalscorer",
+    },
+    {
+        "id": "player_shots",
+        "name": "Player shots",
+        "status": "retired",
+        "note": "Retired on 6 Oct 2026: no player shot rule made money in testing, because "
+        "FanDuel's over-only lines carry too big a margin. Kept for its history.",
+        "backtest": "players",
+    },
+]
+PORTFOLIO_IDS = [p["id"] for p in PORTFOLIOS]
+# Markets that decide a trade's portfolio when it carries no `portfolio` field.
+PORTFOLIO_MARKETS = {
+    "player_shots": "player_shots",
+    "player_shots_on_target": "player_shots",
+    "player_goal_scorer_anytime": "goalscorer",
+}
+
+
+def portfolio_of(trade: dict) -> str:
+    """The portfolio a trade belongs to: its own `portfolio` field (set when it opens),
+    else by market (player markets), else by bet type (match bets are moneyline)."""
+    if trade.get("portfolio") in PORTFOLIO_IDS:
+        return trade["portfolio"]
+    if trade.get("market") in PORTFOLIO_MARKETS:
+        return PORTFOLIO_MARKETS[trade["market"]]
+    return "player_shots" if trade.get("bet_type") == "player" else "moneyline"
+
+
 def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str:
     """League, season, home and away (plus player and market for player bets)."""
     return "|".join([league, str(season), home, away, *extra])
@@ -121,7 +169,7 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
 ENTRY_FIELDS = (
     "id source bet_type league season opened_at kickoff hours_to_kickoff home away market "
     "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
-    "player player_id team line side position"
+    "player player_id team line side position portfolio"
 ).split()
 
 
@@ -179,6 +227,7 @@ def new_trade(
         "line": pick.get("line"),
         "side": pick.get("side"),
         "position": None,
+        "portfolio": portfolio_of({"bet_type": "player" if player else "match", **pick}),
         "started": None,
         "actual": None,
         "close_odds": None,
