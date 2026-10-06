@@ -335,7 +335,7 @@ def summarize(trades: pd.DataFrame) -> dict:
         # Live closes come from throttled scheduled builds: count the stale ones.
         mins = pd.to_numeric(settled.loc[settled["clv_dk"].notna(), "close_minutes_before"])
         if mins.notna().any():
-            out["close_over_60min"] = int((mins > STALE_CLOSE_MINUTES).sum())
+            out["close_early"] = int((mins > STALE_CLOSE_MINUTES).sum())
     return out
 
 

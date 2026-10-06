@@ -84,7 +84,7 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Also settlement, summaries, `report`. Keep it free of network code.
 - `paper.py`: live paper ledger (append-only "open" plus "update" events) and the `portfolio` section of `data.json`. Match trades use the fixture's `p_bet` (the blend) when set, else `p`.
   - Live match closes come from the odds log: the last logged price before kickoff sets `close_odds`, `close_prices`, `close_fetched_at`, `close_minutes_before`, `clv_dk` and `beat_close_dk` (update events; entry fields never change). Without a log, the price each build sees until kickoff.
-  - `trades.summarize` adds `close_over_60min`: settled trades whose close was quoted over 60 minutes before kickoff (scheduled runs are throttled). It merges the priced player backtest trades into the backtest view.
+  - `trades.summarize` adds `close_early`: settled trades whose close was quoted over 60 minutes before kickoff (scheduled runs are throttled). It merges the priced player backtest trades into the backtest view.
 
 **Player bets**
 - `player_data.py`: Understat per-match shots, name matching (exact name wins; ambiguous names are skipped and counted), season stats, active players (FPL status "u" = left).

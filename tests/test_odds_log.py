@@ -105,7 +105,7 @@ def test_live_trade_close_comes_from_the_log(tmp_path):
 
     s = paper.portfolio_section(list(paper.load_ledger(tmp_path).values()))["summary"]
     assert s["clv_dk"] > 0 and s["beat_close_dk"] == 1.0
-    assert s["close_over_60min"] == 1  # the close was 130 minutes out
+    assert s["close_early"] == 1  # the close was 130 minutes out
 
 
 def test_trade_without_log_rows_backfills_once_the_log_covers_it(tmp_path):

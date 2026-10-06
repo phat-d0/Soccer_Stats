@@ -87,7 +87,7 @@ market, with each outcome's price and margin-free chance, when DraftKings quoted
 the model's and the blend's chances at that moment. Rows are never rewritten and never
 duplicated. Live trades take their close from it (`close_odds`, `close_minutes_before`,
 `clv_dk`, `beat_close_dk`), and the Portfolio summary counts closes quoted over an hour
-before kickoff (`close_over_60min`). Read it with `odds_log.load`.
+before kickoff (`close_early`). Read it with `odds_log.load`.
 
 **DraftKings backtest** (needs a paid Odds API plan for historical odds):
 
