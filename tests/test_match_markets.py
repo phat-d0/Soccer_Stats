@@ -267,3 +267,20 @@ def test_bets_profit_and_clv_by_hand():
     assert b["clv"].iloc[0] == pytest.approx(2.0 * 0.55 - 1)
     assert np.isnan(b["clv"].iloc[1])
     assert mm.bets(cands, probs, "ah", "pinnacle_early", 0.5).empty
+
+
+def test_cli_match_markets_runs_offline(league, tmp_path, monkeypatch, capsys):
+    from soccer_stats import cli
+
+    df, _ = league
+    path = tmp_path / "E0_2021.csv"
+    _raw(df, np.random.default_rng(3)).to_csv(path, index=False)
+    base = df.assign(league="E0", season="2021")
+    monkeypatch.setattr(cli, "load_matches", lambda *a, **k: base.drop(columns=["home_xg"]))
+    monkeypatch.setattr(cli, "with_xg", lambda m: (m.assign(home_xg=df["home_xg"].values), None))
+    monkeypatch.setattr("soccer_stats.data.download", lambda *a, **k: path)
+    out = tmp_path / "o.json"
+    cli.main(["match-markets", "--seasons", "2021", "--json", str(out)])
+    text = capsys.readouterr().out
+    assert "==== ah ====" in text and "out-of-sample predictions" in text
+    assert {"h2h", "totals", "ah"} <= set(__import__("json").loads(out.read_text()))
