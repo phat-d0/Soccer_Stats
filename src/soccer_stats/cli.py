@@ -349,6 +349,8 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
             f"Stage 2: {s.get('trades', 0)} player trades, ROI {_fmt(s.get('roi'), 'pct')}, "
             f"CLV {_fmt(s.get('clv_dk'), 'pct')}; {pr['unmatched_names']} names unmatched"
         )
+        detail = {k: v for k, v in pr.items() if k not in ("summary", "breakdowns")}
+        print("Stage 2 detail: " + json.dumps(detail, default=str))
 
     path = (
         Path(args.json)

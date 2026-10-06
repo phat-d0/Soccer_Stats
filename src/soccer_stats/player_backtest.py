@@ -295,6 +295,9 @@ def priced_trades(
     h["season"] = [tr.season_label(k) for k in h["kickoff"]]
     h, info["unmatched_names"] = map_odds_players(h, apps)
     look, close = h[h["kind"] == "look"], h[h["kind"] == "close"]
+    info["look_sides_matched"] = len(look)
+    info["close_sides_matched"] = len(close)
+    info["sides_by_name"] = h["side"].value_counts().to_dict() if not h.empty else {}
     p = preds.copy()
     rows = []
     for r in look.itertuples(index=False):
@@ -319,8 +322,16 @@ def priced_trades(
             }
         )
     lines = pd.DataFrame(rows)
+    info["lines_with_prediction"] = len(lines)
     if lines.empty:
         return pd.DataFrame(), info
+    e = lines["p"] * lines["odds"] - 1
+    info["edge_quantiles"] = {q: round(float(e.quantile(q)), 4) for q in (0.5, 0.9, 0.99, 1.0)}
+    info["odds_range"] = [
+        round(float(lines["odds"].min()), 2),
+        round(float(lines["odds"].max()), 2),
+    ]
+    info["p_mean"] = round(float(lines["p"].mean()), 4)
     # The bookmaker's margin-free chance for each side at the look (the "implied" chance).
     pairs = {}
     for (pid, mkt, ln), g in lines.groupby(["player_id", "market", "line"]):
