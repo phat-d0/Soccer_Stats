@@ -470,3 +470,18 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 }
 .chip.on { background: var(--good-bg); color: var(--good-text); border-color: transparent; font-weight: 600; }
 .chip svg { width: 14px; height: 14px; }
+
+/* ---------- deviation chart ---------- */
+.row-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.row-controls .chip { margin: 0; }
+.segmented.mini { margin: 0; flex: 0 0 auto; }
+.segmented.mini button { padding: 6px 12px; font-size: 13px; }
+select.metric { display: block; width: 100%; margin-bottom: 8px; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary); }
+.chart .sd-band { fill: var(--track); }
+.chart .dev-pos { fill: var(--pos); }
+.chart .dev-neg { fill: var(--neg); }
+.chart .dev-name { fill: var(--text-secondary); font-size: 11px; }
+.chart .dev-row .hit { fill: transparent; }
+.chart .dev-row.on .dev-name { fill: var(--text-primary); font-weight: 600; }
+.chart .dev-row.on .hit { fill: var(--track); opacity: 0.5; }
+.dev-readout { min-height: 40px; font-size: 13px; color: var(--text-secondary); padding: 6px 0 8px; border-bottom: 0.5px solid var(--border); margin-bottom: 6px; }

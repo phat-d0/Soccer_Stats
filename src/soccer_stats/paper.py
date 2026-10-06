@@ -326,6 +326,7 @@ def _open_player_trades(ledger, cards, now, league, ref) -> list[dict]:
                 clv_dk=(t["odds"] * r["implied"] - 1) if r.get("implied") else None,
             )
             t["position"] = r.get("position")
+            t["implied"] = r.get("implied")
             ledger[t["id"]] = t
             events.append({"type": "open", **t})
     return events

@@ -19,7 +19,7 @@ const state = {
   pfShown: 25,
   pfBet: "", // Portfolio bet type filter: "", "match" or "player"
   teamsView: "teams", // Teams tab: "teams" or "players"
-  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true }, // Players view
+  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true, view: "list", metric: "p90" }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
   ps: null, // players_stats.json once loaded (or { error })
   exploreHome: store.get("exploreHome", null),
@@ -566,6 +566,95 @@ function statListHtml() {
   return `${club}${body}${rows.length > shown.length ? `<button class="more" id="pl-more">Show more (${rows.length - shown.length} left)</button>` : ""}`;
 }
 
+// ---------- deviation-from-the-mean chart (season stats) ----------
+const DEV_METRICS = {
+  p90: ["Shots per 90", (r) => per90(r.shots, r.minutes), (r) => r.minutes >= 300, 2, ""],
+  sot90: ["On target per 90", (r) => per90(r.sot, r.minutes), (r) => r.minutes >= 300, 2, ""],
+  sotpct: ["On-target %", (r) => (r.shots ? (100 * r.sot) / r.shots : null), (r) => r.shots >= 10, 0, "%"],
+  gxg: ["Goals minus xG", (r) => r.goals - r.xg, (r) => r.shots >= 10, 1, ""],
+  shots: ["Shots (total)", (r) => r.shots, () => true, 0, ""],
+};
+const DEV_MAX_ROWS = 40;
+let devData = null;
+
+function devChartHtml() {
+  const [label, val, qualifies, dp, unit] = DEV_METRICS[state.pl.metric];
+  const group = statRows().filter(qualifies).map((r) => ({ r, v: val(r) })).filter((x) => x.v != null);
+  if (group.length < 3) return '<p class="muted" style="padding:6px 0">Not enough qualifying players for a chart. Widen the filters.</p>';
+  const mean = group.reduce((a, x) => a + x.v, 0) / group.length;
+  const sd = Math.sqrt(group.reduce((a, x) => a + (x.v - mean) ** 2, 0) / (group.length - 1)) || 1;
+  group.forEach((x) => { x.d = x.v - mean; x.z = x.d / sd; });
+  group.sort((a, b) => b.d - a.d);
+  // Too many to read: keep the top and bottom of the group.
+  let rows = group, cut = false;
+  if (group.length > DEV_MAX_ROWS) { rows = group.slice(0, DEV_MAX_ROWS / 2).concat(group.slice(-DEV_MAX_ROWS / 2)); cut = true; }
+  const W = Math.max(300, Math.round(($("#view").clientWidth || 360) - 30)), RH = 22, T = 18, B = 24, LBL = 112;
+  const H = T + rows.length * RH + (cut ? 14 : 0) + B;
+  const ext = Math.max(...rows.map((x) => Math.abs(x.d)), sd) * 1.08;
+  const x0 = LBL + (W - LBL - 8) / 2, half = (W - LBL - 8) / 2;
+  const sx = (d) => x0 + (d / ext) * half;
+  const band = `<rect class="sd-band" x="${sx(-sd)}" y="${T - 4}" width="${sx(sd) - sx(-sd)}" height="${rows.length * RH + (cut ? 14 : 0) + 4}"/>`;
+  let y = T;
+  const bars = rows.map((x, i) => {
+    if (cut && i === DEV_MAX_ROWS / 2) y += 14;
+    const yy = y; y += RH;
+    const w = Math.max(Math.abs(sx(x.d) - x0), 1.5), left = x.d >= 0 ? x0 : x0 - w;
+    const r = Math.min(4, w / 2);
+    // rounded only at the data end, square at the baseline
+    const path = x.d >= 0
+      ? `M${left},${yy + 4} h${w - r} a${r},${r} 0 0 1 ${r},${r} v${RH - 8 - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - r} z`
+      : `M${left + w},${yy + 4} h-${w - r} a${r},${r} 0 0 0 -${r},${r} v${RH - 8 - 2 * r} a${r},${r} 0 0 0 ${r},${r} h${w - r} z`;
+    const name = x.r.player.length > 16 ? `${x.r.player.slice(0, 15)}…` : x.r.player;
+    return `<g class="dev-row" data-i="${i}">
+      <rect class="hit" x="0" y="${yy}" width="${W}" height="${RH}"/>
+      <text class="dev-name" x="${LBL - 8}" y="${yy + RH / 2 + 4}" text-anchor="end">${esc(name)}</text>
+      <path class="${x.d >= 0 ? "dev-pos" : "dev-neg"}" d="${path}"/>
+    </g>`;
+  }).join("");
+  // SD labels only when there's room beside the average's label.
+  const roomy = sx(sd) - x0 > 46;
+  const ticks = [-1, 0, 1].filter((k) => k === 0 || roomy).map((k) => `<text class="xlab" x="${sx(k * sd)}" y="${H - 8}" text-anchor="${k < 0 ? "end" : k > 0 ? "start" : "middle"}" dx="${k * 4}">${k === 0 ? `avg ${mean.toFixed(dp)}${unit}` : `${k > 0 ? "+" : "−"}1 SD`}</text>`).join("");
+  devData = { rows, mean, sd, dp, unit, label, W };
+  const scope = [seasonName(state.pl.season || state.ps.seasons[0]), state.pl.team || "all clubs", state.pl.pos || "all positions"].join(" · ");
+  return `
+    <p class="note" style="margin-top:0"><b>${esc(label)}</b>, each player against the average of this group (${esc(scope)}, ${group.length} players${state.pl.metric === "shots" ? "" : " who qualify"}). Blue = above average, red = below; the gray band is ±1 standard deviation (${sd.toFixed(dp)}${unit}).${cut ? ` Showing the top and bottom ${DEV_MAX_ROWS / 2}.` : ""}</p>
+    <div class="dev-readout" id="dev-readout" aria-live="polite">Tap a bar for that player's numbers.</div>
+    <div class="chart" id="dev-chart">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: deviation from the group average of ${mean.toFixed(dp)}${unit}">
+        ${band}
+        <line class="zero" x1="${x0}" x2="${x0}" y1="${T - 6}" y2="${H - B + 2}"/>
+        ${bars}
+        ${ticks}
+      </svg>
+    </div>`;
+}
+
+function bindDevChart() {
+  const el = $("#dev-chart");
+  if (!el || !devData) return;
+  const out = $("#dev-readout");
+  const show = (g) => {
+    const x = devData.rows[Number(g.dataset.i)];
+    el.querySelectorAll(".dev-row.on").forEach((n) => n.classList.remove("on"));
+    g.classList.add("on");
+    const r = x.r, u = devData.unit, dp = devData.dp;
+    out.innerHTML = `<b>${esc(r.player)}</b> <span class="muted">${esc(r.team)} · ${esc(r.position || "")}</span><br>${esc(devData.label)} ${x.v.toFixed(dp)}${u} · <span class="${x.d >= 0 ? "gain" : "loss"}">${x.d >= 0 ? "+" : "−"}${Math.abs(x.d).toFixed(dp)}${u} vs average (${x.z >= 0 ? "+" : "−"}${Math.abs(x.z).toFixed(1)} SD)</span> · ${r.shots} shots, ${r.minutes} min`;
+  };
+  el.querySelectorAll(".dev-row").forEach((g) => {
+    g.addEventListener("pointerenter", () => show(g));
+    g.addEventListener("pointerdown", () => show(g));
+  });
+}
+
+function refreshPlayerList() {
+  $("#pl-list").innerHTML = state.pl.mode === "stats" ? statsBodyHtml() : playerListHtml();
+  if (state.pl.mode === "stats" && state.pl.view === "chart") bindDevChart();
+}
+
+function statsBodyHtml() {
+  return state.pl.view === "chart" ? devChartHtml() : statListHtml();
+}
+
 function viewPlayerStats() {
   const d = state.data;
   if (d.players_stats && !state.ps) {
@@ -590,8 +679,14 @@ function viewPlayerStats() {
       <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
       <select id="pl-ssort" aria-label="Sort">${Object.entries(STAT_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.ssort ? "selected" : ""}>${l}</option>`).join("")}</select>
     </div>
-    ${activeToggle()}
-    <div class="card" id="pl-list">${statListHtml()}</div>
+    <div class="row-controls">
+      ${activeToggle()}
+      <div class="segmented mini" role="group" aria-label="List or chart">
+        ${[["list", "List"], ["chart", "Chart"]].map(([k, l]) => `<button data-plview="${k}" class="${f.view === k ? "on" : ""}" aria-pressed="${f.view === k}">${l}</button>`).join("")}
+      </div>
+    </div>
+    ${f.view === "chart" ? `<select id="pl-metric" class="metric" aria-label="Chart measure">${Object.entries(DEV_METRICS).map(([k, [l]]) => `<option value="${k}" ${k === f.metric ? "selected" : ""}>Chart: ${l}</option>`).join("")}</select>` : ""}
+    <div class="card" id="pl-list">${statsBodyHtml()}</div>
     <p class="note">Active players = in a current Premier League squad (Fantasy Premier League's list; injured or suspended players still count). Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record.</p>`;
 }
 
@@ -1049,6 +1144,7 @@ function viewPortfolio() {
     <div class="section-title">Running profit ($)</div>
     <div class="card">${profitChart(settled, "$") || '<p class="muted">Nothing settled yet.</p>'}</div>
     ${state.pfView === "live" ? pfOpen(trades) : ""}
+    ${state.pfBet !== "match" ? impliedVsRealizedHtml(trades) : ""}
     ${pfSettled(trades)}
     ${pfTable("By market", b.market, (g) => PICK_LABEL[g] || (PLAYER_MARKET[g] ? `Player ${PLAYER_MARKET[g]}` : g))}
     ${pfTable("By line", b.line, (g) => `${g}`)}
@@ -1058,6 +1154,42 @@ function viewPortfolio() {
     ${pfTable("By odds", b.odds_bucket)}
     ${state.pfView === "backtest" ? pfTable("By season", b.season, seasonName) + pfTable("By look", b.look, (g) => `${g} before kickoff`) + (state.pfBet === "player" ? "" : pfBacktestExtras(set)) + playerModelHtml(pf.player_model) : ""}
     ${foot}`;
+}
+
+// Player trades: DraftKings' implied chance and the model's chance against what happened.
+function impliedVsRealizedHtml(trades) {
+  const done = trades.filter((t) => t.bet_type === "player" && (t.status === "won" || t.status === "lost"));
+  if (!done.length) return "";
+  const withImp = done.filter((t) => t.implied != null);
+  const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const hit = avg(done.map((t) => (t.status === "won" ? 1 : 0)));
+  const buckets = [[0, 0.3], [0.3, 0.45], [0.45, 0.55], [0.55, 0.7], [0.7, 1.01]];
+  const rows = buckets.map(([lo, hi]) => {
+    const g = withImp.filter((t) => t.implied >= lo && t.implied < hi);
+    if (!g.length) return "";
+    const pl = g.reduce((a, t) => a + t.profit, 0), st = g.reduce((a, t) => a + t.stake, 0);
+    return `<tr><td>${Math.round(lo * 100)}–${Math.min(100, Math.round(hi * 100))}%</td><td>${g.length}</td><td>${pct(avg(g.map((t) => t.implied)))}</td><td>${pct(avg(g.map((t) => t.model_p)))}</td><td>${pct(avg(g.map((t) => (t.status === "won" ? 1 : 0))))}</td><td class="${plClass(pl)}">${signedPct(pl / st)}</td></tr>`;
+  }).join("");
+  const byLine = {};
+  for (const t of done) {
+    const k = `${t.side} ${t.line} ${t.market === "player_shots" ? "shots" : "on target"}`;
+    (byLine[k] ||= []).push(t);
+  }
+  const lineRows = Object.entries(byLine).sort((a, b) => b[1].length - a[1].length).map(([k, g]) => {
+    const pl = g.reduce((a, t) => a + t.profit, 0), st = g.reduce((a, t) => a + t.stake, 0);
+    return `<tr><td>${esc(k[0].toUpperCase() + k.slice(1))}</td><td>${g.length}</td><td>${avg(g.map((t) => t.actual))?.toFixed(2) ?? "–"}</td><td>${pct(avg(g.map((t) => (t.status === "won" ? 1 : 0))))}</td><td class="${plClass(pl)}">${usd(pl, 0)}</td></tr>`;
+  }).join("");
+  return `
+    <div class="section-title">Implied vs realized (player trades)</div>
+    <p class="note" style="margin-top:0">At entry, DraftKings' price implied a ${pct(avg(withImp.map((t) => t.implied)))} chance on average (margin removed) and the model said ${pct(avg(done.map((t) => t.model_p)))}. The bets actually won ${pct(hit)} of the time.</p>
+    <div class="card" style="padding:8px 14px">
+      <table><thead><tr><th>DK implied</th><th>Bets</th><th>DK</th><th>Model</th><th>Won</th><th>ROI</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <p class="note">Grouped by DraftKings' implied chance. If "Won" tracks DK more closely than the model, the market was right and the model's edge wasn't real.</p>
+    <div class="card" style="padding:8px 14px">
+      <table><thead><tr><th>Bet</th><th>Bets</th><th>Avg shots</th><th>Won</th><th>Profit</th></tr></thead><tbody>${lineRows}</tbody></table>
+    </div>
+    <p class="note">Avg shots = what the players actually recorded on those bets, beside the line.</p>`;
 }
 
 function playerModelHtml(pm) {
@@ -1096,6 +1228,7 @@ const TRADE_FIELDS = [
   ["Threshold", (t) => pct(t.threshold)],
   ["Stake", (t) => `$${t.stake}`],
   ["Closing odds", (t) => (t.close_odds ? `${american(t.close_odds)} (${t.close_odds.toFixed(2)})` : "–")],
+  ["DraftKings implied", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
   ["CLV vs DraftKings", (t) => signedPct(t.clv_dk)],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle)],
   ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],
@@ -1122,6 +1255,7 @@ const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, 
 
 function render() {
   chartData = null;
+  devData = null;
   $("#view").innerHTML = VIEWS[state.tab]();
   document.querySelectorAll(".tabbar button").forEach((b) => {
     const on = b.dataset.tab === state.tab;
@@ -1129,6 +1263,7 @@ function render() {
     b.setAttribute("aria-current", on ? "page" : "false");
   });
   bindChart();
+  bindDevChart();
 }
 
 function setTab(tab) {
@@ -1165,6 +1300,9 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfbet !== undefined) {
     state.pfBet = t.dataset.pfbet; state.pfShown = 25; state.pfMarket = "";
     render();
+  } else if (t.dataset.plview) {
+    state.pl.view = t.dataset.plview;
+    render();
   } else if (t.id === "pl-active") {
     state.pl.active = !state.pl.active; state.pl.shown = 40;
     render();
@@ -1178,7 +1316,7 @@ document.addEventListener("click", (ev) => {
     openSheet(playerHtml(t.dataset.player));
   } else if (t.id === "pl-more") {
     state.pl.shown += 40;
-    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
+    refreshPlayerList();
   } else if (t.id === "pf-more") {
     state.pfShown += 25;
     render();
@@ -1200,9 +1338,12 @@ document.addEventListener("change", (ev) => {
   if (ev.target.id === "pl-season") {  // clubs differ by season: re-render the filters too
     state.pl.season = ev.target.value; state.pl.team = ""; state.pl.shown = 40;
     render();
+  } else if (ev.target.id === "pl-metric") {
+    state.pl.metric = ev.target.value;
+    refreshPlayerList();
   } else if (["pl-team", "pl-pos", "pl-sort", "pl-ssort"].includes(ev.target.id)) {
     state.pl[ev.target.id.slice(3)] = ev.target.value; state.pl.shown = 40;
-    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
+    refreshPlayerList();
   }
   if (ev.target.id === "pf-market") { state.pfMarket = ev.target.value; state.pfShown = 25; render(); }
   if (ev.target.id === "pf-season") { state.pfSeason = ev.target.value; state.pfShown = 25; render(); }
@@ -1211,7 +1352,7 @@ document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeShe
 document.addEventListener("input", (ev) => {
   if (ev.target.id === "pl-q") {  // update the list only, so the search box keeps focus
     state.pl.q = ev.target.value; state.pl.shown = 40;
-    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
+    refreshPlayerList();
   }
 });
 

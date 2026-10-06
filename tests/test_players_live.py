@@ -250,6 +250,7 @@ def test_priced_player_backtest(sim):
     assert trades.groupby(["home", "away"]).size().max() <= tr.MAX_PLAYER_TRADES
     assert set(trades["status"]) <= {"won", "lost"}
     assert trades["clv_dk"].notna().all()
+    assert trades["implied"].between(0, 1).all()  # DraftKings' margin-free chance at entry
     rep = tr.report(trades)
     assert {"position", "started", "line"} <= set(rep["breakdowns"])
     # totals of the two bet types add up to the combined view

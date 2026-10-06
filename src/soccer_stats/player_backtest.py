@@ -318,6 +318,23 @@ def priced_trades(
             }
         )
     lines = pd.DataFrame(rows)
+    if lines.empty:
+        return pd.DataFrame(), info
+    # DraftKings' margin-free chance for each side at the look (the "implied" chance).
+    pairs = {}
+    for (pid, mkt, ln), g in lines.groupby(["player_id", "market", "line"]):
+        sides = dict(zip(g["side"], g["odds"], strict=False))
+        pr = tr.devig_pair(sides.get("over"), sides.get("under"))
+        if pr:
+            pairs[(pid, mkt, ln)] = pr
+    lines["implied"] = [
+        (pairs[(p, m, ln)][0] if s == "over" else pairs[(p, m, ln)][1])
+        if (p, m, ln) in pairs
+        else None
+        for p, m, ln, s in zip(
+            lines["player_id"], lines["market"], lines["line"], lines["side"], strict=True
+        )
+    ]
     picks = tr.player_picks(lines, threshold)
     trades = []
     for r in picks.to_dict("records"):
@@ -358,6 +375,7 @@ def priced_trades(
             t["clv_dk"] = t["odds"] * (pair[0] if r["side"] == "over" else pair[1]) - 1
         t.update(tr.settle_player(t, r["actual"], r["started"]))
         t["position"] = r["position"]
+        t["implied"] = r.get("implied")
         t["settled_at"] = t["kickoff"]
         trades.append(t)
     return pd.DataFrame(trades), info
