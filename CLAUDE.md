@@ -172,7 +172,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - a readout line instead of tooltips over the chart;
   - colour tokens defined for both light and dark themes.
 
-## Status (2026-10-06, after round 2)
+## Status (2026-10-06, after round 3)
 
 **Match bets**
 - DraftKings backtest, 2025/26, raw model at a 12% edge: 173 bets, ROI −13% (95% range −38% to +16%), CLV vs DraftKings −5% to −7%. Every threshold from 2% to 20% loses (−8% to −21%).
@@ -184,10 +184,10 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - Model picks at Pinnacle early, 12%: CLV −4.2% (1X2, 1,419 bets), −2.9% (O/U, 285), −2.0% (AH, 744), worse than a random side. AH blend: CLV −0.2% to +0.8% at 2–8%, no range above 0.
   - xG form, xG-minus-goals and soft-vs-sharp earn no out-of-sample log loss (all ranges include 0). Late team news can't be tested yet (FPL log starts 5 Oct 2026).
   - Verdict: no AH or O/U bets in the live rule; nothing in the live code changed.
-- Round 3: the publish run logs every DraftKings quote it downloads (`odds_log/`), and live match trades take their close and CLV vs DraftKings from it. This is the data for testing late team news (price moves between looks) once the 2026/27 season has played some weeks.
   - The AH rows at football-data's average and maximum prices (avg −3.2%, max blend +1.2% to +2.6%) are unreliable (stale quotes; see the data warning above). The Pinnacle-only AH results stand.
 - Free signals (edge finder, `edge/signals.py`, 2017–2026, 7 signals × 2 tests, Bonferroni 99.64% ranges): none earns blend weight beside Pinnacle early (best gain +0.0002, range −0.0017 to +0.0019). Soft-vs-sharp and xG form predict the early-to-close move a little (R² 0.1–1.6%), but betting them at Pinnacle early gives CLV −1.6% to −3.7%, never positive.
 - Line shopping (edge finder, football-data 2017–2026, ~1,700–2,100 bets): the rule's CLV vs Pinnacle's fair close is −6.6% at the average book, −4.0% at Pinnacle early, −2.3% at the best of seven named books. Only the unbettable market maximum is positive, and it turned negative in the last two seasons. The picks do no better than random against the sharp close.
+- Round 3 (moneyline + UI): every publish run appends the DraftKings quotes it already downloaded to `odds_log/E0_<YYYY-MM>.jsonl` on `data-log` (0 extra credits; 20 rows per refresh, 10 fixtures × h2h/totals; a refresh whose prices are unchanged but whose DraftKings `last_update` moved logs new rows, by design). Live match trades now take their close from the last logged quote before kickoff, with margin-free CLV vs DraftKings, `beat_close_dk` and `close_minutes_before`; `close_early` counts closes quoted over 60 minutes out (scheduled runs are throttled). No live trade has settled yet, so there is no live CLV figure. The log is the data for testing late team news against price moves once 2026/27 has a few more weeks.
 - Live: value picks and match paper trades use the blend (`p_bet`) once `E0_dk.json` holds `blend.live`, so they will mostly stop. That is the honest result.
 
 **Player bets**
@@ -209,8 +209,8 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - Live lines correct squads for transfers (FPL); the 6 Oct publish showed 490 players, 0 priced (no FanDuel lines more than 30 hours before kickoff) and no teams without history.
 - No live lineup feed. Build one (ESPN summary API, `rosters[].roster[].starter`) only if a strategy backtests positive.
 
-**Credits**: 22,720 left on 6 Oct after round 2 (publish run 37529138058). Round 2 spent 0 on research; the live DraftKings refreshes cost ~2 each. The key is shared, so check the publish log.
+**Credits**: 22,712 left on 6 Oct after round 3 (publish run 37536404853). Round 3 spent 0 on research; the odds log reuses the live DraftKings refreshes (~2 credits each). The key is shared, so check the publish log.
 
-**App (round 2)**: the match sheet shows model, blend and DraftKings side by side, with a plain-English reason when no value bet shows; player lines show the raw model, the blend and FanDuel's implied chance; Record → Match bets has the DraftKings strategy switch and sweep; Portfolio breakdowns are folded. `sw.js` is `pl-model-v20`.
+**App (round 3)**: Portfolio → Live leads with settled profit, ROI, CLV and beat-the-close tiles and a note on why CLV matters; settled match trades and the trade sheet show the close, how long before kickoff it was taken ("approx." past 60 min) and CLV. Round 2 added model / blend / DraftKings side by side on the match sheet, model / blend / FanDuel on player lines, and the DraftKings strategy switch on Record. `sw.js` is `pl-model-v21`.
 
 Ranked next steps are in the work plan's "Status and next steps" section and in `docs/edge.md`.
