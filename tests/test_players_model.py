@@ -355,3 +355,31 @@ def test_whole_number_lines_mean_at_least():
     t = {"line": 1.0, "side": "over", "odds": 1.8, "stake": 10.0}
     assert tr.settle_player(t, 1, True)["status"] == "won"
     assert tr.settle_player(t, 0, True)["status"] == "lost"
+
+
+def test_calibration_shrinks_toward_price():
+    from soccer_stats import player_calibration as cal
+
+    rng = np.random.default_rng(1)
+    n = 20000
+    truth = rng.uniform(0.03, 0.6, n)
+    implied = np.clip(truth * 1.1, 0.01, 0.95)  # the price: right, plus a margin
+    model = np.clip(truth * np.exp(rng.normal(0.3, 0.5, n)), 0.01, 0.95)  # noisy, too high
+    won = rng.uniform(size=n) < truth
+    coef = cal.fit(implied, model, won)
+    a, b, c = coef
+    assert b > 0.7 and abs(c) < 0.15  # the price carries the weight
+    p = cal.apply(coef, implied, model)
+    assert abs(p.mean() - won.mean()) < 0.01  # margin taken out
+    assert cal.fit(implied[:100], model[:100], won[:100]) is None  # too few lines
+    lines = pd.DataFrame(
+        {
+            "kickoff": pd.date_range("2024-08-01", periods=n, freq="15min", tz="UTC"),
+            "implied": implied,
+            "p_model": model,
+            "won": won.astype(int),
+        }
+    )
+    out, fits = cal.walk_forward(lines)
+    assert out.iloc[: cal.MIN_LINES].isna().all() and out.iloc[-100:].notna().all()
+    assert all(f["lines"] >= cal.MIN_LINES for f in fits)

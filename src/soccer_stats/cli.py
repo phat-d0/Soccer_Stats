@@ -304,7 +304,37 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
     }
     hist = load_player_odds(args.league, set(apps["team"]))
     if not hist.empty:
-        trades, info = pb.priced_trades(before, hist, apps, league=args.league)
+        known_final = pb.walk_forward(
+            feats, start, factors, lineup_known=True, sot_method=sot_method
+        )
+        trades, info = pb.priced_trades(before, hist, apps, league=args.league, known=known_final)
+        lines = info.pop("_lines", {})
+        if args.out and any(not d.empty for d in lines.values()):
+            keep = [
+                "kickoff",
+                "home",
+                "away",
+                "player",
+                "player_id",
+                "team",
+                "position",
+                "started",
+                "market",
+                "line",
+                "side",
+                "odds",
+                "implied",
+                "p_model",
+                "p",
+                "exp_count",
+                "actual",
+                "won",
+            ]
+            frames = [d.assign(kind=k)[["kind", *keep]] for k, d in lines.items() if not d.empty]
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            pd.concat(frames).round(4).to_csv(
+                Path(args.out).with_name(f"{args.league}_player_lines.csv.gz"), index=False
+            )
         out["priced"] = {**info, **tr.report(trades)} if not trades.empty else info
         out["trades"] = (
             trades.sort_values("kickoff", ascending=False).to_dict("records")
@@ -349,7 +379,13 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
             f"Stage 2: {s.get('trades', 0)} player trades, ROI {_fmt(s.get('roi'), 'pct')}, "
             f"CLV {_fmt(s.get('clv_dk'), 'pct')}; {pr['unmatched_names']} names unmatched"
         )
-        detail = {k: v for k, v in pr.items() if k not in ("summary", "breakdowns")}
+        for name, st in pr.get("strategies", {}).items():
+            sweep = ", ".join(
+                f"{th}: {x.get('trades', 0)} / {_fmt(x.get('roi'), 'pct')}"
+                for th, x in st["sweep"].items()
+            )
+            print(f"  {name:>13} (trades / ROI by edge threshold): {sweep}")
+        detail = {k: v for k, v in pr.items() if k not in ("summary", "breakdowns", "strategies")}
         print("Stage 2 detail: " + json.dumps(detail, default=str))
 
     path = (

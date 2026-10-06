@@ -220,7 +220,9 @@ def test_priced_player_backtest(sim):
     preds = pb.walk_forward(feats, start, refit_every="28D")
     rng = np.random.default_rng(0)
     rows = []
-    for r in preds.drop_duplicates(["match_id", "player_id"]).head(400).itertuples():
+    for r in (
+        preds.drop_duplicates(["match_id", "player_id"]).iloc[::3].itertuples()
+    ):
         for kind, at in (
             ("look", r.kickoff - pd.Timedelta(hours=3)),
             ("close", r.kickoff - pd.Timedelta(minutes=1)),
@@ -244,13 +246,17 @@ def test_priced_player_backtest(sim):
                     }
                 )
     hist = pd.DataFrame(rows)
-    trades, info = pb.priced_trades(preds, hist, apps)
-    assert len(trades) > 10
+    trades, info = pb.priced_trades(preds, hist, apps, cal_min_lines=100)
+    assert len(trades) > 5
     assert not trades.duplicated(["home", "away", "player", "market"]).any()
     assert trades.groupby(["home", "away"]).size().max() <= tr.MAX_PLAYER_TRADES
     assert set(trades["status"]) <= {"won", "lost"}
-    assert trades["clv_dk"].notna().all()
-    assert trades["implied"].between(0, 1).all()  # DraftKings' margin-free chance at entry
+    assert trades["started"].all() and set(trades["look"]) == {"lineup"}  # starters, after lineups
+    assert trades["implied"].between(0, 1).all()  # margin-free chance at entry
+    assert set(info["strategies"]) == set(pb.STRATEGIES)
+    raw = info["strategies"]["raw_3h"]["summary"]
+    assert raw["trades"] > 0 and raw["clv_dk"] is not None  # 3-hour trades have a close
+    assert info["calibration"]["look"]["coef"] is not None
     rep = tr.report(trades)
     assert {"position", "started", "line"} <= set(rep["breakdowns"])
     # totals of the two bet types add up to the combined view
@@ -304,9 +310,14 @@ def test_over_only_lines_use_price_as_implied(sim):
                     "snapshot_ts": at,
                 }
             )
-    trades, info = pb.priced_trades(preds, pd.DataFrame(rows), apps)
-    assert len(trades) > 0 and info["implied_from_price_only"] > 0
-    assert trades["implied"].tolist() == pytest.approx([0.25] * len(trades))
-    assert trades["clv_dk"].tolist() == pytest.approx([4.0 / 3.2 - 1] * len(trades))
-    won = trades["status"] == "won"
-    assert (trades.loc[won, "actual"] >= 1).all() and (trades.loc[~won, "actual"] == 0).all()
+    _, info = pb.priced_trades(preds, pd.DataFrame(rows), apps)
+    assert info["implied_from_price_only"] > 0
+    lines = info["_lines"]
+    assert lines["look"]["implied"].tolist() == pytest.approx([0.25] * len(lines["look"]))
+    assert (lines["close"]["implied"] == 1 / 3.2).all()
+    look = lines["look"]
+    assert (look.loc[look["won"] == 1, "actual"] >= 1).all()  # 1.0 = one or more
+    assert (look.loc[look["won"] == 0, "actual"] == 0).all()
+    raw = info["strategies"]["raw_3h"]["summary"]  # 4.0 at entry, 3.2 at the close
+    if raw["trades"]:
+        assert raw["clv_dk"] == pytest.approx(4.0 / 3.2 - 1)

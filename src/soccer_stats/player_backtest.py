@@ -102,7 +102,8 @@ def walk_forward(
     start = pd.Timestamp(start, tz="UTC") if pd.Timestamp(start).tz is None else pd.Timestamp(start)
     if not lineup_known:  # absences aren't known before lineups in the backtest
         feats = feats.assign(absent_share=0.0)
-    weeks = pd.date_range(start, feats["kickoff"].max() + pd.Timedelta(days=1), freq=refit_every)
+    end = feats["kickoff"].max() + pd.Timedelta(refit_every)
+    weeks = pd.date_range(start, end, freq=refit_every)
     out = []
     for lo, hi in zip(weeks[:-1], weeks[1:], strict=True):
         test = feats[(feats["kickoff"] >= lo) & (feats["kickoff"] < hi)]
@@ -275,20 +276,119 @@ def map_odds_players(odds: pd.DataFrame, apps: pd.DataFrame) -> tuple[pd.DataFra
     return df, len(skipped)
 
 
+STRATEGIES = {
+    # name: (snapshot, chance used, starters only)
+    "raw_3h": ("look", "model", False),  # the original rule, for comparison
+    "blend_3h": ("look", "blend", False),
+    "blend_lineup": ("close", "blend", True),  # the strategy the app trades
+}
+MAIN_STRATEGY = "blend_lineup"
+SWEEP = (0.02, 0.05, 0.08, 0.12, 0.20)
+
+
+def _priced_lines(snap: pd.DataFrame, preds: pd.DataFrame, info: dict, key: str) -> pd.DataFrame:
+    """One row per priced side with the model's chance, the outcome and the implied chance.
+
+    Players without a prediction (didn't play: void; or too little history) are dropped.
+    """
+    if snap.empty or preds.empty:
+        return pd.DataFrame()
+    p = preds[["player_id", "season", "kickoff", "started", "position", "shots", "sot"]].copy()
+    p["pmf_shots"], p["pmf_sot"] = preds["pmf_shots"], preds["pmf_sot"]
+    p["mean_shots"], p["mean_sot"] = preds["mean_shots"], preds["mean_sot"]
+    p["pkick"] = p.pop("kickoff")
+    m = snap.merge(p, on=["player_id", "season"], how="inner")
+    m = m[(m["pkick"] - m["kickoff"]).abs() <= pd.Timedelta(days=2)]
+    m = m.drop_duplicates(["event_id", "player_id", "market", "line", "side"])
+    info[f"no_prediction_{key}"] = int(len(snap) - len(m))
+    if m.empty:
+        return pd.DataFrame()
+    count = m["market"].map(MARKET_COUNT)
+    p_over = [
+        float(np.asarray(pm_s if c == "shots" else pm_t)[over_min(ln) :].sum())
+        for pm_s, pm_t, c, ln in zip(m["pmf_shots"], m["pmf_sot"], count, m["line"], strict=True)
+    ]
+    m["p_model"] = np.where(m["side"] == "over", p_over, 1 - np.asarray(p_over))
+    m["actual"] = np.where(count == "shots", m["shots"], m["sot"]).astype(int)
+    m["exp_count"] = np.where(count == "shots", m["mean_shots"], m["mean_sot"])
+    hit = m["actual"] >= np.ceil(m["line"])
+    m["won"] = np.where(m["side"] == "over", hit, ~hit).astype(int)
+    # The bookmaker's margin-free chance when both sides are priced, else 1 / odds.
+    pairs = {}
+    for k, g in m.groupby(["event_id", "player_id", "market", "line"]):
+        sides = dict(zip(g["side"], g["odds"], strict=False))
+        pr = tr.devig_pair(sides.get("over"), sides.get("under"))
+        if pr:
+            pairs[k] = pr
+    m["implied"] = [
+        (pairs[k][0] if s == "over" else pairs[k][1]) if k in pairs else 1 / o
+        for k, s, o in zip(
+            zip(m["event_id"], m["player_id"], m["market"], m["line"], strict=True),
+            m["side"],
+            m["odds"],
+            strict=True,
+        )
+    ]
+    drop = ["pmf_shots", "pmf_sot", "mean_shots", "mean_sot", "pkick", "shots", "sot"]
+    return m.drop(columns=drop).reset_index(drop=True)
+
+
+def _diagnostics(lines: pd.DataFrame, info: dict) -> None:
+    info["lines_with_prediction"] = len(lines)
+    e = lines["p_model"] * lines["odds"] - 1
+    info["edge_quantiles"] = {q: round(float(e.quantile(q)), 4) for q in (0.5, 0.9, 0.99, 1.0)}
+    info["odds_range"] = [
+        round(float(lines["odds"].min()), 2),
+        round(float(lines["odds"].max()), 2),
+    ]
+    info["p_mean"] = round(float(lines["p_model"].mean()), 4)
+    info["lines_seen"] = {str(k): int(v) for k, v in lines["line"].value_counts().head(12).items()}
+    info["implied_from_price_only"] = int((lines["side"] == "over").sum())
+
+
+def calibration_table(lines: pd.DataFrame) -> list[dict]:
+    """Implied vs model vs blend vs actual win rate by implied-chance bucket (all lines)."""
+    bins = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 1.0]
+    g = lines.groupby(pd.cut(lines["implied"], bins), observed=True)
+    out = []
+    for b, x in g:
+        out.append(
+            {
+                "bucket": f"{b.left:.0%}-{b.right:.0%}",
+                "lines": len(x),
+                "implied": round(float(x["implied"].mean()), 4),
+                "model": round(float(x["p_model"].mean()), 4),
+                "blend": round(float(x["p"].mean()), 4) if x["p"].notna().any() else None,
+                "won": round(float(x["won"].mean()), 4),
+            }
+        )
+    return out
+
+
 def priced_trades(
     preds: pd.DataFrame,
     history: pd.DataFrame,
     apps: pd.DataFrame,
     threshold: float = tr.PAPER_EDGE,
     league: str = "E0",
+    known: pd.DataFrame | None = None,
+    cal_min_lines: int | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """Stage 2: the player trade rule on historical FanDuel player odds.
 
-    `preds` are before-lineups walk-forward predictions (with pmf_shots / pmf_sot);
-    `history` is player_odds.load_history() output. Trades open at the look (3 hours
-    before kickoff), close at the last price before kickoff, and settle on Understat's
-    counts. Priced players who didn't play are void (the bookmaker refunds them).
+    `preds` are before-lineups walk-forward predictions and `known` the lineup-known
+    ones (with pmf_shots / pmf_sot); `history` is player_odds.load_history() output.
+
+    Three strategies (STRATEGIES): the raw model at the 3-hour look; the blended chance
+    (player_calibration) at the 3-hour look; and the blended chance on confirmed
+    starters at FanDuel's last price before kickoff, after lineups are out. The last
+    one is the main result (its trades are returned); the others are summarised in
+    info["strategies"] with a threshold sweep. 3-hour trades close at the last price
+    before kickoff (CLV); lineup trades open there, so they have no CLV. Players who
+    didn't play are void (the bookmaker refunds them).
     """
+    from soccer_stats import player_calibration as cal
+
     info = {"priced_sides": len(history), "unmatched_names": 0, "no_prediction": 0}
     if history.empty or preds.empty:
         return pd.DataFrame(), info
@@ -299,78 +399,63 @@ def priced_trades(
     info["look_sides_matched"] = len(look)
     info["close_sides_matched"] = len(close)
     info["sides_by_name"] = h["side"].value_counts().to_dict() if not h.empty else {}
-    p = preds.copy()
-    rows = []
-    for r in look.itertuples(index=False):
-        m = p[
-            (p["player_id"] == r.player_id)
-            & (p["season"] == r.season)
-            & ((p["kickoff"] - r.kickoff).abs() <= pd.Timedelta(days=2))
-        ]
-        if m.empty:
-            info["no_prediction"] += 1  # didn't play (void) or too little history
-            continue
-        m = m.iloc[0]
-        pmf = np.asarray(m[f"pmf_{MARKET_COUNT[r.market]}"])
-        p_over = float(pmf[over_min(r.line) :].sum())
-        rows.append(
-            {
-                **r._asdict(),
-                "p": p_over if r.side == "over" else 1 - p_over,
-                "actual": int(m[MARKET_COUNT[r.market]]),
-                "started": bool(m["started"]),
-                "position": m["position"],
-                "exp_count": float(m[f"mean_{MARKET_COUNT[r.market]}"]),
-            }
-        )
-    lines = pd.DataFrame(rows)
-    info["lines_with_prediction"] = len(lines)
-    if lines.empty:
+
+    lines = {"look": _priced_lines(look, preds, info, "look")}
+    lines["close"] = _priced_lines(close, known if known is not None else preds, info, "close")
+    info["no_prediction"] = info.get("no_prediction_look", 0)
+    if lines["look"].empty:
         return pd.DataFrame(), info
-    e = lines["p"] * lines["odds"] - 1
-    info["edge_quantiles"] = {q: round(float(e.quantile(q)), 4) for q in (0.5, 0.9, 0.99, 1.0)}
-    info["odds_range"] = [
-        round(float(lines["odds"].min()), 2),
-        round(float(lines["odds"].max()), 2),
-    ]
-    info["p_mean"] = round(float(lines["p"].mean()), 4)
-    cols = ["player", "market", "line", "side", "odds", "p", "exp_count", "actual"]
-    info["sample"] = (
-        lines.sort_values(["player", "market", "line"])
-        .groupby("market")
-        .head(12)[cols]
-        .round(3)
-        .to_dict("records")
+    _diagnostics(lines["look"], info)
+    info["calibration"] = {}
+    for kind, df in lines.items():
+        if df.empty:
+            continue
+        n_min = cal_min_lines or cal.MIN_LINES
+        df["p"], fits = cal.walk_forward(df, min_lines=n_min)
+        info["calibration"][kind] = {
+            "fits": len(fits),
+            "last": fits[-1] if fits else None,
+            # what the live app uses: a fit on every settled line
+            "coef": cal.fit(df["implied"], df["p_model"], df["won"], n_min),
+            "table": calibration_table(df),
+        }
+
+    close_by = (
+        {
+            k: g["odds"].iloc[0]
+            for k, g in lines["close"].groupby(["event_id", "player_id", "market", "line", "side"])
+        }
+        if not lines["close"].empty
+        else {}
     )
-    info["lines_seen"] = lines["line"].value_counts().head(12).to_dict()
-    # The bookmaker's margin-free chance for each side at the look (the "implied" chance).
-    pairs = {}
-    for (pid, mkt, ln), g in lines.groupby(["player_id", "market", "line"]):
-        sides = dict(zip(g["side"], g["odds"], strict=False))
-        pr = tr.devig_pair(sides.get("over"), sides.get("under"))
-        if pr:
-            pairs[(pid, mkt, ln)] = pr
-    # FanDuel lists "over" only: then the price alone (1/odds, margin included).
-    lines["implied"] = [
-        (pairs[(p, m, ln)][0] if s == "over" else pairs[(p, m, ln)][1])
-        if (p, m, ln) in pairs
-        else 1 / o
-        for p, m, ln, s, o in zip(
-            lines["player_id"],
-            lines["market"],
-            lines["line"],
-            lines["side"],
-            lines["odds"],
-            strict=True,
-        )
-    ]
-    info["implied_from_price_only"] = int(
-        sum(
-            (k[:3] not in pairs)
-            for k in lines[["player_id", "market", "line"]].itertuples(index=False, name=None)
-        )
-    )
-    picks = tr.player_picks(lines, threshold)
+    results, info["strategies"] = {}, {}
+    for name, (kind, chance, starters) in STRATEGIES.items():
+        df = lines[kind]
+        if df.empty:
+            continue
+        df = df.assign(p=df["p_model"] if chance == "model" else df["p"]).dropna(subset=["p"])
+        if starters:
+            df = df[df["started"].astype(bool)]
+        sweep = {}
+        for th in SWEEP:
+            t = _build_trades(tr.player_picks(df, th), th, league, kind, close_by)
+            sweep[f"{th:.0%}"] = tr.summarize(t) if not t.empty else {"trades": 0}
+        t = _build_trades(tr.player_picks(df, threshold), threshold, league, kind, close_by)
+        results[name] = t
+        info["strategies"][name] = {
+            "snapshot": "3 hours before" if kind == "look" else "after lineups",
+            "chance": chance,
+            "starters_only": starters,
+            "lines": len(df),
+            "summary": tr.summarize(t) if not t.empty else {"trades": 0},
+            "sweep": sweep,
+        }
+    info["main_strategy"] = MAIN_STRATEGY
+    info["_lines"] = lines  # for the CLI to save; not JSON
+    return results.get(MAIN_STRATEGY, pd.DataFrame()), info
+
+
+def _build_trades(picks: pd.DataFrame, threshold: float, league: str, kind: str, close_by: dict):
     trades = []
     for r in picks.to_dict("records"):
         t = tr.new_trade(
@@ -390,33 +475,22 @@ def priced_trades(
             opened_at=r["snapshot_ts"],
             odds_fetched_at=str(r["snapshot_ts"]),
             threshold=threshold,
-            look=f"{3:g}h",
+            model_p_base=r["p_model"],
+            look="3h" if kind == "look" else "lineup",
             player={"player": r["player"], "player_id": r["player_id"], "team": r["team"]},
         )
-        c = close[
-            (close["player_id"] == r["player_id"])
-            & (close["market"] == r["market"])
-            & (close["line"] == r["line"])
-            & ((close["kickoff"] - r["kickoff"]).abs() <= pd.Timedelta(days=2))
-        ]
-        over = c.loc[c["side"] == "over", "odds"]
-        under = c.loc[c["side"] == "under", "odds"]
-        pair = tr.devig_pair(
-            over.iloc[0] if len(over) else None, under.iloc[0] if len(under) else None
-        )
-        same = c.loc[c["side"] == r["side"], "odds"]
-        t["close_odds"] = float(same.iloc[0]) if len(same) else None
-        if pair:
-            t["clv_dk"] = t["odds"] * (pair[0] if r["side"] == "over" else pair[1]) - 1
-        elif t["close_odds"]:
-            t["clv_dk"] = t["odds"] / t["close_odds"] - 1  # no under at the close: price only
+        if kind == "look":
+            c = close_by.get((r["event_id"], r["player_id"], r["market"], r["line"], r["side"]))
+            t["close_odds"] = float(c) if c else None
+            if c:
+                t["clv_dk"] = t["odds"] / c - 1  # over-only: price change at the close
         t.update(tr.settle_player(t, r["actual"], r["started"]))
         t["position"] = r["position"]
-        t["implied"] = r.get("implied")
+        t["implied"] = r["implied"]
         t["bookmaker"] = PLAYER_BOOKMAKER_NAME
         t["settled_at"] = t["kickoff"]
         trades.append(t)
-    return pd.DataFrame(trades), info
+    return pd.DataFrame(trades)
 
 
 def player_report(preds: pd.DataFrame) -> dict:
