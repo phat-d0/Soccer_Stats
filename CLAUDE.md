@@ -82,9 +82,9 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Player bets: `player_picks`, best line per player and market, max 4 per match; a line with no chance (`p` None) never trades.
   - `PLAYER_PAPER_TRADES = False`: the owner's switch (6 Oct). No live player paper trades open until a player rule backtests positive; open ones still settle. Published as `players_status.paper_trades`; the app says player trades are off.
   - Also settlement, summaries, `report`. Keep it free of network code.
-- `paper.py`: live paper ledger (append-only "open" plus "update" events) and the `portfolio` section of `data.json`. Match trades use the fixture's `p_bet` (the blend) when set, else `p`.
+- `paper.py`: live paper ledger (append-only "open" plus "update" events) and the `portfolio` section of `data.json`. Match trades use the fixture's `p_bet` (the blend) when set, else `p`. It merges the priced player backtest trades into the backtest view.
   - Live match closes come from the odds log: the last logged price before kickoff sets `close_odds`, `close_prices`, `close_fetched_at`, `close_minutes_before`, `clv_dk` and `beat_close_dk` (update events; entry fields never change). Without a log, the price each build sees until kickoff.
-  - `trades.summarize` adds `close_early`: settled trades whose close was quoted over 60 minutes before kickoff (scheduled runs are throttled). It merges the priced player backtest trades into the backtest view.
+  - `trades.summarize` adds `close_early`: settled trades whose close was quoted over 60 minutes before kickoff (scheduled runs are throttled).
 
 **Player bets**
 - `player_data.py`: Understat per-match shots, name matching (exact name wins; ambiguous names are skipped and counted), season stats, active players (FPL status "u" = left).
