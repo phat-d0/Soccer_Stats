@@ -351,7 +351,7 @@ function viewMatches() {
     byDay.get(day).push([fx, idx]);
   });
   const nValue = d.fixtures.filter((fx) => bestPick(fx, state.minEdge)).length;
-  const openTrades = new Map((d.portfolio?.live?.trades || []).filter((t) => t.status === "open").map((t) => [`${t.home}|${t.away}`, t]));
+  const openTrades = new Map((d.portfolio?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
   let html = `<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
@@ -368,7 +368,7 @@ function viewMatches() {
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
           ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
-          ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); return `<span class="badge paper">Paper trade open: ${esc(PICK_LABEL[t.market])} @ ${american(t.odds)}</span>`; })() : ""}
+          ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); const { cur } = currentPrice(t); const m = markToMarket(t, cur); return `<span class="badge paper">Paper trade open: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`; })() : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
@@ -601,12 +601,45 @@ function pfFiltered(set) {
   return { trades, summary: part ? part.summary : state.pfBet ? { trades: trades.length } : set.summary, breakdowns: part ? part.breakdowns : set.breakdowns };
 }
 
-function pfTiles(s) {
+// Current DraftKings price for an open trade: the latest price in data.json, else the
+// last one the ledger saw, else the entry price.
+function currentPrice(t) {
+  const fx = state.data.fixtures.find((f) => f.home === t.home && f.away === t.away);
+  let cur = null;
+  if (t.bet_type === "player") {
+    const pl = fx?.players?.find((p) => p.player_id === t.player_id);
+    cur = pl?.lines?.find((l) => l.market === t.market && l.line === t.line && l.side === t.side)?.odds ?? null;
+  } else {
+    cur = fx?.odds?.[t.market] ?? null;
+  }
+  return { cur: cur ?? t.close_odds ?? t.odds, live: cur != null, fx };
+}
+// What an open bet is worth if cashed out at the current price (ignoring the
+// bookmaker's cash-out margin): stake x entry odds / current odds.
+const markToMarket = (t, cur) => t.stake * t.odds / cur - t.stake;
+const plClass = (v) => (v == null || Math.abs(v) < 0.005 ? "" : v > 0 ? "gain" : "loss");
+
+function openPL(trades) {
+  const open = trades.filter((t) => t.status === "open");
+  return {
+    n: open.length,
+    atRisk: open.reduce((a, t) => a + t.stake, 0),
+    pl: open.reduce((a, t) => a + markToMarket(t, currentPrice(t).cur), 0),
+  };
+}
+
+function pfTiles(s, trades = []) {
   const se = s.roi_se != null ? ` ± ${(s.roi_se * 100).toFixed(1)}%` : "";
+  const o = openPL(trades);
+  const total = (s.profit || 0) + o.pl;
+  const openTiles = o.n ? `
+      <div class="tile"><div class="label">Open bets, if cashed out</div><div class="value ${plClass(o.pl)}">${usd(o.pl, 2)}</div><div class="sub">$${o.atRisk} at risk on ${o.n} bet${o.n > 1 ? "s" : ""}</div></div>
+      <div class="tile"><div class="label">Total gain/loss</div><div class="value ${plClass(total)}">${usd(total, 2)}</div><div class="sub">settled + open</div></div>` : "";
   return `
     <div class="tiles" style="margin-top:12px">
+      ${openTiles}
       <div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>
-      <div class="tile"><div class="label">Profit</div><div class="value">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>
+      <div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>
       <div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>
       <div class="tile"><div class="label">Closing line value</div><div class="value">${signedPct(s.clv_dk)}</div><div class="sub">avg vs DraftKings close</div></div>
       <div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of trades"}</div></div>
@@ -617,18 +650,20 @@ function pfTiles(s) {
 function pfOpen(trades) {
   const open = trades.filter((t) => t.status === "open");
   if (!open.length) return "";
-  const fxs = new Map(state.data.fixtures.map((f) => [`${f.home}|${f.away}`, f]));
   const rows = open.map((t) => {
-    const fx = fxs.get(`${t.home}|${t.away}`);
-    const cur = fx?.odds?.[t.market];
-    const curEdge = cur != null && fx?.p?.[t.market] != null ? fx.p[t.market] * cur - 1 : null;
+    const { cur, live, fx } = currentPrice(t);
+    const p = t.bet_type === "player" ? null : fx?.p?.[t.market];
+    const curEdge = p != null ? p * cur - 1 : null;
+    const mtm = markToMarket(t, cur);
+    const move = cur < t.odds ? "shortened" : cur > t.odds ? "drifted" : "unchanged";
     return `
       <button class="bet-row trade" data-trade="${esc(t.id)}">
-        <span>${esc(t.home)} v ${esc(t.away)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}</div>${t.bet_type === "player" ? "" : `<div class="meta">Now ${american(cur)}${curEdge != null ? `, edge ${signedPct(curEdge)}` : ""}</div>`}</span>
-        <span class="pl">$${t.stake}</span>
+        <span>${esc(t.home)} v ${esc(t.away)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
+        <span class="pl ${plClass(mtm)}">${usd(mtm, 2)}<div class="meta">if cashed out</div></span>
       </button>`;
   }).join("");
-  return `<div class="section-title">Open positions</div><div class="card">${rows}</div>`;
+  return `<div class="section-title">Open positions</div><div class="card">${rows}</div>
+    <p class="note">Gain/loss on open bets is what each would be worth at DraftKings' current price (stake × entry odds ÷ current odds), before any cash-out fee. A shortened price means the bet gained value. Bets settle after the final whistle.</p>`;
 }
 
 function pfSettled(trades) {
@@ -641,7 +676,7 @@ function pfSettled(trades) {
   const rows = shown.map((t) => `
     <button class="bet-row trade" data-trade="${esc(t.id)}">
       <span>${esc(t.home)} v ${esc(t.away)}<div class="meta">${esc(shortDate(t.kickoff))} · ${esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · ${t.actual} ${t.market === "player_shots" ? "shots" : "on target"}` : ""}</div></span>
-      <span class="pl ${t.profit > 0 ? "win" : ""}">${t.status === "void" ? "Void" : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
+      <span class="pl ${t.profit > 0 ? "win" : t.profit < 0 ? "loss" : ""}">${t.status === "void" ? "Void" : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
     </button>`).join("");
   const opt = (vals, cur, label, fmt) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
   return `
@@ -727,7 +762,7 @@ function viewPortfolio() {
     ${bets}
     ${ruleNote}
     ${banner}
-    ${pfTiles(s)}
+    ${pfTiles(s, trades)}
     ${ci}
     <div class="section-title">Running profit ($)</div>
     <div class="card">${profitChart(settled, "$") || '<p class="muted">Nothing settled yet.</p>'}</div>

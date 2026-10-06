@@ -453,3 +453,6 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 .pl-lines .edge-pos { color: var(--good-text); font-weight: 600; }
 .small { font-size: 12px; }
 .small-seg { margin-top: 8px; }
+.gain { color: var(--good-text); }
+.loss { color: var(--neg); }
+.bet-row .pl .meta { font-weight: 400; }
