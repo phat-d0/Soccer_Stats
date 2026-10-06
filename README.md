@@ -18,9 +18,11 @@ uv run pytest           # run tests
 
 A phone-first web app you add to your home screen. It opens full-screen with its own
 icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next round
-with value picks; tap for markets and scoreline heatmap), **Teams** (ratings + xG),
-**Record** (replayed profit, closing line value, goals vs xG), **Portfolio** (paper
-trades and the DraftKings backtest), **Explore** (any matchup).
+with value picks; tap for model, blend and DraftKings side by side, player lines and the
+scoreline heatmap), **Teams** (ratings + xG), **Record** (match bets: model alone vs
+blend against DraftKings' prices with the threshold sweep, then the longer Pinnacle
+replay; player shots: the FanDuel strategies), **Portfolio** (paper trades and the
+DraftKings backtest, breakdowns folded away), **Explore** (any matchup).
 
 A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model every hour,
 and every 15 minutes from 10:00 to 22:00 UTC, and publishes the result to GitHub Pages.
@@ -164,7 +166,8 @@ through the same rule, ledger and Portfolio tab as match bets.
   void if he doesn't play. **Live player paper trades are switched off**
   (`PLAYER_PAPER_TRADES = False` in `trades.py`) until some player rule backtests
   positive.
-- **In the app**: player lines with blended chances and edges in each match's sheet, a
+- **In the app**: player lines in each match's sheet with the raw model chance, the blended
+  chance, FanDuel's implied chance and the edge, and a note that player paper trades are off; a
   *Player picks* list on the Matches tab, and an All / Match / Player filter on the
   Portfolio tab. Live player lines refresh per match within 30 hours of kickoff (hourly in
   the last 3 hours) and keep 3,000 credits spare for match odds.

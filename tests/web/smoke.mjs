@@ -70,6 +70,7 @@ const STEPS = [
   ["players-model", async (p) => { await closeSheet(p); await p.click('button[data-plmode="model"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-model-sheet", async (p) => { await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
+  ["record-match-raw", click('button[data-recdk="raw"]')],
   ["record-player", click('button[data-recbet="player"]')],
   ["record-player-blend_3h", click('button[data-recstrat="blend_3h"]')],
   ["record-player-raw_3h", click('button[data-recstrat="raw_3h"]')],
@@ -80,7 +81,7 @@ const STEPS = [
   // No live player trades open while trades.PLAYER_PAPER_TRADES is off: open a trade from "All".
   ["portfolio-live-trade", async (p) => { await p.click('button[data-pfbet=""]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pfbet=""]'); await p.click('button[data-pf="backtest"]'); }],
-  ["portfolio-backtest-match", click('button[data-pfbet="match"]')],
+  ["portfolio-backtest-match", async (p) => { await p.click('button[data-pfbet="match"]'); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-player", click('button[data-pfbet="player"]')],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["explore", async (p) => { await closeSheet(p); await tab("explore")(p); }],

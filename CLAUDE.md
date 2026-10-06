@@ -111,6 +111,10 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Portfolio (live paper trades and the backtest, filter All/Match/Player; player trades are titled by the player's bet);
   - Explore.
 - The value pick (`bestPick`) and the detail sheet's edge column use `fx.p_bet || fx.p`, as `trades.best_pick` in `paper.py`. With the blend live and no picks, the Matches note says the model doesn't beat the market.
+- Match sheet "Markets": Model, Blend (`p_bet`, shaded), DK (margin-free), Odds, Edge. With the blend live and no pick, a "Why no value bet here?" box explains it from `match_blend.h2h` (model weight `c`, matches) and the margin.
+- Match sheet "Player shots": per player a grid of Line, Odds, Model (`p_model`), Blend (`p`), FD (`implied`), Edge; a box above says player paper trades are off and shows `players_status.blend_note`.
+- Record → Match bets opens with "Against DraftKings' prices": a Model alone / Blend switch over `portfolio.backtest.strategies` (E0_dk.json), tiles, the sweep (one column per strategy, odds-capped rows under their own label) and log loss (model, blend, DraftKings). The Pinnacle replay follows.
+- Portfolio: breakdown tables sit in a folded `<details class="fold">`; implied-vs-realized shows on the Player filter only; the match threshold sweep and the player model tables live on Record, not here. Settled trades page by 15.
 - Local test data: `tests/fixtures/web/` (`data.json`, `players_stats.json`, `players_backtest.json`, under 1 MB).
   - Rebuild with `uv run python tests/web/make_fixture.py`: a synthetic league through `publish.build_data`, plus the real ledger and backtests from `origin/data-log` through `paper.run`. Fixtures carry `p_bet` (E0_dk.json `blend.live`, or a fallback fit like the real one) and blended player lines (E0_players.json coefficients). `now` is fixed, so the output is reproducible.
 - Smoke test: `node tests/web/smoke.mjs [--shots DIR]`.

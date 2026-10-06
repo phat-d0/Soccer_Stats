@@ -449,8 +449,6 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 .player-head { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
 .player-head .num { margin-left: auto; color: var(--text-secondary); }
 .player-row .meta { font-size: 12px; color: var(--text-muted); }
-.pl-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.pl-lines .edge-pos { color: var(--good-text); font-weight: 600; }
 .small { font-size: 12px; }
 .small-seg { margin-top: 8px; }
 .gain { color: var(--good-text); }
@@ -503,3 +501,48 @@ table.bd th:first-child { width: 40%; }
   .topbar { padding-left: calc((100% - 640px) / 2 + 16px); padding-right: calc((100% - 640px) / 2 + 16px); }
   .tabbar { padding-left: calc((100% - 640px) / 2); padding-right: calc((100% - 640px) / 2); }
 }
+
+/* Match sheet: model, blend and DraftKings side by side (six columns fit 390px) */
+table.mkts.with-blend { font-size: 13px; }
+table.mkts.with-blend td, table.mkts.with-blend th { padding-left: 3px; padding-right: 3px; }
+table.mkts .blend-col { background: var(--track); }
+/* A plain-English "why" box: no value bet, player trades off */
+.explain {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  background: var(--track);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.explain b { color: var(--text-primary); }
+
+/* Player lines in the match sheet: line | odds | model | blend | book | edge */
+.pl-grid { margin-top: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pl-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.3em 2.8em 2.8em 2.6em 3.5em; gap: 0 5px; padding: 2px 0; color: var(--text-secondary); }
+.pl-row > span:not(:first-child) { text-align: right; }
+.pl-row > span:nth-child(4) { color: var(--text-primary); }
+.pl-row.pl-hdr { font-size: 11px; color: var(--text-muted); padding-bottom: 3px; }
+.pl-row.pl-hdr > span:nth-child(4) { color: var(--text-muted); }
+.pl-row.pick > span:first-child { color: var(--text-primary); font-weight: 600; }
+.pl-row .edge-pos { color: var(--good-text); font-weight: 600; }
+
+/* Folded sections (Portfolio breakdowns) */
+details.fold { margin-top: 18px; }
+details.fold > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 0.5px solid var(--border);
+}
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before { content: "›"; display: inline-block; width: 14px; transition: transform 0.15s; }
+details.fold[open] > summary::before { transform: rotate(90deg); }
+details.fold > summary .muted { font-weight: 400; font-size: 12px; }
+/* A label row inside a table (e.g. "Odds capped at 6.0" in the sweep) */
+tr.sub-head td { text-align: left; font-size: 12px; color: var(--text-muted); padding-top: 12px; }
