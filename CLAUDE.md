@@ -29,7 +29,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | --- | --- | --- |
 | `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (e.g. `2023-2025`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
-| `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push). | ~20 per snapshot; 0 with `print_only` |
+| `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots) to ~100 per historical props call |
 | `ci.yml` | On every push and pull request: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. No secrets. The browser smoke test skips there (no Chromium). | 0 |
 
@@ -62,6 +62,12 @@ Read its "Status and next steps" section first; this file is the technical map.
 - `match_calibration.py`: conditional-logit blend `score_k = a_k + b·log(price_k) + c·log(model_k)` (1X2; two outcomes = logistic for O/U 2.5).
   - Fitted on Pinnacle closing odds (football-data) beside the model's walk-forward chances; refitted every 28 days on earlier matches only.
   - The live fit is saved in `E0_dk.json` → `blend.live.{h2h,totals}.coef`; `publish.add_match_blend` reads it (`DK_BACKTEST_FILE`) and sets each fixture's `p_bet`, which `paper.update_ledger` and the app's `bestPick` use. No file = raw model, as before.
+  - `fit`/`apply`/`walk_forward` also take row weights (AH pushes) and extra signal columns (`d` per feature: +home/−away for 1X2, a logit shift with two outcomes). Without them the coefficients are `[a, b, c]` as before. `RESEARCH_GROUPS` (`ah`) is research only; `GROUPS` (live) is unchanged.
+- `match_markets.py`: research, not live. 1X2, O/U 2.5 and Asian handicap vs Pinnacle on football-data (`soccer-stats match-markets`, `backfill.yml` `match_markets`).
+  - AH settlement (quarter lines split; break-even chance from the score matrix);
+  - `clean_prices` blanks broken average/maximum rows;
+  - `xg_features` (6-match xG form, earlier matches only) and `soft_vs_sharp` are blend signals;
+  - `run` reports log loss, the blend weight, signal tests and the threshold sweep at Pinnacle early/close and the average/maximum early, with ROI ranges and CLV vs Pinnacle's fair close.
 - `odds_feed.py`: live DraftKings odds and the credit budget.
 - `odds_history.py`: historical match odds.
 
@@ -151,7 +157,13 @@ Five agents, each owning part of the code. Start a session's work by calling the
 **Match bets**
 - DraftKings backtest, 2025/26, raw model at a 12% edge: 173 bets, ROI −13% (95% range −38% to +16%), CLV vs DraftKings −5% to −7%. Every threshold from 2% to 20% loses (−8% to −21%).
 - Blend (`match_calibration.py`, fitted on up to 2,276 earlier Pinnacle-priced matches): the fit gives the model about no weight (b ≈ 1.04, c ≈ −0.03). 1X2 log loss: model 1.030, blend 1.018, DraftKings close 1.012. Blend bets: 0 at every threshold (5 at 2% over 2023–2025, all lost).
-- The cached DraftKings history has no over/under 2.5 prices, so totals are untested.
+- The cached DraftKings history has no over/under 2.5 prices, so totals are untested at DraftKings.
+- Round 2 (`match_markets.py`, football-data 2017–2026, Pinnacle AH and O/U from 2019/20; details in `docs/edge.md`):
+  - Log loss, model / blend / Pinnacle close: 1X2 0.9614 / 0.9504 / 0.9489; O/U 2.5 0.6794 / 0.6770 / 0.6755; AH 0.7066 / 0.6949 / 0.6939. The model never beats the close.
+  - Model weight in the blend (live fit): 1X2 0.06, O/U 0.11, AH 0.12 (AH shrinks Pinnacle's price, b ≈ 0.5).
+  - Model picks at Pinnacle early, 12%: CLV −4.2% (1X2, 1,419 bets), −2.9% (O/U, 285), −2.0% (AH, 744), worse than a random side. AH blend: CLV −0.2% to +0.8% at 2–8%, no range above 0.
+  - xG form, xG-minus-goals and soft-vs-sharp earn no out-of-sample log loss (all ranges include 0). Late team news can't be tested yet (FPL log starts 5 Oct 2026).
+  - Verdict: no AH or O/U bets in the live rule; nothing in the live code changed.
 - Line shopping (edge finder, football-data 2017–2026, ~1,700–2,100 bets): the rule's CLV vs Pinnacle's fair close is −6.6% at the average book, −4.0% at Pinnacle early, −2.3% at the best of seven named books. Only the unbettable market maximum is positive, and it turned negative in the last two seasons. The picks do no better than random against the sharp close.
 - Live: value picks and match paper trades use the blend (`p_bet`) once `E0_dk.json` holds `blend.live`, so they will mostly stop. That is the honest result.
 

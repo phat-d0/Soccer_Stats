@@ -204,3 +204,108 @@ This answers the player-shots agent's question (`task=shots`, 2025/26).
 
 Recommendation: do C and D first (both free, on data we already have), then B only if
 the owner wants to keep player bets alive.
+
+## Round 2: match markets beyond 1X2 (moneyline, 2026-10-06)
+
+Owner: moneyline. Code: `src/soccer_stats/match_markets.py` (tests in
+`tests/test_match_markets.py`), run with `soccer-stats match-markets` or *Backfill DraftKings
+odds* with `match_markets` ticked (no key, no push; run 37525340740). This covers
+experiments C (Asian handicap and other totals) and D (the blend at Pinnacle's early price).
+
+**Setup.**
+- Data: football-data E0, 2017/18–2025/26. Live model settings (Dixon-Coles, xG weight 0.7,
+  weekly walk-forward refits): 3,302 out-of-sample predictions.
+- Markets:
+  - 1X2: 3,142 matches.
+  - Over/under 2.5: 2,401 matches. Pinnacle prices start in 2019/20, and football-data has
+    no other totals line, so "totals other than 2.5" can't be tested on free data.
+  - Asian handicap: 2,412 matches, from 2019/20. There is one line per match (AHh early,
+    AHCh close), with Pinnacle's two-way prices plus the average and maximum at the early
+    line. The line moved between early and close in 38% of matches, and those get no CLV.
+    20% of matches had a push or a half stake.
+- AH chance: a side's break-even chance, (W + HW/2) / (W + HW/2 + L + HL/2), from the
+  model's score matrix. Quarter lines are split into two half-stakes. Blend fits weight
+  each match by its unpushed share.
+- Blend: `match_calibration.fit`, now with row weights and optional extra signal terms.
+  It is fitted on Pinnacle's fair close, refitted every 28 days on earlier matches only,
+  and applied to the margin-free price at the time of the bet.
+- Trade rule: one bet per match, on the side with the larger edge. The sweep covers 2–20%.
+  All strategies bet on the same matches (those the blend covers).
+- CLV = price × Pinnacle's fair close (Shin) − 1. Ranges are bootstrap 95%.
+- **Price check:** football-data's average and maximum prices hold a few broken rows: 10
+  AH average rows, 12 AH maximum rows and 10 1X2 maximum rows had overrounds far below
+  100%. The first run, without the check, showed absurd +100% to +700% AH returns at those
+  prices. Rows with an overround outside −3% to +20%, or more than 10 points from
+  Pinnacle's chance, are now blanked and counted in the output.
+
+**Log loss** (out of sample, same matches; lower is better):
+
+| Market | Matches | Model | Blend | Pinnacle early | Pinnacle close | Model weight c (live fit) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1X2 | 2,816 | 0.9614 | 0.9504 | 0.9530 | **0.9489** | 0.06 (refits −0.41 to +0.38) |
+| O/U 2.5 | 2,079 | 0.6794 | 0.6770 | 0.6759 | **0.6755** | 0.11 (refits −0.43 to +0.23) |
+| Asian handicap | 2,090 | 0.7066 | 0.6949 | 0.6952 | **0.6939** | 0.12 (refits +0.05 to +0.78; b = 0.52) |
+
+The model is worse than Pinnacle's close in every market. The blend, which takes the
+close as its input, is still worse out of sample than the close alone. On AH the fit
+shrinks Pinnacle's price (b ≈ 0.5) and gives the model a small positive weight. That
+weight was largest in early refits and has fallen to 0.09–0.12.
+
+**Trade rule at Pinnacle's early price** (a bettable sharp price; CLV vs Pinnacle's fair close):
+
+| Market | Strategy | Edge | Bets | ROI (95% range) | CLV (95% range) |
+| --- | --- | --- | --- | --- | --- |
+| 1X2 | model | 12% | 1,419 | +2.2% (−9.8 to +14.9) | −4.2% (−4.8 to −3.6) |
+| 1X2 | blend | 2% / 12% | 992 / 63 | −2.3% / +17.7% (−34 to +77) | −2.7% / −2.1% (−4.8 to +0.8) |
+| O/U 2.5 | model | 12% | 285 | +3.2% (−9.4 to +16.4) | −2.9% (−3.7 to −1.9) |
+| O/U 2.5 | blend | 2% / 12% | 266 / 8 | −2.4% / −15.5% | −2.8% / +0.5% (−5.7 to +5.1) |
+| AH | model | 12% | 744 | +1.8% (−4.8 to +8.1) | −2.0% (−2.5 to −1.5) |
+| AH | blend | 2% | 647 | −1.4% (−8.9 to +6.2) | −0.2% (−0.7 to +0.3) |
+| AH | blend | 8% | 142 | +7.2% (−8.6 to +23.3) | +0.8% (−0.4 to +2.0) |
+| AH | blend | 12% | 45 | +32.7% (+6.2 to +58.1) | −0.4% (−2.4 to +1.5) |
+
+What the numbers say:
+- **The model's own picks lose to the close in every market.** At 12% CLV is −4.2% on
+  1X2, −2.9% on O/U and −2.0% on AH. A random AH side at Pinnacle's early price costs
+  about half the 2.3% margin (−1.2%), so the model's AH picks are worse than random.
+  Thresholds from 2% to 20% give the same CLV.
+- **AH blend: CLV is about 0 at Pinnacle's own early price** (−0.2% to +0.8% at 2–8%). This
+  is the best result of any match strategy so far, but no range is above 0.
+  - The +32.7% ROI at 12% comes from 45 bets, all in 2019/20–2021/22. It is one cell out
+    of about 200 (3 markets × 4 prices × 3–4 strategies × 6 thresholds), and its CLV is
+    −0.4%. So it is noise, not an edge.
+  - Since 2022/23 the blend has found no AH bets at 12%: as the fit converged on the price,
+    the large disagreements stopped.
+- **Soft prices.** The market average early (a DraftKings stand-in) gives model CLV of
+  −6.8% on 1X2, −4.7% on O/U and −3.2% on AH at 12%. The maximum early gives the model −0.3%
+  to −0.8% and the AH blend +1.2% to +2.6% (2–8%), but the maximum can't be bet in full
+  (round 1).
+- **ROI at Pinnacle's close** (CLV 0 by definition): every model and blend range includes 0
+  in every market.
+
+**Signals the price might lack (task 2).** Each is a walk-forward blend term on the same
+matches. The figure is the change in log loss against the plain blend; negative means the
+signal helps.
+
+| Market | Signal | Change in log loss (95% range) | Note |
+| --- | --- | --- | --- |
+| 1X2 | xG form (6-match xG difference) + xG minus goals | +0.0004 (−0.0012 to +0.0018) | repeat of the edge-finder's test |
+| O/U 2.5 | xG in play + xG minus goals (totals) | +0.0004 (−0.0034 to +0.0042) | repeat |
+| AH | xG form + xG minus goals | +0.0003 (−0.0008 to +0.0015) | new market, same window, no tuning |
+| AH | soft_vs_sharp (average vs Pinnacle 1X2, early) | +0.0001 (−0.0000 to +0.0002) | the edge-finder's suggestion |
+
+None helps out of sample. Two strategies show positive ROI with negative CLV, which marks
+it as noise:
+- O/U blend with xG at 12%: +15.9% (−0.2 to +32.0) on 171 bets, CLV −2.3%.
+- AH blend with soft_vs_sharp: the same 45 bets as the plain blend.
+
+Late team news can't be tested: the FPL log on `data-log` (`fpl_news/`) starts on
+2026-10-05, and no Premier League match has been played since. Any `x_*` column on the
+joined frame becomes a blend variant once a few hundred settled matches carry it.
+
+**Verdict.** Asian handicap and over/under 2.5 behave like 1X2. The model adds no
+information to Pinnacle's price, its own picks lose 2–4% CLV, and the blend does no better
+than break-even against the sharp close. Don't add AH or O/U bets to the live rule. The
+only near-zero CLV is at Pinnacle's own price, so a bettor gains nothing over the margin.
+To test late team news, live prices must first be logged with timestamps (the
+edge-finder's M2), so December's matches can be replayed.

@@ -119,6 +119,15 @@ trades use; without the file everything falls back to the model's own chance. To
 the backtest from cached odds only (no key, no download, no push), dispatch *Backfill
 DraftKings odds* with `print_only` ticked.
 
+**Other match markets (research only).** `soccer-stats match-markets` (or *Backfill
+DraftKings odds* with `match_markets` ticked: no key, no push) replays the model and the
+blend on 1X2, over/under 2.5 and Asian handicap against Pinnacle's prices in
+football-data's files. It reports log loss beside the market, the weight the model earns
+in the blend, extra signals (xG form, soft-vs-sharp prices) and the threshold sweep with
+ROI ranges and CLV against Pinnacle's fair close. Results in `docs/edge.md`: the model
+adds nothing to Pinnacle's price in any of these markets, so the live rule stays on
+DraftKings 1X2 and O/U 2.5 through the blend.
+
 **Reading the Portfolio tab:** switch between *Live paper* and *Backtest*; they are
 never mixed. Look at the trade count first: at 12% there are only a few trades a round,
 and ROI on a small sample is mostly noise. Trust closing line value over ROI: beating
@@ -261,6 +270,7 @@ src/soccer_stats/
   models/dixon_coles.py Dixon-Coles Poisson model with time decay
   backtest.py           walk-forward predictions, scoring vs. market, bet simulation
   match_calibration.py  walk-forward blend of the match model with the bookmaker's price
+  match_markets.py      research: 1X2, O/U 2.5 and Asian handicap vs Pinnacle, signal tests
   cli.py                `soccer-stats` command
   dashboard.py          data shaping for the app (fixtures, ratings, track record)
   xg.py                 Understat xG download, team-name mapping, merge onto matches
@@ -293,6 +303,6 @@ notebooks/              exploration
 - Tune `xi` (time decay) and the lookback window by out-of-sample log loss
 - Elo / pi-ratings as a second model; blend with Dixon-Coles
 - Non-penalty xG, and separate weights for attack vs defence
-- Over/under and Asian handicap markets (often softer than 1X2)
+- Over/under and Asian handicap: tested in round 2 against Pinnacle; no edge (`docs/edge.md`)
 - Market-blending: model probability shrunk toward the market, bet only on large disagreements
 - Lower leagues, where bookmaker prices are less efficient
