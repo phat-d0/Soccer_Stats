@@ -602,8 +602,10 @@ def cmd_match_markets(args: argparse.Namespace) -> None:
         joined = joined.merge(feats, on=["date", "home", "away"], how="left")
     print(f"{len(joined)} predictions matched to football-data prices")
     out = mm.run(joined)
-    for g, r in out.items():
-        _print_market(g, r)
+    print("\nPrice check (rows blanked as implausible):")
+    print(pd.DataFrame(out["price_check"]).round(4).to_string(index=False))
+    for g in mm.GROUPS:
+        _print_market(g, out[g])
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
@@ -612,6 +614,10 @@ def cmd_match_markets(args: argparse.Namespace) -> None:
 
 def _rng(ci) -> str:
     return f"{ci[0]:+.1%} to {ci[1]:+.1%}" if ci else "-"
+
+
+def _rng4(ci) -> str:
+    return f"{ci[0]:+.4f} to {ci[1]:+.4f}" if ci else "-"
 
 
 def _print_market(group: str, r: dict) -> None:
@@ -634,11 +640,11 @@ def _print_market(group: str, r: dict) -> None:
     for k, f in (r.get("fits") or {}).items():
         print(f"{k}: {f['refits']} refits, model weight c range {f['c_range']}, last {f['last']}")
     print(f"Fit on every match (live): {r.get('live')}")
-    if r.get("signal"):
-        d = r["signal"]["loss_diff_vs_blend"]
+    for k, sig in (r.get("signals") or {}).items():
+        d = sig["loss_diff_vs_blend"]
         print(
-            f"Signal {r['signal']['features']}: log loss vs blend "
-            f"{d.get('diff', float('nan')):+.4f} (95% {d.get('ci95')}) "
+            f"{k} {sig['features']}: log loss vs blend "
+            f"{d.get('diff', float('nan')):+.4f} (95% {_rng4(d.get('ci95'))}) "
             f"on {d['matches']} matches (negative = signal helps)"
         )
     print("source          strategy   edge  bets     ROI        95% range      CLV       CLV range")

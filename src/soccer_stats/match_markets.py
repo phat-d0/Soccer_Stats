@@ -56,12 +56,20 @@ SOURCES = {  # price source -> when it is taken
     "max_early": "early",
     "pinnacle_close": "close",
 }
-# Extra signals per group (columns from xg_features); tested one set at a time.
+# Extra signals per group, one blend variant each (columns from xg_features and
+# soft_vs_sharp). The xG terms repeat the edge-finder's 1X2/totals tests (same 6-match
+# window, no tuning); soft_vs_sharp on AH was the edge-finder's suggestion.
 SIGNALS = {
-    "h2h": ("x_xgd", "x_luck"),
-    "ah": ("x_xgd", "x_luck"),
-    "totals": ("x_xgt", "x_luckt"),
+    "h2h": {"blend_xg": ("x_xgd", "x_luck")},
+    "ah": {"blend_xg": ("x_xgd", "x_luck"), "blend_svs": ("x_svs",)},
+    "totals": {"blend_xg": ("x_xgt", "x_luckt")},
 }
+# Price sanity. A source's row is dropped when its overround is implausible (stale or
+# mismatched quotes; a two-way market's maximum can't sit far under 100%), or, for the
+# average and maximum, when its margin-free chance is far from Pinnacle's at the same
+# time (a different line or a typo). Counts are reported in price_check.
+OVERROUND = (-0.03, 0.20)
+MAX_GAP = 0.10
 
 
 # ---------- prices ----------
@@ -90,6 +98,50 @@ def load_prices(raw: pd.DataFrame, season: str | None = None) -> pd.DataFrame:
     res = pd.DataFrame(out, index=df.index).reset_index(drop=True)
     res["season"] = season
     return res
+
+
+def clean_prices(joined: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
+    """Blank implausible prices (see OVERROUND, MAX_GAP); one report row per source."""
+    df = joined.copy()
+    report = []
+    for (g, when, src), _ in COLUMNS.items():
+        cols = [f"{g}_{when}_{src}_{m}" for m in GROUPS[g]]
+        if not set(cols) <= set(df.columns):
+            continue
+        odds = df[cols].to_numpy(dtype=float)
+        priced = np.isfinite(odds).all(1)
+        over = (1 / odds).sum(1) - 1
+        bad = priced & ((over < OVERROUND[0]) | (over > OVERROUND[1]))
+        gap_bad = np.zeros(len(df), dtype=bool)
+        if src != "pinnacle":
+            pin = df[[f"{g}_{when}_pinnacle_{m}" for m in GROUPS[g]]].to_numpy(dtype=float)
+            gap = np.abs(_devig(odds)[:, 0] - _devig(pin)[:, 0])
+            gap_bad = priced & ~bad & (gap > MAX_GAP)
+        df.loc[bad | gap_bad, cols] = np.nan
+        report.append(
+            {
+                "market": g,
+                "when": when,
+                "source": src,
+                "priced": int(priced.sum()),
+                "overround_median": float(np.nanmedian(over[priced])) if priced.any() else None,
+                "dropped_overround": int(bad.sum()),
+                "dropped_far_from_pinnacle": int(gap_bad.sum()),
+                "max_odds": float(np.nanmax(odds[priced])) if priced.any() else None,
+            }
+        )
+    return df, report
+
+
+def soft_vs_sharp(joined: pd.DataFrame) -> pd.Series:
+    """x_svs: log(home/away) from the market average's early 1X2 (Shin) minus the same
+    from Pinnacle's early price. Positive = soft books rate the home side higher."""
+    names = GROUPS["h2h"]
+    avg = _devig(joined[[f"h2h_early_avg_{m}" for m in names]].to_numpy(dtype=float))
+    pin = _devig(joined[[f"h2h_early_pinnacle_{m}" for m in names]].to_numpy(dtype=float))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x = np.log(avg[:, 0] / avg[:, 2]) - np.log(pin[:, 0] / pin[:, 2])
+    return pd.Series(x, index=joined.index)
 
 
 def join(preds: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
@@ -414,10 +466,10 @@ def run_group(
         )
         out["ah_push_share"] = float((close["w"] < 1).mean())
     names = list(GROUPS[group])
-    feats = tuple(f for f in SIGNALS[group] if f in close and close[f].notna().any())
     variants = {"blend": ()}
-    if feats:
-        variants["blend_xg"] = feats
+    for name, feats in SIGNALS[group].items():
+        if all(f in close and close[f].notna().any() for f in feats):
+            variants[name] = feats
     probs: dict[str, dict[str, pd.DataFrame]] = {"close": {}, "early": {}}
     fits: dict[str, list] = {}
     for name, f in variants.items():
@@ -436,13 +488,16 @@ def run_group(
     out["log_loss_early_pinnacle"] = log_loss(
         both, {"pinnacle_early": pe, **{k: probs["close"][k] for k in variants}}, group
     )
-    if "blend_xg" in variants:
-        out["signal"] = {
-            "features": list(feats),
+    out["signals"] = {
+        k: {
+            "features": list(f),
             "loss_diff_vs_blend": loss_diff(
-                close, probs["close"]["blend"], probs["close"]["blend_xg"], group
+                close, probs["close"]["blend"], probs["close"][k], group
             ),
         }
+        for k, f in variants.items()
+        if f
+    }
     out["fits"] = {
         k: {
             "refits": len(v),
@@ -476,4 +531,9 @@ def run_group(
 def run(
     joined: pd.DataFrame, groups=tuple(GROUPS), thresholds=tr.SWEEP, min_rows: int = mc.MIN_ROWS
 ) -> dict:
-    return {g: run_group(joined, g, thresholds, min_rows) for g in groups}
+    """Clean the prices, add soft_vs_sharp, then each market's results (+ price_check)."""
+    df, check = clean_prices(joined)
+    df["x_svs"] = soft_vs_sharp(df)
+    out = {g: run_group(df, g, thresholds, min_rows) for g in groups}
+    out["price_check"] = check
+    return out

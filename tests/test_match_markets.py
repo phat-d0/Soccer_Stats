@@ -239,7 +239,9 @@ def test_run_reports_each_market(result):
         assert r["sweep"], g
         row = r["sweep"][0]
         assert {"source", "strategy", "threshold", "bets"} <= set(row)
-    assert "signal" in out["h2h"]
+    assert "blend_xg" in out["h2h"]["signals"]
+    assert "blend_svs" in out["ah"]["signals"]
+    assert out["price_check"]
     assert out["ah"]["ah_line_moved"] == 0.0
 
 
@@ -284,3 +286,34 @@ def test_cli_match_markets_runs_offline(league, tmp_path, monkeypatch, capsys):
     text = capsys.readouterr().out
     assert "==== ah ====" in text and "out-of-sample predictions" in text
     assert {"h2h", "totals", "ah"} <= set(__import__("json").loads(out.read_text()))
+
+
+def test_clean_prices_blanks_implausible_rows():
+    j = pd.DataFrame(
+        {
+            "ah_early_pinnacle_ah_home": [1.95, 1.95, 1.95],
+            "ah_early_pinnacle_ah_away": [1.95, 1.95, 1.95],
+            # fine; a 30% arbitrage (stale quote); a different line (far from Pinnacle)
+            "ah_early_max_ah_home": [2.0, 3.0, 1.4],
+            "ah_early_max_ah_away": [2.0, 3.0, 3.6],
+        }
+    )
+    out, rep = mm.clean_prices(j)
+    assert out["ah_early_max_ah_home"].notna().tolist() == [True, False, False]
+    assert out["ah_early_pinnacle_ah_home"].notna().all()
+    r = next(x for x in rep if x["source"] == "max")
+    assert (r["dropped_overround"], r["dropped_far_from_pinnacle"]) == (1, 1)
+
+
+def test_soft_vs_sharp_sign():
+    j = pd.DataFrame(
+        {
+            "h2h_early_avg_home": [1.8],
+            "h2h_early_avg_draw": [3.6],
+            "h2h_early_avg_away": [4.5],
+            "h2h_early_pinnacle_home": [2.0],
+            "h2h_early_pinnacle_draw": [3.6],
+            "h2h_early_pinnacle_away": [4.0],
+        }
+    )
+    assert mm.soft_vs_sharp(j).iloc[0] > 0  # soft books like the home side more
