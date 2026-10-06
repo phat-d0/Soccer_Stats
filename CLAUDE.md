@@ -106,7 +106,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
 | `edge-finder` | Research into where a real edge could exist (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. |
 | `lead-reviewer` | Reviews and merges specialist branches, CI, CLAUDE.md, README, the work plan, and credit budgets. |
 
-- Specialists work on their own branches: `agent/<name>`.
+- Specialists work on their own branches: `team/<name>` (`team/edge`, `team/player-shots`, `team/moneyline`, `team/ui`). Round 1 (6 Oct) used `agent/<name>`.
 - The lead reviews each branch, runs the full checks and merges into `claude/soccer-stats-scaffold`.
 - Only the lead sets Odds API credit caps. The default cap is 0.
 
