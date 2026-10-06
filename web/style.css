@@ -486,7 +486,20 @@ select.metric { display: block; width: 100%; margin-bottom: 8px; font: inherit; 
 .chart .dev-row.on .hit { fill: var(--track); opacity: 0.5; }
 .dev-readout { min-height: 40px; font-size: 13px; color: var(--text-secondary); padding: 6px 0 8px; border-bottom: 0.5px solid var(--border); margin-bottom: 6px; }
 
-/* Record tab, player shots: wide tables scroll inside their card on phones */
-.scroll-x { overflow-x: auto; }
-.scroll-x table { min-width: 420px; }
-tr.on-row td { background: var(--track); font-weight: 600; }
+/* Record tab, player shots: the threshold sweep (the chosen strategy's column is shaded) */
+table.sweep { table-layout: fixed; }
+table.sweep th:first-child { width: 22%; }
+table.sweep td:not(:first-child), table.sweep th:not(:first-child) { padding-left: 4px; padding-right: 4px; }
+table.sweep .on-col { background: var(--track); }
+table.sweep th.on-col { color: var(--text-primary); font-weight: 600; border-radius: 6px 6px 0 0; }
+td .meta { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+/* Portfolio breakdown tables: same column widths in every card, so they line up */
+table.bd { table-layout: fixed; }
+table.bd th:first-child { width: 40%; }
+
+/* Laptop: keep the top bar and tab bar in line with the 640px content column */
+@media (min-width: 700px) {
+  .topbar { padding-left: calc((100% - 640px) / 2 + 16px); padding-right: calc((100% - 640px) / 2 + 16px); }
+  .tabbar { padding-left: calc((100% - 640px) / 2); padding-right: calc((100% - 640px) / 2); }
+}

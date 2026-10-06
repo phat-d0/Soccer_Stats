@@ -90,9 +90,15 @@ Read its "Status and next steps" section first; this file is the technical map.
 - Tabs:
   - Matches;
   - Teams, with Players (season stats with list and deviation chart, model backtest);
-  - Record, with Match bets (model replay vs Pinnacle) and Player shots (the FanDuel backtest strategies, threshold sweep, calibration table);
-  - Portfolio (live paper trades and the backtest, filter All/Match/Player);
+  - Record, with Match bets (model replay vs Pinnacle) and Player shots (strategy switch, main strategy first; threshold sweep with one row per edge and one column per strategy; predicted vs actual win rate);
+  - Portfolio (live paper trades and the backtest, filter All/Match/Player; player trades are titled by the player's bet);
   - Explore.
+- Local test data: `tests/fixtures/web/` (`data.json`, `players_stats.json`, `players_backtest.json`, under 1 MB).
+  - Rebuild with `uv run python tests/web/make_fixture.py`: a synthetic league through `publish.build_data`, plus the real ledger and backtests from `origin/data-log` through `paper.run`. `now` is fixed, so the output is reproducible.
+- Smoke test: `node tests/web/smoke.mjs [--shots DIR]`.
+  - Serves `web/` with the fixture and visits every tab, sub-view and sheet at 390px light and dark, and at 1280px.
+  - Fails on console errors, horizontal scroll, or "undefined", "NaN" or "${" in the text.
+  - `tests/test_web_smoke.py` runs it under pytest, and skips without node or Chromium (`/opt/pw-browsers/chromium`, or set `CHROMIUM`).
 
 ## Agent team (`.claude/agents/`)
 
