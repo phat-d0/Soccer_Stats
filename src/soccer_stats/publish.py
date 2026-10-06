@@ -20,6 +20,7 @@ import pandas as pd
 
 from soccer_stats import dashboard
 from soccer_stats import match_calibration as mc
+from soccer_stats import trades as tr
 from soccer_stats.backtest import simulate_bets
 from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
 from soccer_stats.models import DixonColes
@@ -418,7 +419,13 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
     gate = player_gate()
     from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
-    status = {"gate": gate, "error": None, "odds": None, "bookmaker": PLAYER_BOOKMAKER_NAME}
+    status = {
+        "gate": gate,
+        "error": None,
+        "odds": None,
+        "bookmaker": PLAYER_BOOKMAKER_NAME,
+        "paper_trades": tr.PLAYER_PAPER_TRADES,  # the app says when player trades are off
+    }
     stats: list[dict] = []
     try:
         apps, missing = load_appearances(

@@ -145,7 +145,17 @@ def line(p, odds, ln=1.5, side="over", market="player_shots", fetched=None):
     }
 
 
-def test_player_paper_trades_cap_and_settle(tmp_path):
+def test_player_paper_trades_switch_is_off():
+    # Owner decision: no live player paper trades until a player rule backtests positive.
+    assert tr.PLAYER_PAPER_TRADES is False
+    players = [prow(str(i), f"P{i}", [line(0.5 + i / 100, 2.4)]) for i in range(3)]
+    src = {"name": "DraftKings", "fetched_at": NOW.isoformat()}
+    ev, _ = paper.update_ledger({}, [card(players)], src, None, NOW, players_on=True)
+    assert [e for e in ev if e.get("bet_type") == "player"] == []
+
+
+def test_player_paper_trades_cap_and_settle(tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PLAYER_PAPER_TRADES", True)  # the rule itself, switch on
     players = [prow(str(i), f"P{i}", [line(0.5 + i / 100, 2.4)]) for i in range(6)]
     players[0]["lines"].append(line(0.6, 3.0, ln=2.5))  # better edge on another line: kept instead
     src = {"name": "DraftKings", "fetched_at": NOW.isoformat()}
@@ -174,6 +184,7 @@ def test_player_paper_trades_cap_and_settle(tmp_path):
             "started": [True, True],
         }
     )
+    monkeypatch.setattr(tr, "PLAYER_PAPER_TRADES", False)  # open trades settle either way
     ev, _ = paper.update_ledger(ledger, [], src, None, after, apps=apps, players_on=True)
     assert ledger["E0|2627|Arsenal|Leeds|P0|player_shots"]["status"] == "won"  # 3 > 2.5
     voids = [t for t in ledger.values() if t["status"] == "void"]
@@ -208,7 +219,8 @@ def _priced_cards(apps, calibration=None):
     return cards, st, top, fixtures
 
 
-def test_player_cards_without_blend_open_no_trades(sim):
+def test_player_cards_without_blend_open_no_trades(sim, monkeypatch):
+    monkeypatch.setattr(tr, "PLAYER_PAPER_TRADES", True)  # no chance = no trade, even if on
     cards, st, top, fixtures = _priced_cards(sim)
     rows = cards[("T00", "T01")]
     priced = [r for r in rows if r["lines"]]

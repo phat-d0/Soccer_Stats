@@ -36,6 +36,10 @@ EPS = 1e-9  # so an edge of exactly the threshold isn't lost to rounding
 MARKETS = ("home", "draw", "away", "over25", "under25")
 PLAYER_MARKETS = ("player_shots", "player_shots_on_target")
 MAX_PLAYER_TRADES = 4  # per match: they all ride on the same team's shot volume
+# Owner decision (6 Oct 2026): live player paper trades stay OFF until some player rule
+# backtests positive. Every FanDuel strategy loses (-17% to -35% at a 12% edge). Player
+# lines still show in the app with the blended chance; trades already open still settle.
+PLAYER_PAPER_TRADES = False
 GROUPS = {"home": MARKETS[:3], "draw": MARKETS[:3], "away": MARKETS[:3]}
 GROUPS.update({"over25": MARKETS[3:], "under25": MARKETS[3:]})
 MARKET_LABELS = {

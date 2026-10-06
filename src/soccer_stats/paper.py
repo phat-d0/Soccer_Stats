@@ -130,7 +130,8 @@ def update_ledger(
 
     `fixtures` are the app's fixture cards (p, p_base, odds, kickoff, low_data, players,
     ...). Player trades open only when `players_on` (the player model passed its gate)
-    and settle on Understat's counts in `apps`. The note explains why nothing could be
+    and the trades.PLAYER_PAPER_TRADES switch is on; open ones settle on Understat's
+    counts in `apps` either way. The note explains why nothing could be
     opened, if so.
     """
     events: list[dict] = []
@@ -187,7 +188,7 @@ def update_ledger(
             ledger[tid] = t
             events.append({"type": "open", **t})
 
-    if players_on:
+    if players_on and tr.PLAYER_PAPER_TRADES:
         events += _open_player_trades(ledger, cards, now, league, ref)
 
     # 2. Track the close and catch moved fixtures; 3. settle.
