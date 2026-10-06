@@ -1,13 +1,39 @@
-# Diagnoses player-prop coverage: what the cached player-odds history holds and which
-# bookmakers price Premier League player shots (about 40-80 credits). Run by hand.
+# Diagnostics and edge research, run by hand only. Never pushes and never deploys:
+# results are in the job log (and a short-lived workflow artifact).
+#   coverage: what the cached player-odds history holds and which books price player
+#             shots (about 40-80 credits; the original check).
+#   props:    which books price BOTH sides of EPL player shots, live and historical,
+#             stopping at `cap` credits (0 = dry run). See docs/edge.md.
+#   match:    line shopping on football-data prices with the walk-forward match model
+#             (no credits).
+#   shots:    Understat's shot counts vs football-data (team) and ESPN (player); no credits.
 name: Player odds check
 
 on:
   workflow_dispatch:
+    inputs:
+      task:
+        description: "coverage, props, match or shots"
+        type: choice
+        options: [coverage, props, match, shots]
+        default: coverage
+      cap:
+        description: "props: most credits to spend (0 = dry run)"
+        default: "0"
+      hist_dates:
+        description: "props: historical dates (comma-separated ISO times)"
+        default: "2026-10-03T08:00:00Z,2025-03-15T08:00:00Z"
+      seasons:
+        description: "match: seasons to bet (start years); shots: seasons to load"
+        default: "2017-2025"
+
+permissions:
+  contents: read
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -16,9 +42,36 @@ jobs:
           path: data/raw/player_odds_history
           key: player-odds-history-none
           restore-keys: player-odds-history-
-      - name: Check
+      # Restore only: this job never saves a cache, so it can't disturb the paid ones.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'match' || inputs.task == 'shots' }}
+        with:
+          path: data/raw
+          key: raw-data-none
+          restore-keys: raw-data-
+      - name: Run
         env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props') && secrets.ODDS_API_KEY || '' }}
+          TASK: ${{ inputs.task }}
+          CAP: ${{ inputs.cap }}
+          HIST_DATES: ${{ inputs.hist_dates }}
+          SEASONS: ${{ inputs.seasons }}
         run: |
           uv sync --frozen
-          uv run soccer-stats player-odds-check
+          mkdir -p out
+          case "$TASK" in
+            coverage) uv run soccer-stats player-odds-check ;;
+            props) uv run python -m soccer_stats.edge.run props --cap "$CAP" \
+                     --hist-dates "$HIST_DATES" --json out/props.json ;;
+            match) uv run python -m soccer_stats.edge.run match --seasons "$SEASONS" \
+                     --json out/match.json ;;
+            shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
+                     --json out/shots.json ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: edge-${{ inputs.task }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
