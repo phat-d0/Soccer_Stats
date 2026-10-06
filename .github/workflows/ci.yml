@@ -1,0 +1,33 @@
+# Checks every push and pull request: formatting, lint, the test suite and a syntax check
+# of the app. Needs no secrets and no network beyond installing packages; the browser
+# smoke test (tests/test_web_smoke.py) skips here because no Chromium is installed.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install
+        run: uv sync --frozen
+      - name: Format
+        run: uv run ruff format --check src tests
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Tests
+        run: uv run pytest -q
+      - name: App syntax
+        run: node --check web/app.js && node --check web/sw.js
