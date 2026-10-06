@@ -108,11 +108,19 @@ Read its "Status and next steps" section first; this file is the technical map.
 ## Status (2026-10-06)
 
 - Match bets: the DraftKings backtest at a 12% edge lost (ROI about −17%). The claimed edges pick out model errors more than value. Live paper trading continues.
-- Player model, stage 1: it beats the season-average baseline for shots and on target, and the gate is passed.
-- Player bets, priced backtest on FanDuel 2023/24–2025/26:
-  - Raw model: 530 trades, ROI −25.5%. The model is too confident on long shots: chance 12.1% vs FanDuel 9.1% vs 6.8% won.
-  - Bench players lost 83%; starters broke even.
-  - Fix in progress: the calibrated blend plus starters-after-lineups. See the "Status and next steps" section of the work plan for its result.
-- The live app does not yet use the blend or lineups for player paper trades. That is the next step if the backtest supports it.
-  - It needs a live lineup source, about 1 hour before kickoff.
-  - Candidate: ESPN's public summary API (`site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=<id>`, `rosters[].roster[].starter`). Verify its format from a GitHub runner first.
+- Player model, stage 1: it beats the season-average baseline (shots log loss 0.420 vs 0.496 before lineups; 0.400 lineup known). The gate is passed.
+- The starter flag was fixed on 6 Oct. Understat sets `roster_in` on starters who were replaced, so a starter is now anyone whose position isn't "Sub". Check: 11 starters in all 3,040 team-matches.
+- Player bets, priced backtest on FanDuel 2023/24–2025/26, at a 12% edge:
+
+  | Strategy | Bets | ROI |
+  | --- | --- | --- |
+  | Starters after lineups (blend) | 153 | −17% |
+  | Blend, 3 hours before | 223 | −35% |
+  | Raw model, 3 hours before | 628 | −22% |
+
+  - Every threshold from 2% to 20% loses money.
+  - The blend is well calibrated (23.3% predicted vs 23.1% won among starters). FanDuel's over-only lines imply 33%, so their margin is the obstacle, not the model.
+- The live app still opens player paper trades using the raw model at 12%; the blend and lineup rules are not live yet.
+- No live lineup feed has been built. Candidate source: ESPN's summary API (`rosters[].roster[].starter`). Build it only if some strategy backtests positive.
+- Next ideas are in the work plan's "Status and next steps" section. First: find a bookmaker with two-sided (over and under) EPL player shot lines.
+- Credits: 22,962 left on 6 Oct.
