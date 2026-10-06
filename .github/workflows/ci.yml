@@ -1,6 +1,7 @@
 # Checks every push and pull request: formatting, lint, the test suite and a syntax check
-# of the app. Needs no secrets and no network beyond installing packages; the browser
-# smoke test (tests/test_web_smoke.py) skips here because no Chromium is installed.
+# of the app (job "test"), and the browser smoke test of the app on the committed fixture
+# (job "web", tests/web/smoke.mjs in Playwright's Chromium). Needs no secrets and no
+# network beyond installing packages.
 name: CI
 
 on:
@@ -31,3 +32,36 @@ jobs:
         run: uv run pytest -q
       - name: App syntax
         run: node --check web/app.js && node --check web/sw.js
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_VERSION: 1.56.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
+      - name: Install Playwright and Chromium
+        run: |
+          npm install -g "playwright@$PLAYWRIGHT_VERSION"
+          npx -y "playwright@$PLAYWRIGHT_VERSION" install --with-deps chromium
+          echo "CHROMIUM=$(node -e "const r=require('child_process').execSync('npm root -g').toString().trim();console.log(require(r+'/playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+      - name: Smoke test
+        # smoke.mjs prints SKIP and exits 0 without a browser; here that is a failure.
+        run: |
+          node tests/web/smoke.mjs --shots smoke-shots | tee smoke.log
+          ! grep -q '^SKIP' smoke.log
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-shots
+          path: smoke-shots
+          retention-days: 7

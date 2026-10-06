@@ -1,6 +1,7 @@
 """Browser smoke test of the web app (tests/web/smoke.mjs) on the committed fixture.
 
-Skips when node, Playwright or Chromium aren't available (e.g. in CI without a browser).
+Skips when node, Playwright or Chromium aren't available. CI runs smoke.mjs directly in
+its own "web" job (.github/workflows/ci.yml), where a skip is a failure.
 """
 
 import json

@@ -31,7 +31,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (e.g. `2023-2025`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots) to ~100 per historical props call |
-| `ci.yml` | On every push and pull request: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. No secrets. The browser smoke test skips there (no Chromium). | 0 |
+| `ci.yml` | On every push and pull request. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. Job `web`: installs Playwright's Chromium (cached) and runs `tests/web/smoke.mjs`; a skip counts as a failure, and screenshots are uploaded when it fails. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml`, dispatch `publish.yml`, so the app picks up the new results.
 - Caches:
