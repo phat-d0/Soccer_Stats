@@ -21,8 +21,9 @@ icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next
 with value picks; tap for model, blend and DraftKings side by side, player lines and the
 scoreline heatmap), **Teams** (ratings + xG), **Record** (match bets: model alone vs
 blend against DraftKings' prices with the threshold sweep, then the longer Pinnacle
-replay; player shots: the FanDuel strategies), **Portfolio** (paper trades and the
-DraftKings backtest, breakdowns folded away), **Explore** (any matchup).
+replay; player shots: the FanDuel strategies), **Portfolio** (one portfolio per
+strategy: Moneyline live, Anytime goalscorer in testing, retired Player shots kept
+read-only; each with its own live paper trades and backtest), **Explore** (any matchup).
 
 A GitHub Actions job (`.github/workflows/publish.yml`) re-runs the model every hour,
 and every 15 minutes from 10:00 to 22:00 UTC, and publishes the result to GitHub Pages.
@@ -138,8 +139,9 @@ ROI ranges and CLV against Pinnacle's fair close. Results in `docs/edge.md`: the
 adds nothing to Pinnacle's price in any of these markets, so the live rule stays on
 DraftKings 1X2 and O/U 2.5 through the blend.
 
-**Reading the Portfolio tab:** switch between *Live paper* and *Backtest*; they are
-never mixed. Look at the trade count first: at 12% there are only a few trades a round,
+**Reading the Portfolio tab:** pick a strategy's portfolio at the top (the registry is
+`trades.PORTFOLIOS`), then switch between *Live paper* and *Backtest*; they are never
+mixed. Look at the trade count first: at 12% there are only a few trades a round,
 and ROI on a small sample is mostly noise. Trust closing line value over ROI: beating
 the close on average (especially Pinnacle's) is the best sign of a real edge. If ROI
 falls as the sweep's threshold rises, big claimed edges are mostly the model's mistakes,

@@ -402,13 +402,14 @@ def add_settled_live_matches(data: dict) -> None:
                 "settled_at": (kick + pd.Timedelta(hours=3)).isoformat(),
             }
         )
-    section = paper.portfolio_section(trades)
-    match = [t for t in trades if t.get("bet_type", "match") == "match"]
-    early = sum(1 for t in match if (t.get("close_minutes_before") or 0) > 60)
-    section["summary"]["close_early"] = early
-    if "match" in section["by_bet_type"]:
-        section["by_bet_type"]["match"]["summary"]["close_early"] = early
-    data["portfolio"]["live"] = {**live, **section}
+    data["portfolio"]["live"] = {**live, **paper.portfolio_section(trades)}
+    # Rebuild the per-strategy portfolios with these trades, keeping their backtests.
+    backtests = {p["id"]: p["backtest"] for p in data["portfolio"].get("portfolios") or []}
+    data["portfolio"]["portfolios"] = paper.portfolios_section(live, trades, backtests)
+    # The app reads only `portfolios`: leave the old top-level copies out of the fixture
+    # (production keeps them for one release), so the smoke test proves nothing needs them.
+    data["portfolio"].pop("live", None)
+    data["portfolio"].pop("backtest", None)
 
 
 def main(argv: list[str] | None = None) -> None:

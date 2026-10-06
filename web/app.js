@@ -17,7 +17,7 @@ const state = {
   pfMarket: "",
   pfSeason: "",
   pfShown: 15,
-  pfBet: "", // Portfolio bet type filter: "", "match" or "player"
+  pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
   recStrat: "", // Record tab, player shots: which backtest strategy's sweep to show
   recDk: "", // Record tab, match bets: which DraftKings backtest strategy ("raw" or "blend")
@@ -406,7 +406,7 @@ function viewMatches() {
     byDay.get(day).push([fx, idx]);
   });
   const nValue = d.fixtures.filter((fx) => bestPick(fx, state.minEdge)).length;
-  const openTrades = new Map((d.portfolio?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
+  const openTrades = new Map((pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
   let html = `<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet.` : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
@@ -992,7 +992,7 @@ function recordPlayerHtml() {
   const st = pr.strategies[cur];
   const short = (k) => STRATEGY_SHORT[k] || STRATEGY_LABEL[k] || k;
   // Bet-by-bet trades exist for the main strategy only (E0_players.json "trades").
-  const trades = (pf.backtest?.trades || [])
+  const trades = (pfById("player_shots")?.backtest?.trades || [])
     .filter((t) => t.bet_type === "player" && (t.status === "won" || t.status === "lost"))
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff));
   const s = st.summary || {};
@@ -1054,7 +1054,7 @@ const DK_NOTE = {
 const startYears = (v) => String(v).split(/[-,]/).map((y) => y.trim()).filter(Boolean)
   .map((y) => `${y}/${String((Number(y) + 1) % 100).padStart(2, "0")}`).filter((_, i, a) => i === 0 || i === a.length - 1).join("–");
 function recordDkHtml() {
-  const bt = state.data.portfolio?.backtest;
+  const bt = pfById("moneyline")?.backtest;
   const strategies = bt?.strategies;
   if (!strategies || !Object.keys(strategies).length) return "";
   const strats = Object.keys(strategies).sort((a, b) => (a === "raw" ? -1 : b === "raw" ? 1 : a.localeCompare(b)));
@@ -1189,16 +1189,26 @@ const seasonName = (s) => (s && s.length === 4 ? `20${s.slice(0, 2)}/${s.slice(2
 const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
 const kickoffText = (iso) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-function pfSet() {
+// The per-strategy portfolios (data.json → portfolio.portfolios). An older data.json
+// without them is shown as one Moneyline portfolio built from its live and backtest.
+function portfolios() {
   const pf = state.data.portfolio || {};
-  return state.pfView === "backtest" ? pf.backtest : pf.live;
+  if (pf.portfolios?.length) return pf.portfolios;
+  return [{ id: "moneyline", name: "Moneyline", status: "live", note: "", live: pf.live, backtest: pf.backtest }];
 }
-// The chosen bet type's trades and numbers (combined when no filter is set).
-function pfFiltered(set) {
-  const trades = (set.trades || []).filter((t) => !state.pfBet || (t.bet_type || "match") === state.pfBet);
-  const part = state.pfBet ? set.by_bet_type?.[state.pfBet] : null;
-  return { trades, summary: part ? part.summary : state.pfBet ? { trades: trades.length } : set.summary, breakdowns: part ? part.breakdowns : set.breakdowns };
+const pfById = (id) => portfolios().find((p) => p.id === id);
+// The portfolio on screen: the remembered one, else the first that isn't retired.
+function pfCurrent() {
+  const all = portfolios();
+  return all.find((p) => p.id === state.pfId) || all.find((p) => p.status !== "retired") || all[0];
 }
+function pfSet() {
+  const p = pfCurrent();
+  return p ? p[state.pfView === "backtest" ? "backtest" : "live"] : null;
+}
+// Every trade in every portfolio, live and backtest (for the trade sheet).
+const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.backtest?.trades || [])]);
+const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired" };
 
 // Current DraftKings price for an open trade: the latest price in data.json, else the
 // last one the ledger saw, else the entry price.
@@ -1254,7 +1264,8 @@ function pfTiles(s, trades = []) {
       <div class="tile"><div class="label">Total gain/loss</div><div class="value ${plClass(total)}">${usd(total, 2)}</div><div class="sub">settled + open</div></div>` : "";
   const profit = `<div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>`;
   const roi = `<div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>`;
-  const clv = `<div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(s.clv_dk)}">${signedPct(s.clv_dk)}</div><div class="sub">avg vs DraftKings close</div></div>`;
+  const book = trades.length && trades.every(isPlayer) ? playerBook() : "DraftKings";
+  const clv = `<div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(s.clv_dk)}">${signedPct(s.clv_dk)}</div><div class="sub">avg vs ${esc(book)} close</div></div>`;
   const beat = `<div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of settled trades"}</div></div>`;
   const count = `<div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>`;
   const dd = `<div class="tile"><div class="label">Max drawdown</div><div class="value">${s.max_drawdown != null ? `$${s.max_drawdown.toFixed(0)}` : "–"}</div><div class="sub">peak to trough</div></div>`;
@@ -1267,8 +1278,8 @@ function pfTiles(s, trades = []) {
 
 // Live view: why CLV matters, and how many closes were taken early (approximate CLV).
 function clvNote(s, trades) {
-  if (state.pfBet === "player") return "";
   const match = trades.filter((t) => !isPlayer(t) && t.status !== "open");
+  if (!trades.some((t) => !isPlayer(t))) return "";
   const early = s.close_early ?? s.close_over_60min ?? match.filter(closeApprox).length; // either name: moneyline uses close_early
   return `<p class="note">Closing line value compares the price you got with DraftKings' last price before kickoff. Profit takes hundreds of bets to tell skill from luck; consistently beating the close shows up within a few dozen, so it is the faster, more reliable sign of an edge.${early ? ` ${early} close${early > 1 ? "s were" : " was"} taken more than an hour before kickoff, so ${early > 1 ? "their" : "its"} CLV is approximate.` : ""}</p>`;
 }
@@ -1368,43 +1379,52 @@ function pfBreakdowns(b) {
 function viewPortfolio() {
   const pf = state.data.portfolio || {};
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
-  const set = pfSet();
+  const all = portfolios();
+  const cur = pfCurrent();
+  const active = all.filter((p) => p.status !== "retired");
+  const retired = all.filter((p) => p.status === "retired" && p.id !== cur.id);
+  const switcher = active.length > 1 || cur.status === "retired" ? `
+    <div class="segmented" role="group" aria-label="Portfolio">
+      ${active.map((p) => `<button data-pfid="${esc(p.id)}" class="${p.id === cur.id ? "on" : ""}" aria-pressed="${p.id === cur.id}">${esc(p.name)}</button>`).join("")}
+    </div>` : "";
+  const head = `
+    <div class="pf-head">
+      <span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>
+      <span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span>
+    </div>`;
+  const retiredLinks = retired.length ? `
+    <div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : "";
   const toggle = `
-    <div class="segmented" role="group" aria-label="Which trades">
+    <div class="segmented small-seg" role="group" aria-label="Which trades">
       ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
     </div>`;
-  const matchRule = `match bets at DraftKings' price, one per match on the best edge`;
-  const playerRule = playerTradesOff()
-    ? `player shot paper trades are off until a player rule makes money in testing`
-    : `player shots at ${playerBook()}'s price, up to ${MAX_PLAYER_TRADES} per match`;
-  const ruleNote = `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, whatever the Matches filter is set to: ${state.pfBet === "match" ? matchRule : state.pfBet === "player" ? playerRule : `${matchRule}; ${playerRule}`}.</p>`;
-  const foot = `<p class="note">${state.pfView === "live" ? `${oddsAge() || "Odds: DraftKings."}` : `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`} Paper trades: no money is staked.</p>`;
-
-  if (!set) {
-    return `${toggle}${ruleNote}<div class="empty">${state.pfView === "backtest" ? "No backtest yet. It appears after historical DraftKings odds are downloaded and the backtest is run." : "No paper trades yet."}</div>${foot}`;
-  }
-  const hasPlayer = (set.trades || []).some((t) => t.bet_type === "player") || pf.player_model;
-  const bets = hasPlayer ? `
-    <div class="segmented small-seg" role="group" aria-label="Bet type">
-      ${[["", "All bets"], ["match", "Match"], ["player", "Player"]].map(([k, l]) => `<button data-pfbet="${k}" class="${state.pfBet === k ? "on" : ""}" aria-pressed="${state.pfBet === k}">${l}</button>`).join("")}
-    </div>` : "";
-  const view = pfFiltered(set);
-  const trades = view.trades;
-  const s = view.summary || { trades: 0 };
-  const banner = set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note ? `<p class="note">${esc(set.note)}</p>` : "";
+  const set = pfSet();
+  const top = `${switcher}${head}${toggle}`;
+  const isMoneyline = cur.id === "moneyline";
+  const ruleNote = state.pfView === "live" && cur.status === "live"
+    ? `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, whatever the Matches filter is set to.</p>` : "";
+  const foot = `<p class="note">${state.pfView === "live"
+    ? (isMoneyline ? oddsAge() || "Odds: DraftKings." : "")
+    : isMoneyline ? `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`
+      : set?.generated_at ? `Backtest run ${shortDate(set.generated_at)}.` : ""} Paper trades: no money is staked.</p>`.replace('class="note"> ', 'class="note">');
+  const trades = set?.trades || [];
+  const s = set?.summary || { trades: 0 };
+  const banner = set?.error ? `<div class="banner">${esc(set.error)}</div>` : set?.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   if (!trades.length) {
-    const empty = state.pfView === "live"
-      ? `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`
-      : "The backtest found no trades at this threshold.";
-    return `${toggle}${bets}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" ? pfBacktestExtras(set) : ""}${foot}`;
+    const empty = cur.status === "testing"
+      ? "No trades yet. They start once this strategy passes its tests."
+      : cur.status === "retired" && state.pfView === "live"
+        ? "No live trades: this strategy was retired before any opened. Its testing history is under Backtest."
+        : state.pfView === "live"
+          ? `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`
+          : set ? "The backtest found no trades at this threshold." : "No backtest yet.";
+    return `${top}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" && set ? pfBacktestExtras(set) : ""}${retiredLinks}${foot}`;
   }
   const settled = trades.filter((t) => t.status === "won" || t.status === "lost").slice().reverse()
     .map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, t.clv_dk, t.profit]);
-  const b = view.breakdowns || {};
   const ci = s.roi_ci95 ? `<p class="note">95% interval on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Win rate ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
   return `
-    ${toggle}
-    ${bets}
+    ${top}
     ${ruleNote}
     ${banner}
     ${pfTiles(s, trades)}
@@ -1412,10 +1432,11 @@ function viewPortfolio() {
     <div class="section-title">Running profit ($)</div>
     <div class="card">${profitChart(settled, "$") || '<p class="muted">Nothing settled yet.</p>'}</div>
     ${state.pfView === "live" ? pfOpen(trades) : ""}
-    ${state.pfBet === "player" ? impliedVsRealizedHtml(trades) : ""}
+    ${impliedVsRealizedHtml(trades)}
     ${pfSettled(trades)}
-    ${pfBreakdowns(b)}
-    ${state.pfView === "backtest" && state.pfBet !== "player" ? pfBacktestExtras(set) : ""}
+    ${pfBreakdowns(set.breakdowns || {})}
+    ${state.pfView === "backtest" ? pfBacktestExtras(set) : ""}
+    ${retiredLinks}
     ${foot}`;
 }
 
@@ -1587,9 +1608,11 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.recstrat) {
     state.recStrat = t.dataset.recstrat;
     render();
-  } else if (t.dataset.pfbet !== undefined) {
-    state.pfBet = t.dataset.pfbet; state.pfShown = 15; state.pfMarket = "";
+  } else if (t.dataset.pfid) {
+    state.pfId = t.dataset.pfid; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    store.set("pfId", state.pfId);
     render();
+    window.scrollTo(0, 0);
   } else if (t.dataset.plview) {
     state.pl.view = t.dataset.plview;
     render();
@@ -1618,8 +1641,7 @@ document.addEventListener("click", (ev) => {
     state.pfShown += 25;
     render();
   } else if (t.dataset.trade !== undefined) {
-    const pf = state.data.portfolio || {};
-    const tr = [...(pfSet()?.trades || []), ...(pf.backtest?.trades || [])].find((x) => x.id === t.dataset.trade);
+    const tr = [...(pfSet()?.trades || []), ...allTrades()].find((x) => x.id === t.dataset.trade);
     if (tr) openSheet(tradeHtml(tr));
   } else if (t.dataset.fixture !== undefined) {
     const fx = state.data.fixtures[Number(t.dataset.fixture)];
