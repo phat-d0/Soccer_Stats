@@ -152,3 +152,50 @@ pre-registration: the candidates table defines e on the best of a–d (that is a
 was scored that way above), while the finalist list says "e built on" the best of b–d.
 I keep e as it was defined and scored in development (base a), so the holdout tests the
 same model. Holdout ranges: 99.17% (Bonferroni for 3 finalists × 2).
+
+### Holdout result (run 37543374450, opened 2026-10-06T22:53:30Z)
+
+The run printed: `HOLDOUT OPENED at 2026-10-06T22:53:30Z (rows from 2025-07-01):
+Pre-registered final scoring (docs/lab.md): no candidate passed development; finalists
+a (reference), b (best of b-d), e (stack on a).` This was the only time it was opened.
+
+Only **198** of 2025/26's 380 matches have both candidates' predictions and a Pinnacle
+early price in football-data's file, so the holdout is small. Ranges are 99.17%
+(Bonferroni for 3 finalists × 2).
+
+| Finalist | Log loss (Pinnacle early 0.9831) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| a Dixon-Coles + xG | 0.9844 | −0.0013 (−0.031 to +0.029) | +0.76 (−0.40 to +1.90) | 99 | −3.6% (−5.9 to −1.4) | −11.5% (−50 to +31) | no |
+| b Hierarchical Poisson | 0.9892 | −0.0061 (−0.040 to +0.029) | +0.62 (−0.51 to +1.76) | 119 | −5.1% (−7.3 to −2.9) | −9.7% (−48 to +30) | no |
+| e Stack (a + early price) | 0.9839 | −0.0008 (−0.007 to +0.005) | – | 0 | – | – | no |
+
+On all 368 matches a predicted (with or without a price), its 2025/26 log loss is
+1.0155 and b's is 1.0221: a hard season for both.
+
+## Verdict (bake-off 1)
+
+**Nothing passes, on development or on the holdout.** No model tried adds information
+to Pinnacle's early 1X2 price:
+- not a better-tuned version of the live model (b);
+- not machine learning on Elo, xG form, goal form and rest (c and d);
+- not the live model blended with the price (e).
+
+Every model's picks have clearly negative CLV, −3.6% to −5.1% across about 1,500–1,900
+development bets and 100–120 holdout bets. The live model stays as it is. Its blend
+correctly defers to the market, and there is nothing to hand to the moneyline agent.
+
+The harness is the lasting output. Any future idea, match or player, can be put
+through `nested` and `metrics.evaluate` with the same locked-holdout discipline.
+
+## Next ideas, ranked by expected value and cost
+
+| # | Idea | Why it might work | Cost | Owner |
+| --- | --- | --- | --- | --- |
+| 1 | **The same bake-off on softer leagues**: Championship, League One and Two (E1–E3) | football-data carries Pinnacle early and close for these leagues; Understat doesn't. Lower leagues get less betting volume, so early prices may be less efficient. Uses goals-only features and the harness as is. | 0 credits; a few hours | research-lab |
+| 2 | **Late team news vs DraftKings price moves**, from `odds_log/` and `fpl_news/` on data-log | It's the one information source the market may price late. It needs a few weeks of 2026/27 logs (about mid-November). | 0 credits | research-lab |
+| 3 | **DraftKings lagging the sharp price**: bet DraftKings when it hasn't followed Pinnacle's move | A known soft-book inefficiency. It needs a live Pinnacle reference (Odds API `eu` region, about 1 credit per refresh on top of the DraftKings call). | About 1 credit per refresh; owner and lead decision | moneyline, after a research-lab feasibility check |
+| 4 | **Player lines through the harness** (two outcomes; NaN odds for the missing under) | It gives the player model the same locked-holdout test. Expected value is low because of FanDuel's 10-point margin. | 0 credits | player-props |
+| 5 | **O/U 2.5 and Asian handicap through the harness** | Round 2 already found little model weight there (0.11–0.12). | 0 credits | research-lab |
+
+Recommendation: run 1 next (free, and the best chance of a market the models can beat),
+then 2 once the logs hold enough matches.
