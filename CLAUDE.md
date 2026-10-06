@@ -79,10 +79,16 @@ Read its "Status and next steps" section first; this file is the technical map.
   - The live fit coefficients are saved in `E0_players.json` → `priced.calibration.{look,close}.coef`.
 - `player_odds.py`: FanDuel live lines (`fetch_live`, keeps 3,000 credits in reserve) and the historical backfill (cached per event; files `{event_id}_{look|close}_fanduel.json`).
 - `player_live.py`: player lines for upcoming fixtures in the app.
+  - Each priced side has `p_model` (raw model, for display) and `p` (the blend, which sets `edge` and the paper trades).
+  - The blend coefficients come from `publish.player_gate()` → `calibration` (= `E0_players.json` → `priced.calibration.look.coef`).
+  - No coefficients: `p` and `edge` are None, no player paper trades open, and `players_status.blend_note` says so.
+- `player_segments.py`: out-of-sample segment search on `E0_player_lines.csv.gz` (`soccer-stats player-segments --lines <path>`).
+  - Scores 5,760 segments (strategy × market × line × position × venue × odds band × min blended edge) on one season, then reports the best ones unchanged on the other.
+  - Bootstrap ranges resample whole matches. Each line is a 1-unit bet.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
-- `cli.py`: the `soccer-stats` commands: `publish`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `log-news`.
+- `cli.py`: the `soccer-stats` commands: `publish`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `log-news`.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
@@ -136,7 +142,13 @@ Five agents, each owning part of the code. Start a session's work by calling the
 
   - Every threshold from 2% to 20% loses money.
   - The blend is well calibrated (23.3% predicted vs 23.1% won among starters). FanDuel's over-only lines imply 33%, so their margin is the obstacle, not the model.
-- The live app still opens player paper trades using the raw model at 12%; the blend and lineup rules are not live yet.
+- Live player paper trades now use the blend (3-hour "look" coefficients) at 12%, the backtested `blend_3h` rule (−35%). That rule also loses; it is used so live and backtest match. The lineup rule is not live (no lineup feed).
+- Segment search (`player-segments`, branch `agent/player-shots`). Segments are picked on one season and reported unchanged on the other; 5,760 segments were tried, each needing ≥100 bets in the pick season.
+  - Pick on 2024/25, report on 2025/26: 59 segments were profitable in 2024/25; none of them was profitable in 2025/26. The best (home MID starters, 3+ shots, odds 5+, blend edge ≥0) went from 114 bets at +38% [−50%, +152%] to 10 bets at −100%.
+  - Pick on 2025/26, report on 2024/25: no segment was profitable in 2025/26. The best (MID away starters, 1+ on target, odds 5+: −5%) gave 153 bets at −22% [−54%, +11%], winning 12.4% against 16.1% breakeven.
+  - With ≥300 bets, 0 segments were profitable in either season. The least bad was FWD home starters at 1+ shots: −5% [−8%, −2%] over 424 bets (89.6% won vs 94.3% breakeven).
+  - Every line: −44% (starters after lineups, 2025/26, 34,204 lines) and −56% (3 hours before, all players). Nothing survives.
+  - Risk to check: these losses are much bigger than a normal margin. Understat's shot counts may be lower than the Opta counts FanDuel settles on. Compare a sample with FBref or official counts before trusting any player result.
 - No live lineup feed has been built. Candidate source: ESPN's summary API (`rosters[].roster[].starter`). Build it only if some strategy backtests positive.
 - Next ideas are in the work plan's "Status and next steps" section. First: find a bookmaker with two-sided (over and under) EPL player shot lines.
 - Credits: 22,962 left on 6 Oct.

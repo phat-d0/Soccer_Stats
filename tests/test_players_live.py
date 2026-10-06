@@ -7,6 +7,7 @@ from player_sim import simulate_players
 
 from soccer_stats import paper, player_odds
 from soccer_stats import player_backtest as pb
+from soccer_stats import player_calibration as cal
 from soccer_stats import trades as tr
 from soccer_stats.factors import build_features
 from soccer_stats.player_live import player_cards
@@ -185,8 +186,7 @@ def sim():
     return apps
 
 
-def test_player_cards_price_lines(sim):
-    apps = sim
+def _priced_cards(apps, calibration=None):
     last = apps["kickoff"].max()
     k = last + pd.Timedelta(days=4)
     fixtures = [
@@ -202,15 +202,78 @@ def test_player_cards_price_lines(sim):
     ev = event("e9", "T00", "T01", ((top, 1.5, 2.2, 1.65), ("Nobody Known", 0.5, 1.9, 1.9)))
     ev["commence_time"] = k.isoformat()
     ev["fetched_at"] = (k - pd.Timedelta(hours=5)).isoformat()
-    cards, st = player_cards(apps, fixtures, None, [ev], now=k - pd.Timedelta(hours=5))
+    cards, st = player_cards(
+        apps, fixtures, None, [ev], now=k - pd.Timedelta(hours=5), calibration=calibration
+    )
+    return cards, st, top, fixtures
+
+
+def test_player_cards_without_blend_open_no_trades(sim):
+    cards, st, top, fixtures = _priced_cards(sim)
     rows = cards[("T00", "T01")]
     priced = [r for r in rows if r["lines"]]
     assert len(priced) == 1 and priced[0]["player"] == top
     ln = {x["side"]: x for x in priced[0]["lines"]}
-    assert ln["over"]["p"] + ln["under"]["p"] == pytest.approx(1)
+    assert ln["over"]["p_model"] + ln["under"]["p_model"] == pytest.approx(1)
     assert ln["over"]["implied"] + ln["under"]["implied"] == pytest.approx(1)
+    assert all(x["p"] is None and x["edge"] is None for x in ln.values())
     assert st["unmatched_odds"] == 1  # "Nobody Known": skipped and counted
+    assert st["blend"] is False and "no player paper trades" in st["blend_note"]
     assert 0 < priced[0]["exp_shots"] < 10
+    # The paper ledger opens nothing from lines without a blended chance
+    card_ = {**fixtures[0], "players": priced}
+    for x in priced[0]["lines"]:
+        x["fetched_at"] = NOW.isoformat()
+    card_["kickoff"] = KICKOFF.isoformat()
+    src = {"name": "DraftKings", "fetched_at": NOW.isoformat()}
+    ev, _ = paper.update_ledger({}, [card_], src, None, NOW, players_on=True)
+    assert [e for e in ev if e["type"] == "open"] == []
+
+
+def test_player_cards_trade_on_the_blend(sim):
+    coef = [-0.15, 0.17, 0.85]
+    cards, st, top, _ = _priced_cards(sim, calibration=coef)
+    assert st["blend"] is True and st["blend_note"] is None
+    (row,) = [r for r in cards[("T00", "T01")] if r["lines"]]
+    for x in row["lines"]:
+        want = cal.apply(coef, [x["implied"]], [x["p_model"]])[0]
+        assert x["p"] == pytest.approx(want, abs=1e-3)  # blend of price and raw model
+        assert x["p"] != pytest.approx(x["p_model"], abs=1e-4)
+        assert x["edge"] == pytest.approx(x["p"] * x["odds"] - 1, abs=1e-3)
+
+
+def test_player_picks_skip_missing_chances():
+    lines = pd.DataFrame(
+        {
+            "home": ["A", "A"],
+            "away": ["B", "B"],
+            "player": ["X", "Y"],
+            "market": ["player_shots"] * 2,
+            "line": [1.0, 1.0],
+            "side": ["over", "over"],
+            "odds": [3.0, 3.0],
+            "p": [None, 0.5],
+        }
+    )
+    picks = tr.player_picks(lines, 0.12)
+    assert list(picks["player"]) == ["Y"]
+
+
+def test_player_gate_reads_live_blend(tmp_path):
+    from soccer_stats.publish import player_gate
+
+    path = tmp_path / "g.json"
+    path.write_text(
+        json.dumps(
+            {
+                "gate": {"passed": True},
+                "priced": {"calibration": {"look": {"coef": [-0.15, 0.17, 0.85]}}},
+            }
+        )
+    )
+    assert player_gate(str(path))["calibration"] == [-0.15, 0.17, 0.85]
+    path.write_text(json.dumps({"gate": {"passed": True}}))
+    assert player_gate(str(path))["calibration"] is None
 
 
 def test_priced_player_backtest(sim):

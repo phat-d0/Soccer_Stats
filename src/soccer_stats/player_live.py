@@ -6,6 +6,12 @@ backtest (a placeholder appearance is appended after their history, so only earl
 matches count), with the match model's expected goals and game state, and team-mates'
 absences from FPL. Prices are conditional on playing (bets on non-players are void);
 FPL's chance of playing is shown beside them.
+
+Each priced side carries two chances: `p_model`, the raw model, for display; and `p`,
+the walk-forward blend of the model with FanDuel's price (player_calibration, live
+coefficients from the backtest's 3-hour "look" fit). `p` sets the edge and the paper
+trades, so the live rule is the backtested one. Without coefficients `p` is None and
+no player paper trades open.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from soccer_stats import player_calibration as cal
 from soccer_stats import trades as tr
 from soccer_stats.factors import REGULAR_SHARE, build_features
 from soccer_stats.models.player_counts import PlayerShotModel, prob_over
@@ -63,10 +70,23 @@ def player_cards(
     factors: list[str] | None = None,
     sot_method: str = "thin",
     now: pd.Timestamp | None = None,
+    calibration: list[float] | None = None,
 ) -> tuple[dict[tuple[str, str], list[dict]], dict]:
-    """(home, away) -> player rows for the app, plus a status dict."""
+    """(home, away) -> player rows for the app, plus a status dict.
+
+    `calibration` is the blend's [a, b, c] (publish.player_gate); None leaves `p` and
+    `edge` empty on every line, so no player paper trades open.
+    """
     now = now or pd.Timestamp.now(tz="UTC")
-    status = {"players": 0, "priced": 0, "unmatched_odds": 0}
+    status = {
+        "players": 0,
+        "priced": 0,
+        "unmatched_odds": 0,
+        "blend": calibration is not None,
+        "blend_note": None
+        if calibration is not None
+        else "No blend coefficients from the player backtest, so no player paper trades open.",
+    }
     if apps.empty or not fixtures:
         return {}, status
     upcoming = [c for c in fixtures if pd.Timestamp(c["kickoff"]) > now - pd.Timedelta(hours=2)]
@@ -191,18 +211,25 @@ def player_cards(
             fetched = sides["fetched_at"].iloc[0]
             pair = tr.devig_pair(prices.get("over"), prices.get("under"))
             for side, odds_ in prices.items():
-                p = p_over if side == "over" else 1 - p_over
+                p_raw = p_over if side == "over" else 1 - p_over
+                # Margin-free when both sides are priced; FanDuel is over-only, so its
+                # implied chance is 1 / odds and includes the margin (as in the backtest).
+                implied = (pair[0] if side == "over" else pair[1]) if pair else 1 / odds_
+                p = (
+                    float(cal.apply(calibration, [implied], [p_raw])[0])
+                    if calibration is not None
+                    else None
+                )
                 row["lines"].append(
                     {
                         "market": market,
                         "line": line,
                         "side": side,
                         "odds": odds_,
-                        "p": round(p, 4),
-                        "edge": round(p * odds_ - 1, 4),
-                        "implied": round(pair[0] if side == "over" else pair[1], 4)
-                        if pair
-                        else round(1 / odds_, 4),  # over-only books: price incl. margin
+                        "p": round(p, 4) if p is not None else None,
+                        "p_model": round(p_raw, 4),
+                        "edge": round(p * odds_ - 1, 4) if p is not None else None,
+                        "implied": round(implied, 4),
                         "fetched_at": fetched,
                     }
                 )
