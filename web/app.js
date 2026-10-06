@@ -1269,7 +1269,7 @@ function pfTiles(s, trades = []) {
 function clvNote(s, trades) {
   if (state.pfBet === "player") return "";
   const match = trades.filter((t) => !isPlayer(t) && t.status !== "open");
-  const early = s.close_over_60min ?? match.filter(closeApprox).length;
+  const early = s.close_early ?? s.close_over_60min ?? match.filter(closeApprox).length; // either name: moneyline uses close_early
   return `<p class="note">Closing line value compares the price you got with DraftKings' last price before kickoff. Profit takes hundreds of bets to tell skill from luck; consistently beating the close shows up within a few dozen, so it is the faster, more reliable sign of an edge.${early ? ` ${early} close${early > 1 ? "s were" : " was"} taken more than an hour before kickoff, so ${early > 1 ? "their" : "its"} CLV is approximate.` : ""}</p>`;
 }
 
