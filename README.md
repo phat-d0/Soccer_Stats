@@ -154,19 +154,29 @@ through the same rule, ledger and Portfolio tab as match bets.
   are dropped) and a check that players' expected shots add up to the team's. **Player
   odds and player paper trades switch on only when the model beats the baseline for
   both shots and shots on target.** Stage 2 (`soccer-stats backfill-player-odds`, about
-  20 credits per match per snapshot, roughly 15,000 a season) replays the rule on
-  historical DraftKings player lines and reports the usual metrics by market, line,
-  position, and starter or sub.
-- **Rule for player bets**: 12% edge, $10; per player, match and market, the line and
-  side with the highest edge; at most 4 player trades per match; void if he doesn't play.
-- **In the app**: player lines with model chances and edges in each match's sheet, a
+  20 credits per match per snapshot) replays three strategies on historical FanDuel
+  player lines (DraftKings has no EPL player props on The Odds API), with a walk-forward
+  blend of the model and FanDuel's price (`player_calibration.py`). Every strategy and
+  threshold loses money (−17% to −35% at 12%); `soccer-stats player-segments` checks
+  slices out of sample, and none survives.
+- **Rule for player bets**: 12% edge on the blended chance, $10; per player, match and
+  market, the line and side with the highest edge; at most 4 player trades per match;
+  void if he doesn't play. **Live player paper trades are switched off**
+  (`PLAYER_PAPER_TRADES = False` in `trades.py`) until some player rule backtests
+  positive.
+- **In the app**: player lines with blended chances and edges in each match's sheet, a
   *Player picks* list on the Matches tab, and an All / Match / Player filter on the
   Portfolio tab. Live player lines refresh per match within 30 hours of kickoff (hourly in
   the last 3 hours) and keep 3,000 credits spare for match odds.
 
-Not automated: DraftKings settles on its own data provider, which can differ from
-Understat on blocked and deflected shots. `player_data.reconcile()` measures the mismatch
-rate against a hand-collected official sample.
+Settlement data: Understat's player shot counts match ESPN's (Opta-fed) on 99.8% of a
+617 player-match sample (`docs/edge.md`), so the losses are the bookmaker's margin, not a
+counting mismatch.
+
+**Edge research** (`src/soccer_stats/edge/`, findings in `docs/edge.md`): line shopping
+across books, a probe for two-sided player-prop books (none exist on The Odds API for EPL
+shots), FanDuel slices and shot-count checks. Run through the *Player odds check*
+workflow's `task` input.
 
 **One-time setup**
 1. On GitHub: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
@@ -181,7 +191,8 @@ The app code lives in `web/`; `src/soccer_stats/publish.py` writes the `data.jso
 Test the app without the network: `node tests/web/smoke.mjs --shots /tmp/shots` serves
 `web/` with the sample data in `tests/fixtures/web/`, clicks through every tab in Chromium
 (phone light, phone dark and laptop) and fails on console errors or sideways scrolling.
-It needs Playwright and Chromium; `uv run pytest` runs it too, and skips it without them.
+It needs Playwright and Chromium; `uv run pytest` runs it too, and skips it without them
+(as in CI, `.github/workflows/ci.yml`, which runs ruff and pytest on every push).
 Refresh the sample data with `uv run python tests/web/make_fixture.py`.
 
 ## Streamlit app (desktop)
@@ -264,11 +275,16 @@ src/soccer_stats/
   models/player_counts.py  negative binomial shot models, start/sub mixture
   player_backtest.py    walk-forward player tests, ablation, priced backtest
   player_odds.py        FanDuel player shot lines (live budgeted, historical)
-  player_live.py        player lines for upcoming fixtures
+  player_live.py        player lines for upcoming fixtures (raw model and blend)
+  player_calibration.py walk-forward blend of the player model with FanDuel's price
+  player_segments.py    out-of-sample segment search on the priced player lines
+  edge/                 edge research: line shopping, prop books, shot-count checks
 app/streamlit_app.py    the Premier League dashboard (desktop)
 web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)
-.github/workflows/      scheduled build + deploy to GitHub Pages; by-hand odds backfill
+.github/workflows/      CI, scheduled build + deploy to GitHub Pages, player model, by-hand backfills
+docs/edge.md            edge research log
 tests/                  unit tests on synthetic leagues with known parameters
+tests/web/              app smoke test (Playwright) and its fixture generator
 notebooks/              exploration
 ```
 
