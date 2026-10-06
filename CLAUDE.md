@@ -16,7 +16,7 @@ Read its "Status and next steps" section first; this file is the technical map.
   - the paper-trade ledger (`trades/*.jsonl`, append-only);
   - team-news history (`fpl_news/`);
   - the live DraftKings odds log (`odds_log/E0_<YYYY-MM>.jsonl`, append-only);
-  - backtest results (`backtest/E0_dk.json`, `backtest/E0_players.json`, `backtest/E0_players_detail.json`, `backtest/E0_player_trades.csv`, `backtest/E0_player_lines.csv.gz`).
+  - backtest results (`backtest/E0_dk.json`, `backtest/E0_players.json`, `backtest/E0_players_detail.json`, `backtest/E0_goals.json`, `backtest/E0_player_trades.csv`, `backtest/E0_player_lines.csv.gz`).
   Read it with `git fetch origin data-log && git show origin/data-log:<path>`.
 - GitHub Pages serves the app. Source = GitHub Actions. The repo must stay public, or Pages goes 404.
 - Nothing runs locally in a cloud session:
@@ -29,7 +29,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | File | What | Credits |
 | --- | --- | --- |
 | `publish.yml` | Builds the site (`soccer-stats publish`), then on `data-log` logs team news (`log-news`), the build's DraftKings prices (`log-odds`) and paper trades (`paper`), and deploys Pages. Only the default branch publishes: pushes elsewhere don't trigger it, and a dispatch on another branch skips `data-log`. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
-| `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
+| `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` and the anytime-goalscorer stage 1 (`backtest/E0_goals.json`) to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots, signals), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots, signals) to ~100 per historical props call |
 | `ci.yml` | On every push and pull request. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. Job `web`: installs Playwright's Chromium (cached) and runs `tests/web/smoke.mjs`; a skip counts as a failure, and screenshots are uploaded when it fails. No secrets. | 0 |
@@ -107,6 +107,11 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Each priced side has `p_model` (raw model, for display) and `p` (the blend, which sets `edge`, the app's player picks and, if the switch is on, the paper trades).
   - The blend coefficients come from `publish.player_gate()` → `calibration` (= `E0_players.json` → `priced.calibration.look.coef`).
   - No coefficients: `p` and `edge` are None, no player picks or trades, and `players_status.blend_note` says so.
+- `models/player_goals.py` + `player_goals.py`: anytime goalscorer, P(scores ≥ 1 | plays).
+  - NB/Poisson goals per 90 on `GOAL_FACTORS` (shrunk xG/90, shrunk goals/xG, shots/90, penalty share, position, team xG, opponent, venue, game state), all from earlier kickoffs (`goal_features`); start/sub mixture as for shots.
+  - `walk_forward` (weekly refit, 2-year lookback, ≥3 earlier appearances) against two season-to-date benchmarks (goals and xG per appearance, Poisson). `report` scores development (2023/24–2024/25), the locked 2025/26 holdout and live 2026/27: log loss, Brier, calibration, match-resampled 95% ranges. Gate (reported only): beats both benchmarks on the holdout.
+  - Run inside `backtest-players` (same appearances and match model), saved as `E0_goals.json`. Moves onto the research lab's harness (`lab/`) once it merges.
+  - Odds: none bought. Costed plan (60-credit first step) in `docs/player_props.md`.
 - `player_segments.py`: out-of-sample segment search on `E0_player_lines.csv.gz` (`soccer-stats player-segments --lines <path>`).
   - Scores 5,760 segments (strategy × market × line × position × venue × odds band × min blended edge) on one season, then reports the best ones unchanged on the other.
   - Bootstrap ranges resample whole matches. Each line is a 1-unit bet.
@@ -207,6 +212,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - Understat's shot counts match ESPN's (99.8% of 617 player-matches identical), so the losses are margin, not a data mismatch.
 - Live: player lines show with the blended chance (3-hour "look" coefficients); `PLAYER_PAPER_TRADES = False`, so no player paper trades open.
 - Round 2 (`players.yml` run 37528001150, `--seasons 2023-now` = 2023/24–2026/27): stage 1 beats the baseline in every season (shots log loss 0.426 / 0.414 / 0.419 vs 0.507 / 0.491 / 0.491 for 2023/24–2025/26; 2026/27 so far 0.452 vs 0.741 on 1,293 appearances, where the season-average baseline is still thin). Priced, 12% edge: starters after lineups 154 bets −18% (SE ±32 points), blend 3 h before 223 −35%, raw model 3 h before 635 −22%. Every strategy's bets are now in `E0_players.json` (`priced.strategies.<name>.trades`).
+- Round 4: anytime goalscorer model built (`player_goals.py`); stage-1 numbers come with the next `players.yml` run (0 credits; the sandbox can't reach Understat). On simulated data it beats the season-goals benchmark and is calibrated within 3 points. No odds bought: `docs/player_props.md` costs a goalscorer probe + pilot at about 60 credits, a 100-match sample at 1,000, and 3,800 per season (close only); best-over shots stays at 2,100 for pilot + sample. Recommended: 60 credits, only after the goalscorer gate passes. Player paper trades stay off.
 - Live lines correct squads for transfers (FPL); the 6 Oct publish showed 490 players, 0 priced (no FanDuel lines more than 30 hours before kickoff) and no teams without history.
 - No live lineup feed. Build one (ESPN summary API, `rosters[].roster[].starter`) only if a strategy backtests positive.
 

@@ -85,3 +85,21 @@ def simulate_players(n_teams=10, seasons=2, seed=0, alpha=0.3):
             df["opp_shots"] = df["opponent"].map(tot)
             rows.append(df)
     return pd.concat(rows, ignore_index=True), pl
+
+
+XG_PER_SHOT = {"GK": 0.03, "DEF": 0.07, "MID": 0.09, "FWD": 0.15}
+
+
+def add_goals(apps, seed=0):
+    """Add xg and goals to simulate_players output with its own random stream (so the
+    shots stay as they were): each player has a lasting chance quality per shot."""
+    rng = np.random.default_rng(seed + 1000)
+    ids = apps["player_id"].unique()
+    quality = dict(zip(ids, rng.lognormal(0, 0.35, len(ids)), strict=True))
+    per_shot = apps["position"].map(XG_PER_SHOT).to_numpy() * apps["player_id"].map(quality)
+    per_shot = np.clip(per_shot.to_numpy(), 0.01, 0.6)
+    goals = rng.binomial(apps["shots"].to_numpy(), per_shot)
+    noise = rng.uniform(0.7, 1.3, len(apps))
+    return apps.assign(
+        xg=np.round(apps["shots"].to_numpy() * per_shot * noise, 3), goals=goals.astype(int)
+    )
