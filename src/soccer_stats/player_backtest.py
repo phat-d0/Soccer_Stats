@@ -319,6 +319,7 @@ def priced_trades(
                 "actual": int(m[MARKET_COUNT[r.market]]),
                 "started": bool(m["started"]),
                 "position": m["position"],
+                "exp_count": float(m[f"mean_{MARKET_COUNT[r.market]}"]),
             }
         )
     lines = pd.DataFrame(rows)
@@ -332,6 +333,15 @@ def priced_trades(
         round(float(lines["odds"].max()), 2),
     ]
     info["p_mean"] = round(float(lines["p"].mean()), 4)
+    cols = ["player", "market", "line", "side", "odds", "p", "exp_count", "actual"]
+    info["sample"] = (
+        lines.sort_values(["player", "market", "line"])
+        .groupby("market")
+        .head(12)[cols]
+        .round(3)
+        .to_dict("records")
+    )
+    info["lines_seen"] = lines["line"].value_counts().head(12).to_dict()
     # The bookmaker's margin-free chance for each side at the look (the "implied" chance).
     pairs = {}
     for (pid, mkt, ln), g in lines.groupby(["player_id", "market", "line"]):
