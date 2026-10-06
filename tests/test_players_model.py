@@ -217,7 +217,7 @@ def test_parse_match():
     data = {
         "shots": {
             "h": [
-                {"player_id": "10", "result": "Goal", "situation": "Penalty"},
+                {"player_id": "10", "result": "Goal", "situation": "Penalty", "xG": "0.76"},
                 {"player_id": "10", "result": "SavedShot", "situation": "OpenPlay"},
                 {"player_id": "11", "result": "BlockedShot", "situation": "OpenPlay"},
                 {"player_id": "20", "result": "OwnGoal", "situation": "OpenPlay"},
@@ -275,6 +275,7 @@ def test_parse_match():
     ) == (2, 2, 1)
     assert rows["Kai Havertz"]["started"] is False and rows["Kai Havertz"]["shots"] == 1
     assert rows["Joe Rodon"]["shots"] == 1  # his own goal isn't his shot
+    assert rows["Bukayo Saka"]["goals"] == 1 and rows["Bukayo Saka"]["xg"] == pytest.approx(0.76)
     assert rows["Bukayo Saka"]["team_shots"] == 3 and rows["Joe Rodon"]["opp_shots"] == 3
 
 
@@ -291,3 +292,23 @@ def test_player_report_by_name(backtest):
     assert len(rep["apps"][pid][0]) == len(rep["fields"])
     total_exp = sum(r["exp_shots"] for r in rep["players"])
     assert total_exp == pytest.approx(preds["mean_shots"].sum(), rel=1e-3)
+
+
+def test_season_stats_per_player_and_club(sim):
+    from soccer_stats.player_data import season_stats
+
+    _, _, apps = sim
+    apps = apps.assign(goals=0, xg=0.1)
+    moved = apps["player_id"] == apps["player_id"].iloc[0]
+    apps.loc[moved & (apps["season"] == "2425"), "team"] = "Elsewhere"  # a transfer
+    rows = season_stats(apps)
+    assert sum(r["shots"] for r in rows) == apps["shots"].sum()
+    mine = [r for r in rows if r["player_id"] == apps["player_id"].iloc[0]]
+    assert {r["team"] for r in mine} >= {"Elsewhere"}  # one row per club
+    r = next(x for x in rows if x["shots"] > 0)
+    sub = apps[
+        (apps["player_id"] == r["player_id"])
+        & (apps["season"] == r["season"])
+        & (apps["team"] == r["team"])
+    ]
+    assert (r["apps"], r["minutes"], r["sot"]) == (len(sub), sub["minutes"].sum(), sub["sot"].sum())

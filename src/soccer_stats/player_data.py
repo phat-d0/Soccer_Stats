@@ -89,7 +89,7 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
     """One row per player who played: minutes, start, position, shots, shots on target."""
     shots = data.get("shots", {})
     rosters = data.get("rosters", {})
-    counts: dict[str, list[int]] = {}
+    counts: dict[str, list[float]] = {}  # shots, on target, goals, xG
     pens: dict[str, int] = {}
     team_shots = {"h": 0, "a": 0}
     for side in ("h", "a"):
@@ -97,9 +97,11 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
             if s.get("result") == "OwnGoal":
                 continue
             pid = str(s.get("player_id"))
-            c = counts.setdefault(pid, [0, 0])
+            c = counts.setdefault(pid, [0, 0, 0, 0.0])
             c[0] += 1
             c[1] += s.get("result") in ON_TARGET
+            c[2] += s.get("result") == "Goal"
+            c[3] += float(s.get("xG") or 0)
             team_shots[side] += 1
             if s.get("situation") == "Penalty":
                 pens[pid] = pens.get(pid, 0) + 1
@@ -114,7 +116,7 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
             pid = str(p.get("player_id"))
             pos = p.get("position") or ""
             started = pos != "Sub" and not int(float(p.get("roster_in") or 0))
-            sh, sot = counts.get(pid, [0, 0])
+            sh, sot, goals, xg = counts.get(pid, [0, 0, 0, 0.0])
             rows.append(
                 {
                     "match_id": meta["match_id"],
@@ -130,6 +132,8 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
                     "started": bool(started),
                     "shots": int(sh),
                     "sot": int(sot),
+                    "goals": int(goals),
+                    "xg": round(xg, 3),
                     "penalties": pens.get(pid, 0),
                     "team_shots": team_shots[side],
                     "opp_shots": team_shots["a" if side == "h" else "h"],
@@ -288,3 +292,33 @@ def match_in_fixture(
         else:
             unmatched.append(name)
     return out, unmatched
+
+
+def season_stats(apps: pd.DataFrame) -> list[dict]:
+    """Shooting stats per player, club and season (a player who moved has a row per club)."""
+    if apps.empty:
+        return []
+    df = apps.copy()
+    for col in ("goals", "xg"):
+        if col not in df:
+            df[col] = 0
+    g = df.groupby(["season", "team", "player_id"])
+    out = g.agg(
+        player=("player", "last"),
+        position=("position", "last"),
+        apps=("match_id", "nunique"),
+        starts=("started", "sum"),
+        minutes=("minutes", "sum"),
+        shots=("shots", "sum"),
+        sot=("sot", "sum"),
+        goals=("goals", "sum"),
+        xg=("xg", "sum"),
+        last=("kickoff", "max"),
+    ).reset_index()
+    out["last"] = pd.to_datetime(out["last"]).dt.strftime("%Y-%m-%d")
+    team_games = df.groupby(["season", "team"])["match_id"].nunique()
+    out["team_games"] = [
+        team_games[(se, t)] for se, t in zip(out["season"], out["team"], strict=True)
+    ]
+    out["xg"] = out["xg"].round(2)
+    return out.sort_values(["season", "shots"], ascending=[False, False]).to_dict("records")

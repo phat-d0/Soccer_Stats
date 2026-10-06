@@ -462,3 +462,5 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 }
 .filters.three { grid-template-columns: 1fr 1fr; }
 .filters.three select:last-child { grid-column: span 2; }
+.club-total { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 10px; border-bottom: 0.5px solid var(--border); margin-bottom: 2px; font-size: 14px; }
+.club-total .num { color: var(--text-secondary); font-size: 13px; }

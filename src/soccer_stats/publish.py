@@ -367,20 +367,23 @@ def player_gate(path: str | None = None) -> dict:
     }
 
 
-def add_players(data: dict, league: str, fpl_df, credits_left) -> dict:
-    """Player shot lines for each upcoming fixture (never raises)."""
-    from soccer_stats.player_data import load_appearances
+def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, list[dict]]:
+    """Player shot lines for each upcoming fixture, plus season shooting stats per
+    player and club (never raises)."""
+    from soccer_stats.player_data import load_appearances, season_stats
     from soccer_stats.player_live import fpl_players, player_cards
     from soccer_stats.player_odds import fetch_live
 
     season = current_season()
     gate = player_gate()
     status = {"gate": gate, "error": None, "odds": None}
+    stats: list[dict] = []
     try:
         apps, missing = load_appearances(
             league, [season - 1, season], max_new=PLAYER_FETCH_PER_BUILD
         )
         status["missing_matches"] = missing
+        stats = season_stats(apps)
         events = []
         if gate["passed"]:
             events, status["odds"] = fetch_live(league, credits_left=credits_left)
@@ -397,7 +400,7 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> dict:
             fx["players"] = cards.get((fx["home"], fx["away"]), [])
     except Exception as exc:  # Understat down or changed: matches still publish
         status["error"] = f"Player lines unavailable ({type(exc).__name__}: {exc})"[:200]
-    return status
+    return status, stats
 
 
 def publish(out: Path, league: str = "E0") -> Path:
@@ -408,7 +411,7 @@ def publish(out: Path, league: str = "E0") -> Path:
     known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
     fixtures, odds_source = with_draftkings(fixtures, league, known)
 
-    news, news_error, snapshot, players = None, None, [], None
+    news, news_error, snapshot, players, stats = None, None, [], None, []
     if league == "E0":  # FPL covers the Premier League only
         try:
             players = parse_players(fetch_fpl())
@@ -423,9 +426,8 @@ def publish(out: Path, league: str = "E0") -> Path:
     data["odds_source"] = odds_source
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
-        data["players_status"] = _clean(
-            add_players(data, league, players, odds_source["credits_left"])
-        )
+        status, stats = add_players(data, league, players, odds_source["credits_left"])
+        data["players_status"] = _clean(status)
         ps = data["players_status"]
         print(
             ps["error"]
@@ -469,6 +471,19 @@ def publish(out: Path, league: str = "E0") -> Path:
     )
     out.mkdir(parents=True, exist_ok=True)
     shutil.copytree(WEB_DIR, out, dirs_exist_ok=True)
+    if league == "E0" and stats:  # the Players view loads this on demand
+        (out / "players_stats.json").write_text(
+            json.dumps(
+                _clean(
+                    {
+                        "seasons": sorted({r["season"] for r in stats}, reverse=True),
+                        "players": stats,
+                    }
+                ),
+                separators=(",", ":"),
+            )
+        )
+        data["players_stats"] = "players_stats.json"
     (out / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
     # Picked up by the workflow and appended to the data-log branch (injury history).
     (out / "news_snapshot.json").write_text(json.dumps(snapshot, separators=(",", ":")))

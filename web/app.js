@@ -19,8 +19,9 @@ const state = {
   pfShown: 25,
   pfBet: "", // Portfolio bet type filter: "", "match" or "player"
   teamsView: "teams", // Teams tab: "teams" or "players"
-  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40 }, // Players view filters
+  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots" }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
+  ps: null, // players_stats.json once loaded (or { error })
   exploreHome: store.get("exploreHome", null),
   exploreAway: store.get("exploreAway", null),
 };
@@ -482,7 +483,98 @@ function playerListHtml() {
   return `${body}${rows.length > shown.length ? `<button class="more" id="pl-more">Show more (${rows.length - shown.length} left)</button>` : ""}`;
 }
 
+function playersModeToggle() {
+  return `
+    <div class="segmented small-seg" role="group" aria-label="Player view" style="margin:0 0 10px">
+      ${[["stats", "Season stats"], ["model", "Model backtest"]].map(([k, l]) => `<button data-plmode="${k}" class="${state.pl.mode === k ? "on" : ""}" aria-pressed="${state.pl.mode === k}">${l}</button>`).join("")}
+    </div>`;
+}
+
+async function loadPlayerStats() {
+  if (state.ps || !state.data.players_stats) return;
+  try {
+    const res = await fetch(state.data.players_stats, { cache: "no-cache" });
+    if (!res.ok) throw new Error(res.statusText);
+    state.ps = await res.json();
+  } catch (err) {
+    state.ps = { error: String(err.message || err), players: [], seasons: [] };
+  }
+  if (state.tab === "ratings" && state.teamsView === "players") render();
+}
+
+const per90 = (n, min) => (min > 0 ? (n * 90) / min : null);
+const STAT_SORTS = {
+  shots: ["Shots", (r) => r.shots],
+  p90: ["Shots per 90 (300+ min)", (r) => (r.minutes >= 300 ? per90(r.shots, r.minutes) : -1)],
+  sot: ["Shots on target", (r) => r.sot],
+  sotpct: ["On-target % (10+ shots)", (r) => (r.shots >= 10 ? r.sot / r.shots : -1)],
+  goals: ["Goals", (r) => r.goals],
+  xg: ["Expected goals (xG)", (r) => r.xg],
+  minutes: ["Minutes", (r) => r.minutes],
+};
+
+function statRows() {
+  const f = state.pl;
+  const season = f.season || state.ps?.seasons?.[0];
+  const q = foldName(f.q.trim());
+  const rows = (state.ps?.players || []).filter((r) => r.season === season &&
+    (!q || foldName(r.player).includes(q)) && (!f.team || r.team === f.team) && (!f.pos || r.position === f.pos));
+  const key = STAT_SORTS[f.ssort][1];
+  return rows.sort((a, b) => key(b) - key(a));
+}
+
+function statListHtml() {
+  const rows = statRows();
+  if (!rows.length) return '<p class="muted" style="padding:6px 0">No players match these filters.</p>';
+  const f = state.pl;
+  let club = "";
+  if (f.team) {
+    const t = rows.reduce((a, r) => ({ shots: a.shots + r.shots, sot: a.sot + r.sot, goals: a.goals + r.goals, xg: a.xg + r.xg }), { shots: 0, sot: 0, goals: 0, xg: 0 });
+    const games = rows[0].team_games || Math.max(...rows.map((r) => r.apps));
+    club = `<div class="club-total"><b>${esc(f.team)}${f.pos ? ` · ${esc(f.pos)}` : ""}</b><span class="num">${t.shots} shots in ${games} games (${games ? (t.shots / games).toFixed(1) : "–"} a game) · ${t.sot} on target · ${t.goals} goals · ${t.xg.toFixed(1)} xG</span></div>`;
+  }
+  const shown = rows.slice(0, f.shown);
+  const body = shown.map((r) => {
+    const p = per90(r.shots, r.minutes);
+    return `
+      <button class="bet-row trade" data-player="${esc(r.player_id)}">
+        <span>${esc(r.player)} <span class="muted small">${f.team ? "" : `${esc(r.team)} · `}${esc(r.position || "")}</span><div class="meta">${r.apps} games (${r.starts} starts) · ${r.minutes} min</div><div class="meta">${p != null ? p.toFixed(2) : "–"} per 90 · ${r.sot} on target${r.shots ? ` (${Math.round((r.sot / r.shots) * 100)}%)` : ""} · ${r.goals} G · ${r.xg.toFixed(1)} xG</div></span>
+        <span class="pl num">${r.shots}<div class="meta">shots</div></span>
+      </button>`;
+  }).join("");
+  return `${club}${body}${rows.length > shown.length ? `<button class="more" id="pl-more">Show more (${rows.length - shown.length} left)</button>` : ""}`;
+}
+
+function viewPlayerStats() {
+  const d = state.data;
+  if (d.players_stats && !state.ps) {
+    loadPlayerStats();
+    return `${teamsToggle()}${playersModeToggle()}<div class="empty">Loading player stats…</div>`;
+  }
+  const ps = state.ps;
+  if (!ps || !ps.players?.length) {
+    return `${teamsToggle()}${playersModeToggle()}<div class="empty">${ps?.error ? `Couldn't load player stats (${esc(ps.error)}).` : "Player stats appear after the next update."}</div>`;
+  }
+  const f = state.pl;
+  const season = f.season || ps.seasons[0];
+  const teams = [...new Set(ps.players.filter((r) => r.season === season).map((r) => r.team))].sort();
+  const opt = (vals, cur, label, fmt = (v) => v) => `${label ? `<option value="">${label}</option>` : ""}${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
+  return `
+    ${teamsToggle()}
+    ${playersModeToggle()}
+    <input id="pl-q" class="search" type="search" placeholder="Search players" value="${esc(f.q)}" aria-label="Search players" autocomplete="off">
+    <div class="filters">
+      <select id="pl-season" aria-label="Season">${opt(ps.seasons, season, "", seasonName)}</select>
+      <select id="pl-team" aria-label="Club">${opt(teams, f.team, "All clubs")}</select>
+      <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
+      <select id="pl-ssort" aria-label="Sort">${Object.entries(STAT_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.ssort ? "selected" : ""}>${l}</option>`).join("")}</select>
+    </div>
+    <div class="card" id="pl-list">${statListHtml()}</div>
+    <p class="note">Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record.</p>`;
+}
+
 function viewPlayers() {
+  if (state.pl.mode === "stats") return viewPlayerStats();
   const d = state.data;
   if (d.players_backtest && !state.pb) {
     loadPlayersBacktest();
@@ -503,6 +595,7 @@ function viewPlayers() {
   })() : `<p class="note">${pb?.error ? `Couldn't load backtest results (${esc(pb.error)}). ` : ""}Showing next-match expected shots only; backtest results appear after the next Player model run.</p>`;
   return `
     ${teamsToggle()}
+    ${playersModeToggle()}
     ${totals}
     <input id="pl-q" class="search" type="search" placeholder="Search players" value="${esc(f.q)}" aria-label="Search players" autocomplete="off">
     <div class="filters three">
@@ -514,9 +607,24 @@ function viewPlayers() {
     <p class="note">Right column: expected → actual shots over the backtest, and the difference. Tap a player for his match-by-match record.</p>`;
 }
 
+function seasonStatsHtml(pid) {
+  const rows = (state.ps?.players || []).filter((x) => x.player_id === pid);
+  if (!rows.length) return "";
+  const body = rows.map((x) => `<tr><td>${esc(seasonName(x.season))}<div class="meta">${esc(x.team)} · ${x.apps} games</div></td><td>${x.shots}</td><td>${per90(x.shots, x.minutes)?.toFixed(2) ?? "–"}</td><td>${x.sot}</td><td>${x.goals}</td><td>${x.xg.toFixed(1)}</td></tr>`).join("");
+  return `
+    <div class="section-title">Season stats</div>
+    <div class="card" style="padding:8px 14px">
+      <table><thead><tr><th></th><th>Shots</th><th>/90</th><th>OT</th><th>G</th><th>xG</th></tr></thead><tbody>${body}</tbody></table>
+    </div>`;
+}
+
 function playerHtml(pid) {
-  const r = playerRows().find((x) => x.player_id === pid);
-  if (!r) return "";
+  let r = playerRows().find((x) => x.player_id === pid);
+  if (!r) {  // only in the season stats (not in the backtest or next fixtures)
+    const st = (state.ps?.players || []).find((x) => x.player_id === pid);
+    if (!st) return "";
+    r = { player_id: pid, player: st.player, team: st.team, position: st.position, apps: 0 };
+  }
   const fields = state.pb?.fields || [];
   const ix = Object.fromEntries(fields.map((f, i) => [f, i]));
   const apps = (state.pb?.apps?.[pid] || []).slice().reverse();
@@ -526,6 +634,7 @@ function playerHtml(pid) {
     <div class="detail">
       <p class="muted" style="margin:0;font-size:13px">${esc(r.team)} · ${esc(r.position || "")}</p>
       <h2 id="sheet-title">${esc(r.player)}</h2>
+      ${seasonStatsHtml(pid)}
       ${n ? `<div class="card" style="margin-top:10px"><b>Next: ${n.home ? "v" : "at"} ${esc(n.opp)}</b> <span class="muted small">${esc(kickoffText(n.kickoff))}</span>
         <div class="meta" style="margin-top:4px">${n.exp_shots.toFixed(2)} expected shots · ${n.exp_sot.toFixed(2)} on target · 1+ shot ${pct(n.chances?.["shots_o0.5"])} · 2+ ${pct(n.chances?.["shots_o1.5"])}${n.p_play != null && n.p_play < 1 ? ` · FPL ${pct(n.p_play)} to play` : ""}</div></div>` : ""}
       ${r.apps ? `
@@ -540,7 +649,7 @@ function playerHtml(pid) {
       <div class="card" style="padding:8px 14px">
         <table><thead><tr><th></th><th>Exp</th><th>Shots</th><th>Exp OT</th><th>OT</th><th>1+</th></tr></thead><tbody>${rows}</tbody></table>
       </div>
-      <p class="note">Exp = expected shots, OT = on target, 1+ = the model's chance of at least one shot. Green: more than half a shot above expected; red: more than half a shot below.</p>` : '<p class="note">No backtest record yet (too few earlier games).</p>'}
+      <p class="note">Exp = expected shots, OT = on target, 1+ = the model's chance of at least one shot. Green: more than half a shot above expected; red: more than half a shot below.</p>` : '<p class="note">No model backtest record for him yet.</p>'}
     </div>`;
 }
 
@@ -1032,6 +1141,9 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfbet !== undefined) {
     state.pfBet = t.dataset.pfbet; state.pfShown = 25; state.pfMarket = "";
     render();
+  } else if (t.dataset.plmode) {
+    state.pl.mode = t.dataset.plmode; state.pl.shown = 40;
+    render();
   } else if (t.dataset.tv) {
     state.teamsView = t.dataset.tv;
     render();
@@ -1039,7 +1151,7 @@ document.addEventListener("click", (ev) => {
     openSheet(playerHtml(t.dataset.player));
   } else if (t.id === "pl-more") {
     state.pl.shown += 40;
-    $("#pl-list").innerHTML = playerListHtml();
+    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
   } else if (t.id === "pf-more") {
     state.pfShown += 25;
     render();
@@ -1058,9 +1170,12 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("change", (ev) => {
   if (ev.target.id === "ex-home") { state.exploreHome = ev.target.value; store.set("exploreHome", state.exploreHome); render(); }
   if (ev.target.id === "ex-away") { state.exploreAway = ev.target.value; store.set("exploreAway", state.exploreAway); render(); }
-  if (["pl-team", "pl-pos", "pl-sort"].includes(ev.target.id)) {
+  if (ev.target.id === "pl-season") {  // clubs differ by season: re-render the filters too
+    state.pl.season = ev.target.value; state.pl.team = ""; state.pl.shown = 40;
+    render();
+  } else if (["pl-team", "pl-pos", "pl-sort", "pl-ssort"].includes(ev.target.id)) {
     state.pl[ev.target.id.slice(3)] = ev.target.value; state.pl.shown = 40;
-    $("#pl-list").innerHTML = playerListHtml();
+    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
   }
   if (ev.target.id === "pf-market") { state.pfMarket = ev.target.value; state.pfShown = 25; render(); }
   if (ev.target.id === "pf-season") { state.pfSeason = ev.target.value; state.pfShown = 25; render(); }
@@ -1069,7 +1184,7 @@ document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeShe
 document.addEventListener("input", (ev) => {
   if (ev.target.id === "pl-q") {  // update the list only, so the search box keeps focus
     state.pl.q = ev.target.value; state.pl.shown = 40;
-    $("#pl-list").innerHTML = playerListHtml();
+    $("#pl-list").innerHTML = state.pl.mode === "stats" ? statListHtml() : playerListHtml();
   }
 });
 
