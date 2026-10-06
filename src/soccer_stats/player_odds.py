@@ -389,7 +389,8 @@ def check(
         if sample is None and ev.get("id"):
             sample = (ev["id"], json.loads(p.read_text()).get("requested"))
     out.append(
-        f"Cached history: {len(files)} snapshots, {with_dk} with {PLAYER_BOOKMAKER_NAME} player markets"
+        f"Cached history: {len(files)} snapshots, "
+        f"{with_dk} with {PLAYER_BOOKMAKER_NAME} player markets"
     )
     out.append(
         f"  bookmakers seen: {dict(books) or 'none'}; markets seen: {dict(markets) or 'none'}"
