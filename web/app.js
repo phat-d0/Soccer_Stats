@@ -115,7 +115,10 @@ function playerPicks(fx, minEdge) {
   }
   return [...best.values()].sort((a, b) => b.edge - a.edge).slice(0, MAX_PLAYER_TRADES);
 }
-const lineLabel = (x) => `${x.side === "over" ? "Over" : "Under"} ${x.line} ${PLAYER_MARKET[x.market] || x.market}`;
+// FanDuel writes "1+ shots" as a whole-number line (1 = one or more); half lines stay "Over 1.5".
+const lineText = (side, line) =>
+  Number.isInteger(Number(line)) && side === "over" ? `${line}+` : `${side === "over" ? "Over" : "Under"} ${line}`;
+const lineLabel = (x) => `${lineText(x.side, x.line)} ${PLAYER_MARKET[x.market] || x.market}`;
 function tradeLabel(t) {
   return t.bet_type === "player" ? `${t.player} ${lineLabel(t).toLowerCase()}` : PICK_LABEL[t.market] || t.market;
 }
@@ -1147,7 +1150,7 @@ function viewPortfolio() {
     ${state.pfBet !== "match" ? impliedVsRealizedHtml(trades) : ""}
     ${pfSettled(trades)}
     ${pfTable("By market", b.market, (g) => PICK_LABEL[g] || (PLAYER_MARKET[g] ? `Player ${PLAYER_MARKET[g]}` : g))}
-    ${pfTable("By line", b.line, (g) => `${g}`)}
+    ${pfTable("By line", b.line, (g) => (Number.isInteger(Number(g)) ? `${Number(g)}+` : `${g}`))}
     ${pfTable("By position", b.position)}
     ${pfTable("Starter or substitute", b.started, (g) => (g === "True" || g === "true" ? "Started" : "Came on"))}
     ${pfTable("By edge at entry", b.edge_bucket)}
@@ -1175,7 +1178,7 @@ function impliedVsRealizedHtml(trades) {
   }).join("");
   const byLine = {};
   for (const t of done) {
-    const k = `${t.side} ${t.line} ${t.market === "player_shots" ? "shots" : "on target"}`;
+    const k = `${lineText(t.side, t.line)} ${t.market === "player_shots" ? "shots" : "on target"}`;
     (byLine[k] ||= []).push(t);
   }
   const lineRows = Object.entries(byLine).sort((a, b) => b[1].length - a[1].length).map(([k, g]) => {

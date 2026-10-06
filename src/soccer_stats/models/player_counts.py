@@ -165,9 +165,14 @@ class PlayerShotModel:
 
 
 def prob_over(pmf: np.ndarray, line: float) -> np.ndarray:
-    """P(count > line) for half-point lines (e.g. 0.5, 1.5)."""
-    k = int(np.floor(line))
-    return pmf[:, k + 1 :].sum(axis=1)
+    """P(over the line). Half-point lines (0.5, 1.5) mean "more than"; whole-number
+    lines (FanDuel's 1.0 = "1+ shots") mean "at least" - both are count >= ceil(line)."""
+    return pmf[:, over_min(line) :].sum(axis=1)
+
+
+def over_min(line: float) -> int:
+    """The smallest count that wins an "over" bet on this line."""
+    return int(np.ceil(line))
 
 
 def baseline_pmf(df: pd.DataFrame, col: str) -> np.ndarray:

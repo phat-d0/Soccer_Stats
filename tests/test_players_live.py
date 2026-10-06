@@ -275,3 +275,38 @@ def test_priced_player_backtest(sim):
         "profit"
     ] == pytest.approx(combined["summary"]["profit"])
     json.dumps(trades.astype(str).to_dict("records"))
+
+
+def test_over_only_lines_use_price_as_implied(sim):
+    apps = sim
+    feats = build_features(apps)
+    start = feats["kickoff"].min() + pd.Timedelta(days=200)
+    preds = pb.walk_forward(feats, start, refit_every="28D")
+    rows = []
+    for r in preds.drop_duplicates(["match_id", "player_id"]).head(300).itertuples():
+        for kind, at, odds in (
+            ("look", r.kickoff - pd.Timedelta(hours=3), 4.0),
+            ("close", r.kickoff - pd.Timedelta(minutes=1), 3.2),
+        ):
+            rows.append(
+                {
+                    "event_id": r.match_id,
+                    "kickoff": r.kickoff,
+                    "home": r.team,
+                    "away": r.opponent,
+                    "player": r.player,
+                    "market": "player_shots",
+                    "line": 1.0,
+                    "side": "over",
+                    "odds": odds,
+                    "odds_updated": None,
+                    "kind": kind,
+                    "snapshot_ts": at,
+                }
+            )
+    trades, info = pb.priced_trades(preds, pd.DataFrame(rows), apps)
+    assert len(trades) > 0 and info["implied_from_price_only"] > 0
+    assert trades["implied"].tolist() == pytest.approx([0.25] * len(trades))
+    assert trades["clv_dk"].tolist() == pytest.approx([4.0 / 3.2 - 1] * len(trades))
+    won = trades["status"] == "won"
+    assert (trades.loc[won, "actual"] >= 1).all() and (trades.loc[~won, "actual"] == 0).all()

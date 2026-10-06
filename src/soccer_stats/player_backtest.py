@@ -29,6 +29,7 @@ from soccer_stats.factors import ALL_FACTORS, FACTOR_GROUPS
 from soccer_stats.models.player_counts import (
     PlayerShotModel,
     baseline_pmf,
+    over_min,
     prob_over,
     season_averages,
 )
@@ -311,7 +312,7 @@ def priced_trades(
             continue
         m = m.iloc[0]
         pmf = np.asarray(m[f"pmf_{MARKET_COUNT[r.market]}"])
-        p_over = float(pmf[int(np.floor(r.line)) + 1 :].sum())
+        p_over = float(pmf[over_min(r.line) :].sum())
         rows.append(
             {
                 **r._asdict(),
@@ -349,14 +350,26 @@ def priced_trades(
         pr = tr.devig_pair(sides.get("over"), sides.get("under"))
         if pr:
             pairs[(pid, mkt, ln)] = pr
+    # FanDuel lists "over" only: then the price alone (1/odds, margin included).
     lines["implied"] = [
         (pairs[(p, m, ln)][0] if s == "over" else pairs[(p, m, ln)][1])
         if (p, m, ln) in pairs
-        else None
-        for p, m, ln, s in zip(
-            lines["player_id"], lines["market"], lines["line"], lines["side"], strict=True
+        else 1 / o
+        for p, m, ln, s, o in zip(
+            lines["player_id"],
+            lines["market"],
+            lines["line"],
+            lines["side"],
+            lines["odds"],
+            strict=True,
         )
     ]
+    info["implied_from_price_only"] = int(
+        sum(
+            (k[:3] not in pairs)
+            for k in lines[["player_id", "market", "line"]].itertuples(index=False, name=None)
+        )
+    )
     picks = tr.player_picks(lines, threshold)
     trades = []
     for r in picks.to_dict("records"):
@@ -395,6 +408,8 @@ def priced_trades(
         t["close_odds"] = float(same.iloc[0]) if len(same) else None
         if pair:
             t["clv_dk"] = t["odds"] * (pair[0] if r["side"] == "over" else pair[1]) - 1
+        elif t["close_odds"]:
+            t["clv_dk"] = t["odds"] / t["close_odds"] - 1  # no under at the close: price only
         t.update(tr.settle_player(t, r["actual"], r["started"]))
         t["position"] = r["position"]
         t["implied"] = r.get("implied")

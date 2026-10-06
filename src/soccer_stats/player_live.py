@@ -202,7 +202,7 @@ def player_cards(
                         "edge": round(p * odds_ - 1, 4),
                         "implied": round(pair[0] if side == "over" else pair[1], 4)
                         if pair
-                        else None,
+                        else round(1 / odds_, 4),  # over-only books: price incl. margin
                         "fetched_at": fetched,
                     }
                 )

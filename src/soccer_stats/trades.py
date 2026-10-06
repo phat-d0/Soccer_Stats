@@ -207,7 +207,7 @@ def settle_player(trade: dict, actual: int | None, started: bool | None) -> dict
     """Settlement for a player bet: void if he didn't play (actual is None)."""
     if actual is None:
         return {"status": "void", "actual": None, "started": None, "profit": 0.0}
-    over = actual > trade["line"]
+    over = actual >= math.ceil(trade["line"])  # 1.5 = 2 or more; FanDuel's 1.0 = 1 or more
     w = over if trade["side"] == "over" else not over
     return {
         "status": "won" if w else "lost",

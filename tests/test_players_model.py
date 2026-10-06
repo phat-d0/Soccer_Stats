@@ -345,3 +345,13 @@ def test_active_players_from_fpl():
     assert act["3"]["active"] and act["3"]["team"] == "Man United"  # injured still counts
     assert act["4"]["active"] and act["4"]["team"] is None  # unmatched but playing this season
     assert not active_players(apps, None, "2627")["3"]["active"]  # no FPL, not seen this season
+
+
+def test_whole_number_lines_mean_at_least():
+    pmf = np.array([[0.5, 0.3, 0.2]])  # P(0), P(1), P(2)
+    assert prob_over(pmf, 0.5)[0] == pytest.approx(0.5)
+    assert prob_over(pmf, 1.0)[0] == pytest.approx(0.5)  # FanDuel "1+ shots"
+    assert prob_over(pmf, 2.0)[0] == pytest.approx(0.2)
+    t = {"line": 1.0, "side": "over", "odds": 1.8, "stake": 10.0}
+    assert tr.settle_player(t, 1, True)["status"] == "won"
+    assert tr.settle_player(t, 0, True)["status"] == "lost"
