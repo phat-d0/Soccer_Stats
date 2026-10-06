@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -108,6 +109,10 @@ def cmd_paper(args: argparse.Namespace) -> None:
             print(f"Player data unavailable ({type(exc).__name__})")
     log_dir = Path(args.log_dir) if args.log_dir else None
     n = paper.run(data, log_dir, results, league=args.league, apps=apps)
+    detail = log_dir / "backtest" / f"{args.league}_players_detail.json" if log_dir else None
+    if detail and detail.exists():  # the Players view loads this on demand
+        shutil.copy(detail, site / "players_backtest.json")
+        data["players_backtest"] = "players_backtest.json"
     (site / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
     live = data["portfolio"]["live"]
     s = live.get("summary", {})
@@ -358,6 +363,15 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(_clean(out), separators=(",", ":")))
         print(f"Saved to {path}")
+        # Per-player results for the app's Players view (kept out of data.json: it's big).
+        detail = {
+            "generated_at": out["generated_at"],
+            "seasons": args.seasons,
+            **pb.player_report(before),
+        }
+        dpath = path.with_name(f"{args.league}_players_detail.json")
+        dpath.write_text(json.dumps(_clean(detail), separators=(",", ":")))
+        print(f"Per-player results for {len(detail['players'])} players saved to {dpath}")
 
 
 def cmd_backfill_players(args: argparse.Namespace) -> None:

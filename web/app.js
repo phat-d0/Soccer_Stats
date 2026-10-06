@@ -18,6 +18,9 @@ const state = {
   pfSeason: "",
   pfShown: 25,
   pfBet: "", // Portfolio bet type filter: "", "match" or "player"
+  teamsView: "teams", // Teams tab: "teams" or "players"
+  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40 }, // Players view filters
+  pb: null, // players_backtest.json once loaded (or { error })
   exploreHome: store.get("exploreHome", null),
   exploreAway: store.get("exploreAway", null),
 };
@@ -397,7 +400,152 @@ function absText(team) {
   return `<small class="abs">✚ ${bits}: ${n.absences.slice(0, 3).map((a) => esc(a.name)).join(", ")}</small>`;
 }
 
+function teamsToggle() {
+  return `
+    <div class="segmented" role="group" aria-label="Teams or players" style="margin-bottom:10px">
+      ${[["teams", "Teams"], ["players", "Players"]].map(([k, l]) => `<button data-tv="${k}" class="${state.teamsView === k ? "on" : ""}" aria-pressed="${state.teamsView === k}">${l}</button>`).join("")}
+    </div>`;
+}
+
+// ---------- players: backtest expected vs actual shots, and next match ----------
+async function loadPlayersBacktest() {
+  if (state.pb || !state.data.players_backtest) return;
+  try {
+    const res = await fetch(state.data.players_backtest, { cache: "no-cache" });
+    if (!res.ok) throw new Error(res.statusText);
+    state.pb = await res.json();
+  } catch (err) {
+    state.pb = { error: String(err.message || err), players: [], apps: {} };
+  }
+  if (state.tab === "ratings" && state.teamsView === "players") render();
+}
+
+// Next-match expected shots per player, from the fixture cards.
+function nextMatchShots() {
+  const out = new Map();
+  for (const fx of state.data.fixtures) {
+    for (const pl of fx.players || []) {
+      if (!out.has(pl.player_id)) out.set(pl.player_id, { ...pl, opp: pl.team === fx.home ? fx.away : fx.home, home: pl.team === fx.home, kickoff: fx.kickoff });
+    }
+  }
+  return out;
+}
+
+function playerRows() {
+  const next = nextMatchShots();
+  const bt = state.pb?.players || [];
+  const rows = bt.map((r) => ({ ...r, next: next.get(r.player_id) }));
+  const seen = new Set(rows.map((r) => r.player_id));
+  for (const [pid, n] of next) {  // players with a next match but no backtest record yet
+    if (!seen.has(pid)) rows.push({ player_id: pid, player: n.player, team: n.team, position: n.position, apps: 0, next: n });
+  }
+  return rows;
+}
+
+const PL_SORTS = {
+  exp: ["Expected shots (backtest)", (r) => r.exp_shots ?? -1],
+  shots: ["Actual shots (backtest)", (r) => r.shots ?? -1],
+  pergame: ["Expected shots per game", (r) => (r.apps ? r.exp_shots / r.apps : -1)],
+  next: ["Next match expected shots", (r) => r.next?.exp_shots ?? -1],
+  over: ["Shot more than expected", (r) => (r.apps ? (r.shots - r.exp_shots) / r.apps : -99)],
+  under: ["Shot less than expected", (r) => (r.apps ? (r.exp_shots - r.shots) / r.apps : -99)],
+};
+
+// "Martin Ødegaard" -> "martin odegaard", so searches work without accents.
+const FOLD = { "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ł": "l", "ı": "i" };
+const foldName = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[øæœßđłı]/g, (c) => FOLD[c]);
+
+function filteredPlayers() {
+  const f = state.pl;
+  const q = foldName(f.q.trim());
+  const rows = playerRows().filter((r) =>
+    (!q || foldName(r.player).includes(q)) &&
+    (!f.team || r.team === f.team) && (!f.pos || r.position === f.pos));
+  const key = PL_SORTS[f.sort][1];
+  return rows.sort((a, b) => key(b) - key(a));
+}
+
+function playerListHtml() {
+  const rows = filteredPlayers();
+  if (!rows.length) return '<p class="muted" style="padding:6px 0">No players match these filters.</p>';
+  const shown = rows.slice(0, state.pl.shown);
+  const body = shown.map((r) => {
+    const per = r.apps ? `${(r.exp_shots / r.apps).toFixed(2)} expected vs ${(r.shots / r.apps).toFixed(2)} actual a game` : "no backtest record yet";
+    const diff = r.apps ? r.shots - r.exp_shots : null;
+    const next = r.next ? `<div class="meta">Next: ${r.next.home ? "v" : "at"} ${esc(r.next.opp)} · ${r.next.exp_shots.toFixed(1)} expected shots, ${r.next.exp_sot.toFixed(1)} on target</div>` : "";
+    return `
+      <button class="bet-row trade" data-player="${esc(r.player_id)}">
+        <span>${esc(r.player)} <span class="muted small">${esc(r.team)} · ${esc(r.position || "")}</span><div class="meta">${r.apps ? `${r.apps} games · ` : ""}${per}</div>${next}</span>
+        <span class="pl num">${r.apps ? `${r.exp_shots.toFixed(0)} → ${r.shots}` : r.next ? r.next.exp_shots.toFixed(1) : "–"}${diff != null ? `<div class="meta ${plClass(diff)}">${signed(diff, 1)}</div>` : ""}</span>
+      </button>`;
+  }).join("");
+  return `${body}${rows.length > shown.length ? `<button class="more" id="pl-more">Show more (${rows.length - shown.length} left)</button>` : ""}`;
+}
+
+function viewPlayers() {
+  const d = state.data;
+  if (d.players_backtest && !state.pb) {
+    loadPlayersBacktest();
+    return `${teamsToggle()}<div class="empty">Loading player results…</div>`;
+  }
+  const all = playerRows();
+  if (!all.length) {
+    return `${teamsToggle()}<div class="empty">No player results yet. They appear after the next Player model test run (every Monday, or Actions → Player model).</div>`;
+  }
+  const teams = [...new Set(all.map((r) => r.team))].sort();
+  const f = state.pl;
+  const opt = (vals, cur, label, fmt = (v) => v) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
+  const pb = state.pb;
+  const totals = pb?.players?.length ? (() => {
+    const e = pb.players.reduce((a, r) => a + r.exp_shots, 0), a = pb.players.reduce((x, r) => x + r.shots, 0);
+    const better = pb.players.filter((r) => r.beats_baseline).length;
+    return `<p class="note">Backtest ${esc(pb.seasons || "")}: every player's expected shots, predicted before each match, against what he actually took. Overall ${e.toFixed(0)} expected, ${a} actual. The model beat the season-average baseline for ${better} of ${pb.players.length} players.</p>`;
+  })() : `<p class="note">${pb?.error ? `Couldn't load backtest results (${esc(pb.error)}). ` : ""}Showing next-match expected shots only; backtest results appear after the next Player model run.</p>`;
+  return `
+    ${teamsToggle()}
+    ${totals}
+    <input id="pl-q" class="search" type="search" placeholder="Search players" value="${esc(f.q)}" aria-label="Search players" autocomplete="off">
+    <div class="filters three">
+      <select id="pl-team" aria-label="Team">${opt(teams, f.team, "All teams")}</select>
+      <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
+      <select id="pl-sort" aria-label="Sort">${Object.entries(PL_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.sort ? "selected" : ""}>${l}</option>`).join("")}</select>
+    </div>
+    <div class="card" id="pl-list">${playerListHtml()}</div>
+    <p class="note">Right column: expected → actual shots over the backtest, and the difference. Tap a player for his match-by-match record.</p>`;
+}
+
+function playerHtml(pid) {
+  const r = playerRows().find((x) => x.player_id === pid);
+  if (!r) return "";
+  const fields = state.pb?.fields || [];
+  const ix = Object.fromEntries(fields.map((f, i) => [f, i]));
+  const apps = (state.pb?.apps?.[pid] || []).slice().reverse();
+  const rows = apps.map((a) => `<tr><td>${esc(new Date(a[ix.date]).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }))}<div class="meta">${esc(a[ix.opponent])} · ${a[ix.started] ? "started" : "sub"}, ${a[ix.minutes]}′</div></td><td>${a[ix.exp_shots].toFixed(1)}</td><td class="${a[ix.shots] > a[ix.exp_shots] + 0.5 ? "gain" : a[ix.shots] < a[ix.exp_shots] - 0.5 ? "loss" : ""}">${a[ix.shots]}</td><td>${a[ix.exp_sot].toFixed(1)}</td><td>${a[ix.sot]}</td><td>${pct(a[ix.p_1plus])}</td></tr>`).join("");
+  const n = r.next;
+  return `
+    <div class="detail">
+      <p class="muted" style="margin:0;font-size:13px">${esc(r.team)} · ${esc(r.position || "")}</p>
+      <h2 id="sheet-title">${esc(r.player)}</h2>
+      ${n ? `<div class="card" style="margin-top:10px"><b>Next: ${n.home ? "v" : "at"} ${esc(n.opp)}</b> <span class="muted small">${esc(kickoffText(n.kickoff))}</span>
+        <div class="meta" style="margin-top:4px">${n.exp_shots.toFixed(2)} expected shots · ${n.exp_sot.toFixed(2)} on target · 1+ shot ${pct(n.chances?.["shots_o0.5"])} · 2+ ${pct(n.chances?.["shots_o1.5"])}${n.p_play != null && n.p_play < 1 ? ` · FPL ${pct(n.p_play)} to play` : ""}</div></div>` : ""}
+      ${r.apps ? `
+      <div class="tiles" style="margin-top:12px">
+        <div class="tile"><div class="label">Expected shots</div><div class="value">${r.exp_shots.toFixed(1)}</div><div class="sub">${(r.exp_shots / r.apps).toFixed(2)} a game</div></div>
+        <div class="tile"><div class="label">Actual shots</div><div class="value">${r.shots}</div><div class="sub">${(r.shots / r.apps).toFixed(2)} a game</div></div>
+        <div class="tile"><div class="label">On target, expected</div><div class="value">${r.exp_sot.toFixed(1)}</div><div class="sub">actual ${r.sot}</div></div>
+        <div class="tile"><div class="label">Games</div><div class="value">${r.apps}</div><div class="sub">${r.starts} starts · ${r.minutes} min</div></div>
+      </div>
+      <p class="note">Model error ${r.ll.toFixed(3)} vs ${r.ll_base.toFixed(3)} for his season average (lower is better): ${r.beats_baseline ? "the model did better" : "the average did better"} for him.</p>
+      <div class="section-title">Match by match (predicted before each game)</div>
+      <div class="card" style="padding:8px 14px">
+        <table><thead><tr><th></th><th>Exp</th><th>Shots</th><th>Exp OT</th><th>OT</th><th>1+</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>
+      <p class="note">Exp = expected shots, OT = on target, 1+ = the model's chance of at least one shot. Green: more than half a shot above expected; red: more than half a shot below.</p>` : '<p class="note">No backtest record yet (too few earlier games).</p>'}
+    </div>`;
+}
+
 function viewRatings() {
+  if (state.teamsView === "players") return viewPlayers();
   const r = state.data.ratings;
   const maxNet = Math.max(...r.map((t) => Math.abs(t.goal_diff)), 0.01);
   const hasXg = r.some((t) => t.xg_for != null);
@@ -413,6 +561,7 @@ function viewRatings() {
       </div>`;
   }).join("");
   return `
+    ${teamsToggle()}
     <p class="note">Goals each team would score and concede per game against an average Premier League side on a neutral pitch. Recent matches count more.${hasXg ? " The xG line is this season's raw average." : ""}</p>
     <div class="card" style="margin-top:12px">
       <div class="rating-row head"><span></span><span>Team</span><span class="r">For</span><span class="r">Agst</span><span class="r">Net</span></div>
@@ -883,6 +1032,14 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfbet !== undefined) {
     state.pfBet = t.dataset.pfbet; state.pfShown = 25; state.pfMarket = "";
     render();
+  } else if (t.dataset.tv) {
+    state.teamsView = t.dataset.tv;
+    render();
+  } else if (t.dataset.player !== undefined) {
+    openSheet(playerHtml(t.dataset.player));
+  } else if (t.id === "pl-more") {
+    state.pl.shown += 40;
+    $("#pl-list").innerHTML = playerListHtml();
   } else if (t.id === "pf-more") {
     state.pfShown += 25;
     render();
@@ -901,10 +1058,20 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("change", (ev) => {
   if (ev.target.id === "ex-home") { state.exploreHome = ev.target.value; store.set("exploreHome", state.exploreHome); render(); }
   if (ev.target.id === "ex-away") { state.exploreAway = ev.target.value; store.set("exploreAway", state.exploreAway); render(); }
+  if (["pl-team", "pl-pos", "pl-sort"].includes(ev.target.id)) {
+    state.pl[ev.target.id.slice(3)] = ev.target.value; state.pl.shown = 40;
+    $("#pl-list").innerHTML = playerListHtml();
+  }
   if (ev.target.id === "pf-market") { state.pfMarket = ev.target.value; state.pfShown = 25; render(); }
   if (ev.target.id === "pf-season") { state.pfSeason = ev.target.value; state.pfShown = 25; render(); }
 });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); });
+document.addEventListener("input", (ev) => {
+  if (ev.target.id === "pl-q") {  // update the list only, so the search box keeps focus
+    state.pl.q = ev.target.value; state.pl.shown = 40;
+    $("#pl-list").innerHTML = playerListHtml();
+  }
+});
 
 // ---------- load ----------
 async function load(force = false) {

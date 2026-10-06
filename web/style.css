@@ -456,3 +456,9 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 .gain { color: var(--good-text); }
 .loss { color: var(--neg); }
 .bet-row .pl .meta { font-weight: 400; }
+.search {
+  display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 9px 12px; margin: 4px 0 8px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary);
+}
+.filters.three { grid-template-columns: 1fr 1fr; }
+.filters.three select:last-child { grid-column: span 2; }

@@ -361,3 +361,90 @@ def priced_trades(
         t["settled_at"] = t["kickoff"]
         trades.append(t)
     return pd.DataFrame(trades), info
+
+
+def player_report(preds: pd.DataFrame) -> dict:
+    """Per-player backtest results for the app: expected vs actual shots, by name.
+
+    `preds` are walk-forward predictions (one row per appearance, made before the
+    match). Returns a summary row per player and his match-by-match record.
+    """
+    if preds.empty:
+        return {"players": [], "apps": {}}
+    p = preds.sort_values("kickoff")
+    y1 = (p["shots"] > 0.5).astype(float)
+    p = p.assign(
+        bin_ll=-(
+            y1 * np.log(p["p_shots_o0.5"].clip(1e-6, 1 - 1e-6))
+            + (1 - y1) * np.log((1 - p["p_shots_o0.5"]).clip(1e-6, 1 - 1e-6))
+        ),
+        bin_ll_base=-(
+            y1 * np.log(p["b_shots_o0.5"].clip(1e-6, 1 - 1e-6))
+            + (1 - y1) * np.log((1 - p["b_shots_o0.5"]).clip(1e-6, 1 - 1e-6))
+        ),
+    )
+    g = p.groupby("player_id")
+    summary = pd.DataFrame(
+        {
+            "player": g["player"].last(),
+            "team": g["team"].last(),
+            "position": g["position"].last(),
+            "apps": g.size(),
+            "starts": g["started"].sum(),
+            "minutes": g["minutes"].sum(),
+            "exp_shots": g["mean_shots"].sum(),
+            "shots": g["shots"].sum(),
+            "exp_sot": g["mean_sot"].sum(),
+            "sot": g["sot"].sum(),
+            "ll": g["ll_shots"].mean(),
+            "ll_base": g["ll_shots_base"].mean(),
+            "last": g["kickoff"].max(),
+        }
+    ).reset_index()
+    summary["beats_baseline"] = summary["ll"] < summary["ll_base"]
+    summary["last"] = summary["last"].dt.strftime("%Y-%m-%d")
+    cols = [
+        "kickoff",
+        "opponent",
+        "started",
+        "minutes",
+        "mean_shots",
+        "shots",
+        "mean_sot",
+        "sot",
+        "p_shots_o0.5",
+        "p_shots_o1.5",
+    ]
+    apps = {}
+    for pid, sub in p.groupby("player_id"):
+        apps[pid] = [
+            [
+                k.strftime("%Y-%m-%d"),
+                opp,
+                bool(st),
+                int(mi),
+                round(float(es), 2),
+                int(sh),
+                round(float(et), 2),
+                int(so),
+                round(float(p1), 3),
+                round(float(p2), 3),
+            ]
+            for k, opp, st, mi, es, sh, et, so, p1, p2 in sub[cols].itertuples(index=False)
+        ]
+    return {
+        "fields": [
+            "date",
+            "opponent",
+            "started",
+            "minutes",
+            "exp_shots",
+            "shots",
+            "exp_sot",
+            "sot",
+            "p_1plus",
+            "p_2plus",
+        ],
+        "players": summary.round(3).sort_values("exp_shots", ascending=False).to_dict("records"),
+        "apps": apps,
+    }

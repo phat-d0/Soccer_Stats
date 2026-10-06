@@ -276,3 +276,18 @@ def test_parse_match():
     assert rows["Kai Havertz"]["started"] is False and rows["Kai Havertz"]["shots"] == 1
     assert rows["Joe Rodon"]["shots"] == 1  # his own goal isn't his shot
     assert rows["Bukayo Saka"]["team_shots"] == 3 and rows["Joe Rodon"]["opp_shots"] == 3
+
+
+def test_player_report_by_name(backtest):
+    _, _, preds = backtest
+    rep = pb.player_report(preds)
+    rows = {r["player_id"]: r for r in rep["players"]}
+    assert len(rows) == preds["player_id"].nunique()
+    pid, r = next(iter(rows.items()))
+    sub = preds[preds["player_id"] == pid]
+    assert r["apps"] == len(sub) and r["shots"] == sub["shots"].sum()
+    assert r["exp_shots"] == pytest.approx(sub["mean_shots"].sum(), abs=1e-2)
+    assert len(rep["apps"][pid]) == len(sub)
+    assert len(rep["apps"][pid][0]) == len(rep["fields"])
+    total_exp = sum(r["exp_shots"] for r in rep["players"])
+    assert total_exp == pytest.approx(preds["mean_shots"].sum(), rel=1e-3)
