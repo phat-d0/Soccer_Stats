@@ -348,7 +348,7 @@ def build(src: Path, out: Path) -> dict:
 
 # Settled live match trades with closing prices, until the real ledger has some: the
 # moneyline contract (close_odds, close_fetched_at, close_minutes_before, clv_dk,
-# beat_close_dk per trade; summary clv_dk, beat_close_dk, close_early). The last one is
+# beat_close_dk per trade; summary clv_dk, beat_close_dk, close_over_60min). The last one is
 # an older trade without close fields, so the app's "–" fallbacks are exercised.
 SYNTHETIC_SETTLED = [
     # home, away, kickoff, market, odds, close odds, minutes before kickoff, score, won
@@ -405,9 +405,9 @@ def add_settled_live_matches(data: dict) -> None:
     section = paper.portfolio_section(trades)
     match = [t for t in trades if t.get("bet_type", "match") == "match"]
     early = sum(1 for t in match if (t.get("close_minutes_before") or 0) > 60)
-    section["summary"]["close_early"] = early
+    section["summary"]["close_over_60min"] = early
     if "match" in section["by_bet_type"]:
-        section["by_bet_type"]["match"]["summary"]["close_early"] = early
+        section["by_bet_type"]["match"]["summary"]["close_over_60min"] = early
     data["portfolio"]["live"] = {**live, **section}
 
 
