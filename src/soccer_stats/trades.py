@@ -223,13 +223,15 @@ def player_picks(
     """The player trade rule.
 
     `lines` has one row per priced side: home, away, player, market, line, side
-    ("over"/"under"), odds and p (the model's chance of that side, given he plays).
+    ("over"/"under"), odds and p (the chance of that side, given he plays: live, the
+    blend of model and price; None or NaN never trades).
     Keeps, per player, match and market, the line and side with the highest edge if it
     reaches `threshold`; then at most `cap_per_match` per match, the highest edges first.
     """
     if lines.empty:
         return lines.assign(edge=[])
     df = lines.copy()
+    df["p"] = pd.to_numeric(df["p"], errors="coerce")  # no chance (None) = no trade
     df["edge"] = df["p"] * df["odds"] - 1
     df = df[(df["edge"] > 0) & (df["edge"] >= threshold - EPS) & (df["odds"] > 1)]
     if df.empty:

@@ -443,6 +443,22 @@ def cmd_player_odds_check(args: argparse.Namespace) -> None:
         print(line)
 
 
+def cmd_player_segments(args: argparse.Namespace) -> None:
+    import json
+
+    from soccer_stats import player_segments as ps
+
+    lines = ps.load_lines(args.lines)
+    a, b = args.train, args.test
+    results = []
+    for train, test in ((a, b), (b, a)):  # the reverse split is the robustness check
+        res = ps.out_of_sample(lines, train, test, min_bets=args.min_bets)
+        print(ps.format_report(res) + "\n")
+        results.append(res)
+    if args.out:
+        Path(args.out).write_text(json.dumps(results, indent=1, default=str))
+
+
 def _fmt(v, kind="num"):
     if v is None:
         return "–"
@@ -593,6 +609,16 @@ def main(argv: list[str] | None = None) -> None:
     poc = sub.add_parser("player-odds-check", help="diagnose player-prop coverage (~40-80 credits)")
     poc.add_argument("--league", default="E0")
     poc.set_defaults(func=cmd_player_odds_check)
+
+    seg = sub.add_parser(
+        "player-segments", help="out-of-sample segment search on the priced player lines"
+    )
+    seg.add_argument("--lines", required=True, help="E0_player_lines.csv(.gz) from data-log")
+    seg.add_argument("--train", type=int, default=2024, help="season to pick on (2024 = 24/25)")
+    seg.add_argument("--test", type=int, default=2025, help="season to report on")
+    seg.add_argument("--min-bets", type=int, default=100)
+    seg.add_argument("--out", help="write the results as JSON")
+    seg.set_defaults(func=cmd_player_segments)
 
     args = parser.parse_args(argv)
     args.func(args)

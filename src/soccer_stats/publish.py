@@ -357,6 +357,8 @@ def player_gate(path: str | None = None) -> dict:
     except (OSError, ValueError):
         g = {}
     gate = g.get("gate") or {}
+    look = ((g.get("priced") or {}).get("calibration") or {}).get("look") or {}
+    coef = look.get("coef")
     return {
         "passed": bool(gate.get("passed")),
         "shots": gate.get("shots"),
@@ -364,6 +366,8 @@ def player_gate(path: str | None = None) -> dict:
         "factors": g.get("factors"),
         "sot_method": g.get("sot_method", "thin"),
         "generated_at": g.get("generated_at"),
+        # the blend the live app trades on (player_calibration); None = no player trades
+        "calibration": [float(v) for v in coef] if coef and len(coef) == 3 else None,
     }
 
 
@@ -402,6 +406,7 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
             events,
             factors=gate["factors"],
             sot_method=gate["sot_method"],
+            calibration=gate["calibration"],
         )
         status.update(st)
         for fx in data["fixtures"]:
@@ -451,6 +456,7 @@ def publish(out: Path, league: str = "E0") -> Path:
                 if ps["gate"]["passed"]
                 else " (player odds off until the model beats its baseline)"
             )
+            + (f" ({ps['blend_note']})" if ps.get("blend_note") else "")
         )
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
     print(
