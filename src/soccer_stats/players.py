@@ -97,6 +97,7 @@ def parse_players(data: dict) -> pd.DataFrame:
         rows.append(
             {
                 "name": e.get("web_name") or e.get("second_name", ""),
+                "full_name": f"{e.get('first_name', '')} {e.get('second_name', '')}".strip(),
                 "team": teams.get(e["team"], str(e["team"])),
                 "position": POSITIONS.get(e["element_type"], "MID"),
                 "status": e.get("status", "a"),

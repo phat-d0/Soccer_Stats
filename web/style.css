@@ -464,3 +464,9 @@ table.kv td:last-child { text-align: right; overflow-wrap: anywhere; }
 .filters.three select:last-child { grid-column: span 2; }
 .club-total { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 10px; border-bottom: 0.5px solid var(--border); margin-bottom: 2px; font-size: 14px; }
 .club-total .num { color: var(--text-secondary); font-size: 13px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 7px 12px; font: inherit; font-size: 14px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary); cursor: pointer;
+}
+.chip.on { background: var(--good-bg); color: var(--good-text); border-color: transparent; font-weight: 600; }
+.chip svg { width: 14px; height: 14px; }

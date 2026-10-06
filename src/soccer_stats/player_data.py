@@ -322,3 +322,45 @@ def season_stats(apps: pd.DataFrame) -> list[dict]:
     ]
     out["xg"] = out["xg"].round(2)
     return out.sort_values(["season", "shots"], ascending=[False, False]).to_dict("records")
+
+
+def active_players(apps: pd.DataFrame, fpl: pd.DataFrame | None, season: str) -> dict[str, dict]:
+    """Understat player id -> {"active", "team", "status"}: is he in a current PL squad?
+
+    FPL lists every current Premier League player (status "u" = left the club or
+    unavailable for the season). A player matched to FPL is active unless his status is
+    "u", and his current club is FPL's. One not matched to FPL counts as active only if
+    he has played this season, so a name mismatch never hides a current player.
+    """
+    out: dict[str, dict] = {}
+    if apps.empty:
+        return out
+    played_now = set(apps.loc[apps["season"].astype(str) == season, "player_id"])
+    matched: dict[str, dict] = {}
+    if fpl is not None and not fpl.empty:
+        overrides = load_overrides()
+        roster = apps.drop_duplicates(["team", "player_id"])
+        # Exact full names across all clubs, for players who moved within the league
+        # and haven't played for their new club yet (ambiguous names are left out).
+        by_full: dict[str, set] = {}
+        for pid, name in zip(roster["player_id"], roster["player"], strict=True):
+            by_full.setdefault(norm(name), set()).add(pid)
+        for team, squad in fpl.groupby("team"):
+            cands = roster[roster["team"] == team]
+            cmap = dict(zip(cands["player_id"], cands["player"], strict=True))
+            full = squad.get("full_name", squad["name"])
+            got, _ = match_names(full, team, cmap, overrides)
+            got_web, _ = match_names(squad["name"], team, cmap, overrides)
+            for (_, r), fn in zip(squad.iterrows(), full, strict=True):
+                pid = got.get(fn) or got_web.get(r["name"])
+                if not pid and len(by_full.get(norm(fn), ())) == 1:
+                    pid = next(iter(by_full[norm(fn)]))
+                if pid:
+                    matched[pid] = {
+                        "active": r["status"] != "u",
+                        "team": team,
+                        "status": r["status"],
+                    }
+    for pid in apps["player_id"].unique():
+        out[pid] = matched.get(pid) or {"active": pid in played_now, "team": None, "status": None}
+    return out

@@ -370,7 +370,7 @@ def player_gate(path: str | None = None) -> dict:
 def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, list[dict]]:
     """Player shot lines for each upcoming fixture, plus season shooting stats per
     player and club (never raises)."""
-    from soccer_stats.player_data import load_appearances, season_stats
+    from soccer_stats.player_data import active_players, load_appearances, season_stats
     from soccer_stats.player_live import fpl_players, player_cards
     from soccer_stats.player_odds import fetch_live
 
@@ -384,6 +384,12 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
         )
         status["missing_matches"] = missing
         stats = season_stats(apps)
+        active = active_players(apps, fpl_df, f"{season % 100:02d}{(season + 1) % 100:02d}")
+        for r in stats:
+            a = active.get(r["player_id"], {})
+            r["active"] = bool(a.get("active"))
+            r["current_team"] = a.get("team")
+        status["active_players"] = sum(v["active"] for v in active.values())
         events = []
         if gate["passed"]:
             events, status["odds"] = fetch_live(league, credits_left=credits_left)
@@ -431,7 +437,8 @@ def publish(out: Path, league: str = "E0") -> Path:
         ps = data["players_status"]
         print(
             ps["error"]
-            or f"Player lines: {ps.get('players', 0)} players, {ps.get('priced', 0)} priced"
+            or f"Player lines: {ps.get('players', 0)} players, {ps.get('priced', 0)} priced, "
+            f"{ps.get('active_players', 0)} active in current squads"
             + (
                 f", {ps['missing_matches']} Understat matches still to download"
                 if ps.get("missing_matches")

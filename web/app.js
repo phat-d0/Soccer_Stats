@@ -19,7 +19,7 @@ const state = {
   pfShown: 25,
   pfBet: "", // Portfolio bet type filter: "", "match" or "player"
   teamsView: "teams", // Teams tab: "teams" or "players"
-  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots" }, // Players view
+  pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
   ps: null, // players_stats.json once loaded (or { error })
   exploreHome: store.get("exploreHome", null),
@@ -459,7 +459,9 @@ const foldName = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f
 function filteredPlayers() {
   const f = state.pl;
   const q = foldName(f.q.trim());
+  const act = state.ps?.players?.length ? activeMap() : null;
   const rows = playerRows().filter((r) =>
+    (!f.active || !act || act.get(r.player_id)?.active || r.next) &&
     (!q || foldName(r.player).includes(q)) &&
     (!f.team || r.team === f.team) && (!f.pos || r.position === f.pos));
   const key = PL_SORTS[f.sort][1];
@@ -502,6 +504,20 @@ async function loadPlayerStats() {
   if (state.tab === "ratings" && state.teamsView === "players") render();
 }
 
+// Who's in a current Premier League squad (from players_stats.json's FPL matching).
+function activeMap() {
+  const m = new Map();
+  for (const r of state.ps?.players || []) {
+    const cur = m.get(r.player_id);
+    m.set(r.player_id, { active: (cur?.active || false) || !!r.active, team: r.current_team || cur?.team || null });
+  }
+  return m;
+}
+function activeToggle() {
+  const on = state.pl.active;
+  return `<button class="chip ${on ? "on" : ""}" id="pl-active" aria-pressed="${on}">${on ? CHECK : ""}Active players only</button>`;
+}
+
 const per90 = (n, min) => (min > 0 ? (n * 90) / min : null);
 const STAT_SORTS = {
   shots: ["Shots", (r) => r.shots],
@@ -517,7 +533,9 @@ function statRows() {
   const f = state.pl;
   const season = f.season || state.ps?.seasons?.[0];
   const q = foldName(f.q.trim());
+  const act = activeMap();
   const rows = (state.ps?.players || []).filter((r) => r.season === season &&
+    (!f.active || act.get(r.player_id)?.active) &&
     (!q || foldName(r.player).includes(q)) && (!f.team || r.team === f.team) && (!f.pos || r.position === f.pos));
   const key = STAT_SORTS[f.ssort][1];
   return rows.sort((a, b) => key(b) - key(a));
@@ -534,11 +552,14 @@ function statListHtml() {
     club = `<div class="club-total"><b>${esc(f.team)}${f.pos ? ` · ${esc(f.pos)}` : ""}</b><span class="num">${t.shots} shots in ${games} games (${games ? (t.shots / games).toFixed(1) : "–"} a game) · ${t.sot} on target · ${t.goals} goals · ${t.xg.toFixed(1)} xG</span></div>`;
   }
   const shown = rows.slice(0, f.shown);
+  const act = activeMap();
   const body = shown.map((r) => {
     const p = per90(r.shots, r.minutes);
+    const now = act.get(r.player_id);
+    const moved = now?.team && now.team !== r.team ? ` <span class="muted small">· now ${esc(now.team)}</span>` : !now?.active ? ' <span class="muted small">· left the PL</span>' : "";
     return `
       <button class="bet-row trade" data-player="${esc(r.player_id)}">
-        <span>${esc(r.player)} <span class="muted small">${f.team ? "" : `${esc(r.team)} · `}${esc(r.position || "")}</span><div class="meta">${r.apps} games (${r.starts} starts) · ${r.minutes} min</div><div class="meta">${p != null ? p.toFixed(2) : "–"} per 90 · ${r.sot} on target${r.shots ? ` (${Math.round((r.sot / r.shots) * 100)}%)` : ""} · ${r.goals} G · ${r.xg.toFixed(1)} xG</div></span>
+        <span>${esc(r.player)} <span class="muted small">${f.team ? "" : `${esc(r.team)} · `}${esc(r.position || "")}</span>${moved}<div class="meta">${r.apps} games (${r.starts} starts) · ${r.minutes} min</div><div class="meta">${p != null ? p.toFixed(2) : "–"} per 90 · ${r.sot} on target${r.shots ? ` (${Math.round((r.sot / r.shots) * 100)}%)` : ""} · ${r.goals} G · ${r.xg.toFixed(1)} xG</div></span>
         <span class="pl num">${r.shots}<div class="meta">shots</div></span>
       </button>`;
   }).join("");
@@ -569,13 +590,15 @@ function viewPlayerStats() {
       <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
       <select id="pl-ssort" aria-label="Sort">${Object.entries(STAT_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.ssort ? "selected" : ""}>${l}</option>`).join("")}</select>
     </div>
+    ${activeToggle()}
     <div class="card" id="pl-list">${statListHtml()}</div>
-    <p class="note">Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record.</p>`;
+    <p class="note">Active players = in a current Premier League squad (Fantasy Premier League's list; injured or suspended players still count). Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record.</p>`;
 }
 
 function viewPlayers() {
   if (state.pl.mode === "stats") return viewPlayerStats();
   const d = state.data;
+  if (d.players_stats && !state.ps) loadPlayerStats();  // for the active-players filter
   if (d.players_backtest && !state.pb) {
     loadPlayersBacktest();
     return `${teamsToggle()}<div class="empty">Loading player results…</div>`;
@@ -603,6 +626,7 @@ function viewPlayers() {
       <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
       <select id="pl-sort" aria-label="Sort">${Object.entries(PL_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.sort ? "selected" : ""}>${l}</option>`).join("")}</select>
     </div>
+    ${activeToggle()}
     <div class="card" id="pl-list">${playerListHtml()}</div>
     <p class="note">Right column: expected → actual shots over the backtest, and the difference. Tap a player for his match-by-match record.</p>`;
 }
@@ -1140,6 +1164,9 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.pfbet !== undefined) {
     state.pfBet = t.dataset.pfbet; state.pfShown = 25; state.pfMarket = "";
+    render();
+  } else if (t.id === "pl-active") {
+    state.pl.active = !state.pl.active; state.pl.shown = 40;
     render();
   } else if (t.dataset.plmode) {
     state.pl.mode = t.dataset.plmode; state.pl.shown = 40;

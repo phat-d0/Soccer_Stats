@@ -312,3 +312,36 @@ def test_season_stats_per_player_and_club(sim):
         & (apps["team"] == r["team"])
     ]
     assert (r["apps"], r["minutes"], r["sot"]) == (len(sub), sub["minutes"].sum(), sub["sot"].sum())
+
+
+def test_active_players_from_fpl():
+    from soccer_stats.player_data import active_players
+
+    apps = pd.DataFrame(
+        {
+            "season": ["2526", "2627", "2526", "2526", "2627"],
+            "team": ["Arsenal", "Arsenal", "Arsenal", "Chelsea", "Arsenal"],
+            "player_id": ["1", "1", "2", "3", "4"],
+            "player": [
+                "Bukayo Saka",
+                "Bukayo Saka",
+                "Thomas Partey",
+                "Cole Palmer",
+                "Unlisted Kid",
+            ],
+        }
+    )
+    fpl = pd.DataFrame(
+        {
+            "name": ["Saka", "Partey", "Palmer"],
+            "full_name": ["Bukayo Saka", "Thomas Partey", "Cole Palmer"],
+            "team": ["Arsenal", "Arsenal", "Man United"],  # Palmer moved within the league
+            "status": ["a", "u", "i"],
+        }
+    )
+    act = active_players(apps, fpl, "2627")
+    assert act["1"]["active"] and act["1"]["team"] == "Arsenal"
+    assert not act["2"]["active"]  # FPL: left / unavailable for the season
+    assert act["3"]["active"] and act["3"]["team"] == "Man United"  # injured still counts
+    assert act["4"]["active"] and act["4"]["team"] is None  # unmatched but playing this season
+    assert not active_players(apps, None, "2627")["3"]["active"]  # no FPL, not seen this season
