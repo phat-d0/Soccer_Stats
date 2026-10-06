@@ -31,6 +31,10 @@ from soccer_stats.odds import devig_shin
 H2H = ("home", "draw", "away")
 TOTALS = ("over25", "under25")
 GROUPS = {"h2h": H2H, "totals": TOTALS}
+# Research-only groups (match_markets.py): not in GROUPS, so the live blend, the
+# DraftKings backtest and the app never look for them.
+AH = ("ah_home", "ah_away")
+RESEARCH_GROUPS = {"ah": AH}
 MIN_ROWS = 300  # settled matches needed before a fit is trusted
 REFIT = "28D"
 RIDGE = 1e-3  # pulls b toward 1 and c toward 0 a little
@@ -40,49 +44,85 @@ def _log(p) -> np.ndarray:
     return np.log(np.clip(np.asarray(p, dtype=float), 1e-6, 1.0))
 
 
-def _scores(w: np.ndarray, lm: np.ndarray, lq: np.ndarray) -> np.ndarray:
+def names_of(group: str) -> tuple[str, ...]:
+    return GROUPS.get(group) or RESEARCH_GROUPS[group]
+
+
+def feature_sign(k: int) -> np.ndarray:
+    """How an extra feature x moves the scores: +x home / -x away for 1X2 (draw 0);
+    a logit shift toward the first outcome (over, home covers) with two."""
+    return np.array([1.0, 0.0, -1.0]) if k == 3 else np.array([1.0, 0.0])
+
+
+def _features(extra, n: int) -> np.ndarray:
+    if extra is None:
+        return np.zeros((n, 0))
+    x = np.asarray(extra, dtype=float)
+    return x.reshape(n, 1) if x.ndim == 1 else x
+
+
+def _scores(w: np.ndarray, lm: np.ndarray, lq: np.ndarray, x: np.ndarray | None = None):
     k = lm.shape[1]
     a = np.concatenate([[0.0], w[: k - 1]])
-    return a + w[k - 1] * lm + w[k] * lq
+    s = a + w[k - 1] * lm + w[k] * lq
+    if x is not None and x.shape[1]:
+        s = s + (x @ w[k + 1 :])[:, None] * feature_sign(k)
+    return s
 
 
-def fit(market, model, outcome, min_rows: int = MIN_ROWS) -> list[float] | None:
-    """Coefficients [a_2..a_K, b, c], or None with too few matches.
+def fit(
+    market, model, outcome, min_rows: int = MIN_ROWS, weight=None, extra=None
+) -> list[float] | None:
+    """Coefficients [a_2..a_K, b, c, d_1..d_F], or None with too few matches.
 
     `market` and `model` are (n, K) probabilities, `outcome` the index of what happened.
+    `weight` (optional, n) weights each row: Asian handicap half-wins and half-losses
+    count 0.5, pushes 0. `extra` (optional, (n, F)) are signals the price might lack;
+    each gets a coefficient d (see feature_sign). Without them the result is [a, b, c].
     """
     lm, lq = _log(market), _log(model)
     y = np.asarray(outcome, dtype=int)
     n, k = lm.shape
-    if n < min_rows or len(np.unique(y)) < 2:
+    x = _features(extra, n)
+    wt = np.ones(n) if weight is None else np.asarray(weight, dtype=float)
+    if n < min_rows or len(np.unique(y[wt > 0])) < 2:
         return None
+    wt = wt / wt.sum()
     onehot = np.eye(k)[y]
+    f = x.shape[1]
+    sign = feature_sign(k)
 
     def loss(w):
-        s = _scores(w, lm, lq)
-        nll = -(log_softmax(s, axis=1) * onehot).sum(1).mean()
-        return nll + RIDGE * ((w[k - 1] - 1) ** 2 + w[k] ** 2)
+        s = _scores(w, lm, lq, x)
+        nll = -((log_softmax(s, axis=1) * onehot).sum(1) * wt).sum()
+        return nll + RIDGE * ((w[k - 1] - 1) ** 2 + w[k] ** 2 + (w[k + 1 :] ** 2).sum())
 
     def grad(w):
-        d = (softmax(_scores(w, lm, lq), axis=1) - onehot) / n
-        g = np.concatenate([d[:, 1:].sum(0), [(d * lm).sum(), (d * lq).sum()]])
+        d = (softmax(_scores(w, lm, lq, x), axis=1) - onehot) * wt[:, None]
+        g = np.concatenate([d[:, 1:].sum(0), [(d * lm).sum(), (d * lq).sum()], x.T @ (d @ sign)])
         g[k - 1] += 2 * RIDGE * (w[k - 1] - 1)
         g[k] += 2 * RIDGE * w[k]
+        g[k + 1 :] += 2 * RIDGE * w[k + 1 :]
         return g
 
-    w0 = np.concatenate([np.zeros(k - 1), [1.0, 0.0]])
+    w0 = np.concatenate([np.zeros(k - 1), [1.0, 0.0], np.zeros(f)])
     res = minimize(loss, w0, jac=grad, method="L-BFGS-B")
     return [round(float(v), 5) for v in res.x]
 
 
-def apply(coef: list[float] | None, market, model) -> np.ndarray:
+def apply(coef: list[float] | None, market, model, extra=None) -> np.ndarray:
     """Blended probabilities, (n, K); NaN without coefficients or inputs."""
     market = np.atleast_2d(np.asarray(market, dtype=float))
     model = np.atleast_2d(np.asarray(model, dtype=float))
     if coef is None:
         return np.full(market.shape, np.nan)
-    out = softmax(_scores(np.asarray(coef), _log(market), _log(model)), axis=1)
+    n, k = market.shape
+    w = np.asarray(coef, dtype=float)
+    x = _features(extra, n) if len(w) > k + 1 else None
+    out = softmax(_scores(w, _log(market), _log(model), x), axis=1)
     bad = ~(np.isfinite(market).all(1) & np.isfinite(model).all(1))
+    if x is not None:
+        bad |= ~np.isfinite(x).all(1)
     out[bad] = np.nan
     return out
 
@@ -159,14 +199,17 @@ def walk_forward(
     group: str,
     refit: str = REFIT,
     min_rows: int = MIN_ROWS,
+    features: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, list[dict]]:
     """Out-of-sample blended chances for `target` rows.
 
     `target` has `date` (the day the bet is decided, naive), mkt_<m> and p_<m>. Each
     block of `refit` days uses a fit on `train` matches played before the block starts;
-    earlier blocks get NaN (no trade).
+    earlier blocks get NaN (no trade). A `w` column in `train` weights its rows;
+    `features` names extra signal columns present in both frames.
     """
-    names = GROUPS[group]
+    names = names_of(group)
+    feats = list(features)
     out = pd.DataFrame(np.nan, index=target.index, columns=list(names))
     fits: list[dict] = []
     if target.empty or train.empty:
@@ -182,10 +225,15 @@ def walk_forward(
         if block.empty:
             continue
         tr = train[pd.to_datetime(train["date"]) < lo]
-        coef = fit(tr[mk_cols], tr[p_cols], tr["y"], min_rows)
+        if feats:
+            tr = tr.dropna(subset=feats)
+        wt = tr["w"] if "w" in tr else None
+        x = tr[feats] if feats else None
+        coef = fit(tr[mk_cols], tr[p_cols], tr["y"], min_rows, weight=wt, extra=x)
         if coef is None:
             continue
-        out.loc[block.index, list(names)] = apply(coef, block[mk_cols], block[p_cols])
+        bx = block[feats] if feats else None
+        out.loc[block.index, list(names)] = apply(coef, block[mk_cols], block[p_cols], bx)
         fits.append({"from": lo.date().isoformat(), "matches": len(tr), "coef": coef})
     return out, fits
 

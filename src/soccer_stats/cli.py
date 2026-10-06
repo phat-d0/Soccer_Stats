@@ -6,6 +6,7 @@ soccer-stats publish --out _site
 soccer-stats paper --site _site --log-dir ../log
 soccer-stats backfill-odds --seasons 2025 --dry-run
 soccer-stats backtest-dk --seasons 2023-2025 --out dk_trades.csv
+soccer-stats match-markets --seasons 2017-2025 --json out/match_markets.json
 """
 
 from __future__ import annotations
@@ -603,6 +604,100 @@ def _print_strategies(out: dict) -> None:
             )
 
 
+def cmd_match_markets(args: argparse.Namespace) -> None:
+    """Asian handicap, O/U 2.5 and 1X2 against Pinnacle (football-data), out of sample."""
+    import json
+
+    from soccer_stats import match_markets as mm
+    from soccer_stats.data import download, season_code
+    from soccer_stats.publish import _clean
+
+    years = _years(args.seasons)
+    matches = load_matches([args.league], range(years[0] - args.burn_in, years[-1] + 1))
+    matches, err = with_xg(matches)
+    has_xg = matches["home_xg"].notna().any()
+    print(err or f"xG attached to {matches['home_xg'].notna().mean():.0%} of matches")
+    weight = args.xg_weight if has_xg else 0.0
+    preds = backtest.walk_forward(
+        matches,
+        start=f"{years[0]}-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=weight),
+        keep_matrix=True,
+    )
+    print(f"{len(preds)} out-of-sample predictions (xg_weight {weight})")
+    frames = []
+    for y in years:
+        raw = pd.read_csv(download(args.league, y), encoding="latin-1", on_bad_lines="skip")
+        frames.append(mm.load_prices(raw, season=season_code(y)))
+    joined = mm.join(preds, pd.concat(frames, ignore_index=True))
+    if has_xg:
+        feats = mm.xg_features(matches)
+        feats["date"] = pd.to_datetime(feats["date"]).dt.normalize()
+        joined = joined.merge(feats, on=["date", "home", "away"], how="left")
+    print(f"{len(joined)} predictions matched to football-data prices")
+    out = mm.run(joined)
+    print("\nPrice check (rows blanked as implausible):")
+    print(pd.DataFrame(out["price_check"]).round(4).to_string(index=False))
+    for g in mm.GROUPS:
+        _print_market(g, out[g])
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+        print(f"\nJSON written to {args.json}")
+
+
+def _rng(ci) -> str:
+    return f"{ci[0]:+.1%} to {ci[1]:+.1%}" if ci else "-"
+
+
+def _rng4(ci) -> str:
+    return f"{ci[0]:+.4f} to {ci[1]:+.4f}" if ci else "-"
+
+
+def _print_market(group: str, r: dict) -> None:
+    print(f"\n==================== {group} ====================")
+    print(f"Matches priced: close {r['matches_close']}, early {r['matches_early']}")
+    if "ah_line_moved" in r:
+        print(
+            f"AH line moved early -> close: {r['ah_line_moved']:.1%}; "
+            f"matches with a push or half stake: {r['ah_push_share']:.1%}"
+        )
+    for key in ("log_loss", "log_loss_early_pinnacle"):
+        if r.get(key):
+            print(
+                f"{key}: "
+                + ", ".join(
+                    f"{k} {v:.4f}" if isinstance(v, float) else f"{k} {v}"
+                    for k, v in r[key].items()
+                )
+            )
+    for k, f in (r.get("fits") or {}).items():
+        print(f"{k}: {f['refits']} refits, model weight c range {f['c_range']}, last {f['last']}")
+    print(f"Fit on every match (live): {r.get('live')}")
+    for k, sig in (r.get("signals") or {}).items():
+        d = sig["loss_diff_vs_blend"]
+        print(
+            f"{k} {sig['features']}: log loss vs blend "
+            f"{d.get('diff', float('nan')):+.4f} (95% {_rng4(d.get('ci95'))}) "
+            f"on {d['matches']} matches (negative = signal helps)"
+        )
+    print("source          strategy   edge  bets     ROI        95% range      CLV       CLV range")
+    for s in r.get("sweep", []):
+        if not s["bets"]:
+            print(f"{s['source']:<15} {s['strategy']:<9} {s['threshold']:>4.0%} {0:>5}")
+            continue
+        clv = f"{s['clv']:+.1%}" if s.get("clv") is not None else "-"
+        print(
+            f"{s['source']:<15} {s['strategy']:<9} {s['threshold']:>4.0%} {s['bets']:>5} "
+            f"{s['roi']:>+7.1%} {_rng(s['roi_ci95']):>18} {clv:>7} {_rng(s.get('clv_ci95')):>18}"
+        )
+    if r.get("by_season"):
+        print("By season, Pinnacle early, 12% edge:")
+        for s in r["by_season"]:
+            clv = f"{s['clv']:+.1%}" if s.get("clv") is not None else "-"
+            print(f"  {s['strategy']:<9} {s['season']} {s['bets']:>4} {s['roi']:>+7.1%} CLV {clv}")
+
+
 def main(argv: list[str] | None = None) -> None:
     pd.set_option("display.width", 120)
     parser = argparse.ArgumentParser(prog="soccer-stats")
@@ -715,6 +810,16 @@ def main(argv: list[str] | None = None) -> None:
     seg.add_argument("--min-bets", type=int, default=100)
     seg.add_argument("--out", help="write the results as JSON")
     seg.set_defaults(func=cmd_player_segments)
+
+    mk = sub.add_parser(
+        "match-markets", help="Asian handicap, O/U 2.5 and 1X2 vs Pinnacle (football-data)"
+    )
+    mk.add_argument("--league", default="E0")
+    mk.add_argument("--seasons", default="2017-2025", help="seasons to predict (start years)")
+    mk.add_argument("--burn-in", type=int, default=2, help="seasons of training data before")
+    mk.add_argument("--xg-weight", type=float, default=0.7)
+    mk.add_argument("--json", help="write the results as JSON")
+    mk.set_defaults(func=cmd_match_markets)
 
     args = parser.parse_args(argv)
     args.func(args)

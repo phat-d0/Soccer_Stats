@@ -6,9 +6,9 @@ description: Owns the match model and match bets (Dixon-Coles + xG, moneyline/to
 You own match bets: moneyline (home/draw/away) and totals (see CLAUDE.md for the map and status).
 
 Your files:
-- `models/dixon_coles.py`, `backtest.py`, `markets.py`, `odds.py`, `odds_feed.py`, `odds_history.py`, `xg.py`, `data.py`;
+- `models/dixon_coles.py`, `backtest.py`, `markets.py`, `odds.py`, `odds_feed.py`, `odds_history.py`, `xg.py`, `data.py`, `match_calibration.py`, `match_markets.py`;
 - the match parts of `trades.py` (`best_pick`, `select_trades`, `settle`, `clv`) and `paper.py`;
-- `tests/test_trades.py`, `tests/test_dk_backtest.py`, `tests/test_odds_history.py`;
+- `tests/test_trades.py`, `tests/test_dk_backtest.py`, `tests/test_odds_history.py`, `tests/test_match_blend.py`, `tests/test_match_markets.py`;
 - `.github/workflows/backfill.yml`.
 
 The app's `bestPick` in `web/app.js` must stay in step with `best_pick`. Coordinate any rule change with the ui-designer.

@@ -1,6 +1,9 @@
 # Downloads historical DraftKings odds and runs the DraftKings backtest. Run by hand only
 # (Actions -> "Backfill DraftKings odds" -> Run workflow); never on a schedule.
 # The historical endpoint needs a paid Odds API plan. Start with a dry run.
+# match_markets: research only. Runs `soccer-stats match-markets` on football-data
+# (Asian handicap, O/U 2.5 and 1X2 vs Pinnacle, plus the xG signal test): no API key,
+# no download from The Odds API, no push; results in the log and a 7-day artifact.
 name: Backfill DraftKings odds
 
 on:
@@ -23,6 +26,13 @@ on:
         description: "Only print the backtest from cached odds (no API key, no download, no push)"
         type: boolean
         default: false
+      match_markets:
+        description: "Research: AH, O/U 2.5 and 1X2 vs Pinnacle on football-data (no key, no push)"
+        type: boolean
+        default: false
+      markets_seasons:
+        description: "match_markets: seasons to predict (start years)"
+        default: "2017-2025"
 
 permissions:
   contents: write # writes the backtest summary to the data-log branch
@@ -42,7 +52,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.print_only }}
+        if: ${{ !inputs.print_only && !inputs.match_markets }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -51,27 +61,43 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only }}
+        if: ${{ inputs.print_only || inputs.match_markets }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only }}
+        if: ${{ inputs.print_only && !inputs.match_markets }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
 
+      - name: Match markets vs Pinnacle (research, print only)
+        if: ${{ inputs.match_markets }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          uv run soccer-stats match-markets --seasons "${{ inputs.markets_seasons }}" \
+            --json out/match_markets.json
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.match_markets && always() }}
+        with:
+          name: match-markets
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Backtest from cached odds (print only)
-        if: ${{ inputs.print_only }}
+        if: ${{ inputs.print_only && !inputs.match_markets }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.print_only }}
+        if: ${{ !inputs.print_only && !inputs.match_markets }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -81,7 +107,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.dry_run && !inputs.print_only }}
+        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
