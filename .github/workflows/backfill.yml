@@ -19,6 +19,10 @@ on:
         description: "Dry run: print snapshots and credits, spend nothing"
         type: boolean
         default: true
+      print_only:
+        description: "Only print the backtest from cached odds (no API key, no download, no push)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # writes the backtest summary to the data-log branch
@@ -38,12 +42,36 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
+        if: ${{ !inputs.print_only }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
 
+      # Print-only: restore the cached odds (never saves or deletes a cache), run the
+      # backtest without the API key so it can't spend credits, and print the results.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.print_only }}
+        with:
+          path: data/raw
+          key: raw-data-${{ github.run_id }}
+          restore-keys: raw-data-
+
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.print_only }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-${{ github.run_id }}
+          restore-keys: odds-history-
+
+      - name: Backtest from cached odds (print only)
+        if: ${{ inputs.print_only }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
+
       - name: Download historical odds
+        if: ${{ !inputs.print_only }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -53,7 +81,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && !inputs.print_only }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

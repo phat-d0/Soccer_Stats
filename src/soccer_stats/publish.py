@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from soccer_stats import dashboard
+from soccer_stats import match_calibration as mc
 from soccer_stats.backtest import simulate_bets
 from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
 from soccer_stats.models import DixonColes
@@ -371,6 +372,41 @@ def player_gate(path: str | None = None) -> dict:
     }
 
 
+def match_blend(path: str | None = None) -> dict | None:
+    """The live blend coefficients saved by backtest-dk (E0_dk.json -> blend.live), or
+    None when there's no file or no fit."""
+    path = path or os.environ.get("DK_BACKTEST_FILE")
+    try:
+        d = json.loads(Path(path).read_text()) if path else {}
+    except (OSError, ValueError):
+        d = {}
+    live = (d.get("blend") or {}).get("live") or {}
+    if not all((live.get(g) or {}).get("coef") for g in mc.GROUPS):
+        return None
+    return {**live, "generated_at": d.get("generated_at")}
+
+
+def add_match_blend(data: dict, blend: dict | None) -> dict:
+    """Give each fixture `p_bet`: the chance its value pick and paper trade use.
+
+    With a blend fit it's the model blended with DraftKings' margin-free price
+    (match_calibration); without one, the fixture has no p_bet and the model's own
+    chance (`p`) is used, as before. The app's bestPick reads the same field.
+    """
+    data["match_blend"] = {
+        "live": blend is not None,
+        "generated_at": (blend or {}).get("generated_at"),
+        **{g: (blend or {}).get(g) for g in mc.GROUPS},
+    }
+    if blend is None:
+        return data
+    for fx in data.get("fixtures", []):
+        p = mc.blend_card(blend, fx["p"], fx.get("implied") or {})
+        if p and any(v is not None for v in p.values()):
+            fx["p_bet"] = p
+    return data
+
+
 def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, list[dict]]:
     """Player shot lines for each upcoming fixture, plus season shooting stats per
     player and club (never raises)."""
@@ -437,6 +473,7 @@ def publish(out: Path, league: str = "E0") -> Path:
 
     data = build_data(matches, fixtures, xg_error, news, news_error)
     data["odds_source"] = odds_source
+    add_match_blend(data, match_blend())
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])

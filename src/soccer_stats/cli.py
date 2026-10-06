@@ -156,13 +156,15 @@ def cmd_backfill(args: argparse.Namespace) -> None:
 def cmd_backtest_dk(args: argparse.Namespace) -> None:
     import json
 
+    from soccer_stats import match_calibration as mc
     from soccer_stats import paper
     from soccer_stats import trades as tr
     from soccer_stats.odds_history import coverage, load_history
     from soccer_stats.publish import _clean
 
     seasons = _years(args.seasons)
-    matches = load_matches([args.league], range(seasons[0] - args.burn_in, seasons[-1] + 1))
+    first = seasons[0] - args.burn_in - args.blend_seasons
+    matches = load_matches([args.league], range(first, seasons[-1] + 1))
     matches, err = with_xg(matches)
     print(err or f"xG attached to {matches['home_xg'].notna().mean():.0%} of matches")
     known = set(matches["home"])
@@ -188,24 +190,21 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
     )
     ref = {"xg_weight": weight, "matches_fit": len(matches)}
 
-    trades = backtest.dk_trades(
-        cands, threshold=args.threshold, max_odds=args.max_odds, league=args.league, model_ref=ref
+    # The blend is fitted on Pinnacle's close (football-data) beside the same model's
+    # walk-forward chances, starting blend_seasons before the first DraftKings season.
+    preds = backtest.walk_forward(
+        matches, start=f"{seasons[0] - args.blend_seasons}-07-01", model_factory=factory
     )
+    pool = {g: mc.training_rows(preds, g) for g in mc.GROUPS}
+    print("Blend training matches: " + ", ".join(f"{g} {len(d)}" for g, d in pool.items()))
+    cands, fits = backtest.add_blend(cands, pool)
+    strategies = backtest.dk_strategies(cands, args.threshold, args.max_odds, args.league, ref)
+    trades = strategies["raw"]["trades_df"]
     capped = backtest.dk_trades(
         cands, threshold=args.threshold, max_odds=tr.CAP_ODDS, league=args.league, model_ref=ref
     )
     rep = tr.report(trades)
-    sweep = [
-        {
-            "threshold": t,
-            "max_odds": cap,
-            **tr.summarize(
-                backtest.dk_trades(cands, threshold=t, max_odds=cap, league=args.league)
-            ),
-        }
-        for cap in (None, tr.CAP_ODDS)
-        for t in tr.SWEEP
-    ]
+    sweep = strategies["raw"]["sweep"]
     out = {
         "generated_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
         "seasons": args.seasons,
@@ -218,11 +217,29 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         "summary_capped": tr.summarize(capped),
         "breakdowns": rep["breakdowns"],
         "sweep": sweep,
+        "totals_priced": float(cands["odds_over25"].notna().mean())
+        if "odds_over25" in cands
+        else 0.0,
+        "strategies": {
+            k: {key: val for key, val in v.items() if key != "trades_df"}
+            for k, v in strategies.items()
+        },
+        "blend": {
+            "pool": "Pinnacle closing odds (football-data) with the model's walk-forward chances",
+            "fits": fits,
+            "live": {g: mc.live_fit(d, g) for g, d in pool.items()},
+        },
         "trades": trades.sort_values("kickoff", ascending=False).to_dict("records")
         if not trades.empty
         else [],
     }
     _print_report(out)
+    _print_strategies(out)
+    blend_trades = strategies["blend"]["trades_df"]
+    if args.out and not blend_trades.empty:
+        bpath = Path(args.out).with_name(Path(args.out).stem + "_blend.csv")
+        bpath.parent.mkdir(parents=True, exist_ok=True)
+        blend_trades.to_csv(bpath, index=False)
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         trades.to_csv(args.out, index=False)
@@ -517,6 +534,41 @@ def _print_report(out: dict) -> None:
         )
 
 
+def _pct(v) -> str:
+    return "–" if v is None else f"{v:.1%}"
+
+
+def _print_strategies(out: dict) -> None:
+    print(f"\nLooks with a DraftKings over/under 2.5 price: {_pct(out.get('totals_priced'))}")
+    ll = out.get("log_loss") or {}
+    for key, name in (("h2h", "Home/draw/away"), ("totals", "Over/under 2.5")):
+        x = ll if key == "h2h" else ll.get("totals") or {}
+        if x.get("blend_matches"):
+            print(
+                f"{name} log loss on {x['blend_matches']} matches: model "
+                f"{x['model_on_blend']:.4f}, blend {x['blend']:.4f}, "
+                f"DraftKings close {x['draftkings_on_blend']:.4f}"
+            )
+    blend = out.get("blend") or {}
+    for g, fits in blend.get("fits", {}).items():
+        if fits:
+            print(f"Blend fits ({g}): {len(fits)}, latest {fits[-1]}")
+    for g, f in blend.get("live", {}).items():
+        print(f"Live blend ({g}): {f}")
+    for name, st in out.get("strategies", {}).items():
+        print(f"\nStrategy {name}: {st['label']}")
+        print("  edge   cap   bets     ROI        95% range  CLV DK  avg p    won")
+        for r in st["sweep"]:
+            ci = r.get("roi_ci95")
+            rng = f"{ci[0]:+.0%} to {ci[1]:+.0%}" if ci else "-"
+            cap = f"{r['max_odds']:g}" if r["max_odds"] else "none"
+            print(
+                f"  {r['threshold']:>4.0%} {cap:>5} {r['trades']:>5} "
+                f"{_fmt(r.get('roi'), 'pct'):>7} {rng:>16} {_fmt(r.get('clv_dk'), 'pct'):>7} "
+                f"{_pct(r.get('avg_p')):>6} {_pct(r.get('win_rate')):>6}"
+            )
+
+
 def main(argv: list[str] | None = None) -> None:
     pd.set_option("display.width", 120)
     parser = argparse.ArgumentParser(prog="soccer-stats")
@@ -584,6 +636,12 @@ def main(argv: list[str] | None = None) -> None:
     dk.add_argument("--threshold", type=float, default=0.12)
     dk.add_argument("--max-odds", type=float, default=None)
     dk.add_argument("--xg-weight", type=float, default=0.7)
+    dk.add_argument(
+        "--blend-seasons",
+        type=int,
+        default=3,
+        help="seasons of Pinnacle closing odds before the first one to fit the blend on",
+    )
     dk.add_argument("--out", help="CSV path, one row per trade")
     dk.add_argument("--json", help="path for the app's backtest data")
     dk.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_dk.json")

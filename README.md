@@ -59,14 +59,15 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Rule | Value |
 | --- | --- |
 | Markets | Home, draw, away, over 2.5, under 2.5 |
-| Edge | model probability × DraftKings decimal odds − 1 |
+| Probability for the edge | the blend (model + DraftKings' margin-free price, below) when a fit is saved; else the model's own |
+| Edge | that probability × DraftKings decimal odds − 1 |
 | Paper-trade threshold | edge ≥ 12% (`PAPER_EDGE`), whatever the app's filter shows |
 | App filter presets | 2%, 5%, 8%, 12%; default 5% |
 | Trades per match | one, the market with the highest edge |
 | Odds cap | none (the backtest also reports a 6.0 cap) |
 | Thin data | skip if either team has under 6 matches in the training window |
 | Stake | flat $10 |
-| Probability | the one the app shows (team news included); the one without is stored too |
+| Model probability | the one the app shows (team news included); the one without is stored too |
 | Live entry | first build where the pick qualifies, odds under 3 hours old, before kickoff |
 | Backtest entry | first qualifying look, 48 and 3 hours before kickoff |
 | Close | last DraftKings price before kickoff (for closing line value) |
@@ -102,6 +103,21 @@ interval (resampling match weeks), win rate against break-even, average claimed 
 closing line value against DraftKings' and Pinnacle's close, maximum drawdown, model vs
 DraftKings log loss, breakdowns by season, market, edge, odds and look, and a threshold
 sweep at 2, 5, 8, 12, 15 and 20% with and without a 6.0 odds cap.
+
+**The blend** (`match_calibration.py`). The raw model's big edges are mostly its own
+errors, so the edge can instead use a blend of the model and DraftKings' margin-free
+(Shin) price: `score_k = a_k + b·log(price_k) + c·log(model_k)`, softmax over home/draw/
+away, and the same with two outcomes (a logistic blend) for over/under 2.5. It is fitted
+on football-data's Pinnacle closing odds beside the model's walk-forward chances
+(`--blend-seasons`, 3 by default, before the first DraftKings season) and refitted every
+28 days on matches played before the refit date only. `backtest-dk` reports both
+strategies (`raw` and `blend`) with the whole sweep, the bootstrap ROI range, CLV,
+average chance vs win rate and log loss, and saves a fit on every settled match under
+`blend.live` in `backtest/E0_dk.json`. The publish workflow reads that file: each fixture
+then gets `p_bet` (the blend), which the app's value pick, its edge column and the paper
+trades use; without the file everything falls back to the model's own chance. To rerun
+the backtest from cached odds only (no key, no download, no push), dispatch *Backfill
+DraftKings odds* with `print_only` ticked.
 
 **Reading the Portfolio tab:** switch between *Live paper* and *Backtest*; they are
 never mixed. Look at the trade count first: at 12% there are only a few trades a round,
@@ -227,6 +243,7 @@ src/soccer_stats/
   markets.py            score matrix -> 1X2, over/under, BTTS, Asian handicap
   models/dixon_coles.py Dixon-Coles Poisson model with time decay
   backtest.py           walk-forward predictions, scoring vs. market, bet simulation
+  match_calibration.py  walk-forward blend of the match model with the bookmaker's price
   cli.py                `soccer-stats` command
   dashboard.py          data shaping for the app (fixtures, ratings, track record)
   xg.py                 Understat xG download, team-name mapping, merge onto matches
