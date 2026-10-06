@@ -94,6 +94,22 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Portfolio (live paper trades and the backtest, filter All/Match/Player);
   - Explore.
 
+## Agent team (`.claude/agents/`)
+
+Five agents, each owning part of the code. Start a session's work by calling the relevant agent by name.
+
+| Agent | Owns |
+| --- | --- |
+| `ui-designer` | `web/*` and the display fields in `publish.py`. Screenshot-tests at 390px, light and dark. |
+| `player-shots` | The player model, backtest, calibration and live player lines (`player_*.py`, `factors.py`, `models/player_counts.py`, `players.yml`). |
+| `moneyline` | The match model and match bets (`models/dixon_coles.py`, `backtest.py`, `odds*.py`, match parts of `trades.py` and `paper.py`, `backfill.yml`). |
+| `edge-finder` | Research into where a real edge could exist (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. |
+| `lead-reviewer` | Reviews and merges specialist branches, CI, CLAUDE.md, README, the work plan, and credit budgets. |
+
+- Specialists work on their own branches: `agent/<name>`.
+- The lead reviews each branch, runs the full checks and merges into `claude/soccer-stats-scaffold`.
+- Only the lead sets Odds API credit caps. The default cap is 0.
+
 ## Conventions
 
 - Run checks before every push: `uv run ruff format src tests && uv run ruff check src tests && uv run pytest -q`. All must pass. Use `.venv/bin/pytest` if `uv` isn't on the path. JS: `node --check web/app.js`.
