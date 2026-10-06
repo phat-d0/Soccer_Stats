@@ -151,12 +151,12 @@ Five agents, each owning part of the code. Start a session's work by calling the
 | Agent | Owns |
 | --- | --- |
 | `ui-designer` | `web/*` and the display fields in `publish.py`. Screenshot-tests at 390px, light and dark. |
-| `player-shots` | The player model, backtest, calibration and live player lines (`player_*.py`, `factors.py`, `models/player_counts.py`, `players.yml`). |
+| `player-props` | Every player market (shots, on target, anytime goalscorer, assists, cards): models, backtests, calibration, live player lines and new player ideas (`player_*.py`, `factors.py`, `models/player_counts.py`, `players.yml`). Formerly `player-shots`. |
 | `moneyline` | The match model and match bets (`models/dixon_coles.py`, `backtest.py`, `odds*.py`, match parts of `trades.py` and `paper.py`, `backfill.yml`). |
-| `edge-finder` | Research into where a real edge could exist (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. |
+| `research-lab` | The shared evaluation harness and pass rules (`src/soccer_stats/lab/`, `docs/lab.md`), the machine-learning model bake-off, and signal/market research (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. Formerly `edge-finder`. |
 | `lead-reviewer` | Reviews and merges specialist branches, CI, CLAUDE.md, README, the work plan, and credit budgets. |
 
-- Specialists work on their own branches: `team/<name>` (`team/edge`, `team/player-shots`, `team/moneyline`, `team/ui`) from round 2. Round 1 (6 Oct) used `agent/<name>`; those branches are merged.
+- Specialists work on their own branches: `team/<name>` (`team/research`, `team/player-props`, `team/moneyline`, `team/ui` from round 4; `team/edge` and `team/player-shots` in rounds 2–3). Round 1 (6 Oct) used `agent/<name>`; those branches are merged.
 - From round 2 each specialist runs as a separate cloud session on its `team/<name>` branch, cut from the latest `claude/soccer-stats-scaffold`. It pushes only its branch; it never merges, and never pushes `data-log` by hand.
 - When done, each specialist **opens a pull request** from `team/<name>` into `claude/soccer-stats-scaffold` (from round 4; rounds 1–3 were merged with git directly, without PRs).
 - The lead runs in the main (coordinating) session, as in the owner's baseball team. It reviews each PR (diff, CI on the PR, full checks), comments, and merges it on GitHub with a merge commit, so each shows as Merged in the owner's app.

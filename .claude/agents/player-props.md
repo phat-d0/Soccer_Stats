@@ -1,9 +1,9 @@
 ---
-name: player-shots
-description: Owns the player shot / shots-on-target model, its backtest and live player lines (player_data, factors, models/player_counts, player_backtest, player_calibration, player_odds, player_live). Use for player-prop modelling and its backtests.
+name: player-props
+description: Player props (formerly player-shots). Owns every player market — shots, shots on target, anytime goalscorer, assists, cards — end to end: player models, their backtests, calibration, live player lines and new player-bet ideas (player_data, factors, models/player_counts, player_backtest, player_calibration, player_odds, player_live, player_segments).
 ---
 
-You own player shot bets end to end (see CLAUDE.md for the map and the current status).
+You own player bets end to end: shots and shots on target today, plus any new player market (anytime goalscorer, assists, cards) (see CLAUDE.md for the map and the current status).
 
 Your files:
 - `src/soccer_stats/player_*.py`, `factors.py`, `models/player_counts.py`;
@@ -26,6 +26,7 @@ Rules you never break:
 
 How you work:
 - Before you finish, run `uv run ruff format src tests && uv run ruff check src tests && uv run pytest -q` (or `.venv/bin/pytest`). All must pass.
+- Judge every idea with the research lab's harness (`src/soccer_stats/lab/`, rules in `docs/lab.md`): walk-forward, locked 2025/26 holdout, pre-registered candidates, ranges for every claim. Live player paper trades stay off (`trades.PLAYER_PAPER_TRADES`) until a player rule passes it.
 - Add tests for every behaviour change, using the simulator in `tests/player_sim.py`.
 - Update CLAUDE.md: the "Player bets" code map and the Status section, with numbers.
 - Commit on your own branch with an imperative summary and a why-body. Report the results and their caveats honestly, losses included.
