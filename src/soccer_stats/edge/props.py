@@ -222,13 +222,16 @@ def probe(
             1,
             f"historical events at {d}",
         )
+        listed = (idx or {}).get("data", []) or []
         cands = [
-            e
-            for e in (idx or {}).get("data", [])
-            if pd.Timestamp(e["commence_time"]) < now - pd.Timedelta(hours=3)
+            e for e in listed if pd.Timestamp(e["commence_time"]) < now - pd.Timedelta(hours=3)
         ]
         if not cands:
-            budget.log.append(f"historical {d}: no finished match listed")
+            first = min((e["commence_time"] for e in listed), default=None)
+            budget.log.append(
+                f"historical {d}: no finished match listed ({len(listed)} events, "
+                f"snapshot {(idx or {}).get('timestamp')}, earliest kickoff {first})"
+            )
             continue
         e = min(cands, key=lambda e: e["commence_time"])
         at = pd.Timestamp(e["commence_time"]) - pd.Timedelta(hours=1)
