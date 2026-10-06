@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -7,6 +9,8 @@ from test_dk_backtest import _probs, make_history
 from soccer_stats import backtest
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
+from soccer_stats.paper import update_ledger
+from soccer_stats.publish import add_match_blend, implied_probs, match_blend
 
 MIN = 60  # small synthetic league
 
@@ -132,3 +136,68 @@ def test_log_loss_reports_blend(setup):
     for k in ("model_on_blend", "blend", "draftkings_on_blend"):
         assert 0.5 < ll[k] < 1.5
     assert ll["totals"]["blend_matches"] > 50
+
+
+def _live_coefs(fits, look_at):
+    day = pd.Timestamp(look_at).tz_convert(None).normalize()
+    return {
+        g: {"coef": [f for f in fits[g] if pd.Timestamp(f["from"]) <= day][-1]["coef"]}
+        for g in mc.GROUPS
+    }
+
+
+def test_live_blend_gives_the_backtest_trade(setup):
+    """publish.add_match_blend -> paper.update_ledger opens the backtest's blend trade."""
+    *_, blended, fits, _ = setup
+    trades = backtest.dk_trades(blended, tr.PAPER_EDGE, probs="blend")
+    assert len(trades) > 0
+    t = trades.iloc[0]
+    c = blended[
+        (blended["home"] == t["home"])
+        & (blended["away"] == t["away"])
+        & (blended["look"] == t["look"])
+    ].iloc[0]
+    odds = {m: c[f"odds_{m}"] for m in tr.MARKETS}
+    card = {
+        "home": c["home"],
+        "away": c["away"],
+        "kickoff": c["kickoff"].isoformat(),
+        "p": {m: c[f"p_{m}"] for m in tr.MARKETS},
+        "odds": odds,
+        "implied": implied_probs({f"odds_{m}": v for m, v in odds.items()}),
+        "low_data": False,
+    }
+    data = add_match_blend({"fixtures": [card]}, _live_coefs(fits, c["look_at"]))
+    assert data["match_blend"]["live"]
+    for m in tr.MARKETS:
+        assert card["p_bet"][m] == pytest.approx(c[f"pb_{m}"], abs=1e-9)
+    ledger = {}
+    source = {"name": "DraftKings", "fetched_at": c["odds_fetched_at"]}
+    update_ledger(ledger, [card], source, None, now=c["look_at"])
+    live = next(iter(ledger.values()))
+    for k in ("id", "market", "odds", "model_p", "edge", "kickoff"):
+        assert live[k] == t[k], k
+    assert live["model_ref"]["probs"] == "blend"
+
+
+def test_without_a_blend_fit_the_raw_model_is_used(tmp_path):
+    assert match_blend(str(tmp_path / "missing.json")) is None
+    path = tmp_path / "E0_dk.json"
+    path.write_text(json.dumps({"blend": {"live": {"h2h": {"coef": None}}}}))
+    assert match_blend(str(path)) is None
+    card = {"p": {"home": 0.5}, "implied": {"home": 0.4}}
+    data = add_match_blend({"fixtures": [card]}, None)
+    assert "p_bet" not in card and data["match_blend"]["live"] is False
+    live = {"h2h": {"coef": [0, 0, 1, 0]}, "totals": {"coef": [0, 1, 0]}}
+    path.write_text(json.dumps({"generated_at": "x", "blend": {"live": live}}))
+    assert match_blend(str(path))["h2h"]["coef"] == [0, 0, 1, 0]
+
+
+def test_blend_card_leaves_unpriced_markets_empty():
+    coefs = {"h2h": {"coef": [0, 0, 1, 0]}, "totals": {"coef": [0, 1, 0]}}
+    probs = {"home": 0.5, "draw": 0.3, "away": 0.2, "over25": 0.6, "under25": 0.4}
+    implied = {"home": 0.4, "draw": 0.3, "away": 0.3, "over25": None, "under25": None}
+    p = mc.blend_card(coefs, probs, implied)
+    # b = 1, c = 0: the blend is the price.
+    assert p["home"] == pytest.approx(0.4) and p["away"] == pytest.approx(0.3)
+    assert p["over25"] is None and p["under25"] is None

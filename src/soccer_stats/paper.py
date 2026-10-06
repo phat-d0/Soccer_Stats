@@ -154,7 +154,8 @@ def update_ledger(
             kickoff = pd.Timestamp(c["kickoff"])
             if kickoff <= now or c.get("low_data"):
                 continue
-            pick = tr.best_pick(c["p"], c.get("odds") or {}, tr.PAPER_EDGE)
+            # p_bet (the model blended with the price) when publish set it; as bestPick.
+            pick = tr.best_pick(c.get("p_bet") or c["p"], c.get("odds") or {}, tr.PAPER_EDGE)
             if not pick:
                 continue
             tid = tr.trade_id(league, tr.season_label(kickoff), c["home"], c["away"])
@@ -173,7 +174,7 @@ def update_ledger(
                 threshold=tr.PAPER_EDGE,
                 model_p_base=base.get(pick["market"]) if base else None,
                 news_applied=bool(c.get("news_applied")),
-                model_ref=ref,
+                model_ref={**(ref or {}), "probs": "blend" if c.get("p_bet") else "raw"},
             )
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}

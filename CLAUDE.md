@@ -29,7 +29,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | --- | --- | --- |
 | `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (e.g. `2023-2025`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
-| `backfill.yml` | Historical DraftKings match odds for the match backtest. | ~20 per snapshot |
+| `backfill.yml` | Historical DraftKings match odds for the match backtest. Input `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostic: which bookmakers price EPL player props. | ~80 |
 
 - After `players.yml`, dispatch `publish.yml`, so the app picks up the new results.
@@ -57,6 +57,10 @@ Read its "Status and next steps" section first; this file is the technical map.
 **Match model**
 - `models/dixon_coles.py`: the match model.
 - `backtest.py`: walk-forward and the DraftKings backtest (`dk_trades`).
+  - `STRATEGIES`: `raw` (model) and `blend`; `add_blend` adds `pb_*`, `dk_strategies` runs the sweep with bootstrap ranges; `dk_log_loss` reports model, blend and DraftKings.
+- `match_calibration.py`: conditional-logit blend `score_k = a_k + b·log(price_k) + c·log(model_k)` (1X2; two outcomes = logistic for O/U 2.5).
+  - Fitted on Pinnacle closing odds (football-data) beside the model's walk-forward chances; refitted every 28 days on earlier matches only.
+  - The live fit is saved in `E0_dk.json` → `blend.live.{h2h,totals}.coef`; `publish.add_match_blend` reads it (`DK_BACKTEST_FILE`) and sets each fixture's `p_bet`, which `paper.update_ledger` and the app's `bestPick` use. No file = raw model, as before.
 - `odds_feed.py`: live DraftKings odds and the credit budget.
 - `odds_history.py`: historical match odds.
 
@@ -124,6 +128,11 @@ Five agents, each owning part of the code. Start a session's work by calling the
 ## Status (2026-10-06)
 
 - Match bets: the DraftKings backtest at a 12% edge lost (ROI about −17%). The claimed edges pick out model errors more than value. Live paper trading continues.
+- Match blend (branch `agent/moneyline`, 6 Oct; print-only run on cached 2025/26 DraftKings odds, 368 matches; blend fitted on 2,276 earlier Pinnacle-priced matches):
+  - 1X2 log loss: model 1.0301, blend 1.0184, DraftKings close 1.0123. The latest fit gives the model almost no weight (c = −0.04, b = 1.02): the price already holds what the model knows.
+  - Raw at 2/5/8/12/20%: 314/265/217/172/117 bets, ROI −9/−9/−11/−18/−24%, CLV about −6%. Blend: 5 bets at 2% (all lost), none at 5% or more.
+  - DraftKings over/under 2.5 prices are missing from the cached history (no totals trades or totals log loss).
+  - Once `E0_dk.json` holds `blend.live`, the app's match value picks and paper trades use the blend, so match paper trades will mostly stop: the honest result.
 - Player model, stage 1: it beats the season-average baseline (shots log loss 0.420 vs 0.496 before lineups; 0.400 lineup known). The gate is passed.
 - The starter flag was fixed on 6 Oct. Understat sets `roster_in` on starters who were replaced, so a starter is now anyone whose position isn't "Sub". Check: 11 starters in all 3,040 team-matches.
 - Player bets, priced backtest on FanDuel 2023/24–2025/26, at a 12% edge:

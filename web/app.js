@@ -93,7 +93,7 @@ const TRADE_MARKETS = ["home", "draw", "away", "over25", "under25"];
 function bestPick(fx, minEdge) {
   let best = null;
   for (const k of TRADE_MARKETS) {
-    const o = fx.odds?.[k], p = fx.p?.[k];
+    const o = fx.odds?.[k], p = (fx.p_bet || fx.p)?.[k]; // p_bet: model blended with the price
     if (o == null || p == null || o <= 1) continue;
     const e = p * o - 1;
     if (e > 0 && e >= minEdge - 1e-9 && (!best || e > best.edge)) best = { market: k, odds: o, edge: e };
@@ -268,7 +268,7 @@ function detailHtml(fx) {
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
     const odds_ = o?.[k];
-    const edge = odds_ != null ? p[k] * odds_ - 1 : null;
+    const edge = odds_ != null ? (fx.p_bet || p)[k] * odds_ - 1 : null; // as bestPick
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
         ? `<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`

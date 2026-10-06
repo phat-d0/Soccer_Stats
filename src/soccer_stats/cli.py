@@ -217,6 +217,9 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         "summary_capped": tr.summarize(capped),
         "breakdowns": rep["breakdowns"],
         "sweep": sweep,
+        "totals_priced": float(cands["odds_over25"].notna().mean())
+        if "odds_over25" in cands
+        else 0.0,
         "strategies": {
             k: {key: val for key, val in v.items() if key != "trades_df"}
             for k, v in strategies.items()
@@ -520,6 +523,7 @@ def _pct(v) -> str:
 
 
 def _print_strategies(out: dict) -> None:
+    print(f"\nLooks with a DraftKings over/under 2.5 price: {_pct(out.get('totals_priced'))}")
     ll = out.get("log_loss") or {}
     for key, name in (("h2h", "Home/draw/away"), ("totals", "Over/under 2.5")):
         x = ll if key == "h2h" else ll.get("totals") or {}
