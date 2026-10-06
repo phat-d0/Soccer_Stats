@@ -220,9 +220,7 @@ def test_priced_player_backtest(sim):
     preds = pb.walk_forward(feats, start, refit_every="28D")
     rng = np.random.default_rng(0)
     rows = []
-    for r in (
-        preds.drop_duplicates(["match_id", "player_id"]).iloc[::3].itertuples()
-    ):
+    for r in preds.drop_duplicates(["match_id", "player_id"]).iloc[::3].itertuples():
         for kind, at in (
             ("look", r.kickoff - pd.Timedelta(hours=3)),
             ("close", r.kickoff - pd.Timedelta(minutes=1)),

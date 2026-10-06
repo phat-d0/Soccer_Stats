@@ -233,6 +233,13 @@ def test_parse_match():
                     "time": "90",
                     "roster_in": "0",
                 },
+                "5": {
+                    "player_id": "13",
+                    "player": "Declan Rice",
+                    "position": "DMC",
+                    "time": "70",
+                    "roster_in": "2",  # replaced by Havertz: still a starter
+                },
                 "2": {
                     "player_id": "11",
                     "player": "Kai Havertz",
@@ -267,7 +274,8 @@ def test_parse_match():
         "away": "Leeds",
     }
     rows = {r["player"]: r for r in parse_match(data, meta)}
-    assert set(rows) == {"Bukayo Saka", "Kai Havertz", "Joe Rodon"}
+    assert set(rows) == {"Bukayo Saka", "Kai Havertz", "Joe Rodon", "Declan Rice"}
+    assert rows["Declan Rice"]["started"] is True
     assert (
         rows["Bukayo Saka"]["shots"],
         rows["Bukayo Saka"]["sot"],

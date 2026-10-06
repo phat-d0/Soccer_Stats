@@ -261,6 +261,8 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         f"{len(apps)} appearances from {apps['match_id'].nunique()} matches"
         + (f" ({missing} matches couldn't be downloaded)" if missing else "")
     )
+    starters = apps[apps["started"]].groupby(["match_id", "team"]).size()
+    print(f"Starters per team per match: {starters.value_counts().sort_index().to_dict()}")
     matches = load_matches([args.league], years)
     matches, err = with_xg(matches)
     preds = backtest.walk_forward(
@@ -301,6 +303,7 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         "sot_methods": {"thin": s_before["sot"]["model"], "count": sot_count["sot"]["model"]},
         "ablation": ab,
         "team_totals": rec,
+        "starters_per_team": {str(k): int(v) for k, v in starters.value_counts().items()},
     }
     hist = load_player_odds(args.league, set(apps["team"]))
     if not hist.empty:

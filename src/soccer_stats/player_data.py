@@ -115,7 +115,9 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
                 continue
             pid = str(p.get("player_id"))
             pos = p.get("position") or ""
-            started = pos != "Sub" and not int(float(p.get("roster_in") or 0))
+            # Understat lists substitutes with position "Sub". (roster_in / roster_out link
+            # substitution pairs and are set for starters who were replaced too.)
+            started = pos != "Sub"
             sh, sot, goals, xg = counts.get(pid, [0, 0, 0, 0.0])
             rows.append(
                 {
