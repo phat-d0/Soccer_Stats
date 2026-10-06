@@ -96,10 +96,11 @@ None of these signals justifies a model change for betting.
 - No free source gives timestamped historical FPL changes or timestamped soft prices.
   football-data's early and close prices carry no time.
 - To make it testable, see proposal M2 below: log the DraftKings 1X2 prices that
-  `publish.yml` already fetches, with their time. It touches `publish.yml` and data-log, so the lead
-  owns it. Then compare each FPL status change (for a regular starter) with the price move in the next and previous hour. About 100
-  matches (mid-December) gives a first read. The cost is 0 credits: publish already pays
-  for these calls.
+  `publish.yml` already fetches, with their time. It touches `publish.yml` and
+  data-log, so the lead owns it. Then compare each FPL status change (for a regular
+  starter) with the price move in the next and previous hour. About 100 matches
+  (mid-December) gives a first read. The cost is 0 credits: publish already pays for
+  these calls.
 
 ### 2. Costed plan: best over price across FanDuel, 1xBet and Kambi (not run)
 
@@ -160,7 +161,7 @@ roughly ±1.5 points, and the paired price lift is much tighter.
 | # | Proposal | Why | Cost |
 | --- | --- | --- | --- |
 | M1 | **No model change from this round.** Keep `xg_weight` 0.7 and the Pinnacle-fitted blend as they are. Don't add xG form, rest or soft-book features. | None earned out-of-sample blend weight (section 1). The model's own blend weight is about 0. | 0 |
-| M2 | **Log the live DraftKings 1X2 and totals prices with their timestamp** on each `publish.yml` run, to `data-log/odds_log/YYYY-MM.jsonl` (append-only, like `fpl_news`). | It's the only way to test late team news (1b) and intraday moves. The prices are already fetched, so no credits. About 2 KB per run. | 0 credits, about 1 hour |
+| M2 | **(Now with the lead: the moneyline session handed it on.)** **Log the live DraftKings 1X2 and totals prices with their timestamp** on each `publish.yml` run, to `data-log/odds_log/YYYY-MM.jsonl` (append-only, like `fpl_news`). | It's the only way to test late team news (1b) and intraday moves. The prices are already fetched, so no credits. About 2 KB per run. | 0 credits, about 1 hour |
 | M3 | (Optional, for the lead) If match paper trades are kept for display, report CLV against Pinnacle's fair close beside ROI. It's precise at about 200 bets; ROI isn't. | Round 1 and round 2 both find CLV is the only number tight enough to decide. | 0 |
 
 ### Ranked next steps (round 2)
