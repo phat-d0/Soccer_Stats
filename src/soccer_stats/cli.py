@@ -288,10 +288,29 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         print(f"App data written to {path}")
 
 
+def _print_goals(goals: dict) -> None:
+    print("\n=== Anytime goalscorer (stage 1: no odds), P(scores | plays) ===")
+    for view in ("before_lineups", "lineup_known"):
+        for split, s in (goals.get(view) or {}).items():
+            if not s.get("n"):
+                continue
+            parts = [
+                f"{view:>14} {split:>11}: {s['n']} apps, scored {s['scored_rate']:.1%} "
+                f"vs predicted {s['predicted_rate']:.1%}; log loss {s['model']['log_loss']:.4f}"
+            ]
+            for b in ("season_goals", "season_xg"):
+                v = s[f"vs_{b}"]
+                rng = v["range95"] or [float("nan")] * 2
+                parts.append(f"vs {b} {v['diff']:+.4f} ({rng[0]:+.4f} to {rng[1]:+.4f})")
+            print("; ".join(parts))
+    print(f"Goalscorer gate ({goals['gate']['rule']}): {goals['gate']['passed']}")
+
+
 def cmd_backtest_players(args: argparse.Namespace) -> None:
     import json
 
     from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goals as pg
     from soccer_stats import trades as tr
     from soccer_stats.factors import ALL_FACTORS, build_features
     from soccer_stats.player_data import load_appearances
@@ -407,6 +426,17 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
             trades.to_csv(args.out, index=False)
 
+    # Anytime goalscorer, stage 1 (no odds): same appearances and match model.
+    gfeats = pg.goal_features(feats)
+    goals = {
+        "generated_at": out["generated_at"],
+        "seasons": args.seasons,
+        **pg.report(
+            pg.walk_forward(gfeats, start), pg.walk_forward(gfeats, start, lineup_known=True)
+        ),
+    }
+    _print_goals(goals)
+
     print(f"\n=== Player model, {args.seasons} (stage 1: no odds) ===")
     for name, sc in (("Before lineups", s_final), ("Lineup known", s_known)):
         for c in ("shots", "sot"):
@@ -478,6 +508,9 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         dpath = path.with_name(f"{args.league}_players_detail.json")
         dpath.write_text(json.dumps(_clean(detail), separators=(",", ":")))
         print(f"Per-player results for {len(detail['players'])} players saved to {dpath}")
+        gpath = path.with_name(f"{args.league}_goals.json")
+        gpath.write_text(json.dumps(_clean(goals), separators=(",", ":")))
+        print(f"Anytime goalscorer stage 1 saved to {gpath}")
 
 
 def cmd_backfill_players(args: argparse.Namespace) -> None:
