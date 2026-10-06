@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 from soccer_stats import trades as tr
+from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
 FRESH_HOURS = 3.0  # only open on odds fetched this recently
 VOID_MOVED_HOURS = 48.0
@@ -327,6 +328,7 @@ def _open_player_trades(ledger, cards, now, league, ref) -> list[dict]:
             )
             t["position"] = r.get("position")
             t["implied"] = r.get("implied")
+            t["bookmaker"] = PLAYER_BOOKMAKER_NAME
             ledger[t["id"]] = t
             events.append({"type": "open", **t})
     return events

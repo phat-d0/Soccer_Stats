@@ -14,7 +14,7 @@ removed; groups that don't lower out-of-sample log loss are dropped), the choice
 shots-on-target method, and a check that a team's expected player shots add up to its
 expected team shots.
 
-Stage 2 (with DraftKings prices) applies the player trade rule to historical player
+Stage 2 (with FanDuel prices) applies the player trade rule to historical player
 odds and reports the match backtest's metrics split by market, line, position and
 starter or substitute.
 """
@@ -33,6 +33,7 @@ from soccer_stats.models.player_counts import (
     season_averages,
 )
 from soccer_stats.player_data import match_in_fixture
+from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
 LINES = (0.5, 1.5, 2.5)
 TOLERANCE = 0.15  # expected player shots vs expected team shots
@@ -280,7 +281,7 @@ def priced_trades(
     threshold: float = tr.PAPER_EDGE,
     league: str = "E0",
 ) -> tuple[pd.DataFrame, dict]:
-    """Stage 2: the player trade rule on historical DraftKings player odds.
+    """Stage 2: the player trade rule on historical FanDuel player odds.
 
     `preds` are before-lineups walk-forward predictions (with pmf_shots / pmf_sot);
     `history` is player_odds.load_history() output. Trades open at the look (3 hours
@@ -320,7 +321,7 @@ def priced_trades(
     lines = pd.DataFrame(rows)
     if lines.empty:
         return pd.DataFrame(), info
-    # DraftKings' margin-free chance for each side at the look (the "implied" chance).
+    # The bookmaker's margin-free chance for each side at the look (the "implied" chance).
     pairs = {}
     for (pid, mkt, ln), g in lines.groupby(["player_id", "market", "line"]):
         sides = dict(zip(g["side"], g["odds"], strict=False))
@@ -376,6 +377,7 @@ def priced_trades(
         t.update(tr.settle_player(t, r["actual"], r["started"]))
         t["position"] = r["position"]
         t["implied"] = r.get("implied")
+        t["bookmaker"] = PLAYER_BOOKMAKER_NAME
         t["settled_at"] = t["kickoff"]
         trades.append(t)
     return pd.DataFrame(trades), info

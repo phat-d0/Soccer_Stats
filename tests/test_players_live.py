@@ -29,7 +29,7 @@ def event(eid="e1", home="Arsenal", away="Leeds United", players=(("Bukayo Saka"
         "away_team": away,
         "bookmakers": [
             {
-                "key": "draftkings",
+                "key": "fanduel",
                 "markets": [
                     {
                         "key": "player_shots",
@@ -38,12 +38,12 @@ def event(eid="e1", home="Arsenal", away="Leeds United", players=(("Bukayo Saka"
                     }
                 ],
             },
-            {"key": "fanduel", "markets": [{"key": "player_shots", "outcomes": outcomes}]},
+            {"key": "draftkings", "markets": [{"key": "player_shots", "outcomes": outcomes}]},
         ],
     }
 
 
-def test_parse_event_keeps_draftkings_sides():
+def test_parse_event_keeps_player_bookmaker_sides():
     df = player_odds.parse_event(event(), {"Arsenal", "Leeds"})
     assert len(df) == 2 and set(df["side"]) == {"over", "under"}
     assert df["away"].iloc[0] == "Leeds" and df["line"].iloc[0] == 1.5

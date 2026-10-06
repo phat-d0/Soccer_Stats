@@ -1,4 +1,4 @@
-"""Player shot lines for upcoming matches: model chances beside DraftKings prices.
+"""Player shot lines for upcoming matches: model chances beside FanDuel prices.
 
 For each upcoming fixture, the candidates are the players who appeared for either team
 in its last CANDIDATE_MATCHES matches. Their features are built exactly as in the
@@ -166,7 +166,7 @@ def player_cards(
             "lines": [],
         }
         out.setdefault((home, away), []).append((row, pmfs))
-    # Attach DraftKings lines by name, within the match's two teams.
+    # Attach FanDuel lines by name, within the match's two teams.
     for (home, away), plist in out.items():
         if odds.empty:
             continue

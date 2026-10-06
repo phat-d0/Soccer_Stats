@@ -376,7 +376,9 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
 
     season = current_season()
     gate = player_gate()
-    status = {"gate": gate, "error": None, "odds": None}
+    from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
+
+    status = {"gate": gate, "error": None, "odds": None, "bookmaker": PLAYER_BOOKMAKER_NAME}
     stats: list[dict] = []
     try:
         apps, missing = load_appearances(

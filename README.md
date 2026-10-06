@@ -240,7 +240,7 @@ src/soccer_stats/
   factors.py            the player factor list (prior-only features)
   models/player_counts.py  negative binomial shot models, start/sub mixture
   player_backtest.py    walk-forward player tests, ablation, priced backtest
-  player_odds.py        DraftKings player shot lines (live budgeted, historical)
+  player_odds.py        FanDuel player shot lines (live budgeted, historical)
   player_live.py        player lines for upcoming fixtures
 app/streamlit_app.py    the Premier League dashboard (desktop)
 web/                    the iPhone web app (HTML/CSS/JS, service worker, icons)

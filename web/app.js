@@ -314,8 +314,8 @@ function playersSection(fx) {
   }).join("");
   const anyLines = ps.some((pl) => pl.lines?.length);
   const note = anyLines
-    ? "Each line: DraftKings price · model chance · edge. Chances assume he plays (bets on non-players are void)."
-    : gate?.passed ? "No DraftKings player lines for this match yet." : "Expected shots if he plays. DraftKings player lines appear once the player model beats its baseline in testing.";
+    ? `Each line: ${playerBook()} price · model chance · edge. Chances assume he plays (bets on non-players are void).`
+    : gate?.passed ? `No ${playerBook()} player lines for this match yet.` : `Expected shots if he plays. ${playerBook()} player lines appear once the player model beats its baseline in testing.`;
   return `
     <div class="section-title">Player shots</div>
     <div class="card">${rows}</div>
@@ -1156,7 +1156,10 @@ function viewPortfolio() {
     ${foot}`;
 }
 
-// Player trades: DraftKings' implied chance and the model's chance against what happened.
+// Who prices the player shot lines (FanDuel; match odds come from DraftKings).
+const playerBook = () => state.data?.players_status?.bookmaker || "FanDuel";
+
+// Player trades: the bookmaker's implied chance and the model's chance against what happened.
 function impliedVsRealizedHtml(trades) {
   const done = trades.filter((t) => t.bet_type === "player" && (t.status === "won" || t.status === "lost"));
   if (!done.length) return "";
@@ -1181,11 +1184,11 @@ function impliedVsRealizedHtml(trades) {
   }).join("");
   return `
     <div class="section-title">Implied vs realized (player trades)</div>
-    <p class="note" style="margin-top:0">At entry, DraftKings' price implied a ${pct(avg(withImp.map((t) => t.implied)))} chance on average (margin removed) and the model said ${pct(avg(done.map((t) => t.model_p)))}. The bets actually won ${pct(hit)} of the time.</p>
+    <p class="note" style="margin-top:0">At entry, ${playerBook()}'s price implied a ${pct(avg(withImp.map((t) => t.implied)))} chance on average (margin removed) and the model said ${pct(avg(done.map((t) => t.model_p)))}. The bets actually won ${pct(hit)} of the time.</p>
     <div class="card" style="padding:8px 14px">
-      <table><thead><tr><th>DK implied</th><th>Bets</th><th>DK</th><th>Model</th><th>Won</th><th>ROI</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>${playerBook()} implied</th><th>Bets</th><th>Book</th><th>Model</th><th>Won</th><th>ROI</th></tr></thead><tbody>${rows}</tbody></table>
     </div>
-    <p class="note">Grouped by DraftKings' implied chance. If "Won" tracks DK more closely than the model, the market was right and the model's edge wasn't real.</p>
+    <p class="note">Grouped by ${playerBook()}'s implied chance. If "Won" tracks the book more closely than the model, the market was right and the model's edge wasn't real.</p>
     <div class="card" style="padding:8px 14px">
       <table><thead><tr><th>Bet</th><th>Bets</th><th>Avg shots</th><th>Won</th><th>Profit</th></tr></thead><tbody>${lineRows}</tbody></table>
     </div>
@@ -1206,7 +1209,7 @@ function playerModelHtml(pm) {
         ${pm.lineup_known ? row("Shots, lineup known", pm.lineup_known, "shots") + row("On target, lineup known", pm.lineup_known, "sot") : ""}
       </tbody></table>
     </div>
-    <p class="note">Log loss of the chance of over 0.5, 1.5 and 2.5, lower is better; the baseline is each player's season average. ${g.passed ? "The model beats it for both, so DraftKings player lines and player paper trades are on." : "Player odds and trades stay off until the model beats the baseline for both."}${tt?.ratio_to_expected ? ` Team check: players' expected shots add up to ${(tt.ratio_to_expected * 100).toFixed(0)}% of the team's (tolerance ±${(tt.tolerance * 100).toFixed(0)}%).` : ""}</p>
+    <p class="note">Log loss of the chance of over 0.5, 1.5 and 2.5, lower is better; the baseline is each player's season average. ${g.passed ? "The model beats it for both, so ${playerBook()} player lines and player paper trades are on." : "Player odds and trades stay off until the model beats the baseline for both."}${tt?.ratio_to_expected ? ` Team check: players' expected shots add up to ${(tt.ratio_to_expected * 100).toFixed(0)}% of the team's (tolerance ±${(tt.tolerance * 100).toFixed(0)}%).` : ""}</p>
     ${ab ? `<div class="section-title">Factor groups (ablation)</div>
     <div class="card" style="padding:8px 14px"><table><thead><tr><th>Without</th><th>Log loss</th><th>Change</th><th></th></tr></thead><tbody>${ab}</tbody></table></div>
     <p class="note">A group stays only if removing it makes predictions worse. On-target method: ${esc(pm.sot_method === "count" ? "its own count model" : "a share of his shots")}.</p>` : ""}`;
@@ -1228,7 +1231,8 @@ const TRADE_FIELDS = [
   ["Threshold", (t) => pct(t.threshold)],
   ["Stake", (t) => `$${t.stake}`],
   ["Closing odds", (t) => (t.close_odds ? `${american(t.close_odds)} (${t.close_odds.toFixed(2)})` : "–")],
-  ["DraftKings implied", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
+  ["Bookmaker", (t) => t.bookmaker || (t.bet_type === "player" ? "FanDuel" : "DraftKings")],
+  ["Book implied chance", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
   ["CLV vs DraftKings", (t) => signedPct(t.clv_dk)],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle)],
   ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],

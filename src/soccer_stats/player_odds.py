@@ -1,4 +1,7 @@
-"""DraftKings player shot lines from The Odds API (player_shots, player_shots_on_target).
+"""FanDuel player shot lines from The Odds API (player_shots, player_shots_on_target).
+
+DraftKings doesn't price Premier League player shots through The Odds API, so player
+bets use FanDuel (PLAYER_BOOKMAKER); match bets stay on DraftKings.
 
 Player props come one match at a time from the event-odds endpoint. Live, each upcoming
 match within PLAYER_WINDOW_HOURS of kickoff is refreshed at most every REFRESH_HOURS
@@ -23,11 +26,13 @@ import pandas as pd
 import requests
 
 from soccer_stats.data import RAW_DIR
-from soccer_stats.odds_feed import BOOKMAKER, SPORTS, _team
+from soccer_stats.odds_feed import SPORTS, _team
 from soccer_stats.odds_history import BackfillReport
 
 BASE = "https://api.the-odds-api.com/v4"
 MARKETS = ("player_shots", "player_shots_on_target")
+PLAYER_BOOKMAKER = "fanduel"
+PLAYER_BOOKMAKER_NAME = "FanDuel"
 PLAYER_WINDOW_HOURS = 30
 REFRESH_HOURS, LATE_REFRESH_HOURS, LATE_HOURS = 3.0, 1.0, 3.0
 RESERVE_CREDITS = 3000  # leave the match odds plenty
@@ -38,7 +43,7 @@ LOOK_HOURS = 3.0
 def _params(api_key: str, **extra) -> dict:
     return {
         "apiKey": api_key,
-        "bookmakers": BOOKMAKER,
+        "bookmakers": PLAYER_BOOKMAKER,
         "markets": ",".join(MARKETS),
         "oddsFormat": "decimal",
         "dateFormat": "iso",
@@ -52,7 +57,7 @@ def parse_event(event: dict, known_teams: set[str] | None = None) -> pd.DataFram
     home = _team(event.get("home_team", ""), known_teams)
     away = _team(event.get("away_team", ""), known_teams)
     for book in event.get("bookmakers", []):
-        if book.get("key") != BOOKMAKER:
+        if book.get("key") != PLAYER_BOOKMAKER:
             continue
         for m in book.get("markets", []):
             if m.get("key") not in MARKETS:
@@ -101,7 +106,7 @@ def fetch_live(
     now: pd.Timestamp | None = None,
     get: Callable = requests.get,
 ) -> tuple[list[dict], dict]:
-    """Cached DraftKings player odds for matches kicking off soon. Never raises.
+    """Cached FanDuel player odds for matches kicking off soon. Never raises.
 
     Returns (events with player odds, status). `credits_left` is the account balance
     seen by the match-odds refresh, so player calls never eat into its reserve.
@@ -180,7 +185,8 @@ def _cached(d: Path, now: pd.Timestamp) -> list[dict]:
 
 
 def hist_path(league: str, event_id: str, kind: str, raw_dir: Path = RAW_DIR) -> Path:
-    return raw_dir / "player_odds_history" / league / f"{event_id}_{kind}.json"
+    # The bookmaker is in the name, so snapshots from another book are never reused.
+    return raw_dir / "player_odds_history" / league / f"{event_id}_{kind}_{PLAYER_BOOKMAKER}.json"
 
 
 def events_index_path(league: str, at: pd.Timestamp, raw_dir: Path = RAW_DIR) -> Path:
@@ -315,7 +321,10 @@ def load_history(
     d = raw_dir / "player_odds_history" / league
     frames = []
     for path in (
-        sorted(d.glob("*_look.json")) + sorted(d.glob("*_close.json")) if d.exists() else []
+        sorted(d.glob(f"*_look_{PLAYER_BOOKMAKER}.json"))
+        + sorted(d.glob(f"*_close_{PLAYER_BOOKMAKER}.json"))
+        if d.exists()
+        else []
     ):
         snap = json.loads(path.read_text())
         df = (
@@ -325,7 +334,7 @@ def load_history(
         )
         if df.empty:
             continue
-        df["kind"] = "look" if path.stem.endswith("_look") else "close"
+        df["kind"] = "look" if "_look_" in path.stem else "close"
         df["snapshot_ts"] = pd.Timestamp(snap.get("timestamp") or snap["requested"])
         frames.append(df)
     return (
@@ -361,7 +370,12 @@ def check(
     credits). Returns report lines; the key never appears in them."""
     out = []
     d = raw_dir / "player_odds_history" / league
-    files = sorted(d.glob("*_look.json")) + sorted(d.glob("*_close.json")) if d.exists() else []
+    files = (
+        sorted(d.glob(f"*_look_{PLAYER_BOOKMAKER}.json"))
+        + sorted(d.glob(f"*_close_{PLAYER_BOOKMAKER}.json"))
+        if d.exists()
+        else []
+    )
     books, markets, with_dk, sample = Counter(), Counter(), 0, None
     for p in files:
         ev = json.loads(p.read_text()).get("event") or {}
@@ -370,11 +384,13 @@ def check(
             books[b.get("key")] += 1
             for m in b.get("markets", []):
                 markets[m.get("key")] += 1
-        if any(b.get("key") == BOOKMAKER and b.get("markets") for b in bs):
+        if any(b.get("key") == PLAYER_BOOKMAKER and b.get("markets") for b in bs):
             with_dk += 1
         if sample is None and ev.get("id"):
             sample = (ev["id"], json.loads(p.read_text()).get("requested"))
-    out.append(f"Cached history: {len(files)} snapshots, {with_dk} with DraftKings player markets")
+    out.append(
+        f"Cached history: {len(files)} snapshots, {with_dk} with {PLAYER_BOOKMAKER_NAME} player markets"
+    )
     out.append(
         f"  bookmakers seen: {dict(books) or 'none'}; markets seen: {dict(markets) or 'none'}"
     )
