@@ -579,7 +579,7 @@ def main(argv: list[str] | None = None) -> None:
     bp.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_players.json")
     bp.set_defaults(func=cmd_backtest_players)
 
-    bfp = sub.add_parser("backfill-player-odds", help="historical DraftKings player shot odds")
+    bfp = sub.add_parser("backfill-player-odds", help="historical FanDuel player shot odds")
     bfp.add_argument("--league", default="E0")
     bfp.add_argument("--seasons", default="2025")
     bfp.add_argument("--max-credits", type=int, default=0)

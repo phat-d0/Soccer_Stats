@@ -1,5 +1,5 @@
 # Tests the player shot model (stage 1, no odds or credits) every Monday, and on demand.
-# Optionally downloads historical DraftKings player odds first for the priced backtest
+# Optionally downloads historical FanDuel player odds first for the priced backtest
 # (stage 2; about 20 credits per match per snapshot). Results go to the data-log branch,
 # where the app and the scheduled build read them: player odds and player paper trades
 # switch on only when the model beats its season-average baseline.

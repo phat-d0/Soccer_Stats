@@ -18,6 +18,8 @@ const state = {
   pfSeason: "",
   pfShown: 25,
   pfBet: "", // Portfolio bet type filter: "", "match" or "player"
+  recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
+  recStrat: "", // Record tab, player shots: which backtest strategy's sweep to show
   teamsView: "teams", // Teams tab: "teams" or "players"
   pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true, view: "list", metric: "p90" }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
@@ -900,7 +902,87 @@ function bindChart() {
   svg.addEventListener("pointerleave", leave);
 }
 
+function recordToggle() {
+  return `
+    <div class="segmented" role="group" aria-label="Bet type" style="margin-bottom:12px">
+      ${[["match", "Match bets"], ["player", "Player shots"]].map(([k, l]) => `<button data-recbet="${k}" class="${state.recBet === k ? "on" : ""}" aria-pressed="${state.recBet === k}">${l}</button>`).join("")}
+    </div>`;
+}
+
 function viewRecord() {
+  return recordToggle() + (state.recBet === "player" ? recordPlayerHtml() : recordMatchHtml());
+}
+
+const STRATEGY_LABEL = {
+  blend_lineup: "Starters, after lineups",
+  blend_3h: "Blend, 3 h before",
+  raw_3h: "Raw model, 3 h before",
+};
+const STRATEGY_NOTE = {
+  blend_lineup: "Confirmed starters only, at FanDuel's last price before kickoff (after lineups are out), using the model's chance blended with FanDuel's price. This is the rule the app trades.",
+  blend_3h: "Everyone priced 3 hours before kickoff (lineups not yet known), using the blended chance.",
+  raw_3h: "The original rule: the raw model's chance, 3 hours before kickoff. Kept for comparison.",
+};
+
+// The priced player backtest: FanDuel player shot lines, strategies side by side.
+function recordPlayerHtml() {
+  const pf = state.data.portfolio || {};
+  const pm = pf.player_model || {};
+  const pr = pm.priced;
+  if (!pr || !pr.strategies) {
+    return `<div class="empty">No priced player backtest yet.</div>${playerModelHtml(pm)}`;
+  }
+  const strats = Object.keys(pr.strategies);
+  const main = pr.main_strategy || strats[0];
+  const cur = strats.includes(state.recStrat) ? state.recStrat : main;
+  const st = pr.strategies[cur];
+  const trades = (pf.backtest?.trades || [])
+    .filter((t) => t.bet_type === "player" && (t.status === "won" || t.status === "lost"))
+    .sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  const s = st.summary || {};
+  const seasons = [...new Set(trades.map((t) => t.season))].sort();
+  const span = seasons.length ? `${seasonName(seasons[0])}${seasons.length > 1 ? `–${seasonName(seasons[seasons.length - 1])}` : ""}` : "";
+  const sweepRows = strats.map((k) => {
+    const cells = Object.entries(pr.strategies[k].sweep || {}).map(([, x]) => `<td>${x.trades ? `${x.trades} · ${signedPct(x.roi)}` : "–"}</td>`).join("");
+    return `<tr class="${k === cur ? "on-row" : ""}"><td>${esc(STRATEGY_LABEL[k] || k)}</td>${cells}</tr>`;
+  }).join("");
+  const ths = Object.keys(pr.strategies[main].sweep || {}).map((t) => `<th>${esc(t)}+</th>`).join("");
+  const cal = pr.calibration?.[st.snapshot === "after lineups" ? "close" : "look"]?.table || [];
+  const calRows = cal.map((r) => `<tr><td>${esc(r.bucket)}</td><td>${r.lines.toLocaleString()}</td><td>${pct(r.implied, 1)}</td><td>${pct(r.model, 1)}</td><td>${pct(r.blend, 1)}</td><td>${pct(r.won, 1)}</td></tr>`).join("");
+  const sel = trades.map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, 0, t.profit]);
+  const recent = trades.slice(-25).reverse().map((t) => `
+    <button class="bet-row trade" data-trade="${esc(t.id)}">
+      <span>${esc(t.player)} · ${esc(lineLabel(t))}<div class="meta">${shortDate(t.kickoff)} · ${esc(t.home)} v ${esc(t.away)} · ${odds(t.odds)} · chance ${pct(t.model_p, 0)} vs FanDuel ${pct(t.implied, 0)} · had ${t.actual}</div></span>
+      <span class="pl ${t.profit > 0 ? "win" : ""}">${usd(t.profit)}</span>
+    </button>`).join("");
+  return `
+    <p class="note">The player rule replayed on ${esc(playerBook())}'s historical player shot lines${span ? ` (${esc(span)})` : ""}: $10 per bet, best line per player and market, at most ${4} per match, with the model's chances computed only from matches before each bet.</p>
+    <div class="segmented small-seg" role="group" aria-label="Strategy" style="margin:4px 0 6px">
+      ${strats.map((k) => `<button data-recstrat="${k}" class="${k === cur ? "on" : ""}" aria-pressed="${k === cur}">${esc(STRATEGY_LABEL[k] || k)}</button>`).join("")}
+    </div>
+    <p class="note">${esc(STRATEGY_NOTE[cur] || "")}</p>
+    <div class="tiles" style="margin-top:12px">
+      <div class="tile"><div class="label">Profit</div><div class="value">${usd(s.profit)}</div><div class="sub">from ${s.trades || 0} bets at 12%+ edge</div></div>
+      <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${s.roi_ci95 ? `95%: ${signedPct(s.roi_ci95[0], 0)} to ${signedPct(s.roi_ci95[1], 0)}` : "ROI"}</div></div>
+      <div class="tile"><div class="label">Won</div><div class="value">${pct(s.win_rate, 1)}</div><div class="sub">${pct(s.breakeven, 1)} needed to break even</div></div>
+      <div class="tile"><div class="label">Beat the close</div><div class="value">${s.beat_close_dk != null ? pct(s.beat_close_dk) : "–"}</div><div class="sub">${s.clv_dk != null ? `avg ${signedPct(s.clv_dk)}` : "bets placed at the close"}</div></div>
+    </div>
+    ${cur === main ? `<div class="section-title">Running profit ($)</div><div class="card">${profitChart(sel, "$") || '<p class="muted">No bets.</p>'}</div>` : ""}
+    <div class="section-title">Bets and ROI by edge threshold</div>
+    <div class="card scroll-x" style="padding:8px 14px">
+      <table><thead><tr><th>Strategy</th>${ths}</tr></thead><tbody>${sweepRows}</tbody></table>
+    </div>
+    <p class="note">Each cell: number of bets · return per bet when only bets with at least that edge are placed. A real edge should hold up, or improve, as the threshold rises.</p>
+    ${calRows ? `<div class="section-title">Chance of the bet winning, all priced lines</div>
+    <div class="card scroll-x" style="padding:8px 14px">
+      <table><thead><tr><th>FanDuel says</th><th>Lines</th><th>FanDuel</th><th>Model</th><th>Blend</th><th>Won</th></tr></thead><tbody>${calRows}</tbody></table>
+    </div>
+    <p class="note">FanDuel's chance is 1 / odds, so it includes their margin. The closer a column is to "Won", the better calibrated it is; the blend is what bets use.</p>` : ""}
+    ${cur === main && recent ? `<div class="section-title">Latest bets</div><div class="card">${recent}</div>` : ""}
+    ${playerModelHtml(pm)}`;
+}
+
+function recordMatchHtml() {
   const d = state.data;
   const rec = d.record.model;
   if (!rec || !rec.matches) return '<div class="empty">Not enough data to replay yet.</div>';
@@ -1304,6 +1386,12 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pf) {
     state.pfView = t.dataset.pf; state.pfShown = 25; state.pfMarket = ""; state.pfSeason = "";
     render();
+  } else if (t.dataset.recbet) {
+    state.recBet = t.dataset.recbet;
+    render();
+  } else if (t.dataset.recstrat) {
+    state.recStrat = t.dataset.recstrat;
+    render();
   } else if (t.dataset.pfbet !== undefined) {
     state.pfBet = t.dataset.pfbet; state.pfShown = 25; state.pfMarket = "";
     render();
@@ -1328,7 +1416,8 @@ document.addEventListener("click", (ev) => {
     state.pfShown += 25;
     render();
   } else if (t.dataset.trade !== undefined) {
-    const tr = (pfSet()?.trades || []).find((x) => x.id === t.dataset.trade);
+    const pf = state.data.portfolio || {};
+    const tr = [...(pfSet()?.trades || []), ...(pf.backtest?.trades || [])].find((x) => x.id === t.dataset.trade);
     if (tr) openSheet(tradeHtml(tr));
   } else if (t.dataset.fixture !== undefined) {
     const fx = state.data.fixtures[Number(t.dataset.fixture)];

@@ -485,3 +485,8 @@ select.metric { display: block; width: 100%; margin-bottom: 8px; font: inherit; 
 .chart .dev-row.on .dev-name { fill: var(--text-primary); font-weight: 600; }
 .chart .dev-row.on .hit { fill: var(--track); opacity: 0.5; }
 .dev-readout { min-height: 40px; font-size: 13px; color: var(--text-secondary); padding: 6px 0 8px; border-bottom: 0.5px solid var(--border); margin-bottom: 6px; }
+
+/* Record tab, player shots: wide tables scroll inside their card on phones */
+.scroll-x { overflow-x: auto; }
+.scroll-x table { min-width: 420px; }
+tr.on-row td { background: var(--track); font-weight: 600; }
