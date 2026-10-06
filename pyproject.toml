@@ -9,6 +9,8 @@ dependencies = [
     "pandas>=2.1",
     "scipy>=1.11",
     "requests>=2.31",
+    "lightgbm>=4.7.0",
+    "scikit-learn>=1.9.1",
 ]
 
 [project.optional-dependencies]
