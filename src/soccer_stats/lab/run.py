@@ -221,7 +221,6 @@ def main(argv: list[str] | None = None) -> None:
 
     from soccer_stats.edge.stats import bonferroni_level
 
-    level = bonferroni_level(TESTS)
     holdout = Holdout(HOLDOUT_START)
     if args.open_holdout:
         names = [n.strip() for n in args.finalists.split(",") if n.strip()]
@@ -232,7 +231,10 @@ def main(argv: list[str] | None = None) -> None:
         holdout.unlock(args.reason)
     else:
         names = CANDIDATES + [STACK]
-    print(f"Ranges are {level:.2%}: Bonferroni for {TESTS} tests (2 pass metrics x 5).")
+    # Development: 2 pass metrics x 5 candidates. Holdout: 2 x the finalists.
+    tests = 2 * len(names) if args.open_holdout else TESTS
+    level = bonferroni_level(tests)
+    print(f"Ranges are {level:.2%}: Bonferroni for {tests} tests (2 pass metrics each).")
     df = load(holdout)
     run_names = [n for n in names if n != STACK]
     last = LAST if args.open_holdout else LAST - 1

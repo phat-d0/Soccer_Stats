@@ -98,3 +98,57 @@ model, and a ranked list of next ideas.
 **Run.** `odds-check.yml` with `task=lab` (development) or `task=lab-holdout` (with
 `reason`, `finalists`, `stack_base`), print-only: it never pushes and never deploys. No
 Odds API credits.
+
+### Development results (run 37542756710, 2026-10-06 22:47 UTC, holdout locked)
+
+2,934 matches (2017/18–2024/25) that every candidate a–d predicted and Pinnacle priced
+early. Ranges are 99.5% (Bonferroni for 10 tests) and resample whole matches. Bets: the
+live rule (12% edge, one per match) at Pinnacle's early price, 1 unit each. The stack's
+base was chosen by the pre-registered rule: a, the Dixon-Coles baseline, had the best
+development log loss of a–d.
+
+| Candidate | Log loss | vs early price (gain, range) | Brier | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Pinnacle early (reference) | 0.9493 | – | – | – | – | – | – | – |
+| a Dixon-Coles + xG | 0.9589 | −0.0096 (−0.0180 to −0.0012) | 0.5676 | +0.11 (−0.18 to +0.38) | 1,481 | −4.1% (−5.0 to −3.4) | +2.3% (−13.4 to +20.0) | no |
+| b Hierarchical Poisson | 0.9618 | −0.0125 (−0.0210 to −0.0033) | 0.5699 | +0.06 (−0.27 to +0.35) | 1,676 | −5.0% (−5.8 to −4.3) | +1.0% (−15.0 to +18.3) | no |
+| c LightGBM | 0.9749 | −0.0256 (−0.0370 to −0.0153) | 0.5784 | −0.03 (−0.23 to +0.19) | 1,918 | −4.0% (−4.7 to −3.3) | −4.7% (−16.5 to +8.8) | no |
+| d Multinomial logit | 0.9653 | −0.0160 (−0.0254 to −0.0063) | 0.5722 | +0.04 (−0.21 to +0.31) | 1,629 | −3.6% (−4.2 to −2.8) | −1.0% (−14.1 to +13.1) | no |
+| e Stack (a + early price) | 0.9511 | −0.0018 (−0.0047 to +0.0012) | 0.5624 | – | 26 | −1.3% (−5.5 to +2.6) | +0.5% (−81 to +93) | no |
+
+Log loss by season (lower is better; Pinnacle early for scale is 0.949 overall):
+
+| Season | a | b | c | d | e |
+| --- | --- | --- | --- | --- | --- |
+| 2017/18 | 0.9537 | 0.9569 | 0.9819 | 0.9654 | 0.9485 |
+| 2018/19 | 0.8942 | 0.8991 | 0.9157 | 0.9038 | 0.8930 |
+| 2019/20 | 0.9651 | 0.9685 | 0.9964 | 0.9869 | 0.9699 |
+| 2020/21 | 1.0096 | 1.0093 | 1.0322 | 1.0313 | 1.0075 |
+| 2021/22 | 0.9498 | 0.9579 | 0.9690 | 0.9527 | 0.9310 |
+| 2022/23 | 0.9914 | 0.9890 | 0.9761 | 0.9679 | 0.9737 |
+| 2023/24 | 0.9360 | 0.9514 | 0.9470 | 0.9395 | 0.9150 |
+| 2024/25 | 0.9710 | 0.9761 | 0.9877 | 0.9789 | 0.9701 |
+
+What it shows:
+- **Nothing passes.** Every model is worse than Pinnacle's early price on its own (every
+  log-loss gain range is below 0), and none earns blend weight whose range clears 0. The
+  baseline comes closest (c = +0.11, about the 6% weight the live blend found), but the
+  range runs from −0.18 to +0.38.
+- **CLV is negative for every model, with tight ranges**: −3.6% to −5.0% against a −2.8%
+  margin. The live rule's picks are worse than a random side (round 1 found the same).
+- **ROI is noise**: the ranges are about ±15 points on 1,500–1,900 bets. The baseline's
+  +2.3% is not evidence of anything; CLV says the picks lose to the close.
+- **More flexible is worse.** LightGBM is the worst on log loss and calibration (its
+  0.1–0.2 bin predicts 15.5% for 17.9% observed). The hierarchical Poisson's empirical-
+  Bayes priors chose the widest prior (0.4) in 8 of 9 seasons: shrinkage didn't help.
+  The logit has the best CLV of a–d (−3.6%), still well below 0.
+- **The stack** (the live idea: baseline blended with the price) almost matches the
+  early price (0.9511 vs 0.9493) and makes only 26 bets at a 12% edge. That is the
+  honest state of the live blend: it mostly defers to the market.
+
+**Holdout finalists** (by the rule above): no candidate passed, so the finalists are
+a (reference), b (best of b–d by development log loss) and e. One wording slip in the
+pre-registration: the candidates table defines e on the best of a–d (that is a, and e
+was scored that way above), while the finalist list says "e built on" the best of b–d.
+I keep e as it was defined and scored in development (base a), so the holdout tests the
+same model. Holdout ranges: 99.17% (Bonferroni for 3 finalists × 2).
