@@ -27,11 +27,14 @@ def walk_forward(
     lookback_days: int = 730,
     min_team_matches: int = 6,
     model_factory=DixonColes,
+    keep_matrix: bool = False,
 ) -> pd.DataFrame:
     """Predict 1X2 probabilities for every match on/after `start` using only prior data.
 
     Matches involving a team with fewer than `min_team_matches` games in the
-    training window are skipped (ratings for them are mostly guesswork).
+    training window are skipped (ratings for them are mostly guesswork). With
+    `keep_matrix`, each row also carries its score matrix (`matrix`), for markets
+    priced later (Asian handicap lines).
     """
     matches = matches.sort_values("date").reset_index(drop=True)
     start = pd.Timestamp(start)
@@ -65,6 +68,7 @@ def walk_forward(
                     "p_away": p[2],
                     "p_over25": over,
                     "p_under25": 1 - over,
+                    **({"matrix": m} if keep_matrix else {}),
                 }
             )
     return pd.DataFrame(out)
