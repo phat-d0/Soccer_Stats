@@ -21,7 +21,9 @@ Review each specialist branch:
 6. **Docs.** CLAUDE.md and the README are updated for the change.
 
 Merging:
-- Merge approved branches into `claude/soccer-stats-scaffold` with merge commits, in dependency order.
+- Specialists open pull requests from `team/<name>` into `claude/soccer-stats-scaffold`. Review each PR, not a bare branch: read the diff, wait for CI on the PR to pass, and leave a short review comment (approve, or request changes with the specific fix; end it with the attribution footer).
+- Merge approved PRs on GitHub with a merge commit (`merge_pull_request`, method `merge`), in dependency order, so each shows as Merged in the owner's app.
+- If a later PR conflicts after an earlier merge, merge the base into that PR branch (or ask its session to), rerun the checks, then merge the PR. Never merge a PR whose CI is red.
 - Resolve conflicts preserving both sides' behaviour.
 - Rerun the full checks after each merge, then push.
 - Send back anything that fails, with the specific fix needed.

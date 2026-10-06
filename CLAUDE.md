@@ -158,7 +158,8 @@ Five agents, each owning part of the code. Start a session's work by calling the
 
 - Specialists work on their own branches: `team/<name>` (`team/edge`, `team/player-shots`, `team/moneyline`, `team/ui`) from round 2. Round 1 (6 Oct) used `agent/<name>`; those branches are merged.
 - From round 2 each specialist runs as a separate cloud session on its `team/<name>` branch, cut from the latest `claude/soccer-stats-scaffold`. It pushes only its branch; it never merges, and never pushes `data-log` by hand.
-- The lead runs in the main (coordinating) session, as in the owner's baseball team. It reviews each branch, runs the full checks and merges into `claude/soccer-stats-scaffold`.
+- When done, each specialist **opens a pull request** from `team/<name>` into `claude/soccer-stats-scaffold` (from round 4; rounds 1–3 were merged with git directly, without PRs).
+- The lead runs in the main (coordinating) session, as in the owner's baseball team. It reviews each PR (diff, CI on the PR, full checks), comments, and merges it on GitHub with a merge commit, so each shows as Merged in the owner's app.
 - Only the lead sets Odds API credit caps. The default cap is 0.
 
 ## Conventions

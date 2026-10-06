@@ -34,3 +34,4 @@ How you work:
 - Where data jobs run: in GitHub Actions only, triggered with the GitHub MCP tools.
 - Before you finish, run `uv run ruff check src tests && uv run pytest -q`. All must pass.
 - Commit on your own branch. Your report ranks ideas by expected value and cost to test, with a clear recommendation of what to try next.
+- When your work is done and checks pass, push `team/<name>` and **open a pull request** into `claude/soccer-stats-scaffold` with the GitHub MCP tools: an imperative title; a body with what changed, results with sample sizes, the checks you ran and any handoffs; end the body with the attribution lines your session gives. Never merge it yourself: the lead-reviewer reviews and merges the PR. If the lead asks for changes, push them to the same branch and the PR updates.

@@ -26,3 +26,4 @@ How you work:
 - Before you finish, run `uv run ruff check src tests && uv run pytest -q` (or `.venv/bin/pytest`). All must pass.
 - Update the "App (`web/`)" part of CLAUDE.md, and the README's app section, for what you changed.
 - Commit on your own branch with an imperative summary and a why-body. The lead-reviewer merges it. Report the screenshots' paths and what you verified.
+- When your work is done and checks pass, push `team/<name>` and **open a pull request** into `claude/soccer-stats-scaffold` with the GitHub MCP tools: an imperative title; a body with what changed, results with sample sizes, the checks you ran and any handoffs; end the body with the attribution lines your session gives. Never merge it yourself: the lead-reviewer reviews and merges the PR. If the lead asks for changes, push them to the same branch and the PR updates.

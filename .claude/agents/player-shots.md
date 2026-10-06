@@ -29,3 +29,4 @@ How you work:
 - Add tests for every behaviour change, using the simulator in `tests/player_sim.py`.
 - Update CLAUDE.md: the "Player bets" code map and the Status section, with numbers.
 - Commit on your own branch with an imperative summary and a why-body. Report the results and their caveats honestly, losses included.
+- When your work is done and checks pass, push `team/<name>` and **open a pull request** into `claude/soccer-stats-scaffold` with the GitHub MCP tools: an imperative title; a body with what changed, results with sample sizes, the checks you ran and any handoffs; end the body with the attribution lines your session gives. Never merge it yourself: the lead-reviewer reviews and merges the PR. If the lead asks for changes, push them to the same branch and the PR updates.
