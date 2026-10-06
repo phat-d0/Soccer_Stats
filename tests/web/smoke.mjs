@@ -76,17 +76,20 @@ const STEPS = [
   ["record-player-raw_3h", click('button[data-recstrat="raw_3h"]')],
   ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-live", async (p) => { await closeSheet(p); await tab("portfolio")(p); }],
-  ["portfolio-live-match", click('button[data-pfbet="match"]')],
   // A settled live match trade whose close was taken early (approximate CLV; fixture data).
   ["portfolio-live-close-sheet", async (p) => { await p.click('button[data-trade="E0|2627|Spurs|Brentford"]'); await sheet(p); }, true],
-  ["portfolio-live-player", async (p) => { await closeSheet(p); await p.click('button[data-pfbet="player"]'); }],
-  // No live player trades open while trades.PLAYER_PAPER_TRADES is off: open a trade from "All".
-  ["portfolio-live-trade", async (p) => { await p.click('button[data-pfbet=""]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pfbet=""]'); await p.click('button[data-pf="backtest"]'); }],
-  ["portfolio-backtest-match", async (p) => { await p.click('button[data-pfbet="match"]'); await p.click("details.fold > summary"); }],
-  ["portfolio-backtest-player", click('button[data-pfbet="player"]')],
+  ["portfolio-live-trade", async (p) => { await closeSheet(p); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
+  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  ["explore", async (p) => { await closeSheet(p); await tab("explore")(p); }],
+  // An empty portfolio (in testing): its plain-English state, live and backtest.
+  ["portfolio-goalscorer", async (p) => { await closeSheet(p); await p.click('button[data-pfid="goalscorer"]'); }],
+  ["portfolio-goalscorer-live", click('button[data-pf="live"]')],
+  // A retired portfolio, reached from the "Retired" link: its history, read-only.
+  ["portfolio-retired-live", click('button.linkish[data-pfid="player_shots"]')],
+  ["portfolio-retired-backtest", click('button[data-pf="backtest"]')],
+  ["portfolio-retired-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
+  ["portfolio-moneyline", async (p) => { await closeSheet(p); await p.click('button[data-pfid="moneyline"]'); }],
+  ["explore", tab("explore")],
 ];
 const MODES = [
   ["phone-light", { viewport: { width: 390, height: 844 }, colorScheme: "light", isMobile: true, hasTouch: true, deviceScaleFactor: 2 }],

@@ -7,6 +7,10 @@
 #   match:    line shopping on football-data prices with the walk-forward match model
 #             (no credits).
 #   shots:    Understat's shot counts vs football-data (team) and ESPN (player); no credits.
+#   lab:      the research lab's 1X2 model bake-off on development seasons (docs/lab.md);
+#             the 2025/26 holdout stays locked. No credits.
+#   lab-holdout: opens the locked holdout once for `finalists` (and `stack_base`), with
+#             `reason` printed and the time it was opened. No credits.
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
 #             move and as blend inputs (no credits).
 name: Player odds check
@@ -15,9 +19,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots or signals"
+        description: "coverage, props, match, shots, signals, lab or lab-holdout"
         type: choice
-        options: [coverage, props, match, shots, signals]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout]
         default: coverage
       cap:
         description: "props: most credits to spend (0 = dry run)"
@@ -28,6 +32,15 @@ on:
       seasons:
         description: "match/signals: seasons to bet (start years); shots: seasons to load"
         default: "2017-2025"
+      reason:
+        description: "lab-holdout: why the holdout is opened (logged)"
+        default: ""
+      finalists:
+        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack"
+        default: ""
+      stack_base:
+        description: "lab-holdout: the stack's base candidate (one of the finalists)"
+        default: ""
 
 permissions:
   contents: read
@@ -46,7 +59,7 @@ jobs:
           restore-keys: player-odds-history-
       # Restore only: this job never saves a cache, so it can't disturb the paid ones.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'match' || inputs.task == 'shots' || inputs.task == 'signals' }}
+        if: ${{ inputs.task != 'coverage' && inputs.task != 'props' }}
         with:
           path: data/raw
           key: raw-data-none
@@ -58,6 +71,9 @@ jobs:
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
           SEASONS: ${{ inputs.seasons }}
+          REASON: ${{ inputs.reason }}
+          FINALISTS: ${{ inputs.finalists }}
+          STACK_BASE: ${{ inputs.stack_base }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -69,6 +85,10 @@ jobs:
                      --json out/match.json ;;
             signals) uv run python -m soccer_stats.edge.run signals --seasons "$SEASONS" \
                      --json out/signals.json ;;
+            lab) uv run python -m soccer_stats.lab.run --json out/lab_dev.json ;;
+            lab-holdout) uv run python -m soccer_stats.lab.run --open-holdout \
+                     --reason "$REASON" --finalists "$FINALISTS" --stack-base "$STACK_BASE" \
+                     --json out/lab_holdout.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
           esac

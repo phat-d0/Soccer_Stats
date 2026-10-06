@@ -549,3 +549,13 @@ tr.sub-head td { text-align: left; font-size: 12px; color: var(--text-muted); pa
 /* A closing price taken more than an hour before kickoff (approximate CLV) */
 .approx { color: var(--text-muted); font-style: italic; }
 .nowrap { white-space: nowrap; }
+
+/* Portfolio tab: one portfolio per strategy */
+.pf-head { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-secondary); margin: 10px 0 2px; line-height: 1.45; }
+.pf-head .pill { margin-top: 1px; }
+.pf-head b { color: var(--text-primary); }
+.pill.st-live { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+.pill.st-testing { background: var(--track); color: var(--text-secondary); }
+.pill.st-retired { background: var(--track); color: var(--text-muted); }
+.pf-retired { margin-top: 18px; font-size: 13px; color: var(--text-muted); }
+button.linkish { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--pos); text-decoration: underline; cursor: pointer; }

@@ -24,8 +24,12 @@ def test_fixture_is_complete():
     for f in (data["players_stats"], data["players_backtest"]):
         assert (FIXTURE / f).exists()
     pf = data["portfolio"]
-    assert pf["live"]["trades"] and pf["backtest"]["trades"]
+    assert "live" not in pf and "backtest" not in pf  # the app reads `portfolios` only
     assert pf["player_model"]["priced"]["strategies"]
+    pfs = {p["id"]: p for p in pf["portfolios"]}
+    assert pfs["moneyline"]["live"]["trades"] and pfs["moneyline"]["backtest"]["trades"]
+    assert pfs["goalscorer"]["live"]["summary"]["trades"] == 0  # the empty state
+    assert pfs["player_shots"]["status"] == "retired" and pfs["player_shots"]["backtest"]
     size = sum(p.stat().st_size for p in FIXTURE.glob("*.json"))
     assert size < 1_000_000  # keep the committed fixture small
 
