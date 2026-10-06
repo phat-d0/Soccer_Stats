@@ -77,7 +77,9 @@ const STEPS = [
   ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-live", async (p) => { await closeSheet(p); await tab("portfolio")(p); }],
   ["portfolio-live-match", click('button[data-pfbet="match"]')],
-  ["portfolio-live-player", click('button[data-pfbet="player"]')],
+  // A settled live match trade whose close was taken early (approximate CLV; fixture data).
+  ["portfolio-live-close-sheet", async (p) => { await p.click('button[data-trade="E0|2627|Spurs|Brentford"]'); await sheet(p); }, true],
+  ["portfolio-live-player", async (p) => { await closeSheet(p); await p.click('button[data-pfbet="player"]'); }],
   // No live player trades open while trades.PLAYER_PAPER_TRADES is off: open a trade from "All".
   ["portfolio-live-trade", async (p) => { await p.click('button[data-pfbet=""]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pfbet=""]'); await p.click('button[data-pf="backtest"]'); }],

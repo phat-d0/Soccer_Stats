@@ -546,3 +546,6 @@ details.fold[open] > summary::before { transform: rotate(90deg); }
 details.fold > summary .muted { font-weight: 400; font-size: 12px; }
 /* A label row inside a table (e.g. "Odds capped at 6.0" in the sweep) */
 tr.sub-head td { text-align: left; font-size: 12px; color: var(--text-muted); padding-top: 12px; }
+/* A closing price taken more than an hour before kickoff (approximate CLV) */
+.approx { color: var(--text-muted); font-style: italic; }
+.nowrap { white-space: nowrap; }

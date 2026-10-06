@@ -1216,6 +1216,24 @@ function currentPrice(t) {
 // What an open bet is worth if cashed out at the current price (ignoring the
 // bookmaker's cash-out margin): stake x entry odds / current odds.
 const markToMarket = (t, cur) => t.stake * t.odds / cur - t.stake;
+// When a match trade's closing price was taken, in minutes before kickoff:
+// close_minutes_before when published, else worked out from close_fetched_at.
+const CLOSE_APPROX_MIN = 60;
+function closeMinutes(t) {
+  if (t.close_minutes_before != null) return t.close_minutes_before;
+  if (!t.close_fetched_at || !t.kickoff) return null;
+  const m = (Date.parse(t.kickoff) - Date.parse(t.close_fetched_at)) / 60000;
+  return Number.isFinite(m) && m >= 0 ? Math.round(m) : null;
+}
+const closeApprox = (t) => (closeMinutes(t) ?? 0) > CLOSE_APPROX_MIN;
+const minutesText = (m) => (m == null ? "–" : m >= 120 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m)} min`);
+const priceBoth = (d) => (d ? `${american(d)} (${d.toFixed(2)})` : "–");
+// One meta line for a settled match trade: closing price, when, CLV ("–" when missing).
+function closeLine(t) {
+  if (t.status === "open" || isPlayer(t)) return "";
+  const m = closeMinutes(t);
+  return `<div class="meta">Close ${priceBoth(t.close_odds)}${m != null ? ` · ${minutesText(m)} before` : ""} · <span class="nowrap">CLV <span class="${plClass(t.clv_dk)}">${signedPct(t.clv_dk)}</span></span>${closeApprox(t) ? ' · <span class="approx">approx.</span>' : ""}</div>`;
+}
 const plClass = (v) => (v == null || Math.abs(v) < 0.005 ? "" : v > 0 ? "gain" : "loss");
 
 function openPL(trades) {
@@ -1234,16 +1252,25 @@ function pfTiles(s, trades = []) {
   const openTiles = o.n ? `
       <div class="tile"><div class="label">Open bets, if cashed out</div><div class="value ${plClass(o.pl)}">${usd(o.pl, 2)}</div><div class="sub">$${o.atRisk} at risk on ${o.n} bet${o.n > 1 ? "s" : ""}</div></div>
       <div class="tile"><div class="label">Total gain/loss</div><div class="value ${plClass(total)}">${usd(total, 2)}</div><div class="sub">settled + open</div></div>` : "";
-  return `
-    <div class="tiles" style="margin-top:12px">
-      ${openTiles}
-      <div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>
-      <div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>
-      <div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>
-      <div class="tile"><div class="label">Closing line value</div><div class="value">${signedPct(s.clv_dk)}</div><div class="sub">avg vs DraftKings close</div></div>
-      <div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of trades"}</div></div>
-      <div class="tile"><div class="label">Max drawdown</div><div class="value">${s.max_drawdown != null ? `$${s.max_drawdown.toFixed(0)}` : "–"}</div><div class="sub">peak to trough</div></div>
-    </div>`;
+  const profit = `<div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>`;
+  const roi = `<div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>`;
+  const clv = `<div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(s.clv_dk)}">${signedPct(s.clv_dk)}</div><div class="sub">avg vs DraftKings close</div></div>`;
+  const beat = `<div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of settled trades"}</div></div>`;
+  const count = `<div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>`;
+  const dd = `<div class="tile"><div class="label">Max drawdown</div><div class="value">${s.max_drawdown != null ? `$${s.max_drawdown.toFixed(0)}` : "–"}</div><div class="sub">peak to trough</div></div>`;
+  return state.pfView === "live"
+    ? `<div class="tiles" style="margin-top:12px">${profit}${roi}${clv}${beat}</div>
+    ${clvNote(s, trades)}
+    <div class="tiles" style="margin-top:12px">${openTiles}${count}${dd}</div>`
+    : `<div class="tiles" style="margin-top:12px">${openTiles}${count}${profit}${roi}${clv}${beat}${dd}</div>`;
+}
+
+// Live view: why CLV matters, and how many closes were taken early (approximate CLV).
+function clvNote(s, trades) {
+  if (state.pfBet === "player") return "";
+  const match = trades.filter((t) => !isPlayer(t) && t.status !== "open");
+  const early = s.close_early ?? match.filter(closeApprox).length;
+  return `<p class="note">Closing line value compares the price you got with DraftKings' last price before kickoff. Profit takes hundreds of bets to tell skill from luck; consistently beating the close shows up within a few dozen, so it is the faster, more reliable sign of an edge.${early ? ` ${early} close${early > 1 ? "s were" : " was"} taken more than an hour before kickoff, so ${early > 1 ? "their" : "its"} CLV is approximate.` : ""}</p>`;
 }
 
 function pfOpen(trades) {
@@ -1274,7 +1301,7 @@ function pfSettled(trades) {
   const shown = sel.slice(0, state.pfShown);
   const rows = shown.map((t) => `
     <button class="bet-row trade" data-trade="${esc(t.id)}">
-      <span>${tradeTitle(t)}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${countWord(t.market, t.actual)}` : ""}</div></span>
+      <span>${tradeTitle(t)}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${countWord(t.market, t.actual)}` : ""}</div>${closeLine(t)}</span>
       <span class="pl ${t.profit > 0 ? "win" : t.profit < 0 ? "loss" : ""}">${t.status === "void" ? "Void" : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
     </button>`).join("");
   const opt = (vals, cur, label, fmt) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
@@ -1475,10 +1502,12 @@ const TRADE_FIELDS = [
   ["Edge at entry", (t) => signedPct(t.edge)],
   ["Threshold", (t) => pct(t.threshold)],
   ["Stake", (t) => `$${t.stake}`],
-  ["Closing odds", (t) => (t.close_odds ? `${american(t.close_odds)} (${t.close_odds.toFixed(2)})` : "–")],
+  [(t) => (t.status === "open" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
+  [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, "match"],
   ["Bookmaker", (t) => t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings")],
   ["Book implied chance", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
-  [(t) => (isPlayer(t) ? "Price move to close" : "CLV vs DraftKings"), (t) => signedPct(t.clv_dk)],
+  [(t) => (isPlayer(t) ? "Price move to close" : t.status === "open" ? "CLV so far" : "CLV vs DraftKings"), (t) => signedPct(t.clv_dk)],
+  ["Beat the close", (t) => (t.beat_close_dk == null ? (t.clv_dk == null || t.status === "open" ? "–" : t.clv_dk > 0 ? "Yes" : "No") : t.beat_close_dk ? "Yes" : "No"), "match"],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle), "match"],
   ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],
   ["Score", (t) => t.score || "–", "match"],

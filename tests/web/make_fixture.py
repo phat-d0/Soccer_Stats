@@ -328,6 +328,7 @@ def build(src: Path, out: Path) -> dict:
         shutil.copytree(src, log)
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
+    add_settled_live_matches(data)
 
     sample = sample_detail(detail, data["fixtures"])
     stats = stats_from_detail(sample)
@@ -343,6 +344,71 @@ def build(src: Path, out: Path) -> dict:
     (out / "players_backtest.json").write_text(dump(sample))
     (out / "players_stats.json").write_text(dump(stats))
     return data
+
+
+# Settled live match trades with closing prices, until the real ledger has some: the
+# moneyline contract (close_odds, close_fetched_at, close_minutes_before, clv_dk,
+# beat_close_dk per trade; summary clv_dk, beat_close_dk, close_early). The last one is
+# an older trade without close fields, so the app's "–" fallbacks are exercised.
+SYNTHETIC_SETTLED = [
+    # home, away, kickoff, market, odds, close odds, minutes before kickoff, score, won
+    ("Arsenal", "Everton", "2026-09-27T14:00:00Z", "draw", 4.6, 4.2, 4, "1-1", True),
+    ("Fulham", "Wolves", "2026-09-27T14:00:00Z", "away", 3.9, 4.1, 6, "2-0", False),
+    ("Burnley", "Leeds", "2026-09-20T11:30:00Z", "home", 3.1, 2.9, 3, "0-1", False),
+    ("Spurs", "Brentford", "2026-09-20T14:00:00Z", "away", 5.2, 4.8, 95, "1-2", True),
+    ("Newcastle", "Chelsea", "2026-09-13T16:30:00Z", "home", 2.7, 2.75, 5, "0-0", False),
+    ("Everton", "Brighton", "2026-08-30T14:00:00Z", "away", 3.4, None, None, "1-0", False),
+]
+
+
+def add_settled_live_matches(data: dict) -> None:
+    live = data["portfolio"].get("live") or {"trades": []}
+    trades = list(live.get("trades") or [])
+    for home, away, ko, market, odds, close, mins, score, won in SYNTHETIC_SETTLED:
+        kick = pd.Timestamp(ko)
+        fetched = (kick - pd.Timedelta(minutes=mins)).isoformat() if mins is not None else None
+        clv = odds / close - 1 if close else None
+        trades.append(
+            {
+                "id": f"E0|2627|{home}|{away}",
+                "source": "live",
+                "bet_type": "match",
+                "league": "E0",
+                "season": "2627",
+                "opened_at": (kick - pd.Timedelta(hours=40)).isoformat(),
+                "kickoff": kick.isoformat(),
+                "hours_to_kickoff": 40.0,
+                "home": home,
+                "away": away,
+                "market": market,
+                "odds": odds,
+                "odds_fetched_at": (kick - pd.Timedelta(hours=40)).isoformat(),
+                "model_p": round(1.15 / odds, 4),
+                "model_p_base": round(1.15 / odds, 4),
+                "edge": 0.15,
+                "threshold": 0.12,
+                "stake": 10.0,
+                "news_applied": False,
+                "model_ref": {"commit": "synthetic", "xg_weight": 0.7, "matches_fit": 800},
+                "close_odds": close,
+                "close_fetched_at": fetched,
+                "close_minutes_before": mins,
+                "clv_dk": round(clv, 4) if clv is not None else None,
+                "beat_close_dk": (clv > 0) if clv is not None else None,
+                "clv_pinnacle": None,
+                "status": "won" if won else "lost",
+                "score": score,
+                "profit": round(10 * (odds - 1), 2) if won else -10.0,
+                "settled_at": (kick + pd.Timedelta(hours=3)).isoformat(),
+            }
+        )
+    section = paper.portfolio_section(trades)
+    match = [t for t in trades if t.get("bet_type", "match") == "match"]
+    early = sum(1 for t in match if (t.get("close_minutes_before") or 0) > 60)
+    section["summary"]["close_early"] = early
+    if "match" in section["by_bet_type"]:
+        section["by_bet_type"]["match"]["summary"]["close_early"] = early
+    data["portfolio"]["live"] = {**live, **section}
 
 
 def main(argv: list[str] | None = None) -> None:
