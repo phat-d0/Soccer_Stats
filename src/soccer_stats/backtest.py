@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
 from soccer_stats.markets import match_odds, over_under
 from soccer_stats.models import DixonColes
@@ -294,17 +295,75 @@ def dk_candidates(
     return pd.DataFrame(rows)
 
 
+STRATEGIES = {
+    "raw": "The model's own chances",
+    "blend": "Model blended with DraftKings' margin-free price (walk-forward fit)",
+}
+
+
+def add_blend(
+    candidates: pd.DataFrame,
+    pool: dict[str, pd.DataFrame],
+    refit: str = mc.REFIT,
+    min_rows: int = mc.MIN_ROWS,
+) -> tuple[pd.DataFrame, dict]:
+    """Add pb_<market>: the model blended with DraftKings' margin-free price at each look.
+
+    `pool` maps "h2h"/"totals" to match_calibration.training_rows (settled matches with
+    the model's walk-forward chances and Pinnacle's close). Each look uses a fit on
+    matches played before its refit block, so never on anything after the bet.
+    """
+    df = candidates.copy()
+    fits = {}
+    if df.empty:
+        return df, fits
+    day = pd.to_datetime(df["look_at"], utc=True).dt.tz_convert(None).dt.normalize()
+    for g, names in mc.GROUPS.items():
+        mk = mc._devig_rows(df, [f"odds_{m}" for m in names])
+        target = pd.DataFrame(
+            {
+                "date": day.to_numpy(),
+                **{f"mkt_{m}": mk[:, i] for i, m in enumerate(names)},
+                **{f"p_{m}": df[f"p_{m}"].to_numpy(dtype=float) for m in names},
+            },
+            index=df.index,
+        )
+        train = pool.get(g)
+        if train is None:
+            train = pd.DataFrame()
+        blended, fits[g] = mc.walk_forward(train, target, g, refit, min_rows)
+        for m in names:
+            df[f"pb_{m}"] = blended[m]
+    return df, fits
+
+
+def blend_view(candidates: pd.DataFrame) -> pd.DataFrame:
+    """Candidates whose p_<market> are the blended chances (the raw ones kept as praw_)."""
+    df = candidates.copy()
+    for m in tr.MARKETS:
+        df[f"praw_{m}"] = df[f"p_{m}"]
+        df[f"p_{m}"] = df[f"pb_{m}"] if f"pb_{m}" in df else np.nan
+    return df
+
+
 def dk_trades(
     candidates: pd.DataFrame,
     threshold: float = tr.PAPER_EDGE,
     max_odds: float | None = None,
     league: str = "E0",
     model_ref: dict | None = None,
+    probs: str = "raw",
 ) -> pd.DataFrame:
     """Apply the trade rule at each look in turn; a match trades at its first qualifying
-    look and never again. Trades are settled and given closing line value."""
+    look and never again. Trades are settled and given closing line value.
+
+    `probs` picks the chance the edge is measured with (STRATEGIES): "raw" (the model)
+    or "blend" (pb_<market> from add_blend). Settlement is the same either way.
+    """
     if candidates.empty:
         return pd.DataFrame(columns=tr.ENTRY_FIELDS)
+    if probs == "blend":
+        candidates = blend_view(candidates)
     order = {k: i for i, k in enumerate(dict.fromkeys(candidates["look"]))}
     picked = tr.select_trades(candidates, threshold=threshold, max_odds=max_odds)
     if picked.empty:
@@ -339,23 +398,82 @@ def dk_trades(
     return pd.DataFrame(out)
 
 
+def dk_strategies(
+    candidates: pd.DataFrame,
+    threshold: float = tr.PAPER_EDGE,
+    max_odds: float | None = None,
+    league: str = "E0",
+    model_ref: dict | None = None,
+    thresholds=tr.SWEEP,
+) -> dict:
+    """Each strategy's trades at `threshold` plus its threshold sweep (with and without
+    the odds cap): bets, ROI with a bootstrap 95% range, CLV, and avg chance vs won."""
+    out = {}
+    for probs, label in STRATEGIES.items():
+        if probs == "blend" and "pb_home" not in candidates:
+            continue
+        main = dk_trades(candidates, threshold, max_odds, league, model_ref, probs=probs)
+        rows = []
+        for cap in (None, tr.CAP_ODDS):
+            for t in thresholds:
+                tt = dk_trades(candidates, t, cap, league, probs=probs)
+                s = tr.summarize(tt)
+                ci = tr.bootstrap_roi(tt) if s.get("settled") else None
+                if s.get("settled"):
+                    settled = tt[tt["status"].isin(["won", "lost"])]
+                    s["avg_p"] = float(settled["model_p"].mean())
+                rows.append({"threshold": t, "max_odds": cap, **s, "roi_ci95": ci and list(ci)})
+        summary = tr.report(main)["summary"]
+        out[probs] = {"label": label, "summary": summary, "sweep": rows, "trades_df": main}
+    return out
+
+
+def _group_log_loss(df: pd.DataFrame, names: tuple[str, ...], group: str) -> dict:
+    rows = []
+    for r in df.to_dict("records"):
+        c = r["close"]
+        if not all(c.get(m) and c.get(m) > 1 for m in names):
+            continue
+        y = int(mc.outcome_index(r["home_goals"], r["away_goals"], group))
+        mk = devig_shin(np.array([c[m] for m in names], dtype=float))
+        pm = [r[f"p_{m}"] for m in names]
+        pb = [r.get(f"pb_{m}") for m in names]
+        has_b = all(x is not None and np.isfinite(x) for x in pb)
+        rows.append(
+            (
+                -np.log(max(pm[y], 1e-12)),
+                -np.log(max(mk[y], 1e-12)),
+                -np.log(max(pb[y], 1e-12)) if has_b else np.nan,
+            )
+        )
+    if not rows:
+        return {}
+    a = np.array(rows)
+    out = {"matches": len(a), "model": float(a[:, 0].mean()), "draftkings": float(a[:, 1].mean())}
+    b = a[np.isfinite(a[:, 2])]
+    if len(b):
+        # On the matches the blend covers (it needs a few hundred earlier matches first).
+        out["blend_matches"] = len(b)
+        out["model_on_blend"] = float(b[:, 0].mean())
+        out["blend"] = float(b[:, 2].mean())
+        out["draftkings_on_blend"] = float(b[:, 1].mean())
+    return out
+
+
 def dk_log_loss(candidates: pd.DataFrame) -> dict:
-    """Model log loss beside DraftKings' (margin-free close) on the same matches."""
+    """Model (and blend) log loss beside DraftKings' margin-free close on the same matches.
+
+    One row per match, at its last look. Home/draw/away at the top level; over/under 2.5
+    under "totals".
+    """
     if candidates.empty:
         return {}
     df = candidates.drop_duplicates(["home", "away", "season"], keep="last")
     df = df[~df["void"]]
-    rows = []
-    for r in df.to_dict("records"):
-        c = r["close"]
-        if not all(c.get(m) and c.get(m) > 1 for m in ("home", "draw", "away")):
-            continue
-        hg, ag = r["home_goals"], r["away_goals"]
-        y = 0 if hg > ag else 1 if hg == ag else 2
-        mk = devig_shin(np.array([c["home"], c["draw"], c["away"]], dtype=float))
-        pm = [r["p_home"], r["p_draw"], r["p_away"]]
-        rows.append((-np.log(max(pm[y], 1e-12)), -np.log(max(mk[y], 1e-12))))
-    if not rows:
+    out = _group_log_loss(df, mc.H2H, "h2h")
+    if not out:
         return {}
-    a = np.array(rows)
-    return {"matches": len(a), "model": float(a[:, 0].mean()), "draftkings": float(a[:, 1].mean())}
+    totals = _group_log_loss(df, mc.TOTALS, "totals")
+    if totals:
+        out["totals"] = totals
+    return out
