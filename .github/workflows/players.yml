@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
     inputs:
       seasons:
-        description: "Seasons to test (start years)"
-        default: "2023-2025"
+        description: "Seasons to test (start years; now = the season in progress, left out until it has played matches)"
+        default: "2023-now"
       odds_seasons:
         description: "Seasons of historical player odds to download (blank = none)"
         default: ""
@@ -68,7 +68,7 @@ jobs:
           uv sync --frozen
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          SEASONS="${{ inputs.seasons || '2023-2025' }}"
+          SEASONS="${{ inputs.seasons || '2023-now' }}"
           for attempt in 1 2 3; do
             git worktree remove --force ../log 2>/dev/null || rm -rf ../log
             git worktree prune
@@ -78,7 +78,7 @@ jobs:
               --out ../log/backtest/E0_player_trades.csv --log-dir ../log
             git -C ../log add -A backtest
             if git -C ../log diff --cached --quiet; then exit 0; fi
-            git -C ../log commit -q -m "Player model $SEASONS"
+            git -C ../log commit -q -m "Player model $SEASONS ($(date -u +%F))"
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
