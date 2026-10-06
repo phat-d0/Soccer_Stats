@@ -326,3 +326,158 @@ def test_espn_parse_join_and_compare():
     assert c["shots_exact"] == pytest.approx(0.5)
     assert c["sot_exact"] == 1.0
     assert espn.compare(pd.DataFrame())["player_matches"] == 0
+
+
+# ---------- signals vs the closing-line move ----------
+
+
+def _probs(r):
+    """1X2 chances from a log(home/away) ratio, with a fixed 27% draw."""
+    h = 1 / (1 + np.exp(-r))
+    return 0.73 * h, np.full_like(r, 0.27), 0.73 * (1 - h)
+
+
+def _market(n=2400, seed=0, hidden_sd=0.3):
+    """Matches where the close knows `hidden` and the early price doesn't.
+
+    The model knows it too (model_vs_early is a planted signal); the market-average
+    price is the early one plus noise (soft_vs_sharp is a null signal).
+    """
+    rng = np.random.default_rng(seed)
+    true = rng.normal(0.3, 0.7, n)
+    hidden = rng.normal(0, hidden_sd, n)
+    early = true - hidden
+    t_true = rng.normal(0, 0.4, n)
+    t_hidden = rng.normal(0, 0.2, n)
+    ph, pd_, pa = _probs(true)
+    eh, ed, ea = _probs(early)
+    ah, ad, aa = _probs(early + rng.normal(0, 0.1, n))
+    u = rng.random(n)
+    res = np.where(u < ph, 0, np.where(u < ph + pd_, 1, 2))
+    over = rng.random(n) < 1 / (1 + np.exp(-t_true))
+    po_e = 1 / (1 + np.exp(-(t_true - t_hidden)))
+    po_c = 1 / (1 + np.exp(-t_true))
+    df = pd.DataFrame(
+        {
+            "date": pd.Timestamp("2018-08-01") + pd.to_timedelta(np.arange(n) // 4, "D"),
+            "home": [f"H{i % 20}" for i in range(n)],
+            "away": [f"A{i % 20}" for i in range(n)],
+            "home_goals": np.where(res == 0, 2, np.where(res == 1, 1, 0)),
+            "away_goals": np.where(res == 2, 2, np.where(res == 1, 1, 0)),
+            "p_home": ph,
+            "p_draw": pd_,
+            "p_away": pa,
+            "p_over25": po_c,
+            "p_under25": 1 - po_c,
+        }
+    )
+    # Results are 2-0, 1-1 or 0-2 (under 2.5); one more goal each makes it over.
+    df.loc[over, ["home_goals", "away_goals"]] += 1
+    df["season"] = df["date"].dt.year.astype(str)
+    for name, (h, d, a) in {
+        "pinnacle_close": (ph, pd_, pa),
+        "pinnacle_early": (eh, ed, ea),
+        "avg_early": (ah, ad, aa),
+    }.items():
+        df[f"{name}_home"], df[f"{name}_draw"], df[f"{name}_away"] = (
+            1 / (1.03 * h),
+            1 / (1.03 * d),
+            1 / (1.03 * a),
+        )
+    for name, p in (("pinnacle_early", po_e), ("pinnacle_close", po_c)):
+        df[f"{name}_over25"], df[f"{name}_under25"] = 1 / (1.03 * p), 1 / (1.03 * (1 - p))
+    return df
+
+
+def test_signals_find_a_planted_move_and_not_a_null_one():
+    from soccer_stats.edge import signals
+
+    df = signals.build(_market())
+    assert df["move_h2h"].notna().all()
+    planted = signals.move_test(df, "model_vs_early")
+    null = signals.move_test(df, "soft_vs_sharp")
+    assert planted["oos_r2"] > 0.3 and planted["slope_range"][0] > 0
+    assert planted["clv"] > 0.02 and planted["clv_range"][0] > 0
+    assert null["oos_r2"] < 0.02
+    assert null["slope_range"][0] < 0 < null["slope_range"][1] or abs(null["corr"]) < 0.05
+    tot = signals.move_test(df, "model_total_vs_early")
+    assert tot["oos_r2"] > 0.3 and tot["clv"] > 0
+    base = signals.move_baseline(df)
+    assert base["h2h"]["random_side_clv"] < 0.01
+
+
+def test_blend_weight_rewards_only_information_the_price_lacks():
+    from soccer_stats.edge import signals
+
+    df = signals.build(_market(n=4000, hidden_sd=0.7))
+    planted = signals.blend_test(df, "model_vs_early")
+    null = signals.blend_test(df, "soft_vs_sharp")
+    assert planted["gain"] > 0 and planted["gain_range"][0] > 0
+    assert all(c > 0 for c in planted["d_by_season"])
+    assert planted["ll_close"] - 0.01 < planted["ll_with_signal"] < planted["ll_early"]
+    assert null["gain_range"][0] < 0.001
+
+
+def test_team_form_uses_only_earlier_matches():
+    from soccer_stats.edge import signals
+
+    rng = np.random.default_rng(3)
+    teams = [f"T{i}" for i in range(6)]
+    rows = []
+    for k in range(60):
+        h, a = rng.choice(teams, 2, replace=False)
+        rows.append(
+            {
+                "date": pd.Timestamp("2024-08-01") + pd.Timedelta(days=3 * k),
+                "home": h,
+                "away": a,
+                "home_goals": int(rng.poisson(1.5)),
+                "away_goals": int(rng.poisson(1.2)),
+                "home_xg": float(rng.gamma(2, 0.7)),
+                "away_xg": float(rng.gamma(2, 0.6)),
+            }
+        )
+    m = pd.DataFrame(rows)
+    f = signals.team_form(m)
+    # Changing the last match's result changes no form value (all are from earlier).
+    m2 = m.copy()
+    m2.loc[59, ["home_goals", "away_goals", "home_xg", "away_xg"]] = [9, 0, 6.0, 0.1]
+    pd.testing.assert_frame_equal(f, signals.team_form(m2))
+    # Form for a match is the mean of that team's previous matches.
+    i = 40
+    team = m.loc[i, "home"]
+    prev = m.iloc[:i]
+    prev = prev[(prev["home"] == team) | (prev["away"] == team)].tail(signals.FORM_WINDOW)
+    gd = np.where(
+        prev["home"] == team,
+        prev["home_goals"] - prev["away_goals"],
+        prev["away_goals"] - prev["home_goals"],
+    )
+    assert f.loc[i, "home_gd"] == pytest.approx(gd.mean())
+    assert f.loc[i, "home_rest"] == min(
+        (m.loc[i, "date"] - prev["date"].iloc[-1]).days, signals.REST_CAP
+    )
+    # A team's first matches have no form yet, and a full rest.
+    first = m.index[0]
+    assert np.isnan(f.loc[first, "home_xgd"]) and f.loc[first, "home_rest"] == signals.REST_CAP
+
+
+def test_signals_command_runs_end_to_end(monkeypatch, tmp_path, capsys):
+    import json
+
+    from soccer_stats.edge import run
+
+    joined = _market(n=1600)
+    rng = np.random.default_rng(5)
+    matches = joined[["date", "home", "away", "home_goals", "away_goals"]].copy()
+    matches["home_xg"] = rng.gamma(2, 0.7, len(matches))
+    matches["away_xg"] = rng.gamma(2, 0.6, len(matches))
+    monkeypatch.setattr(run, "_match_data", lambda args: (matches, joined, None))
+    out = tmp_path / "signals.json"
+    run.main(["signals", "--json", str(out)])
+    text = capsys.readouterr().out
+    assert "14 tests" in text and "xg_vs_goals" in text
+    res = json.loads(out.read_text())
+    assert len(res["moves"]) == len(res["blends"]) == 7
+    xg = next(r for r in res["moves"] if r["signal"] == "xg_vs_goals")
+    assert xg["test_rows"] > 500
