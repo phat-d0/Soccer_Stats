@@ -96,8 +96,8 @@ None of these signals justifies a model change for betting.
 - No free source gives timestamped historical FPL changes or timestamped soft prices.
   football-data's early and close prices carry no time.
 - To make it testable, see proposal M2 below: log the DraftKings 1X2 prices that
-  `publish.yml` already fetches, with their time. Then compare each FPL status change
-  (for a regular starter) with the price move in the next and previous hour. About 100
+  `publish.yml` already fetches, with their time. It touches `publish.yml` and data-log, so the lead
+  owns it. Then compare each FPL status change (for a regular starter) with the price move in the next and previous hour. About 100
   matches (mid-December) gives a first read. The cost is 0 credits: publish already pays
   for these calls.
 
@@ -167,7 +167,7 @@ roughly ±1.5 points, and the paired price lift is much tighter.
 
 | # | Step | Expected value | Cost | Owner |
 | --- | --- | --- | --- | --- |
-| 1 | M2: log live prices with timestamps, then test team news in December | Low to medium; the only untested free idea | 0 credits | moneyline, then edge-finder |
+| 1 | M2: log live prices with timestamps, then test team news in December | Low to medium; the only untested free idea | 0 credits | lead-reviewer (touches `publish.yml` and data-log; moneyline handed it on), then edge-finder |
 | 2 | Asian handicap and other totals lines on football-data (round 1's C): is the model's CLV better there? | Low after this round: the model earns no weight on 1X2 or O/U 2.5 | 0 credits | moneyline (in progress: `match_markets.py` on `team/moneyline`) |
 | 3 | Best-over pilot (section 2), only if the owner wants player bets kept alive | Low (prior about 15%) | 100 credits, then 2,000 | edge-finder, owner approval |
 | 4 | Recheck for two-sided EPL player shots in December (round 1's F) | Low | 5 credits | edge-finder |
