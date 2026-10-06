@@ -15,6 +15,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 - `data-log`: written only by workflows. Holds:
   - the paper-trade ledger (`trades/*.jsonl`, append-only);
   - team-news history (`fpl_news/`);
+  - the live DraftKings odds log (`odds_log/E0_<YYYY-MM>.jsonl`, append-only);
   - backtest results (`backtest/E0_dk.json`, `backtest/E0_players.json`, `backtest/E0_players_detail.json`, `backtest/E0_player_trades.csv`, `backtest/E0_player_lines.csv.gz`).
   Read it with `git fetch origin data-log && git show origin/data-log:<path>`.
 - GitHub Pages serves the app. Source = GitHub Actions. The repo must stay public, or Pages goes 404.
@@ -27,7 +28,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 
 | File | What | Credits |
 | --- | --- | --- |
-| `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
+| `publish.yml` | Builds the site (`soccer-stats publish`), then on `data-log` logs team news (`log-news`), the build's DraftKings prices (`log-odds`) and paper trades (`paper`), and deploys Pages. Only the default branch publishes: pushes elsewhere don't trigger it, and a dispatch on another branch skips `data-log`. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots, signals), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots, signals) to ~100 per historical props call |
@@ -69,6 +70,10 @@ Read its "Status and next steps" section first; this file is the technical map.
   - `xg_features` (6-match xG form, earlier matches only) and `soft_vs_sharp` are blend signals;
   - `run` reports log loss, the blend weight, signal tests and the threshold sweep at Pinnacle early/close and the average/maximum early, with ROI ranges and CLV vs Pinnacle's fair close.
 - `odds_feed.py`: live DraftKings odds and the credit budget.
+- `odds_log.py`: the live DraftKings price log on `data-log` (`odds_log/E0_<YYYY-MM>.jsonl`), written by `soccer-stats log-odds` from the built `data.json` (no API calls).
+  - One row per fixture × market (h2h, totals 2.5): prices, margin-free `fair`, `bookmaker`, `fetched_at` (DraftKings' `last_update`, else the download time; `time_source` says which), `downloaded_at`, `logged_at`, and the model's `p` and `p_bet` then.
+  - Append-only and deduplicated on fixture, market, prices and `fetched_at`; quotes at or after kickoff are skipped.
+  - `load` reads it; `last_before(log, home, away, kickoff, market)` gives the last quote before kickoff (the live close).
 - `odds_history.py`: historical match odds.
 
 **Trades and portfolio**
@@ -77,7 +82,9 @@ Read its "Status and next steps" section first; this file is the technical map.
   - Player bets: `player_picks`, best line per player and market, max 4 per match; a line with no chance (`p` None) never trades.
   - `PLAYER_PAPER_TRADES = False`: the owner's switch (6 Oct). No live player paper trades open until a player rule backtests positive; open ones still settle. Published as `players_status.paper_trades`; the app says player trades are off.
   - Also settlement, summaries, `report`. Keep it free of network code.
-- `paper.py`: live paper ledger (append-only "open" plus "update" events) and the `portfolio` section of `data.json`. Match trades use the fixture's `p_bet` (the blend) when set, else `p`. It merges the priced player backtest trades into the backtest view.
+- `paper.py`: live paper ledger (append-only "open" plus "update" events) and the `portfolio` section of `data.json`. Match trades use the fixture's `p_bet` (the blend) when set, else `p`.
+  - Live match closes come from the odds log: the last logged price before kickoff sets `close_odds`, `close_prices`, `close_fetched_at`, `close_minutes_before`, `clv_dk` and `beat_close_dk` (update events; entry fields never change). Without a log, the price each build sees until kickoff.
+  - `trades.summarize` adds `close_over_60min`: settled trades whose close was quoted over 60 minutes before kickoff (scheduled runs are throttled). It merges the priced player backtest trades into the backtest view.
 
 **Player bets**
 - `player_data.py`: Understat per-match shots, name matching (exact name wins; ambiguous names are skipped and counted), season stats, active players (FPL status "u" = left).
@@ -113,7 +120,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
-- `cli.py`: the `soccer-stats` commands: `publish`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`.
+- `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
@@ -176,6 +183,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - Model picks at Pinnacle early, 12%: CLV −4.2% (1X2, 1,419 bets), −2.9% (O/U, 285), −2.0% (AH, 744), worse than a random side. AH blend: CLV −0.2% to +0.8% at 2–8%, no range above 0.
   - xG form, xG-minus-goals and soft-vs-sharp earn no out-of-sample log loss (all ranges include 0). Late team news can't be tested yet (FPL log starts 5 Oct 2026).
   - Verdict: no AH or O/U bets in the live rule; nothing in the live code changed.
+- Round 3: the publish run logs every DraftKings quote it downloads (`odds_log/`), and live match trades take their close and CLV vs DraftKings from it. This is the data for testing late team news (price moves between looks) once the 2026/27 season has played some weeks.
   - The AH rows at football-data's average and maximum prices (avg −3.2%, max blend +1.2% to +2.6%) are unreliable (stale quotes; see the data warning above). The Pinnacle-only AH results stand.
 - Free signals (edge finder, `edge/signals.py`, 2017–2026, 7 signals × 2 tests, Bonferroni 99.64% ranges): none earns blend weight beside Pinnacle early (best gain +0.0002, range −0.0017 to +0.0019). Soft-vs-sharp and xG form predict the early-to-close move a little (R² 0.1–1.6%), but betting them at Pinnacle early gives CLV −1.6% to −3.7%, never positive.
 - Line shopping (edge finder, football-data 2017–2026, ~1,700–2,100 bets): the rule's CLV vs Pinnacle's fair close is −6.6% at the average book, −4.0% at Pinnacle early, −2.3% at the best of seven named books. Only the unbettable market maximum is positive, and it turned negative in the last two seasons. The picks do no better than random against the sharp close.

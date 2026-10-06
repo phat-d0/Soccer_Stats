@@ -3,6 +3,7 @@
 soccer-stats backtest --league E0 --seasons 2019-2024
 soccer-stats backtest --league E0 --seasons 2019-2024 --xg-weight 0 0.5 0.7 1
 soccer-stats publish --out _site
+soccer-stats log-odds --site _site --log-dir ../log
 soccer-stats paper --site _site --log-dir ../log
 soccer-stats backfill-odds --seasons 2025 --dry-run
 soccer-stats backtest-dk --seasons 2023-2025 --out dk_trades.csv
@@ -101,6 +102,18 @@ def cmd_log_news(args: argparse.Namespace) -> None:
     snapshot = json.loads(Path(args.snapshot).read_text())
     n = append_news_log(snapshot, Path(args.log_dir))
     print(f"{n} team-news changes logged")
+
+
+def cmd_log_odds(args: argparse.Namespace) -> None:
+    """Append the build's DraftKings prices to odds_log/ (no API calls; deduplicated)."""
+    import json
+
+    from soccer_stats import odds_log
+
+    data = json.loads((Path(args.site) / "data.json").read_text())
+    rows = odds_log.rows_from_data(data, pd.Timestamp.now(tz="UTC"), args.league)
+    n = odds_log.append(Path(args.log_dir), rows, args.league)
+    print(f"Odds log: {n} new rows ({len(rows)} priced fixture markets this build)")
 
 
 def cmd_paper(args: argparse.Namespace) -> None:
@@ -730,6 +743,12 @@ def main(argv: list[str] | None = None) -> None:
     log.add_argument("--snapshot", default="_site/news_snapshot.json")
     log.add_argument("--log-dir", required=True)
     log.set_defaults(func=cmd_log_news)
+
+    lo = sub.add_parser("log-odds", help="append the build's DraftKings prices to odds_log/")
+    lo.add_argument("--site", default="_site", help="folder written by publish")
+    lo.add_argument("--log-dir", required=True, help="data-log checkout")
+    lo.add_argument("--league", default="E0")
+    lo.set_defaults(func=cmd_log_odds)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")

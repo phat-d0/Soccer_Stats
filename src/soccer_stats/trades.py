@@ -58,6 +58,7 @@ ODDS_BUCKETS = [
     (3.5, 6.0, "3.5–6.0"),
     (6.0, math.inf, "over 6.0"),
 ]
+STALE_CLOSE_MINUTES = 60  # a live close quoted earlier than this before kickoff is stale
 SWEEP = (0.02, 0.05, 0.08, 0.12, 0.15, 0.20)
 
 
@@ -182,7 +183,9 @@ def new_trade(
         "actual": None,
         "close_odds": None,
         "close_fetched_at": None,
+        "close_minutes_before": None,
         "clv_dk": None,
+        "beat_close_dk": None,
         "clv_pinnacle": None,
         "status": "open",
         "score": None,
@@ -328,6 +331,11 @@ def summarize(trades: pd.DataFrame) -> dict:
             v = settled[col].dropna()
             out[f"clv_{key}"] = float(v.mean())
             out[f"beat_close_{key}"] = float((v > 0).mean())
+    if "close_minutes_before" in settled and "clv_dk" in settled:
+        # Live closes come from throttled scheduled builds: count the stale ones.
+        mins = pd.to_numeric(settled.loc[settled["clv_dk"].notna(), "close_minutes_before"])
+        if mins.notna().any():
+            out["close_over_60min"] = int((mins > STALE_CLOSE_MINUTES).sum())
     return out
 
 

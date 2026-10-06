@@ -225,6 +225,10 @@ def fixture_cards(
                     "under25": r["odds_under25"],
                 },
                 "implied": implied_probs(r),
+                # When DraftKings last changed these prices (their last_update), if known.
+                "odds_updated": r.get("odds_updated")
+                if isinstance(r.get("odds_updated"), str)
+                else None,
                 "low_data": bool(r["low_data"]),
                 # Team news: applied only to each team's next match (see players.py).
                 "news_applied": adjusted,
