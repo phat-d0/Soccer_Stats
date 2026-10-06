@@ -4,8 +4,10 @@ Every scheduled build calls update_ledger, which:
 1. opens a trade for each upcoming fixture whose best pick passes the trade rule
    (trades.best_pick at PAPER_EDGE), using DraftKings odds fetched within the last
    FRESH_HOURS and only before kickoff;
-2. tracks the closing price of open trades until kickoff (the last DraftKings price
-   seen before kickoff), with closing line value against it;
+2. tracks the closing price of match trades: the last DraftKings price before kickoff
+   in the odds log (odds_log.py; without a log, the last price seen by a build before
+   kickoff), with closing line value against it and how many minutes before kickoff
+   that price was quoted (GitHub throttles scheduled runs, so it can be hours);
 3. settles trades once football-data has the result, adding closing line value against
    Pinnacle's close; voids a trade if kickoff moves by more than VOID_MOVED_HOURS or no
    result arrives within VOID_AFTER_DAYS.
@@ -24,6 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from soccer_stats import odds_log as ol
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
@@ -36,7 +39,9 @@ UPDATE_FIELDS = {
     "close_odds",
     "close_prices",
     "close_fetched_at",
+    "close_minutes_before",
     "clv_dk",
+    "beat_close_dk",
     "clv_pinnacle",
     "status",
     "score",
@@ -115,6 +120,40 @@ def _result(results: pd.DataFrame, trade: dict) -> dict | None:
     return r.iloc[0].to_dict() if not r.empty else None
 
 
+def _minutes_before(kickoff, quoted) -> float | None:
+    if not quoted:
+        return None
+    return round((pd.Timestamp(kickoff) - pd.Timestamp(quoted)) / pd.Timedelta(minutes=1), 1)
+
+
+def _close_fields(t: dict, group: dict, quoted, kickoff) -> dict:
+    """Closing fields for a match trade from its market group's prices at `quoted`."""
+    clv = tr.clv(t["odds"], t["market"], group)
+    return {
+        "close_odds": group.get(t["market"]),
+        "close_prices": group,
+        "close_fetched_at": quoted,
+        "close_minutes_before": _minutes_before(kickoff, quoted),
+        "clv_dk": clv,
+        "beat_close_dk": None if clv is None else bool(clv > 0),
+    }
+
+
+def _log_close(t: dict, log: pd.DataFrame, now: pd.Timestamp) -> dict | None:
+    """An update event when the odds log holds a later close than the trade has."""
+    market = "h2h" if t["market"] in ol.MARKETS["h2h"] else "totals"
+    r = ol.last_before(log, t["home"], t["away"], t["kickoff"], market)
+    if r is None:
+        return None
+    quoted = r["fetched_at"].isoformat(timespec="seconds")
+    group = {m: r["prices"].get(m) for m in tr.GROUPS[t["market"]]}
+    if quoted == t.get("close_fetched_at") and group == t.get("close_prices"):
+        return None
+    if t.get("close_fetched_at") and pd.Timestamp(quoted) < pd.Timestamp(t["close_fetched_at"]):
+        return None  # never step the close back in time
+    return _update(t, now, **_close_fields(t, group, quoted, t["kickoff"]))
+
+
 def update_ledger(
     ledger: dict[str, dict],
     fixtures: list[dict],
@@ -125,6 +164,7 @@ def update_ledger(
     ref: dict | None = None,
     apps: pd.DataFrame | None = None,
     players_on: bool = False,
+    odds_log: pd.DataFrame | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -132,7 +172,9 @@ def update_ledger(
     ...). Player trades open only when `players_on` (the player model passed its gate)
     and the trades.PLAYER_PAPER_TRADES switch is on; open ones settle on Understat's
     counts in `apps` either way. The note explains why nothing could be
-    opened, if so.
+    opened, if so. With `odds_log` (odds_log.load), every live match trade's close is
+    the last logged DraftKings price before kickoff; without it, the price each build
+    sees until kickoff.
     """
     events: list[dict] = []
     note = None
@@ -179,17 +221,23 @@ def update_ledger(
             )
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
-            t.update(
-                close_odds=t["odds"],
-                close_prices=group,
-                close_fetched_at=fetched,
-                clv_dk=tr.clv(t["odds"], t["market"], group),
-            )
+            quoted = c.get("odds_updated") or fetched
+            t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
             ledger[tid] = t
             events.append({"type": "open", **t})
 
     if players_on and tr.PLAYER_PAPER_TRADES:
         events += _open_player_trades(ledger, cards, now, league, ref)
+
+    # 2a. The close from the odds log, for every live match trade (settled ones too, so
+    # trades opened before the log existed get their close once it covers them).
+    if odds_log is not None:
+        for t in ledger.values():
+            if t["source"] != "live" or t.get("bet_type") == "player" or t["status"] == "void":
+                continue
+            ev = _log_close(t, odds_log, now)
+            if ev:
+                events.append(ev)
 
     # 2. Track the close and catch moved fixtures; 3. settle.
     for t in ledger.values():
@@ -213,20 +261,11 @@ def update_ledger(
                 events.append(ev)
             continue
         if kickoff > now:
-            if c and fresh and pd.Timestamp(fetched) < kickoff:
+            if odds_log is None and c and fresh and pd.Timestamp(fetched) < kickoff:
                 group = {m: (c.get("odds") or {}).get(m) for m in tr.GROUPS[t["market"]]}
-                price = group.get(t["market"])
-                if price and group != t.get("close_prices"):
-                    events.append(
-                        _update(
-                            t,
-                            now,
-                            close_odds=price,
-                            close_prices=group,
-                            close_fetched_at=fetched,
-                            clv_dk=tr.clv(t["odds"], t["market"], group),
-                        )
-                    )
+                if group.get(t["market"]) and group != t.get("close_prices"):
+                    quoted = c.get("odds_updated") or fetched
+                    events.append(_update(t, now, **_close_fields(t, group, quoted, kickoff)))
             continue
         res = _result(results, t)
         if res is not None:
@@ -439,6 +478,7 @@ def run(
                 "so nothing was opened this update."
             )
         else:
+            log = ol.load(log_dir, league) if ol.log_dir(log_dir).is_dir() else None
             events, note = update_ledger(
                 ledger,
                 data.get("fixtures", []),
@@ -451,6 +491,7 @@ def run(
                 players_on=bool(
                     ((data.get("players_status") or {}).get("gate") or {}).get("passed")
                 ),
+                odds_log=log,
             )
             written = append_events(log_dir, events, league)
             live.update(portfolio_section(list(ledger.values())), note=note)

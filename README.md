@@ -72,7 +72,7 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Model probability | the one the app shows (team news included); the one without is stored too |
 | Live entry | first build where the pick qualifies, odds under 3 hours old, before kickoff |
 | Backtest entry | first qualifying look, 48 and 3 hours before kickoff |
-| Close | last DraftKings price before kickoff (for closing line value) |
+| Close | last DraftKings price before kickoff in the odds log (for closing line value); its minutes before kickoff are stored, since scheduled builds can be late |
 | Settlement | 90-minute result from football-data; void if kickoff moves 48h+ or no result in 14 days |
 
 **Live paper trades** (`paper.py`): after each build, `soccer-stats paper` updates an
@@ -80,6 +80,14 @@ append-only ledger at `paper_trades/E0_<season>.jsonl` on the `data-log` branch.
 entry (time, price, probability, edge) is written once and never edited; later lines only
 add the closing price and the settlement. Rebuilding adds nothing new. If the ledger or
 the odds are unavailable, the site still publishes, opens nothing, and the tab says why.
+
+**Odds log.** Each publish run appends the DraftKings prices it downloaded (no extra API
+calls) to `odds_log/E0_<YYYY-MM>.jsonl` on the `data-log` branch: one row per fixture and
+market, with each outcome's price and margin-free chance, when DraftKings quoted it, and
+the model's and the blend's chances at that moment. Rows are never rewritten and never
+duplicated. Live trades take their close from it (`close_odds`, `close_minutes_before`,
+`clv_dk`, `beat_close_dk`), and the Portfolio summary counts closes quoted over an hour
+before kickoff (`close_early`). Read it with `odds_log.load`.
 
 **DraftKings backtest** (needs a paid Odds API plan for historical odds):
 
