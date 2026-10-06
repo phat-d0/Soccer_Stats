@@ -7,15 +7,17 @@
 #   match:    line shopping on football-data prices with the walk-forward match model
 #             (no credits).
 #   shots:    Understat's shot counts vs football-data (team) and ESPN (player); no credits.
+#   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
+#             move and as blend inputs (no credits).
 name: Player odds check
 
 on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match or shots"
+        description: "coverage, props, match, shots or signals"
         type: choice
-        options: [coverage, props, match, shots]
+        options: [coverage, props, match, shots, signals]
         default: coverage
       cap:
         description: "props: most credits to spend (0 = dry run)"
@@ -24,7 +26,7 @@ on:
         description: "props: historical dates (comma-separated ISO times)"
         default: "2026-10-03T08:00:00Z,2025-03-15T08:00:00Z"
       seasons:
-        description: "match: seasons to bet (start years); shots: seasons to load"
+        description: "match/signals: seasons to bet (start years); shots: seasons to load"
         default: "2017-2025"
 
 permissions:
@@ -44,7 +46,7 @@ jobs:
           restore-keys: player-odds-history-
       # Restore only: this job never saves a cache, so it can't disturb the paid ones.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'match' || inputs.task == 'shots' }}
+        if: ${{ inputs.task == 'match' || inputs.task == 'shots' || inputs.task == 'signals' }}
         with:
           path: data/raw
           key: raw-data-none
@@ -65,6 +67,8 @@ jobs:
                      --hist-dates "$HIST_DATES" --json out/props.json ;;
             match) uv run python -m soccer_stats.edge.run match --seasons "$SEASONS" \
                      --json out/match.json ;;
+            signals) uv run python -m soccer_stats.edge.run signals --seasons "$SEASONS" \
+                     --json out/signals.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
           esac

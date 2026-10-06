@@ -1,9 +1,11 @@
-"""Edge research jobs: `python -m soccer_stats.edge.run {props,match,fanduel} ...`.
+"""Edge research jobs: `python -m soccer_stats.edge.run {props,match,shots,signals,fanduel} ...`.
 
 * props: paid probe of two-sided player-prop books (needs ODDS_API_KEY; --cap credits).
 * match: line shopping on football-data prices with the walk-forward match model
   (needs football-data and Understat, so it runs in GitHub Actions; no credits).
 * shots: Understat's shot counts vs football-data (team) and ESPN (player).
+* signals: free signals vs Pinnacle's early-to-close move and as blend inputs
+  (football-data and Understat, so it runs in GitHub Actions; no credits).
 * fanduel: slices of backtest/E0_player_lines.csv.gz (local file, no network).
 
 Output is plain text for the job log, plus JSON with --json. The key is never printed.
@@ -86,9 +88,9 @@ def cmd_props(args: argparse.Namespace) -> None:
     _dump(out, args.json)
 
 
-def cmd_match(args: argparse.Namespace) -> None:
+def _match_data(args: argparse.Namespace):
+    """Matches with xG, walk-forward predictions joined to football-data prices."""
     from soccer_stats import backtest
-    from soccer_stats import trades as tr
     from soccer_stats.data import download, load_matches, season_code
     from soccer_stats.edge import books
     from soccer_stats.models import DixonColes
@@ -113,6 +115,14 @@ def cmd_match(args: argparse.Namespace) -> None:
     prices = pd.concat(frames, ignore_index=True)
     joined = books.add_fair_close(books.join(preds, prices))
     print(f"{len(joined)} predictions matched to football-data prices")
+    return matches, joined, prices
+
+
+def cmd_match(args: argparse.Namespace) -> None:
+    from soccer_stats import trades as tr
+    from soccer_stats.edge import books
+
+    _, joined, prices = _match_data(args)
 
     mg = books.margins(prices)
     print("\n== Margin by book (sum of 1/odds - 1) ==")
@@ -203,6 +213,70 @@ def _fmt(df: pd.DataFrame) -> pd.DataFrame:
     return d.round(4)
 
 
+def cmd_signals(args: argparse.Namespace) -> None:
+    from soccer_stats.edge import signals
+    from soccer_stats.edge.stats import bonferroni_level
+
+    matches, joined, _ = _match_data(args)
+    form = signals.team_form(matches)
+    form = pd.concat([matches[["date", "home", "away"]], form], axis=1)
+    form["date"] = pd.to_datetime(form["date"]).dt.normalize()
+    df = signals.build(joined, form)
+    tests = 2 * len(signals.SIGNALS)
+    level = bonferroni_level(tests)
+    print(f"\n{len(df)} matches; {len(signals.SIGNALS)} signals x 2 tests = {tests} tests;")
+    print(f"ranges are {level:.2%} (Bonferroni for {tests}).")
+    base = signals.move_baseline(df)
+    print("\n== Early-to-close moves at Pinnacle, and a random early bet's CLV ==")
+    for g, v in base.items():
+        print(f"  {g}: {v}")
+    for name, (group, text) in signals.SIGNALS.items():
+        cov = df[name].notna().mean()
+        print(f"  {name} ({group}, {cov:.0%} of matches): {text}")
+    moves, blends = signals.run_all(df, level)
+    print("\n== 1. Does the signal predict the early-to-close move? (out of sample) ==")
+    print(_fmt_sig(moves).to_string(index=False))
+    print("\n== 2. Does it earn blend weight beside Pinnacle early? (log loss, by season) ==")
+    print(_fmt_sig(blends).to_string(index=False))
+    by_season = []
+    for name in signals.SIGNALS:
+        for season, part in df.groupby("season"):
+            g = signals.SIGNALS[name][0]
+            d = part[[name, f"move_{g}"]].dropna()
+            if len(d) > 30 and d[name].std() > 0:
+                by_season.append(
+                    {
+                        "signal": name,
+                        "season": season,
+                        "rows": len(d),
+                        "corr": float(d.corr().iloc[0, 1]),
+                    }
+                )
+    bs = pd.DataFrame(by_season)
+    print("\n== Correlation with the move, by season ==")
+    print(bs.pivot(index="signal", columns="season", values="corr").round(3).to_string())
+    _dump(
+        {
+            "seasons": args.seasons,
+            "tests": tests,
+            "level": level,
+            "baseline": base,
+            "moves": moves.to_dict("records"),
+            "blends": blends.to_dict("records"),
+            "by_season": by_season,
+        },
+        args.json,
+    )
+
+
+def _fmt_sig(df: pd.DataFrame) -> pd.DataFrame:
+    d = df.copy()
+    for c in ("slope_range", "clv_range", "gain_range"):
+        if c in d:
+            d[c] = [f"{v[0]:+.4f}..{v[1]:+.4f}" if isinstance(v, tuple) else "" for v in d[c]]
+    return d.round(4)
+
+
 def cmd_fanduel(args: argparse.Namespace) -> None:
     from soccer_stats.edge import fanduel
 
@@ -238,6 +312,11 @@ def main(argv: list[str] | None = None) -> None:
     sh.add_argument("--days", type=int, default=6, help="latest match dates to check on ESPN")
     sh.add_argument("--json")
     sh.set_defaults(func=cmd_shots)
+    sg = sub.add_parser("signals", help="free signals vs the early-to-close move")
+    sg.add_argument("--league", default="E0")
+    sg.add_argument("--seasons", default="2017-2025", help="seasons to test (start years)")
+    sg.add_argument("--json")
+    sg.set_defaults(func=cmd_signals)
     f = sub.add_parser("fanduel", help="slices of FanDuel's historical player lines")
     f.add_argument("lines", help="path to E0_player_lines.csv.gz")
     f.add_argument("--holdout", default="2526")
