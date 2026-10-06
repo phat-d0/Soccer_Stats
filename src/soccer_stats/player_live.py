@@ -32,7 +32,16 @@ SHOW_PER_TEAM = 6  # players shown per team when there are no prices
 MARKET_COUNT = {"player_shots": "shots", "player_shots_on_target": "sot"}
 
 
-def _candidates(apps: pd.DataFrame, team: str) -> pd.DataFrame:
+def _candidates(apps: pd.DataFrame, team: str, active: dict | None = None) -> pd.DataFrame:
+    """Players who appeared in the team's last CANDIDATE_MATCHES matches, corrected for
+    transfers when `active` (player_data.active_players) is given.
+
+    At a season's start those matches are last season's, so: a player FPL places at
+    another club, or lists as gone (status "u"), is dropped; a player with Premier
+    League history whom FPL places at this club (a signing from another club) is added
+    with no recent appearances here. Players FPL doesn't match are kept, so a name
+    mismatch never hides anyone.
+    """
     recent = apps[apps["team"] == team].drop_duplicates("match_id").tail(CANDIDATE_MATCHES)
     sub = apps[(apps["team"] == team) & apps["match_id"].isin(recent["match_id"])]
     out = (
@@ -47,7 +56,28 @@ def _candidates(apps: pd.DataFrame, team: str) -> pd.DataFrame:
     )
     out["share"] = out["shots"] / max(sub["shots"].sum(), 1)
     out["recent_rate"] = out["apps"] / max(len(recent), 1)
-    return out
+    if not active:
+        return out
+    gone = [
+        pid
+        for pid in out["player_id"]
+        if (a := active.get(pid))
+        and (a.get("status") == "u" or (a.get("team") is not None and a["team"] != team))
+    ]
+    out = out[~out["player_id"].isin(gone)]
+    joined = [
+        pid
+        for pid, a in active.items()
+        if a.get("team") == team and a.get("active") and pid not in set(out["player_id"])
+    ]
+    if joined:
+        last = apps[apps["player_id"].isin(joined)].drop_duplicates("player_id", keep="last")
+        new = last[["player_id", "player", "position"]].assign(
+            apps=0, shots=0, share=0.0, recent_rate=0.0
+        )
+        out = pd.concat([out, new], ignore_index=True)
+    out.attrs["moved_out"], out.attrs["moved_in"] = len(gone), len(joined)
+    return out.reset_index(drop=True)
 
 
 def _fpl_chances(fpl: pd.DataFrame | None, team: str, cands: pd.DataFrame) -> dict[str, float]:
@@ -71,17 +101,26 @@ def player_cards(
     sot_method: str = "thin",
     now: pd.Timestamp | None = None,
     calibration: list[float] | None = None,
+    active: dict[str, dict] | None = None,
 ) -> tuple[dict[tuple[str, str], list[dict]], dict]:
     """(home, away) -> player rows for the app, plus a status dict.
 
     `calibration` is the blend's [a, b, c] (publish.player_gate); None leaves `p` and
-    `edge` empty on every line, so no player paper trades open.
+    `edge` empty on every line, so no player paper trades open. `active` is
+    player_data.active_players output, used to correct squads for transfers.
+    Promoted teams without Premier League history get no rows (no data to price
+    from); their FanDuel names are counted in `unmatched_odds`, and a sample of
+    unmatched names is kept for player_names.csv.
     """
     now = now or pd.Timestamp.now(tz="UTC")
     status = {
         "players": 0,
         "priced": 0,
         "unmatched_odds": 0,
+        "unmatched_names": [],
+        "teams_without_history": [],
+        "moved_out": 0,
+        "moved_in": 0,
         "blend": calibration is not None,
         "blend_note": None
         if calibration is not None
@@ -97,8 +136,11 @@ def player_cards(
             if team in seen:  # only each team's next match
                 continue
             seen.add(team)
-            cands = _candidates(apps, team)
+            cands = _candidates(apps, team, active)
+            status["moved_out"] += cands.attrs.get("moved_out", 0)
+            status["moved_in"] += cands.attrs.get("moved_in", 0)
             if cands.empty:
+                status["teams_without_history"].append(team)
                 continue
             cands_by_team[(c["home"], c["away"], team)] = cands
             ch = _fpl_chances(fpl, team, cands)
@@ -166,6 +208,12 @@ def player_cards(
         else pd.DataFrame()
     )
     out: dict[tuple[str, str], list[dict]] = {}
+    if not odds.empty:  # an upcoming match's lines with no modelled players can't match
+        modelled = set(live["match_id"])
+        listed = {(c["home"], c["away"]) for c in upcoming}
+        for (home, away), g in odds.groupby(["home", "away"]):
+            if (home, away) in listed and f"next|{home}|{away}" not in modelled:
+                _unmatched(status, g["player"].unique())
     for i, r in live.iterrows():
         home, away = r["match_id"].split("|")[1:]
         pmfs = {"shots": d["shots"][i], "sot": d["sot"][i]}
@@ -199,7 +247,7 @@ def player_cards(
         }
         found, missed = match_in_fixture(g["player"].unique(), rosters)
         ids = {name: [pid] for name, (pid, _team) in found.items()}
-        status["unmatched_odds"] += len(missed)
+        _unmatched(status, missed)
         by_pid = {row["player_id"]: (row, pmfs) for row, pmfs in plist}
         for (name, market, line), sides in g.groupby(["player", "market", "line"]):
             hit = ids.get(name, [])
@@ -249,6 +297,16 @@ def player_cards(
                 )[:SHOW_PER_TEAM]
             final[key] = top
     return final, status
+
+
+UNMATCHED_SAMPLE = 30
+
+
+def _unmatched(status: dict, names) -> None:
+    names = list(names)
+    status["unmatched_odds"] += len(names)
+    room = UNMATCHED_SAMPLE - len(status["unmatched_names"])
+    status["unmatched_names"] += sorted(names)[: max(room, 0)]
 
 
 def fpl_players(players: pd.DataFrame) -> pd.DataFrame:

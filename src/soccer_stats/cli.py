@@ -18,15 +18,33 @@ from pathlib import Path
 import pandas as pd
 
 from soccer_stats import backtest
-from soccer_stats.data import load_matches
+from soccer_stats.data import current_season, load_matches
 from soccer_stats.models import DixonColes
 from soccer_stats.xg import with_xg
 
 
 def _years(spec: str) -> list[int]:
-    """'2019-2023' -> [2019, ..., 2023]; '2021' -> [2021]."""
+    """'2019-2023' -> [2019, ..., 2023]; '2021' -> [2021]; 'now' is the season in
+    progress ('2023-now')."""
     lo, _, hi = spec.partition("-")
-    return list(range(int(lo), int(hi or lo) + 1))
+    lo_y = current_season() if lo == "now" else int(lo)
+    hi_y = current_season() if hi == "now" else int(hi or lo_y)
+    return list(range(lo_y, hi_y + 1))
+
+
+def _season_not_ready(league: str, year: int) -> str | None:
+    """Why a season can't be backtested yet (no played match in football-data's or
+    Understat's file, or a file can't be read), or None when it can."""
+    from soccer_stats.player_data import season_matches
+
+    try:
+        played = len(load_matches([league], [year]))
+        understat = int(season_matches(league, year)["played"].sum())
+    except Exception as exc:  # file not posted yet, or a source down
+        return f"its data can't be read yet ({type(exc).__name__})"
+    if not played or not understat:
+        return "no matches played yet"
+    return None
 
 
 def cmd_backtest(args: argparse.Namespace) -> None:
@@ -267,6 +285,14 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
     from soccer_stats.publish import _clean
 
     seasons = _years(args.seasons)
+    # The season in progress joins once it has played matches; before that (or with a
+    # source down) it's left out rather than failing the weekly run.
+    if len(seasons) > 1 and seasons[-1] >= current_season():
+        why = _season_not_ready(args.league, seasons[-1])
+        if why:
+            print(f"Leaving out {seasons[-1]}/{(seasons[-1] + 1) % 100:02d}: {why}")
+            seasons = seasons[:-1]
+    args.seasons = f"{seasons[0]}-{seasons[-1]}" if len(seasons) > 1 else str(seasons[0])
     years = range(seasons[0] - args.burn_in, seasons[-1] + 1)
     apps, missing = load_appearances(args.league, years)
     if apps.empty:
@@ -317,6 +343,8 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         "sot_method": sot_method,
         "before_lineups": s_final,
         "lineup_known": s_known,
+        # stage 1 per season, so a new season's few matches are visible on their own
+        "by_season": pb.score_by_season(before),
         "sot_methods": {"thin": s_before["sot"]["model"], "count": sot_count["sot"]["model"]},
         "ablation": ab,
         "team_totals": rec,
@@ -373,6 +401,12 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
                 f"{name:>15} {c:>5}: log loss {r['model']:.4f} vs baseline {r['baseline']:.4f}"
                 f" ({'beats' if r['beats_baseline'] else 'does NOT beat'} it)"
             )
+    for season, r in out["by_season"].items():
+        print(
+            f"  {season}: {r['appearances']} appearances, shots {r['shots']['model']:.4f} vs "
+            f"{r['shots']['baseline']:.4f}, on target {r['sot']['model']:.4f} vs "
+            f"{r['sot']['baseline']:.4f}"
+        )
     print(
         f"Shots on target method: {sot_method} "
         f"(thin {out['sot_methods']['thin']:.4f}, count {out['sot_methods']['count']:.4f})"
@@ -649,7 +683,11 @@ def main(argv: list[str] | None = None) -> None:
 
     bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
     bp.add_argument("--league", default="E0")
-    bp.add_argument("--seasons", default="2023-2025", help="seasons to predict (start years)")
+    bp.add_argument(
+        "--seasons",
+        default="2023-now",
+        help="seasons to predict (start years; 'now' = the season in progress)",
+    )
     bp.add_argument("--burn-in", type=int, default=1, help="seasons of data before")
     bp.add_argument("--out", help="CSV of priced player trades (stage 2)")
     bp.add_argument("--json", help="path for the results (the gate the app reads)")

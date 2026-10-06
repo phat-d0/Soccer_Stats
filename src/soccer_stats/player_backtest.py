@@ -187,6 +187,27 @@ def score(preds: pd.DataFrame) -> dict:
     return out
 
 
+def score_by_season(preds: pd.DataFrame) -> dict:
+    """score() per season: appearances and model vs baseline log loss for each count."""
+    if preds.empty:
+        return {}
+    out = {}
+    for season, g in preds.groupby(preds["season"].astype(str)):
+        s = score(g)
+        out[season] = {
+            "appearances": s["appearances"],
+            **{
+                c: {
+                    "model": round(s[c]["model"], 4),
+                    "baseline": round(s[c]["baseline"], 4),
+                    "beats_baseline": s[c]["beats_baseline"],
+                }
+                for c in COUNTS
+            },
+        }
+    return out
+
+
 def reconcile_team_totals(preds: pd.DataFrame) -> dict:
     """Do a team's expected player shots add up to its expected team shots?
 
@@ -443,6 +464,7 @@ def priced_trades(
         t = _build_trades(tr.player_picks(df, threshold), threshold, league, kind, close_by)
         results[name] = t
         info["strategies"][name] = {
+            "trades": compact_trades(t),
             "snapshot": "3 hours before" if kind == "look" else "after lineups",
             "chance": chance,
             "starters_only": starters,
@@ -451,8 +473,61 @@ def priced_trades(
             "sweep": sweep,
         }
     info["main_strategy"] = MAIN_STRATEGY
+    info["trade_fields"] = list(TRADE_FIELDS)
     info["_lines"] = lines  # for the CLI to save; not JSON
     return results.get(MAIN_STRATEGY, pd.DataFrame()), info
+
+
+# Bet-by-bet trades of every strategy at the main threshold, one compact row each
+# (strategies[name]["trades"], columns in info["trade_fields"]), oldest first, so the
+# app can chart any strategy. About 100 bytes a bet instead of ~900 for a full trade.
+TRADE_FIELDS = (
+    "date",
+    "home",
+    "away",
+    "player",
+    "market",
+    "line",
+    "side",
+    "odds",
+    "p",
+    "implied",
+    "edge",
+    "actual",
+    "status",
+    "profit",
+    "clv",
+)
+
+
+def compact_trades(trades: pd.DataFrame) -> list[list]:
+    """Trades -> rows in TRADE_FIELDS order (void bets kept: status "void", profit 0)."""
+    if trades.empty:
+        return []
+    t = trades.sort_values(["kickoff", "home", "player", "market"])
+    clv = t["clv_dk"] if "clv_dk" in t else pd.Series(None, index=t.index)
+    out = []
+    for r, c in zip(t.to_dict("records"), clv, strict=True):
+        out.append(
+            [
+                pd.Timestamp(r["kickoff"]).strftime("%Y-%m-%d"),
+                r["home"],
+                r["away"],
+                r["player"],
+                "shots" if r["market"] == "player_shots" else "sot",
+                float(r["line"]),
+                r["side"],
+                round(float(r["odds"]), 2),
+                round(float(r["model_p"]), 3),
+                round(float(r["implied"]), 3),
+                round(float(r["edge"]), 3),
+                int(r["actual"]) if pd.notna(r.get("actual")) else None,
+                r["status"],
+                round(float(r["profit"] or 0), 2),
+                round(float(c), 3) if c is not None and pd.notna(c) else None,
+            ]
+        )
+    return out
 
 
 def _build_trades(picks: pd.DataFrame, threshold: float, league: str, kind: str, close_by: dict):

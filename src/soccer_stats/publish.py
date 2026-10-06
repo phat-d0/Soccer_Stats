@@ -348,6 +348,7 @@ def portfolio_placeholder() -> dict:
 
 
 PLAYER_FETCH_PER_BUILD = 40  # new Understat match files per build (catches up gradually)
+PLAYER_SEASONS = 3  # seasons of appearances loaded for live player lines
 
 
 def player_gate(path: str | None = None) -> dict:
@@ -428,11 +429,14 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
     }
     stats: list[dict] = []
     try:
+        # Three seasons, so the live model trains on up to two years (TRAIN_DAYS) as in
+        # the backtest, even at a season's start; the season stats show the last two.
         apps, missing = load_appearances(
-            league, [season - 1, season], max_new=PLAYER_FETCH_PER_BUILD
+            league, range(season - PLAYER_SEASONS + 1, season + 1), max_new=PLAYER_FETCH_PER_BUILD
         )
         status["missing_matches"] = missing
-        stats = season_stats(apps)
+        recent = {f"{y % 100:02d}{(y + 1) % 100:02d}" for y in (season - 1, season)}
+        stats = [r for r in season_stats(apps) if r["season"] in recent]
         active = active_players(apps, fpl_df, f"{season % 100:02d}{(season + 1) % 100:02d}")
         for r in stats:
             a = active.get(r["player_id"], {})
@@ -450,6 +454,7 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
             factors=gate["factors"],
             sot_method=gate["sot_method"],
             calibration=gate["calibration"],
+            active=active,
         )
         status.update(st)
         for fx in data["fixtures"]:
@@ -490,6 +495,17 @@ def publish(out: Path, league: str = "E0") -> Path:
             ps["error"]
             or f"Player lines: {ps.get('players', 0)} players, {ps.get('priced', 0)} priced, "
             f"{ps.get('active_players', 0)} active in current squads"
+            + (
+                f", {ps['unmatched_odds']} {ps.get('bookmaker')} names unmatched "
+                f"(e.g. {', '.join(ps.get('unmatched_names', [])[:5])})"
+                if ps.get("unmatched_odds")
+                else ""
+            )
+            + (
+                f", no history for {', '.join(ps['teams_without_history'])}"
+                if ps.get("teams_without_history")
+                else ""
+            )
             + (
                 f", {ps['missing_matches']} Understat matches still to download"
                 if ps.get("missing_matches")

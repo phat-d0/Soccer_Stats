@@ -28,7 +28,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | File | What | Credits |
 | --- | --- | --- |
 | `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
-| `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (e.g. `2023-2025`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
+| `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push). | ~20 per snapshot; 0 with `print_only` |
 | `odds-check.yml` | Diagnostics and edge research. Inputs: `task` (coverage, props, match, shots), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`. Never pushes. | 0 (match, shots) to ~100 per historical props call |
 | `ci.yml` | On every push and pull request: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. No secrets. The browser smoke test skips there (no Chromium). | 0 |
@@ -80,11 +80,17 @@ Read its "Status and next steps" section first; this file is the technical map.
 - `player_backtest.py`: stage-1 walk-forward, scoring, ablation, and `priced_trades`.
   - `priced_trades` replays three strategies (`STRATEGIES`), sweeping edge thresholds for each.
   - `MAIN_STRATEGY = "blend_lineup"`: confirmed starters, at the last price before kickoff, using the blended chance.
+  - Every strategy keeps its bets at the 12% threshold in `E0_players.json` → `priced.strategies.<name>.trades`: compact rows (~100 bytes each), columns in `priced.trade_fields` (`date, home, away, player, market, line, side, odds, p, implied, edge, actual, status, profit, clv`), oldest first, voids included. The full main-strategy trades stay in the top-level `trades`.
+  - `score_by_season`: stage-1 log loss per season (`E0_players.json` → `by_season`), so a new season's first weeks show on their own.
+- `cli backtest-players`: `--seasons 2023-now` by default; the in-progress season joins once football-data and Understat both have a played match (`_season_not_ready`).
 - `player_calibration.py`: logistic blend `logit p = a + b·logit(implied) + c·logit(model)`.
   - Refitted every 28 days on earlier lines (walk-forward).
   - The live fit coefficients are saved in `E0_players.json` → `priced.calibration.{look,close}.coef`.
 - `player_odds.py`: FanDuel live lines (`fetch_live`, keeps 3,000 credits in reserve) and the historical backfill (cached per event; files `{event_id}_{look|close}_fanduel.json`).
 - `player_live.py`: player lines for upcoming fixtures in the app.
+  - Candidates are each team's players from its last 5 matches, corrected for transfers with `player_data.active_players` (`active=`): FPL at another club or status "u" drops a player; FPL at this club adds a signing with Premier League history. Players FPL doesn't match are kept.
+  - Promoted teams without Premier League history (Hull, Coventry in 2026/27) get no rows; `players_status` reports `teams_without_history`, `moved_in`/`moved_out`, `unmatched_odds` and a sample of `unmatched_names` (add spellings to `player_names.csv`). The publish log prints them.
+  - `publish.add_players` loads three seasons (`PLAYER_SEASONS`), so the model trains on up to two years as in the backtest even at a season's start; `players_stats.json` keeps the last two.
   - Each priced side has `p_model` (raw model, for display) and `p` (the blend, which sets `edge`, the app's player picks and, if the switch is on, the paper trades).
   - The blend coefficients come from `publish.player_gate()` → `calibration` (= `E0_players.json` → `priced.calibration.look.coef`).
   - No coefficients: `p` and `edge` are None, no player picks or trades, and `players_status.blend_note` says so.
@@ -170,6 +176,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - No Odds API book prices EPL player shots on both sides (all five regions; 1xBet and the Kambi books are over-only too). No FanDuel slice is close to fair: the best (odds ≤ 1.25 at the close) is −13.8%, −16.6% in the holdout season.
 - Understat's shot counts match ESPN's (99.8% of 617 player-matches identical), so the losses are margin, not a data mismatch.
 - Live: player lines show with the blended chance (3-hour "look" coefficients); `PLAYER_PAPER_TRADES = False`, so no player paper trades open.
+- Season 2026/27 (starts 10 Oct), round 2: live lines handle transfers and promoted teams (above); FanDuel's live fetch keeps 3,000 credits (an unknown balance allows one call, then the headers' balance holds the reserve); the weekly run adds 2026/27 once it has played matches. Nothing was re-run here (the sandbox can't reach the sources): the next `players.yml` run writes the per-strategy trades and `by_season`.
 - No live lineup feed. Build one (ESPN summary API, `rosters[].roster[].starter`) only if a strategy backtests positive.
 
 **Credits**: 22,732 left on 6 Oct after the edge round (220 spent). The key is shared, so check the publish log.
