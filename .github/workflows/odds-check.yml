@@ -1,0 +1,24 @@
+# Diagnoses player-prop coverage: what the cached player-odds history holds and which
+# bookmakers price Premier League player shots (about 40-80 credits). Run by hand.
+name: Player odds check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/player_odds_history
+          key: player-odds-history-none
+          restore-keys: player-odds-history-
+      - name: Check
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats player-odds-check

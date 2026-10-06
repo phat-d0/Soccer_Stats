@@ -348,3 +348,81 @@ def load_history(
             ]
         )
     )
+
+
+def check(
+    league: str = "E0",
+    raw_dir: Path = RAW_DIR,
+    api_key: str | None = None,
+    get: Callable = requests.get,
+) -> list[str]:
+    """Diagnose player-prop coverage: what the cached history holds, and which US
+    bookmakers price player shots for one recent and one upcoming match (about 40-80
+    credits). Returns report lines; the key never appears in them."""
+    out = []
+    d = raw_dir / "player_odds_history" / league
+    files = sorted(d.glob("*_look.json")) + sorted(d.glob("*_close.json")) if d.exists() else []
+    books, markets, with_dk, sample = Counter(), Counter(), 0, None
+    for p in files:
+        ev = json.loads(p.read_text()).get("event") or {}
+        bs = ev.get("bookmakers", [])
+        for b in bs:
+            books[b.get("key")] += 1
+            for m in b.get("markets", []):
+                markets[m.get("key")] += 1
+        if any(b.get("key") == BOOKMAKER and b.get("markets") for b in bs):
+            with_dk += 1
+        if sample is None and ev.get("id"):
+            sample = (ev["id"], json.loads(p.read_text()).get("requested"))
+    out.append(f"Cached history: {len(files)} snapshots, {with_dk} with DraftKings player markets")
+    out.append(
+        f"  bookmakers seen: {dict(books) or 'none'}; markets seen: {dict(markets) or 'none'}"
+    )
+    api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
+    if not api_key:
+        return out + ["No ODDS_API_KEY: skipping live checks"]
+    sport = SPORTS[league]
+    params = {
+        "apiKey": api_key,
+        "regions": "us,us2,uk,eu",
+        "markets": ",".join(MARKETS),
+        "oddsFormat": "decimal",
+    }
+
+    def describe(label, body):
+        ev = body.get("data", body) if isinstance(body, dict) else {}
+        rows = []
+        for b in ev.get("bookmakers", []):
+            ms = {m["key"]: len(m.get("outcomes", [])) for m in b.get("markets", [])}
+            rows.append(f"{b['key']} {ms}")
+        out.append(
+            f"{label}: {ev.get('home_team')} v {ev.get('away_team')} -> "
+            + ("; ".join(rows) if rows else "no bookmaker prices player shots")
+        )
+
+    try:
+        if sample:
+            r = get(
+                f"{BASE}/historical/sports/{sport}/events/{sample[0]}/odds",
+                params={**params, "date": sample[1][:19] + "Z"},
+                timeout=60,
+            )
+            out.append(
+                f"Historical call: HTTP {r.status_code}, cost {r.headers.get('x-requests-last')}"
+            )
+            if r.ok:
+                describe("  history (all regions)", r.json())
+        r = get(f"{BASE}/sports/{sport}/events", params={"apiKey": api_key}, timeout=30)
+        evs = r.json() if r.ok else []
+        if evs:
+            e = evs[0]
+            r = get(f"{BASE}/sports/{sport}/events/{e['id']}/odds", params=params, timeout=30)
+            out.append(
+                f"Live call: HTTP {r.status_code}, cost {r.headers.get('x-requests-last')}, "
+                f"credits left {r.headers.get('x-requests-remaining')}"
+            )
+            if r.ok:
+                describe("  next match (all regions)", r.json())
+    except requests.RequestException as exc:
+        out.append(f"Could not reach The Odds API ({type(exc).__name__})")
+    return out

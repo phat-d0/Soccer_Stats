@@ -395,6 +395,13 @@ def cmd_backfill_players(args: argparse.Namespace) -> None:
         print("Dry run: no API calls made.")
 
 
+def cmd_player_odds_check(args: argparse.Namespace) -> None:
+    from soccer_stats.player_odds import check
+
+    for line in check(args.league):
+        print(line)
+
+
 def _fmt(v, kind="num"):
     if v is None:
         return "–"
@@ -541,6 +548,10 @@ def main(argv: list[str] | None = None) -> None:
     bfp.add_argument("--keep-credits", type=int, default=1500)
     bfp.add_argument("--dry-run", action="store_true")
     bfp.set_defaults(func=cmd_backfill_players)
+
+    poc = sub.add_parser("player-odds-check", help="diagnose player-prop coverage (~40-80 credits)")
+    poc.add_argument("--league", default="E0")
+    poc.set_defaults(func=cmd_player_odds_check)
 
     args = parser.parse_args(argv)
     args.func(args)
