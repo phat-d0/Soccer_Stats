@@ -10,3 +10,4 @@ data/raw/*
 data/processed/
 .env
 _site/
+.claude/worktrees/
