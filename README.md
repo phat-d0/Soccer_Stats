@@ -178,6 +178,12 @@ Build it locally: `uv run soccer-stats publish --out _site && python -m http.ser
 (add `uv run soccer-stats paper --site _site --log-dir <folder>` to try the ledger).
 The app code lives in `web/`; `src/soccer_stats/publish.py` writes the `data.json` it reads.
 
+Test the app without the network: `node tests/web/smoke.mjs --shots /tmp/shots` serves
+`web/` with the sample data in `tests/fixtures/web/`, clicks through every tab in Chromium
+(phone light, phone dark and laptop) and fails on console errors or sideways scrolling.
+It needs Playwright and Chromium; `uv run pytest` runs it too, and skips it without them.
+Refresh the sample data with `uv run python tests/web/make_fixture.py`.
+
 ## Streamlit app (desktop)
 
 A dashboard to follow the model through the season:
