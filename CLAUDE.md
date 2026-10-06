@@ -30,7 +30,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | `publish.yml` | Builds the site (`soccer-stats publish`), updates paper trades and team news on `data-log`, deploys Pages. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (e.g. `2023-2025`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds for the match backtest. | ~20 per snapshot |
-| `odds-check.yml` | Diagnostic: which bookmakers price EPL player props. | ~80 |
+| `odds-check.yml` | Diagnostics and edge research (`task`: coverage, props, match, shots); never pushes. | 0 (match, shots) to ~100 per historical props call |
 
 - After `players.yml`, dispatch `publish.yml`, so the app picks up the new results.
 - Caches:
@@ -79,6 +79,11 @@ Read its "Status and next steps" section first; this file is the technical map.
   - The live fit coefficients are saved in `E0_players.json` → `priced.calibration.{look,close}.coef`.
 - `player_odds.py`: FanDuel live lines (`fetch_live`, keeps 3,000 credits in reserve) and the historical backfill (cached per event; files `{event_id}_{look|close}_fanduel.json`).
 - `player_live.py`: player lines for upcoming fixtures in the app.
+
+**Edge research**
+- `edge/`: analysis helpers (line shopping on football-data books, two-sided prop probe,
+  FanDuel slices, Understat vs ESPN shot counts), run via `python -m soccer_stats.edge.run`
+  and `odds-check.yml` (`task` = props, match, shots). Findings: `docs/edge.md`.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
@@ -138,5 +143,6 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - The blend is well calibrated (23.3% predicted vs 23.1% won among starters). FanDuel's over-only lines imply 33%, so their margin is the obstacle, not the model.
 - The live app still opens player paper trades using the raw model at 12%; the blend and lineup rules are not live yet.
 - No live lineup feed has been built. Candidate source: ESPN's summary API (`rosters[].roster[].starter`). Build it only if some strategy backtests positive.
-- Next ideas are in the work plan's "Status and next steps" section. First: find a bookmaker with two-sided (over and under) EPL player shot lines.
-- Credits: 22,962 left on 6 Oct.
+- Next ideas are in the work plan's "Status and next steps" section.
+- Edge research (`docs/edge.md`, 6 Oct): no Odds API book prices EPL player shots on both sides (all regions checked); Understat shot counts match ESPN; line shopping lifts match-bet CLV from about −6.5% to −2.5% but not above 0.
+- Credits: 22,732 left on 6 Oct (after the edge round).
