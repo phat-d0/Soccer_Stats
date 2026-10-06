@@ -128,11 +128,12 @@ Five agents, each owning part of the code. Start a session's work by calling the
 ## Status (2026-10-06)
 
 - Match bets: the DraftKings backtest at a 12% edge lost (ROI about −17%). The claimed edges pick out model errors more than value. Live paper trading continues.
-- Match blend (branch `agent/moneyline`, 6 Oct; print-only run on cached 2025/26 DraftKings odds, 368 matches; blend fitted on 2,276 earlier Pinnacle-priced matches):
-  - 1X2 log loss: model 1.0301, blend 1.0184, DraftKings close 1.0123. The latest fit gives the model almost no weight (c = −0.04, b = 1.02): the price already holds what the model knows.
-  - Raw at 2/5/8/12/20%: 314/265/217/172/117 bets, ROI −9/−9/−11/−18/−24%, CLV about −6%. Blend: 5 bets at 2% (all lost), none at 5% or more.
-  - DraftKings over/under 2.5 prices are missing from the cached history (no totals trades or totals log loss).
-  - Once `E0_dk.json` holds `blend.live`, the app's match value picks and paper trades use the blend, so match paper trades will mostly stop: the honest result.
+- Match blend (6 Oct; print-only run of `backtest-dk --seasons 2025` on the cached DraftKings odds, 368 matches; blend fitted on up to 1,468 earlier Pinnacle-priced matches):
+  - 1X2 log loss: model 1.0302, blend 1.0178, DraftKings close 1.0123. The fit gives the model no weight (latest b = 1.04, c = −0.03): the price already holds what the model knows.
+  - Raw, no cap, at 2/5/8/12/20%: 313/261/217/173/112 bets, ROI −8/−8/−12/−13/−21% (12%: 95% range −38% to +16%), CLV −5% to −7%.
+  - Blend: 0 bets at every threshold (with `--seasons 2023-2025`, 2,276 fit matches: 5 bets at 2%, all lost; none above).
+  - The cached DraftKings history has no over/under 2.5 prices (0% of looks), so totals are untested.
+  - Once `E0_dk.json` holds `blend.live` (next non-print `backfill.yml` run), match value picks and paper trades use the blend, so they will mostly stop: the honest result.
 - Player model, stage 1: it beats the season-average baseline (shots log loss 0.420 vs 0.496 before lineups; 0.400 lineup known). The gate is passed.
 - The starter flag was fixed on 6 Oct. Understat sets `roster_in` on starters who were replaced, so a starter is now anyone whose position isn't "Sub". Check: 11 starters in all 3,040 team-matches.
 - Player bets, priced backtest on FanDuel 2023/24–2025/26, at a 12% edge:
