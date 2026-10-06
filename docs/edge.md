@@ -168,7 +168,7 @@ roughly ±1.5 points, and the paired price lift is much tighter.
 | # | Step | Expected value | Cost | Owner |
 | --- | --- | --- | --- | --- |
 | 1 | M2: log live prices with timestamps, then test team news in December | Low to medium; the only untested free idea | 0 credits | moneyline, then edge-finder |
-| 2 | Asian handicap and other totals lines on football-data (round 1's C): is the model's CLV better there? | Low after this round: the model earns no weight on 1X2 or O/U 2.5 | 0 credits | edge-finder |
+| 2 | Asian handicap and other totals lines on football-data (round 1's C): is the model's CLV better there? | Low after this round: the model earns no weight on 1X2 or O/U 2.5 | 0 credits | moneyline (in progress: `match_markets.py` on `team/moneyline`) |
 | 3 | Best-over pilot (section 2), only if the owner wants player bets kept alive | Low (prior about 15%) | 100 credits, then 2,000 | edge-finder, owner approval |
 | 4 | Recheck for two-sided EPL player shots in December (round 1's F) | Low | 5 credits | edge-finder |
 
