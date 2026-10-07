@@ -651,6 +651,8 @@ def cmd_goal_lab(args: argparse.Namespace) -> None:
                 else ""
             )
         )
+    for c in ("A", "B"):
+        print(f"  {c} tail: {json.dumps(res['candidates'][c]['tail'])}")
     chosen = res["chosen"]
     print(f"Chosen: {chosen} (B if none of C-H passed)")
 
@@ -666,7 +668,8 @@ def cmd_goal_lab(args: argparse.Namespace) -> None:
     out["seen_2526"]["holdout_log"] = seen.events
     for c, d in out["seen_2526"]["candidates"].items():
         print(
-            f"  seen 2025/26 {c}: log loss {d['log_loss']}, AUC {d['auc']}, tail {d['tail']['ok']}"
+            f"  seen 2025/26 {c}: log loss {d['log_loss']}, AUC {d['auc']}, "
+            f"tail {json.dumps(d['tail'])}"
         )
     print("  seen 2025/26 vs B: " + json.dumps(out["seen_2526"]["vs_ref"], default=str))
 
