@@ -129,9 +129,10 @@ PORTFOLIOS = [
         "id": "goalscorer",
         "name": "Anytime goalscorer",
         "status": "testing",
-        "note": "Tested and stopped: the model predicts scorers well, but every bookmaker "
-        "prices 'to score' about 50% above how often players score (16% vs 11% in a 5-match "
-        "test), so there are no trades.",
+        "note": "Testing: the model predicts scorers well, and six tries to sharpen it "
+        "(lineups, penalties, opponents, form, machine learning) added almost nothing. "
+        "Bookmakers price 'to score' about 50% above how often players score, so there are "
+        "no trades.",
         "backtest": "goalscorer",
     },
     {

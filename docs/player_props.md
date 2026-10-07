@@ -434,3 +434,90 @@ Every feature uses only earlier kickoffs. C–H start from B.
   credits.
 - The 2026/27 forward window is dropped before any computation unless `--open-forward`
   is given with a reason.
+
+## 9. Goalscorer improvements: results (round 6, 2026-10-07)
+
+- **Runs:** `odds-check.yml` `task=goal-lab`, run 37661673868 (and run 37660385945, whose
+  pilot step failed: `gh` refused to print the log).
+- **Cost:** 0 credits.
+- **What was scored:** development 2023/24–2024/25 only; the forward window stayed locked.
+- **Rerun differences:** the two runs differ only in the fifth decimal (C's gain −0.00006
+  both times; D −0.00009 / −0.00010; G's resolution 0.01052 / 0.01049). The verdicts are
+  the same.
+
+### Development: 2023/24–2024/25, starters with at least 3 earlier appearances, lineup known
+
+Each candidate's starters are scored against its reference: A for B, B for C–H.
+
+| # | Log loss | Gain vs reference (99.29% range) | Brier | Resolution | AUC | Share 30%+ | Tail rule | Passes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Season-xG benchmark | 0.3160 | – | – | – | – | – | – | – |
+| A current, before lineups | 0.2900 | – | 0.0850 | 0.0099 | 0.779 | 3.8% | no (20–30%: 24.3% predicted, 29.9% scored) | – |
+| B current, lineup known | 0.2880 | +0.0020 (−0.0002 to +0.0040) | 0.0844 | 0.0105 | 0.781 | 7.6% | yes | no |
+| C + set pieces, penalty taker | 0.2880 | −0.0001 (−0.0002 to +0.0001) | 0.0845 | 0.0106 | 0.781 | 7.5% | yes | no |
+| D + opponent xG conceded | 0.2881 | −0.0001 (−0.0002 to +0.0001) | 0.0844 | 0.0106 | 0.780 | 7.6% | yes | no |
+| E xG-share structure | 0.2875 | +0.0005 (−0.0003 to +0.0012) | 0.0843 | 0.0106 | 0.782 | 7.3% | yes | no |
+| F + form at two speeds | 0.2874 | +0.0005 (−0.0000 to +0.0011) | 0.0843 | 0.0106 | 0.782 | 7.5% | yes | no |
+| G all of C–F | 0.2875 | +0.0005 (−0.0001 to +0.0011) | 0.0843 | 0.0105 | 0.782 | 7.5% | yes | no |
+| H LightGBM (nested) | 0.3020 | −0.0141 (−0.0167 to −0.0112) | 0.0863 | 0.0101 | 0.779 | 9.2% | no | no |
+
+**Verdict, by the pre-registered rule: nothing passes, so B stays.**
+
+- **Lineup known (B vs A):** knowing the lineup is the biggest lever, as expected. It
+  doubles the share of starters given 30%+, from 3.8% to 7.6%, and fixes A's
+  under-prediction in the tails. But its log-loss gain (+0.002) misses the Bonferroni bar
+  by a hair. B is still how the model would be used after lineups.
+- **C, D:** set-piece and penalty role, and the opponent's xG conceded, add nothing that
+  the model's own penalty share and the match model's team xG don't already carry.
+- **E, F, G:** the xG-share structure and two-speed form each add about +0.0005, with
+  ranges reaching 0. That is a real but tiny sharpening, not a step.
+- **H:** LightGBM is clearly worse and over-confident. 9.2% of starters get 30%+, and the
+  tail rule fails.
+
+### 2025/26, reported as "seen"
+
+This season chose nothing.
+
+| # | Log loss | AUC | 20–30% predicted / scored | 30%+ predicted / scored (n) |
+| --- | --- | --- | --- | --- |
+| A | 0.2709 | 0.770 | 24.1% / 26.8% | 36.3% / 37.6% (141) |
+| B | 0.2691 | 0.771 | 24.6% / 26.0% | **35.6% / 29.6% (375)**: fails the tail rule |
+
+- A vs B: −0.0018 (95% −0.0038 to +0.0004).
+- In 2025/26, B's most confident calls (30%+) scored 6 points less often than predicted.
+  The forward check will show whether that repeats.
+
+### The pilot, descriptively
+
+5 matches decide nothing. The round-5 pilot's prices were read back from that job's log.
+
+- **Starters matched:** 51 of the 5 matches' starters to a pilot price. That's fewer than
+  round 5's 83, because this matching uses only the players who appeared in each match;
+  the misses are still mostly full legal names.
+- **Best price vs scoring:** the best price implied 19.8%, and 7.8% scored.
+- **Model A:** rated no starter above the price.
+- **Model B:**
+  - rated 2 starters above the price, and neither scored;
+  - one of them was at a 12% edge, and didn't score.
+- The model mostly agrees with the books that these players are less likely to score than
+  priced. It rarely finds a price too long.
+
+### What follows
+
+- **No priced test is proposed.** The pre-registration asked for one only if an improved
+  model passed on development, and none did.
+- The structural gap stands either way: Yes-only prices sit about 50% above scoring
+  rates. A model with a log-loss gain of +0.002 can't close that.
+- **The forward check stays as registered, on B:** 2026/27 matches from 2026-10-10, opened
+  once when at least 150 have been played (about early December). Run it with
+  `odds-check.yml` `task=goal-lab` and `reason` set to the pre-registered reason.
+  - It reports B against A and the season-xG benchmark, and B's tail rule.
+  - It checks whether B's 2025/26 over-confidence at 30%+ repeats.
+  - If it does, the next step is a pre-registered shrinkage of the top tail (e.g. the
+    blend's recalibration), not a new model.
+- **Ideas not tried, for a later round:**
+  - assists (`player_assisted` is in Understat's shot data), as a second Yes-only market
+    with possibly different pricing;
+  - "to score or assist";
+  - live lineups an hour before kickoff from ESPN. That is the only way to bet B's
+    lineup-known chances in practice.
