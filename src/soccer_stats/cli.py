@@ -428,12 +428,15 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
 
     # Anytime goalscorer, stage 1 (no odds): same appearances and match model.
     gfeats = pg.goal_features(feats)
+    hold = pg.stage1_holdout()
     goals = {
         "generated_at": out["generated_at"],
         "seasons": args.seasons,
         **pg.report(
-            pg.walk_forward(gfeats, start), pg.walk_forward(gfeats, start, lineup_known=True)
+            pg.walk_forward(gfeats, start, holdout=hold),
+            pg.walk_forward(gfeats, start, lineup_known=True, holdout=hold),
         ),
+        "holdout_log": hold.events,
     }
     _print_goals(goals)
 
@@ -539,6 +542,154 @@ def cmd_player_odds_check(args: argparse.Namespace) -> None:
 
     for line in check(args.league):
         print(line)
+
+
+def _goal_predictions(league: str, holdout_reason: str):
+    """Understat appearances (2022/23-2025/26) and the goalscorer model's walk-forward
+    chances for 2025/26 with the lineup known (the pilot is priced at the close)."""
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.player_data import load_appearances
+
+    years = range(2022, 2026)
+    apps, missing = load_appearances(league, years)
+    if apps.empty:
+        raise SystemExit("No Understat appearances loaded: nothing to match the prices to.")
+    matches, err = with_xg(load_matches([league], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2023-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=0.7 if not err else 0.0),
+    )
+    feats = pg.goal_features(build_features(apps, pb.match_info(preds, apps)))
+    feats = feats[feats["kickoff"] < pd.Timestamp("2026-07-01", tz="UTC")]
+    hold = pg.stage1_holdout(holdout_reason)
+    gp = pg.walk_forward(feats, "2025-07-01", lineup_known=True, holdout=hold)
+    print(f"{len(apps)} appearances ({missing} match files missing); {len(gp)} 2025/26 chances")
+    return apps, gp
+
+
+def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
+    """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
+    import json
+
+    from soccer_stats import player_goal_odds as go
+    from soccer_stats.publish import _clean
+
+    events = go.pilot_events(args.league)
+    print(f"Pilot matches (cached FanDuel closes): {len(events)}")
+    for e in events:
+        print(f"  {e['kickoff']:%Y-%m-%d %H:%M} {e['home']} v {e['away']} (close {e['requested']})")
+    if len(events) < 5:
+        print("WARNING: fewer than the 5 pre-registered pilot matches are cached.")
+    # Free part first, so a broken pipeline spends nothing.
+    apps, gp = _goal_predictions(
+        args.league,
+        "goalscorer pilot: the 2025/26 stage-1 chances (pre-registered in "
+        "docs/player_props.md, reported on every weekly run) for the 5 pilot matches",
+    )
+    res = go.run_calls(args.cap, events, args.league)
+    print(f"\n=== Calls (cap {args.cap}) ===")
+    for line in res["log"]:
+        print("  " + line)
+    print(f"Credits spent: {res['spent']} (left on the shared key: {res['left']})")
+    print(f"Books found live: {res.get('books_found_live')}")
+    print(f"Books requested for the pilot: {res.get('books_requested')}")
+    live_books = [r for x in res["live"] for r in go.book_summary(x["prices"])]
+    for x in res["live"]:
+        print(f"  live {x['event']}: {go.book_summary(x['prices']) or 'no goalscorer prices'}")
+    allp = (
+        pd.concat([x["prices"] for x in res["pilot"]], ignore_index=True)
+        if res["pilot"]
+        else pd.DataFrame(columns=["event_id", "book", "player", "yes", "no"])
+    )
+    # Paid data first, to the log and the JSON, before anything that could fail.
+    for x in res["pilot"]:
+        print(f"  pilot {x['home']} v {x['away']}: {len(x['prices'])} prices")
+        for r in x["prices"].itertuples(index=False):
+            print(f"    {r.book:>14} {r.player:<28} yes {r.yes} no {r.no}")
+    raw = {
+        "spent": res["spent"],
+        "left": res["left"],
+        "log": res["log"],
+        "books_found_live": res.get("books_found_live"),
+        "books_requested": res.get("books_requested"),
+        "live_prices": [
+            {"event": x["event"], "prices": x["prices"].to_dict("records")} for x in res["live"]
+        ],
+        "pilot_prices": [
+            {
+                "event": f"{x['home']} v {x['away']}",
+                "kickoff": str(x["kickoff"]),
+                "prices": x["prices"].to_dict("records"),
+            }
+            for x in res["pilot"]
+        ],
+    }
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).with_name("goalscorer_prices.json").write_text(
+            json.dumps(_clean(raw), indent=1)
+        )
+    books = go.book_summary(allp)
+    print("Pilot books: " + json.dumps(books))
+    known = set(apps["team"])
+    m = go.match_players(res["pilot"], apps, gp, known)
+    ev = go.evaluate(m)
+    print("Pilot measures (starters, best price): " + json.dumps(ev, default=str))
+    v = go.verdict(books, ev)
+    print("Verdict (pre-registered rules, docs/player_props.md §5): " + json.dumps(v))
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(
+            json.dumps(
+                _clean(
+                    {
+                        "spent": res["spent"],
+                        "left": res["left"],
+                        "log": res["log"],
+                        "books_found_live": res.get("books_found_live"),
+                        "books_requested": res.get("books_requested"),
+                        "live_books": live_books,
+                        "live_prices": [
+                            {"event": x["event"], "prices": x["prices"].to_dict("records")}
+                            for x in res["live"]
+                        ],
+                        "pilot_books": books,
+                        "pilot_events": [{k: str(v) for k, v in e.items()} for e in events],
+                        "measures": ev,
+                        "verdict": v,
+                        "lines": m.astype(str).to_dict("records") if not m.empty else [],
+                    }
+                ),
+                indent=1,
+            )
+        )
+
+
+def cmd_player_lab(args: argparse.Namespace) -> None:
+    """Player shot lines through the lab's metrics, development seasons only."""
+    import json
+
+    from soccer_stats import player_lab as pl
+
+    res = pl.run(pl.load_lines(args.lines))
+    if args.players_json:
+        res["backtest_dev"] = pl.backtest_dev_summary(
+            json.loads(Path(args.players_json).read_text())
+        )
+    for name, st in res["strategies"].items():
+        for mk, x in st.items() if isinstance(st, dict) and "fair_market" in st else []:
+            b, bl = x.get("bets") or {}, x.get("blend") or {}
+            print(
+                f"{name:>13} {mk:>19}: {x.get('rows')} lines, log loss {x.get('log_loss')} vs "
+                f"{x.get('market_log_loss')}, blend c {bl.get('c')} {bl.get('c_range')}, "
+                f"{b.get('bets')} bets, CLV {b.get('clv')} {b.get('clv_range')}, "
+                f"ROI {b.get('roi')} {b.get('roi_range')}, passes {x.get('passes')}"
+            )
+    if args.json:
+        Path(args.json).write_text(json.dumps(res, indent=1, default=str))
 
 
 def cmd_player_segments(args: argparse.Namespace) -> None:
@@ -852,6 +1003,20 @@ def main(argv: list[str] | None = None) -> None:
     poc = sub.add_parser("player-odds-check", help="diagnose player-prop coverage (~40-80 credits)")
     poc.add_argument("--league", default="E0")
     poc.set_defaults(func=cmd_player_odds_check)
+
+    gp_ = sub.add_parser(
+        "goalscorer-pilot", help="anytime goalscorer odds: live probe + 5-match pilot (capped)"
+    )
+    gp_.add_argument("--league", default="E0")
+    gp_.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
+    gp_.add_argument("--json", help="write the results as JSON")
+    gp_.set_defaults(func=cmd_goalscorer_pilot)
+
+    pl_ = sub.add_parser("player-lab", help="player shot lines through the lab's metrics")
+    pl_.add_argument("--lines", required=True, help="E0_player_lines.csv(.gz) from data-log")
+    pl_.add_argument("--players-json", help="E0_players.json, for the backtest's own numbers")
+    pl_.add_argument("--json", help="write the results as JSON")
+    pl_.set_defaults(func=cmd_player_lab)
 
     seg = sub.add_parser(
         "player-segments", help="out-of-sample segment search on the priced player lines"
