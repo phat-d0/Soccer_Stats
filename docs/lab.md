@@ -358,3 +358,71 @@ look up which books price these leagues live on The Odds API.
 
 Recommendation: stop 1X2 model work. Do 2 now (cheap, protects the live code), and do
 1 when the logs are long enough.
+
+## A minimum edge learned from history (pre-registered 2026-10-07, before any run)
+
+**Owner's request:** replace the fixed edge buttons (1/2/5/8/12%…) with a minimum edge
+that comes from history. Only flag a bet when its claimed edge is big enough to stand
+out from how far realized results normally land from the claims.
+
+**Code:** `lab/thresholds.py`, `edge_threshold(bets)`. It is generic: one row per
+settled bet with the claimed edge, the chance it was measured with, the odds, won or
+lost (voids left out), a match id, the season and the time.
+
+**Rule (fixed now):**
+- *Return per bet:* won × odds − 1 per unit staked (the realized edge).
+- *Levels:* claimed edge t = 0%, 1%, …, 30%. Each level is judged on the bets claiming t
+  to t + 5 points. This rolling band is the only smoothing. I chose a band over "every
+  bet at t and up" on synthetic data, before any real run: the cumulative version
+  returns 0% whenever the large edges pay, even when small claimed edges are pure noise.
+  That answers a different question from "which bets stand out".
+- *Range:* 95% two-sided, by bootstrap over whole matches (2,000 draws).
+- *Minimum edge:* the smallest t whose band has a lower bound above 0, where every
+  higher band with at least 30 bets also does. Bands with fewer than 30 development
+  bets are not judged.
+- *Out of sample:* the level is found on the development part and checked on the
+  latest season. With a single season, the development part is its first half by
+  kickoff and the check is the second half. It is published only if the check's bets at
+  t and up returned more than 0 (point estimate; the check sample is small). Otherwise
+  `min_edge` is null.
+- *No qualifying level:* `min_edge` is null, with a plain-English `note` the app shows
+  as it is.
+- *Multiple testing:* 31 levels are scanned. The every-higher-band condition and the
+  out-of-sample check guard against picking a lucky band. There is no further
+  correction.
+
+**Bet pools (the trade rules are unchanged):**
+- **Moneyline, DraftKings** (`backtest-dk`): every match's bet under the live rule at a
+  threshold of 0, so the first look (48 h, then 3 h) with any positive edge. Computed
+  for each strategy (`strategies.raw` and `strategies.blend`, each with
+  `.edge_threshold`).
+  - The top-level `edge_threshold` is for the chance the app trades on: the blend when
+    fitted, else the model (`edge_threshold_strategy` says which).
+  - Caveat: at a higher threshold the rule can bet at the later look instead. The pool
+    keeps the first qualifying look, so it approximates the rule at t rather than
+    replaying it.
+- **Moneyline, Pinnacle replay** (`edge_threshold_pinnacle` in `E0_dk.json`): the model's
+  bets at Pinnacle's early price (football-data), over the seasons `backtest-dk`
+  already predicts for the blend's training. This is the larger sample.
+- **Player shots** (`backtest-players`): the main strategy's picks (confirmed starters,
+  FanDuel's last price, blended chance) at a threshold of 0. Filtering them by edge
+  gives exactly the rule's picks at any higher threshold. Each strategy also gets
+  `priced.strategies.<name>.edge_threshold`; the top-level `edge_threshold` in
+  `E0_players.json` is the main strategy's.
+
+**Output contract** (for the app):
+
+```
+edge_threshold: {min_edge, confidence, method, n_bets, seasons, note,
+  by_bucket: [{edge_lo, edge_hi, n, implied, model, realized, realized_lo, realized_hi,
+               roi, roi_lo, roi_hi}],
+  development_scan: [...], check: {...}}
+```
+
+- `implied`, `model` and `realized` are win rates. `realized_lo` and `realized_hi`
+  bound the realized win rate. `roi*` is the realized return per unit.
+- `by_bucket` uses every settled bet, for display only. The buckets are claimed edge
+  0–2, 2–5, 5–8, 8–12, 12–20, 20–30 and 30%+.
+
+**Expectation (stated before running):** every backtest so far loses at every
+threshold, so I expect `min_edge: null` for all three pools.
