@@ -455,9 +455,9 @@ function edgeChartSource(pfId) {
   const bt = pfById(pfId)?.backtest || {};
   const et = edgeInfo(pfId);
   if (hasBuckets(et)) return { et, caption: "" };
-  if (hasBuckets(bt.edge_threshold_pinnacle)) return { et: bt.edge_threshold_pinnacle, caption: "Too few bets of its own yet, so this shows the model against Pinnacle's early price over more matches (football-data)." };
+  if (hasBuckets(bt.edge_threshold_pinnacle)) return { et: bt.edge_threshold_pinnacle, caption: "Too few bets of its own yet, so this shows the model alone (not the live blend) against Pinnacle's early price, over more matches (football-data)." };
   const raw = bt.strategies?.raw?.edge_threshold;
-  if (hasBuckets(raw)) return { et: raw, caption: "Too few bets of its own yet, so this shows the model's own chances (without the blend) at DraftKings." };
+  if (hasBuckets(raw)) return { et: raw, caption: "Too few bets of its own yet, so this shows the model alone (not the live blend) at DraftKings' prices." };
   return null;
 }
 
