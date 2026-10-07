@@ -185,6 +185,55 @@ def cmd_backfill(args: argparse.Namespace) -> None:
         print("Dry run: no API calls made.")
 
 
+def _pinnacle_edge_threshold(preds: pd.DataFrame, league: str) -> dict:
+    """lab.thresholds on the model's bets at Pinnacle's early price (football-data)."""
+    from soccer_stats.data import download, season_code
+    from soccer_stats.edge import books
+    from soccer_stats.lab import thresholds as th
+
+    if preds.empty:
+        return th.edge_threshold(pd.DataFrame(columns=["edge", "won"]), "match bets")
+    years = sorted({2000 + int(str(s)[:2]) for s in preds["season"].dropna().unique()})
+    frames = []
+    for y in years:
+        raw = pd.read_csv(download(league, y), encoding="latin-1", on_bad_lines="skip")
+        frames.append(books.book_prices(raw, season=season_code(y)))
+    joined = books.add_fair_close(books.join(preds, pd.concat(frames, ignore_index=True)))
+    bets = books.replay(joined, "pinnacle", "early", threshold=0.0)
+    pool = pd.DataFrame(
+        {
+            "edge": bets["edge"],
+            "p": bets["model_p"],
+            "odds": bets["odds"],
+            "won": bets["won"].astype(float),
+            "group": bets["season"].astype(str) + "|" + bets["home"] + "|" + bets["away"],
+            "season": bets["season"].astype(str),
+            "time": pd.to_datetime(bets["date"]),
+        }
+    )
+    return th.edge_threshold(pool, "match bets at Pinnacle's early price")
+
+
+def _print_edge_threshold(name: str, et: dict | None) -> None:
+    if not et:
+        return
+    me = et.get("min_edge")
+    print(f"\n== Learned minimum edge: {name} ==")
+    print(
+        f"  min_edge: {'none' if me is None else f'{me:.0%}'} ({et.get('n_bets')} bets; "
+        f"{et.get('seasons')})"
+    )
+    print(f"  {et.get('note')}")
+    for r in et.get("by_bucket", []):
+        hi = r["edge_hi"]
+        print(
+            f"  claimed {r['edge_lo']:.0%}-{'up' if hi is None else f'{hi:.0%}'}: n {r['n']}, "
+            f"implied {r['implied']:.3f}, model {r['model']:.3f}, won {r['realized']:.3f} "
+            f"({r['realized_lo']:.3f}-{r['realized_hi']:.3f}), return {r['roi']:+.3f} "
+            f"({r['roi_lo']:+.3f} to {r['roi_hi']:+.3f})"
+        )
+
+
 def cmd_backtest_dk(args: argparse.Namespace) -> None:
     import json
 
@@ -256,6 +305,12 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
             k: {key: val for key, val in v.items() if key != "trades_df"}
             for k, v in strategies.items()
         },
+        # The learned minimum edge for the chance the live app trades on (the blend
+        # once it is fitted), and for the model alone on Pinnacle's early prices over
+        # the longer football-data history (lab.thresholds; docs/lab.md).
+        "edge_threshold": strategies.get("blend", strategies["raw"])["edge_threshold"],
+        "edge_threshold_strategy": "blend" if "blend" in strategies else "raw",
+        "edge_threshold_pinnacle": _pinnacle_edge_threshold(preds, args.league),
         "blend": {
             "pool": "Pinnacle closing odds (football-data) with the model's walk-forward chances",
             "fits": fits,
@@ -267,6 +322,9 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
     }
     _print_report(out)
     _print_strategies(out)
+    for k, v in strategies.items():
+        _print_edge_threshold(f"DraftKings, {k}", v.get("edge_threshold"))
+    _print_edge_threshold("Pinnacle early (football-data)", out["edge_threshold_pinnacle"])
     blend_trades = strategies["blend"]["trades_df"]
     if args.out and not blend_trades.empty:
         bpath = Path(args.out).with_name(Path(args.out).stem + "_blend.csv")
@@ -417,6 +475,9 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
                 Path(args.out).with_name(f"{args.league}_player_lines.csv.gz"), index=False
             )
         out["priced"] = {**info, **tr.report(trades)} if not trades.empty else info
+        out["edge_threshold"] = info.get("edge_threshold")
+        for name, st in info.get("strategies", {}).items():
+            _print_edge_threshold(f"player shots, {name}", st.get("edge_threshold"))
         out["trades"] = (
             trades.sort_values("kickoff", ascending=False).to_dict("records")
             if not trades.empty

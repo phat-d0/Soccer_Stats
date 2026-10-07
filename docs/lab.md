@@ -358,3 +358,109 @@ look up which books price these leagues live on The Odds API.
 
 Recommendation: stop 1X2 model work. Do 2 now (cheap, protects the live code), and do
 1 when the logs are long enough.
+
+## A minimum edge learned from history (pre-registered 2026-10-07, before any run)
+
+**Owner's request:** replace the fixed edge buttons (1/2/5/8/12%…) with a minimum edge
+that comes from history. Only flag a bet when its claimed edge is big enough to stand
+out from how far realized results normally land from the claims.
+
+**Code:** `lab/thresholds.py`, `edge_threshold(bets)`. It is generic: one row per
+settled bet with the claimed edge, the chance it was measured with, the odds, won or
+lost (voids left out), a match id, the season and the time.
+
+**Rule (fixed now):**
+- *Return per bet:* won × odds − 1 per unit staked (the realized edge).
+- *Levels:* claimed edge t = 0%, 1%, …, 30%. Each level is judged on the bets claiming t
+  to t + 5 points. This rolling band is the only smoothing. I chose a band over "every
+  bet at t and up" on synthetic data, before any real run: the cumulative version
+  returns 0% whenever the large edges pay, even when small claimed edges are pure noise.
+  That answers a different question from "which bets stand out".
+- *Range:* 95% two-sided, by bootstrap over whole matches (2,000 draws).
+- *Minimum edge:* the smallest t whose band has a lower bound above 0, where every
+  higher band with at least 30 bets also does. Bands with fewer than 30 development
+  bets are not judged.
+- *Out of sample:* the level is found on the development part and checked on the
+  latest season. With a single season, the development part is its first half by
+  kickoff and the check is the second half. It is published only if the check's bets at
+  t and up returned more than 0 (point estimate; the check sample is small). Otherwise
+  `min_edge` is null.
+- *No qualifying level:* `min_edge` is null, with a plain-English `note` the app shows
+  as it is.
+- *Multiple testing:* 31 levels are scanned. The every-higher-band condition and the
+  out-of-sample check guard against picking a lucky band. There is no further
+  correction.
+
+**Bet pools (the trade rules are unchanged):**
+- **Moneyline, DraftKings** (`backtest-dk`): every match's bet under the live rule at a
+  threshold of 0, so the first look (48 h, then 3 h) with any positive edge. Computed
+  for each strategy (`strategies.raw` and `strategies.blend`, each with
+  `.edge_threshold`).
+  - The top-level `edge_threshold` is for the chance the app trades on: the blend when
+    fitted, else the model (`edge_threshold_strategy` says which).
+  - Caveat: at a higher threshold the rule can bet at the later look instead. The pool
+    keeps the first qualifying look, so it approximates the rule at t rather than
+    replaying it.
+- **Moneyline, Pinnacle replay** (`edge_threshold_pinnacle` in `E0_dk.json`): the model's
+  bets at Pinnacle's early price (football-data), over the seasons `backtest-dk`
+  already predicts for the blend's training. This is the larger sample.
+- **Player shots** (`backtest-players`): the main strategy's picks (confirmed starters,
+  FanDuel's last price, blended chance) at a threshold of 0. Filtering them by edge
+  gives exactly the rule's picks at any higher threshold. Each strategy also gets
+  `priced.strategies.<name>.edge_threshold`; the top-level `edge_threshold` in
+  `E0_players.json` is the main strategy's.
+
+**Output contract** (for the app):
+
+```
+edge_threshold: {min_edge, confidence, method, n_bets, seasons, note,
+  by_bucket: [{edge_lo, edge_hi, n, implied, model, realized, realized_lo, realized_hi,
+               roi, roi_lo, roi_hi}],
+  development_scan: [...], check: {...}}
+```
+
+- `implied`, `model` and `realized` are win rates. `realized_lo` and `realized_hi`
+  bound the realized win rate. `roi*` is the realized return per unit.
+- `by_bucket` uses every settled bet, for display only. The buckets are claimed edge
+  0–2, 2–5, 5–8, 8–12, 12–20, 20–30 and 30%+.
+
+**Expectation (stated before running):** every backtest so far loses at every
+threshold, so I expect `min_edge: null` for all three pools.
+
+### Results (2026-10-07; print-only `backfill.yml` run 37645372430, and the player lines on data-log)
+
+| Pool | Settled bets with a positive edge | Development / check | `min_edge` | Why |
+| --- | --- | --- | --- | --- |
+| Moneyline, DraftKings, blend (the live chance; top-level in `E0_dk.json`) | 20 | – | **null** | Too few: the blend almost never claims an edge |
+| Moneyline, DraftKings, model alone | 338 | 2025/26 first half (169) / second half | **null** | No band's lower bound clears 0. Best was 2–7%: 41 bets, +34.5% a bet (range −12.7% to +84.2%) |
+| Moneyline, model at Pinnacle early (football-data) | 1,280 | 2022/23–2024/25 (1,084) / 2025/26 (196) | **null** | No band's lower bound clears 0. Best was 25–30%: 69 bets, +19.8% (range −33.8% to +95.7%) |
+| Player shots, starters after lineups (blend; top-level in `E0_players.json`) | 333 | 2024/25 (262) / 2025/26 | **null** | No band's lower bound clears 0. Best was 13–18%: 33 bets, +25.8% (range −100% to +207%) |
+
+The player-shots row was computed from `backtest/E0_player_lines.csv.gz` on data-log
+with the same rule as `backtest-players`: the main strategy's picks at a threshold of 0.
+
+Claimed edge vs result, all settled bets (win rates; return per unit with its range):
+
+| Pool | Claimed edge | Bets | Implied | Model | Won | Return (range) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pinnacle early | 0–2% | 71 | 0.476 | 0.482 | 0.479 | +2.4% (−26% to +32%) |
+| Pinnacle early | 2–5% | 137 | 0.437 | 0.452 | 0.380 | −15.0% (−35% to +7%) |
+| Pinnacle early | 5–8% | 158 | 0.414 | 0.441 | 0.405 | −4.9% (−26% to +18%) |
+| Pinnacle early | 8–12% | 186 | 0.420 | 0.460 | 0.398 | −4.4% (−24% to +16%) |
+| Pinnacle early | 12–20% | 302 | 0.385 | 0.444 | 0.371 | −2.9% (−19% to +14%) |
+| Pinnacle early | 20–30% | 183 | 0.306 | 0.380 | 0.257 | −14.1% (−40% to +18%) |
+| Pinnacle early | 30%+ | 243 | 0.203 | 0.295 | 0.198 | −10.4% (−36% to +18%) |
+| DraftKings, model | 0–2% | 49 | 0.418 | 0.422 | 0.388 | −12.9% (−45% to +21%) |
+| DraftKings, model | 12–20% | 59 | 0.304 | 0.352 | 0.322 | −2.4% (−39% to +41%) |
+| DraftKings, model | 20–30% | 46 | 0.241 | 0.301 | 0.174 | −37.2% (−78% to +10%) |
+| Player shots | 12–20% | 58 | 0.066 | 0.077 | 0.069 | −14.7% (−86% to +91%) |
+| Player shots | 20–30% | 48 | 0.070 | 0.087 | 0.021 | −56.2% (−100% to +43%) |
+
+What it shows:
+- In every pool, the realized win rate follows the bookmaker's implied rate, within
+  noise (a few buckets land slightly above it), not the model's. The bigger the claimed
+  edge, the further the model's chance sits above what happened.
+- This is the same finding as the bake-offs, from another angle: the claimed edge is
+  the model's error, not information.
+- The expected `min_edge: null` holds everywhere. The app should say so in plain words
+  instead of offering edge buttons that imply a bet is worth taking.
