@@ -26,6 +26,8 @@ FEATURES = [
     "home_rest",
     "away_rest",
 ]
+# Leagues without xG (Understat covers only the top divisions): goals-only features.
+FEATURES_GOALS = [f for f in FEATURES if "xg" not in f]
 
 
 def elo(matches: pd.DataFrame) -> pd.DataFrame:
