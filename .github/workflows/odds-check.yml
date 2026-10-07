@@ -14,6 +14,9 @@
 #   goalscorer: the anytime-goalscorer stage-0 live probe and 5-match pilot
 #             (docs/player_props.md), never past `cap` credits (0 = no calls); prints
 #             the books, margins, name matches, measures and the pre-registered verdict.
+#   goal-lab: the goalscorer model improvements (docs/player_props.md section 8),
+#             development seasons; `reason` opens the locked 2026/27 forward window
+#             (once, logged). No credits.
 #   player-lab: the priced player shot lines (data-log) through the lab's metrics,
 #             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
@@ -24,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, goalscorer or player-lab"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab or goal-lab"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab, goal-lab]
         default: coverage
       cap:
         description: "props / goalscorer: most credits to spend (0 = dry run)"
@@ -41,7 +44,7 @@ on:
         description: "lab/lab-holdout: football-data division (E0, E1, E2, E3)"
         default: "E0"
       reason:
-        description: "lab-holdout: why the holdout is opened (logged)"
+        description: "lab-holdout / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
         default: ""
       finalists:
         description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack"
@@ -52,6 +55,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # goal-lab reads the round-5 pilot's job log
 
 jobs:
   check:
@@ -101,6 +105,13 @@ jobs:
                      --json out/lab_holdout.json ;;
             goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
                      --json out/goalscorer_pilot.json ;;
+            goal-lab)
+              curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \
+                "https://api.github.com/repos/${{ github.repository }}/actions/jobs/112639640656/logs" \
+                -o out/pilot.log || echo "pilot log not available"
+              uv run soccer-stats goal-lab --pilot-log out/pilot.log \
+                --open-forward "$REASON" --json out/goal_lab.json
+              rm -f out/pilot.log ;;
             player-lab)
               git fetch --depth=1 origin data-log
               git show FETCH_HEAD:backtest/E0_player_lines.csv.gz > out/lines.csv.gz
