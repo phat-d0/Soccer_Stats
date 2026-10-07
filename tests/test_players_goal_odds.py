@@ -244,3 +244,7 @@ def test_match_players_evaluate_and_verdict():
     }
     v3 = go.verdict([{"book": "pinnacle", "two_sided": 20, "margin_two_sided": 0.05}], mid)
     assert v3["decision"] == "go"
+
+
+def test_verdict_without_prices_is_no_data():
+    assert go.verdict([], {"lines": 0})["decision"] == "no data"

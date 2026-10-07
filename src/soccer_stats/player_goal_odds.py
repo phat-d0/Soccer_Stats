@@ -389,6 +389,14 @@ def verdict(books: list[dict], ev: dict) -> dict:
     or no book beyond FanDuel covers at least half the starters. Pilot step: ask for the
     100-match sample only if the pilot finds a second book or a two-sided book.
     """
+    if not ev.get("lines"):
+        return {
+            "decision": "no data",
+            "kill_reasons": [],
+            "go_reasons": [],
+            "ask_for_sample": False,
+            "second_books": [],
+        }
     two = [b for b in books if b["two_sided"] and (b["margin_two_sided"] or 1) < 0.06]
     others = [b for b, c in (ev.get("starter_coverage") or {}).items() if b != PLAYER_BOOKMAKER]
     second_half = [
