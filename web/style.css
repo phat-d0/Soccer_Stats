@@ -559,3 +559,39 @@ tr.sub-head td { text-align: left; font-size: 12px; color: var(--text-muted); pa
 .pill.st-retired { background: var(--track); color: var(--text-muted); }
 .pf-retired { margin-top: 18px; font-size: 13px; color: var(--text-muted); }
 button.linkish { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--pos); text-decoration: underline; cursor: pointer; }
+
+/* Minimum edge learned from past bets: the recommendation and "Explore other edges" */
+.edge-panel { background: var(--surface-2); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; }
+.edge-rec { font-size: 14px; line-height: 1.45; color: var(--text-secondary); }
+.edge-rec b { color: var(--text-primary); }
+.edge-rec .meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.edge-exploring { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+details.edge-explore { margin-top: 10px; }
+details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; font-size: 13px; color: var(--text-secondary); border-top: 0.5px solid var(--border); border-radius: 0; }
+
+/* Claimed edge vs what happened: one dot-plot row per edge bucket */
+.eb-card { padding: 10px 14px; }
+.eb-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.eb-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.eb-key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.eb-row, .eb-axis { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; }
+.eb-row { background: none; border: 0; border-top: 0.5px solid var(--border); padding: 8px 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.eb-row.above { background: color-mix(in srgb, var(--track) 70%, transparent); }
+.eb-row.sel .eb-label { color: var(--text-primary); font-weight: 600; }
+.eb-label { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; padding-left: 4px; }
+.eb-label .meta { display: block; font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.eb-label .meta.gain { color: var(--good-text); }
+.eb-label .meta.loss { color: var(--neg); }
+.eb-plot { position: relative; height: 18px; margin: 0 8px; }
+.eb-row .eb-plot { background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat; }
+.eb-range { position: absolute; top: 7px; height: 4px; border-radius: 2px; opacity: 0.35; }
+.eb-range.pos, .eb-key.real.pos, .eb-dot.real.pos { background: var(--pos); }
+.eb-range.neg, .eb-dot.real.neg { background: var(--neg); }
+.eb-dot { position: absolute; top: 4px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; }
+.eb-dot.imp, .eb-key.imp { background: var(--text-muted); width: 3px; margin-left: -1.5px; border-radius: 1px; height: 14px; top: 2px; }
+.eb-key.imp { height: 12px; }
+.eb-dot.mod, .eb-key.mod { background: var(--surface-2); border: 2px solid var(--text-secondary); box-sizing: border-box; }
+.eb-axis { margin-top: 2px; }
+.eb-axis .eb-plot { height: 14px; }
+.eb-axis .eb-plot span { position: absolute; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.eb-readout { min-height: 36px; font-size: 13px; color: var(--text-secondary); padding: 8px 0 2px; border-top: 0.5px solid var(--border); margin-top: 6px; }

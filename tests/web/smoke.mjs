@@ -60,7 +60,9 @@ const closeSheet = async (p) => { await p.click(".sheet-close"); };
 const STEPS = [
   ["matches", tab("matches")],
   ["match-sheet", async (p) => { await p.click('button.match[data-fixture="0"]'); await sheet(p); }, true],
-  ["matches-edge-2", async (p) => { await closeSheet(p); await p.click('button[data-edge="0.02"]'); }],
+  // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
+  ["matches-edge-2", async (p) => { await closeSheet(p); await p.click("details.edge-explore > summary"); await p.click('button[data-edge="0.02"]'); }],
+  ["matches-edge-reset", click('button[data-edge="reset"]')],
   ["teams", tab("ratings")],
   ["players-stats", async (p) => { await p.click('button[data-tv="players"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-stats-club", async (p) => { await p.selectOption("#pl-team", { index: 1 }); }],
@@ -70,6 +72,7 @@ const STEPS = [
   ["players-model", async (p) => { await closeSheet(p); await p.click('button[data-plmode="model"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-model-sheet", async (p) => { await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
+  ["record-match-bucket", click('.eb-row[data-ebrow="0"]')],
   ["record-match-raw", click('button[data-recdk="raw"]')],
   ["record-player", click('button[data-recbet="player"]')],
   ["record-player-blend_3h", click('button[data-recstrat="blend_3h"]')],

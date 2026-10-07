@@ -329,6 +329,7 @@ def build(src: Path, out: Path) -> dict:
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
+    add_edge_thresholds(data)
 
     sample = sample_detail(detail, data["fixtures"])
     stats = stats_from_detail(sample)
@@ -410,6 +411,156 @@ def add_settled_live_matches(data: dict) -> None:
     # (production keeps them for one release), so the smoke test proves nothing needs them.
     data["portfolio"].pop("live", None)
     data["portfolio"].pop("backtest", None)
+
+
+# The research lab's edge_threshold contract, until data-log's backtests carry it: one
+# portfolio with a recommended level and one with none (min_edge null), so the app's
+# two states are both in the fixture. Synthetic numbers, marked in `method`.
+_EDGE_POOLS = {
+    "winning": {
+        "min_edge": 0.08,
+        "confidence": 0.95,
+        "method": "synthetic fixture values (walk-forward edge buckets)",
+        "n_bets": 1419,
+        "seasons": {"development": ["2223", "2324", "2425"], "check": ["2526"]},
+        "note": "Synthetic numbers for the app's tests.",
+        "by_bucket": [
+            {
+                "edge_lo": 0.02,
+                "edge_hi": 0.05,
+                "n": 420,
+                "implied": 0.36,
+                "model": 0.38,
+                "realized": 0.35,
+                "realized_lo": 0.31,
+                "realized_hi": 0.40,
+                "roi": -0.028,
+                "roi_lo": -0.148,
+                "roi_hi": 0.092,
+            },
+            {
+                "edge_lo": 0.05,
+                "edge_hi": 0.08,
+                "n": 360,
+                "implied": 0.33,
+                "model": 0.36,
+                "realized": 0.32,
+                "realized_lo": 0.27,
+                "realized_hi": 0.37,
+                "roi": -0.03,
+                "roi_lo": -0.15,
+                "roi_hi": 0.09,
+            },
+            {
+                "edge_lo": 0.08,
+                "edge_hi": 0.12,
+                "n": 290,
+                "implied": 0.30,
+                "model": 0.34,
+                "realized": 0.31,
+                "realized_lo": 0.26,
+                "realized_hi": 0.36,
+                "roi": 0.033,
+                "roi_lo": -0.087,
+                "roi_hi": 0.153,
+            },
+            {
+                "edge_lo": 0.12,
+                "edge_hi": None,
+                "n": 349,
+                "implied": 0.24,
+                "model": 0.31,
+                "realized": 0.25,
+                "realized_lo": 0.21,
+                "realized_hi": 0.30,
+                "roi": 0.042,
+                "roi_lo": -0.078,
+                "roi_hi": 0.162,
+            },
+        ],
+    },
+    "losing": {
+        "min_edge": None,
+        "confidence": 0.95,
+        "method": "synthetic fixture values (walk-forward edge buckets)",
+        "n_bets": 1012,
+        "seasons": {"development": ["2526 first half"], "check": ["2526 second half"]},
+        "note": "No minimum edge works. At every claimed edge from 0% to 30%, past bets lost "
+        "money after FanDuel's margin.",
+        "by_bucket": [
+            {
+                "edge_lo": 0.02,
+                "edge_hi": 0.08,
+                "n": 410,
+                "implied": 0.33,
+                "model": 0.25,
+                "realized": 0.24,
+                "realized_lo": 0.20,
+                "realized_hi": 0.28,
+                "roi": -0.273,
+                "roi_lo": -0.393,
+                "roi_hi": -0.153,
+            },
+            {
+                "edge_lo": 0.08,
+                "edge_hi": 0.15,
+                "n": 380,
+                "implied": 0.30,
+                "model": 0.24,
+                "realized": 0.22,
+                "realized_lo": 0.18,
+                "realized_hi": 0.27,
+                "roi": -0.267,
+                "roi_lo": -0.387,
+                "roi_hi": -0.147,
+            },
+            {
+                "edge_lo": 0.15,
+                "edge_hi": None,
+                "n": 222,
+                "implied": 0.21,
+                "model": 0.19,
+                "realized": 0.16,
+                "realized_lo": 0.11,
+                "realized_hi": 0.21,
+                "roi": -0.238,
+                "roi_lo": -0.358,
+                "roi_hi": -0.118,
+            },
+        ],
+    },
+}
+
+
+# Per portfolio, the backtest keys to fill. Moneyline is as the real data came back on
+# 7 Oct: no level and no buckets in its own (blend) pool, so the chart falls back to the
+# Pinnacle pool. Player shots carries a synthetic recommended level, so the app's
+# "only flag bets with at least ..." state is tested too.
+SYNTHETIC_EDGE = {
+    "moneyline": {
+        "edge_threshold": {
+            "min_edge": None,
+            "confidence": 0.95,
+            "method": "synthetic fixture values (walk-forward edge buckets)",
+            "n_bets": 20,
+            "seasons": {},
+            "note": "Too few settled match bets with a positive edge (20) to learn a minimum edge.",
+            "by_bucket": [],
+        },
+        "edge_threshold_pinnacle": {**_EDGE_POOLS["losing"], "n_bets": 1280},
+    },
+    "player_shots": {"edge_threshold": _EDGE_POOLS["winning"]},
+}
+
+
+def add_edge_thresholds(data: dict) -> None:
+    for p in data["portfolio"].get("portfolios") or []:
+        bt = p.get("backtest")
+        if bt is None:
+            continue
+        for key, value in SYNTHETIC_EDGE.get(p["id"], {}).items():
+            if bt.get(key) is None:  # the real field wins once data-log carries it
+                bt[key] = value
 
 
 def main(argv: list[str] | None = None) -> None:
