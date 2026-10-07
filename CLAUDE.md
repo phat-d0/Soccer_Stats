@@ -31,7 +31,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 | `publish.yml` | Builds the site (`soccer-stats publish`), then on `data-log` logs team news (`log-news`), the build's DraftKings prices (`log-odds`) and paper trades (`paper`), and deploys Pages. Only the default branch publishes: pushes elsewhere don't trigger it, and a dispatch on another branch skips `data-log`. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` and the anytime-goalscorer stage 1 (`backtest/E0_goals.json`) to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
 | `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
-| `odds-check.yml` | Diagnostics, edge research and the research lab. Inputs: `task` (coverage, props, match, shots, signals, lab, lab-holdout), `cap` (props credit cap, 0 = dry run), `hist_dates`, `seasons`; `league` (lab, lab-holdout: E0–E3); for `lab-holdout`: `reason`, `finalists`, `stack_base`. Never pushes. | 0 (match, shots, signals, lab) to ~100 per historical props call |
+| `odds-check.yml` | Diagnostics, edge research and the research lab. Inputs: `task` (coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab), `cap` (props / goalscorer credit cap, 0 = dry run; the key is passed only to coverage, props and goalscorer), `hist_dates`, `seasons`; `league` (lab, lab-holdout: E0–E3); for `lab-holdout`: `reason`, `finalists`, `stack_base`. Never pushes. | 0 (match, shots, signals, lab, player-lab) to ~100 per historical props call; goalscorer ≤ `cap` (5 per live call, 10 per pilot call) |
 | `ci.yml` | On every push and pull request. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. Job `web`: installs Playwright's Chromium (cached) and runs `tests/web/smoke.mjs`; a skip counts as a failure, and screenshots are uploaded when it fails. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml`, dispatch `publish.yml`, so the app picks up the new results.
@@ -133,6 +133,7 @@ Read its "Status and next steps" section first; this file is the technical map.
   and `odds-check.yml` (`task` = props, match, shots, signals). Findings and ranked next experiments: `docs/edge.md`.
 - `edge/signals.py`: seven pre-registered free signals (xG form, xG minus goals, rest, model vs early, soft books vs Pinnacle early, two totals signals; 6-match window, earlier matches only) tested against Pinnacle's early-to-close move and as a blend term beside Pinnacle early, season by season on earlier seasons, ranges Bonferroni-widened for 14 tests.
 - **football-data's Asian handicap average and maximum (`AvgAH*`, `MaxAH*`) are unreliable**: often stale or at a different line. Pinnacle's AH prices are fine. Anything using the average/maximum AH columns must run `match_markets.clean_prices` or equivalent, and even then treat the results as suspect.
+- **football-data's 2025/26 files have Pinnacle 1X2 prices for only part of the season**: about 52% of E0 matches, 47% / 30% / 30% of E1 / E2 / E3 (found in round 5). Anything fitted or scored on 2025/26 Pinnacle prices (the live match blend, the Record replay, any holdout) has a thinner sample than the match count suggests. Check price coverage before pre-registering a holdout.
 
 **Research lab** (`lab/`, rules and results in `docs/lab.md`)
 - `harness.py` (generic: rows with a time, group, outcome, features, market): `walk_forward` (refit every 28 days on earlier rows), `nested` (each season's settings chosen on the season before, trained on still earlier rows), `Holdout` (2025/26 is locked: predicting it raises `HoldoutLocked` unless `unlock(reason)` is called, which prints and logs the time).
@@ -142,7 +143,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
-- `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`.
+- `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`, `goalscorer-pilot`, `player-lab`.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
@@ -196,7 +197,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
   - a readout line instead of tooltips over the chart;
   - colour tokens defined for both light and dark themes.
 
-## Status (2026-10-06, after round 4)
+## Status (2026-10-07, after round 5)
 
 **Match bets**
 - DraftKings backtest, 2025/26, raw model at a 12% edge: 173 bets, ROI −13% (95% range −38% to +16%), CLV vs DraftKings −5% to −7%. Every threshold from 2% to 20% loses (−8% to −21%).
@@ -215,6 +216,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - Round 4 (research lab, `lab/`, `docs/lab.md`): a pre-registered 1X2 bake-off against Pinnacle's early price. Development is 2017/18–2024/25, 2,934 matches, 99.5% ranges; the holdout 2025/26 was opened once (2026-10-06 22:53 UTC) with 198 priced matches. Nothing passes. Log loss: Dixon-Coles 0.9589, hierarchical Poisson 0.9618, LightGBM 0.9749, multinomial logit 0.9653, stack with the price 0.9511, Pinnacle early 0.9493. No blend-weight range clears 0. CLV −3.6% to −5.0% (holdout −3.6% and −5.1%). No live change. Next: the same bake-off on E1–E3 (free).
 - Round 4 (UI, PR #3): the Portfolio tab is one portfolio per strategy (`trades.PORTFOLIOS`: Moneyline live, Anytime goalscorer testing, Player shots retired). The old `portfolio.live` / `portfolio.backtest` / `player_model` keys stay: the app still reads `player_model` (Record → Player shots) and falls back to `live`/`backtest` for an older data.json, so removing them is a separate change.
 - Round 5 (research lab, bake-off 2, `docs/lab.md`): the same pre-registered bake-off on E1–E3. These are goals-only (no Understat xG); development is 2017/18–2024/25, about 4,000–4,200 matches per league, at 99.83% ranges (30 tests). Nothing passes in any league: every model trails Pinnacle early by 0.016–0.021 log loss, no blend-weight range clears 0, and CLV is −3.8% to −4.9%. The 2025/26 holdouts were opened once but couldn't be scored: football-data has Pinnacle prices for only 47% / 30% / 30% of 2025/26 (E0 about 52%). That gap also thins any 2025/26 fit on Pinnacle prices (the live blend). Verdict: stop 1X2 model work against Pinnacle; next is team news vs the DraftKings log.
+- Round 5 (lead): PRs #5 (research lab) and #6 (player props) merged through the GitHub API; 220 tests pass; `players.yml` run 37577615109 (0 credits) reproduced the goalscorer stage-1 numbers exactly on the lab harness (holdout opening logged), and publish run 37578089543 succeeded.
 - Live: value picks and match paper trades use the blend (`p_bet`) once `E0_dk.json` holds `blend.live`, so they will mostly stop. That is the honest result.
 
 **Player bets**
@@ -242,7 +244,7 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - Live lines correct squads for transfers (FPL); the 6 Oct publish showed 490 players, 0 priced (no FanDuel lines more than 30 hours before kickoff) and no teams without history.
 - No live lineup feed. Build one (ESPN summary API, `rosters[].roster[].starter`) only if a strategy backtests positive.
 
-**Credits**: 22,636 left on 7 Oct after round 5's goalscorer probe and pilot (60 spent, the approved cap; run 37574303057). Before it: 22,696. The key is shared, so check the publish log.
+**Credits**: 22,634 left on 7 Oct after round 5 (publish run 37578089543). Round 5 spent 60, the owner-approved cap, on the goalscorer probe and pilot (run 37574303057: 22,696 → 22,636); the bake-off on E1–E3 and the shots lab run were free. The key is shared, so check the publish log.
 
 **App (rounds 3–4)**: Portfolio → Live leads with settled profit, ROI, CLV and beat-the-close tiles and a note on why CLV matters; settled match trades and the trade sheet show the close, how long before kickoff it was taken ("approx." past 60 min) and CLV. Round 2 added model / blend / DraftKings side by side on the match sheet, model / blend / FanDuel on player lines, and the DraftKings strategy switch on Record. Round 4 split Portfolio into one portfolio per strategy (Moneyline, Anytime goalscorer, Player shots) with a status note each. `sw.js` is `pl-model-v22`.
 
