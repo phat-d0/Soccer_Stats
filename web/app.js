@@ -419,7 +419,7 @@ const confText = (c) => (c == null ? "" : typeof c === "number" ? `${pct(c)} con
 // Why there is no pick, in one sentence (Matches note, match sheet).
 function noEdgeText(pfId) {
   const et = edgeInfo(pfId);
-  return `Nothing is flagged: ${et?.note ? esc(et.note) : "no edge level has beaten the market in past bets."}`;
+  return `Nothing is flagged. ${et?.note ? esc(et.note) : "No edge level has beaten the market in past bets."}`;
 }
 
 // The recommendation, in plain English, with the old edge buttons folded away under
@@ -448,12 +448,26 @@ function edgePanel(pfId = "moneyline") {
     </div>`;
 }
 
+// What the chart draws: the portfolio's own edge_threshold buckets, else (too few bets
+// there, by_bucket empty) a bigger pool from the same backtest, with a caption.
+const hasBuckets = (et) => (et?.by_bucket || []).some((r) => r.n);
+function edgeChartSource(pfId) {
+  const bt = pfById(pfId)?.backtest || {};
+  const et = edgeInfo(pfId);
+  if (hasBuckets(et)) return { et, caption: "" };
+  if (hasBuckets(bt.edge_threshold_pinnacle)) return { et: bt.edge_threshold_pinnacle, caption: "Too few bets of its own yet, so this shows the model against Pinnacle's early price over more matches (football-data)." };
+  const raw = bt.strategies?.raw?.edge_threshold;
+  if (hasBuckets(raw)) return { et: raw, caption: "Too few bets of its own yet, so this shows the model's own chances (without the blend) at DraftKings." };
+  return null;
+}
+
 // Claimed edge vs what happened: per edge bucket, the book's implied chance, the model's
 // chance and the realized win rate with its range. A dot plot; tap a row for the readout.
 function edgeBucketsHtml(pfId) {
-  const et = edgeInfo(pfId);
-  const rows = (et?.by_bucket || []).filter((r) => r.n);
-  if (!rows.length) return "";
+  const src = edgeChartSource(pfId);
+  if (!src) return "";
+  const et = src.et;
+  const rows = et.by_bucket.filter((r) => r.n);
   const vals = rows.flatMap((r) => [r.implied, r.model, r.realized, r.realized_lo, r.realized_hi]).filter((v) => v != null);
   const hi = Math.min(1, Math.ceil((Math.max(...vals) + 0.02) * 10) / 10);
   const lo = Math.max(0, Math.floor((Math.min(...vals) - 0.02) * 10) / 10);
@@ -469,7 +483,7 @@ function edgeBucketsHtml(pfId) {
     const dot = (v, cls) => (v == null ? "" : `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>`);
     const above = et.min_edge != null && r.edge_lo >= et.min_edge - 1e-9;
     return `<button class="eb-row${above ? " above" : ""}" data-ebrow="${i}" data-eb="${esc(pfId)}">
-      <span class="eb-label">${label(r)}<span class="meta">${r.n} bets</span>${r.roi != null ? `<span class="meta ${plClass(r.roi)}">${signedPct(r.roi, 0)} per bet</span>` : ""}</span>
+      <span class="eb-label">${label(r)}<span class="meta">${r.n} bets</span>${r.roi != null ? `<span class="meta ${plClass(r.roi)}">ROI ${signedPct(r.roi, 0)}</span>` : ""}</span>
       <span class="eb-plot">${range}${dot(r.implied, "imp")}${dot(r.model, "mod")}${dot(r.realized, `real ${beat ? "pos" : "neg"}`)}</span>
     </button>`;
   }).join("");
@@ -482,7 +496,7 @@ function edgeBucketsHtml(pfId) {
       ${axis}
       <div class="eb-readout" id="eb-readout-${esc(pfId)}">${ebReadout(et, rows.length - 1)}</div>
     </div>
-    <p class="note">Each row groups past bets by the edge the model claimed, with their return per bet. A real edge wins more often than the book's chance (blue); red means it won less. Rows at or above the recommended level are shaded.${et.method ? ` Method: ${esc(et.method)}.` : ""}</p>`;
+    <p class="note">${src.caption ? `${esc(src.caption)} ` : ""}Each row groups past bets by the edge the model claimed, with their return per bet. A real edge wins more often than the book's chance (blue); red means it won less. Rows at or above the recommended level are shaded.${et.method ? ` Method: ${esc(et.method)}.` : ""}</p>`;
 }
 function ebReadout(et, i) {
   const r = (et.by_bucket || []).filter((b) => b.n)[i];
@@ -1710,8 +1724,8 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.ebrow !== undefined) {
     const el = document.getElementById(`eb-readout-${t.dataset.eb}`);
-    const et = edgeInfo(t.dataset.eb);
-    if (el && et) el.innerHTML = ebReadout(et, Number(t.dataset.ebrow));
+    const src = edgeChartSource(t.dataset.eb);
+    if (el && src) el.innerHTML = ebReadout(src.et, Number(t.dataset.ebrow));
     t.parentElement.querySelectorAll(".eb-row").forEach((r) => r.classList.toggle("sel", r === t));
   } else if (t.dataset.recdk) {
     state.recDk = t.dataset.recdk;

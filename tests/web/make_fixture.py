@@ -416,8 +416,8 @@ def add_settled_live_matches(data: dict) -> None:
 # The research lab's edge_threshold contract, until data-log's backtests carry it: one
 # portfolio with a recommended level and one with none (min_edge null), so the app's
 # two states are both in the fixture. Synthetic numbers, marked in `method`.
-SYNTHETIC_EDGE = {
-    "moneyline": {
+_EDGE_POOLS = {
+    "winning": {
         "min_edge": 0.08,
         "confidence": 0.95,
         "method": "synthetic fixture values (walk-forward edge buckets)",
@@ -479,7 +479,7 @@ SYNTHETIC_EDGE = {
             },
         ],
     },
-    "player_shots": {
+    "losing": {
         "min_edge": None,
         "confidence": 0.95,
         "method": "synthetic fixture values (walk-forward edge buckets)",
@@ -532,11 +532,35 @@ SYNTHETIC_EDGE = {
 }
 
 
+# Per portfolio, the backtest keys to fill. Moneyline is as the real data came back on
+# 7 Oct: no level and no buckets in its own (blend) pool, so the chart falls back to the
+# Pinnacle pool. Player shots carries a synthetic recommended level, so the app's
+# "only flag bets with at least ..." state is tested too.
+SYNTHETIC_EDGE = {
+    "moneyline": {
+        "edge_threshold": {
+            "min_edge": None,
+            "confidence": 0.95,
+            "method": "synthetic fixture values (walk-forward edge buckets)",
+            "n_bets": 20,
+            "seasons": {},
+            "note": "Too few settled match bets with a positive edge (20) to learn a minimum edge.",
+            "by_bucket": [],
+        },
+        "edge_threshold_pinnacle": {**_EDGE_POOLS["losing"], "n_bets": 1280},
+    },
+    "player_shots": {"edge_threshold": _EDGE_POOLS["winning"]},
+}
+
+
 def add_edge_thresholds(data: dict) -> None:
     for p in data["portfolio"].get("portfolios") or []:
         bt = p.get("backtest")
-        if bt is not None and bt.get("edge_threshold") is None and p["id"] in SYNTHETIC_EDGE:
-            bt["edge_threshold"] = SYNTHETIC_EDGE[p["id"]]
+        if bt is None:
+            continue
+        for key, value in SYNTHETIC_EDGE.get(p["id"], {}).items():
+            if bt.get(key) is None:  # the real field wins once data-log carries it
+                bt[key] = value
 
 
 def main(argv: list[str] | None = None) -> None:
