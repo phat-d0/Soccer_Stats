@@ -409,6 +409,9 @@ Every feature uses only earlier kickoffs. C–H start from B.
 - **Pass (development):** the gain's 99.29% range lies above 0, **and** the 20–30% and 30%+
   buckets each have predicted within their observed rate's 95% range (or within 3 points
   when the range is wider).
+- **Tail rule, as coded before any run (`player_goal_lab.tail_rule`):** when a bucket's
+  95% range is at most ±3 points, the predicted rate must lie inside it; when the range is
+  wider, the predicted rate must be within 3 points of the observed one.
 - **Selection:** among C–H that pass, the lowest development log loss is "the improved
   model". If none passes, B stays.
 - **Forward verdict:** the improved model (or B) against B and the season-xG benchmark on

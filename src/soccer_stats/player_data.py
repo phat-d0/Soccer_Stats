@@ -32,6 +32,7 @@ from soccer_stats.xg import HEADERS, TEAM_NAMES, fetch_season
 
 MATCH_URL = "https://understat.com/getMatchData/{id}"
 ON_TARGET = {"Goal", "SavedShot"}
+SET_PIECES = {"FromCorner", "SetPiece", "DirectFreekick"}
 POSITION_GROUPS = {
     "GK": "GK",
     "DR": "DEF",
@@ -91,6 +92,8 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
     rosters = data.get("rosters", {})
     counts: dict[str, list[float]] = {}  # shots, on target, goals, xG
     pens: dict[str, int] = {}
+    sp_xg: dict[str, float] = {}  # corners, set pieces, direct free kicks (not penalties)
+    pen_xg: dict[str, float] = {}
     team_shots = {"h": 0, "a": 0}
     for side in ("h", "a"):
         for s in shots.get(side, []) or []:
@@ -105,6 +108,9 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
             team_shots[side] += 1
             if s.get("situation") == "Penalty":
                 pens[pid] = pens.get(pid, 0) + 1
+                pen_xg[pid] = pen_xg.get(pid, 0.0) + float(s.get("xG") or 0)
+            elif s.get("situation") in SET_PIECES:
+                sp_xg[pid] = sp_xg.get(pid, 0.0) + float(s.get("xG") or 0)
     rows = []
     for side in ("h", "a"):
         roster = rosters.get(side, {}) or {}
@@ -137,6 +143,8 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
                     "goals": int(goals),
                     "xg": round(xg, 3),
                     "penalties": pens.get(pid, 0),
+                    "pen_xg": round(pen_xg.get(pid, 0.0), 3),
+                    "sp_xg": round(sp_xg.get(pid, 0.0), 3),
                     "team_shots": team_shots[side],
                     "opp_shots": team_shots["a" if side == "h" else "h"],
                 }

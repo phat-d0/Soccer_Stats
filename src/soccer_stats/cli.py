@@ -17,6 +17,7 @@ import functools
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from soccer_stats import backtest
@@ -605,6 +606,161 @@ def cmd_player_odds_check(args: argparse.Namespace) -> None:
         print(line)
 
 
+def cmd_goal_lab(args: argparse.Namespace) -> None:
+    """Goalscorer model improvements (docs/player_props.md §8), print-only."""
+    import json
+
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.publish import _clean
+
+    years = range(2021, current_season() + 1 if args.open_forward else 2026)
+    apps, missing = load_appearances(args.league, years)
+    print(f"{len(apps)} appearances ({missing} match files missing)")
+    matches, err = with_xg(load_matches([args.league], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=0.7 if not err else 0.0),
+    )
+    feats = gl.extra_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
+    fwd = feats["kickoff"] >= gl.FORWARD_START
+    if not args.open_forward:
+        feats = feats[~fwd]  # the forward window is never computed on while locked
+    feats = feats.reset_index(drop=True)
+    out = {"pre_registration": "docs/player_props.md section 8"}
+
+    print("\n=== Development (2023/24-2024/25), starters, lineup known ===")
+    dev, tuned = gl.predict_dev(feats, Holdout(gl.SEEN_START))
+    res = gl.compare(dev, feats)
+    out.update(development=res, gbm_tuning=tuned)
+    for c, d in res["candidates"].items():
+        t = res["tests"].get(c, {})
+        print(
+            f"  {c}: log loss {d['log_loss']} (season-xG {d.get('log_loss_season_xg')}), "
+            f"Brier {d['brier']}, resolution {d['resolution']}, AUC {d['auc']}, "
+            f"30%+ {d['share_30plus']:.1%}, tail ok {d['tail']['ok']}"
+            + (
+                f" | vs {t['vs']}: gain {t['gain']} range {t['range']} -> "
+                f"{'PASS' if t['passes'] else 'no'}"
+                if t
+                else ""
+            )
+        )
+    chosen = res["chosen"]
+    print(f"Chosen: {chosen} (B if none of C-H passed)")
+
+    names = sorted({"A", "B", chosen})
+    seen = Holdout(gl.SEEN_START)
+    seen.unlock(
+        "goal-lab: 2025/26 reported as 'seen' after selection (pre-registered in "
+        "docs/player_props.md section 8); it chooses nothing"
+    )
+    slo, shi = gl.SEEN_START, pd.Timestamp("2026-07-01", tz="UTC")
+    sp = pd.DataFrame({n: gl.predict(feats, n, slo, shi, seen, _gbm_cfg(tuned, n)) for n in names})
+    out["seen_2526"] = gl.score_window(sp, feats, names)
+    out["seen_2526"]["holdout_log"] = seen.events
+    for c, d in out["seen_2526"]["candidates"].items():
+        print(
+            f"  seen 2025/26 {c}: log loss {d['log_loss']}, AUC {d['auc']}, tail {d['tail']['ok']}"
+        )
+    print("  seen 2025/26 vs B: " + json.dumps(out["seen_2526"]["vs_ref"], default=str))
+
+    if args.pilot_log and Path(args.pilot_log).exists():
+        out["pilot"] = _goal_pilot_describe(
+            gl.parse_pilot_log(Path(args.pilot_log).read_text()), apps, feats, sp, names
+        )
+        print("Pilot (5 matches, descriptive only): " + json.dumps(out["pilot"]["summary"]))
+
+    if args.open_forward:
+        fh = gl.forward_holdout(args.open_forward)
+        flo = gl.FORWARD_START
+        fhi = feats["kickoff"].max() + pd.Timedelta(days=1)
+        fp = pd.DataFrame(
+            {n: gl.predict(feats, n, flo, fhi, fh, _gbm_cfg(tuned, n)) for n in names}
+        )
+        out["forward"] = gl.score_window(fp, feats, names)
+        out["forward"]["matches"] = int(feats.loc[fp.index, "match_id"].nunique())
+        out["forward"]["holdout_log"] = fh.events
+        print("Forward check: " + json.dumps(out["forward"], default=str)[:2000])
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
+def _gbm_cfg(tuned: dict, name: str):
+    """H's settings for a later window: the ones chosen for the last development season."""
+    if name != "H" or not tuned:
+        return None
+    return tuned[max(tuned)]["config"]
+
+
+def _goal_pilot_describe(prices, apps, feats, sp, names) -> dict:
+    """Model vs the best price per starter in the round-5 pilot matches (descriptive)."""
+    from soccer_stats.odds_feed import _team
+    from soccer_stats.player_data import match_in_fixture
+
+    known = set(apps["team"])
+    rows = []
+    for (home, away), g in prices.groupby(["home", "away"]):
+        h, a = _team(home, known), _team(away, known)
+        game = feats[(feats["team"] == h) & (feats["opponent"] == a) & (feats["season"] == "2526")]
+        if game.empty:
+            continue
+        rosters = {
+            t: dict(
+                game[game["team"] == t][["player_id", "player"]].itertuples(index=False, name=None)
+            )
+            for t in (h, a)
+        }
+        found, _ = match_in_fixture(g["player"].unique(), rosters)
+        best = g.groupby("player")["yes"].max()
+        for name, odds in best.items():
+            if name not in found:
+                continue
+            pid, team = found[name]
+            r = game[(game["player_id"] == pid)]
+            if r.empty or not bool(r["started"].iloc[0]):
+                continue
+            i = r.index[0]
+            row = {
+                "match": f"{h} v {a}",
+                "player": name,
+                "best_odds": float(odds),
+                "implied": round(1 / float(odds), 4),
+                "scored": int(r["goals"].iloc[0] > 0),
+            }
+            for n in names:
+                v = sp[n].get(i, np.nan) if n in sp else np.nan
+                row[f"p_{n}"] = None if pd.isna(v) else round(float(v), 4)
+            rows.append(row)
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return {"summary": {"starters": 0}, "rows": []}
+    summary = {
+        "starters": len(df),
+        "matches": int(df["match"].nunique()),
+        "implied": round(float(df["implied"].mean()), 4),
+        "scored": round(float(df["scored"].mean()), 4),
+    }
+    for n in names:
+        c = f"p_{n}"
+        d = df.dropna(subset=[c])
+        ev = d[c] * d["best_odds"] - 1
+        summary[n] = {
+            "mean_p": round(float(d[c].mean()), 4),
+            "model_above_price": int((d[c] > d["implied"]).sum()),
+            "of_those_scored": int(d.loc[d[c] > d["implied"], "scored"].sum()),
+            "edge_12pct": int((ev >= 0.12).sum()),
+            "edge_12pct_scored": int(d.loc[ev >= 0.12, "scored"].sum()),
+        }
+    return {"summary": summary, "rows": df.to_dict("records")}
+
+
 def _goal_predictions(league: str, holdout_reason: str):
     """Understat appearances (2022/23-2025/26) and the goalscorer model's walk-forward
     chances for 2025/26 with the lineup known (the pilot is priced at the close)."""
@@ -1064,6 +1220,15 @@ def main(argv: list[str] | None = None) -> None:
     poc = sub.add_parser("player-odds-check", help="diagnose player-prop coverage (~40-80 credits)")
     poc.add_argument("--league", default="E0")
     poc.set_defaults(func=cmd_player_odds_check)
+
+    gl_ = sub.add_parser("goal-lab", help="goalscorer model improvements (pre-registered)")
+    gl_.add_argument("--league", default="E0")
+    gl_.add_argument("--pilot-log", help="the round-5 pilot's job log, for the description")
+    gl_.add_argument(
+        "--open-forward", default="", help="reason to open the locked forward window (once)"
+    )
+    gl_.add_argument("--json", help="write the results as JSON")
+    gl_.set_defaults(func=cmd_goal_lab)
 
     gp_ = sub.add_parser(
         "goalscorer-pilot", help="anytime goalscorer odds: live probe + 5-match pilot (capped)"
