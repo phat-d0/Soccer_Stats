@@ -265,7 +265,7 @@ one per match) at Pinnacle's early price, 1 unit each.
 
 **Pinnacle coverage.** Every scored season (2017/18–2024/25) has all six Pinnacle
 prices for at least 90% of its matches in all three leagues: E1 99–100%, E3 97–100%,
-and E2 printed no dropped season. No season was dropped. 2014/15–2015/16 show 0%
+E2 98–100%. No season was dropped. 2014/15–2015/16 show 0%
 only because prices are loaded from 2016/17; those seasons are warm-up, never scored.
 
 | League | Candidate | Matches | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
@@ -304,3 +304,57 @@ What it shows:
 **Holdout finalists** (by the rule above), in every league: a (reference), d (best of
 b–d), and e on d. Holdout ranges: 99.72% (Bonferroni for 3 finalists × 2 × 3
 leagues).
+
+### Holdout (opened 2026-10-07, 04:50–04:51 UTC): not scorable
+
+Each league's holdout was opened once, as pre-registered, for a, d and e:
+- E1, run 37573365902, at 04:50:29Z;
+- E2, run 37573368859, at 04:50:31Z;
+- E3, run 37573371184, at 04:51:09Z.
+
+Each run printed its banner and reason. **None could be scored.** Pinnacle's early and
+closing 1X2 prices cover only **47% (E1), 30% (E2) and 30% (E3)** of 2025/26's matches
+in football-data's files. The pre-registered 90% coverage rule excludes the season, so
+the runs printed "Not scored" and no table. I did not re-open them or score the
+priced subset: that would break the open-once rule after the fact.
+
+What this means:
+- Nothing passed on development, so no holdout result could have changed the verdict.
+- The 2025/26 holdout is now spent for these leagues.
+- **Data finding for the whole project:** football-data's 2025/26 files have Pinnacle
+  prices for only part of the season. That is 30–47% here, and the E0 holdout found
+  198 priced matches of 380 (about 52%). Pinnacle closed its public odds API in 2025,
+  which would explain it, but I haven't checked. Anything that fits or scores against
+  football-data's Pinnacle prices for 2025/26 has a thinner sample than it looks: the
+  live match blend (`match_calibration`, fitted on Pinnacle closes) and the Record
+  replay. That is for the moneyline agent and the lead to check.
+- **Process fix:** check holdout-season price coverage before pre-registering. Counting
+  which matches have prices doesn't need results or models. I should have done it
+  here.
+
+## Verdict (bake-off 2)
+
+**Nothing passes in the Championship, League One or League Two.** Every goals-based
+model is clearly worse than Pinnacle's early price:
+- log loss is 0.016–0.021 worse, with every range below 0;
+- no blend weight is above 0;
+- CLV is −3.8% to −4.9% across about 1,900–2,400 bets per model and league.
+
+The lower leagues' early prices are not measurably softer against these models than the
+Premier League's. With bake-off 1, that makes four leagues and five model types with
+the same result. Building more 1X2 models against Pinnacle's early price is not worth
+more effort. There is no handover to the moneyline agent. Nothing passed, so I didn't
+look up which books price these leagues live on The Odds API.
+
+## Next ideas after bake-off 2, ranked by expected value and cost
+
+| # | Idea | Why | Cost | Owner |
+| --- | --- | --- | --- | --- |
+| 1 | **Late team news vs DraftKings price moves**, from `odds_log/` and `fpl_news/` (pre-register first) | The one source of information not tested yet. The market may price late changes slowly at soft books. | 0 credits; needs data to about mid-November | research-lab |
+| 2 | **Check the 2025/26 Pinnacle gap in the live blend**: how many 2025/26 training rows `match_calibration` has, and whether it should use Betfair exchange or the market average where Pinnacle is missing | Keeps the live blend honest; a data issue, not an edge | 0 credits, about an hour | moneyline (with research-lab) |
+| 3 | **A new holdout for future bake-offs**: 2026/27 against the logged DraftKings closes, or football-data's Betfair exchange prices for 2025/26 | 2025/26 at Pinnacle is spent and thin | 0 credits | research-lab |
+| 4 | DraftKings lagging the sharp price (needs a live Pinnacle or exchange reference) | A known soft-book inefficiency | About 1 credit per refresh; owner and lead decision | moneyline |
+| 5 | Player lines through the harness | Same locked-holdout test for player models; expected value is low because of FanDuel's margin | 0 credits | player-props |
+
+Recommendation: stop 1X2 model work. Do 2 now (cheap, protects the live code), and do
+1 when the logs are long enough.
