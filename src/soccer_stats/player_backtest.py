@@ -409,6 +409,7 @@ def priced_trades(
     didn't play are void (the bookmaker refunds them).
     """
     from soccer_stats import player_calibration as cal
+    from soccer_stats.lab import thresholds as lab_th
 
     info = {"priced_sides": len(history), "unmatched_names": 0, "no_prediction": 0}
     if history.empty or preds.empty:
@@ -463,6 +464,11 @@ def priced_trades(
             sweep[f"{th:.0%}"] = tr.summarize(t) if not t.empty else {"trades": 0}
         t = _build_trades(tr.player_picks(df, threshold), threshold, league, kind, close_by)
         results[name] = t
+        # The research lab's learned minimum edge: every pick the rule would make at a
+        # threshold of 0 (lab.thresholds). Filtering these by edge gives exactly the
+        # rule's picks at any higher threshold.
+        pool = _build_trades(tr.player_picks(df, 0.0), 0.0, league, kind, close_by)
+        edge_th = lab_th.edge_threshold(lab_th.from_trades(pool, implied="implied"), "player bets")
         info["strategies"][name] = {
             "trades": compact_trades(t),
             "snapshot": "3 hours before" if kind == "look" else "after lineups",
@@ -471,8 +477,10 @@ def priced_trades(
             "lines": len(df),
             "summary": tr.summarize(t) if not t.empty else {"trades": 0},
             "sweep": sweep,
+            "edge_threshold": edge_th,
         }
     info["main_strategy"] = MAIN_STRATEGY
+    info["edge_threshold"] = info["strategies"].get(MAIN_STRATEGY, {}).get("edge_threshold")
     info["trade_fields"] = list(TRADE_FIELDS)
     info["_lines"] = lines  # for the CLI to save; not JSON
     return results.get(MAIN_STRATEGY, pd.DataFrame()), info

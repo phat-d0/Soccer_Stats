@@ -428,8 +428,23 @@ def dk_strategies(
                     s["avg_p"] = float(settled["model_p"].mean())
                 rows.append({"threshold": t, "max_odds": cap, **s, "roi_ci95": ci and list(ci)})
         summary = tr.report(main)["summary"]
-        out[probs] = {"label": label, "summary": summary, "sweep": rows, "trades_df": main}
+        out[probs] = {
+            "label": label,
+            "summary": summary,
+            "sweep": rows,
+            "edge_threshold": dk_edge_threshold(candidates, league, probs),
+            "trades_df": main,
+        }
     return out
+
+
+def dk_edge_threshold(candidates: pd.DataFrame, league: str = "E0", probs: str = "raw") -> dict:
+    """The research lab's learned minimum edge (lab.thresholds) for one strategy: every
+    match's bet at the rule's first look with any positive edge (threshold 0)."""
+    from soccer_stats.lab import thresholds as th
+
+    pool = dk_trades(candidates, 0.0, None, league, probs=probs)
+    return th.edge_threshold(th.from_trades(pool), "match bets")
 
 
 def _group_log_loss(df: pd.DataFrame, names: tuple[str, ...], group: str) -> dict:
