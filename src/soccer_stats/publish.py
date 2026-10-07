@@ -36,7 +36,7 @@ from soccer_stats.players import (
     parse_players,
     team_news,
 )
-from soccer_stats.trades import DEFAULT_FILTER, FILTER_PRESETS, PAPER_EDGE, STAKE
+from soccer_stats.trades import FILTER_PRESETS, PAPER_EDGE, STAKE
 from soccer_stats.xg import LEAGUES as XG_LEAGUES
 from soccer_stats.xg import load_schedule, with_xg
 
@@ -339,7 +339,6 @@ def portfolio_placeholder() -> dict:
             "threshold": PAPER_EDGE,
             "stake": STAKE,
             "presets": list(FILTER_PRESETS),
-            "default_filter": DEFAULT_FILTER,
             "fresh_hours": FRESH_HOURS,
         },
         "live": {
