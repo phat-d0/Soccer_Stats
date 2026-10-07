@@ -62,7 +62,9 @@ class HierPoisson:
         n = len(teams)
         hi, ai = d["home"].map(ix).to_numpy(), d["away"].map(ix).to_numpy()
         th, ta = d["home_goals"].to_numpy(float), d["away_goals"].to_numpy(float)
-        hx, ax = d["home_xg"].to_numpy(float), d["away_xg"].to_numpy(float)
+        nan = np.full(len(d), np.nan)  # leagues without xG fit goals only
+        hx = d["home_xg"].to_numpy(float) if "home_xg" in d else nan
+        ax = d["away_xg"].to_numpy(float) if "away_xg" in d else nan
         has = np.isfinite(hx) & np.isfinite(ax)
         th[has] = self.xg_weight * hx[has] + (1 - self.xg_weight) * th[has]
         ta[has] = self.xg_weight * ax[has] + (1 - self.xg_weight) * ta[has]

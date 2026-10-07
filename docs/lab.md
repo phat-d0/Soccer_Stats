@@ -199,3 +199,162 @@ through `nested` and `metrics.evaluate` with the same locked-holdout discipline.
 
 Recommendation: run 1 next (free, and the best chance of a market the models can beat),
 then 2 once the logs hold enough matches.
+
+## Bake-off 2: 1X2 on the English lower leagues (pre-registered 2026-10-07, before any run)
+
+**Question:** in the Championship (E1), League One (E2) and League Two (E3), where
+betting volume is lower and prices may be less sharp, does any model, or a stack of a
+model with the opening price, add information to Pinnacle's early 1X2 price out of
+sample?
+
+**What is the same as bake-off 1:** the harness, seasons, candidates a–e and their
+tuning grids, the stack rule, the market, the bet rule, the metrics and the pass rule.
+- Data: football-data, 2014/15–2025/26. 2014/15–2015/16 warm up, 2016/17 feeds the
+  stack, **development is 2017/18–2024/25**, and the **2025/26 holdout is locked**.
+- Market: Pinnacle's early price (Shin). Bets: the live rule (12% edge, one per match)
+  at that price. CLV is against Pinnacle's Shin-fair close.
+- Pass rule: for a–d, the blend-weight range is above 0 **and** the CLV range is above
+  0. For e, the log-loss gain over the early price has a range above 0 **and** the CLV
+  range is above 0. Profit alone never passes.
+
+**What is different:**
+- **Goals only.** Understat has no xG for these leagues, so:
+  - (a) is Dixon-Coles on goals (`xg_weight` 0);
+  - (b) fits goals;
+  - (c) and (d) use `features.FEATURES_GOALS`: Elo, goals for and against over 6 and
+    20 matches, and rest (13 features; home advantage is in the orientation).
+
+  This limits comparability with E0: a lower-league failure could be the lost xG, not
+  the market. A pass would be on weaker inputs, which makes it more convincing, not
+  less.
+- **Each league on its own.** Each is scored separately; no pooling.
+- **Pinnacle coverage check.** A season is scored only if at least 90% of its matches
+  have all six Pinnacle 1X2 prices (early and close). Seasons below that still train
+  the models but are not scored. The run prints the coverage per season, and I report
+  any dropped season here.
+- **Promotion and relegation.** Each league is loaded on its own, so a promoted or
+  relegated team's matches in another division are not seen. Its Elo restarts at
+  1,420, or carries over from its last spell in that league. The same applies to E0.
+
+**Multiple testing.** 3 leagues × 5 candidates × 2 pass metrics = **30 tests**, so every
+development range is **99.83%** (Bonferroni). Tuning variants are chosen inside the
+training years, as before (8 + 8 + 3 configs per league, 57 in all, not scored
+separately). On the holdout, each league's ranges use 2 × (its number of finalists) ×
+3 leagues.
+
+**Holdout:** opened once per league, after that league's development results are
+recorded here, for the same finalists as bake-off 1:
+1. every candidate that passes;
+2. a (the reference);
+3. the best of b–d by development log loss;
+4. e, as defined: the stack on the best of a–d.
+
+**If something passes on development and on the holdout:**
+- a handover proposal for the moneyline agent;
+- a check (from The Odds API's documentation, no calls) of whether DraftKings or
+  another available book prices that league live.
+
+**Run:** `odds-check.yml` with `task=lab` and `league=E1|E2|E3`, then `task=lab-holdout`
+with the same `league` and the finalists. Print-only, no credits.
+
+### Development results (2026-10-07 04:43–04:46 UTC, holdouts locked)
+
+Runs 37572801050 (E1), 37572803258 (E2) and 37572805017 (E3). Ranges are 99.83%
+(Bonferroni for 30 tests) and resample whole matches. Bets: the live rule (12% edge,
+one per match) at Pinnacle's early price, 1 unit each.
+
+**Pinnacle coverage.** Every scored season (2017/18–2024/25) has all six Pinnacle
+prices for at least 90% of its matches in all three leagues: E1 99–100%, E3 97–100%,
+E2 98–100%. No season was dropped. 2014/15–2015/16 show 0%
+only because prices are loaded from 2016/17; those seasons are warm-up, never scored.
+
+| League | Candidate | Matches | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E1 | a Dixon-Coles (goals) | 4,232 | 1.0554 (1.0355) | −0.020 (−0.030 to −0.012) | −0.11 (−0.30 to +0.08) | 2,213 | −4.3% (−4.9 to −3.7) | −7.3% (−17.8 to +3.4) | no |
+| E1 | b Hierarchical Poisson | 4,232 | 1.0542 | −0.019 (−0.027 to −0.011) | −0.21 (−0.44 to +0.04) | 2,400 | −4.7% (−5.3 to −4.2) | −7.2% (−18.4 to +5.1) | no |
+| E1 | c LightGBM | 4,232 | 1.0539 | −0.018 (−0.028 to −0.008) | −0.01 (−0.24 to +0.23) | 2,435 | −4.4% (−4.9 to −3.8) | −3.7% (−13.2 to +6.7) | no |
+| E1 | d Multinomial logit | 4,232 | 1.0520 | −0.017 (−0.025 to −0.009) | −0.14 (−0.46 to +0.09) | 2,142 | −4.8% (−5.4 to −4.2) | −5.3% (−17.6 to +6.5) | no |
+| E1 | e Stack (d + early price) | 4,232 | 1.0363 | −0.001 (−0.003 to +0.002) | – | 20 | −3.0% (−7.2 to +1.2) | −12.6% (−90 to +77) | no |
+| E2 | a Dixon-Coles (goals) | 4,011 | 1.0429 (1.0248) | −0.018 (−0.028 to −0.009) | −0.01 (−0.27 to +0.24) | 1,936 | −3.8% (−4.4 to −3.2) | −5.6% (−14.8 to +5.6) | no |
+| E2 | b Hierarchical Poisson | 4,011 | 1.0446 | −0.020 (−0.028 to −0.011) | −0.07 (−0.32 to +0.16) | 2,029 | −4.4% (−5.1 to −3.7) | −6.5% (−16.4 to +3.9) | no |
+| E2 | c LightGBM | 4,011 | 1.0456 | −0.021 (−0.032 to −0.010) | +0.11 (−0.08 to +0.34) | 2,432 | −4.6% (−5.1 to −4.1) | −1.1% (−11.0 to +8.9) | no |
+| E2 | d Multinomial logit | 4,011 | 1.0412 | −0.016 (−0.025 to −0.008) | +0.12 (−0.10 to +0.41) | 2,207 | −4.6% (−5.2 to −4.1) | −4.1% (−15.8 to +8.2) | no |
+| E2 | e Stack (d + early price) | 4,011 | 1.0255 | −0.001 (−0.003 to +0.002) | – | 15 | −2.1% (−7.0 to +2.0) | −12.5% (−100 to +92) | no |
+| E3 | a Dixon-Coles (goals) | 4,039 | 1.0731 (1.0526) | −0.020 (−0.029 to −0.011) | −0.10 (−0.31 to +0.16) | 1,899 | −4.1% (−4.7 to −3.5) | −3.8% (−15.3 to +6.4) | no |
+| E3 | b Hierarchical Poisson | 4,039 | 1.0698 | −0.017 (−0.025 to −0.010) | −0.25 (−0.49 to +0.05) | 1,956 | −4.9% (−5.5 to −4.3) | −6.2% (−17.8 to +4.4) | no |
+| E3 | c LightGBM | 4,039 | 1.0722 | −0.020 (−0.029 to −0.009) | −0.06 (−0.28 to +0.23) | 2,310 | −4.5% (−5.1 to −4.0) | −5.6% (−14.8 to +5.2) | no |
+| E3 | d Multinomial logit | 4,039 | 1.0687 | −0.016 (−0.024 to −0.008) | −0.16 (−0.37 to +0.16) | 1,961 | −4.8% (−5.4 to −4.1) | −7.6% (−19.9 to +4.3) | no |
+| E3 | e Stack (d + early price) | 4,039 | 1.0533 | −0.001 (−0.002 to +0.001) | – | 8 | −4.6% (−11.9 to +2.8) | +76% (−100 to +277) | no |
+
+What it shows:
+- **Nothing passes in any league.** Every model is worse than Pinnacle's early price by
+  0.016–0.021 in log loss, and every gain range is below 0. No blend-weight range
+  clears 0; most point estimates are below 0, so the price already holds what the
+  goals models know.
+- **CLV is −3.8% to −4.9% for every model in every league**, with tight ranges. That is
+  the same picture as the Premier League (−3.6% to −5.0%). The lower leagues' early
+  prices are not measurably softer against these models.
+- The multinomial logit had the best development log loss of b–d in all three leagues,
+  so the stack is built on it (the pre-registered rule). The stack nearly matches the
+  early price and makes 8–20 bets in eight seasons.
+- Caveat: these runs are goals-only, so part of the gap to the market may be the
+  missing xG. But E0 with xG was no better against Pinnacle, so xG alone would not
+  close the gap.
+
+**Holdout finalists** (by the rule above), in every league: a (reference), d (best of
+b–d), and e on d. Holdout ranges: 99.72% (Bonferroni for 3 finalists × 2 × 3
+leagues).
+
+### Holdout (opened 2026-10-07, 04:50–04:51 UTC): not scorable
+
+Each league's holdout was opened once, as pre-registered, for a, d and e:
+- E1, run 37573365902, at 04:50:29Z;
+- E2, run 37573368859, at 04:50:31Z;
+- E3, run 37573371184, at 04:51:09Z.
+
+Each run printed its banner and reason. **None could be scored.** Pinnacle's early and
+closing 1X2 prices cover only **47% (E1), 30% (E2) and 30% (E3)** of 2025/26's matches
+in football-data's files. The pre-registered 90% coverage rule excludes the season, so
+the runs printed "Not scored" and no table. I did not re-open them or score the
+priced subset: that would break the open-once rule after the fact.
+
+What this means:
+- Nothing passed on development, so no holdout result could have changed the verdict.
+- The 2025/26 holdout is now spent for these leagues.
+- **Data finding for the whole project:** football-data's 2025/26 files have Pinnacle
+  prices for only part of the season. That is 30–47% here, and the E0 holdout found
+  198 priced matches of 380 (about 52%). Pinnacle closed its public odds API in 2025,
+  which would explain it, but I haven't checked. Anything that fits or scores against
+  football-data's Pinnacle prices for 2025/26 has a thinner sample than it looks: the
+  live match blend (`match_calibration`, fitted on Pinnacle closes) and the Record
+  replay. That is for the moneyline agent and the lead to check.
+- **Process fix:** check holdout-season price coverage before pre-registering. Counting
+  which matches have prices doesn't need results or models. I should have done it
+  here.
+
+## Verdict (bake-off 2)
+
+**Nothing passes in the Championship, League One or League Two.** Every goals-based
+model is clearly worse than Pinnacle's early price:
+- log loss is 0.016–0.021 worse, with every range below 0;
+- no blend weight is above 0;
+- CLV is −3.8% to −4.9% across about 1,900–2,400 bets per model and league.
+
+The lower leagues' early prices are not measurably softer against these models than the
+Premier League's. With bake-off 1, that makes four leagues and five model types with
+the same result. Building more 1X2 models against Pinnacle's early price is not worth
+more effort. There is no handover to the moneyline agent. Nothing passed, so I didn't
+look up which books price these leagues live on The Odds API.
+
+## Next ideas after bake-off 2, ranked by expected value and cost
+
+| # | Idea | Why | Cost | Owner |
+| --- | --- | --- | --- | --- |
+| 1 | **Late team news vs DraftKings price moves**, from `odds_log/` and `fpl_news/` (pre-register first) | The one source of information not tested yet. The market may price late changes slowly at soft books. | 0 credits; needs data to about mid-November | research-lab |
+| 2 | **Check the 2025/26 Pinnacle gap in the live blend**: how many 2025/26 training rows `match_calibration` has, and whether it should use Betfair exchange or the market average where Pinnacle is missing | Keeps the live blend honest; a data issue, not an edge | 0 credits, about an hour | moneyline (with research-lab) |
+| 3 | **A new holdout for future bake-offs**: 2026/27 against the logged DraftKings closes, or football-data's Betfair exchange prices for 2025/26 | 2025/26 at Pinnacle is spent and thin | 0 credits | research-lab |
+| 4 | DraftKings lagging the sharp price (needs a live Pinnacle or exchange reference) | A known soft-book inefficiency | About 1 credit per refresh; owner and lead decision | moneyline |
+| 5 | Player lines through the harness | Same locked-holdout test for player models; expected value is low because of FanDuel's margin | 0 credits | player-props |
+
+Recommendation: stop 1X2 model work. Do 2 now (cheap, protects the live code), and do
+1 when the logs are long enough.

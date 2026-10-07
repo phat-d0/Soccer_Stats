@@ -37,6 +37,9 @@ on:
       seasons:
         description: "match/signals: seasons to bet (start years); shots: seasons to load"
         default: "2017-2025"
+      league:
+        description: "lab/lab-holdout: football-data division (E0, E1, E2, E3)"
+        default: "E0"
       reason:
         description: "lab-holdout: why the holdout is opened (logged)"
         default: ""
@@ -76,6 +79,7 @@ jobs:
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
           SEASONS: ${{ inputs.seasons }}
+          LEAGUE: ${{ inputs.league }}
           REASON: ${{ inputs.reason }}
           FINALISTS: ${{ inputs.finalists }}
           STACK_BASE: ${{ inputs.stack_base }}
@@ -90,8 +94,9 @@ jobs:
                      --json out/match.json ;;
             signals) uv run python -m soccer_stats.edge.run signals --seasons "$SEASONS" \
                      --json out/signals.json ;;
-            lab) uv run python -m soccer_stats.lab.run --json out/lab_dev.json ;;
-            lab-holdout) uv run python -m soccer_stats.lab.run --open-holdout \
+            lab) uv run python -m soccer_stats.lab.run --league "$LEAGUE" \
+                     --json out/lab_dev.json ;;
+            lab-holdout) uv run python -m soccer_stats.lab.run --league "$LEAGUE" --open-holdout \
                      --reason "$REASON" --finalists "$FINALISTS" --stack-base "$STACK_BASE" \
                      --json out/lab_holdout.json ;;
             goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
