@@ -30,6 +30,8 @@ def test_fixture_is_complete():
     assert pfs["moneyline"]["live"]["trades"] and pfs["moneyline"]["backtest"]["trades"]
     assert pfs["goalscorer"]["live"]["summary"]["trades"] == 0  # the empty state
     assert pfs["player_shots"]["status"] == "retired" and pfs["player_shots"]["backtest"]
+    assert pfs["moneyline"]["backtest"]["edge_threshold"]["min_edge"] is not None
+    assert pfs["player_shots"]["backtest"]["edge_threshold"]["min_edge"] is None
     size = sum(p.stat().st_size for p in FIXTURE.glob("*.json"))
     assert size < 1_000_000  # keep the committed fixture small
 

@@ -329,6 +329,7 @@ def build(src: Path, out: Path) -> dict:
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
+    add_edge_thresholds(data)
 
     sample = sample_detail(detail, data["fixtures"])
     stats = stats_from_detail(sample)
@@ -410,6 +411,110 @@ def add_settled_live_matches(data: dict) -> None:
     # (production keeps them for one release), so the smoke test proves nothing needs them.
     data["portfolio"].pop("live", None)
     data["portfolio"].pop("backtest", None)
+
+
+# The research lab's edge_threshold contract, until data-log's backtests carry it: one
+# portfolio with a recommended level and one with none (min_edge null), so the app's
+# two states are both in the fixture. Synthetic numbers, marked in `method`.
+SYNTHETIC_EDGE = {
+    "moneyline": {
+        "min_edge": 0.08,
+        "confidence": 0.9,
+        "method": "synthetic fixture values (walk-forward edge buckets)",
+        "n_bets": 1419,
+        "seasons": ["2223", "2324", "2425", "2526"],
+        "note": "Synthetic numbers for the app's tests.",
+        "by_bucket": [
+            {
+                "edge_lo": 0.02,
+                "edge_hi": 0.05,
+                "n": 420,
+                "implied": 0.36,
+                "model": 0.38,
+                "realized": 0.35,
+                "realized_lo": 0.31,
+                "realized_hi": 0.40,
+            },
+            {
+                "edge_lo": 0.05,
+                "edge_hi": 0.08,
+                "n": 360,
+                "implied": 0.33,
+                "model": 0.36,
+                "realized": 0.32,
+                "realized_lo": 0.27,
+                "realized_hi": 0.37,
+            },
+            {
+                "edge_lo": 0.08,
+                "edge_hi": 0.12,
+                "n": 290,
+                "implied": 0.30,
+                "model": 0.34,
+                "realized": 0.31,
+                "realized_lo": 0.26,
+                "realized_hi": 0.36,
+            },
+            {
+                "edge_lo": 0.12,
+                "edge_hi": None,
+                "n": 349,
+                "implied": 0.24,
+                "model": 0.31,
+                "realized": 0.25,
+                "realized_lo": 0.21,
+                "realized_hi": 0.30,
+            },
+        ],
+    },
+    "player_shots": {
+        "min_edge": None,
+        "confidence": 0.9,
+        "method": "synthetic fixture values (walk-forward edge buckets)",
+        "n_bets": 1012,
+        "seasons": ["2324", "2425", "2526"],
+        "note": "FanDuel's over-only margin is bigger than any edge the model claims.",
+        "by_bucket": [
+            {
+                "edge_lo": 0.02,
+                "edge_hi": 0.08,
+                "n": 410,
+                "implied": 0.33,
+                "model": 0.25,
+                "realized": 0.24,
+                "realized_lo": 0.20,
+                "realized_hi": 0.28,
+            },
+            {
+                "edge_lo": 0.08,
+                "edge_hi": 0.15,
+                "n": 380,
+                "implied": 0.30,
+                "model": 0.24,
+                "realized": 0.22,
+                "realized_lo": 0.18,
+                "realized_hi": 0.27,
+            },
+            {
+                "edge_lo": 0.15,
+                "edge_hi": None,
+                "n": 222,
+                "implied": 0.21,
+                "model": 0.19,
+                "realized": 0.16,
+                "realized_lo": 0.11,
+                "realized_hi": 0.21,
+            },
+        ],
+    },
+}
+
+
+def add_edge_thresholds(data: dict) -> None:
+    for p in data["portfolio"].get("portfolios") or []:
+        bt = p.get("backtest")
+        if bt is not None and "edge_threshold" not in bt and p["id"] in SYNTHETIC_EDGE:
+            bt["edge_threshold"] = SYNTHETIC_EDGE[p["id"]]
 
 
 def main(argv: list[str] | None = None) -> None:

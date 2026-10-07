@@ -102,5 +102,6 @@ def test_app_filter_presets_match():
     js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
     steps = re.search(r"const EDGE_STEPS = \[([^\]]*)\]", js).group(1)
     assert tuple(float(x) for x in steps.split(",")) == tr.FILTER_PRESETS
-    assert f"const DEFAULT_EDGE = {tr.DEFAULT_FILTER}" in js
+    # No fixed default in the app: the minimum edge comes from the backtest's edge_threshold
+    # (EDGE_STEPS are only for "Explore other edges").
     assert f"const PAPER_EDGE = {tr.PAPER_EDGE}" in js
