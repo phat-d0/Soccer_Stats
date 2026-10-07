@@ -256,3 +256,51 @@ recorded here, for the same finalists as bake-off 1:
 
 **Run:** `odds-check.yml` with `task=lab` and `league=E1|E2|E3`, then `task=lab-holdout`
 with the same `league` and the finalists. Print-only, no credits.
+
+### Development results (2026-10-07 04:43–04:46 UTC, holdouts locked)
+
+Runs 37572801050 (E1), 37572803258 (E2) and 37572805017 (E3). Ranges are 99.83%
+(Bonferroni for 30 tests) and resample whole matches. Bets: the live rule (12% edge,
+one per match) at Pinnacle's early price, 1 unit each.
+
+**Pinnacle coverage.** Every scored season (2017/18–2024/25) has all six Pinnacle
+prices for at least 90% of its matches in all three leagues: E1 99–100%, E3 97–100%,
+and E2 printed no dropped season. No season was dropped. 2014/15–2015/16 show 0%
+only because prices are loaded from 2016/17; those seasons are warm-up, never scored.
+
+| League | Candidate | Matches | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E1 | a Dixon-Coles (goals) | 4,232 | 1.0554 (1.0355) | −0.020 (−0.030 to −0.012) | −0.11 (−0.30 to +0.08) | 2,213 | −4.3% (−4.9 to −3.7) | −7.3% (−17.8 to +3.4) | no |
+| E1 | b Hierarchical Poisson | 4,232 | 1.0542 | −0.019 (−0.027 to −0.011) | −0.21 (−0.44 to +0.04) | 2,400 | −4.7% (−5.3 to −4.2) | −7.2% (−18.4 to +5.1) | no |
+| E1 | c LightGBM | 4,232 | 1.0539 | −0.018 (−0.028 to −0.008) | −0.01 (−0.24 to +0.23) | 2,435 | −4.4% (−4.9 to −3.8) | −3.7% (−13.2 to +6.7) | no |
+| E1 | d Multinomial logit | 4,232 | 1.0520 | −0.017 (−0.025 to −0.009) | −0.14 (−0.46 to +0.09) | 2,142 | −4.8% (−5.4 to −4.2) | −5.3% (−17.6 to +6.5) | no |
+| E1 | e Stack (d + early price) | 4,232 | 1.0363 | −0.001 (−0.003 to +0.002) | – | 20 | −3.0% (−7.2 to +1.2) | −12.6% (−90 to +77) | no |
+| E2 | a Dixon-Coles (goals) | 4,011 | 1.0429 (1.0248) | −0.018 (−0.028 to −0.009) | −0.01 (−0.27 to +0.24) | 1,936 | −3.8% (−4.4 to −3.2) | −5.6% (−14.8 to +5.6) | no |
+| E2 | b Hierarchical Poisson | 4,011 | 1.0446 | −0.020 (−0.028 to −0.011) | −0.07 (−0.32 to +0.16) | 2,029 | −4.4% (−5.1 to −3.7) | −6.5% (−16.4 to +3.9) | no |
+| E2 | c LightGBM | 4,011 | 1.0456 | −0.021 (−0.032 to −0.010) | +0.11 (−0.08 to +0.34) | 2,432 | −4.6% (−5.1 to −4.1) | −1.1% (−11.0 to +8.9) | no |
+| E2 | d Multinomial logit | 4,011 | 1.0412 | −0.016 (−0.025 to −0.008) | +0.12 (−0.10 to +0.41) | 2,207 | −4.6% (−5.2 to −4.1) | −4.1% (−15.8 to +8.2) | no |
+| E2 | e Stack (d + early price) | 4,011 | 1.0255 | −0.001 (−0.003 to +0.002) | – | 15 | −2.1% (−7.0 to +2.0) | −12.5% (−100 to +92) | no |
+| E3 | a Dixon-Coles (goals) | 4,039 | 1.0731 (1.0526) | −0.020 (−0.029 to −0.011) | −0.10 (−0.31 to +0.16) | 1,899 | −4.1% (−4.7 to −3.5) | −3.8% (−15.3 to +6.4) | no |
+| E3 | b Hierarchical Poisson | 4,039 | 1.0698 | −0.017 (−0.025 to −0.010) | −0.25 (−0.49 to +0.05) | 1,956 | −4.9% (−5.5 to −4.3) | −6.2% (−17.8 to +4.4) | no |
+| E3 | c LightGBM | 4,039 | 1.0722 | −0.020 (−0.029 to −0.009) | −0.06 (−0.28 to +0.23) | 2,310 | −4.5% (−5.1 to −4.0) | −5.6% (−14.8 to +5.2) | no |
+| E3 | d Multinomial logit | 4,039 | 1.0687 | −0.016 (−0.024 to −0.008) | −0.16 (−0.37 to +0.16) | 1,961 | −4.8% (−5.4 to −4.1) | −7.6% (−19.9 to +4.3) | no |
+| E3 | e Stack (d + early price) | 4,039 | 1.0533 | −0.001 (−0.002 to +0.001) | – | 8 | −4.6% (−11.9 to +2.8) | +76% (−100 to +277) | no |
+
+What it shows:
+- **Nothing passes in any league.** Every model is worse than Pinnacle's early price by
+  0.016–0.021 in log loss, and every gain range is below 0. No blend-weight range
+  clears 0; most point estimates are below 0, so the price already holds what the
+  goals models know.
+- **CLV is −3.8% to −4.9% for every model in every league**, with tight ranges. That is
+  the same picture as the Premier League (−3.6% to −5.0%). The lower leagues' early
+  prices are not measurably softer against these models.
+- The multinomial logit had the best development log loss of b–d in all three leagues,
+  so the stack is built on it (the pre-registered rule). The stack nearly matches the
+  early price and makes 8–20 bets in eight seasons.
+- Caveat: these runs are goals-only, so part of the gap to the market may be the
+  missing xG. But E0 with xG was no better against Pinnacle, so xG alone would not
+  close the gap.
+
+**Holdout finalists** (by the rule above), in every league: a (reference), d (best of
+b–d), and e on d. Holdout ranges: 99.72% (Bonferroni for 3 finalists × 2 × 3
+leagues).
