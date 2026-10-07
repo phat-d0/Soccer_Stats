@@ -2,8 +2,9 @@
 
 Every scheduled build calls update_ledger, which:
 1. opens a trade for each upcoming fixture whose best pick passes the trade rule
-   (trades.best_pick at PAPER_EDGE), using DraftKings odds fetched within the last
-   FRESH_HOURS and only before kickoff;
+   (trades.best_pick at the minimum edge learned from history, trades.paper_threshold;
+   none learned = no new match trades; no backtest file = PAPER_EDGE), using
+   DraftKings odds fetched within the last FRESH_HOURS and only before kickoff;
 2. tracks the closing price of match trades: the last DraftKings price before kickoff
    in the odds log (odds_log.py; without a log, the last price seen by a build before
    kickoff), with closing line value against it and how many minutes before kickoff
@@ -165,6 +166,7 @@ def update_ledger(
     apps: pd.DataFrame | None = None,
     players_on: bool = False,
     odds_log: pd.DataFrame | None = None,
+    threshold: float | None = tr.PAPER_EDGE,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -174,7 +176,8 @@ def update_ledger(
     counts in `apps` either way. The note explains why nothing could be
     opened, if so. With `odds_log` (odds_log.load), every live match trade's close is
     the last logged DraftKings price before kickoff; without it, the price each build
-    sees until kickoff.
+    sees until kickoff. Match trades open at `threshold` (trades.paper_threshold); None
+    opens no new match trades, while open ones still get their close and settle.
     """
     events: list[dict] = []
     note = None
@@ -192,13 +195,13 @@ def update_ledger(
     cards = {(c["home"], c["away"]): c for c in fixtures if c.get("kickoff")}
 
     # 1. Open.
-    if fresh:
+    if fresh and threshold is not None:
         for c in cards.values():
             kickoff = pd.Timestamp(c["kickoff"])
             if kickoff <= now or c.get("low_data"):
                 continue
             # p_bet (the model blended with the price) when publish set it; as bestPick.
-            pick = tr.best_pick(c.get("p_bet") or c["p"], c.get("odds") or {}, tr.PAPER_EDGE)
+            pick = tr.best_pick(c.get("p_bet") or c["p"], c.get("odds") or {}, threshold)
             if not pick:
                 continue
             tid = tr.trade_id(league, tr.season_label(kickoff), c["home"], c["away"])
@@ -214,7 +217,7 @@ def update_ledger(
                 kickoff=kickoff,
                 opened_at=now,
                 odds_fetched_at=fetched,
-                threshold=tr.PAPER_EDGE,
+                threshold=threshold,
                 model_p_base=base.get(pick["market"]) if base else None,
                 news_applied=bool(c.get("news_applied")),
                 model_ref={**(ref or {}), "probs": "blend" if c.get("p_bet") else "raw"},
@@ -447,13 +450,18 @@ def portfolio_section(trades: list[dict]) -> dict:
 
 
 def portfolios_section(
-    live: dict, live_trades: list[dict], backtests: dict[str, dict | None]
+    live: dict,
+    live_trades: list[dict],
+    backtests: dict[str, dict | None],
+    match_rule: dict | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
 
     `live` carries the ledger's error and note, shared by every portfolio; `backtests`
-    maps a portfolio id to its backtest file's contents (or None).
+    maps a portfolio id to its backtest file's contents (or None). `match_rule`
+    (trades.paper_threshold) goes on Moneyline's live section as `rule`, and its note
+    (why no new trades, or the fallback) becomes that section's note when there's no other.
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -467,14 +475,14 @@ def portfolios_section(
                 "edge_threshold": bt.get("edge_threshold"),  # research lab: minimum edge
                 **portfolio_section(trades),
             }
+        section = {**portfolio_section(mine), "error": live.get("error"), "note": live.get("note")}
+        if p["id"] == "moneyline" and match_rule is not None:
+            section["rule"] = match_rule
+            section["note"] = live.get("note") or match_rule.get("note")
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
-                "live": {
-                    **portfolio_section(mine),
-                    "error": live.get("error"),
-                    "note": live.get("note"),
-                },
+                "live": section,
                 "backtest": bt,
             }
         )
@@ -513,6 +521,11 @@ def run(
     written = 0
     live_trades: list[dict] = []
     backtests: dict[str, dict | None] = {}
+    dk = _read_json(backtest_path(log_dir, league)) if log_dir is not None else None
+    rule = tr.paper_threshold(dk)
+    portfolio.setdefault("rule", {}).update(
+        threshold=rule["threshold"], threshold_source=rule["source"], threshold_note=rule["note"]
+    )
     if log_dir is None or not Path(log_dir).is_dir():
         live["error"] = "The paper-trade ledger is unavailable, so nothing was opened this update."
     else:
@@ -538,6 +551,7 @@ def run(
                     ((data.get("players_status") or {}).get("gate") or {}).get("passed")
                 ),
                 odds_log=log,
+                threshold=rule["threshold"],
             )
             written = append_events(log_dir, events, league)
             live_trades = list(ledger.values())
@@ -568,5 +582,5 @@ def run(
     portfolio["live"] = live
     # One portfolio per strategy (the app reads these); live, backtest and player_model
     # above stay for one release.
-    portfolio["portfolios"] = portfolios_section(live, live_trades, backtests)
+    portfolio["portfolios"] = portfolios_section(live, live_trades, backtests, rule)
     return written

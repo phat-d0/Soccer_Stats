@@ -137,3 +137,67 @@ def test_run_fails_safe_and_fills_portfolio(tmp_path):
     live = data["portfolio"]["live"]
     assert live["error"] is None and live["summary"]["open"] == 1
     assert data["portfolio"]["backtest"]["summary"]["trades"] == 3
+
+
+# ---------- the live threshold: the minimum edge learned from history ----------
+
+
+def test_paper_threshold_from_the_backtest_file():
+    assert tr.paper_threshold(None)["threshold"] == tr.PAPER_EDGE
+    assert tr.paper_threshold({"summary": {}})["source"] == "default"  # older file
+    assert tr.paper_threshold({"edge_threshold": None})["threshold"] == tr.PAPER_EDGE
+    r = tr.paper_threshold({"edge_threshold": {"min_edge": None, "note": "Too few bets."}})
+    assert r["threshold"] is None and r["source"] == "history" and "Too few bets." in r["note"]
+    r = tr.paper_threshold({"edge_threshold": {"min_edge": 0.07, "note": None}})
+    assert r == {"threshold": 0.07, "source": "history", "note": None}
+    assert tr.best_pick({"home": 0.9}, {"home": 2.0}, None) is None  # as the app's bestPick
+
+
+def _ledger_build(tmp_path, cards, now, threshold, res=None):
+    ledger = paper.load_ledger(tmp_path)
+    events, _ = paper.update_ledger(
+        ledger, cards, src(now - pd.Timedelta(minutes=30)), res, now, threshold=threshold
+    )
+    paper.append_events(tmp_path, events)
+    return paper.load_ledger(tmp_path), events
+
+
+def test_null_level_opens_nothing_but_open_trades_still_settle(tmp_path):
+    led, ev = _ledger_build(tmp_path, [card()], NOW, 0.12)  # opened under the old rule
+    assert len(ev) == 1 and led["E0|2627|Arsenal|Leeds"]["threshold"] == 0.12
+    other = card(home="Chelsea", away="Burnley")
+    led, ev = _ledger_build(tmp_path, [card(), other], NOW + pd.Timedelta(hours=1), None)
+    assert not any(e["type"] == "open" for e in ev)  # no level learned: no new trades
+    after = KICKOFF + pd.Timedelta(hours=3)
+    led, ev = _ledger_build(tmp_path, [], after, None, results(1, 1))
+    assert led["E0|2627|Arsenal|Leeds"]["status"] == "won"
+
+
+def test_a_learned_level_trades_only_at_or_above_it(tmp_path):
+    # The draw at 5.0 with p 0.24 is a 20% edge.
+    _, ev = _ledger_build(tmp_path / "a", [card()], NOW, 0.25)
+    assert ev == []
+    led, ev = _ledger_build(tmp_path / "b", [card()], NOW, 0.20)
+    assert [e["type"] for e in ev] == ["open"]
+    assert led["E0|2627|Arsenal|Leeds"]["threshold"] == 0.20
+
+
+def test_run_uses_the_backtest_level_and_says_why(tmp_path):
+    (tmp_path / "backtest").mkdir()
+    bt = tmp_path / "backtest" / "E0_dk.json"
+    data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
+
+    bt.write_text(json.dumps({"summary": {}, "edge_threshold": {"min_edge": None, "note": "x."}}))
+    assert paper.run(data, tmp_path, None, now=NOW) == 0
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    assert ml["live"]["rule"]["threshold"] is None and "No new match" in ml["live"]["note"]
+    assert data["portfolio"]["rule"]["threshold"] is None
+    others = [p for p in data["portfolio"]["portfolios"] if p["id"] != "moneyline"]
+    assert all("rule" not in p["live"] for p in others)
+
+    bt.write_text(json.dumps({"summary": {}}))  # older file: the fixed 12%
+    data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
+    assert paper.run(data, tmp_path, None, now=NOW) == 1
+    assert data["portfolio"]["rule"]["threshold_source"] == "default"
+    led = paper.load_ledger(tmp_path)
+    assert led["E0|2627|Arsenal|Leeds"]["threshold"] == tr.PAPER_EDGE

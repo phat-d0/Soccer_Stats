@@ -406,7 +406,13 @@ def add_settled_live_matches(data: dict) -> None:
     data["portfolio"]["live"] = {**live, **paper.portfolio_section(trades)}
     # Rebuild the per-strategy portfolios with these trades, keeping their backtests.
     backtests = {p["id"]: p["backtest"] for p in data["portfolio"].get("portfolios") or []}
-    data["portfolio"]["portfolios"] = paper.portfolios_section(live, trades, backtests)
+    r = data["portfolio"].get("rule") or {}
+    match_rule = {
+        "threshold": r.get("threshold"),
+        "source": r.get("threshold_source"),
+        "note": r.get("threshold_note"),
+    }
+    data["portfolio"]["portfolios"] = paper.portfolios_section(live, trades, backtests, match_rule)
     # The app reads only `portfolios`: leave the old top-level copies out of the fixture
     # (production keeps them for one release), so the smoke test proves nothing needs them.
     data["portfolio"].pop("live", None)
