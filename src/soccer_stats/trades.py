@@ -10,7 +10,9 @@ value pick (bestPick in web/app.js) mirrors it:
 * One trade per match: the qualifying market with the highest edge.
 * No odds cap by default (results are reported with and without a 6.0 cap).
 * Skip a match if either team has fewer than MIN_TEAM_MATCHES in the training window.
-* Flat STAKE dollars; paper trades always use PAPER_EDGE, whatever the app's filter shows.
+* Flat STAKE dollars. Live match paper trades use the minimum edge learned from history
+  (paper_threshold: E0_dk.json -> edge_threshold.min_edge), the same level the app flags
+  with; no learned level means no new match trades, and no file means PAPER_EDGE.
 
 This module does no network or file access, so it can be tested on synthetic leagues.
 """
@@ -25,9 +27,8 @@ import pandas as pd
 
 from soccer_stats.odds import devig_shin
 
-PAPER_EDGE = 0.12  # paper trades open at this edge, whatever the app's filter is set to
+PAPER_EDGE = 0.12  # the fixed edge: backtest sweeps, and live trades before any learned level
 FILTER_PRESETS = (0.02, 0.05, 0.08, 0.12)  # the app's minimum-edge buttons
-DEFAULT_FILTER = 0.05
 STAKE = 10.0  # dollars per trade
 MIN_TEAM_MATCHES = 6
 CAP_ODDS = 6.0  # the optional cap reported beside the uncapped results
@@ -66,13 +67,45 @@ def _ok(x) -> bool:
     return x is not None and not (isinstance(x, float) and math.isnan(x))
 
 
+def paper_threshold(dk: dict | None) -> dict:
+    """The minimum edge live match paper trades open at, from backtest-dk's output.
+
+    `dk` is E0_dk.json (or None). Its top-level `edge_threshold.min_edge` is the level
+    learned from history for the chance the app trades on (lab/thresholds.py), the same
+    one the app's bestPick flags with (matchEdge). Returns {threshold, source, note}:
+    - a learned level: threshold = min_edge, source "history";
+    - min_edge null (no level beat the market): threshold None, so no new match trades,
+      and the note says why;
+    - no file or no edge_threshold (older data, first run): PAPER_EDGE, source "default".
+    """
+    et = (dk or {}).get("edge_threshold")
+    if not isinstance(et, dict) or "min_edge" not in et:
+        return {
+            "threshold": PAPER_EDGE,
+            "source": "default",
+            "note": f"No minimum edge learned from past bets yet, so paper trades use the "
+            f"fixed {PAPER_EDGE:.0%} rule.",
+        }
+    if et["min_edge"] is None:
+        why = et.get("note") or "No edge level has beaten the market in past bets."
+        return {
+            "threshold": None,
+            "source": "history",
+            "note": f"No new match paper trades: {why}",
+        }
+    return {"threshold": float(et["min_edge"]), "source": "history", "note": None}
+
+
 def best_pick(
-    probs: dict, odds: dict, threshold: float = PAPER_EDGE, max_odds: float | None = None
+    probs: dict, odds: dict, threshold: float | None = PAPER_EDGE, max_odds: float | None = None
 ) -> dict | None:
     """The qualifying market with the highest edge, or None. Mirrors bestPick in app.js.
 
-    `probs` and `odds` map market -> model probability / decimal price.
+    `probs` and `odds` map market -> model probability / decimal price. A threshold of
+    None (no learned minimum edge) qualifies nothing, as in the app.
     """
+    if threshold is None:
+        return None
     best = None
     for m in MARKETS:
         o, p = odds.get(m), probs.get(m)

@@ -443,7 +443,7 @@ function edgePanel(pfId = "moneyline") {
         <div class="segmented" role="group" aria-label="Minimum edge to explore" style="margin-top:10px">
           ${EDGE_STEPS.map((e) => `<button data-edge="${e}" class="${e === state.exploreEdge ? "on" : ""}" aria-pressed="${e === state.exploreEdge}">${pct(e)}</button>`).join("")}
         </div>
-        <p class="note">For a look only: this changes what the app flags until you go back. Paper trades keep their own rule.</p>
+        <p class="note">For a look only: this changes what the app flags until you go back. Paper trades always follow the recommended minimum above.</p>
       </details>
     </div>`;
 }
@@ -1522,7 +1522,7 @@ function viewPortfolio() {
   const top = `${switcher}${head}${toggle}`;
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = state.pfView === "live" && cur.status === "live"
-    ? `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, whatever the Matches filter is set to.</p>` : "";
+    ? (rule.threshold == null ? "" : `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.</p>`) : "";
   const foot = `<p class="note">${state.pfView === "live"
     ? (isMoneyline ? oddsAge() || "Odds: DraftKings." : "")
     : isMoneyline ? `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`
@@ -1536,7 +1536,7 @@ function viewPortfolio() {
       : cur.status === "retired" && state.pfView === "live"
         ? "No live trades: this strategy was retired before any opened. Its testing history is under Backtest."
         : state.pfView === "live"
-          ? `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`
+          ? (rule.threshold == null ? "No new paper trades: no minimum edge has beaten the market in past bets." : `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`)
           : set ? "The backtest found no trades at this threshold." : "No backtest yet.";
     return `${top}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" && set ? pfBacktestExtras(set) : ""}${retiredLinks}${foot}`;
   }

@@ -64,7 +64,7 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Markets | Home, draw, away, over 2.5, under 2.5 |
 | Probability for the edge | the blend (model + DraftKings' margin-free price, below) when a fit is saved; else the model's own |
 | Edge | that probability × DraftKings decimal odds − 1 |
-| Paper-trade threshold | edge ≥ 12% (`PAPER_EDGE`), whatever the app's filter shows |
+| Paper-trade threshold | the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`), the level the app flags with; none learned = no new match paper trades; no backtest file = 12% (`PAPER_EDGE`) |
 | App minimum edge | learned from past bets (`edge_threshold` in each backtest); none when no level beat the market; 2/5/8/12% under "Explore other edges" |
 | Trades per match | one, the market with the highest edge |
 | Odds cap | none (the backtest also reports a 6.0 cap) |
