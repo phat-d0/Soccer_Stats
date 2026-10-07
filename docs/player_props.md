@@ -124,6 +124,43 @@ calls. The saving is one budget guard and one cache file per match. A combined
 pilot-plus-sample (105 matches) is about **3,150 credits**. With the reserve, it needs about
 6,200 left at the start.
 
+### Run details, fixed before any call (2026-10-07, round 5)
+
+The owner approved stage 0 plus the (a) pilot, with a hard cap of 60 credits.
+
+- **Command:** `soccer-stats goalscorer-pilot --cap 60` (`player_goal_odds.py`).
+- **Where it runs:** `odds-check.yml` with `task=goalscorer` and `cap=60`. The job never
+  pushes and never deploys; the results go to the job log and a 7-day artifact.
+- **Order:** the free goalscorer chances come first (Understat and the match model, holdout
+  scoring as pre-registered). The calls follow, and the analysis comes last.
+- **Stage 0:**
+  - live event odds for upcoming matches in kickoff order, all five regions, one market;
+  - at most 5 credits a call (an empty answer costs 0);
+  - it stops after two matches with prices, or after 8 tries.
+- **Pilot:**
+  - the first cached 2025/26 FanDuel close in Aug, Oct, Dec, Feb and Apr;
+  - the same snapshot time (one minute before kickoff);
+  - one `bookmakers=` list: the books stage 0 found, topped up to ten with the known
+    player-prop books (fanduel, draftkings, betmgm, williamhill_us, betrivers, ballybet,
+    unibet, betparx, onexbet, pinnacle). Up to ten books cost the same as one region, so
+    the top-up costs nothing and doesn't depend on stage 0 finding a book this early;
+  - at most 10 credits a call.
+- **Guards:**
+  - a call is skipped if its maximum cost would take the running total past the cap;
+  - a call is also skipped if it would leave fewer than 3,000 credits on the shared key
+    (the live reserve);
+  - the counted cost is each response's `x-requests-last`.
+- **Measures:** exactly those in §5, computed by `player_goal_odds.evaluate`.
+  - Players are matched by name to Understat within the match's two clubs (their whole
+    2025/26 squads).
+  - "Starters" are Understat starters.
+  - The model's chance is the stage-1 walk-forward with the lineup known (the close comes
+    after lineups).
+- **Verdict:** `player_goal_odds.verdict` applies §5 as written. The go/kill table was
+  written for the 100-match sample. On 5 matches the coverage rules (a second book, a
+  two-sided book) can be decided; a gap or ROI on about 5 matches is an early read with a
+  wide range.
+
 ### Smallest useful spend
 
 Stage 0 plus the (a) pilot is **about 60 credits**.

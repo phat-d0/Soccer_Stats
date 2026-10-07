@@ -11,6 +11,11 @@
 #             the 2025/26 holdout stays locked. No credits.
 #   lab-holdout: opens the locked holdout once for `finalists` (and `stack_base`), with
 #             `reason` printed and the time it was opened. No credits.
+#   goalscorer: the anytime-goalscorer stage-0 live probe and 5-match pilot
+#             (docs/player_props.md), never past `cap` credits (0 = no calls); prints
+#             the books, margins, name matches, measures and the pre-registered verdict.
+#   player-lab: the priced player shot lines (data-log) through the lab's metrics,
+#             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
 #             move and as blend inputs (no credits).
 name: Player odds check
@@ -19,12 +24,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab or lab-holdout"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, goalscorer or player-lab"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab]
         default: coverage
       cap:
-        description: "props: most credits to spend (0 = dry run)"
+        description: "props / goalscorer: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -66,7 +71,7 @@ jobs:
           restore-keys: raw-data-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer') && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -89,6 +94,15 @@ jobs:
             lab-holdout) uv run python -m soccer_stats.lab.run --open-holdout \
                      --reason "$REASON" --finalists "$FINALISTS" --stack-base "$STACK_BASE" \
                      --json out/lab_holdout.json ;;
+            goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
+                     --json out/goalscorer_pilot.json ;;
+            player-lab)
+              git fetch --depth=1 origin data-log
+              git show FETCH_HEAD:backtest/E0_player_lines.csv.gz > out/lines.csv.gz
+              git show FETCH_HEAD:backtest/E0_players.json > out/players.json
+              uv run soccer-stats player-lab --lines out/lines.csv.gz \
+                --players-json out/players.json --json out/player_lab.json
+              rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
           esac

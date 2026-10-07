@@ -21,6 +21,9 @@ import pandas as pd
 
 from soccer_stats.edge.stats import bootstrap_mean
 from soccer_stats.factors import PRIOR_90S, before_kickoff, ewsum_prior
+from soccer_stats.lab import harness
+from soccer_stats.lab import metrics as lab_metrics_mod
+from soccer_stats.lab.harness import Holdout
 from soccer_stats.models.player_goals import GOAL_FACTORS, GoalscorerModel
 
 PRIOR_XG = 8.0  # shrink goals / xG toward 1 by this much xG
@@ -61,6 +64,61 @@ def goal_features(feats: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=["_90s", "_one"])
 
 
+STAGE1_REASON = (
+    "goalscorer stage 1: the 2025/26 holdout is scored on every weekly run, as "
+    "pre-registered in docs/player_props.md (the gate); the spec is not tuned on it"
+)
+
+
+def stage1_holdout(reason: str | None = STAGE1_REASON) -> Holdout:
+    """The lab's locked 2025/26 holdout, opened (and logged) for a pre-registered reason;
+    reason=None keeps it locked."""
+    h = Holdout(pd.Timestamp(f"20{HOLDOUT[:2]}-07-01", tz="UTC"))
+    if reason:
+        h.unlock(reason)
+    return h
+
+
+class GoalCandidate:
+    """The goalscorer model as a lab-harness candidate (lab/harness.py).
+
+    The harness hands `fit` every row before the block; the model keeps the last
+    `lookback_days` before the block start and needs at least 200 appearances and 10
+    goals. It fits when the block arrives (the block start is the earliest test row's
+    week from `start`), so the window is exactly the one the weekly loop always used.
+    `predict` gives [P(no goal), P(goal)], NaN for players with too few earlier
+    appearances (not scored, as for shots).
+    """
+
+    def __init__(
+        self,
+        start,
+        refit_every: str = "7D",
+        factors: list[str] | None = None,
+        lineup_known: bool = False,
+        lookback_days: int = 730,
+        min_prev_apps: int = 3,
+    ):
+        self.start, self.step = pd.Timestamp(start), pd.Timedelta(refit_every)
+        self.factors, self.lineup_known = factors, lineup_known
+        self.lookback = pd.Timedelta(days=lookback_days)
+        self.min_prev_apps = min_prev_apps
+        self.train = None
+
+    def fit(self, train: pd.DataFrame) -> None:
+        self.train = train
+
+    def predict(self, test: pd.DataFrame) -> np.ndarray:
+        lo = self.start + ((test["kickoff"].min() - self.start) // self.step) * self.step
+        tr = self.train[self.train["kickoff"] >= lo - self.lookback]
+        p = np.full(len(test), np.nan)
+        ok = (test["prev_apps"] >= self.min_prev_apps).to_numpy()
+        if len(tr) >= 200 and tr["goals"].sum() >= 10 and ok.any():
+            model = GoalscorerModel(self.factors).fit(tr)
+            p[ok] = model.prob_score(test[ok], self.lineup_known)
+        return np.column_stack([1 - p, p])
+
+
 def walk_forward(
     feats: pd.DataFrame,
     start: str | pd.Timestamp,
@@ -69,50 +127,62 @@ def walk_forward(
     refit_every: str = "7D",
     lookback_days: int = 730,
     min_prev_apps: int = 3,
+    holdout: Holdout | None = None,
 ) -> pd.DataFrame:
-    """Out-of-sample P(scores) for each appearance from `start` on (goal_features input).
+    """Out-of-sample P(scores) for each appearance from `start` on (goal_features input),
+    through the lab harness: refitted weekly on appearances before the week only.
 
-    Each week's model is fitted only on appearances before the week; players with fewer
-    than `min_prev_apps` earlier appearances are left out, as for shots.
+    `holdout` (a lab Holdout) refuses to score rows at or after its start unless it was
+    unlocked with a reason. Players with fewer than `min_prev_apps` earlier appearances
+    are left out, as for shots.
     """
     start = pd.Timestamp(start)
     start = start.tz_localize("UTC") if start.tz is None else start
     end = feats["kickoff"].max() + pd.Timedelta(refit_every)
-    weeks = pd.date_range(start, end, freq=refit_every)
-    out = []
-    for lo, hi in zip(weeks[:-1], weeks[1:], strict=True):
-        test = feats[(feats["kickoff"] >= lo) & (feats["kickoff"] < hi)]
-        test = test[test["prev_apps"] >= min_prev_apps]
-        if test.empty:
-            continue
-        train = feats[
-            (feats["kickoff"] < lo) & (feats["kickoff"] >= lo - pd.Timedelta(days=lookback_days))
+    cand = dict(
+        start=start,
+        refit_every=refit_every,
+        factors=factors,
+        lineup_known=lineup_known,
+        lookback_days=lookback_days,
+        min_prev_apps=min_prev_apps,
+    )
+    pr = harness.walk_forward(
+        feats,
+        lambda **kw: GoalCandidate(**kw),
+        cand,
+        start,
+        end,
+        holdout=holdout,
+        time_col="kickoff",
+        refit=refit_every,
+        min_train=1,
+    )
+    if pr.empty:
+        return pd.DataFrame()
+    pr = pr[pr["p_1"].notna()]
+    test = feats.loc[pr.index]
+    rec = test[
+        [
+            "match_id",
+            "season",
+            "kickoff",
+            "team",
+            "opponent",
+            "player_id",
+            "player",
+            "position",
+            "started",
+            "minutes",
+            "goals",
+            "xg",
         ]
-        if len(train) < 200 or train["goals"].sum() < 10:
-            continue
-        model = GoalscorerModel(factors).fit(train)
-        rec = test[
-            [
-                "match_id",
-                "season",
-                "kickoff",
-                "team",
-                "opponent",
-                "player_id",
-                "player",
-                "position",
-                "started",
-                "minutes",
-                "goals",
-                "xg",
-            ]
-        ].copy()
-        rec["p_model"] = model.prob_score(test, lineup_known)
-        rec["p_base_goals"] = 1 - np.exp(-test["season_avg_goals"].clip(lower=1e-4))
-        rec["p_base_xg"] = 1 - np.exp(-test["season_avg_xg"].clip(lower=1e-4))
-        rec["scored"] = (test["goals"] > 0).astype(int)
-        out.append(rec)
-    return pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+    ].copy()
+    rec["p_model"] = pr["p_1"].to_numpy()
+    rec["p_base_goals"] = 1 - np.exp(-test["season_avg_goals"].clip(lower=1e-4))
+    rec["p_base_xg"] = 1 - np.exp(-test["season_avg_xg"].clip(lower=1e-4))
+    rec["scored"] = (test["goals"] > 0).astype(int)
+    return rec.reset_index(drop=True)
 
 
 def _ll(p: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -175,6 +245,38 @@ def split(preds: pd.DataFrame, holdout: str = HOLDOUT) -> dict[str, pd.DataFrame
     return {k: v for k, v in parts.items() if not v.empty}
 
 
+def lab_metrics(preds: pd.DataFrame, n_boot_blend: int = 100) -> dict:
+    """The lab's metrics (lab/metrics.evaluate) with the season-to-date xG benchmark in
+    the market's place, until goalscorer odds exist: log-loss gain over the benchmark
+    and the weight the model earns beside it (score = a + b·log(bench) + c·log(model)).
+    No prices, so no bets, CLV or `passes`."""
+    if len(preds) < 50:
+        return {}
+    p = preds["p_model"].clip(1e-6, 1 - 1e-6).to_numpy()
+    b = preds["p_base_xg"].clip(1e-6, 1 - 1e-6).to_numpy()
+    nan = np.full((len(p), 2), np.nan)
+    r = lab_metrics_mod.evaluate(
+        np.column_stack([1 - p, p]),
+        preds["scored"].to_numpy(),
+        np.column_stack([1 - b, b]),
+        nan,
+        nan,
+        preds["match_id"].to_numpy(),
+        n_boot_blend=n_boot_blend,
+    )
+    bl = r.get("blend") or {}
+    return {
+        "market": "season-to-date xG benchmark (no odds yet)",
+        "rows": r["rows"],
+        "log_loss": round(r["log_loss"], 5),
+        "benchmark_log_loss": round(r["market_log_loss"], 5),
+        "gain": round(r["gain_vs_market"]["mean"], 5),
+        "gain_range95": [round(v, 5) for v in r["gain_vs_market"]["range"] or ()] or None,
+        "blend_c": round(float(bl["c"]), 3) if "c" in bl else None,
+        "blend_c_range95": [round(v, 3) for v in bl["c_range"]] if "c_range" in bl else None,
+    }
+
+
 def report(before: pd.DataFrame, known: pd.DataFrame | None = None) -> dict:
     """Stage-1 result: scores per split, before lineups and (optionally) lineup known.
 
@@ -183,7 +285,7 @@ def report(before: pd.DataFrame, known: pd.DataFrame | None = None) -> dict:
     """
     out = {"factors": list(GOAL_FACTORS), "holdout": HOLDOUT, "before_lineups": {}}
     for k, p in split(before).items():
-        out["before_lineups"][k] = score(p)
+        out["before_lineups"][k] = {**score(p), "lab": lab_metrics(p)}
     if known is not None and not known.empty:
         out["lineup_known"] = {k: score(p) for k, p in split(known).items()}
     h = out["before_lineups"].get("holdout", {})

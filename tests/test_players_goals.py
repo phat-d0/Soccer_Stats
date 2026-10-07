@@ -109,3 +109,27 @@ def test_cli_prints_goal_report(feats, capsys):
     cli._print_goals(rep)
     out = capsys.readouterr().out
     assert "before_lineups" in out and "lineup_known" in out and "nan" not in out.lower()
+
+
+def test_goal_walk_forward_respects_the_locked_holdout(feats):
+    from soccer_stats.lab.harness import HoldoutLocked
+
+    start = feats["kickoff"].min() + pd.Timedelta(days=365)
+    cut = feats["kickoff"].max() - pd.Timedelta(days=60)
+    locked = pg.stage1_holdout(None)
+    locked.start = cut
+    with pytest.raises(HoldoutLocked):
+        pg.walk_forward(feats, start, refit_every="28D", holdout=locked)
+    opened = pg.stage1_holdout("test: pre-registered")
+    opened.start = cut
+    p = pg.walk_forward(feats, start, refit_every="28D", holdout=opened)
+    assert (p["kickoff"] >= cut).any() and opened.events[0].startswith("HOLDOUT OPENED")
+
+
+def test_lab_metrics_on_goal_predictions(feats):
+    start = feats["kickoff"].min() + pd.Timedelta(days=365)
+    preds = pg.walk_forward(feats, start, refit_every="28D")
+    r = pg.lab_metrics(preds, n_boot_blend=20)
+    assert r["rows"] == len(preds) and r["gain"] > 0  # beats the season-xG benchmark
+    lo, hi = r["gain_range95"]
+    assert lo <= r["gain"] <= hi and r["blend_c"] > 0
