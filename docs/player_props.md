@@ -340,3 +340,94 @@ The backtest's "CLV" is the raw price move, the same artifact as above.
 `lab.harness.walk_forward` with the lab's `Holdout`. Its predictions are identical to the
 old loop (checked on simulated data, 2,874 rows). So the round-4 numbers on data-log stand,
 and the weekly run logs each opening of the holdout.
+
+## 8. Goalscorer model improvements: pre-registration (round 6, 2026-10-07, before any run)
+
+The owner's call: keep Anytime goalscorer and improve the model. Credit cap 0 this round.
+
+**What "better" has to mean.** The model is already calibrated on average. A model pays
+only if it finds players the bookmakers underprice by more than their margin: the
+pilot's best prices implied 16.4% for starters who scored 10.8%. So improvements are
+judged on sharper, better-separated chances, where a bet would sit (starters, after
+lineups), and above all on paired log loss. Averages matching is not enough.
+
+### Data and split
+
+- **Data:**
+  - Understat EPL appearances 2021/22–2024/25 (2021/22 only warms up features and
+    training);
+  - the match model's walk-forward expected goals and game state (as in
+    `backtest-players`).
+- **Predictions:** walk-forward through `lab.harness`, refitted every 28 days on all
+  earlier appearances (730-day window). 2022/23 is predicted only to tune H (nested); it
+  is not scored.
+- **Development (the only data that chooses anything):** 2023/24 and 2024/25.
+- **Population scored:** starters (Understat), at least 3 earlier appearances, the
+  lineup known (bets are placed after lineups). Candidate A is the one exception: it is
+  scored before lineups, on the same rows.
+- **2025/26:**
+  - not clean any more, because it has been scored every week since round 4;
+  - it chooses nothing;
+  - after selection, the chosen candidate and B are reported there, labelled "seen".
+- **Forward check (the verdict):** 2026/27 matches kicking off on or after
+  **2026-10-10 00:00 UTC**.
+  - They are locked with the lab's `Holdout` pattern from this commit on.
+  - They are scored once, when at least 150 of those matches have been played (about
+    early December), by a run that prints and logs the reason and time.
+
+### Candidates (fixed now)
+
+Every feature uses only earlier kickoffs. C–H start from B.
+
+| # | Candidate | What changes |
+| --- | --- | --- |
+| A | Current model, before lineups | The live spec (`GOAL_FACTORS`), chance of starting from his history |
+| B | Current model, lineup known | Same model; starters known (p_start = 1), expected minutes as a starter. **The reference for C–H** |
+| C | + set-piece and penalty role | Shrunk set-piece xG per 90 (corners, set pieces, direct free kicks; no penalties); took his team's most recent penalty (0/1) |
+| D | + opponent's defensive xG | Opponent's recency-weighted xG conceded per match over league average; opponent's share of xG conceded to his position over the league share |
+| E | Share structure | His shrunk share of his team's xG in the matches he played, beside the team's expected goals for this match (replaces his own xG per 90) |
+| F | + form at two speeds | Shrunk xG per 90 with a half-life of 4 appearances and of 40 (beside the current 10) |
+| G | All of C, D, E (added, not replacing) and F | One regularised count model, same L2 |
+| H | LightGBM, Poisson objective | G's features, minutes offset; nested grid: leaves {4, 8} × min child {100, 400}, 200 trees at 0.03 (4 configs; each season tuned on the season before) |
+
+### Metrics
+
+- **Primary:** paired log-loss gain per starter-row against the reference (A for B; B for
+  C–H), with ranges resampling whole matches.
+- Also reported:
+  - Brier score, and its Murphy decomposition (reliability, resolution) over ten bins;
+  - AUC;
+  - **sharpness:** the share of starters given 30% or more;
+  - **tail calibration:** predicted vs scored in the 20–30% and 30%+ buckets, with each
+    bucket's 95% binomial range;
+  - log loss against the season-xG benchmark.
+
+### Tests, correction and pass bar
+
+- **Tests:** 7 comparisons (B vs A; C, D, E, F, G, H vs B), so every range is **99.29%**
+  (Bonferroni, 0.05 / 7).
+- **Pass (development):** the gain's 99.29% range lies above 0, **and** the 20–30% and 30%+
+  buckets each have predicted within their observed rate's 95% range (or within 3 points
+  when the range is wider).
+- **Selection:** among C–H that pass, the lowest development log loss is "the improved
+  model". If none passes, B stays.
+- **Forward verdict:** the improved model (or B) against B and the season-xG benchmark on
+  the forward window. It passes if its gain over B has a 95% range above 0 and the same
+  tail rule holds. If B was kept, the forward check confirms B's calibration only.
+
+### What this can and can't show
+
+- Sharper chances are necessary for a goalscorer edge, but not enough. With Yes-only
+  prices about 50% above the scoring rate, the model has to find starters priced at 1.5×
+  their true chance or worse in the other direction.
+- No price test happens this round (0 credits). The 5 cached pilot matches are used only
+  to describe where the model and the best price disagreed. **5 matches decide nothing.**
+- A priced test is proposed, with a cost and a go/kill rule, only if the improved model
+  passes on development.
+
+### Run
+
+- `odds-check.yml` `task=goal-lab` (`soccer-stats goal-lab`): print-only, never pushes, no
+  credits.
+- The 2026/27 forward window is dropped before any computation unless `--open-forward`
+  is given with a reason.
