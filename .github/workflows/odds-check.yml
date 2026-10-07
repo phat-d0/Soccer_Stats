@@ -106,9 +106,9 @@ jobs:
             goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
                      --json out/goalscorer_pilot.json ;;
             goal-lab)
-              GH_TOKEN="${{ github.token }}" gh api \
-                "repos/${{ github.repository }}/actions/jobs/112639640656/logs" > out/pilot.log \
-                || echo "pilot log not available"
+              curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \
+                "https://api.github.com/repos/${{ github.repository }}/actions/jobs/112639640656/logs" \
+                -o out/pilot.log || echo "pilot log not available"
               uv run soccer-stats goal-lab --pilot-log out/pilot.log \
                 --open-forward "$REASON" --json out/goal_lab.json
               rm -f out/pilot.log ;;
