@@ -404,11 +404,22 @@ const matchEdge = () => edgeRule("moneyline").edge;
 const playerEdge = () => edgeRule("player_shots").edge;
 // "a 12%" but "an 8%" / "an 11%" / "an 18%".
 const aPct = (x) => { const t = pct(x); return `${/^(8|11|18)/.test(t) ? "an" : "a"} ${t}`; };
+const seasonLabel = (x) => String(x).replace(/^(\d{4})\b/, (m) => seasonName(m));
+function seasonsText(v) {
+  if (!v) return "";
+  if (Array.isArray(v)) return v.map(seasonLabel).join(", ");
+  if (typeof v === "object") {
+    const dev = (v.development || []).map(seasonLabel).join(", ");
+    const chk = (v.check || []).map(seasonLabel).join(", ");
+    return [dev && `found on ${dev}`, chk && `checked on ${chk}`].filter(Boolean).join(", ");
+  }
+  return seasonLabel(v);
+}
 const confText = (c) => (c == null ? "" : typeof c === "number" ? `${pct(c)} confidence` : `${c} confidence`);
 // Why there is no pick, in one sentence (Matches note, match sheet).
 function noEdgeText(pfId) {
   const et = edgeInfo(pfId);
-  return `No edge level has beaten the market in past bets, so nothing is flagged.${et?.note ? ` ${esc(et.note)}` : ""}`;
+  return `Nothing is flagged: ${et?.note ? esc(et.note) : "no edge level has beaten the market in past bets."}`;
 }
 
 // The recommendation, in plain English, with the old edge buttons folded away under
@@ -416,11 +427,11 @@ function noEdgeText(pfId) {
 function edgePanel(pfId = "moneyline") {
   const et = edgeInfo(pfId);
   const rule = edgeRule(pfId);
-  const basis = et ? [et.n_bets ? `${et.n_bets.toLocaleString()} past bets` : "", et.seasons ? `${esc(Array.isArray(et.seasons) ? et.seasons.map(seasonName).join(", ") : seasonName(String(et.seasons)))}` : "", confText(et.confidence)].filter(Boolean).join(" · ") : "";
+  const basis = et ? [et.n_bets ? `${et.n_bets.toLocaleString()} past bets` : "", esc(seasonsText(et.seasons)), confText(et.confidence)].filter(Boolean).join(" · ") : "";
   const rec = !et
     ? `Flagging bets with at least ${aPct(PAPER_EDGE)} edge, the paper-trade rule. A level learned from past bets appears here once the backtest has one.`
     : et.min_edge == null
-      ? `<b>Nothing is flagged:</b> no edge level has beaten the market in past bets.${et.note ? ` ${esc(et.note)}` : ""}`
+      ? `<b>Nothing is flagged.</b> ${et.note ? esc(et.note) : "No edge level has beaten the market in past bets."}`
       : `<b>Only flag bets with at least ${aPct(et.min_edge)} edge:</b> below that, past bets didn't beat the market.${et.note ? ` ${esc(et.note)}` : ""}`;
   const exploring = rule.source === "explore";
   return `
@@ -458,7 +469,7 @@ function edgeBucketsHtml(pfId) {
     const dot = (v, cls) => (v == null ? "" : `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>`);
     const above = et.min_edge != null && r.edge_lo >= et.min_edge - 1e-9;
     return `<button class="eb-row${above ? " above" : ""}" data-ebrow="${i}" data-eb="${esc(pfId)}">
-      <span class="eb-label">${label(r)}<span class="meta">${r.n} bets</span></span>
+      <span class="eb-label">${label(r)}<span class="meta">${r.n} bets</span>${r.roi != null ? `<span class="meta ${plClass(r.roi)}">${signedPct(r.roi, 0)} per bet</span>` : ""}</span>
       <span class="eb-plot">${range}${dot(r.implied, "imp")}${dot(r.model, "mod")}${dot(r.realized, `real ${beat ? "pos" : "neg"}`)}</span>
     </button>`;
   }).join("");
@@ -471,12 +482,12 @@ function edgeBucketsHtml(pfId) {
       ${axis}
       <div class="eb-readout" id="eb-readout-${esc(pfId)}">${ebReadout(et, rows.length - 1)}</div>
     </div>
-    <p class="note">Each row groups past bets by the edge the model claimed. A real edge wins more often than the book's chance (blue); red means it won less. Rows at or above the recommended level are shaded.${et.method ? ` Method: ${esc(et.method)}.` : ""}</p>`;
+    <p class="note">Each row groups past bets by the edge the model claimed, with their return per bet. A real edge wins more often than the book's chance (blue); red means it won less. Rows at or above the recommended level are shaded.${et.method ? ` Method: ${esc(et.method)}.` : ""}</p>`;
 }
 function ebReadout(et, i) {
   const r = (et.by_bucket || []).filter((b) => b.n)[i];
   if (!r) return "";
-  return `<b>Edge ${pct(r.edge_lo)}${r.edge_hi != null ? `–${pct(r.edge_hi)}` : "+"}</b>, ${r.n} bets: book ${pct(r.implied, 1)}, model ${pct(r.model, 1)}, won ${pct(r.realized, 1)}${r.realized_lo != null ? ` (range ${pct(r.realized_lo, 0)}–${pct(r.realized_hi, 0)})` : ""}.`;
+  return `<b>Edge ${pct(r.edge_lo)}${r.edge_hi != null ? `–${pct(r.edge_hi)}` : "+"}</b>, ${r.n} bets: book ${pct(r.implied, 1)}, model ${pct(r.model, 1)}, won ${pct(r.realized, 1)}${r.realized_lo != null ? ` (range ${pct(r.realized_lo, 0)}–${pct(r.realized_hi, 0)})` : ""}${r.roi != null ? `; return per bet ${signedPct(r.roi)}${r.roi_lo != null ? ` (range ${signedPct(r.roi_lo, 0)} to ${signedPct(r.roi_hi, 0)})` : ""}` : ""}.`;
 }
 
 // ---------- views ----------

@@ -464,6 +464,7 @@ def portfolios_section(
             bt = {
                 "generated_at": bt.get("generated_at"),
                 "seasons": bt.get("seasons"),
+                "edge_threshold": bt.get("edge_threshold"),  # research lab: minimum edge
                 **portfolio_section(trades),
             }
         out.append(

@@ -580,6 +580,8 @@ details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; 
 .eb-row.sel .eb-label { color: var(--text-primary); font-weight: 600; }
 .eb-label { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; padding-left: 4px; }
 .eb-label .meta { display: block; font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.eb-label .meta.gain { color: var(--good-text); }
+.eb-label .meta.loss { color: var(--neg); }
 .eb-plot { position: relative; height: 18px; margin: 0 8px; }
 .eb-row .eb-plot { background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat; }
 .eb-range { position: absolute; top: 7px; height: 4px; border-radius: 2px; opacity: 0.35; }

@@ -419,10 +419,10 @@ def add_settled_live_matches(data: dict) -> None:
 SYNTHETIC_EDGE = {
     "moneyline": {
         "min_edge": 0.08,
-        "confidence": 0.9,
+        "confidence": 0.95,
         "method": "synthetic fixture values (walk-forward edge buckets)",
         "n_bets": 1419,
-        "seasons": ["2223", "2324", "2425", "2526"],
+        "seasons": {"development": ["2223", "2324", "2425"], "check": ["2526"]},
         "note": "Synthetic numbers for the app's tests.",
         "by_bucket": [
             {
@@ -434,6 +434,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.35,
                 "realized_lo": 0.31,
                 "realized_hi": 0.40,
+                "roi": -0.028,
+                "roi_lo": -0.148,
+                "roi_hi": 0.092,
             },
             {
                 "edge_lo": 0.05,
@@ -444,6 +447,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.32,
                 "realized_lo": 0.27,
                 "realized_hi": 0.37,
+                "roi": -0.03,
+                "roi_lo": -0.15,
+                "roi_hi": 0.09,
             },
             {
                 "edge_lo": 0.08,
@@ -454,6 +460,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.31,
                 "realized_lo": 0.26,
                 "realized_hi": 0.36,
+                "roi": 0.033,
+                "roi_lo": -0.087,
+                "roi_hi": 0.153,
             },
             {
                 "edge_lo": 0.12,
@@ -464,16 +473,20 @@ SYNTHETIC_EDGE = {
                 "realized": 0.25,
                 "realized_lo": 0.21,
                 "realized_hi": 0.30,
+                "roi": 0.042,
+                "roi_lo": -0.078,
+                "roi_hi": 0.162,
             },
         ],
     },
     "player_shots": {
         "min_edge": None,
-        "confidence": 0.9,
+        "confidence": 0.95,
         "method": "synthetic fixture values (walk-forward edge buckets)",
         "n_bets": 1012,
-        "seasons": ["2324", "2425", "2526"],
-        "note": "FanDuel's over-only margin is bigger than any edge the model claims.",
+        "seasons": {"development": ["2526 first half"], "check": ["2526 second half"]},
+        "note": "No minimum edge works. At every claimed edge from 0% to 30%, past bets lost "
+        "money after FanDuel's margin.",
         "by_bucket": [
             {
                 "edge_lo": 0.02,
@@ -484,6 +497,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.24,
                 "realized_lo": 0.20,
                 "realized_hi": 0.28,
+                "roi": -0.273,
+                "roi_lo": -0.393,
+                "roi_hi": -0.153,
             },
             {
                 "edge_lo": 0.08,
@@ -494,6 +510,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.22,
                 "realized_lo": 0.18,
                 "realized_hi": 0.27,
+                "roi": -0.267,
+                "roi_lo": -0.387,
+                "roi_hi": -0.147,
             },
             {
                 "edge_lo": 0.15,
@@ -504,6 +523,9 @@ SYNTHETIC_EDGE = {
                 "realized": 0.16,
                 "realized_lo": 0.11,
                 "realized_hi": 0.21,
+                "roi": -0.238,
+                "roi_lo": -0.358,
+                "roi_hi": -0.118,
             },
         ],
     },
@@ -513,7 +535,7 @@ SYNTHETIC_EDGE = {
 def add_edge_thresholds(data: dict) -> None:
     for p in data["portfolio"].get("portfolios") or []:
         bt = p.get("backtest")
-        if bt is not None and "edge_threshold" not in bt and p["id"] in SYNTHETIC_EDGE:
+        if bt is not None and bt.get("edge_threshold") is None and p["id"] in SYNTHETIC_EDGE:
             bt["edge_threshold"] = SYNTHETIC_EDGE[p["id"]]
 
 

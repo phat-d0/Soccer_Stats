@@ -103,6 +103,7 @@ def test_backtests_go_to_their_portfolio():
     players = {
         "generated_at": "2026-10-06",
         "priced": {"x": 1},
+        "edge_threshold": {"min_edge": None, "note": "No minimum edge works."},
         "trades": [trade(1, bet_type="player", market="player_shots")],
     }
     pfs = paper.portfolios_section({}, [], {"moneyline": dk, "player_shots": players})
@@ -111,6 +112,7 @@ def test_backtests_go_to_their_portfolio():
     ps = by_id["player_shots"]["backtest"]
     assert ps["summary"]["trades"] == 1 and "priced" not in ps
     assert ps["generated_at"] == "2026-10-06"
+    assert ps["edge_threshold"]["min_edge"] is None  # the research lab's level is kept
 
 
 def test_run_fills_portfolios(tmp_path):
