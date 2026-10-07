@@ -274,7 +274,8 @@ def test_one_x_two_and_feature_models_give_valid_chances():
         assert np.isfinite(q).all()
 
 
-def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(monkeypatch, tmp_path, capsys):
+@pytest.mark.parametrize("league", ["E0", "E1"])
+def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch, tmp_path, capsys):
     import json
 
     from soccer_stats.lab import models, run
@@ -294,14 +295,22 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(monkeypatch, tmp_pa
     for k in ("home", "draw", "away"):
         df[f"mkt_{k}"] = df[f"mkt_{k}"] / mk.sum(axis=1)
         df[f"pinnacle_early_{k}"] = 1 / (1.03 * df[f"mkt_{k}"])
+        df[f"pinnacle_close_{k}"] = 1 / (1.03 * df[f"fair_{k}"])
+    if league == "E1":
+        # No xG at all (the goals-only path must not ask for it), and one season
+        # without Pinnacle prices, which must be left out of scoring.
+        df = df.drop(columns=[c for c in df.columns if "xg" in c])
+        df.loc[df["season_start"] == 2016, "pinnacle_close_home"] = np.nan
     df["match"] = df.index.astype(str)
     seen = {}
 
-    def fake_load(holdout):
+    def fake_load(holdout, league="E0"):
         seen["locked"] = not holdout.unlocked
+        seen["league"] = league
         return df
 
     monkeypatch.setattr(run, "load", fake_load)
+    monkeypatch.setattr(run, "has_xg", lambda lg: lg == "E0")
     monkeypatch.setattr(run, "WARMUP", 2015)
     monkeypatch.setattr(run, "FIRST_SCORED", 2016)
     monkeypatch.setattr(run, "LAST", 2019)
@@ -315,13 +324,29 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(monkeypatch, tmp_pa
     monkeypatch.setattr(models, "GRIDS", small)
     monkeypatch.setattr(run, "GRIDS", small)
     out = tmp_path / "lab.json"
-    run.main(["--json", str(out)])
+    run.main(["--league", league, "--json", str(out)])
     text = capsys.readouterr().out
-    assert seen["locked"] and "DEVELOPMENT" in text and "HOLDOUT OPENED" not in text
+    assert seen["locked"] and seen["league"] == league
+    assert "DEVELOPMENT" in text and "HOLDOUT OPENED" not in text
     res = json.loads(out.read_text())
     assert set(res["results"]) == {*small, "e_stack"}
     assert res["holdout_events"] == []
+    if league == "E1":
+        assert res["not_scored"] == [2016]
+        assert res["level"] == pytest.approx(1 - 0.05 / 30, abs=1e-5)  # 3 leagues, 1 family
+        assert res["coverage"]["2016"] < run.MIN_COVERAGE
+    else:
+        assert res["not_scored"] == [] and res["level"] == pytest.approx(0.995)
     for name, r in res["results"].items():
-        assert r["rows"] > (100 if name == "e_stack" else 250) and "c_range" in r["blend"]
+        assert r["rows"] > (60 if name == "e_stack" else 120) and "c_range" in r["blend"]
     with pytest.raises(SystemExit):
         run.main(["--open-holdout", "--reason", "x", "--finalists", "nope"])
+
+
+def test_goals_only_features_and_league_families():
+    from soccer_stats.lab import run
+
+    assert features.FEATURES_GOALS and not [f for f in features.FEATURES_GOALS if "xg" in f]
+    assert set(features.FEATURES_GOALS) < set(features.FEATURES)
+    assert run.family("E0") == 1 and run.family("E2") == 3
+    assert run.has_xg("E0") and not run.has_xg("E1")

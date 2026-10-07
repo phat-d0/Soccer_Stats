@@ -199,3 +199,60 @@ through `nested` and `metrics.evaluate` with the same locked-holdout discipline.
 
 Recommendation: run 1 next (free, and the best chance of a market the models can beat),
 then 2 once the logs hold enough matches.
+
+## Bake-off 2: 1X2 on the English lower leagues (pre-registered 2026-10-07, before any run)
+
+**Question:** in the Championship (E1), League One (E2) and League Two (E3), where
+betting volume is lower and prices may be less sharp, does any model, or a stack of a
+model with the opening price, add information to Pinnacle's early 1X2 price out of
+sample?
+
+**What is the same as bake-off 1:** the harness, seasons, candidates a–e and their
+tuning grids, the stack rule, the market, the bet rule, the metrics and the pass rule.
+- Data: football-data, 2014/15–2025/26. 2014/15–2015/16 warm up, 2016/17 feeds the
+  stack, **development is 2017/18–2024/25**, and the **2025/26 holdout is locked**.
+- Market: Pinnacle's early price (Shin). Bets: the live rule (12% edge, one per match)
+  at that price. CLV is against Pinnacle's Shin-fair close.
+- Pass rule: for a–d, the blend-weight range is above 0 **and** the CLV range is above
+  0. For e, the log-loss gain over the early price has a range above 0 **and** the CLV
+  range is above 0. Profit alone never passes.
+
+**What is different:**
+- **Goals only.** Understat has no xG for these leagues, so:
+  - (a) is Dixon-Coles on goals (`xg_weight` 0);
+  - (b) fits goals;
+  - (c) and (d) use `features.FEATURES_GOALS`: Elo, goals for and against over 6 and
+    20 matches, and rest (13 features; home advantage is in the orientation).
+
+  This limits comparability with E0: a lower-league failure could be the lost xG, not
+  the market. A pass would be on weaker inputs, which makes it more convincing, not
+  less.
+- **Each league on its own.** Each is scored separately; no pooling.
+- **Pinnacle coverage check.** A season is scored only if at least 90% of its matches
+  have all six Pinnacle 1X2 prices (early and close). Seasons below that still train
+  the models but are not scored. The run prints the coverage per season, and I report
+  any dropped season here.
+- **Promotion and relegation.** Each league is loaded on its own, so a promoted or
+  relegated team's matches in another division are not seen. Its Elo restarts at
+  1,420, or carries over from its last spell in that league. The same applies to E0.
+
+**Multiple testing.** 3 leagues × 5 candidates × 2 pass metrics = **30 tests**, so every
+development range is **99.83%** (Bonferroni). Tuning variants are chosen inside the
+training years, as before (8 + 8 + 3 configs per league, 57 in all, not scored
+separately). On the holdout, each league's ranges use 2 × (its number of finalists) ×
+3 leagues.
+
+**Holdout:** opened once per league, after that league's development results are
+recorded here, for the same finalists as bake-off 1:
+1. every candidate that passes;
+2. a (the reference);
+3. the best of b–d by development log loss;
+4. e, as defined: the stack on the best of a–d.
+
+**If something passes on development and on the holdout:**
+- a handover proposal for the moneyline agent;
+- a check (from The Odds API's documentation, no calls) of whether DraftKings or
+  another available book prices that league live.
+
+**Run:** `odds-check.yml` with `task=lab` and `league=E1|E2|E3`, then `task=lab-holdout`
+with the same `league` and the finalists. Print-only, no credits.

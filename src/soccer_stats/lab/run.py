@@ -5,6 +5,12 @@ Development (default): seasons 2016/17 (warm-up for the stack) to 2024/25, score
 sees them. `--open-holdout --reason "..." --finalists a,b` scores only the named
 candidates on 2025/26, once, and prints a banner with the time it was opened.
 
+`--league` picks the football-data division (default E0). Leagues Understat doesn't
+cover (E1-E3) run on goals only: no xG target for Dixon-Coles or the hierarchical
+Poisson, and goals-only features (features.FEATURES_GOALS) for LightGBM and the logit.
+Seasons where Pinnacle's early and closing 1X2 prices cover under MIN_COVERAGE of the
+matches are not scored (they are still used for training).
+
 Needs football-data and Understat (GitHub Actions; no Odds API credits).
 """
 
@@ -33,6 +39,8 @@ CANDIDATES = list(FACTORIES)
 STACK = "e_stack"
 STACK_MIN_ROWS = 300  # earlier out-of-sample matches before the stack's first fit
 TESTS = 2 * (len(CANDIDATES) + 1)  # two pass metrics per candidate (a-e)
+LOWER = ("E1", "E2", "E3")  # pre-registered together: one family across 3 leagues
+MIN_COVERAGE = 0.9  # share of a season's matches with Pinnacle early and close prices
 
 pd.set_option("display.width", 200)
 pd.set_option("display.max_columns", 30)
@@ -44,6 +52,24 @@ def _devig(df: pd.DataFrame, cols: list[str]) -> np.ndarray:
     for i in np.flatnonzero(np.isfinite(v).all(1) & (v > 1).all(1)):
         out[i] = devig_shin(v[i])
     return out
+
+
+def has_xg(league: str) -> bool:
+    from soccer_stats.xg import LEAGUES
+
+    return league in LEAGUES
+
+
+def family(league: str) -> int:
+    """How many leagues share one multiple-testing family (E1-E3 count together)."""
+    return len(LOWER) if league in LOWER else 1
+
+
+def coverage(df: pd.DataFrame) -> dict[int, float]:
+    """Share of each season's matches with all six Pinnacle early and close prices."""
+    cols = [f"pinnacle_{w}_{m}" for w in ("early", "close") for m in H2H]
+    ok = df[cols].notna().all(axis=1)
+    return {int(k): float(v) for k, v in ok.groupby(df["season_start"]).mean().items()}
 
 
 def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
@@ -59,17 +85,20 @@ def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
     matches = load_matches([league], range(FIRST_SEASON, LAST + 1))
     if not holdout.unlocked:
         matches = matches[matches["date"] < holdout.start].reset_index(drop=True)
-    matches, err = with_xg(matches)
-    if err:
-        raise SystemExit(err)
-    print(f"{len(matches)} matches, xG on {matches['home_xg'].notna().mean():.0%}")
+    if has_xg(league):
+        matches, err = with_xg(matches)
+        if err:
+            raise SystemExit(err)
+    else:
+        matches = matches.assign(home_xg=np.nan, away_xg=np.nan)
+    print(f"{league}: {len(matches)} matches, xG on {matches['home_xg'].notna().mean():.0%}")
     df = features.build(matches)
     df["time"] = df["date"]
     df["season_start"] = 2000 + df["season"].str[:2].astype(int)
     dc = backtest.walk_forward(
         matches,
         start=f"{WARMUP}-07-01",
-        model_factory=functools.partial(DixonColes, xg_weight=0.7),
+        model_factory=functools.partial(DixonColes, xg_weight=0.7 if has_xg(league) else 0.0),
     )
     dc = dc[["date", "home", "away", "p_home", "p_draw", "p_away"]].rename(
         columns={f"p_{m}": f"dc_p_{m}" for m in H2H}
@@ -90,12 +119,21 @@ def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
     return df.sort_values("time").reset_index(drop=True)
 
 
-def predict_all(df: pd.DataFrame, names: list[str], periods: list[int], holdout: Holdout):
+def predict_all(
+    df: pd.DataFrame,
+    names: list[str],
+    periods: list[int],
+    holdout: Holdout,
+    goals_only: bool = False,
+):
     preds, tuning = {}, {}
     for name in names:
+        factory = FACTORIES[name]
+        if goals_only and name in ("c_gbm", "d_logit"):
+            factory = functools.partial(factory, features=tuple(features.FEATURES_GOALS))
         pr, chosen = nested(
             df,
-            FACTORIES[name],
+            factory,
             GRIDS[name],
             periods,
             period_col="season_start",
@@ -216,8 +254,10 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--reason", default="", help="why the holdout is opened (logged)")
     ap.add_argument("--finalists", default="", help="holdout: comma-separated candidates")
     ap.add_argument("--stack-base", default="", help="holdout: the stack's base candidate")
+    ap.add_argument("--league", default="E0", help="football-data division, e.g. E0 or E1")
     ap.add_argument("--json")
     args = ap.parse_args(argv)
+    league = args.league
 
     from soccer_stats.edge.stats import bonferroni_level
 
@@ -231,18 +271,32 @@ def main(argv: list[str] | None = None) -> None:
         holdout.unlock(args.reason)
     else:
         names = CANDIDATES + [STACK]
-    # Development: 2 pass metrics x 5 candidates. Holdout: 2 x the finalists.
-    tests = 2 * len(names) if args.open_holdout else TESTS
+    # Development: 2 pass metrics x 5 candidates. Holdout: 2 x the finalists. E1-E3 are
+    # one family, so both are multiplied by the 3 leagues.
+    tests = (2 * len(names) if args.open_holdout else TESTS) * family(league)
     level = bonferroni_level(tests)
     print(f"Ranges are {level:.2%}: Bonferroni for {tests} tests (2 pass metrics each).")
-    df = load(holdout)
+    df = load(holdout, league)
+    cov = coverage(df)
+    print(
+        "Pinnacle early+close coverage by season: "
+        + ", ".join(f"{k}: {v:.0%}" for k, v in cov.items())
+    )
     run_names = [n for n in names if n != STACK]
     last = LAST if args.open_holdout else LAST - 1
     periods = list(range(WARMUP, last + 1))
     print(f"Predicting seasons {periods[0]}-{periods[-1]} for {run_names}")
-    preds, tuning = predict_all(df, run_names, periods, holdout)
+    preds, tuning = predict_all(df, run_names, periods, holdout, goals_only=not has_xg(league))
     first = LAST if args.open_holdout else FIRST_SCORED
-    scored = (df["season_start"] >= first) & (df["season_start"] <= last)
+    priced = [k for k, v in cov.items() if v >= MIN_COVERAGE]
+    dropped = [k for k in range(first, last + 1) if k not in priced]
+    if dropped:
+        print(f"Not scored (Pinnacle coverage under {MIN_COVERAGE:.0%}): {dropped}")
+    scored = (
+        (df["season_start"] >= first)
+        & (df["season_start"] <= last)
+        & df["season_start"].isin(priced)
+    )
     stack_base = None
     if STACK in names:
         if args.open_holdout:
@@ -258,7 +312,9 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Stack base: {stack_base}")
         add_stack(df, preds, stack_base)
     res = score(df, preds, scored, level)
-    label = "HOLDOUT 2025/26" if args.open_holdout else "DEVELOPMENT 2017/18-2024/25"
+    label = f"{league} " + (
+        "HOLDOUT 2025/26" if args.open_holdout else "DEVELOPMENT 2017/18-2024/25"
+    )
     print(f"\n== {label}: 1X2 at Pinnacle's early price (12% edge, 1 unit) ==")
     print(table(res).to_string(index=False))
     for name, r in res.items():
@@ -270,7 +326,10 @@ def main(argv: list[str] | None = None) -> None:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         out = {
             "mode": label,
+            "league": league,
             "level": level,
+            "coverage": cov,
+            "not_scored": dropped,
             "holdout_events": holdout.events,
             "stack_base": stack_base,
             "tuning": tuning,
