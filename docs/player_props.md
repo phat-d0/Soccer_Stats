@@ -196,3 +196,147 @@ at the best price is ≤ 4 points, upper end ≤ 6). Its prior is about 15%.
 **Recommendation.** Ask the owner for **60 credits**: stage 0 plus the goalscorer pilot.
 Run it only after the goalscorer stage-1 gate passes on the next `players.yml` run. Ask for
 the 1,000-credit sample only if the pilot finds a second book or a two-sided book.
+
+## 6. Results: goalscorer probe and pilot (round 5, 2026-10-07)
+
+- **Run:** `odds-check.yml` `task=goalscorer` `cap=60`, run 37574303057, 05:02 UTC.
+- **Dry run:** run 37573676963 (`cap=0`) spent 0 and checked the pipeline first.
+
+### Credits
+
+| Call | Credits | Left after |
+| --- | --- | --- |
+| Live event list | 0 | 22,696 |
+| Live, Arsenal v Leeds United (10 Oct), 5 regions | 5 | 22,691 |
+| Live, Aston Villa v Brentford (10 Oct), 5 regions | 5 | 22,686 |
+| Pilot, Liverpool v Bournemouth, 2025-08-15 close | 10 | 22,676 |
+| Pilot, Bournemouth v Fulham, 2025-10-03 close | 10 | 22,666 |
+| Pilot, Bournemouth v Everton, 2025-12-02 close | 10 | 22,656 |
+| Pilot, Aston Villa v Brentford, 2026-02-01 close | 10 | 22,646 |
+| Pilot, West Ham v Wolves, 2026-04-10 close | 10 | 22,636 |
+| **Total** | **60 of the 60 cap** | **22,636** |
+
+### Who prices EPL anytime goalscorer
+
+**Live (3 days before the first 2026/27 matches).** 14 books price it:
+
+- espnbet, bovada, fanatics, mybookieag, rebet, williamhill_us (Caesars), betmgm (us, us2);
+- betrivers, betparx, ballybet, unibet (Kambi);
+- tab, tabtouch, pointsbetau (au).
+
+Each book covers 27–46 players a match.
+
+- **None lists a "No" price.** Every line is Yes only, so no book gives a measurable margin
+  or a fair price.
+- FanDuel and DraftKings were not among them (none of the five regions returned them).
+- 1xBet and Pinnacle were not among them either.
+
+**Pilot (history).** The ten books asked for were the first ten found live. Stage 0 found more
+than ten, so the known-books top-up didn't apply, and FanDuel was not asked for. Four books
+returned prices at the close:
+
+| Book | Matches | Players |
+| --- | --- | --- |
+| BetRivers | 5 of 5 | 91 |
+| Bovada | 3 | 84 |
+| ESPN BET | 2 | 54 |
+| MyBookie | 1 | 32 |
+
+Again, none had a No price.
+
+### Name matching
+
+- 141 of the 169 names (83%) matched the two clubs' Understat squads.
+- Most misses are full legal names, e.g. "Francisco Evanilson de Lima Barbosa", "Igor Thiago
+  Nascimento Rodrigues", "Emiliano Buendia Stati". The rest are players with no Understat
+  appearance that season.
+- `player_names.csv` overrides would fix the legal names if this market is ever traded.
+
+### Measures
+
+These are the pre-registered measures on Understat starters at the best of the four books'
+prices: 83 starters, 5 matches, ranges resampling matches.
+
+| Measure | Value |
+| --- | --- |
+| Implied chance at the best price (1 / odds) | 16.4% |
+| Scored | 10.8% |
+| **Gap** | **5.6 points (95% 2.3 to 8.8)** |
+| Back-all ROI at the best price | −48.9% (95% −68% to −27%) |
+| Starters priced by BetRivers / Bovada / ESPN BET / MyBookie | 86% / 58% / 41% / 13% |
+| Model (stage 1, lineup known), 79 starters | mean 9.6%; log loss 0.267 vs the price's 0.285 |
+| Model bets at a 12% edge | 2, both lost |
+
+- The model's lower log loss is against a price with the margin in it, so it is no evidence
+  of an edge.
+- The FanDuel price lift couldn't be measured, because FanDuel wasn't requested.
+
+### Verdict, by the rules in §5 as written: **kill**
+
+- **The kill rule fires:** "the gap is above 5 points" (5.6).
+- **The go rules don't:**
+  - the gap is not at most 3 points;
+  - there is no two-sided book.
+- The pilot-step rule (ask for the sample if a second book or a two-sided book turns up) is
+  overridden by the kill.
+
+**Caveat, stated before the run** (§4 run details): the go/kill table was written for the
+100-match sample. On 5 matches the gap's range (2.3 to 8.8) still includes values at or
+below 5. The rule is applied as written regardless.
+
+- **No 1,000-credit sample is recommended.** The owner can still choose one, knowing this
+  caveat.
+- The structural finding stands either way. Every book on the API prices goalscorer Yes
+  only, at roughly 50% more than the scoring rate (16.4% vs 10.8%). That is the same wall
+  as FanDuel's shot overs.
+
+## 7. Player shots through the lab harness (round 5, development seasons only)
+
+- **What ran:** `soccer-stats player-lab` (`odds-check.yml` `task=player-lab`, run
+  37573679173, 0 credits) on `data-log:backtest/E0_player_lines.csv.gz`.
+- **Holdout:** the 2025/26 holdout stays locked (only rows before 2025-07-01). It was not
+  reopened for shots.
+- **Same numbers locally:** the run in Actions reproduced the local run exactly.
+
+**Why the market needs de-margining.** FanDuel lists overs only, so 1 / odds carries its
+margin. The lab's rule needs a margin-free market and a fair close. Two things go wrong
+without them:
+- any calibrated model "adds information" against the raw price;
+- price drift reads as CLV.
+
+So the market's chance is FanDuel's price de-margined by a walk-forward logistic fit on
+earlier lines (`player_lab.recalibrate`), and the close is de-margined the same way. The
+raw-price numbers are kept beside them, labelled as not a valid test. On raw prices, both
+3-hour strategies would "pass" with CLV of +3.0% and +2.6%. That is an artifact: their ROI
+is −32% and −36%.
+
+| Strategy (development 2023/24–2024/25) | Lines | Log loss model / de-margined price | Blend weight c (95%) | Bets at 12% | CLV vs de-margined close (95%) | ROI (95%) | Passes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Raw model, 3 h before | 53,552 | 0.334 / 0.352 | 0.84 (0.78 to 0.89) | 817 | −37.4% (−38.5 to −35.9) | −32% (−55 to −5) | no |
+| Blend, 3 h before | 51,233 | 0.331 / 0.350 | 0.90 (0.82 to 0.96) | 286 | −37.3% (−38.8 to −34.8) | −36% (−74 to +12) | no |
+| Starters after lineups (blend) | 36,123 | 0.366 / 0.372 | 0.75 (0.62 to 0.86) | 186 | – (bet at the close) | −15% (−75 to +58) | no |
+
+**What it shows.**
+- The shot model does carry information the price lacks:
+  - it beats FanDuel's de-margined price on log loss;
+  - it earns a large blend weight.
+- But the 12% edges the rule finds are long shots (average odds about 15). There FanDuel's
+  de-margined close is far below the price's break-even, so CLV is about −37%.
+- Nothing passes, consistent with data-log's losing backtest.
+
+**Consistent with data-log.** The weekly backtest's own trades (trade rule: best line per
+player, at most 4 a match), development rows only:
+
+| Strategy | Bets | ROI | Price-move CLV |
+| --- | --- | --- | --- |
+| Raw model, 3 h before | 510 | −28.3% | +3.4% |
+| Blend, 3 h before | 189 | −35.9% | +3.5% |
+| Starters after lineups | 125 | −11.6% | – |
+
+The lab's simpler bet rule (every line at 12%, no cap) makes more bets with similar ROI.
+The backtest's "CLV" is the raw price move, the same artifact as above.
+
+**Goalscorer stage 1 on the harness.** `player_goals.walk_forward` now runs through
+`lab.harness.walk_forward` with the lab's `Holdout`. Its predictions are identical to the
+old loop (checked on simulated data, 2,874 rows). So the round-4 numbers on data-log stand,
+and the weekly run logs each opening of the holdout.
