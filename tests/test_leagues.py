@@ -19,9 +19,9 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 # ---------- the registry ----------
 
 
-def test_registry_matches_the_loaders_and_only_e0_is_live():
+def test_registry_matches_the_loaders_and_every_league_is_live():
     assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1", "E1"}
-    assert lgs.live_codes() == ["E0"]
+    assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1"]  # primary first
     for code, lg in lgs.LEAGUES.items():
         assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
         assert code in fd.LEAGUES  # football-data knows the division
@@ -57,14 +57,14 @@ def test_refresh_interval_splits_the_budget_between_live_leagues():
 
 
 def test_a_league_that_is_not_live_is_never_fetched(tmp_path, monkeypatch):
+    off = dict(lgs.LEAGUES, SP1=replace(lgs.LEAGUES["SP1"], live=False))
+    monkeypatch.setattr(feed, "LEAGUES", off)
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
     events, status = feed.fetch_odds("SP1", raw_dir=tmp_path, api_key="k", now=T)
     assert events is None and "not live" in status.error
 
 
 def test_a_live_matchday_league_fetches_only_near_a_match(tmp_path, monkeypatch):
-    on = dict(lgs.LEAGUES, SP1=replace(lgs.LEAGUES["SP1"], live=True))
-    monkeypatch.setattr(feed, "LEAGUES", on)
     calls = []
 
     class Resp:
@@ -79,6 +79,45 @@ def test_a_live_matchday_league_fetches_only_near_a_match(tmp_path, monkeypatch)
     events, status = feed.fetch_odds("SP1", raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
     assert len(calls) == 1 and "soccer_spain_la_liga" in calls[0] and events == []
     assert (tmp_path / "odds_api_SP1_draftkings.json").exists()  # its own cache file
+
+
+def _meta(tmp_path, code, fetched_at, credits):
+    path = tmp_path / f"odds_api_{code}_draftkings.json"
+    path.write_text("[]")
+    meta = {"fetched_at": fetched_at.isoformat(), "credits_left": credits, "last_cost": 2}
+    path.with_suffix(".meta.json").write_text(json.dumps(meta))
+
+
+def test_the_premier_league_keeps_its_cadence_with_six_leagues_live():
+    # Healthy balance: the even split doesn't bind; every league sits at its floor.
+    assert feed.refresh_interval_hours(22_000, 2, T, share=6) == 1.0
+    # Low balance: an even split would slow E0, so it budgets alone (publish passes 1).
+    assert feed.refresh_interval_hours(3_000, 2, T, share=6) > 1.0
+    assert feed.refresh_interval_hours(3_000, 2, T) == 1.0
+    # Matchday leagues keep a 3,000-credit reserve: they stop first.
+    reserve = feed.MATCHDAY_RESERVE_CREDITS
+    assert feed.refresh_interval_hours(2_900, 2, T, share=6, reserve=reserve) == float("inf")
+
+
+def test_a_matchday_league_pauses_below_its_reserve_on_the_freshest_balance(tmp_path, monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
+    near = [T + pd.Timedelta(hours=30)]
+    # SP1 last saw 20,000 credits a day ago; E0 saw 2,500 an hour ago (the shared key).
+    _meta(tmp_path, "SP1", T - pd.Timedelta(days=1), 20_000)
+    _meta(tmp_path, "E0", T - pd.Timedelta(hours=1), 2_500)
+    _, status = feed.fetch_odds("SP1", raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
+    assert status.refresh_hours is None and "2500 credits left" in status.error
+    assert "keeping 3000" in status.error
+    # E0 itself keeps fetching on the same balance (only the 20-credit floor applies).
+    calls = []
+
+    class Resp:
+        ok, status_code, text = True, 200, "[]"
+        headers = {"x-requests-remaining": "2498", "x-requests-last": "2"}
+
+    monkeypatch.setattr(requests, "get", lambda url, **k: calls.append(url) or Resp())
+    _, status = feed.fetch_odds("E0", raw_dir=tmp_path, api_key="k", now=T)
+    assert len(calls) == 1 and status.refresh_hours == 1.0
 
 
 # ---------- credit estimate ----------
@@ -102,8 +141,7 @@ def test_estimate_credits():
     assert one["matches"] == 1 and 16 + 4 < one["calls"] < 48
     two = feed.estimate_credits("SP1", k + [k[0] + pd.Timedelta(days=1)], start, end)
     assert one["calls"] < two["calls"] < 2 * one["calls"] + 1
-    # A league priced while its live flag is off (the estimate ignores the flag).
-    assert not lgs.get("D1").live and feed.estimate_credits("D1", k, start, end)["calls"] > 0
+    assert feed.estimate_credits("D1", k, start, end)["calls"] > 0
 
 
 # ---------- a second league through publish, the odds log and paper trades ----------
@@ -154,7 +192,7 @@ def test_league_list_and_cards(league):
     assert sp1 == {
         "code": "SP1",
         "name": "La Liga",
-        "live": False,
+        "live": True,
         "fixtures": 1,
         "odds": "football-data",
     }
@@ -162,7 +200,7 @@ def test_league_list_and_cards(league):
 
 
 def test_odds_log_writes_each_league_to_its_own_file(tmp_path):
-    # SP1 without DraftKings odds (live off) logs nothing; E0 logs as before.
+    # SP1 without DraftKings odds (none fetched yet) logs nothing; E0 logs as before.
     rows = ol.rows_from_data(_two_league_data(), NOW)
     assert {r["league"] for r in rows} == {"E0"}
     rows = ol.rows_from_data(_two_league_data({"league": "SP1", **src()}), NOW)
@@ -252,8 +290,8 @@ def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
     assert "by_league" not in ml["backtest"]["edge_threshold"]
 
 
-def test_championship_runs_goals_only_with_live_off(league, tmp_path):
-    """E1 has no Understat xG: the goals-only fit, its own cards, no odds, no trades."""
+def test_championship_runs_goals_only(league, tmp_path):
+    """E1 has no Understat xG: the goals-only fit, its own cards, live odds, no trades."""
     from soccer_stats.publish import build_data
 
     df, _ = league
@@ -275,9 +313,7 @@ def test_championship_runs_goals_only_with_live_off(league, tmp_path):
     d = build_data(df, fixtures, xg_error=None, league="E1")
     assert d["xg_weight"] == 0.0 and d["league"] == "Championship"
     assert [f["league"] for f in d["fixtures"]] == ["E1"]
-    assert not lgs.get("E1").live
-    _, status = feed.fetch_odds("E1", raw_dir=tmp_path, api_key="k")
-    assert "not live" in status.error
+    assert lgs.get("E1").live and lgs.get("E1").odds_policy == "matchday"
     assert tr.paper_threshold(None, "E1")["threshold"] is None
 
 
