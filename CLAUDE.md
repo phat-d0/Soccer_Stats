@@ -205,6 +205,50 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - The lead runs in the main (coordinating) session, as in the owner's baseball team. It reviews each PR (diff, CI on the PR, full checks), comments, and merges it on GitHub with a merge commit, so each shows as Merged in the owner's app.
 - Only the lead sets Odds API credit caps. The default cap is 0.
 
+## Lead handoff (read this first in a new lead session)
+
+The lead runs in the owner's main session ("Soccer stats prediction model"). If you are a new lead session, pick up from here.
+
+**Team sessions** (cloud sessions; message them with claude-code-remote `send_message`, check them with `get_session`):
+
+| Session title | Session id | Branch |
+| --- | --- | --- |
+| Soccer team: Moneyline | session_01SHL1YZ5knBRSduL7vurWN7 | team/moneyline |
+| Soccer team: Research lab | session_019c4cFKhKCuU6mdEtYqoUxp | team/research |
+| Soccer team: Player props | session_01C8B5tL2iAqVcZ7cYbz2bdc | team/player-props |
+| Soccer team: UI Design | session_01YUi3o1ueWm8BePMSWeB2hb | team/ui |
+
+**Process:**
+- Specialists open PRs into `claude/soccer-stats-scaffold`.
+- The lead reviews each PR (diff, CI, local checks) and merges ONLY through the GitHub API (`merge_pull_request`, method `merge`). A local merge pushed to the base shows the PR as Closed instead of Merged.
+- GitHub won't take a formal self-approval (all sessions post as the owner), so approvals go in as review comments.
+- After merging, run `players.yml` / `backfill.yml` (0-credit inputs) if backtests changed, then `publish.yml`.
+
+**Owner preferences:**
+- Plain English, no branch names in parentheses in session titles or summaries.
+- Session titles follow "Soccer team: <Role>", like the baseball team.
+- One shared Odds API key on the 100K plan: the owner decided against two keys on cost. Baseball usage is small in its post-season, which ends late October.
+- Credit caps are 0 unless the owner approves a spend.
+
+**Round 7 (8 Oct, in progress when this was written):**
+- **PR #14, Moneyline:** multi-league pipeline — La Liga SP1, Bundesliga D1, Serie A I1, Ligue 1 F1, Championship E1 (goals-only, no Understat xG). Live odds are off for all but E0. Per-league paper thresholds (`trades.paper_threshold(<code>_dk.json, code)`, `portfolio.rules[code]`, `edge_threshold.by_league`). Credit estimates are in `docs/leagues.md`: about 4,050 credits/month for all six leagues live, E1 alone about 396.
+- **PR #15, UI:** competition filter (hidden with one league; one Moneyline portfolio with a filter, the owner's choice). It reads `data.leagues` and `portfolio.rules[code]`. #14 and #15 merge in either order; regenerate the web fixture if its JSON conflicts.
+- **Research lab, PR pending:** pre-registered 1X2 bake-off on SP1/D1/I1/F1 with Understat xG, plus per-league learned minimum edges incl. E1.
+- Merge order: moneyline, research, UI. A lead check-in trigger is set (`trig_01BkJiY1wXCWQhZ8kk3b7LmK`, 8 Oct 21:50 UTC).
+- After merging, report to the owner the four-league results and the per-league live credit costs. The owner decides league by league whether to switch live odds on; nothing goes live without approval.
+
+**Scheduled checks** (send_later into the lead session):
+- 16 Nov 2026 (`trig_01N4zsU1KdvQ66W9MZhGBDeK`): late team news vs the DraftKings odds log (Research lab; needs ≥100 logged matches, else re-arm two weeks).
+- 7 Dec 2026 (`trig_01KakNWotv6GkGQUqhjTvtbT`): the goalscorer forward check on 2026/27 from 10 Oct, once ≥150 matches (Player props).
+
+**Open threads:**
+- **Player shots:** on 8 Oct the owner asked whether to keep expanding or drop it. The lead recommended parking it: keep the free display and the weekly model, no new spend, a ≤20-credit bookmaker re-check every few months for any book offering unders. Await the owner's answer before starting any player-shots work. Owner ideas on the table: possession and opponent-defence features (free), own xG from shot coordinates (low value), tracking data (not feasible). Bet365 isn't on The Odds API as far as we found.
+- **The three European cups** (Champions, Europa and Conference League): phase 2, a costed plan for the owner after the top-4 results. No free historical prices; needs cross-league ratings.
+- **Housekeeping:**
+  - add a step-level time limit to the Playwright install in `ci.yml` (it hung twice);
+  - make the paper CLI log print the rule used;
+  - drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading `player_model`.
+
 ## Conventions
 
 - Run checks before every push: `uv run ruff format src tests && uv run ruff check src tests && uv run pytest -q`. All must pass (CI runs the same). Use `.venv/bin/pytest` if `uv` isn't on the path. JS: `node --check web/app.js`, and after web changes `node tests/web/smoke.mjs` (regenerate the fixture first if `data.json`'s shape changed).
