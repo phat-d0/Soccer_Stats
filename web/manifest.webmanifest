@@ -1,7 +1,7 @@
 {
-  "name": "Premier League Model",
-  "short_name": "PL Model",
-  "description": "Premier League match predictions and value bets",
+  "name": "Soccer Model",
+  "short_name": "Soccer Model",
+  "description": "Soccer match predictions and value bets across several leagues",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
