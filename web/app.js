@@ -394,6 +394,10 @@ const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Lig
 const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
 const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
 const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
+// Understat's xG covers these; elsewhere (the Championship) the model runs on goals only,
+// so a card's expected goals aren't labelled "xG".
+const XG_LEAGUES = new Set(["E0", "SP1", "D1", "I1", "F1"]);
+const xgLabel = (fx) => (XG_LEAGUES.has(fxLeague(fx)) ? "xG" : "exp. goals");
 const tLeague = (t) => t.league || "E0";
 // Competitions in the data: fixtures plus Moneyline's trades, in LEAGUES order.
 function leaguesPresent() {
@@ -576,8 +580,8 @@ function viewMatches() {
         <button class="card match" data-fixture="${idx}">
           <div class="match-head"><span>${esc(time)}${!lg && multiLeague() ? ` · ${esc(leagueName(fxLeague(fx)))}` : ""}</span><span>Details ›</span></div>
           <div class="teams">
-            <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} xG</span>
-            <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} xG</span>
+            <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} ${xgLabel(fx)}</span>
+            <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} ${xgLabel(fx)}</span>
           </div>
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
