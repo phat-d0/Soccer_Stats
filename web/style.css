@@ -595,3 +595,9 @@ details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; 
 .eb-axis .eb-plot { height: 14px; }
 .eb-axis .eb-plot span { position: absolute; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .eb-readout { min-height: 36px; font-size: 13px; color: var(--text-secondary); padding: 8px 0 2px; border-top: 0.5px solid var(--border); margin-top: 6px; }
+
+/* Competition filter: All + one chip per league in the data (hidden with one league) */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 0.5px solid var(--border); background: var(--surface-2); color: var(--text-secondary); cursor: pointer; }
+.chip.on { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-2); font-weight: 600; }
+.pf-head + .chips, .segmented + .chips { margin-top: 10px; }

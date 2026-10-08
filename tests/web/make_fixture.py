@@ -330,6 +330,15 @@ def build(src: Path, out: Path) -> dict:
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
     add_edge_thresholds(data)
+    add_second_league(data)
+    # The app never reads each player strategy's compact trade rows (Record → Player shots
+    # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
+    for st in (
+        ((data["portfolio"].get("player_model") or {}).get("priced") or {})
+        .get("strategies", {})
+        .values()
+    ):
+        st.pop("trades", None)
 
     sample = sample_detail(detail, data["fixtures"])
     stats = stats_from_detail(sample)
@@ -567,6 +576,110 @@ def add_edge_thresholds(data: dict) -> None:
         for key, value in SYNTHETIC_EDGE.get(p["id"], {}).items():
             if bt.get(key) is None:  # the real field wins once data-log carries it
                 bt[key] = value
+
+
+# A second competition (La Liga, SP1), until the multi-league pipeline's data reaches the
+# fixture: two upcoming SP1 matches without odds (live odds are Premier League only), a few
+# settled SP1 Moneyline trades, live and backtest, and a per-league minimum edge, so the
+# app's competition filter, per-league summaries and per-league edge panel are all tested.
+SP1_TEAMS = [("Real Madrid", "Sevilla"), ("Barcelona", "Valencia")]
+SP1_TRADES = [
+    # live?, home, away, kickoff, market, odds, won
+    (True, "Real Madrid", "Getafe", "2026-09-28T19:00:00Z", "draw", 5.0, False),
+    (True, "Villarreal", "Betis", "2026-09-21T14:15:00Z", "away", 3.2, True),
+    (False, "Barcelona", "Girona", "2026-03-15T20:00:00Z", "home", 1.6, True),
+    (False, "Atletico Madrid", "Osasuna", "2026-02-08T15:15:00Z", "away", 7.0, False),
+    (False, "Sevilla", "Celta Vigo", "2026-01-18T17:30:00Z", "draw", 3.6, False),
+]
+SP1_EDGE = {
+    "min_edge": 0.06,
+    "confidence": 0.95,
+    "method": "synthetic fixture values (walk-forward edge buckets)",
+    "n_bets": 512,
+    "seasons": {"development": ["2324", "2425"], "check": ["2526"]},
+    "note": "Synthetic numbers for the app's tests.",
+    "by_bucket": [],
+}
+
+
+def add_second_league(data: dict) -> None:
+    for fx in data["fixtures"]:
+        fx.setdefault("league", "E0")
+    base = data["fixtures"][: len(SP1_TEAMS)]
+    for fx, (home, away) in zip(base, SP1_TEAMS, strict=True):
+        sp = {
+            **fx,
+            "league": "SP1",
+            "home": home,
+            "away": away,
+            "kickoff": (pd.Timestamp(fx["kickoff"]) + pd.Timedelta(hours=4)).isoformat(),
+            "odds": None,
+            "implied": None,
+            "p_bet": None,
+            "odds_updated": None,
+            "news": None,
+            "news_applied": False,
+            "players": [],
+        }
+        data["fixtures"].append(sp)
+    data["fixtures"].sort(key=lambda f: f["kickoff"])
+
+    pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
+    ml = pfs["moneyline"]
+    template = next(t for t in ml["live"]["trades"] if t.get("bet_type", "match") == "match")
+    live_trades = [t for p in pfs.values() for t in p["live"]["trades"]]
+    backtests = {pid: p["backtest"] for pid, p in pfs.items()}
+    for t in live_trades + (backtests["moneyline"] or {}).get("trades", []):
+        t.setdefault("league", "E0")
+    bt_trades = []
+    for live, home, away, ko, market, odds, won in SP1_TRADES:
+        kick = pd.Timestamp(ko)
+        t = {
+            **template,
+            "id": f"SP1|2627|{home}|{away}",
+            "league": "SP1",
+            "source": "live" if live else "backtest",
+            "season": tr.season_label(kick),
+            "kickoff": kick.isoformat(),
+            "opened_at": (kick - pd.Timedelta(hours=30)).isoformat(),
+            "home": home,
+            "away": away,
+            "market": market,
+            "odds": odds,
+            "status": "won" if won else "lost",
+            "profit": round(10 * (odds - 1), 2) if won else -10.0,
+            "score": "1-1" if market == "draw" and won else None,
+            "close_odds": None,
+            "close_fetched_at": None,
+            "close_minutes_before": None,
+            "clv_dk": None,
+            "beat_close_dk": None,
+            "settled_at": (kick + pd.Timedelta(hours=3)).isoformat(),
+        }
+        (live_trades if live else bt_trades).append(t)
+    if backtests["moneyline"] is not None:
+        bt = backtests["moneyline"]
+        bt["trades"] = sorted(bt.get("trades", []) + bt_trades, key=lambda t: t["kickoff"])
+    # Moneyline's multi-league contract: the leagues in this build, and a minimum per league.
+    data["leagues"] = [
+        {"code": "E0", "name": "Premier League", "live": True, "fixtures": 0, "odds": "DraftKings"},
+        {"code": "SP1", "name": "La Liga", "live": False, "fixtures": 0, "odds": None},
+    ]
+    for lg in data["leagues"]:
+        lg["fixtures"] = sum(f["league"] == lg["code"] for f in data["fixtures"])
+    r = data["portfolio"].get("rule") or {}
+    data["portfolio"]["rules"] = {
+        "E0": {
+            "threshold": r.get("threshold"),
+            "source": r.get("threshold_source"),
+            "note": r.get("threshold_note"),
+        },
+        "SP1": {"threshold": SP1_EDGE["min_edge"], "source": "history", "note": SP1_EDGE["note"]},
+    }
+    live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
+    data["portfolio"]["portfolios"] = paper.portfolios_section(
+        live, live_trades, backtests, ml["live"].get("rule")
+    )
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -129,3 +129,22 @@ def test_run_fills_portfolios(tmp_path):
     missing = {"fixtures": [], "portfolio": {}}
     paper.run(missing, tmp_path / "nope", None, now=NOW)
     assert all(p["live"]["error"] for p in missing["portfolio"]["portfolios"])
+
+
+def test_by_league_splits_summaries_and_adds_up():
+    trades = [
+        trade(1),
+        trade(2, profit=-10.0, status="lost", league="SP1"),
+        trade(3, league="SP1"),
+        trade(4, profit=-10.0, status="lost"),  # no league: counts as E0
+    ]
+    pfs = paper.portfolios_section({}, trades, {"moneyline": {"summary": {}, "trades": trades}})
+    ml = next(p for p in pfs if p["id"] == "moneyline")
+    lg = ml["live"]["by_league"]
+    assert set(lg) == {"E0", "SP1"} and "trades" not in lg["SP1"]
+    assert lg["E0"]["summary"]["trades"] + lg["SP1"]["summary"]["trades"] == 4
+    assert lg["E0"]["summary"]["profit"] + lg["SP1"]["summary"]["profit"] == pytest.approx(
+        ml["live"]["summary"]["profit"]
+    )
+    assert set(ml["backtest"]["by_league"]) == {"E0", "SP1"}  # passed-through file too
+    assert paper.by_league([trade(1), trade(2)]) is None  # one league: no split

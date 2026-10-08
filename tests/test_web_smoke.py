@@ -33,7 +33,12 @@ def test_fixture_is_complete():
     ml = pfs["moneyline"]["backtest"]
     assert ml["edge_threshold"]["min_edge"] is None and ml["edge_threshold"]["by_bucket"] == []
     assert ml["edge_threshold_pinnacle"]["by_bucket"]  # the chart's fallback pool
-    assert pfs["player_shots"]["backtest"]["edge_threshold"]["min_edge"] is not None
+    assert pfs["player_shots"]["backtest"]["edge_threshold"]  # real since PR #9 (null level)
+    # A recommended level (synthetic) and a second competition for the filter
+    assert pf["rules"]["SP1"]["threshold"] is not None
+    assert [lg["code"] for lg in data["leagues"]] == ["E0", "SP1"]
+    assert {f["league"] for f in data["fixtures"]} == {"E0", "SP1"}
+    assert set(pfs["moneyline"]["live"]["by_league"]) == {"E0", "SP1"}
     size = sum(p.stat().st_size for p in FIXTURE.glob("*.json"))
     assert size < 1_000_000  # keep the committed fixture small
 

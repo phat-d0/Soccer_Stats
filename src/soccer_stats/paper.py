@@ -450,6 +450,22 @@ def portfolio_section(trades: list[dict]) -> dict:
     }
 
 
+def by_league(trades: list[dict]) -> dict | None:
+    """Summary and breakdowns per competition (each trade's football-data `league`, E0 when
+    missing), for the app's competition filter; None with one league or none. No trade lists:
+    the app filters the section's own trades."""
+    groups: dict[str, list[dict]] = {}
+    for t in trades:
+        groups.setdefault(t.get("league") or "E0", []).append(t)
+    if len(groups) < 2:
+        return None
+    out = {}
+    for lg, sub in sorted(groups.items()):
+        sec = portfolio_section(sub)
+        out[lg] = {"summary": sec["summary"], "breakdowns": sec["breakdowns"]}
+    return out
+
+
 def portfolios_section(
     live: dict,
     live_trades: list[dict],
@@ -476,7 +492,11 @@ def portfolios_section(
                 "edge_threshold": bt.get("edge_threshold"),  # research lab: minimum edge
                 **portfolio_section(trades),
             }
+        if bt is not None and (lg := by_league(bt.get("trades") or [])):
+            bt = {**bt, "by_league": lg}
         section = {**portfolio_section(mine), "error": live.get("error"), "note": live.get("note")}
+        if lg := by_league(mine):
+            section["by_league"] = lg
         if p["id"] == "moneyline" and match_rule is not None:
             section["rule"] = match_rule
             section["note"] = live.get("note") or match_rule.get("note")

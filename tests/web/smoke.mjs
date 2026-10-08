@@ -63,6 +63,9 @@ const STEPS = [
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
   ["matches-edge-2", async (p) => { await closeSheet(p); await p.click("details.edge-explore > summary"); await p.click('button[data-edge="0.02"]'); }],
   ["matches-edge-reset", click('button[data-edge="reset"]')],
+  // The competition filter (shown because the fixture has a second league, SP1).
+  ["matches-league-sp1", click('.chip[data-league="SP1"]')],
+  ["matches-league-all", click('.chip[data-league=""]')],
   ["teams", tab("ratings")],
   ["players-stats", async (p) => { await p.click('button[data-tv="players"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-stats-club", async (p) => { await p.selectOption("#pl-team", { index: 1 }); }],
@@ -74,11 +77,16 @@ const STEPS = [
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
   ["record-match-bucket", click('.eb-row[data-ebrow="0"]')],
   ["record-match-raw", click('button[data-recdk="raw"]')],
+  ["record-match-sp1", click('.chip[data-league="SP1"]')],
+  ["record-match-all", click('.chip[data-league=""]')],
   ["record-player", click('button[data-recbet="player"]')],
   ["record-player-blend_3h", click('button[data-recstrat="blend_3h"]')],
   ["record-player-raw_3h", click('button[data-recstrat="raw_3h"]')],
   ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-live", async (p) => { await closeSheet(p); await tab("portfolio")(p); }],
+  ["portfolio-live-sp1", click('.chip[data-league="SP1"]')],
+  ["portfolio-backtest-sp1", click('button[data-pf="backtest"]')],
+  ["portfolio-live-all", async (p) => { await p.click('button[data-pf="live"]'); await p.click('.chip[data-league=""]'); }],
   // A settled live match trade whose close was taken early (approximate CLV; fixture data).
   ["portfolio-live-close-sheet", async (p) => { await p.click('button[data-trade="E0|2627|Spurs|Brentford"]'); await sheet(p); }, true],
   ["portfolio-live-trade", async (p) => { await closeSheet(p); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],

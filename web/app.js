@@ -12,6 +12,7 @@ const store = {
 const state = {
   data: null,
   tab: "matches", // the app always opens on upcoming fixtures
+  league: store.get("league", ""), // competition filter (football-data code), "" = all
   exploreEdge: null, // a step picked under "Explore other edges"; null = the recommended edge
   pfView: "live", // Portfolio: "live" paper trades or "backtest"
   pfMarket: "",
@@ -307,7 +308,7 @@ function detailHtml(fx) {
     : blend
       ? `Model = the model alone. Blend = the model mixed with ${bookPoss()} price, the chance value picks use. ${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = blend × payout − 1.`
       : `${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1.`;
-  const pick = hasOdds ? bestPick(fx, matchEdge()) : null;
+  const pick = hasOdds ? bestPick(fx, fxEdge(fx)) : null;
   return `
     <div class="detail">
       <p class="muted" style="margin:0;font-size:13px">${esc(when)}</p>
@@ -324,7 +325,7 @@ function detailHtml(fx) {
         </table>
       </div>
       <p class="note">${marketNote}</p>
-      ${hasOdds && matchEdge() == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline")}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
+      ${hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
       ${playersSection(fx)}
       <div class="section-title">Scorelines</div>
       <div class="card">
@@ -388,19 +389,65 @@ function closeSheet() {
   document.body.style.overflow = "";
 }
 
+// ---------- competitions (football-data league codes) ----------
+const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"]];
+const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
+const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
+const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
+// Understat's xG covers these; elsewhere (the Championship) the model runs on goals only,
+// so a card's expected goals aren't labelled "xG".
+const XG_LEAGUES = new Set(["E0", "SP1", "D1", "I1", "F1"]);
+const xgLabel = (fx) => (XG_LEAGUES.has(fxLeague(fx)) ? "xG" : "exp. goals");
+const tLeague = (t) => t.league || "E0";
+// Competitions in the data: fixtures plus Moneyline's trades, in LEAGUES order.
+function leaguesPresent() {
+  const ml = pfById("moneyline");
+  const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || [])].map(tLeague)]);
+  const order = LEAGUES.map(([k]) => k);
+  return [...codes].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) || a.localeCompare(b));
+}
+const multiLeague = () => leaguesPresent().length > 1;
+// The selected competition, "" for all (or when only one competition is in the data).
+const leagueOn = () => (multiLeague() && leaguesPresent().includes(state.league) ? state.league : "");
+// All + one chip per competition; nothing at all with a single competition.
+function leagueFilter() {
+  if (!multiLeague()) return "";
+  const cur = leagueOn();
+  const chip = (code, label) => `<button class="chip${cur === code ? " on" : ""}" data-league="${esc(code)}" aria-pressed="${cur === code}">${esc(label)}</button>`;
+  return `<div class="chips" role="group" aria-label="Competition">${chip("", "All")}${leaguesPresent().map((c) => chip(c, leagueShort(c))).join("")}</div>`;
+}
+// With "All" and per-league levels: one short line per competition.
+function leagueEdgeList(pfId, lg) {
+  const by = pfById(pfId)?.backtest?.edge_threshold?.by_league || {};
+  const rules = pfId === "moneyline" ? state.data.portfolio?.rules || {} : {};
+  if (lg || !multiLeague() || (!Object.keys(by).length && !Object.keys(rules).length)) return "";
+  const items = leaguesPresent().filter((c) => by[c] || rules[c]).map((c) => { const e = edgeInfo(pfId, c); return `${esc(leagueShort(c))}: ${e?.min_edge == null ? "nothing flagged" : `${pct(e.min_edge)}+`}`; });
+  return items.length ? `<div class="meta">By competition: ${items.join(" · ")}.</div>` : "";
+}
+
 // ---------- minimum edge, learned from past bets ----------
 // edge_threshold from a portfolio's backtest (research lab): min_edge (null = no edge level
 // beat the market), confidence, method, n_bets, seasons, note, by_bucket. Missing = older data.
-const edgeInfo = (pfId) => pfById(pfId)?.backtest?.edge_threshold || null;
+// With a league, that league's own level (edge_threshold.by_league[code]) when it has one.
+// Moneyline also has portfolio.rules[code] ({threshold, source, note}; source "none" = no
+// learned level) for leagues without their own edge_threshold.
+function edgeInfo(pfId, lg = "") {
+  const et = pfById(pfId)?.backtest?.edge_threshold || null;
+  if (lg && et?.by_league?.[lg]) return et.by_league[lg];
+  const r = pfId === "moneyline" && lg && lg !== "E0" ? state.data.portfolio?.rules?.[lg] : null;
+  if (r) return { min_edge: r.source === "none" ? null : r.threshold ?? null, note: r.note || "", by_bucket: [] };
+  return et;
+}
 // The minimum edge in force for a portfolio: an explored step, else history's level,
 // else (no edge_threshold yet) the paper-trade rule. edge null = flag nothing.
-function edgeRule(pfId) {
+function edgeRule(pfId, lg = "") {
   if (state.exploreEdge != null) return { edge: state.exploreEdge, source: "explore" };
-  const et = edgeInfo(pfId);
+  const et = edgeInfo(pfId, lg);
   if (!et) return { edge: PAPER_EDGE, source: "default" };
   return { edge: et.min_edge ?? null, source: "history" };
 }
-const matchEdge = () => edgeRule("moneyline").edge;
+const matchEdge = (lg = leagueOn()) => edgeRule("moneyline", lg).edge;
+const fxEdge = (fx) => edgeRule("moneyline", fxLeague(fx)).edge; // each match by its own league
 const playerEdge = () => edgeRule("player_shots").edge;
 // "a 12%" but "an 8%" / "an 11%" / "an 18%".
 const aPct = (x) => { const t = pct(x); return `${/^(8|11|18)/.test(t) ? "an" : "a"} ${t}`; };
@@ -417,16 +464,16 @@ function seasonsText(v) {
 }
 const confText = (c) => (c == null ? "" : typeof c === "number" ? `${pct(c)} confidence` : `${c} confidence`);
 // Why there is no pick, in one sentence (Matches note, match sheet).
-function noEdgeText(pfId) {
-  const et = edgeInfo(pfId);
+function noEdgeText(pfId, lg = "") {
+  const et = edgeInfo(pfId, lg);
   return `Nothing is flagged. ${et?.note ? esc(et.note) : "No edge level has beaten the market in past bets."}`;
 }
 
 // The recommendation, in plain English, with the old edge buttons folded away under
 // "Explore other edges" (they override the recommendation until reset).
-function edgePanel(pfId = "moneyline") {
-  const et = edgeInfo(pfId);
-  const rule = edgeRule(pfId);
+function edgePanel(pfId = "moneyline", lg = "") {
+  const et = edgeInfo(pfId, lg);
+  const rule = edgeRule(pfId, lg);
   const basis = et ? [et.n_bets ? `${et.n_bets.toLocaleString()} past bets` : "", esc(seasonsText(et.seasons)), confText(et.confidence)].filter(Boolean).join(" · ") : "";
   const rec = !et
     ? `Flagging bets with at least ${aPct(PAPER_EDGE)} edge, the paper-trade rule. A level learned from past bets appears here once the backtest has one.`
@@ -436,7 +483,7 @@ function edgePanel(pfId = "moneyline") {
   const exploring = rule.source === "explore";
   return `
     <div class="edge-panel">
-      <div class="edge-rec">${rec}${basis ? `<div class="meta">Based on ${basis}.</div>` : ""}</div>
+      <div class="edge-rec">${rec}${basis ? `<div class="meta">Based on ${basis}.</div>` : ""}${leagueEdgeList(pfId, lg)}</div>
       ${exploring ? `<div class="edge-exploring">Exploring: flagging ${pct(state.exploreEdge)}+ instead. <button class="linkish" data-edge="reset">Back to the recommended level</button></div>` : ""}
       <details class="fold edge-explore"${exploring ? " open" : ""}>
         <summary>Explore other edges</summary>
@@ -451,10 +498,11 @@ function edgePanel(pfId = "moneyline") {
 // What the chart draws: the portfolio's own edge_threshold buckets, else (too few bets
 // there, by_bucket empty) a bigger pool from the same backtest, with a caption.
 const hasBuckets = (et) => (et?.by_bucket || []).some((r) => r.n);
-function edgeChartSource(pfId) {
+function edgeChartSource(pfId, lg = "") {
   const bt = pfById(pfId)?.backtest || {};
-  const et = edgeInfo(pfId);
+  const et = edgeInfo(pfId, lg);
   if (hasBuckets(et)) return { et, caption: "" };
+  if (lg && lg !== "E0") return null; // the fallback pools below are the Premier League's
   if (hasBuckets(bt.edge_threshold_pinnacle)) return { et: bt.edge_threshold_pinnacle, caption: "Too few bets of its own yet, so this shows the model alone (not the live blend) against Pinnacle's early price, over more matches (football-data)." };
   const raw = bt.strategies?.raw?.edge_threshold;
   if (hasBuckets(raw)) return { et: raw, caption: "Too few bets of its own yet, so this shows the model alone (not the live blend) at DraftKings' prices." };
@@ -463,8 +511,8 @@ function edgeChartSource(pfId) {
 
 // Claimed edge vs what happened: per edge bucket, the book's implied chance, the model's
 // chance and the realized win rate with its range. A dot plot; tap a row for the readout.
-function edgeBucketsHtml(pfId) {
-  const src = edgeChartSource(pfId);
+function edgeBucketsHtml(pfId, lg = "") {
+  const src = edgeChartSource(pfId, lg);
   if (!src) return "";
   const et = src.et;
   const rows = et.by_bucket.filter((r) => r.n);
@@ -510,27 +558,30 @@ function viewMatches() {
   if (!d.fixtures.length) {
     return `<div class="empty">No upcoming fixtures found.<br>Try the Explore tab.</div>`;
   }
+  const lg = leagueOn();
+  const shown = d.fixtures.map((fx, idx) => [fx, idx]).filter(([fx]) => !lg || fxLeague(fx) === lg);
   const byDay = new Map();
-  d.fixtures.forEach((fx, idx) => {
+  shown.forEach(([fx, idx]) => {
     const day = new Date(fx.kickoff).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day).push([fx, idx]);
   });
-  const minE = matchEdge();
-  const nValue = d.fixtures.filter((fx) => bestPick(fx, minE)).length;
+  const minE = matchEdge(lg);
+  const nValue = shown.filter(([fx]) => bestPick(fx, fxEdge(fx))).length;
+  const allNull = shown.every(([fx]) => fxEdge(fx) == null);
   const openTrades = new Map((pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
-  let html = `<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${nValue ? `<b>${nValue}</b> of ${d.fixtures.length} matches have a value bet at ${pct(minE)}+ edge.` : minE == null ? noEdgeText("moneyline") : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
+  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches: live odds cover the Premier League only, so there are no value bets here.` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
-      const pick = bestPick(fx, minE);
+      const pick = bestPick(fx, fxEdge(fx));
       const time = new Date(fx.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
       html += `
         <button class="card match" data-fixture="${idx}">
-          <div class="match-head"><span>${esc(time)}</span><span>Details ›</span></div>
+          <div class="match-head"><span>${esc(time)}${!lg && multiLeague() ? ` · ${esc(leagueName(fxLeague(fx)))}` : ""}</span><span>Details ›</span></div>
           <div class="teams">
-            <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} xG</span>
-            <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} xG</span>
+            <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} ${xgLabel(fx)}</span>
+            <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} ${xgLabel(fx)}</span>
           </div>
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
@@ -540,7 +591,7 @@ function viewMatches() {
         </button>`;
     }
   }
-  const pp = d.fixtures.flatMap((fx, idx) => playerPicks(fx, playerEdge()).map((x) => ({ ...x, fx, idx })));
+  const pp = shown.flatMap(([fx, idx]) => playerPicks(fx, playerEdge()).map((x) => ({ ...x, fx, idx })));
   if (pp.length) {
     html += `<div class="section-title">Player picks</div><div class="card">${pp.map((x) => `
       <button class="bet-row trade" data-fixture="${x.idx}">
@@ -552,7 +603,7 @@ function viewMatches() {
     <div class="section-title">How to read this</div>
     <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.${d.match_blend?.live ? " The value check uses the model blended with DraftKings' price, weighted by how much the model added in past matches." : ""}</p>
     <div class="section-title">Minimum edge</div>
-    ${edgePanel("moneyline")}`;
+    ${edgePanel("moneyline", lg)}`;
   return html;
 }
 
@@ -1229,11 +1280,23 @@ function recordDkHtml() {
     <div class="section-title" style="margin-top:22px">Longer replay at Pinnacle odds</div>`;
 }
 
+// The DraftKings strategy comparison and the Pinnacle replay (data.record) are Premier
+// League numbers; another competition's backtest bets are listed in Portfolio → Backtest.
 function recordMatchHtml() {
   const d = state.data;
+  const lg = leagueOn();
+  const edgeTop = `
+    ${leagueFilter()}
+    <div class="section-title" style="margin-top:4px">Minimum edge${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>
+    ${edgePanel("moneyline", lg)}
+    ${edgeBucketsHtml("moneyline", lg)}`;
+  if (lg && lg !== "E0") {
+    const n = (pfById("moneyline")?.backtest?.trades || []).filter((t) => tLeague(t) === lg).length;
+    return `${edgeTop}<p class="note">The DraftKings strategy comparison and the week-by-week model replay cover the Premier League only: choose Premier or All to see them.${n ? ` ${esc(leagueName(lg))}'s ${n} backtest bet${n > 1 ? "s are" : " is"} in Portfolio → Backtest.` : ""}</p>`;
+  }
   const rec = d.record.model;
-  if (!rec || !rec.matches) return '<div class="empty">Not enough data to replay yet.</div>';
-  const replayEdge = matchEdge() ?? PAPER_EDGE; // no recommended level: replay the paper rule
+  if (!rec || !rec.matches) return `${edgeTop}<div class="empty">Not enough data to replay yet.</div>`;
+  const replayEdge = matchEdge("E0") ?? PAPER_EDGE; // no recommended level: replay the paper rule
   const s = summarize(rec.bets, replayEdge);
   const gap = rec.log_loss - rec.market_log_loss;
   const since = new Date(d.record_start).toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -1261,12 +1324,10 @@ function recordMatchHtml() {
     </div>`).join("");
 
   return `
-    <div class="section-title" style="margin-top:4px">Minimum edge</div>
-    ${edgePanel("moneyline")}
-    ${edgeBucketsHtml("moneyline")}
+    ${edgeTop}
     ${recordDkHtml()}
     <p class="note">The model replayed week by week since ${esc(since)}, using only data it would have had before each match. 1-unit bets at the historical opening odds in football-data's files (mostly Pinnacle)${isDK() ? "; past DraftKings prices aren't available, so DraftKings' bigger margin would make real results somewhat worse" : ""}.</p>
-    <p class="note">Replayed at ${pct(replayEdge)}+ edge${matchEdge() == null ? ", the paper-trade rule, since no level is recommended" : ""}.</p>
+    <p class="note">${multiLeague() ? "Premier League matches, r" : "R"}eplayed at ${pct(replayEdge)}+ edge${matchEdge("E0") == null ? ", the paper-trade rule, since no level is recommended" : ""}.</p>
     <div class="tiles" style="margin-top:12px">
       <div class="tile"><div class="label">Profit</div><div class="value">${signed(s.profit)}</div><div class="sub">units from ${s.n} bets</div></div>
       <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">ROI</div></div>
@@ -1496,6 +1557,15 @@ function pfBreakdowns(b) {
     </details>`;
 }
 
+// A section narrowed to one competition: its trades, and its summary and breakdowns from
+// by_league (or, without one, a count only: older data is Premier League only).
+function leagueSet(set, lg) {
+  const trades = (set.trades || []).filter((t) => tLeague(t) === lg);
+  const part = set.by_league?.[lg];
+  const fallback = trades.length === (set.trades || []).length ? { summary: set.summary, breakdowns: set.breakdowns } : { summary: { trades: trades.length }, breakdowns: {} };
+  return { ...set, trades, ...(part || fallback) };
+}
+
 function viewPortfolio() {
   const pf = state.data.portfolio || {};
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
@@ -1518,8 +1588,11 @@ function viewPortfolio() {
     <div class="segmented small-seg" role="group" aria-label="Which trades">
       ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
     </div>`;
-  const set = pfSet();
-  const top = `${switcher}${head}${toggle}`;
+  const fullSet = pfSet();
+  // Moneyline: one portfolio, filtered by competition (by_league summaries from paper.py).
+  const lg = cur.id === "moneyline" ? leagueOn() : "";
+  const set = fullSet && lg ? leagueSet(fullSet, lg) : fullSet;
+  const top = `${switcher}${head}${cur.id === "moneyline" ? leagueFilter() : ""}${toggle}`;
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = state.pfView === "live" && cur.status === "live"
     ? (rule.threshold == null ? "" : `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.</p>`) : "";
@@ -1555,7 +1628,7 @@ function viewPortfolio() {
     ${impliedVsRealizedHtml(trades)}
     ${pfSettled(trades)}
     ${pfBreakdowns(set.breakdowns || {})}
-    ${state.pfView === "backtest" ? edgeBucketsHtml(cur.id) + pfBacktestExtras(set) : ""}
+    ${state.pfView === "backtest" ? edgeBucketsHtml(cur.id, lg) + pfBacktestExtras(set) : ""}
     ${retiredLinks}
     ${foot}`;
 }
@@ -1724,7 +1797,7 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.ebrow !== undefined) {
     const el = document.getElementById(`eb-readout-${t.dataset.eb}`);
-    const src = edgeChartSource(t.dataset.eb);
+    const src = edgeChartSource(t.dataset.eb, t.dataset.eb === "moneyline" ? leagueOn() : "");
     if (el && src) el.innerHTML = ebReadout(src.et, Number(t.dataset.ebrow));
     t.parentElement.querySelectorAll(".eb-row").forEach((r) => r.classList.toggle("sel", r === t));
   } else if (t.dataset.recdk) {
@@ -1732,6 +1805,10 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.recstrat) {
     state.recStrat = t.dataset.recstrat;
+    render();
+  } else if (t.dataset.league !== undefined) {
+    state.league = t.dataset.league; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    store.set("league", state.league);
     render();
   } else if (t.dataset.pfid) {
     state.pfId = t.dataset.pfid; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
