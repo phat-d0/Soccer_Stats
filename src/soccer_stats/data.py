@@ -151,6 +151,24 @@ def _extract(raw: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(cols, index=raw.index)
 
 
+def season_kickoffs(league: str, start_year: int, raw_dir: Path = RAW_DIR) -> pd.Series:
+    """Kickoff times (UTC) of a season's played matches from its football-data file.
+
+    For leagues without an Understat schedule (the Championship): football-data's Time
+    column is UK local time; matches without one count as 15:00.
+    """
+    raw = pd.read_csv(download(league, start_year, raw_dir=raw_dir), encoding="latin-1")
+    raw = raw.dropna(subset=["Date"])
+    times = raw["Time"].fillna("15:00") if "Time" in raw else pd.Series("15:00", index=raw.index)
+    local = pd.to_datetime(raw["Date"] + " " + times, dayfirst=True, format="mixed")
+    return (
+        local.dt.tz_localize("Europe/London", ambiguous="NaT", nonexistent="shift_forward")
+        .dt.tz_convert("UTC")
+        .dropna()
+        .reset_index(drop=True)
+    )
+
+
 def load_fixtures(
     leagues: Iterable[str], raw_dir: Path = RAW_DIR, max_age_hours: float = 6
 ) -> pd.DataFrame:

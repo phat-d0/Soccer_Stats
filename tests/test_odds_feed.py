@@ -143,7 +143,7 @@ def test_with_draftkings_adds_unscheduled_matches(tmp_path, monkeypatch):
     monkeypatch.setattr(feed, "RAW_DIR", tmp_path)
     monkeypatch.setattr(
         "soccer_stats.publish.fetch_odds",
-        lambda league: (EVENTS, feed.OddsStatus(credits_left=400)),
+        lambda league, **kw: (EVENTS, feed.OddsStatus(credits_left=400)),
     )
     fixtures = pd.DataFrame(
         {

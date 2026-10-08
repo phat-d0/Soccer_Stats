@@ -49,16 +49,31 @@ def _ok(x) -> bool:
     return isinstance(x, (int, float)) and np.isfinite(x) and x > 1
 
 
+def source_for(data: dict, league: str, primary: str) -> dict:
+    """The odds source behind a league's fixtures (data.json `odds_sources`, else the
+    top-level `odds_source` for the primary league)."""
+    by_league = data.get("odds_sources") or {}
+    if league in by_league:
+        return by_league[league] or {}
+    return (data.get("odds_source") or {}) if league == primary else {}
+
+
 def rows_from_data(data: dict, now: pd.Timestamp, league: str = "E0") -> list[dict]:
-    """Log rows for every priced fixture market in a built data.json (DraftKings only)."""
-    src = data.get("odds_source") or {}
-    if src.get("name") != BOOKMAKER:
-        return []
-    downloaded = _iso(src.get("fetched_at"))
+    """Log rows for every priced fixture market in a built data.json (DraftKings only).
+
+    Each fixture's own `league` (default `league`, the primary one) decides its row's
+    league and which odds source it came from; a league without DraftKings odds logs
+    nothing.
+    """
     out = []
     for c in data.get("fixtures") or []:
         if not c.get("kickoff"):
             continue
+        lg = c.get("league") or league
+        src = source_for(data, lg, league)
+        if src.get("name") != BOOKMAKER:
+            continue
+        downloaded = _iso(src.get("fetched_at"))
         kickoff = pd.Timestamp(_iso(c["kickoff"]))
         quoted = _iso(c.get("odds_updated")) or downloaded
         if quoted is None or pd.Timestamp(quoted) >= kickoff:
@@ -73,7 +88,7 @@ def rows_from_data(data: dict, now: pd.Timestamp, league: str = "E0") -> list[di
             pb = c.get("p_bet") or None
             out.append(
                 {
-                    "league": league,
+                    "league": lg,
                     "home": c["home"],
                     "away": c["away"],
                     "kickoff": kickoff.isoformat(timespec="seconds"),
@@ -108,19 +123,23 @@ def _read(root: Path, league: str) -> list[dict]:
 
 
 def append(root: Path, rows: list[dict], league: str = "E0") -> int:
-    """Append rows not already logged to their month's file; returns how many were written."""
+    """Append rows not already logged to their league's month file (the row's `league`,
+    default `league`); returns how many were written."""
     if not rows:
         return 0
-    seen = {_key(r) for r in _read(root, league)}
+    seen: dict[str, set] = {}
     by_file: dict[Path, list[str]] = {}
     d = log_dir(root)
     for r in rows:
+        lg = r.get("league") or league
+        if lg not in seen:
+            seen[lg] = {_key(x) for x in _read(root, lg)}
         k = _key(r)
-        if k in seen:
+        if k in seen[lg]:
             continue
-        seen.add(k)
+        seen[lg].add(k)
         month = pd.Timestamp(r["fetched_at"]).strftime("%Y-%m")
-        by_file.setdefault(d / f"{league}_{month}.jsonl", []).append(
+        by_file.setdefault(d / f"{lg}_{month}.jsonl", []).append(
             json.dumps(r, separators=(",", ":"))
         )
     if not by_file:

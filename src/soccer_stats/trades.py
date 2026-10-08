@@ -67,18 +67,28 @@ def _ok(x) -> bool:
     return x is not None and not (isinstance(x, float) and math.isnan(x))
 
 
-def paper_threshold(dk: dict | None) -> dict:
+def paper_threshold(dk: dict | None, league: str = "E0") -> dict:
     """The minimum edge live match paper trades open at, from backtest-dk's output.
 
-    `dk` is E0_dk.json (or None). Its top-level `edge_threshold.min_edge` is the level
-    learned from history for the chance the app trades on (lab/thresholds.py), the same
-    one the app's bestPick flags with (matchEdge). Returns {threshold, source, note}:
+    `dk` is <league>_dk.json (or None). A league other than the Premier League trades only
+    with its own learned level: no file or no edge_threshold means no trades. The file's
+    top-level `edge_threshold.min_edge` is the level learned from history for the chance
+    the app trades on (lab/thresholds.py), the same one the app's bestPick flags with
+    (matchEdge). Returns {threshold, source, note}:
     - a learned level: threshold = min_edge, source "history";
     - min_edge null (no level beat the market): threshold None, so no new match trades,
       and the note says why;
-    - no file or no edge_threshold (older data, first run): PAPER_EDGE, source "default".
+    - no file or no edge_threshold (older data, first run): PAPER_EDGE, source "default"
+      for the Premier League; None, source "none", for any other league.
     """
     et = (dk or {}).get("edge_threshold")
+    if league != "E0" and (not isinstance(et, dict) or "min_edge" not in et):
+        return {
+            "threshold": None,
+            "source": "none",
+            "note": "No new paper trades: no minimum edge has been learned for this league "
+            "from its own past bets yet.",
+        }
     if not isinstance(et, dict) or "min_edge" not in et:
         return {
             "threshold": PAPER_EDGE,
