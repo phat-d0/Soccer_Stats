@@ -521,3 +521,75 @@ This season chose nothing.
   - "to score or assist";
   - live lineups an hour before kickoff from ESPN. That is the only way to bet B's
     lineup-known chances in practice.
+
+## 10. Multi-league goalscorer test: pre-registration (round 8, 2026-10-08, before any new-league result)
+
+The owner approved it on 8 Oct. Credit cap 0, and player paper trades stay off. The model
+spec is **unchanged**:
+- **B:** round 6's reference, the current `GOAL_FACTORS` model with the lineup known.
+- **A:** the same model before lineups.
+
+Nothing is tuned on any of the data below.
+
+### (a) Historical test: La Liga, Bundesliga, Serie A, Ligue 1
+
+- **Data:** Understat appearances 2022/23–2025/26 per league (2022/23 only warms up
+  features and training), and each league's walk-forward match model for team expected
+  goals and game state. All of it comes from the round-7 multi-league plumbing.
+- **Fits:** walk-forward through `lab.harness`, refitted every 28 days on that league's
+  earlier appearances (730-day window). Each league has its own model; nothing pools
+  across leagues in training.
+- **Scored seasons:** 2023/24, 2024/25 and 2025/26. None of these leagues' goalscorer data
+  has been looked at before, so all three are clean.
+- **Benchmarks:** the same as round 4/6. The season-to-date goals and xG per appearance
+  are each turned into P(≥1) = 1 − e^(−mean), with the position average before a
+  player's first appearance.
+- **Two comparisons per league, both pre-registered:**
+  1. **B on starters with the lineup known** (the betting view, as in round 6). The
+     benchmarks are per appearance, substitute appearances included, so on starters they
+     lean low. That favours B, and this comparison is reported but **is not the gate**.
+  2. **A on every appearance before lineups** (the round-4 stage-1 view, where the
+     benchmarks are on equal terms). **This is the gate.**
+- **Metrics (same as before):**
+  - paired log-loss gain against each benchmark (benchmark minus model), with ranges
+    resampling whole matches;
+  - Brier score, AUC, the share given 30%+, and the round-6 `tail_rule` for B;
+  - per league, and pooled over the four leagues.
+- **Correction:** 4 leagues × 2 benchmarks = 8 tests, so per-league ranges are
+  **99.375%**. Pooled ranges are 95% (one pooled test per benchmark).
+- **The answer the owner asked for** ("does it beat both benchmarks in each league?"):
+  a league counts as **yes** when A's gain over **both** benchmarks has its 99.375% range
+  above 0. B's numbers are reported beside it.
+- **The Premier League** is shown beside them for reference: the same run, 2023/24–2025/26.
+  Its 2025/26 has been seen since round 4.
+
+### (b) Widened forward check: all five leagues
+
+- **Scope:** round 6's locked forward check (E0, 2026/27 matches from **2026-10-10
+  00:00 UTC**) widens to **E0, SP1, D1, I1 and F1**.
+- **Locked:** in every league, matches kicking off on or after 10 Oct are dropped before
+  any computation, unless the run is given `--open-forward` with a reason. Opening prints
+  and logs the reason and the time.
+- **When:** opened once, when at least **150 matches pooled** across the five leagues
+  have been played. The owner's trigger is 7 Dec.
+- **Gate, pinned now, on the pooled forward starters:**
+  - B (lineup known) beats **both** season benchmarks, each paired log-loss gain having a
+    95% range above 0;
+  - and B passes the round-6 tail rule (20–30% and 30%+ buckets).
+- **Also reported:**
+  - per league (not gated, because samples are small);
+  - A vs the benchmarks on all appearances;
+  - B vs A.
+- **What a pass means:** the model's calibration and sharpness hold on unseen 2026/27
+  matches in five leagues. It doesn't mean the model can beat bookmakers' prices; that
+  needs priced data and a separate, costed proposal.
+
+### Run
+
+- **Workflow:** `goal-leagues.yml`, dispatch only. It never pushes or deploys and uses no
+  credits.
+- **Jobs:** one job per league runs `soccer-stats goal-league` and uploads its scored rows.
+  A pooling job then runs `soccer-stats goal-pool`.
+- **Cache:** each league's Understat files go to their own cache key prefix
+  (`understat-<league>-`), so the Premier League jobs' `raw-data-` cache is never
+  replaced.
