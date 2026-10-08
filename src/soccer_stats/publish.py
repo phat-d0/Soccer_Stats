@@ -135,7 +135,7 @@ def with_draftkings(
     Without a key (or before the first successful download) the football-data odds stay.
     Matches DraftKings has priced but the schedule lacks are added. A "matchday" league
     (leagues.py) is told its scheduled kickoffs, so it fetches only near a match; `share`
-    is the number of live leagues splitting the credits.
+    is the number of live leagues splitting the credits (1 for the primary league).
     """
     now = now or pd.Timestamp.now(tz="UTC")
     lg = lgs.LEAGUES.get(league)
@@ -531,7 +531,8 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
     known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
-    fixtures, odds_source = with_draftkings(fixtures, league, known, share=share)
+    # The primary league budgets as if alone (share 1): the others never slow it down.
+    fixtures, odds_source = with_draftkings(fixtures, league, known)
 
     news, news_error, snapshot, players, stats = None, None, [], None, []
     if league == "E0":  # FPL covers the Premier League only

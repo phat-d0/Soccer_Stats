@@ -42,6 +42,9 @@ SPORTS = {code: lg.odds_sport for code, lg in LEAGUES.items()}
 BOOKMAKER = "draftkings"
 BOOKMAKER_NAME = "DraftKings"
 RESERVE_CREDITS = 20  # never spend below this
+# "matchday" leagues stop below this many credits on the shared key (the same reserve the
+# player-odds fetches keep), so they pause long before the Premier League or baseball app.
+MATCHDAY_RESERVE_CREDITS = 3000
 MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this...
 KICKOFF_INTERVAL_HOURS = 0.5  # ...except this close to a kickoff
 KICKOFF_WINDOW_HOURS = 2.0
@@ -106,16 +109,19 @@ def refresh_interval_hours(
     reset_day: int = 1,
     min_hours: float = MIN_INTERVAL_HOURS,
     share: int = 1,
+    reserve: int = RESERVE_CREDITS,
 ) -> float:
     """Hours between refreshes so the remaining credits last until the next reset.
 
-    `share` is how many live leagues split the credits (each gets an equal part).
-    Returns inf when nothing more can be spent this period.
+    `share` is how many live leagues split the credits (each gets an equal part); the
+    Premier League always budgets with share 1, so other leagues never slow it down.
+    `reserve` is the balance never spent below. Returns inf when nothing more can be
+    spent this period.
     """
     if credits_left is None:
         return min_hours  # unknown budget: fetch once to find out
     per_call = max(cost or DEFAULT_COST, 1)
-    affordable = (credits_left - RESERVE_CREDITS) // per_call // max(share, 1)
+    affordable = (credits_left - reserve) // per_call // max(share, 1)
     if affordable <= 0:
         return float("inf")
     hours_left = (next_reset(now, reset_day) - now) / pd.Timedelta(hours=1)
@@ -166,6 +172,21 @@ def policy_floor(league: str, kickoffs, now: pd.Timestamp) -> float | None:
     return MATCHDAY_FAR_HOURS
 
 
+def latest_meta(raw_dir: Path) -> dict:
+    """The most recent download's meta across every league's odds cache (empty if none).
+
+    The key is shared, so the freshest credits_left is the best guess at the balance."""
+    best: dict = {}
+    for path in Path(raw_dir).glob(f"odds_api_*_{BOOKMAKER}.meta.json"):
+        try:
+            meta = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if meta.get("fetched_at") and meta.get("fetched_at") > best.get("fetched_at", ""):
+            best = meta
+    return best
+
+
 def fetch_odds(
     league: str = "E0",
     raw_dir: Path = RAW_DIR,
@@ -183,6 +204,8 @@ def fetch_odds(
     A league whose `live` flag is off is never fetched. `kickoffs` (the league's upcoming
     kickoffs from the schedule) let a "matchday" league know a match is near before any
     odds are cached; `share` splits the shared credit budget between the live leagues.
+    A "matchday" league budgets from the freshest balance any league has seen and keeps
+    MATCHDAY_RESERVE_CREDITS spare, so it pauses first when credits run low.
     """
     lg = LEAGUES.get(league)
     if lg is not None and not lg.live:
@@ -206,20 +229,29 @@ def fetch_odds(
 
     last = pd.Timestamp(status.fetched_at) if status.fetched_at and path.exists() else None
     credits = status.credits_left
-    if last is not None and last < next_reset(now, reset_day) - pd.DateOffset(months=1):
-        credits = None  # the allowance has reset since our last download
+    reserve = RESERVE_CREDITS
+    seen = last
+    if lg is not None and lg.odds_policy != "always":
+        reserve = MATCHDAY_RESERVE_CREDITS
+        fresh = latest_meta(raw_dir)
+        if fresh and (seen is None or pd.Timestamp(fresh["fetched_at"]) > seen):
+            seen, credits = pd.Timestamp(fresh["fetched_at"]), fresh.get("credits_left")
+    if seen is not None and seen < next_reset(now, reset_day) - pd.DateOffset(months=1):
+        credits = None  # the allowance has reset since the last download we know of
     cached = json.loads(path.read_text()) if path.exists() else None
     floor = policy_floor(league, _kickoffs(cached) + list(kickoffs or []), now)
     if floor is None:  # a "matchday" league with no match soon: keep what's cached
         status.error = f"no {lg.name if lg else league} match within {MATCHDAY_HOURS:g} hours"
         return cached, status
-    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day, floor, share)
+    interval = refresh_interval_hours(
+        credits, status.last_cost, now, reset_day, floor, share, reserve
+    )
     status.refresh_hours = None if interval == float("inf") else round(interval, 2)
     hours_since = (now - last) / pd.Timedelta(hours=1) if last is not None else None
-    # When paused, still check once a day in case the allowance reset on another day.
-    due = (
-        last is None or hours_since >= interval or (interval == float("inf") and hours_since >= 24)
-    )
+    # When paused, the Premier League still checks once a day in case the allowance reset
+    # on another day; a matchday league waits for its balance to come back in a fresher meta.
+    due = last is None or hours_since >= interval
+    due = due or (reserve == RESERVE_CREDITS and interval == float("inf") and hours_since >= 24)
 
     if due:
         try:
@@ -258,15 +290,15 @@ def fetch_odds(
                 status.fetched_at = meta["fetched_at"]
                 status.credits_left, status.last_cost = meta["credits_left"], meta["last_cost"]
                 interval = refresh_interval_hours(
-                    status.credits_left, status.last_cost, now, reset_day, floor, share
+                    status.credits_left, status.last_cost, now, reset_day, floor, share, reserve
                 )
                 status.refresh_hours = None if interval == float("inf") else round(interval, 2)
             else:
                 status.error = f"The Odds API returned HTTP {resp.status_code}"
     elif interval == float("inf"):
         status.error = (
-            f"paused until the allowance resets: {status.credits_left} credits left "
-            f"(keeping {RESERVE_CREDITS} in reserve)"
+            f"paused until the allowance resets: {credits} credits left "
+            f"(keeping {reserve} in reserve)"
         )
 
     if not path.exists():
