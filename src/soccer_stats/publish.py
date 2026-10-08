@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from soccer_stats import dashboard
+from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
 from soccer_stats.backtest import simulate_bets
@@ -123,16 +124,28 @@ def upcoming_fixtures(
 
 
 def with_draftkings(
-    fixtures: pd.DataFrame, league: str, known_teams: set[str], now: pd.Timestamp | None = None
+    fixtures: pd.DataFrame,
+    league: str,
+    known_teams: set[str],
+    now: pd.Timestamp | None = None,
+    share: int = 1,
 ) -> tuple[pd.DataFrame, dict]:
     """Swap fixture odds for DraftKings odds when an Odds API key is configured.
 
     Without a key (or before the first successful download) the football-data odds stay.
-    Matches DraftKings has priced but the schedule lacks are added.
+    Matches DraftKings has priced but the schedule lacks are added. A "matchday" league
+    (leagues.py) is told its scheduled kickoffs, so it fetches only near a match; `share`
+    is the number of live leagues splitting the credits.
     """
     now = now or pd.Timestamp.now(tz="UTC")
-    events, status = fetch_odds(league)
+    lg = lgs.LEAGUES.get(league)
+    if lg is not None and lg.odds_policy != "always" and not fixtures.empty:
+        kickoffs = list(pd.to_datetime(fixtures["kickoff"], utc=True))
+        events, status = fetch_odds(league, kickoffs=kickoffs, share=share)
+    else:
+        events, status = fetch_odds(league, share=share)
     source = {
+        "league": league,
         "name": "football-data",
         "format": "decimal",
         "fetched_at": status.fetched_at,
@@ -193,6 +206,7 @@ def fixture_cards(
     counts: pd.Series,
     news: dict[str, TeamNews] | None = None,
     mults: dict[tuple[str, str], tuple[float, float]] | None = None,
+    league: str = lgs.PRIMARY,
 ) -> list[dict]:
     if fixtures.empty:
         return []
@@ -205,6 +219,7 @@ def fixture_cards(
         adjusted = mult != (1.0, 1.0)
         cards.append(
             {
+                "league": league,  # football-data code (leagues.LEAGUES)
                 "kickoff": r["kickoff"],
                 "home": r["home"],
                 "away": r["away"],
@@ -274,6 +289,7 @@ def build_data(
     news: dict[str, TeamNews] | None = None,
     news_error: str | None = None,
     now: pd.Timestamp | None = None,
+    league: str = lgs.PRIMARY,
 ) -> dict:
     season = current_season()
     now = now or pd.Timestamp.now(tz="UTC")
@@ -307,7 +323,8 @@ def build_data(
     return _clean(
         {
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-            "league": "Premier League",
+            "league": lgs.name(league),
+            "league_code": league,
             "season": f"{season}/{(season + 1) % 100:02d}",
             "last_result": matches["date"].max(),
             "matches_fit": len(matches),
@@ -323,6 +340,7 @@ def build_data(
                 counts,
                 news,
                 fixture_multipliers(fixtures, news, now) if news and not fixtures.empty else None,
+                league=league,
             ),
             "news_error": news_error,
             "team_news": {t: n.to_dict() for t, n in (news or {}).items() if t in teams},
@@ -467,13 +485,53 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
     return status, stats
 
 
-def publish(out: Path, league: str = "E0") -> Path:
+def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None) -> tuple:
+    """Fixture cards and odds source for a league other than the primary one.
+
+    Its own Dixon-Coles fit (same settings as the primary league), its schedule and its
+    DraftKings odds. No blend (p_bet) and no team news: those exist for E0 only. Never
+    raises: a league that fails to load returns no cards and says why.
+    """
     season = current_season()
+    try:
+        matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
+        matches, _ = with_xg(matches)
+        fixtures = upcoming_fixtures(league, now=now)
+        known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
+        fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
+        weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+        model = dashboard.fit_model(matches, xg_weight=weight)
+        teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
+        counts = dashboard.match_counts(matches, teams or sorted(model.teams))
+        cards = fixture_cards(model, fixtures, counts, league=league)
+    except Exception as exc:  # one league failing never stops the site
+        return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}
+    return cards, source
+
+
+def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
+    """Every registry league for data.json: code, name, live flag, fixtures, odds source."""
+    return [
+        {
+            "code": code,
+            "name": lg.name,
+            "live": lg.live,
+            "fixtures": sum(f.get("league") == code for f in fixtures),
+            "odds": (sources.get(code) or {}).get("name"),
+        }
+        for code, lg in lgs.LEAGUES.items()
+    ]
+
+
+def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
+    season = current_season()
+    live = lgs.live_codes()
+    share = max(len(live), 1)
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
     known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
-    fixtures, odds_source = with_draftkings(fixtures, league, known)
+    fixtures, odds_source = with_draftkings(fixtures, league, known, share=share)
 
     news, news_error, snapshot, players, stats = None, None, [], None, []
     if league == "E0":  # FPL covers the Premier League only
@@ -486,9 +544,19 @@ def publish(out: Path, league: str = "E0") -> Path:
         except Exception as exc:  # FPL down or changed: predictions still publish
             news_error = f"Team news unavailable: {exc}"
 
-    data = build_data(matches, fixtures, xg_error, news, news_error)
+    data = build_data(matches, fixtures, xg_error, news, news_error, league=league)
     data["odds_source"] = odds_source
     add_match_blend(data, match_blend())
+    # Other live leagues: their fixtures join the list, each card tagged with its league.
+    sources = {league: odds_source}
+    for code in live:
+        if code == league:
+            continue
+        cards, sources[code] = league_fixtures(code, share)
+        data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])
+        print(f"{lgs.name(code)}: {len(cards)} fixtures, odds {sources[code].get('name')}")
+    data["odds_sources"] = _clean(sources)
+    data["leagues"] = league_list(data["fixtures"], sources)
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])

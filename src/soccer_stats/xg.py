@@ -66,6 +66,9 @@ TEAM_NAMES = {
     "Greuther Fuerth": "Greuther Furth",
     "St. Pauli": "St Pauli",
     "FC Heidenheim": "Heidenheim",
+    "Hamburger SV": "Hamburg",
+    "Hannover 96": "Hannover",
+    "Nuernberg": "Nurnberg",
     # Italy
     "AC Milan": "Milan",
     "Parma Calcio 1913": "Parma",

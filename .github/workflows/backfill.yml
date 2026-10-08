@@ -33,6 +33,9 @@ on:
       markets_seasons:
         description: "match_markets: seasons to predict (start years)"
         default: "2017-2025"
+      estimate_month:
+        description: "Only estimate Odds API credits per league for this month (YYYY-MM; no key, no push)"
+        default: ""
 
 permissions:
   contents: write # writes the backtest summary to the data-log branch
@@ -52,7 +55,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.print_only && !inputs.match_markets }}
+        if: ${{ !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -61,21 +64,27 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only || inputs.match_markets }}
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.estimate_month != '' }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only && !inputs.match_markets }}
+        if: ${{ inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
 
+      - name: Credit estimate per league (print only)
+        if: ${{ inputs.estimate_month != '' }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats estimate-credits --month "${{ inputs.estimate_month }}"
+
       - name: Match markets vs Pinnacle (research, print only)
-        if: ${{ inputs.match_markets }}
+        if: ${{ inputs.match_markets && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -91,13 +100,13 @@ jobs:
           if-no-files-found: ignore
 
       - name: Backtest from cached odds (print only)
-        if: ${{ inputs.print_only && !inputs.match_markets }}
+        if: ${{ inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.print_only && !inputs.match_markets }}
+        if: ${{ !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -107,7 +116,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets }}
+        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

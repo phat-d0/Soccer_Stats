@@ -30,8 +30,8 @@ Read its "Status and next steps" section first; this file is the technical map.
 | --- | --- | --- |
 | `publish.yml` | Builds the site (`soccer-stats publish`), then on `data-log` logs team news (`log-news`), the build's DraftKings prices (`log-odds`) and paper trades (`paper`), and deploys Pages. Only the default branch publishes: pushes elsewhere don't trigger it, and a dispatch on another branch skips `data-log`. Hourly cron plus every 15 min 10:00–22:00 UTC, but GitHub throttles scheduled runs; dispatch by hand to refresh now. | ~2 per match-odds refresh, plus live player lines near kickoff |
 | `players.yml` | Player model: stage-1 test, then the priced backtest on cached FanDuel lines. Writes `backtest/E0_players*.json` and the anytime-goalscorer stage 1 (`backtest/E0_goals.json`) to `data-log`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`: `now` = the season in progress, left out until it has played matches), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`. | 0 unless `odds_seasons` is set |
-| `backfill.yml` | Historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
-| `odds-check.yml` | Diagnostics, edge research and the research lab. Inputs: `task` (coverage, props, match, shots, signals, lab, lab-holdout, goalscorer, player-lab, goal-lab), `cap` (props / goalscorer credit cap, 0 = dry run; the key is passed only to coverage, props and goalscorer), `hist_dates`, `seasons`; `league` (lab, lab-holdout: E0–E3); for `lab-holdout`: `reason`, `finalists`, `stack_base`. Never pushes. | 0 (match, shots, signals, lab, player-lab) to ~100 per historical props call; goalscorer ≤ `cap` (5 per live call, 10 per pilot call) |
+| `backfill.yml` | `estimate_month` (YYYY-MM): only print the Odds API credit estimate per league for that month (no key, no push). Otherwise: historical DraftKings match odds, then `backtest-dk`, which writes `backtest/E0_dk.json` (incl. the live match blend `blend.live`) to `data-log`. Inputs: `seasons`, `max_credits` (0 = download nothing; the backtest still runs on cached odds and saves), `keep_credits`, `dry_run` (true = no backtest, no push), `print_only`: run `backtest-dk` from the cached odds and only print (no key, no download, no push), `match_markets` (+ `markets_seasons`): run `match-markets` on football-data only (no key, no push; log + 7-day artifact). | ~20 per snapshot; 0 with `print_only` |
+| `odds-check.yml` | Diagnostics, edge research and the research lab. Inputs: `task` (coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab, goal-lab), `cap` (props / goalscorer credit cap, 0 = dry run; the key is passed only to coverage, props and goalscorer), `hist_dates`, `seasons`; `league` (lab, lab-holdout, lab-coverage, lab-edge: E0–E3, SP1, D1, I1, F1), `holdout_season` (lab, lab-holdout, lab-edge; blank = 2025); for `lab-holdout`: `reason`, `finalists`, `stack_base`. Never pushes. | 0 (match, shots, signals, lab, player-lab) to ~100 per historical props call; goalscorer ≤ `cap` (5 per live call, 10 per pilot call) |
 | `ci.yml` | On every push and pull request. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check` on the app. Job `web`: installs Playwright's Chromium (cached) and runs `tests/web/smoke.mjs`; a skip counts as a failure, and screenshots are uploaded when it fails. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml`, dispatch `publish.yml`, so the app picks up the new results.
@@ -57,6 +57,9 @@ Read its "Status and next steps" section first; this file is the technical map.
 ## Code map (`src/soccer_stats`)
 
 **Match model**
+- `leagues.py`: the league registry (`LEAGUES`: football-data code, name, Understat name, Odds API sport key, `live`, `odds_policy`). E0 is live with policy `always` (unchanged); SP1, D1, I1, F1 and E1 (Championship: no Understat, so `understat=None`, goals-only fit, football-data schedule) are wired up with `live=False` and policy `matchday`. `live_codes()` lists the live ones, primary (E0) first. Costs and how to switch one on: `docs/leagues.md`.
+  - `publish` builds every live league: E0 fills the top-level fields as before; other live leagues get their own fit (`league_fixtures`, no blend or team news) and their cards join `fixtures`. Every card has `league` (the code); `data.json` gains `league_code`, `leagues` (`[{code, name, live, fixtures, odds}]` for every registry league) and `odds_sources` (`{code: source}`; `odds_source` stays E0's).
+  - Paper trades run per league (`paper.leagues_in_play`): each league's cards, odds source, results, odds log and ledger file (`paper_trades/<code>_<season>.jsonl`, trade ids start with the code), at its own learned minimum (`trades.paper_threshold(paper.league_backtest(log_dir, code), code)`: `<code>_dk.json` on data-log, else for non-E0 leagues the research lab's committed `lab/min_edge.json` → `leagues[code]`; a non-E0 league with neither opens nothing). `portfolio.rules` = `{code: {threshold, source, note}}`; `portfolio.rule` stays E0's. With 2+ leagues in play, Moneyline's backtest gets `edge_threshold.by_league[code]` (each league's own `edge_threshold`, or `min_edge` null with the rule's note), which the app's competition filter reads. The odds log writes each row to its league's file.
 - `models/dixon_coles.py`: the match model.
 - `backtest.py`: walk-forward and the DraftKings backtest (`dk_trades`).
   - `STRATEGIES`: `raw` (model) and `blend`; `add_blend` adds `pb_*`, `dk_strategies` runs the sweep with bootstrap ranges; `dk_log_loss` reports model, blend and DraftKings.
@@ -69,7 +72,7 @@ Read its "Status and next steps" section first; this file is the technical map.
   - `clean_prices` blanks broken average/maximum rows;
   - `xg_features` (6-match xG form, earlier matches only) and `soft_vs_sharp` are blend signals;
   - `run` reports log loss, the blend weight, signal tests and the threshold sweep at Pinnacle early/close and the average/maximum early, with ROI ranges and CLV vs Pinnacle's fair close.
-- `odds_feed.py`: live DraftKings odds and the credit budget.
+- `odds_feed.py`: live DraftKings odds and the credit budget. `SPORTS` comes from the registry. A league with `live=False` is never fetched. `policy_floor(league, kickoffs, now)`: E0 as before (1 h, 30 min within 2 h of a kickoff); "matchday" leagues fetch nothing without a kickoff within 48 h, then every 3 h, hourly within 6 h, every 30 min within 2 h. `refresh_interval_hours(..., share)` splits the budget across live leagues. `estimate_credits(league, kickoffs, start, end)` replays the scheduled publish runs under these rules (`soccer-stats estimate-credits --month YYYY-MM`; `backfill.yml` `estimate_month`, no key).
 - `odds_log.py`: the live DraftKings price log on `data-log` (`odds_log/E0_<YYYY-MM>.jsonl`), written by `soccer-stats log-odds` from the built `data.json` (no API calls).
   - One row per fixture × market (h2h, totals 2.5): prices, margin-free `fair`, `bookmaker`, `fetched_at` (DraftKings' `last_update`, else the download time; `time_source` says which), `downloaded_at`, `logged_at`, and the model's `p` and `p_bet` then.
   - Append-only and deduplicated on fixture, market, prices and `fetched_at`; quotes at or after kickoff are skipped.
@@ -143,9 +146,10 @@ Read its "Status and next steps" section first; this file is the technical map.
 **Research lab** (`lab/`, rules and results in `docs/lab.md`)
 - `harness.py` (generic: rows with a time, group, outcome, features, market): `walk_forward` (refit every 28 days on earlier rows), `nested` (each season's settings chosen on the season before, trained on still earlier rows), `Holdout` (2025/26 is locked: predicting it raises `HoldoutLocked` unless `unlock(reason)` is called, which prints and logs the time).
 - `metrics.py` (generic, any number of outcomes): log loss, Brier, calibration table, blend weight `c` beside the market with a range from whole-match bootstrap refits, `walk_forward_blend`, the live 12% rule's CLV and ROI with ranges, and `passes` (blend-weight range > 0 AND CLV range > 0).
-- `features.py`: Elo, 6/20-match xG and goals for/against, rest; earlier matches only (`FEATURES_GOALS` for leagues without xG). `models.py`: the bake-off candidates (Dixon-Coles baseline, hierarchical Poisson, LightGBM, multinomial logit) and their tuning grids. `run.py`: the 1X2 bake-off (`python -m soccer_stats.lab.run --league E0|E1|E2|E3`, `odds-check.yml` `task=lab` with `league`; `lab-holdout` opens the holdout for named finalists). E1–E3 run goals-only, count as one multiple-testing family, and score only seasons where Pinnacle prices cover at least 90% of matches.
+- `features.py`: Elo, 6/20-match xG and goals for/against, rest; earlier matches only (`FEATURES_GOALS` for leagues without xG). `models.py`: the bake-off candidates (Dixon-Coles baseline, hierarchical Poisson, LightGBM, multinomial logit) and their tuning grids. `run.py`: the 1X2 bake-off (`python -m soccer_stats.lab.run --league E0|E1|E2|E3|SP1|D1|I1|F1`, `odds-check.yml` `task=lab` with `league`; `lab-holdout` opens the holdout for named finalists). E1–E3 run goals-only, count as one multiple-testing family, and score only seasons where Pinnacle prices cover at least 90% of matches. SP1/D1/I1/F1 (with xG) are a second family of four. `--holdout-season Y` moves the locked holdout to season Y (development ends at Y-1); `--coverage-only` (`task=lab-coverage`) prints Pinnacle and xG coverage per season, counts only, so a holdout can be chosen before pre-registering. Development runs also report `lab.thresholds.edge_threshold` for a's bets at Pinnacle early (`edge_threshold` in the JSON); `--edge-only` (`task=lab-edge`) runs only a and that step (no model selection) and logs the whole contract on one `EDGE_JSON` line.
 - Player markets can reuse `harness` and `metrics` as they are (two outcomes; NaN odds where a side isn't offered).
 - `thresholds.py`: the learned minimum edge (owner's request, replacing fixed edge buttons). `edge_threshold(bets)` judges claimed-edge bands of 5 points (t to t+5%, t = 0–30%) on settled bets, with 95% match-resampled ranges of the return per unit staked. `min_edge` is the smallest t whose band, and every higher band with at least 30 bets, has a lower bound above 0. It is found on development seasons and published only if the latest season's bets at t and up returned more than 0 (one season: halves by kickoff). Otherwise `min_edge` is None with a plain-English `note`.
+  - Per-league levels for the app's other leagues: `lab/min_edge.json` → `leagues.<code>` (E1, SP1, D1, I1, F1; the contract above without `development_scan`, plus `source` with the run id), read with `thresholds.league_levels()` (missing file = {}). E0's level stays in `E0_dk.json`.
   - Output: `{min_edge, confidence, method, n_bets, seasons, note, by_bucket: [{edge_lo, edge_hi, n, implied, model, realized, realized_lo, realized_hi, roi, roi_lo, roi_hi}], development_scan, check}`. `implied`, `model` and `realized` are win rates; `roi*` is the return per unit.
   - Written by `backtest-dk` into `E0_dk.json`:
     - `edge_threshold` for the chance the app trades on (`edge_threshold_strategy`: blend when fitted);
@@ -156,7 +160,7 @@ Read its "Status and next steps" section first; this file is the technical map.
 
 **Site and CLI**
 - `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
-- `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`, `goalscorer-pilot`, `player-lab`.
+- `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `estimate-credits`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`, `goalscorer-pilot`, `player-lab`.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
@@ -211,6 +215,50 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - The lead runs in the main (coordinating) session, as in the owner's baseball team. It reviews each PR (diff, CI on the PR, full checks), comments, and merges it on GitHub with a merge commit, so each shows as Merged in the owner's app.
 - Only the lead sets Odds API credit caps. The default cap is 0.
 
+## Lead handoff (read this first in a new lead session)
+
+The lead runs in the owner's main session ("Soccer stats prediction model"). If you are a new lead session, pick up from here.
+
+**Team sessions** (cloud sessions; message them with claude-code-remote `send_message`, check them with `get_session`):
+
+| Session title | Session id | Branch |
+| --- | --- | --- |
+| Soccer team: Moneyline | session_01SHL1YZ5knBRSduL7vurWN7 | team/moneyline |
+| Soccer team: Research lab | session_019c4cFKhKCuU6mdEtYqoUxp | team/research |
+| Soccer team: Player props | session_01C8B5tL2iAqVcZ7cYbz2bdc | team/player-props |
+| Soccer team: UI Design | session_01YUi3o1ueWm8BePMSWeB2hb | team/ui |
+
+**Process:**
+- Specialists open PRs into `claude/soccer-stats-scaffold`.
+- The lead reviews each PR (diff, CI, local checks) and merges ONLY through the GitHub API (`merge_pull_request`, method `merge`). A local merge pushed to the base shows the PR as Closed instead of Merged.
+- GitHub won't take a formal self-approval (all sessions post as the owner), so approvals go in as review comments.
+- After merging, run `players.yml` / `backfill.yml` (0-credit inputs) if backtests changed, then `publish.yml`.
+
+**Owner preferences:**
+- Plain English, no branch names in parentheses in session titles or summaries.
+- Session titles follow "Soccer team: <Role>", like the baseball team.
+- One shared Odds API key on the 100K plan: the owner decided against two keys on cost. Baseball usage is small in its post-season, which ends late October.
+- Credit caps are 0 unless the owner approves a spend.
+
+**Round 7 (8 Oct, in progress when this was written):**
+- **PR #14, Moneyline:** multi-league pipeline — La Liga SP1, Bundesliga D1, Serie A I1, Ligue 1 F1, Championship E1 (goals-only, no Understat xG). Live odds are off for all but E0. Per-league paper thresholds (`trades.paper_threshold(<code>_dk.json, code)`, `portfolio.rules[code]`, `edge_threshold.by_league`). Credit estimates are in `docs/leagues.md`: about 4,050 credits/month for all six leagues live, E1 alone about 396.
+- **PR #15, UI:** competition filter (hidden with one league; one Moneyline portfolio with a filter, the owner's choice). It reads `data.leagues` and `portfolio.rules[code]`. #14 and #15 merge in either order; regenerate the web fixture if its JSON conflicts.
+- **Research lab, PR pending:** pre-registered 1X2 bake-off on SP1/D1/I1/F1 with Understat xG, plus per-league learned minimum edges incl. E1.
+- Merge order: moneyline, research, UI. A lead check-in trigger is set (`trig_01BkJiY1wXCWQhZ8kk3b7LmK`, 8 Oct 21:50 UTC).
+- After merging, report to the owner the four-league results and the per-league live credit costs. The owner decides league by league whether to switch live odds on; nothing goes live without approval.
+
+**Scheduled checks** (send_later into the lead session):
+- 16 Nov 2026 (`trig_01N4zsU1KdvQ66W9MZhGBDeK`): late team news vs the DraftKings odds log (Research lab; needs ≥100 logged matches, else re-arm two weeks).
+- 7 Dec 2026 (`trig_01KakNWotv6GkGQUqhjTvtbT`): the goalscorer forward check on 2026/27 from 10 Oct, once ≥150 matches (Player props).
+
+**Open threads:**
+- **Player shots:** on 8 Oct the owner asked whether to keep expanding or drop it. The lead recommended parking it: keep the free display and the weekly model, no new spend, a ≤20-credit bookmaker re-check every few months for any book offering unders. Await the owner's answer before starting any player-shots work. Owner ideas on the table: possession and opponent-defence features (free), own xG from shot coordinates (low value), tracking data (not feasible). Bet365 isn't on The Odds API as far as we found.
+- **The three European cups** (Champions, Europa and Conference League): phase 2, a costed plan for the owner after the top-4 results. No free historical prices; needs cross-league ratings.
+- **Housekeeping:**
+  - add a step-level time limit to the Playwright install in `ci.yml` (it hung twice);
+  - make the paper CLI log print the rule used;
+  - drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading `player_model`.
+
 ## Conventions
 
 - Run checks before every push: `uv run ruff format src tests && uv run ruff check src tests && uv run pytest -q`. All must pass (CI runs the same). Use `.venv/bin/pytest` if `uv` isn't on the path. JS: `node --check web/app.js`, and after web changes `node tests/web/smoke.mjs` (regenerate the fixture first if `data.json`'s shape changed).
@@ -246,6 +294,8 @@ Five agents, each owning part of the code. Start a session's work by calling the
 - Lead (PRs #9 and #8 merged through the GitHub API; 225 tests, smoke 31 views × 3 modes): the app (UI, PR #8, `sw.js` v23) replaces the edge buttons with a plain-English "Minimum edge" panel on Matches and Record ("Nothing is flagged" plus the lab's note), folds the 2/5/8/12% buttons under "Explore other edges" (display only), and draws claimed edge vs what happened per bucket (Moneyline falls back to the Pinnacle pool for the chart, captioned). With `min_edge` null no value picks or player picks are flagged. Paper trades then still opened at `PAPER_EDGE` (12%).
 - Moneyline (7 Oct, owner decision): live match paper trades now follow `edge_threshold.min_edge` from `E0_dk.json`. It is null today, so no new match paper trades open, and the Moneyline live note says why; open trades still close and settle. Without the file, the fixed 12% applies. The unused `default_filter` is gone; `sw.js` v24.
 - Round 6 (lead): PRs #11 (moneyline) and #12 (player props) merged through the GitHub API; 237 tests, smoke 31 views × 3 modes. `players.yml` run 37670050859 (0 credits) and publish run 37670495146 succeeded: "Paper trades: 0 ledger events written; 4 trades, 4 open", so no new match trades under the null minimum; the 4 trades opened earlier at 12% still settle. The paper CLI line doesn't print the rule yet (it is in `data.json` → `portfolio.rule`).
+- Round 7 (moneyline, multi-league): the pipeline is ready for La Liga, Bundesliga, Serie A and Ligue 1 (`leagues.py`, all `live=False`); the Premier League is unchanged. Credit estimate for October 2026 (real kickoff times, `backfill.yml` run 37841834127, 0 credits): E0 1,548 a month (live now), SP1 620, D1 414, I1 622, F1 448, E1 396 (October 2025 calendar, `data.season_kickoffs`); all six ≈ 4,050 a month (about 5½ months of the ~22,600 balance) against ≈ 1,500 for E0 alone. A new league opens no paper trades until it has its own learned minimum (needs a DraftKings backtest, i.e. paid historical odds). See `docs/leagues.md`.
+- Round 7 (research lab, bake-off 3, `docs/lab.md`): the pre-registered bake-off on La Liga, Bundesliga, Serie A and Ligue 1, with xG. A coverage check came first (football-data's Pinnacle prices cover 49–52% of 2025/26 in all four), so the holdout is 2024/25, development 2017/18–2023/24, one family of 40 tests (99.875%). Three Bundesliga team names were added to `xg.TEAM_NAMES`. Nothing passes on development (2,079–2,569 matches per league; every model trails Pinnacle early by 0.010–0.034 log loss; no blend-weight range clears 0; CLV −3.2% to −5.4%) or on the holdout (285–364 matches; CLV −3.2% to −7.4%). The learned minimum edge is null in each league. No handover; no live change. The Championship's learned minimum edge (owner's request; `task=lab-edge` run 37845449673, candidate a goals-only at Pinnacle early, development 2017/18–2023/24, check 2024/25, 4,052 bets) is null too: at 12–20% claimed edges the model said 42.0%, won 32.8% vs 36.3% implied. All five levels (E1, SP1, D1, I1, F1) are in `lab/min_edge.json`.
 - Live: value picks and match paper trades use the blend (`p_bet`) once `E0_dk.json` holds `blend.live`, so they will mostly stop. That is the honest result.
 
 **Player bets**
