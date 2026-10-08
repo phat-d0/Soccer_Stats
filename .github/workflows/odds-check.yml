@@ -20,6 +20,11 @@
 #   goal-lab: the goalscorer model improvements (docs/player_props.md section 8),
 #             development seasons; `reason` opens the locked 2026/27 forward window
 #             (once, logged). No credits.
+#   goal-league: anytime goalscorer, round 8 (docs/player_props.md section 10): one
+#             `league` (SP1, D1, I1, F1), downloading its Understat match files and saving
+#             them to that league's own cache (understat-<league>-). No credits.
+#   goal-leagues: all five leagues (E0 + the four caches above) scored and pooled; `reason`
+#             opens the locked 2026/27 forward window once. Run goal-league per league first.
 #   player-lab: the priced player shot lines (data-log) through the lab's metrics,
 #             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
@@ -30,9 +35,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab or goal-lab"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab, goal-lab, goal-league or goal-leagues"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab, goal-lab]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab, goal-lab, goal-league, goal-leagues]
         default: coverage
       cap:
         description: "props / goalscorer: most credits to spend (0 = dry run)"
@@ -75,13 +80,44 @@ jobs:
           path: data/raw/player_odds_history
           key: player-odds-history-none
           restore-keys: player-odds-history-
-      # Restore only: this job never saves a cache, so it can't disturb the paid ones.
+      # Restore only (goal-league saves its own league prefix): the paid caches are never saved.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task != 'coverage' && inputs.task != 'props' }}
+        if: ${{ inputs.task != 'coverage' && inputs.task != 'props' && inputs.task != 'goal-league' }}
         with:
           path: data/raw
           key: raw-data-none
           restore-keys: raw-data-
+      # Goalscorer leagues: each league's Understat files have their own cache prefix.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'goal-league' }}
+        with:
+          path: data/raw
+          key: understat-${{ inputs.league }}-none
+          restore-keys: understat-${{ inputs.league }}-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'goal-leagues' }}
+        with:
+          path: data/raw
+          key: understat-SP1-none
+          restore-keys: understat-SP1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'goal-leagues' }}
+        with:
+          path: data/raw
+          key: understat-D1-none
+          restore-keys: understat-D1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'goal-leagues' }}
+        with:
+          path: data/raw
+          key: understat-I1-none
+          restore-keys: understat-I1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'goal-leagues' }}
+        with:
+          path: data/raw
+          key: understat-F1-none
+          restore-keys: understat-F1-
       - name: Run
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer') && secrets.ODDS_API_KEY || '' }}
@@ -125,6 +161,14 @@ jobs:
               uv run soccer-stats goal-lab --pilot-log out/pilot.log \
                 --open-forward "$REASON" --json out/goal_lab.json
               rm -f out/pilot.log ;;
+            goal-league) uv run soccer-stats goal-league --league "$LEAGUE" \
+                     --rows "out/rows_${LEAGUE}.csv.gz" --json "out/goal_${LEAGUE}.json" ;;
+            goal-leagues)
+              for L in E0 SP1 D1 I1 F1; do
+                uv run soccer-stats goal-league --league "$L" --open-forward "$REASON" \
+                  --rows "out/rows_${L}.csv.gz" --json "out/goal_${L}.json"
+              done
+              uv run soccer-stats goal-pool --rows-dir out --json out/goal_pool.json ;;
             player-lab)
               git fetch --depth=1 origin data-log
               git show FETCH_HEAD:backtest/E0_player_lines.csv.gz > out/lines.csv.gz
@@ -135,10 +179,16 @@ jobs:
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
           esac
+      # Only goal-league saves a cache, under its own league's prefix (never raw-data-).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'goal-league' && inputs.league != 'E0' }}
+        with:
+          path: data/raw
+          key: understat-${{ inputs.league }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: edge-${{ inputs.task }}
+          name: edge-${{ inputs.task }}${{ inputs.task == 'goal-league' && format('-{0}', inputs.league) || '' }}
           path: out/
           retention-days: 7
           if-no-files-found: ignore

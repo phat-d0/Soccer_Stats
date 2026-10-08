@@ -437,3 +437,119 @@ def parse_pilot_log(text: str) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows, columns=["home", "away", "book", "player", "yes"])
+
+
+# ---------- round 8: the same model in five leagues (docs/player_props.md §10) ----------
+
+LEAGUE_SEASONS = ("2324", "2425", "2526")
+NEW_LEAGUES = ("SP1", "D1", "I1", "F1")
+FORWARD_LEAGUES = ("E0", *NEW_LEAGUES)
+LEVEL_LEAGUE = 1 - 0.05 / 8  # 4 leagues x 2 benchmarks: 99.375%
+FORWARD_MIN_MATCHES = 150
+BENCHMARKS = {"season_goals": "bench_goals", "season_xg": "bench_xg"}
+
+
+def scored_rows(feats, league, start, end, holdout=None, seasons=None) -> pd.DataFrame:
+    """One row per appearance with A's and B's walk-forward chances, the outcome and the
+    two season-to-date benchmarks (P(>=1) = 1 - exp(-mean))."""
+    pa = predict(feats, "A", start, end, holdout)
+    pb_ = predict(feats, "B", start, end, holdout)
+    idx = pa.dropna().index.intersection(pb_.dropna().index)
+    r = feats.loc[idx]
+    out = pd.DataFrame(
+        {
+            "league": league,
+            "season": r["season"].astype(str).to_numpy(),
+            "match_id": (league + "|" + r["match_id"].astype(str)).to_numpy(),
+            "kickoff": r["kickoff"].to_numpy(),
+            "started": r["started"].astype(bool).to_numpy(),
+            "scored": (r["goals"] > 0).astype(int).to_numpy(),
+            "p_A": pa.loc[idx].to_numpy(),
+            "p_B": pb_.loc[idx].to_numpy(),
+            "bench_goals": 1 - np.exp(-r["season_avg_goals"].clip(lower=1e-4).to_numpy()),
+            "bench_xg": 1 - np.exp(-r["season_avg_xg"].clip(lower=1e-4).to_numpy()),
+        }
+    )
+    if seasons is not None:
+        out = out[out["season"].isin(seasons)]
+    return out.reset_index(drop=True)
+
+
+def _gains(rows, col, level):
+    y, g = rows["scored"].to_numpy(), rows["match_id"].to_numpy()
+    ll_m = _ll(rows[col], y)
+    res = {}
+    for name, b in BENCHMARKS.items():
+        d = _ll(rows[b], y) - ll_m
+        rng = boot_range(d, g, level=level)
+        res[name] = {
+            "gain": round(float(d.mean()), 5),
+            "range": [round(v, 5) for v in rng] if rng else None,
+            "beats": bool(rng and rng[0] > 0),
+        }
+    return res
+
+
+def bench_tests(rows: pd.DataFrame, level: float) -> dict:
+    """The pre-registered comparisons on one league (or the pool).
+
+    Gate: A on every appearance before lineups beats both benchmarks (range above 0).
+    Betting view: B on starters with the lineup known, against the same benchmarks
+    (they are per appearance, so they lean low on starters), plus B vs A.
+    """
+    if rows.empty:
+        return {"rows": 0}
+    y = rows["scored"].to_numpy()
+    allv = {
+        "rows": len(rows),
+        "matches": int(rows["match_id"].nunique()),
+        "model": describe(rows["p_A"].to_numpy(), y, rows["match_id"].to_numpy()),
+        "vs": _gains(rows, "p_A", level),
+    }
+    allv["beats_both"] = all(v["beats"] for v in allv["vs"].values())
+    st = rows[rows["started"]]
+    ys = st["scored"].to_numpy()
+    starters = {
+        "rows": len(st),
+        "model": describe(st["p_B"].to_numpy(), ys, st["match_id"].to_numpy()),
+        "vs": _gains(st, "p_B", level),
+    }
+    starters["beats_both"] = all(v["beats"] for v in starters["vs"].values())
+    d = _ll(st["p_A"], ys) - _ll(st["p_B"], ys)
+    rng = boot_range(d, st["match_id"].to_numpy(), level=level)
+    starters["vs_A"] = {"gain": round(float(d.mean()), 5), "range": rng}
+    return {"level": round(level, 5), "all_before_lineups": allv, "starters_lineup_known": starters}
+
+
+def history_report(rows_by_league: dict[str, pd.DataFrame]) -> dict:
+    """Per league at 99.375% and pooled over the four new leagues at 95%."""
+    out = {"leagues": {}}
+    for lg, r in rows_by_league.items():
+        out["leagues"][lg] = bench_tests(r, LEVEL_LEAGUE)
+    new = [r for lg, r in rows_by_league.items() if lg in NEW_LEAGUES]
+    if new:
+        out["pooled_new_leagues"] = bench_tests(pd.concat(new, ignore_index=True), 0.95)
+    out["answer"] = {
+        lg: out["leagues"][lg]["all_before_lineups"].get("beats_both")
+        for lg in rows_by_league
+        if out["leagues"][lg].get("all_before_lineups")
+    }
+    return out
+
+
+def forward_report(rows: pd.DataFrame) -> dict:
+    """The widened forward check (§10b): pooled gate on B's starters plus per league."""
+    matches = int(rows["match_id"].nunique()) if len(rows) else 0
+    out = {"matches": matches, "enough": matches >= FORWARD_MIN_MATCHES}
+    if rows.empty:
+        return out
+    pooled = bench_tests(rows, 0.95)
+    st = pooled["starters_lineup_known"]
+    out["pooled"] = pooled
+    out["gate"] = {
+        "beats_both": st["beats_both"],
+        "tail_ok": st["model"]["tail"]["ok"],
+        "passes": bool(out["enough"] and st["beats_both"] and st["model"]["tail"]["ok"]),
+    }
+    out["leagues"] = {lg: bench_tests(r, 0.95) for lg, r in rows.groupby("league")}
+    return out
