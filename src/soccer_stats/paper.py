@@ -72,15 +72,16 @@ def load_ledger(log_dir: Path, league: str = "E0") -> dict[str, dict]:
 
 
 def append_events(log_dir: Path, events: list[dict], league: str = "E0") -> int:
-    """Append events to their season's ledger file; returns how many were written."""
+    """Append events to their league's season ledger file (league and season from the
+    trade id); returns how many were written."""
     if not events:
         return 0
     d = ledger_dir(log_dir)
     d.mkdir(parents=True, exist_ok=True)
     by_file: dict[Path, list[str]] = {}
     for ev in events:
-        season = ev["id"].split("|")[1]
-        by_file.setdefault(d / f"{league}_{season}.jsonl", []).append(
+        lg, season = ev["id"].split("|")[:2]
+        by_file.setdefault(d / f"{lg or league}_{season}.jsonl", []).append(
             json.dumps(ev, separators=(",", ":"))
         )
     for path, lines in by_file.items():
@@ -498,6 +499,18 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
+def leagues_in_play(data: dict, primary: str = "E0") -> list[str]:
+    """The primary league plus every league with fixtures in this build (data.json
+    `leagues`, or the fixtures' own `league`), primary first."""
+    codes = [primary]
+    listed = [lg["code"] for lg in data.get("leagues") or [] if lg.get("fixtures")]
+    tagged = [f.get("league") for f in data.get("fixtures") or [] if f.get("league")]
+    for c in listed + tagged:
+        if c not in codes:
+            codes.append(c)
+    return codes
+
+
 def backtest_path(log_dir: Path, league: str = "E0") -> Path:
     """Where backtest-dk saves the app's backtest section (on the data-log branch)."""
     return Path(log_dir) / "backtest" / f"{league}_dk.json"
@@ -521,38 +534,59 @@ def run(
     written = 0
     live_trades: list[dict] = []
     backtests: dict[str, dict | None] = {}
-    dk = _read_json(backtest_path(log_dir, league)) if log_dir is not None else None
-    rule = tr.paper_threshold(dk)
+    codes = leagues_in_play(data, league)
+    rules = {
+        lg: tr.paper_threshold(
+            _read_json(backtest_path(log_dir, lg)) if log_dir is not None else None, lg
+        )
+        for lg in codes
+    }
+    rule = rules[league]
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"], threshold_source=rule["source"], threshold_note=rule["note"]
     )
+    portfolio["rules"] = rules  # per league: the minimum edge each one trades at
     if log_dir is None or not Path(log_dir).is_dir():
         live["error"] = "The paper-trade ledger is unavailable, so nothing was opened this update."
     else:
         try:
-            ledger = load_ledger(log_dir, league)
+            ledger: dict[str, dict] = {}
+            for lg in codes:
+                ledger.update(load_ledger(log_dir, lg))
         except Exception as exc:  # corrupt or unreadable: never write blind
             live["error"] = (
                 f"The paper-trade ledger couldn't be read ({type(exc).__name__}), "
                 "so nothing was opened this update."
             )
         else:
-            log = ol.load(log_dir, league) if ol.log_dir(log_dir).is_dir() else None
-            events, note = update_ledger(
-                ledger,
-                data.get("fixtures", []),
-                data.get("odds_source") or {},
-                results,
-                now,
-                league,
-                model_ref(data),
-                apps=apps,
-                players_on=bool(
-                    ((data.get("players_status") or {}).get("gate") or {}).get("passed")
-                ),
-                odds_log=log,
-                threshold=rule["threshold"],
-            )
+            players_on = bool(((data.get("players_status") or {}).get("gate") or {}).get("passed"))
+            events: list[dict] = []
+            note = None
+            for lg in codes:
+                # Each league runs the rule on its own trades, fixtures, odds and results.
+                sub = {k: t for k, t in ledger.items() if k.split("|")[0] == lg}
+                cards = [c for c in data.get("fixtures", []) if (c.get("league") or league) == lg]
+                res = results
+                if res is not None and "league" in res and not res.empty:
+                    res = res[res["league"] == lg]
+                log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
+                ev, n = update_ledger(
+                    sub,
+                    cards,
+                    ol.source_for(data, lg, league),
+                    res,
+                    now,
+                    lg,
+                    model_ref(data),
+                    apps=apps if lg == league else None,
+                    players_on=players_on and lg == league,
+                    odds_log=log,
+                    threshold=rules[lg]["threshold"],
+                )
+                ledger.update(sub)
+                events += ev
+                if lg == league:
+                    note = n
             written = append_events(log_dir, events, league)
             live_trades = list(ledger.values())
             live.update(portfolio_section(live_trades), note=note)

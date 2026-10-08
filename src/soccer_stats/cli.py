@@ -117,6 +117,34 @@ def cmd_log_odds(args: argparse.Namespace) -> None:
     print(f"Odds log: {n} new rows ({len(rows)} priced fixture markets this build)")
 
 
+def cmd_estimate_credits(args: argparse.Namespace) -> None:
+    """Expected Odds API credits per league for a month under the refresh rules."""
+    from soccer_stats.leagues import LEAGUES
+    from soccer_stats.odds_feed import estimate_credits
+    from soccer_stats.xg import load_schedule
+
+    start = pd.Timestamp(f"{args.month}-01", tz="UTC")
+    end = start + pd.offsets.MonthBegin(1)
+    year = start.year if start.month >= 7 else start.year - 1
+    total = 0
+    print(f"Odds API credits for {args.month} (refresh rules only; an upper bound):")
+    for code, lg in LEAGUES.items():
+        try:
+            sched = load_schedule(code, year, include_played=True)
+            kickoffs = list(sched["kickoff"])
+        except Exception as exc:  # no schedule: say so rather than guess
+            print(f"  {lg.name:<15} schedule unavailable ({type(exc).__name__})")
+            continue
+        e = estimate_credits(code, kickoffs, start, end)
+        if lg.live:
+            total += e["credits"]
+        print(
+            f"  {lg.name:<15} {'live' if lg.live else 'off ':<4}  {e['matches']:>3} matches  "
+            f"{e['calls']:>4} calls  {e['credits']:>5} credits ({lg.odds_policy})"
+        )
+    print(f"Live leagues now: {total} credits")
+
+
 def cmd_paper(args: argparse.Namespace) -> None:
     import json
 
@@ -127,8 +155,8 @@ def cmd_paper(args: argparse.Namespace) -> None:
     site = Path(args.site)
     data = json.loads((site / "data.json").read_text())
     season = current_season()
-    try:
-        results = load_matches([args.league], [season - 1, season])
+    try:  # every league with fixtures or trades this build (leagues.py), primary first
+        results = load_matches(paper.leagues_in_play(data, args.league), [season - 1, season])
     except Exception as exc:  # no results: trades stay open until the next build
         print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
         results = pd.DataFrame(columns=["home", "away", "season"])
@@ -1153,6 +1181,12 @@ def main(argv: list[str] | None = None) -> None:
     lo.add_argument("--log-dir", required=True, help="data-log checkout")
     lo.add_argument("--league", default="E0")
     lo.set_defaults(func=cmd_log_odds)
+
+    ec = sub.add_parser(
+        "estimate-credits", help="Odds API credits per league for a month (refresh rules)"
+    )
+    ec.add_argument("--month", default=pd.Timestamp.now(tz="UTC").strftime("%Y-%m"))
+    ec.set_defaults(func=cmd_estimate_credits)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")
