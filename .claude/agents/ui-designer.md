@@ -22,7 +22,7 @@ How you work:
   - Take screenshots at 390px in light and dark mode, and look at them.
   - Check the browser console for errors.
   - Run `node --check web/app.js`.
-- Bump the cache name in `web/sw.js` (`pl-model-vNN`) whenever web files change.
+- Bump the cache name in `web/sw.js` (`soccer-model-vNN`) whenever web files change.
 - Before you finish, run `uv run ruff check src tests && uv run pytest -q` (or `.venv/bin/pytest`). All must pass.
 - Update the "App (`web/`)" part of CLAUDE.md, and the README's app section, for what you changed.
 - Commit on your own branch with an imperative summary and a why-body. The lead-reviewer merges it. Report the screenshots' paths and what you verified.

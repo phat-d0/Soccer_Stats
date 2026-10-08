@@ -16,7 +16,7 @@ uv run pytest           # run tests
 
 ## iPhone app
 
-A phone-first web app you add to your home screen. It opens full-screen with its own
+A phone-first web app, **Soccer Model**, that you add to your home screen. It opens full-screen with its own
 icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next round
 with value picks; tap for model, blend and DraftKings side by side, player lines and the
 scoreline heatmap), **Teams** (ratings + xG), **Record** (match bets: model alone vs
