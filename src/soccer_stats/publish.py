@@ -123,6 +123,12 @@ def upcoming_fixtures(
     return window.reset_index(drop=True)
 
 
+def _season_teams(matches: pd.DataFrame, season: int) -> set[str]:
+    """Teams with a match (home or away) in the season so far: the names odds must match."""
+    this = matches[matches["date"] >= f"{season}-07-01"]
+    return set(this["home"]) | set(this["away"])
+
+
 def with_draftkings(
     fixtures: pd.DataFrame,
     league: str,
@@ -156,7 +162,7 @@ def with_draftkings(
     }
     if events is None:
         return fixtures, source
-    dk = parse_odds(events, known_teams)
+    dk = align_to_schedule(parse_odds(events, known_teams), fixtures)
     out = apply_odds(fixtures, dk) if not fixtures.empty else fixtures
     have = set(zip(out.get("home", []), out.get("away", []), strict=False))
     horizon = (
@@ -168,13 +174,63 @@ def with_draftkings(
         [(h, a) not in have for h, a in zip(dk["home"], dk["away"], strict=True)], dtype=bool
     )
     in_window = (dk["kickoff"] >= now - pd.Timedelta(hours=2)) & (dk["kickoff"] <= horizon)
-    extra = dk[unscheduled & in_window.to_numpy()]
+    # A match the schedule lacks joins only when the model knows both teams. Otherwise it
+    # is an unmapped spelling (a second card beside the scheduled one, with league-average
+    # chances), so it is left out and listed for odds_feed.TEAM_NAMES.
+    named = np.array(
+        [
+            not known_teams or (h in known_teams and a in known_teams)
+            for h, a in zip(dk["home"], dk["away"], strict=True)
+        ],
+        dtype=bool,
+    )
+    candidates = unscheduled & in_window.to_numpy()
+    source["unmatched"] = [
+        f"{h} v {a} ({k:%Y-%m-%d %H:%M})"
+        for h, a, k in dk.loc[candidates & ~named, ["home", "away", "kickoff"]].itertuples(
+            index=False
+        )
+    ]
+    extra = dk[candidates & named]
     if not extra.empty:
         out = (
             pd.concat([out, extra], ignore_index=True).sort_values("kickoff").reset_index(drop=True)
         )
     source.update(name=BOOKMAKER_NAME, format="american")
     return out, source
+
+
+def align_to_schedule(dk: pd.DataFrame, fixtures: pd.DataFrame, hours: float = 3.0) -> pd.DataFrame:
+    """Give a priced match the schedule's team names when only one name differs.
+
+    A DraftKings event whose (home, away) isn't scheduled takes the names of the one
+    scheduled fixture within `hours` of its kickoff that shares its home or its away team.
+    """
+    if dk.empty or fixtures.empty:
+        return dk
+    out = dk.copy()
+    have = set(zip(fixtures["home"], fixtures["away"], strict=True))
+    kick = pd.to_datetime(fixtures["kickoff"], utc=True)
+    for i, r in out.iterrows():
+        if (r["home"], r["away"]) in have:
+            continue
+        near = (kick - r["kickoff"]).abs() <= pd.Timedelta(hours=hours)
+        same = near & ((fixtures["home"] == r["home"]) | (fixtures["away"] == r["away"]))
+        if same.sum() == 1:
+            fx = fixtures[same].iloc[0]
+            out.at[i, "home"], out.at[i, "away"] = fx["home"], fx["away"]
+    return out
+
+
+def duplicate_fixtures(fixtures: list[dict]) -> list[tuple]:
+    """Cards that share (league, home, away, kickoff): should always be empty."""
+    seen, dups = set(), []
+    for f in fixtures:
+        key = (f.get("league", lgs.PRIMARY), f.get("home"), f.get("away"), f.get("kickoff"))
+        if key in seen:
+            dups.append(key)
+        seen.add(key)
+    return dups
 
 
 def implied_probs(r: dict) -> dict:
@@ -467,9 +523,11 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
         events = []
         if gate["passed"]:
             events, status["odds"] = fetch_live(league, credits_left=credits_left)
+        # Player lines are Premier League only: other leagues' cards stay out.
+        own = [fx for fx in data["fixtures"] if fx.get("league", league) == league]
         cards, st = player_cards(
             apps,
-            data["fixtures"],
+            own,
             fpl_players(fpl_df) if fpl_df is not None else None,
             events,
             factors=gate["factors"],
@@ -497,7 +555,7 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
         matches, _ = with_xg(matches)
         fixtures = upcoming_fixtures(league, now=now)
-        known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
+        known = _season_teams(matches, season)
         fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
         weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
         model = dashboard.fit_model(matches, xg_weight=weight)
@@ -530,7 +588,7 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
-    known = set(matches.loc[matches["date"] >= f"{season}-07-01", "home"])
+    known = _season_teams(matches, season)
     # The primary league budgets as if alone (share 1): the others never slow it down.
     fixtures, odds_source = with_draftkings(fixtures, league, known)
 
@@ -556,6 +614,14 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         cards, sources[code] = league_fixtures(code, share)
         data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])
         print(f"{lgs.name(code)}: {len(cards)} fixtures, odds {sources[code].get('name')}")
+    for code, src in sources.items():
+        if src.get("unmatched"):  # priced matches that joined no fixture
+            print(
+                f"{lgs.name(code)}: {len(src['unmatched'])} odds events unmatched: "
+                + "; ".join(src["unmatched"])
+            )
+    dups = duplicate_fixtures(data["fixtures"])
+    print(f"Duplicate fixtures: {len(dups)}" + (f" {dups}" if dups else ""))
     data["odds_sources"] = _clean(sources)
     data["leagues"] = league_list(data["fixtures"], sources)
     data["portfolio"] = portfolio_placeholder()
