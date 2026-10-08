@@ -77,5 +77,9 @@ Ways to spend less, if needed (none are built yet):
   in `odds_feed.py` and a unique-prefix match). Names only mapped for English clubs so far
   may leave some fixtures without odds. The publish log prints each league's fixture
   count and odds source; look for fixtures missing odds and add the spellings.
+- **xG team names.** The research lab found Understat xG matching only 89–90% of 2025/26
+  La Liga and Bundesliga matches: probably a promoted club or two spelled differently
+  (`xg.TEAM_NAMES`). Unmatched matches fall back to goals in the fit, so nothing breaks,
+  but check the publish log's xG coverage for each league once it's live.
 - **Team news and the blend.** FPL team news and the model+price blend (`p_bet`) are
   Premier League only. Other leagues use the raw model's chance.
