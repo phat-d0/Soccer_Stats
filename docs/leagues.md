@@ -18,9 +18,9 @@ The Odds API key is shared with the baseball app. The balance was about 22,600 o
    `backtest/<code>_dk.json` → `edge_threshold.min_edge` on `data-log`, or else the research
    lab's committed level (`src/soccer_stats/lab/min_edge.json` → `leagues[code]`, learned on
    Pinnacle prices). So far the lab reports null for SP1, D1, I1 and F1; E1 is still being
-   computed. That needs a DraftKings
-   backtest for the league, which needs historical DraftKings odds, which costs credits.
-   That's a separate decision. With no level, the league shows fixtures and odds only.
+   computed. A DraftKings level for the league needs its own DraftKings backtest, which
+   needs historical DraftKings odds, which cost credits. That's a separate decision. With
+   no level, the league shows fixtures and odds only.
 
 ## Refresh rule
 
