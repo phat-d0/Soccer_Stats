@@ -464,3 +464,78 @@ What it shows:
   the model's error, not information.
 - The expected `min_edge: null` holds everywhere. The app should say so in plain words
   instead of offering edge buttons that imply a bet is worth taking.
+
+## Bake-off 3: 1X2 on La Liga, Bundesliga, Serie A and Ligue 1 (pre-registered 2026-10-08, before any model run)
+
+**Question:** does any model, or a stack of a model with the opening price, add
+information to Pinnacle's early 1X2 price out of sample in Spain (SP1), Germany (D1),
+Italy (I1) or France (F1)?
+
+**Coverage checked first** (`odds-check.yml` `task=lab-coverage`, runs 37840790870,
+37840794329, 37840798213, 37840802259 and 37841597798). It counts matches with all six
+Pinnacle 1X2 prices (early and close) and matches with Understat xG; it scores no
+results and fits no models.
+
+| League | Pinnacle, 2016/17–2024/25 | Pinnacle, 2025/26 | xG, 2016/17–2024/25 |
+| --- | --- | --- | --- |
+| SP1 | 99–100% | 49% | 100% |
+| D1 | 100% | 49% | 100% |
+| I1 | 99–100% | 52% | 100% |
+| F1 | 99–100% | 50% | 90% (2016/17), else 100% |
+
+- The first D1 check found xG on only 78–89% of 2016/17–2018/19. Three Understat names
+  had no football-data spelling: Hamburger SV, Hannover 96 and Nuernberg. I added them
+  to `xg.TEAM_NAMES` (c30fed5, additive; the moneyline session was told). The re-check
+  shows 100%.
+- F1's 2016/17 gap is in a warm-up season only.
+- Ligue 1 had 279 matches in 2019/20 (stopped early) and 306 a season from 2023/24.
+
+**Seasons (chosen from the coverage above):**
+- 2014/15–2015/16 warm up features and training.
+- 2016/17 is predicted, not scored; it feeds the stack.
+- **Development: 2017/18–2023/24** (7 seasons, about 2,300–2,650 matches per league).
+- **Holdout: 2024/25, locked**, the latest season with at least 90% Pinnacle coverage
+  in every league (`--holdout-season 2024`).
+- 2025/26 is not used at all: under 90% coverage, and after the holdout, so it stays
+  locked.
+
+**Same as bake-off 1 (E0):**
+- candidates a–e, with the same tuning grids and the same nested tuning;
+- features with xG (`features.FEATURES`: Elo, 6/20-match xG and goals for and against,
+  rest); Dixon-Coles and the hierarchical Poisson fit 0.7·xG + 0.3·goals;
+- the stack rule (e = the best of a–d by development log loss, blended with Pinnacle
+  early);
+- the market (Pinnacle early, Shin) and the bet rule (12% edge, one per match, at
+  Pinnacle early);
+- the metrics and the pass rule: for a–d, blend-weight range above 0 **and** CLV range
+  above 0; for e, log-loss gain range above 0 **and** CLV range above 0. Profit alone
+  never passes.
+- The 90% coverage rule applies per season. All development seasons pass it, per the
+  table above.
+
+**Multiple testing:** the four leagues are one family. 4 leagues × 5 candidates × 2 pass
+metrics = **40 tests**, so every development range is **99.875%** (Bonferroni). Tuning
+variants are chosen inside the training years: 19 configs per league, 76 in all, not
+scored separately.
+
+**Holdout:** opened once per league, after that league's development results are
+recorded here, for:
+1. every candidate that passes;
+2. a (the reference);
+3. the best of b–d by development log loss;
+4. e, as defined (the stack on the best of a–d).
+
+Each league's holdout ranges are Bonferroni for 2 × its finalists × 4 leagues.
+
+**Learned minimum edge, per league:** `lab.thresholds.edge_threshold` on a's (the live
+model's) bets at Pinnacle early. The bets are the live rule at a threshold of 0 over the
+development seasons; the check is 2023/24, the latest development season. The rules are
+as pre-registered for the learned minimum edge above (5-point bands, 95%, at least 30
+bets, every higher band, the check must return more than 0). It is reported per league,
+and I expect null.
+
+**If something passes on development and on its holdout:** a handover proposal for the
+moneyline agent. Otherwise, no change and a plain verdict.
+
+**Run:** `odds-check.yml` with `task=lab`, `league=SP1|D1|I1|F1` and `holdout_season=2024`;
+then `task=lab-holdout` with the same inputs and the finalists. Print-only, no credits.
