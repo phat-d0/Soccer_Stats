@@ -607,4 +607,4 @@ What it shows:
   common rows in the table. a skips a team's first matches after promotion, so in D1
   and I1 d won on its own rows even though a is lower on the common rows. I keep e as
   it was defined and scored in development, as in bake-off 1.
-- Holdout ranges: 99.583% (Bonferroni for 3 finalists × 2 × 4 leagues = 24).
+- Holdout ranges: 99.79% (Bonferroni for 3 finalists × 2 × 4 leagues = 24).
