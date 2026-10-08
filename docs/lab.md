@@ -539,3 +539,72 @@ moneyline agent. Otherwise, no change and a plain verdict.
 
 **Run:** `odds-check.yml` with `task=lab`, `league=SP1|D1|I1|F1` and `holdout_season=2024`;
 then `task=lab-holdout` with the same inputs and the finalists. Print-only, no credits.
+
+### Development results (2026-10-08 20:45–20:48 UTC, holdouts locked)
+
+Runs 37841844538 (SP1), 37841848290 (D1), 37841852120 (I1) and 37841856079 (F1).
+Seasons 2017/18–2023/24. Ranges are 99.875% (Bonferroni for 40 tests) and resample
+whole matches. Bets: the live rule (12% edge, one per match) at Pinnacle's early price,
+1 unit each.
+
+| League | Candidate | Matches | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | a Dixon-Coles + xG | 2,569 | 0.9868 (0.9772) | −0.010 (−0.019 to −0.000) | +0.20 (−0.09 to +0.55) | 1,205 | −5.0% (−6.1 to −3.9) | +0.8% (−19 to +23) | no |
+| SP1 | b Hierarchical Poisson | 2,569 | 0.9915 | −0.014 (−0.023 to −0.004) | +0.10 (−0.26 to +0.47) | 1,402 | −5.4% (−6.4 to −4.4) | −5.8% (−24 to +13) | no |
+| SP1 | c LightGBM | 2,569 | 1.0029 | −0.026 (−0.040 to −0.011) | +0.06 (−0.12 to +0.26) | 1,712 | −3.5% (−4.2 to −2.7) | +0.5% (−12 to +16) | no |
+| SP1 | d Multinomial logit | 2,569 | 0.9948 | −0.018 (−0.029 to −0.006) | +0.08 (−0.18 to +0.31) | 1,418 | −4.0% (−4.9 to −3.1) | −2.3% (−17 to +13) | no |
+| SP1 | e Stack (a + early) | 2,569 | 0.9777 | −0.001 (−0.004 to +0.003) | – | 14 | −8.1% (−19 to +3) | −100% | no |
+| D1 | a Dixon-Coles + xG | 2,079 | 0.9972 (0.9833) | −0.014 (−0.024 to −0.004) | −0.30 (−0.67 to +0.12) | 822 | −4.1% (−5.2 to −2.9) | −0.6% (−27 to +24) | no |
+| D1 | b Hierarchical Poisson | 2,079 | 1.0020 | −0.019 (−0.032 to −0.008) | −0.28 (−0.66 to +0.14) | 1,227 | −4.2% (−5.5 to −3.2) | −8.6% (−28 to +15) | no |
+| D1 | c LightGBM | 2,079 | 1.0139 | −0.031 (−0.048 to −0.013) | −0.06 (−0.29 to +0.20) | 1,456 | −4.1% (−4.9 to −3.2) | −1.2% (−16 to +17) | no |
+| D1 | d Multinomial logit | 2,079 | 1.0010 | −0.018 (−0.033 to −0.004) | −0.03 (−0.42 to +0.34) | 1,272 | −4.2% (−5.1 to −3.3) | −0.2% (−18 to +17) | no |
+| D1 | e Stack (d + early) | 2,079 | 0.9853 | −0.002 (−0.007 to +0.003) | – | 204 | −4.9% (−8.2 to −1.6) | −1.5% (−49 to +49) | no |
+| I1 | a Dixon-Coles + xG | 2,561 | 0.9733 (0.9545) | −0.019 (−0.028 to −0.010) | −0.30 (−0.63 to +0.08) | 1,081 | −4.4% (−5.5 to −3.2) | −15.5% (−34 to +6) | no |
+| I1 | b Hierarchical Poisson | 2,561 | 0.9769 | −0.022 (−0.032 to −0.013) | −0.26 (−0.60 to +0.13) | 1,384 | −5.2% (−6.3 to −4.1) | −14.9% (−32 to +4) | no |
+| I1 | c LightGBM | 2,561 | 0.9824 | −0.028 (−0.044 to −0.015) | −0.05 (−0.24 to +0.20) | 1,583 | −3.5% (−4.3 to −2.6) | −5.4% (−19 to +12) | no |
+| I1 | d Multinomial logit | 2,561 | 0.9746 | −0.020 (−0.031 to −0.010) | −0.09 (−0.31 to +0.19) | 1,240 | −3.2% (−4.0 to −2.3) | −14.8% (−29 to +0) | no |
+| I1 | e Stack (d + early) | 2,561 | 0.9543 | +0.000 (−0.005 to +0.006) | – | 147 | −3.9% (−6.4 to −1.6) | +0.9% (−28 to +34) | no |
+| F1 | a Dixon-Coles + xG | 2,390 | 1.0051 (0.9890) | −0.016 (−0.026 to −0.007) | −0.22 (−0.58 to +0.19) | 1,068 | −3.8% (−4.9 to −2.6) | −8.4% (−28 to +14) | no |
+| F1 | b Hierarchical Poisson | 2,390 | 1.0067 | −0.018 (−0.026 to −0.007) | −0.22 (−0.59 to +0.22) | 1,181 | −4.7% (−5.8 to −3.7) | −6.9% (−26 to +13) | no |
+| F1 | c LightGBM | 2,390 | 1.0227 | −0.034 (−0.047 to −0.019) | −0.17 (−0.38 to +0.09) | 1,498 | −3.4% (−4.3 to −2.6) | −6.4% (−22 to +8) | no |
+| F1 | d Multinomial logit | 2,390 | 1.0126 | −0.024 (−0.035 to −0.012) | −0.19 (−0.45 to +0.09) | 1,252 | −4.1% (−5.1 to −3.0) | −7.3% (−25 to +12) | no |
+| F1 | e Stack (a + early) | 2,390 | 0.9904 | −0.001 (−0.006 to +0.002) | – | 54 | −4.2% (−9.1 to +0.0) | −0.7% (−50 to +48) | no |
+
+**Learned minimum edge (a at Pinnacle early; development 2017/18–2022/23, check 2023/24):**
+
+| League | Bets | `min_edge` | Best band (development) |
+| --- | --- | --- | --- |
+| SP1 | 2,432 | null | 24–29%: 115 bets, +30.7% (range −16.7% to +84.6%) |
+| D1 | 1,954 | null | 18–23%: 128 bets, +11.6% (range −24.0% to +49.8%) |
+| I1 | 2,395 | null | 12–17%: 259 bets, +19.7% (range −5.5% to +47.9%) |
+| F1 | 2,236 | null | 13–18%: 267 bets, +8.9% (range −13.4% to +34.1%) |
+
+What it shows:
+- **Nothing passes in any of the four leagues.** Every model is worse than Pinnacle's
+  early price on log loss: −0.010 to −0.034, with every range at or below 0. No
+  blend-weight range clears 0; in D1, I1 and F1 every point estimate is negative.
+- **CLV is −3.2% to −5.4%** for every model in every league, with tight ranges.
+- **The stack only matches the price** (gains −0.002 to +0.000). Its few bets also have
+  negative CLV, so the stack adds nothing.
+- This is the same as the Premier League (bake-off 1, with xG) and the English lower
+  leagues (bake-off 2, goals only). With xG and a fully priced holdout season, the
+  big-four leagues behave like E0.
+- **No league has a minimum edge**, so `min_edge` is null for each. Serie A's best band
+  comes closest (lower bound −5.5%), but it is one band out of 31 and fails the
+  every-higher-band rule.
+
+**Holdout finalists** (by the pre-registered rule):
+
+| League | Finalists |
+| --- | --- |
+| SP1 | a, b (best of b–d), e (on a) |
+| D1 | a, d (best of b–d), e (on d) |
+| I1 | a, d (best of b–d), e (on d) |
+| F1 | a, b (best of b–d), e (on a) |
+
+- **Stack base, a subtlety.** The stack's base is chosen by each candidate's development
+  log loss over the rows *it* predicted (`run.py`, as in bake-offs 1 and 2), not the
+  common rows in the table. a skips a team's first matches after promotion, so in D1
+  and I1 d won on its own rows even though a is lower on the common rows. I keep e as
+  it was defined and scored in development, as in bake-off 1.
+- Holdout ranges: 99.583% (Bonferroni for 3 finalists × 2 × 4 leagues = 24).
