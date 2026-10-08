@@ -768,7 +768,10 @@ resample whole matches. With ranges this wide and nothing tuned, there is no sep
 holdout: each test is run once.
 
 **Reading the result.**
-- The close absorbs lineup news in a league if test 4's range includes 0.
+- The close absorbs lineup news in a league if test 4's range is not above 0 (it
+  includes 0, or lies below it: adding x then only adds noise). Clarified before any
+  real run, after the synthetic tests showed a range wholly below 0 for a close that
+  already knows the XI.
 - Lineups move the price there if test 1 passes.
 - If the close absorbs it everywhere, a team-news edge can only exist against books
   slower than Pinnacle (DraftKings). The live check on 16 Nov answers that question;
