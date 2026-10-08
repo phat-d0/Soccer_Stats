@@ -289,3 +289,34 @@ def test_season_kickoffs_from_football_data(tmp_path, monkeypatch):
         pd.Timestamp("2025-10-07 18:45", tz="UTC"),
         pd.Timestamp("2026-02-01 15:00", tz="UTC"),  # GMT; no time = 15:00
     ]
+
+
+def test_lab_levels_fill_in_for_leagues_without_a_backtest(tmp_path, monkeypatch):
+    lab = tmp_path / "min_edge.json"
+    lab.write_text(
+        json.dumps(
+            {
+                "method": "model at Pinnacle early",
+                "leagues": {
+                    "SP1": {"min_edge": 0.07, "note": None},
+                    "E0": {"min_edge": 0.01, "note": None},  # never used for E0
+                },
+            }
+        )
+    )
+    monkeypatch.setattr(paper, "LAB_LEVELS", lab)
+    log = tmp_path / "log"
+    (log / "backtest").mkdir(parents=True)
+    assert paper.league_backtest(log, "SP1") == {"edge_threshold": {"min_edge": 0.07, "note": None}}
+    assert paper.league_backtest(log, "E0") is None  # E0 reads E0_dk.json only
+    assert paper.league_backtest(log, "D1") is None
+    # A league's own DraftKings backtest wins over the lab file.
+    own = {"edge_threshold": {"min_edge": 0.03, "note": None}}
+    (log / "backtest" / "SP1_dk.json").write_text(json.dumps(own))
+    assert paper.league_backtest(log, "SP1") == own
+
+    (log / "backtest" / "SP1_dk.json").unlink()
+    d = _two_league_data({"league": "SP1", **src()})
+    paper.run(d, log, None, now=NOW)
+    assert d["portfolio"]["rules"]["SP1"]["threshold"] == 0.07
+    assert paper.load_ledger(log, "SP1")  # the SP1 trade (20% edge) opened at 7%

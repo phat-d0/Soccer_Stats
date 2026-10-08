@@ -508,11 +508,7 @@ def _add_league_levels(bt: dict | None, codes: list[str], rules: dict, log_dir, 
         return
     by = {}
     for lg in codes:
-        own = (
-            et
-            if lg == primary
-            else (_read_json(backtest_path(log_dir, lg)) or {}).get("edge_threshold")
-        )
+        own = et if lg == primary else (league_backtest(log_dir, lg) or {}).get("edge_threshold")
         by[lg] = own if isinstance(own, dict) else {"min_edge": None, "note": rules[lg]["note"]}
     bt["edge_threshold"] = {**et, "by_league": by}
 
@@ -527,6 +523,21 @@ def leagues_in_play(data: dict, primary: str = "E0") -> list[str]:
         if c not in codes:
             codes.append(c)
     return codes
+
+
+LAB_LEVELS = Path(__file__).resolve().parent / "lab" / "min_edge.json"
+
+
+def league_backtest(log_dir: Path, league: str) -> dict | None:
+    """The file a league's minimum edge comes from: backtest/<code>_dk.json on data-log;
+    for a league other than E0 without one, the research lab's committed levels
+    (lab/min_edge.json -> leagues[code], an edge_threshold dict) wrapped as
+    {"edge_threshold": ...}. None when neither has the league."""
+    dk = _read_json(backtest_path(log_dir, league))
+    if dk is not None or league == "E0":
+        return dk
+    et = ((_read_json(LAB_LEVELS) or {}).get("leagues") or {}).get(league)
+    return {"edge_threshold": et} if isinstance(et, dict) else None
 
 
 def backtest_path(log_dir: Path, league: str = "E0") -> Path:
@@ -554,9 +565,7 @@ def run(
     backtests: dict[str, dict | None] = {}
     codes = leagues_in_play(data, league)
     rules = {
-        lg: tr.paper_threshold(
-            _read_json(backtest_path(log_dir, lg)) if log_dir is not None else None, lg
-        )
+        lg: tr.paper_threshold(league_backtest(log_dir, lg) if log_dir is not None else None, lg)
         for lg in codes
     }
     rule = rules[league]

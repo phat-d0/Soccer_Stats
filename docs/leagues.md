@@ -14,8 +14,11 @@ The Odds API key is shared with the baseball app. The balance was about 22,600 o
 2. Each publish run then builds that league's fixtures with its own match model, fetches
    its DraftKings odds by the refresh rule below, and logs them to
    `odds_log/<code>_<YYYY-MM>.jsonl`. The app gets every fixture tagged with its league.
-3. **Paper trades for that league stay off** until it has its own learned minimum edge
-   (`backtest/<code>_dk.json` → `edge_threshold.min_edge`). That needs a DraftKings
+3. **Paper trades for that league stay off** until it has its own learned minimum edge:
+   `backtest/<code>_dk.json` → `edge_threshold.min_edge` on `data-log`, or else the research
+   lab's committed level (`src/soccer_stats/lab/min_edge.json` → `leagues[code]`, learned on
+   Pinnacle prices). So far the lab reports null for SP1, D1, I1 and F1; E1 is still being
+   computed. That needs a DraftKings
    backtest for the league, which needs historical DraftKings odds, which costs credits.
    That's a separate decision. With no level, the league shows fixtures and odds only.
 
