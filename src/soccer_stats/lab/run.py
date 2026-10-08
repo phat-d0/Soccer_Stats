@@ -309,6 +309,24 @@ def model_edge_threshold(
     return th.edge_threshold(bets, label)
 
 
+def _print_edge(name: str, edge_th: dict) -> None:
+    me = edge_th.get("min_edge")
+    print(f"\n== Learned minimum edge ({name} at Pinnacle early, development seasons) ==")
+    print(
+        f"  min_edge: {'none' if me is None else f'{me:.0%}'}; {edge_th.get('n_bets')} "
+        f"bets; {edge_th.get('seasons')}"
+    )
+    print(f"  {edge_th.get('note')}")
+    for r in edge_th.get("by_bucket", []):
+        hi = "up" if r["edge_hi"] is None else f"{r['edge_hi']:.0%}"
+        rng = f" ({r['roi_lo']:+.1%} to {r['roi_hi']:+.1%})" if r.get("roi_lo") is not None else ""
+        print(
+            f"  claimed edge {r['edge_lo']:.0%}-{hi}: {r['n']} bets, implied "
+            f"{r['implied']:.1%}, model {r['model']:.1%}, won {r['realized']:.1%}, "
+            f"ROI {r['roi']:+.1%}{rng}"
+        )
+
+
 def by_season(df: pd.DataFrame, preds: dict, scored: pd.Series) -> dict:
     out = {}
     y = df["y"].to_numpy(int)
@@ -342,6 +360,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="print Pinnacle and xG coverage per season (counts only) and stop",
     )
+    ap.add_argument(
+        "--edge-only",
+        action="store_true",
+        help="development only: run candidate a and print its learned minimum edge "
+        "(no other candidates, no stack, no tuning)",
+    )
     ap.add_argument("--json")
     args = ap.parse_args(argv)
     league = args.league
@@ -369,6 +393,8 @@ def main(argv: list[str] | None = None) -> None:
         if STACK in names and args.stack_base not in names:
             raise SystemExit("--stack-base must be one of the finalists.")
         holdout.unlock(args.reason)
+    elif args.edge_only:
+        names = [CANDIDATES[0]]
     else:
         names = CANDIDATES + [STACK]
     # Development: 2 pass metrics x 5 candidates. Holdout: 2 x the finalists. E1-E3 are
@@ -397,6 +423,17 @@ def main(argv: list[str] | None = None) -> None:
         & (df["season_start"] <= last)
         & df["season_start"].isin(priced)
     )
+    if args.edge_only:
+        edge_th = model_edge_threshold(df, preds[names[0]], scored, "match bets at Pinnacle early")
+        _print_edge(names[0], edge_th)
+        # One line with the whole contract, so the log alone can fill lab/min_edge.json.
+        print("EDGE_JSON " + json.dumps(_jsonable(edge_th), default=str))
+        if args.json:
+            Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+            out = {"mode": "edge-only", "league": league, "coverage": cov}
+            out |= {"not_scored": dropped, "edge_threshold": edge_th}
+            Path(args.json).write_text(json.dumps(_jsonable(out), indent=1, default=str))
+        return
     stack_base = None
     if STACK in names:
         if args.open_holdout:
@@ -429,13 +466,7 @@ def main(argv: list[str] | None = None) -> None:
     base = CANDIDATES[0]  # a: the live model (pre-registered)
     if not args.open_holdout and base in preds:
         edge_th = model_edge_threshold(df, preds[base], scored, "match bets at Pinnacle early")
-        me = edge_th.get("min_edge")
-        print(f"\n== Learned minimum edge ({base} at Pinnacle early, development seasons) ==")
-        print(
-            f"  min_edge: {'none' if me is None else f'{me:.0%}'}; {edge_th.get('n_bets')} "
-            f"bets; {edge_th.get('seasons')}"
-        )
-        print(f"  {edge_th.get('note')}")
+        _print_edge(base, edge_th)
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         out = {

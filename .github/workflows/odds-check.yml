@@ -9,6 +9,8 @@
 #   shots:    Understat's shot counts vs football-data (team) and ESPN (player); no credits.
 #   lab:      the research lab's 1X2 model bake-off on development seasons (docs/lab.md);
 #             the 2025/26 holdout stays locked. No credits.
+#   lab-edge: the live model's learned minimum edge at Pinnacle early for `league`
+#             (candidate a only, development seasons; no model selection).
 #   lab-coverage: Pinnacle and xG coverage per season for `league` (counts only).
 #   lab-holdout: opens the locked holdout once for `finalists` (and `stack_base`), with
 #             `reason` printed and the time it was opened. No credits.
@@ -28,9 +30,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, goalscorer, player-lab or goal-lab"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab or goal-lab"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, goalscorer, player-lab, goal-lab]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, goalscorer, player-lab, goal-lab]
         default: coverage
       cap:
         description: "props / goalscorer: most credits to spend (0 = dry run)"
@@ -42,10 +44,10 @@ on:
         description: "match/signals: seasons to bet (start years); shots: seasons to load"
         default: "2017-2025"
       league:
-        description: "lab/lab-holdout/lab-coverage: football-data division (E0-E3, SP1, D1, I1, F1)"
+        description: "lab/lab-holdout/lab-coverage/lab-edge: football-data division (E0-E3, SP1, D1, I1, F1)"
         default: "E0"
       holdout_season:
-        description: "lab/lab-holdout: start year of the locked holdout season (blank = 2025)"
+        description: "lab/lab-holdout/lab-edge: start year of the locked holdout season (blank = 2025)"
         default: ""
       reason:
         description: "lab-holdout / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
@@ -107,6 +109,8 @@ jobs:
                      --json out/signals.json ;;
             lab) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS \
                      --json out/lab_dev.json ;;
+            lab-edge) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS --edge-only \
+                     --json out/lab_edge.json ;;
             lab-coverage) uv run python -m soccer_stats.lab.run --league "$LEAGUE" \
                      --coverage-only --json out/lab_coverage.json ;;
             lab-holdout) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS --open-holdout \

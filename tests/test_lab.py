@@ -1,5 +1,7 @@
 """Research-lab harness and bake-off candidates on synthetic data (no network)."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -338,6 +340,16 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch
         assert res["not_scored"] == [2016]
         assert res["level"] == pytest.approx(1 - 0.05 / 30, abs=1e-5)  # 3 leagues, 1 family
         assert res["coverage"]["2016"] < run.MIN_COVERAGE
+        # --edge-only: candidate a and its learned minimum edge, nothing else.
+        edge_out = tmp_path / "edge.json"
+        run.main(["--league", league, "--edge-only", "--json", str(edge_out)])
+        text2 = capsys.readouterr().out
+        assert "['a_dixon_coles']" in text2 and "Stack base" not in text2
+        assert "Learned minimum edge" in text2 and seen["locked"]
+        e = json.loads(edge_out.read_text())
+        assert e["mode"] == "edge-only" and e["not_scored"] == [2016] and "results" not in e
+        assert e["edge_threshold"]["n_bets"] > 0 and "min_edge" in e["edge_threshold"]
+        assert set(e["edge_threshold"]["seasons"]["development"]) <= {"2017", "2018"}
     elif league == "SP1":
         # Bake-off 3: four leagues in one family; the holdout moved to 2018/19, so
         # development ends at 2017/18 and 2018/19 is never scored.
