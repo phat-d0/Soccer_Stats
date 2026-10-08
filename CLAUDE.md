@@ -164,7 +164,8 @@ Read its "Status and next steps" section first; this file is the technical map.
 
 **App (`web/`)**
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`.
-- Bump the cache name in `sw.js` (`pl-model-vNN`) on every web change, or phones keep the old app.
+- The app is "Soccer Model" (renamed from "PL Model" on 8 Oct; title, metas, manifest and header). The header subtitle names the league with one, or "N leagues" with several.
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v27; `pl-model-vNN` before the rename, which activate cleans up) on every web change, or phones keep the old app.
 - Tabs:
   - Matches;
   - Teams, with Players (season stats with list and deviation chart, model backtest);
