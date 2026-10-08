@@ -138,9 +138,12 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
         e = estimate_credits(code, kickoffs, start, end)
         if lg.live:
             total += e["credits"]
+        month = [k for k in kickoffs if start <= k < end]
+        times = len({(k.hour, k.minute) for k in month})
         print(
             f"  {lg.name:<15} {'live' if lg.live else 'off ':<4}  {e['matches']:>3} matches  "
-            f"{e['calls']:>4} calls  {e['credits']:>5} credits ({lg.odds_policy})"
+            f"{e['calls']:>4} calls  {e['credits']:>5} credits ({lg.odds_policy}; "
+            f"{times} distinct kickoff times)"
         )
     print(f"Live leagues now: {total} credits")
 
