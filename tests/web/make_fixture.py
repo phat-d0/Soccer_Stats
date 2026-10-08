@@ -660,9 +660,22 @@ def add_second_league(data: dict) -> None:
     if backtests["moneyline"] is not None:
         bt = backtests["moneyline"]
         bt["trades"] = sorted(bt.get("trades", []) + bt_trades, key=lambda t: t["kickoff"])
-        et = bt.get("edge_threshold")
-        if et is not None and "by_league" not in et:
-            bt["edge_threshold"] = {**et, "by_league": {"E0": et, "SP1": SP1_EDGE}}
+    # Moneyline's multi-league contract: the leagues in this build, and a minimum per league.
+    data["leagues"] = [
+        {"code": "E0", "name": "Premier League", "live": True, "fixtures": 0, "odds": "DraftKings"},
+        {"code": "SP1", "name": "La Liga", "live": False, "fixtures": 0, "odds": None},
+    ]
+    for lg in data["leagues"]:
+        lg["fixtures"] = sum(f["league"] == lg["code"] for f in data["fixtures"])
+    r = data["portfolio"].get("rule") or {}
+    data["portfolio"]["rules"] = {
+        "E0": {
+            "threshold": r.get("threshold"),
+            "source": r.get("threshold_source"),
+            "note": r.get("threshold_note"),
+        },
+        "SP1": {"threshold": SP1_EDGE["min_edge"], "source": "history", "note": SP1_EDGE["note"]},
+    }
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     data["portfolio"]["portfolios"] = paper.portfolios_section(
         live, live_trades, backtests, ml["live"].get("rule")

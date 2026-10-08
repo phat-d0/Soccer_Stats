@@ -391,14 +391,14 @@ function closeSheet() {
 
 // ---------- competitions (football-data league codes) ----------
 const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"]];
-const leagueName = (c) => LEAGUES.find(([k]) => k === c)?.[1] || c;
-const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || c;
+const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
+const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
 const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
 const tLeague = (t) => t.league || "E0";
 // Competitions in the data: fixtures plus Moneyline's trades, in LEAGUES order.
 function leaguesPresent() {
   const ml = pfById("moneyline");
-  const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || [])].map(tLeague)]);
+  const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || [])].map(tLeague)]);
   const order = LEAGUES.map(([k]) => k);
   return [...codes].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) || a.localeCompare(b));
 }
@@ -414,9 +414,10 @@ function leagueFilter() {
 }
 // With "All" and per-league levels: one short line per competition.
 function leagueEdgeList(pfId, lg) {
-  const by = pfById(pfId)?.backtest?.edge_threshold?.by_league;
-  if (lg || !by || !Object.keys(by).length) return "";
-  const items = leaguesPresent().filter((c) => by[c]).map((c) => `${esc(leagueShort(c))}: ${by[c].min_edge == null ? "nothing flagged" : `${pct(by[c].min_edge)}+`}`);
+  const by = pfById(pfId)?.backtest?.edge_threshold?.by_league || {};
+  const rules = pfId === "moneyline" ? state.data.portfolio?.rules || {} : {};
+  if (lg || !multiLeague() || (!Object.keys(by).length && !Object.keys(rules).length)) return "";
+  const items = leaguesPresent().filter((c) => by[c] || rules[c]).map((c) => { const e = edgeInfo(pfId, c); return `${esc(leagueShort(c))}: ${e?.min_edge == null ? "nothing flagged" : `${pct(e.min_edge)}+`}`; });
   return items.length ? `<div class="meta">By competition: ${items.join(" · ")}.</div>` : "";
 }
 
@@ -424,9 +425,14 @@ function leagueEdgeList(pfId, lg) {
 // edge_threshold from a portfolio's backtest (research lab): min_edge (null = no edge level
 // beat the market), confidence, method, n_bets, seasons, note, by_bucket. Missing = older data.
 // With a league, that league's own level (edge_threshold.by_league[code]) when it has one.
+// Moneyline also has portfolio.rules[code] ({threshold, source, note}; source "none" = no
+// learned level) for leagues without their own edge_threshold.
 function edgeInfo(pfId, lg = "") {
   const et = pfById(pfId)?.backtest?.edge_threshold || null;
-  return (lg && et?.by_league?.[lg]) || et;
+  if (lg && et?.by_league?.[lg]) return et.by_league[lg];
+  const r = pfId === "moneyline" && lg && lg !== "E0" ? state.data.portfolio?.rules?.[lg] : null;
+  if (r) return { min_edge: r.source === "none" ? null : r.threshold ?? null, note: r.note || "", by_bucket: [] };
+  return et;
 }
 // The minimum edge in force for a portfolio: an explored step, else history's level,
 // else (no edge_threshold yet) the paper-trade rule. edge null = flag nothing.
