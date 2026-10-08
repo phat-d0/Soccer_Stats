@@ -464,3 +464,248 @@ What it shows:
   the model's error, not information.
 - The expected `min_edge: null` holds everywhere. The app should say so in plain words
   instead of offering edge buttons that imply a bet is worth taking.
+
+## Bake-off 3: 1X2 on La Liga, Bundesliga, Serie A and Ligue 1 (pre-registered 2026-10-08, before any model run)
+
+**Question:** does any model, or a stack of a model with the opening price, add
+information to Pinnacle's early 1X2 price out of sample in Spain (SP1), Germany (D1),
+Italy (I1) or France (F1)?
+
+**Coverage checked first** (`odds-check.yml` `task=lab-coverage`, runs 37840790870,
+37840794329, 37840798213, 37840802259 and 37841597798). It counts matches with all six
+Pinnacle 1X2 prices (early and close) and matches with Understat xG; it scores no
+results and fits no models.
+
+| League | Pinnacle, 2016/17–2024/25 | Pinnacle, 2025/26 | xG, 2016/17–2024/25 |
+| --- | --- | --- | --- |
+| SP1 | 99–100% | 49% | 100% |
+| D1 | 100% | 49% | 100% |
+| I1 | 99–100% | 52% | 100% |
+| F1 | 99–100% | 50% | 90% (2016/17), else 100% |
+
+- The first D1 check found xG on only 78–89% of 2016/17–2018/19. Three Understat names
+  had no football-data spelling: Hamburger SV, Hannover 96 and Nuernberg. I added them
+  to `xg.TEAM_NAMES` (c30fed5, additive; the moneyline session was told). The re-check
+  shows 100%.
+- F1's 2016/17 gap is in a warm-up season only.
+- Ligue 1 had 279 matches in 2019/20 (stopped early) and 306 a season from 2023/24.
+
+**Seasons (chosen from the coverage above):**
+- 2014/15–2015/16 warm up features and training.
+- 2016/17 is predicted, not scored; it feeds the stack.
+- **Development: 2017/18–2023/24** (7 seasons, about 2,300–2,650 matches per league).
+- **Holdout: 2024/25, locked**, the latest season with at least 90% Pinnacle coverage
+  in every league (`--holdout-season 2024`).
+- 2025/26 is not used at all: under 90% coverage, and after the holdout, so it stays
+  locked.
+
+**Same as bake-off 1 (E0):**
+- candidates a–e, with the same tuning grids and the same nested tuning;
+- features with xG (`features.FEATURES`: Elo, 6/20-match xG and goals for and against,
+  rest); Dixon-Coles and the hierarchical Poisson fit 0.7·xG + 0.3·goals;
+- the stack rule (e = the best of a–d by development log loss, blended with Pinnacle
+  early);
+- the market (Pinnacle early, Shin) and the bet rule (12% edge, one per match, at
+  Pinnacle early);
+- the metrics and the pass rule: for a–d, blend-weight range above 0 **and** CLV range
+  above 0; for e, log-loss gain range above 0 **and** CLV range above 0. Profit alone
+  never passes.
+- The 90% coverage rule applies per season. All development seasons pass it, per the
+  table above.
+
+**Multiple testing:** the four leagues are one family. 4 leagues × 5 candidates × 2 pass
+metrics = **40 tests**, so every development range is **99.875%** (Bonferroni). Tuning
+variants are chosen inside the training years: 19 configs per league, 76 in all, not
+scored separately.
+
+**Holdout:** opened once per league, after that league's development results are
+recorded here, for:
+1. every candidate that passes;
+2. a (the reference);
+3. the best of b–d by development log loss;
+4. e, as defined (the stack on the best of a–d).
+
+Each league's holdout ranges are Bonferroni for 2 × its finalists × 4 leagues.
+
+**Learned minimum edge, per league:** `lab.thresholds.edge_threshold` on a's (the live
+model's) bets at Pinnacle early. The bets are the live rule at a threshold of 0 over the
+development seasons; the check is 2023/24, the latest development season. The rules are
+as pre-registered for the learned minimum edge above (5-point bands, 95%, at least 30
+bets, every higher band, the check must return more than 0). It is reported per league,
+and I expect null.
+
+**If something passes on development and on its holdout:** a handover proposal for the
+moneyline agent. Otherwise, no change and a plain verdict.
+
+**Run:** `odds-check.yml` with `task=lab`, `league=SP1|D1|I1|F1` and `holdout_season=2024`;
+then `task=lab-holdout` with the same inputs and the finalists. Print-only, no credits.
+
+### Development results (2026-10-08 20:45–20:48 UTC, holdouts locked)
+
+Runs 37841844538 (SP1), 37841848290 (D1), 37841852120 (I1) and 37841856079 (F1).
+Seasons 2017/18–2023/24. Ranges are 99.875% (Bonferroni for 40 tests) and resample
+whole matches. Bets: the live rule (12% edge, one per match) at Pinnacle's early price,
+1 unit each.
+
+| League | Candidate | Matches | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | a Dixon-Coles + xG | 2,569 | 0.9868 (0.9772) | −0.010 (−0.019 to −0.000) | +0.20 (−0.09 to +0.55) | 1,205 | −5.0% (−6.1 to −3.9) | +0.8% (−19 to +23) | no |
+| SP1 | b Hierarchical Poisson | 2,569 | 0.9915 | −0.014 (−0.023 to −0.004) | +0.10 (−0.26 to +0.47) | 1,402 | −5.4% (−6.4 to −4.4) | −5.8% (−24 to +13) | no |
+| SP1 | c LightGBM | 2,569 | 1.0029 | −0.026 (−0.040 to −0.011) | +0.06 (−0.12 to +0.26) | 1,712 | −3.5% (−4.2 to −2.7) | +0.5% (−12 to +16) | no |
+| SP1 | d Multinomial logit | 2,569 | 0.9948 | −0.018 (−0.029 to −0.006) | +0.08 (−0.18 to +0.31) | 1,418 | −4.0% (−4.9 to −3.1) | −2.3% (−17 to +13) | no |
+| SP1 | e Stack (a + early) | 2,569 | 0.9777 | −0.001 (−0.004 to +0.003) | – | 14 | −8.1% (−19 to +3) | −100% | no |
+| D1 | a Dixon-Coles + xG | 2,079 | 0.9972 (0.9833) | −0.014 (−0.024 to −0.004) | −0.30 (−0.67 to +0.12) | 822 | −4.1% (−5.2 to −2.9) | −0.6% (−27 to +24) | no |
+| D1 | b Hierarchical Poisson | 2,079 | 1.0020 | −0.019 (−0.032 to −0.008) | −0.28 (−0.66 to +0.14) | 1,227 | −4.2% (−5.5 to −3.2) | −8.6% (−28 to +15) | no |
+| D1 | c LightGBM | 2,079 | 1.0139 | −0.031 (−0.048 to −0.013) | −0.06 (−0.29 to +0.20) | 1,456 | −4.1% (−4.9 to −3.2) | −1.2% (−16 to +17) | no |
+| D1 | d Multinomial logit | 2,079 | 1.0010 | −0.018 (−0.033 to −0.004) | −0.03 (−0.42 to +0.34) | 1,272 | −4.2% (−5.1 to −3.3) | −0.2% (−18 to +17) | no |
+| D1 | e Stack (d + early) | 2,079 | 0.9853 | −0.002 (−0.007 to +0.003) | – | 204 | −4.9% (−8.2 to −1.6) | −1.5% (−49 to +49) | no |
+| I1 | a Dixon-Coles + xG | 2,561 | 0.9733 (0.9545) | −0.019 (−0.028 to −0.010) | −0.30 (−0.63 to +0.08) | 1,081 | −4.4% (−5.5 to −3.2) | −15.5% (−34 to +6) | no |
+| I1 | b Hierarchical Poisson | 2,561 | 0.9769 | −0.022 (−0.032 to −0.013) | −0.26 (−0.60 to +0.13) | 1,384 | −5.2% (−6.3 to −4.1) | −14.9% (−32 to +4) | no |
+| I1 | c LightGBM | 2,561 | 0.9824 | −0.028 (−0.044 to −0.015) | −0.05 (−0.24 to +0.20) | 1,583 | −3.5% (−4.3 to −2.6) | −5.4% (−19 to +12) | no |
+| I1 | d Multinomial logit | 2,561 | 0.9746 | −0.020 (−0.031 to −0.010) | −0.09 (−0.31 to +0.19) | 1,240 | −3.2% (−4.0 to −2.3) | −14.8% (−29 to +0) | no |
+| I1 | e Stack (d + early) | 2,561 | 0.9543 | +0.000 (−0.005 to +0.006) | – | 147 | −3.9% (−6.4 to −1.6) | +0.9% (−28 to +34) | no |
+| F1 | a Dixon-Coles + xG | 2,390 | 1.0051 (0.9890) | −0.016 (−0.026 to −0.007) | −0.22 (−0.58 to +0.19) | 1,068 | −3.8% (−4.9 to −2.6) | −8.4% (−28 to +14) | no |
+| F1 | b Hierarchical Poisson | 2,390 | 1.0067 | −0.018 (−0.026 to −0.007) | −0.22 (−0.59 to +0.22) | 1,181 | −4.7% (−5.8 to −3.7) | −6.9% (−26 to +13) | no |
+| F1 | c LightGBM | 2,390 | 1.0227 | −0.034 (−0.047 to −0.019) | −0.17 (−0.38 to +0.09) | 1,498 | −3.4% (−4.3 to −2.6) | −6.4% (−22 to +8) | no |
+| F1 | d Multinomial logit | 2,390 | 1.0126 | −0.024 (−0.035 to −0.012) | −0.19 (−0.45 to +0.09) | 1,252 | −4.1% (−5.1 to −3.0) | −7.3% (−25 to +12) | no |
+| F1 | e Stack (a + early) | 2,390 | 0.9904 | −0.001 (−0.006 to +0.002) | – | 54 | −4.2% (−9.1 to +0.0) | −0.7% (−50 to +48) | no |
+
+**Learned minimum edge (a at Pinnacle early; development 2017/18–2022/23, check 2023/24):**
+
+| League | Bets | `min_edge` | Best band (development) |
+| --- | --- | --- | --- |
+| SP1 | 2,432 | null | 24–29%: 115 bets, +30.7% (range −16.7% to +84.6%) |
+| D1 | 1,954 | null | 18–23%: 128 bets, +11.6% (range −24.0% to +49.8%) |
+| I1 | 2,395 | null | 12–17%: 259 bets, +19.7% (range −5.5% to +47.9%) |
+| F1 | 2,236 | null | 13–18%: 267 bets, +8.9% (range −13.4% to +34.1%) |
+
+What it shows:
+- **Nothing passes in any of the four leagues.** Every model is worse than Pinnacle's
+  early price on log loss: −0.010 to −0.034, with every range at or below 0. No
+  blend-weight range clears 0; in D1, I1 and F1 every point estimate is negative.
+- **CLV is −3.2% to −5.4%** for every model in every league, with tight ranges.
+- **The stack only matches the price** (gains −0.002 to +0.000). Its few bets also have
+  negative CLV, so the stack adds nothing.
+- This is the same as the Premier League (bake-off 1, with xG) and the English lower
+  leagues (bake-off 2, goals only). With xG and a fully priced holdout season, the
+  big-four leagues behave like E0.
+- **No league has a minimum edge**, so `min_edge` is null for each. Serie A's best band
+  comes closest (lower bound −5.5%), but it is one band out of 31 and fails the
+  every-higher-band rule.
+
+**Holdout finalists** (by the pre-registered rule):
+
+| League | Finalists |
+| --- | --- |
+| SP1 | a, b (best of b–d), e (on a) |
+| D1 | a, d (best of b–d), e (on d) |
+| I1 | a, d (best of b–d), e (on d) |
+| F1 | a, b (best of b–d), e (on a) |
+
+- **Stack base, a subtlety.** The stack's base is chosen by each candidate's development
+  log loss over the rows *it* predicted (`run.py`, as in bake-offs 1 and 2), not the
+  common rows in the table. a skips a team's first matches after promotion, so in D1
+  and I1 d won on its own rows even though a is lower on the common rows. I keep e as
+  it was defined and scored in development, as in bake-off 1.
+- Holdout ranges: 99.79% (Bonferroni for 3 finalists × 2 × 4 leagues = 24).
+
+### Holdout results (2024/25, each opened once, 2026-10-08)
+
+| League | Run | Opened (UTC) | Matches |
+| --- | --- | --- | --- |
+| SP1 | 37843378719 | 20:58:23 | 364 |
+| D1 | 37843382576 | 20:58:26 | 285 |
+| I1 | 37843387711 | 20:58:30 | 352 |
+| F1 | 37843391250 | 20:58:30 | 291 |
+
+Each run printed its banner and reason, and 2024/25 had 100% Pinnacle coverage in every
+league. Ranges are 99.79% (Bonferroni for 24 tests).
+
+| League | Finalist | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | a | 0.9700 (0.9563) | −0.014 (−0.037 to +0.008) | −0.16 (−1.17 to +0.79) | 141 | −3.9% (−7.0 to −0.5) | −9.2% (−53 to +40) | no |
+| SP1 | b | 0.9720 | −0.016 (−0.039 to +0.008) | −0.15 (−1.24 to +0.94) | 166 | −5.9% (−8.9 to −2.9) | −15.5% (−57 to +34) | no |
+| SP1 | e (on a) | 0.9575 | −0.001 (−0.010 to +0.007) | – | 0 | – | – | no |
+| D1 | a | 1.0034 (0.9834) | −0.020 (−0.044 to +0.002) | −0.86 (−1.86 to +0.39) | 78 | −4.6% (−9.1 to −0.8) | −21.5% (−74 to +43) | no |
+| D1 | d | 1.0118 | −0.028 (−0.060 to +0.003) | −0.34 (−1.23 to +0.55) | 165 | −5.7% (−8.4 to −3.6) | −9.8% (−52 to +30) | no |
+| D1 | e (on d) | 0.9854 | −0.002 (−0.010 to +0.005) | – | 0 | – | – | no |
+| I1 | a | 0.9643 (0.9450) | −0.019 (−0.040 to −0.001) | −0.21 (−1.28 to +0.93) | 118 | −6.0% (−9.3 to −2.5) | −35.8% (−75 to +5) | no |
+| I1 | d | 0.9508 | −0.006 (−0.036 to +0.026) | +0.28 (−0.52 to +1.10) | 209 | −3.2% (−4.8 to −1.5) | −13.5% (−43 to +20) | no |
+| I1 | e (on d) | 0.9377 | +0.007 (−0.002 to +0.017) | – | 0 | – | – | no |
+| F1 | a | 0.9839 (0.9638) | −0.020 (−0.048 to +0.007) | −0.26 (−1.13 to +0.69) | 128 | −6.6% (−9.8 to −3.2) | −3.5% (−50 to +51) | no |
+| F1 | b | 0.9775 | −0.014 (−0.040 to +0.014) | −0.12 (−1.06 to +0.89) | 172 | −7.4% (−10.3 to −4.7) | −2.6% (−43 to +51) | no |
+| F1 | e (on a) | 0.9635 | +0.000 (−0.009 to +0.008) | – | 0 | – | – | no |
+
+- The holdout agrees with development: no finalist passes in any league.
+- Every model's CLV range is below 0, at −3.2% to −7.4%.
+- The Serie A stack beat the early price on 2024/25 (log loss 0.9377 vs 0.9450). Its
+  range includes 0 and it made no bets, so it fails the pre-registered rule. One season
+  out of four leagues and three finalists is the kind of result the correction exists
+  for.
+
+## Verdict (bake-off 3)
+
+**Nothing passes in La Liga, the Bundesliga, Serie A or Ligue 1, on development or on
+the holdout.** With xG and fully priced seasons, the big-four leagues match the Premier
+League:
+- every model trails Pinnacle's early price;
+- no model earns blend weight above 0;
+- the live rule's picks give up 3–7% against the close.
+
+Each league's learned minimum edge is null. Across bake-offs 1–3 that is eight leagues,
+five model types and one stack, with the same result. **No handover to the moneyline
+agent**, and no reason to add these leagues to the live bet rule. Nothing passed, so
+the question of which live book prices them didn't arise and wasn't checked.
+
+**Next ideas** (unchanged in rank from bake-off 2, with one addition):
+1. Late team news against the DraftKings odds log, once the log is long enough (free).
+2. Stop 1X2 model work against Pinnacle's early price in any league. If the owner wants
+   a non-English league shown in the app, show it for display only, with the blend
+   (which defers to the price).
+3. New: if more leagues are ever tested, test the stack's one near-miss (Serie A)
+   first, as its own pre-registered experiment on 2025/26 once a sharp closing price
+   covers it. Pinnacle in football-data covers only half of that season, so the price
+   source has to be decided first.
+
+## The Championship's learned minimum edge (pre-registered 2026-10-08, before any run)
+
+The owner is adding the Championship (E1) to the app beside the big-four leagues, so it
+needs the same learned minimum edge. This is not a new model selection: bake-off 2
+already ran E1's goals-only bake-off and nothing passed.
+- **Bets**: candidate a only (the live Dixon-Coles, goals only, the same spec as
+  bake-off 2), at Pinnacle's early 1X2 price, under the live rule at a threshold of 0
+  (the outcome with the largest positive edge, one per match). No other candidate, no
+  stack and no tuning are run (`lab.run --edge-only`).
+- **Seasons**: 2017/18–2024/25, scoring only seasons where Pinnacle's early and closing
+  prices cover at least 90% of the matches. 2025/26 is left out (47% covered) and stays
+  locked.
+- **Rule**: `lab.thresholds.edge_threshold` unchanged (5-point bands, 95% match-resampled
+  ranges, at least 30 bets per judged band). Development is every scored season but the
+  latest; the latest scored season is the check.
+- **Where it goes**: `src/soccer_stats/lab/min_edge.json`, one entry per league in the
+  `edge_threshold` contract plus the run it came from, read with
+  `lab.thresholds.league_levels()`. The same file records the big-four levels from
+  bake-off 3 (all null). E0 keeps its level in `E0_dk.json`.
+
+### Results (2026-10-08 21:15 UTC; `odds-check.yml task=lab-edge`, 0 credits)
+
+| League | Run | Bets | Development / check | min_edge | Best development band |
+| --- | --- | --- | --- | --- | --- |
+| E1 (goals only) | 37845449673 | 4,052 | 2017/18–2023/24 / 2024/25 | none | 28–33%: 162 bets, +16.4% (−9.6% to +44.6%) |
+| SP1 | 37845453133 | 2,432 | 2017/18–2022/23 / 2023/24 | none | 24–29%: 115 bets, +30.7% (−16.7% to +84.6%) |
+| D1 | 37845456702 | 1,954 | same | none | 18–23%: 128 bets, +11.6% (−24.0% to +49.8%) |
+| I1 | 37845460440 | 2,395 | same | none | 12–17%: 259 bets, +19.7% (−5.5% to +47.9%) |
+| F1 | 37845463369 | 2,236 | same | none | 13–18%: 267 bets, +8.9% (−13.4% to +34.1%) |
+
+- **The Championship has no learned minimum edge.** E1 seasons 2016/17–2024/25 are all
+  at least 99% priced, so 2017/18–2024/25 are scored and 2025/26 (47%) is left out.
+  No 5-point band from 0% to 30% has a lower bound above 0. At the live 12% rule's
+  edges (12–20%) the model claimed 42.0% and won 32.8% against 36.3% implied: −10.7% a
+  bet (−19.7% to −1.1%). Realized win rates track Pinnacle's implied rate, not the
+  model's, as in every other league.
+- The big-four reruns reproduce bake-off 3's bet counts exactly (`--edge-only` runs the
+  same candidate a on the same seasons), and all four stay null.
+- Written to `src/soccer_stats/lab/min_edge.json` (read with
+  `lab.thresholds.league_levels()`), one entry per league in the `edge_threshold`
+  contract plus `source`. The development scans are in each run's `EDGE_JSON` log line,
+  not the file. Nothing in the live rule changes.

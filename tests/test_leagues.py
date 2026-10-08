@@ -235,7 +235,14 @@ def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
     ml = next(p for p in d["portfolio"]["portfolios"] if p["id"] == "moneyline")
     by = ml["backtest"]["edge_threshold"]["by_league"]
     assert by["E0"]["min_edge"] == 0.08
-    assert by["SP1"]["min_edge"] is None and "this league" in by["SP1"]["note"]
+    # SP1 has no SP1_dk.json, so its level comes from the lab's committed file (null
+    # since bake-off 3), or the rule's own note if that file has no entry.
+    lab = paper.league_backtest(tmp_path, "SP1")
+    assert by["SP1"]["min_edge"] is None and by["SP1"]["note"]
+    if lab is not None:
+        assert by["SP1"] == lab["edge_threshold"]
+    else:
+        assert "this league" in by["SP1"]["note"]
     assert ml["backtest"]["edge_threshold"]["min_edge"] == 0.08  # top level unchanged
 
     # One league only: no by_league (the app falls back to the top level).

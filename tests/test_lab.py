@@ -1,5 +1,7 @@
 """Research-lab harness and bake-off candidates on synthetic data (no network)."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -274,7 +276,7 @@ def test_one_x_two_and_feature_models_give_valid_chances():
         assert np.isfinite(q).all()
 
 
-@pytest.mark.parametrize("league", ["E0", "E1"])
+@pytest.mark.parametrize("league", ["E0", "E1", "SP1"])
 def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch, tmp_path, capsys):
     import json
 
@@ -304,9 +306,11 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch
     df["match"] = df.index.astype(str)
     seen = {}
 
-    def fake_load(holdout, league="E0"):
+    def fake_load(holdout, league="E0", last=None):
         seen["locked"] = not holdout.unlocked
         seen["league"] = league
+        seen["last"] = last
+        seen["holdout_start"] = holdout.start
         return df
 
     monkeypatch.setattr(run, "load", fake_load)
@@ -324,7 +328,8 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch
     monkeypatch.setattr(models, "GRIDS", small)
     monkeypatch.setattr(run, "GRIDS", small)
     out = tmp_path / "lab.json"
-    run.main(["--league", league, "--json", str(out)])
+    extra = ["--holdout-season", "2018"] if league == "SP1" else []
+    run.main(["--league", league, *extra, "--json", str(out)])
     text = capsys.readouterr().out
     assert seen["locked"] and seen["league"] == league
     assert "DEVELOPMENT" in text and "HOLDOUT OPENED" not in text
@@ -335,6 +340,25 @@ def test_bake_off_runs_end_to_end_and_keeps_the_holdout_shut(league, monkeypatch
         assert res["not_scored"] == [2016]
         assert res["level"] == pytest.approx(1 - 0.05 / 30, abs=1e-5)  # 3 leagues, 1 family
         assert res["coverage"]["2016"] < run.MIN_COVERAGE
+        # --edge-only: candidate a and its learned minimum edge, nothing else.
+        edge_out = tmp_path / "edge.json"
+        run.main(["--league", league, "--edge-only", "--json", str(edge_out)])
+        text2 = capsys.readouterr().out
+        assert "['a_dixon_coles']" in text2 and "Stack base" not in text2
+        assert "Learned minimum edge" in text2 and seen["locked"]
+        e = json.loads(edge_out.read_text())
+        assert e["mode"] == "edge-only" and e["not_scored"] == [2016] and "results" not in e
+        assert e["edge_threshold"]["n_bets"] > 0 and "min_edge" in e["edge_threshold"]
+        assert set(e["edge_threshold"]["seasons"]["development"]) <= {"2017", "2018"}
+    elif league == "SP1":
+        # Bake-off 3: four leagues in one family; the holdout moved to 2018/19, so
+        # development ends at 2017/18 and 2018/19 is never scored.
+        assert res["level"] == pytest.approx(1 - 0.05 / 40, abs=1e-5)
+        assert seen["last"] == 2018 and str(seen["holdout_start"].date()) == "2018-07-01"
+        assert "DEVELOPMENT 2016/17-2017/18" in text
+        assert set(res["by_season"]) <= {"2016", "2017"}
+        et = res["edge_threshold"]
+        assert et["n_bets"] > 0 and "min_edge" in et and et["note"]
     else:
         assert res["not_scored"] == [] and res["level"] == pytest.approx(0.995)
     for name, r in res["results"].items():
@@ -348,5 +372,17 @@ def test_goals_only_features_and_league_families():
 
     assert features.FEATURES_GOALS and not [f for f in features.FEATURES_GOALS if "xg" in f]
     assert set(features.FEATURES_GOALS) < set(features.FEATURES)
-    assert run.family("E0") == 1 and run.family("E2") == 3
+    assert run.family("E0") == 1 and run.family("E2") == 3 and run.family("SP1") == 4
     assert run.has_xg("E0") and not run.has_xg("E1")
+
+
+def test_league_levels_are_read_from_the_committed_file():
+    from soccer_stats.lab import thresholds as th
+
+    levels = th.league_levels()
+    assert {"E1", "SP1", "D1", "I1", "F1"} <= set(levels) and "E0" not in levels
+    for code, lv in levels.items():
+        assert {"min_edge", "note", "method", "n_bets", "seasons", "source"} <= set(lv), code
+        assert lv["min_edge"] is None or 0 <= lv["min_edge"] <= 0.3
+        assert "Pinnacle" in lv["method"] and "not DraftKings" in lv["method"]
+    assert th.league_levels(Path("/no/such/file.json")) == {}

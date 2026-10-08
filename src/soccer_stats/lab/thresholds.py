@@ -17,6 +17,9 @@ resample whole matches), `season`, `time` (for ordering) and optionally `implied
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -27,6 +30,7 @@ GRID = tuple(round(0.01 * i, 2) for i in range(31))  # claimed edge 0%, 1%, ...,
 BAND = 0.05  # each level is judged on bets claiming t to t + BAND (the smoothing)
 MIN_BETS = 30  # a band with fewer development bets is not judged
 BUCKETS = (0.0, 0.02, 0.05, 0.08, 0.12, 0.20, 0.30, None)  # by_bucket edges (None = open)
+LEVELS_FILE = Path(__file__).with_name("min_edge.json")  # per-league levels (not E0)
 METHOD = (
     "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to "
     f"t+{BAND:.0%} returned more than 0 per unit staked at the 95% lower bound, and so "
@@ -187,3 +191,15 @@ def from_trades(trades: pd.DataFrame, implied: str | None = None) -> pd.DataFram
     if implied and implied in trades:
         out["implied"] = trades[implied].astype(float)
     return out
+
+
+def league_levels(path: Path | None = None) -> dict[str, dict]:
+    """Learned minimum edges per league from the lab's committed file, keyed by
+    football-data code (E1, SP1, D1, I1, F1): each the edge_threshold contract plus
+    `source` (the run and seasons it came from). E0's level lives in E0_dk.json. A
+    missing or unreadable file gives {}."""
+    try:
+        data = json.loads((path or LEVELS_FILE).read_text())
+    except (OSError, ValueError):
+        return {}
+    return dict(data.get("leagues") or {})
