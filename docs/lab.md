@@ -608,3 +608,61 @@ What it shows:
   and I1 d won on its own rows even though a is lower on the common rows. I keep e as
   it was defined and scored in development, as in bake-off 1.
 - Holdout ranges: 99.79% (Bonferroni for 3 finalists × 2 × 4 leagues = 24).
+
+### Holdout results (2024/25, each opened once, 2026-10-08)
+
+| League | Run | Opened (UTC) | Matches |
+| --- | --- | --- | --- |
+| SP1 | 37843378719 | 20:58:23 | 364 |
+| D1 | 37843382576 | 20:58:26 | 285 |
+| I1 | 37843387711 | 20:58:30 | 352 |
+| F1 | 37843391250 | 20:58:30 | 291 |
+
+Each run printed its banner and reason, and 2024/25 had 100% Pinnacle coverage in every
+league. Ranges are 99.79% (Bonferroni for 24 tests).
+
+| League | Finalist | Log loss (Pinnacle early) | Gain vs early (range) | Blend weight c (range) | Bets | CLV (range) | ROI (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | a | 0.9700 (0.9563) | −0.014 (−0.037 to +0.008) | −0.16 (−1.17 to +0.79) | 141 | −3.9% (−7.0 to −0.5) | −9.2% (−53 to +40) | no |
+| SP1 | b | 0.9720 | −0.016 (−0.039 to +0.008) | −0.15 (−1.24 to +0.94) | 166 | −5.9% (−8.9 to −2.9) | −15.5% (−57 to +34) | no |
+| SP1 | e (on a) | 0.9575 | −0.001 (−0.010 to +0.007) | – | 0 | – | – | no |
+| D1 | a | 1.0034 (0.9834) | −0.020 (−0.044 to +0.002) | −0.86 (−1.86 to +0.39) | 78 | −4.6% (−9.1 to −0.8) | −21.5% (−74 to +43) | no |
+| D1 | d | 1.0118 | −0.028 (−0.060 to +0.003) | −0.34 (−1.23 to +0.55) | 165 | −5.7% (−8.4 to −3.6) | −9.8% (−52 to +30) | no |
+| D1 | e (on d) | 0.9854 | −0.002 (−0.010 to +0.005) | – | 0 | – | – | no |
+| I1 | a | 0.9643 (0.9450) | −0.019 (−0.040 to −0.001) | −0.21 (−1.28 to +0.93) | 118 | −6.0% (−9.3 to −2.5) | −35.8% (−75 to +5) | no |
+| I1 | d | 0.9508 | −0.006 (−0.036 to +0.026) | +0.28 (−0.52 to +1.10) | 209 | −3.2% (−4.8 to −1.5) | −13.5% (−43 to +20) | no |
+| I1 | e (on d) | 0.9377 | +0.007 (−0.002 to +0.017) | – | 0 | – | – | no |
+| F1 | a | 0.9839 (0.9638) | −0.020 (−0.048 to +0.007) | −0.26 (−1.13 to +0.69) | 128 | −6.6% (−9.8 to −3.2) | −3.5% (−50 to +51) | no |
+| F1 | b | 0.9775 | −0.014 (−0.040 to +0.014) | −0.12 (−1.06 to +0.89) | 172 | −7.4% (−10.3 to −4.7) | −2.6% (−43 to +51) | no |
+| F1 | e (on a) | 0.9635 | +0.000 (−0.009 to +0.008) | – | 0 | – | – | no |
+
+- The holdout agrees with development: no finalist passes in any league.
+- Every model's CLV range is below 0, at −3.2% to −7.4%.
+- The Serie A stack beat the early price on 2024/25 (log loss 0.9377 vs 0.9450). Its
+  range includes 0 and it made no bets, so it fails the pre-registered rule. One season
+  out of four leagues and three finalists is the kind of result the correction exists
+  for.
+
+## Verdict (bake-off 3)
+
+**Nothing passes in La Liga, the Bundesliga, Serie A or Ligue 1, on development or on
+the holdout.** With xG and fully priced seasons, the big-four leagues match the Premier
+League:
+- every model trails Pinnacle's early price;
+- no model earns blend weight above 0;
+- the live rule's picks give up 3–7% against the close.
+
+Each league's learned minimum edge is null. Across bake-offs 1–3 that is eight leagues,
+five model types and one stack, with the same result. **No handover to the moneyline
+agent**, and no reason to add these leagues to the live bet rule. Nothing passed, so
+the question of which live book prices them didn't arise and wasn't checked.
+
+**Next ideas** (unchanged in rank from bake-off 2, with one addition):
+1. Late team news against the DraftKings odds log, once the log is long enough (free).
+2. Stop 1X2 model work against Pinnacle's early price in any league. If the owner wants
+   a non-English league shown in the app, show it for display only, with the blend
+   (which defers to the price).
+3. New: if more leagues are ever tested, test the stack's one near-miss (Serie A)
+   first, as its own pre-registered experiment on 2025/26 once a sharp closing price
+   covers it. Pinnacle in football-data covers only half of that season, so the price
+   source has to be decided first.
