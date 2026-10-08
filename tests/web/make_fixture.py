@@ -579,7 +579,7 @@ def add_edge_thresholds(data: dict) -> None:
 
 
 # A second competition (La Liga, SP1), until the multi-league pipeline's data reaches the
-# fixture: two upcoming SP1 matches without odds (live odds are Premier League only), a few
+# fixture: two upcoming SP1 matches without odds yet (more than 48 hours out), a few
 # settled SP1 Moneyline trades, live and backtest, and a per-league minimum edge, so the
 # app's competition filter, per-league summaries and per-league edge panel are all tested.
 SP1_TEAMS = [("Real Madrid", "Sevilla"), ("Barcelona", "Valencia")]
@@ -663,7 +663,7 @@ def add_second_league(data: dict) -> None:
     # Moneyline's multi-league contract: the leagues in this build, and a minimum per league.
     data["leagues"] = [
         {"code": "E0", "name": "Premier League", "live": True, "fixtures": 0, "odds": "DraftKings"},
-        {"code": "SP1", "name": "La Liga", "live": False, "fixtures": 0, "odds": None},
+        {"code": "SP1", "name": "La Liga", "live": True, "fixtures": 0, "odds": None},
     ]
     for lg in data["leagues"]:
         lg["fixtures"] = sum(f["league"] == lg["code"] for f in data["fixtures"])
