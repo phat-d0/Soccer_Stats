@@ -1,8 +1,10 @@
 """The leagues the match pipeline knows, and which of them run live.
 
 One entry per league: its football-data code (the key everywhere: file names, trade ids,
-the odds log, `<code>_dk.json`), display name, Understat league name (xG), The Odds API
-sport key, and two switches:
+the odds log, `<code>_dk.json`), display name, Understat league name (xG; None for a
+league Understat doesn't cover, such as the Championship, which then runs the goals-only
+model and takes its schedule from football-data), The Odds API sport key, and two
+switches:
 
 * `live`: publish builds the league's fixtures and fetches its DraftKings odds. Only the
   Premier League is live; the others are wired up but off until the owner turns them on
@@ -26,7 +28,7 @@ from dataclasses import dataclass
 class League:
     code: str  # football-data division code
     name: str
-    understat: str  # Understat league name (xg.LEAGUES)
+    understat: str | None  # Understat league name (xg.LEAGUES); None = no xG
     odds_sport: str  # The Odds API sport key
     live: bool = False
     odds_policy: str = "matchday"  # "always" or "matchday"
@@ -40,6 +42,7 @@ LEAGUES: dict[str, League] = {
         League("D1", "Bundesliga", "Bundesliga", "soccer_germany_bundesliga"),
         League("I1", "Serie A", "Serie_A", "soccer_italy_serie_a"),
         League("F1", "Ligue 1", "Ligue_1", "soccer_france_ligue_one"),
+        League("E1", "Championship", None, "soccer_efl_champ"),
     )
 }
 PRIMARY = "E0"  # the league whose fields fill data.json's top level (params, teams, ...)

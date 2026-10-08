@@ -119,22 +119,28 @@ def cmd_log_odds(args: argparse.Namespace) -> None:
 
 def cmd_estimate_credits(args: argparse.Namespace) -> None:
     """Expected Odds API credits per league for a month under the refresh rules."""
+    from soccer_stats.data import season_kickoffs
     from soccer_stats.leagues import LEAGUES
     from soccer_stats.odds_feed import estimate_credits
     from soccer_stats.xg import load_schedule
 
-    start = pd.Timestamp(f"{args.month}-01", tz="UTC")
-    end = start + pd.offsets.MonthBegin(1)
-    year = start.year if start.month >= 7 else start.year - 1
+    month_start = pd.Timestamp(f"{args.month}-01", tz="UTC")
+    year = month_start.year if month_start.month >= 7 else month_start.year - 1
     total = 0
     print(f"Odds API credits for {args.month} (refresh rules only; an upper bound):")
     for code, lg in LEAGUES.items():
+        start, note = month_start, ""
         try:
-            sched = load_schedule(code, year, include_played=True)
-            kickoffs = list(sched["kickoff"])
+            if lg.understat:  # Understat lists the whole season, kickoff times included
+                kickoffs = list(load_schedule(code, year, include_played=True)["kickoff"])
+            else:  # football-data only has played matches: use the month a year earlier
+                start = month_start - pd.DateOffset(years=1)
+                kickoffs = list(season_kickoffs(code, year - 1))
+                note = f", {start:%b %Y} calendar"
         except Exception as exc:  # no schedule: say so rather than guess
             print(f"  {lg.name:<15} schedule unavailable ({type(exc).__name__})")
             continue
+        end = start + pd.offsets.MonthBegin(1)
         e = estimate_credits(code, kickoffs, start, end)
         if lg.live:
             total += e["credits"]
@@ -143,7 +149,7 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
         print(
             f"  {lg.name:<15} {'live' if lg.live else 'off ':<4}  {e['matches']:>3} matches  "
             f"{e['calls']:>4} calls  {e['credits']:>5} credits ({lg.odds_policy}; "
-            f"{times} distinct kickoff times)"
+            f"{times} distinct kickoff times{note})"
         )
     print(f"Live leagues now: {total} credits")
 

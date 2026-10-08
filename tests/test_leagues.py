@@ -20,14 +20,15 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 
 
 def test_registry_matches_the_loaders_and_only_e0_is_live():
-    assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1"}
+    assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1", "E1"}
     assert lgs.live_codes() == ["E0"]
     for code, lg in lgs.LEAGUES.items():
-        assert xg.LEAGUES[code] == lg.understat  # Understat names stay in step
+        assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
         assert code in fd.LEAGUES  # football-data knows the division
         assert feed.SPORTS[code] == lg.odds_sport
     assert lgs.get("E0").odds_policy == "always"
-    assert {lgs.get(c).odds_policy for c in ("SP1", "D1", "I1", "F1")} == {"matchday"}
+    assert {lgs.get(c).odds_policy for c in ("SP1", "D1", "I1", "F1", "E1")} == {"matchday"}
+    assert lgs.get("E1").understat is None and feed.SPORTS["E1"] == "soccer_efl_champ"
     assert feed.SPORTS["E0"] == "soccer_epl"  # the live path is unchanged
     assert lgs.name("XX") == "XX"
 
@@ -242,3 +243,49 @@ def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
     paper.run(d, tmp_path, None, now=NOW)
     ml = next(p for p in d["portfolio"]["portfolios"] if p["id"] == "moneyline")
     assert "by_league" not in ml["backtest"]["edge_threshold"]
+
+
+def test_championship_runs_goals_only_with_live_off(league, tmp_path):
+    """E1 has no Understat xG: the goals-only fit, its own cards, no odds, no trades."""
+    from soccer_stats.publish import build_data
+
+    df, _ = league
+    df = df.copy()
+    df["date"] = df["date"] + (pd.Timestamp.now().normalize() - df["date"].max())
+    df["league"], df["season"] = "E1", "x"
+    df[["home_xg", "away_xg"]] = float("nan")  # what with_xg gives a league it can't cover
+    for col in ["odds_home", "odds_draw", "odds_away", "close_home", "close_draw", "close_away"]:
+        df[col] = 3.0
+    fixtures = pd.DataFrame(
+        {
+            "kickoff": [pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(days=2)],
+            "home": ["T02"],
+            "away": ["T03"],
+            **{c: [2.5] for c in ("odds_home", "odds_draw", "odds_away")},
+            **{c: [1.9] for c in ("odds_over25", "odds_under25")},
+        }
+    )
+    d = build_data(df, fixtures, xg_error=None, league="E1")
+    assert d["xg_weight"] == 0.0 and d["league"] == "Championship"
+    assert [f["league"] for f in d["fixtures"]] == ["E1"]
+    assert not lgs.get("E1").live
+    _, status = feed.fetch_odds("E1", raw_dir=tmp_path, api_key="k")
+    assert "not live" in status.error
+    assert tr.paper_threshold(None, "E1")["threshold"] is None
+
+
+def test_season_kickoffs_from_football_data(tmp_path, monkeypatch):
+    path = tmp_path / "E1_2526.csv"
+    path.write_text(
+        "Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG\n"
+        "E1,04/10/2025,15:00,Leeds,Hull,1,0\n"
+        "E1,07/10/2025,19:45,Hull,Leeds,0,0\n"
+        "E1,01/02/2026,,Hull,Leeds,0,0\n"
+    )
+    monkeypatch.setattr(fd, "download", lambda *a, **k: path)
+    ks = fd.season_kickoffs("E1", 2025)
+    assert list(ks) == [
+        pd.Timestamp("2025-10-04 14:00", tz="UTC"),  # BST
+        pd.Timestamp("2025-10-07 18:45", tz="UTC"),
+        pd.Timestamp("2026-02-01 15:00", tz="UTC"),  # GMT; no time = 15:00
+    ]
