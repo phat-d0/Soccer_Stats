@@ -11,6 +11,12 @@ Poisson, and goals-only features (features.FEATURES_GOALS) for LightGBM and the 
 Seasons where Pinnacle's early and closing 1X2 prices cover under MIN_COVERAGE of the
 matches are not scored (they are still used for training).
 
+`--holdout-season Y` moves the locked holdout to season Y (development then ends at
+Y-1); `--coverage-only` prints Pinnacle and xG coverage per season (counts only, no
+scoring) so a holdout can be chosen before pre-registering. In development the live
+model's (a's) bets at Pinnacle early also get the learned minimum edge
+(lab.thresholds).
+
 Needs football-data and Understat (GitHub Actions; no Odds API credits).
 """
 
@@ -40,6 +46,7 @@ STACK = "e_stack"
 STACK_MIN_ROWS = 300  # earlier out-of-sample matches before the stack's first fit
 TESTS = 2 * (len(CANDIDATES) + 1)  # two pass metrics per candidate (a-e)
 LOWER = ("E1", "E2", "E3")  # pre-registered together: one family across 3 leagues
+TOP = ("SP1", "D1", "I1", "F1")  # bake-off 3: one family across 4 leagues
 MIN_COVERAGE = 0.9  # share of a season's matches with Pinnacle early and close prices
 
 pd.set_option("display.width", 200)
@@ -61,8 +68,50 @@ def has_xg(league: str) -> bool:
 
 
 def family(league: str) -> int:
-    """How many leagues share one multiple-testing family (E1-E3 count together)."""
-    return len(LOWER) if league in LOWER else 1
+    """How many leagues share one multiple-testing family (E1-E3 count together, and
+    SP1/D1/I1/F1 together)."""
+    for group in (LOWER, TOP):
+        if league in group:
+            return len(group)
+    return 1
+
+
+def coverage_report(league: str, last: int = LAST) -> list[dict]:
+    """Per season: matches, the share with all six Pinnacle 1X2 prices (early and
+    close), and the share with Understat xG. Counts only: no results are scored and no
+    model is fitted, so it can be run before choosing a holdout."""
+    from soccer_stats.data import download, load_matches, season_code
+    from soccer_stats.edge import books
+    from soccer_stats.xg import with_xg
+
+    matches = load_matches([league], range(WARMUP, last + 1))
+    if has_xg(league):
+        matches, err = with_xg(matches)
+        if err:
+            print(err)
+    else:
+        matches = matches.assign(home_xg=np.nan)
+    frames = []
+    for y in range(WARMUP, last + 1):
+        raw = pd.read_csv(download(league, y), encoding="latin-1", on_bad_lines="skip")
+        frames.append(books.book_prices(raw, season=season_code(y)))
+    px = pd.concat(frames, ignore_index=True)
+    cols = [f"pinnacle_{w}_{m}" for w in ("early", "close") for m in H2H]
+    px["priced"] = px[cols].notna().all(axis=1)
+    out = []
+    for y in range(WARMUP, last + 1):
+        code = season_code(y)
+        m = matches[matches["season"] == code]
+        p = px[px["season"] == code]
+        out.append(
+            {
+                "season": y,
+                "matches": len(m),
+                "pinnacle": float(p["priced"].mean()) if len(p) else 0.0,
+                "xg": float(m["home_xg"].notna().mean()) if len(m) else 0.0,
+            }
+        )
+    return out
 
 
 def coverage(df: pd.DataFrame) -> dict[int, float]:
@@ -72,7 +121,7 @@ def coverage(df: pd.DataFrame) -> dict[int, float]:
     return {int(k): float(v) for k, v in ok.groupby(df["season_start"]).mean().items()}
 
 
-def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
+def load(holdout: Holdout, league: str = "E0", last: int | None = None) -> pd.DataFrame:
     """One row per match: time, season, teams, goals, xG, FEATURES, y, the Dixon-Coles
     walk-forward chances, and Pinnacle's early and closing prices. With the holdout
     locked, matches from its start are dropped before anything is computed."""
@@ -82,7 +131,8 @@ def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
     from soccer_stats.models import DixonColes
     from soccer_stats.xg import with_xg
 
-    matches = load_matches([league], range(FIRST_SEASON, LAST + 1))
+    last = last or LAST
+    matches = load_matches([league], range(FIRST_SEASON, last + 1))
     if not holdout.unlocked:
         matches = matches[matches["date"] < holdout.start].reset_index(drop=True)
     if has_xg(league):
@@ -105,7 +155,7 @@ def load(holdout: Holdout, league: str = "E0") -> pd.DataFrame:
     )
     df = df.merge(dc, on=["date", "home", "away"], how="left")
     frames = []
-    for y in range(WARMUP, LAST + 1):
+    for y in range(WARMUP, last + 1):
         raw = pd.read_csv(download(league, y), encoding="latin-1", on_bad_lines="skip")
         frames.append(books.book_prices(raw, season=season_code(y)))
     px = pd.concat(frames, ignore_index=True)
@@ -234,6 +284,31 @@ def _jsonable(x):
     return x
 
 
+def model_edge_threshold(
+    df: pd.DataFrame, p: np.ndarray, scored: pd.Series, label: str = "match bets"
+) -> dict:
+    """lab.thresholds on one candidate's bets at Pinnacle's early price: the live rule at
+    a threshold of 0 (the outcome with the largest positive edge, one per match)."""
+    from soccer_stats.lab import thresholds as th
+
+    odds = df[[f"pinnacle_early_{m}" for m in H2H]].to_numpy(float)
+    ok = scored.to_numpy() & np.isfinite(p).all(1) & np.isfinite(odds).all(1)
+    d, q, o = df[ok], p[ok], odds[ok]
+    rows, k = metrics.pick_bets(q, o, 0.0)
+    bets = pd.DataFrame(
+        {
+            "edge": q[rows, k] * o[rows, k] - 1,
+            "p": q[rows, k],
+            "odds": o[rows, k],
+            "won": (d["y"].to_numpy(int)[rows] == k).astype(float),
+            "group": d["match"].to_numpy()[rows],
+            "season": d["season_start"].astype(int).astype(str).to_numpy()[rows],
+            "time": pd.to_datetime(d["time"].to_numpy()[rows]),
+        }
+    )
+    return th.edge_threshold(bets, label)
+
+
 def by_season(df: pd.DataFrame, preds: dict, scored: pd.Series) -> dict:
     out = {}
     y = df["y"].to_numpy(int)
@@ -255,13 +330,38 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--finalists", default="", help="holdout: comma-separated candidates")
     ap.add_argument("--stack-base", default="", help="holdout: the stack's base candidate")
     ap.add_argument("--league", default="E0", help="football-data division, e.g. E0 or E1")
+    ap.add_argument(
+        "--holdout-season",
+        type=int,
+        default=None,
+        help="start year of the locked holdout season (default 2025); development ends "
+        "the season before",
+    )
+    ap.add_argument(
+        "--coverage-only",
+        action="store_true",
+        help="print Pinnacle and xG coverage per season (counts only) and stop",
+    )
     ap.add_argument("--json")
     args = ap.parse_args(argv)
     league = args.league
+    if args.coverage_only:
+        rows = coverage_report(league)
+        print(f"{league}: Pinnacle early+close and Understat xG coverage by season")
+        for r in rows:
+            print(
+                f"  {r['season']}/{(r['season'] + 1) % 100:02d}: {r['matches']} matches, "
+                f"Pinnacle {r['pinnacle']:.0%}, xG {r['xg']:.0%}"
+            )
+        if args.json:
+            Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.json).write_text(json.dumps({"league": league, "coverage": rows}))
+        return
+    hold_season = args.holdout_season or LAST
 
     from soccer_stats.edge.stats import bonferroni_level
 
-    holdout = Holdout(HOLDOUT_START)
+    holdout = Holdout(f"{hold_season}-07-01" if args.holdout_season else HOLDOUT_START)
     if args.open_holdout:
         names = [n.strip() for n in args.finalists.split(",") if n.strip()]
         if not names or set(names) - set(CANDIDATES) - {STACK}:
@@ -276,18 +376,18 @@ def main(argv: list[str] | None = None) -> None:
     tests = (2 * len(names) if args.open_holdout else TESTS) * family(league)
     level = bonferroni_level(tests)
     print(f"Ranges are {level:.2%}: Bonferroni for {tests} tests (2 pass metrics each).")
-    df = load(holdout, league)
+    df = load(holdout, league, last=hold_season) if args.holdout_season else load(holdout, league)
     cov = coverage(df)
     print(
         "Pinnacle early+close coverage by season: "
         + ", ".join(f"{k}: {v:.0%}" for k, v in cov.items())
     )
     run_names = [n for n in names if n != STACK]
-    last = LAST if args.open_holdout else LAST - 1
+    last = hold_season if args.open_holdout else hold_season - 1
     periods = list(range(WARMUP, last + 1))
     print(f"Predicting seasons {periods[0]}-{periods[-1]} for {run_names}")
     preds, tuning = predict_all(df, run_names, periods, holdout, goals_only=not has_xg(league))
-    first = LAST if args.open_holdout else FIRST_SCORED
+    first = hold_season if args.open_holdout else FIRST_SCORED
     priced = [k for k, v in cov.items() if v >= MIN_COVERAGE]
     dropped = [k for k in range(first, last + 1) if k not in priced]
     if dropped:
@@ -313,7 +413,10 @@ def main(argv: list[str] | None = None) -> None:
         add_stack(df, preds, stack_base)
     res = score(df, preds, scored, level)
     label = f"{league} " + (
-        "HOLDOUT 2025/26" if args.open_holdout else "DEVELOPMENT 2017/18-2024/25"
+        f"HOLDOUT {hold_season}/{(hold_season + 1) % 100:02d}"
+        if args.open_holdout
+        else f"DEVELOPMENT {FIRST_SCORED}/{(FIRST_SCORED + 1) % 100:02d}-"
+        f"{last}/{(last + 1) % 100:02d}"
     )
     print(f"\n== {label}: 1X2 at Pinnacle's early price (12% edge, 1 unit) ==")
     print(table(res).to_string(index=False))
@@ -322,6 +425,17 @@ def main(argv: list[str] | None = None) -> None:
     seasons = by_season(df, preds, scored)
     print("\nLog loss by season:")
     print(pd.DataFrame(seasons).T.to_string())
+    edge_th = None
+    base = CANDIDATES[0]  # a: the live model (pre-registered)
+    if not args.open_holdout and base in preds:
+        edge_th = model_edge_threshold(df, preds[base], scored, "match bets at Pinnacle early")
+        me = edge_th.get("min_edge")
+        print(f"\n== Learned minimum edge ({base} at Pinnacle early, development seasons) ==")
+        print(
+            f"  min_edge: {'none' if me is None else f'{me:.0%}'}; {edge_th.get('n_bets')} "
+            f"bets; {edge_th.get('seasons')}"
+        )
+        print(f"  {edge_th.get('note')}")
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         out = {
@@ -335,6 +449,7 @@ def main(argv: list[str] | None = None) -> None:
             "tuning": tuning,
             "results": res,
             "by_season": seasons,
+            "edge_threshold": edge_th,
         }
         Path(args.json).write_text(json.dumps(_jsonable(out), indent=1, default=str))
 
