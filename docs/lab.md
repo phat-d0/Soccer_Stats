@@ -666,3 +666,23 @@ the question of which live book prices them didn't arise and wasn't checked.
    first, as its own pre-registered experiment on 2025/26 once a sharp closing price
    covers it. Pinnacle in football-data covers only half of that season, so the price
    source has to be decided first.
+
+## The Championship's learned minimum edge (pre-registered 2026-10-08, before any run)
+
+The owner is adding the Championship (E1) to the app beside the big-four leagues, so it
+needs the same learned minimum edge. This is not a new model selection: bake-off 2
+already ran E1's goals-only bake-off and nothing passed.
+- **Bets**: candidate a only (the live Dixon-Coles, goals only, the same spec as
+  bake-off 2), at Pinnacle's early 1X2 price, under the live rule at a threshold of 0
+  (the outcome with the largest positive edge, one per match). No other candidate, no
+  stack and no tuning are run (`lab.run --edge-only`).
+- **Seasons**: 2017/18–2024/25, scoring only seasons where Pinnacle's early and closing
+  prices cover at least 90% of the matches. 2025/26 is left out (47% covered) and stays
+  locked.
+- **Rule**: `lab.thresholds.edge_threshold` unchanged (5-point bands, 95% match-resampled
+  ranges, at least 30 bets per judged band). Development is every scored season but the
+  latest; the latest scored season is the check.
+- **Where it goes**: `src/soccer_stats/lab/min_edge.json`, one entry per league in the
+  `edge_threshold` contract plus the run it came from, read with
+  `lab.thresholds.league_levels()`. The same file records the big-four levels from
+  bake-off 3 (all null). E0 keeps its level in `E0_dk.json`.
