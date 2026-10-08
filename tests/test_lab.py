@@ -384,4 +384,5 @@ def test_league_levels_are_read_from_the_committed_file():
     for code, lv in levels.items():
         assert {"min_edge", "note", "method", "n_bets", "seasons", "source"} <= set(lv), code
         assert lv["min_edge"] is None or 0 <= lv["min_edge"] <= 0.3
+        assert "Pinnacle" in lv["method"] and "not DraftKings" in lv["method"]
     assert th.league_levels(Path("/no/such/file.json")) == {}

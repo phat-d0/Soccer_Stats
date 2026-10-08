@@ -5,7 +5,7 @@
   "E1": {
    "min_edge": null,
    "confidence": 0.95,
-   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "method": "Pool: the model (a_dixon_coles (goals only)) at Pinnacle's early 1X2 price (football-data), one bet a match at a threshold of 0; not DraftKings bets. Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
    "n_bets": 4052,
    "seasons": {
     "development": [
@@ -128,7 +128,7 @@
   "SP1": {
    "min_edge": null,
    "confidence": 0.95,
-   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "method": "Pool: the model (a_dixon_coles (xG)) at Pinnacle's early 1X2 price (football-data), one bet a match at a threshold of 0; not DraftKings bets. Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
    "n_bets": 2432,
    "seasons": {
     "development": [
@@ -250,7 +250,7 @@
   "D1": {
    "min_edge": null,
    "confidence": 0.95,
-   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "method": "Pool: the model (a_dixon_coles (xG)) at Pinnacle's early 1X2 price (football-data), one bet a match at a threshold of 0; not DraftKings bets. Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
    "n_bets": 1954,
    "seasons": {
     "development": [
@@ -372,7 +372,7 @@
   "I1": {
    "min_edge": null,
    "confidence": 0.95,
-   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "method": "Pool: the model (a_dixon_coles (xG)) at Pinnacle's early 1X2 price (football-data), one bet a match at a threshold of 0; not DraftKings bets. Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
    "n_bets": 2395,
    "seasons": {
     "development": [
@@ -494,7 +494,7 @@
   "F1": {
    "min_edge": null,
    "confidence": 0.95,
-   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "method": "Pool: the model (a_dixon_coles (xG)) at Pinnacle's early 1X2 price (football-data), one bet a match at a threshold of 0; not DraftKings bets. Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
    "n_bets": 2236,
    "seasons": {
     "development": [
@@ -613,5 +613,6 @@
     "holdout_locked": "2024/25 onward (bake-off 3 holdout)"
    }
   }
- }
+ },
+ "method": "lab.thresholds.edge_threshold on the model at Pinnacle early (docs/lab.md)"
 }
