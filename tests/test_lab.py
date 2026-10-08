@@ -374,3 +374,14 @@ def test_goals_only_features_and_league_families():
     assert set(features.FEATURES_GOALS) < set(features.FEATURES)
     assert run.family("E0") == 1 and run.family("E2") == 3 and run.family("SP1") == 4
     assert run.has_xg("E0") and not run.has_xg("E1")
+
+
+def test_league_levels_are_read_from_the_committed_file():
+    from soccer_stats.lab import thresholds as th
+
+    levels = th.league_levels()
+    assert {"E1", "SP1", "D1", "I1", "F1"} <= set(levels) and "E0" not in levels
+    for code, lv in levels.items():
+        assert {"min_edge", "note", "method", "n_bets", "seasons", "source"} <= set(lv), code
+        assert lv["min_edge"] is None or 0 <= lv["min_edge"] <= 0.3
+    assert th.league_levels(Path("/no/such/file.json")) == {}

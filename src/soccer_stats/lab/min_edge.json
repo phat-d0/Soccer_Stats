@@ -1,0 +1,617 @@
+{
+ "generated_at": "2026-10-08T21:16:10Z",
+ "about": "Learned minimum edge per league (lab.thresholds) for the live model's 1X2 bets at Pinnacle's early price (football-data), docs/lab.md. E0's level is in E0_dk.json. development_scan is in each source run's EDGE_JSON log line.",
+ "leagues": {
+  "E1": {
+   "min_edge": null,
+   "confidence": 0.95,
+   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "n_bets": 4052,
+   "seasons": {
+    "development": [
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "check": [
+     "2024"
+    ]
+   },
+   "note": "No minimum edge works. At every claimed edge from 0% to 30%, the 3580 past match bets at Pinnacle early lost money or could plausibly have lost it, so no edge the model claims is large enough to trust. The best band was 28%-33%: 162 bets returned +16.4% a bet (range -9.6% to +44.6%).",
+   "by_bucket": [
+    {
+     "edge_lo": 0.0,
+     "edge_hi": 0.02,
+     "n": 263,
+     "implied": 0.38687,
+     "model": 0.39101,
+     "realized": 0.40304,
+     "realized_lo": 0.34221,
+     "realized_hi": 0.46008,
+     "roi": 0.05703,
+     "roi_lo": -0.11385,
+     "roi_hi": 0.22001
+    },
+    {
+     "edge_lo": 0.02,
+     "edge_hi": 0.05,
+     "n": 502,
+     "implied": 0.38333,
+     "model": 0.39689,
+     "realized": 0.4004,
+     "realized_lo": 0.35657,
+     "realized_hi": 0.44422,
+     "roi": 0.06394,
+     "roi_lo": -0.06017,
+     "roi_hi": 0.18814
+    },
+    {
+     "edge_lo": 0.05,
+     "edge_hi": 0.08,
+     "n": 501,
+     "implied": 0.38455,
+     "model": 0.40936,
+     "realized": 0.38723,
+     "realized_lo": 0.34132,
+     "realized_hi": 0.42715,
+     "roi": 0.0113,
+     "roi_lo": -0.11515,
+     "roi_hi": 0.12604
+    },
+    {
+     "edge_lo": 0.08,
+     "edge_hi": 0.12,
+     "n": 573,
+     "implied": 0.38016,
+     "model": 0.41792,
+     "realized": 0.35777,
+     "realized_lo": 0.31937,
+     "realized_hi": 0.39791,
+     "roi": -0.04574,
+     "roi_lo": -0.15491,
+     "roi_hi": 0.07159
+    },
+    {
+     "edge_lo": 0.12,
+     "edge_hi": 0.2,
+     "n": 875,
+     "implied": 0.36304,
+     "model": 0.41963,
+     "realized": 0.328,
+     "realized_lo": 0.29714,
+     "realized_hi": 0.36,
+     "roi": -0.1072,
+     "roi_lo": -0.19662,
+     "roi_hi": -0.01117
+    },
+    {
+     "edge_lo": 0.2,
+     "edge_hi": 0.3,
+     "n": 616,
+     "implied": 0.32378,
+     "model": 0.40251,
+     "realized": 0.32955,
+     "realized_lo": 0.29221,
+     "realized_hi": 0.36688,
+     "roi": 0.01232,
+     "roi_lo": -0.11018,
+     "roi_hi": 0.14526
+    },
+    {
+     "edge_lo": 0.3,
+     "edge_hi": null,
+     "n": 722,
+     "implied": 0.25758,
+     "model": 0.37373,
+     "realized": 0.23269,
+     "realized_lo": 0.20357,
+     "realized_hi": 0.26454,
+     "roi": -0.10485,
+     "roi_lo": -0.23611,
+     "roi_hi": 0.03266
+    }
+   ],
+   "source": {
+    "league": "E1",
+    "name": "Championship",
+    "model": "a_dixon_coles (goals only)",
+    "price": "Pinnacle early 1X2 (football-data)",
+    "workflow": "odds-check.yml task=lab-edge",
+    "run_id": 37845449673,
+    "holdout_locked": "2025/26"
+   }
+  },
+  "SP1": {
+   "min_edge": null,
+   "confidence": 0.95,
+   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "n_bets": 2432,
+   "seasons": {
+    "development": [
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022"
+    ],
+    "check": [
+     "2023"
+    ]
+   },
+   "note": "No minimum edge works. At every claimed edge from 0% to 30%, the 2098 past match bets at Pinnacle early lost money or could plausibly have lost it, so no edge the model claims is large enough to trust. The best band was 24%-29%: 115 bets returned +30.7% a bet (range -16.7% to +84.6%).",
+   "by_bucket": [
+    {
+     "edge_lo": 0.0,
+     "edge_hi": 0.02,
+     "n": 227,
+     "implied": 0.40355,
+     "model": 0.40764,
+     "realized": 0.37004,
+     "realized_lo": 0.31278,
+     "realized_hi": 0.43612,
+     "roi": -0.16599,
+     "roi_lo": -0.32121,
+     "roi_hi": 0.00838
+    },
+    {
+     "edge_lo": 0.02,
+     "edge_hi": 0.05,
+     "n": 350,
+     "implied": 0.36029,
+     "model": 0.37274,
+     "realized": 0.35429,
+     "realized_lo": 0.30571,
+     "realized_hi": 0.40571,
+     "roi": -0.06214,
+     "roi_lo": -0.20061,
+     "roi_hi": 0.09108
+    },
+    {
+     "edge_lo": 0.05,
+     "edge_hi": 0.08,
+     "n": 319,
+     "implied": 0.34582,
+     "model": 0.36825,
+     "realized": 0.30408,
+     "realized_lo": 0.25392,
+     "realized_hi": 0.35423,
+     "roi": -0.18445,
+     "roi_lo": -0.33414,
+     "roi_hi": -0.02529
+    },
+    {
+     "edge_lo": 0.08,
+     "edge_hi": 0.12,
+     "n": 331,
+     "implied": 0.33734,
+     "model": 0.37055,
+     "realized": 0.33837,
+     "realized_lo": 0.28701,
+     "realized_hi": 0.38678,
+     "roi": -0.03477,
+     "roi_lo": -0.19722,
+     "roi_hi": 0.13266
+    },
+    {
+     "edge_lo": 0.12,
+     "edge_hi": 0.2,
+     "n": 458,
+     "implied": 0.30253,
+     "model": 0.34938,
+     "realized": 0.29913,
+     "realized_lo": 0.25764,
+     "realized_hi": 0.34279,
+     "roi": 0.01395,
+     "roi_lo": -0.15479,
+     "roi_hi": 0.18984
+    },
+    {
+     "edge_lo": 0.2,
+     "edge_hi": 0.3,
+     "n": 298,
+     "implied": 0.24651,
+     "model": 0.30605,
+     "realized": 0.2349,
+     "realized_lo": 0.18792,
+     "realized_hi": 0.28523,
+     "roi": -0.03483,
+     "roi_lo": -0.25485,
+     "roi_hi": 0.21302
+    },
+    {
+     "edge_lo": 0.3,
+     "edge_hi": null,
+     "n": 449,
+     "implied": 0.17623,
+     "model": 0.2599,
+     "realized": 0.18263,
+     "realized_lo": 0.14699,
+     "realized_hi": 0.22049,
+     "roi": 0.02949,
+     "roi_lo": -0.20446,
+     "roi_hi": 0.2675
+    }
+   ],
+   "source": {
+    "league": "SP1",
+    "name": "La Liga",
+    "model": "a_dixon_coles (xG)",
+    "price": "Pinnacle early 1X2 (football-data)",
+    "workflow": "odds-check.yml task=lab-edge",
+    "run_id": 37845453133,
+    "holdout_locked": "2024/25 onward (bake-off 3 holdout)"
+   }
+  },
+  "D1": {
+   "min_edge": null,
+   "confidence": 0.95,
+   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "n_bets": 1954,
+   "seasons": {
+    "development": [
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022"
+    ],
+    "check": [
+     "2023"
+    ]
+   },
+   "note": "No minimum edge works. At every claimed edge from 0% to 30%, the 1696 past match bets at Pinnacle early lost money or could plausibly have lost it, so no edge the model claims is large enough to trust. The best band was 18%-23%: 128 bets returned +11.6% a bet (range -24.0% to +49.8%).",
+   "by_bucket": [
+    {
+     "edge_lo": 0.0,
+     "edge_hi": 0.02,
+     "n": 196,
+     "implied": 0.35932,
+     "model": 0.36309,
+     "realized": 0.30612,
+     "realized_lo": 0.2398,
+     "realized_hi": 0.37245,
+     "roi": -0.09026,
+     "roi_lo": -0.31577,
+     "roi_hi": 0.13235
+    },
+    {
+     "edge_lo": 0.02,
+     "edge_hi": 0.05,
+     "n": 315,
+     "implied": 0.35899,
+     "model": 0.37161,
+     "realized": 0.33651,
+     "realized_lo": 0.28254,
+     "realized_hi": 0.3873,
+     "roi": -0.01603,
+     "roi_lo": -0.18287,
+     "roi_hi": 0.14822
+    },
+    {
+     "edge_lo": 0.05,
+     "edge_hi": 0.08,
+     "n": 313,
+     "implied": 0.32505,
+     "model": 0.34578,
+     "realized": 0.28754,
+     "realized_lo": 0.23642,
+     "realized_hi": 0.33866,
+     "roi": -0.14003,
+     "roi_lo": -0.30486,
+     "roi_hi": 0.03706
+    },
+    {
+     "edge_lo": 0.08,
+     "edge_hi": 0.12,
+     "n": 308,
+     "implied": 0.32267,
+     "model": 0.35468,
+     "realized": 0.28896,
+     "realized_lo": 0.24026,
+     "realized_hi": 0.33766,
+     "roi": -0.09166,
+     "roi_lo": -0.26804,
+     "roi_hi": 0.08159
+    },
+    {
+     "edge_lo": 0.12,
+     "edge_hi": 0.2,
+     "n": 384,
+     "implied": 0.27841,
+     "model": 0.32087,
+     "realized": 0.24479,
+     "realized_lo": 0.20052,
+     "realized_hi": 0.28906,
+     "roi": -0.08573,
+     "roi_lo": -0.26631,
+     "roi_hi": 0.09933
+    },
+    {
+     "edge_lo": 0.2,
+     "edge_hi": 0.3,
+     "n": 218,
+     "implied": 0.23616,
+     "model": 0.29316,
+     "realized": 0.21101,
+     "realized_lo": 0.16055,
+     "realized_hi": 0.26147,
+     "roi": -0.1,
+     "roi_lo": -0.35109,
+     "roi_hi": 0.15248
+    },
+    {
+     "edge_lo": 0.3,
+     "edge_hi": null,
+     "n": 220,
+     "implied": 0.17045,
+     "model": 0.24491,
+     "realized": 0.19091,
+     "realized_lo": 0.14091,
+     "realized_hi": 0.24091,
+     "roi": 0.22718,
+     "roi_lo": -0.16127,
+     "roi_hi": 0.67833
+    }
+   ],
+   "source": {
+    "league": "D1",
+    "name": "Bundesliga",
+    "model": "a_dixon_coles (xG)",
+    "price": "Pinnacle early 1X2 (football-data)",
+    "workflow": "odds-check.yml task=lab-edge",
+    "run_id": 37845456702,
+    "holdout_locked": "2024/25 onward (bake-off 3 holdout)"
+   }
+  },
+  "I1": {
+   "min_edge": null,
+   "confidence": 0.95,
+   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "n_bets": 2395,
+   "seasons": {
+    "development": [
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022"
+    ],
+    "check": [
+     "2023"
+    ]
+   },
+   "note": "No minimum edge works. At every claimed edge from 0% to 30%, the 2066 past match bets at Pinnacle early lost money or could plausibly have lost it, so no edge the model claims is large enough to trust. The best band was 12%-17%: 259 bets returned +19.7% a bet (range -5.5% to +47.9%).",
+   "by_bucket": [
+    {
+     "edge_lo": 0.0,
+     "edge_hi": 0.02,
+     "n": 258,
+     "implied": 0.38658,
+     "model": 0.39027,
+     "realized": 0.34109,
+     "realized_lo": 0.28295,
+     "realized_hi": 0.39922,
+     "roi": -0.11969,
+     "roi_lo": -0.2953,
+     "roi_hi": 0.05718
+    },
+    {
+     "edge_lo": 0.02,
+     "edge_hi": 0.05,
+     "n": 366,
+     "implied": 0.38879,
+     "model": 0.4021,
+     "realized": 0.36885,
+     "realized_lo": 0.31967,
+     "realized_hi": 0.41803,
+     "roi": -0.08475,
+     "roi_lo": -0.22549,
+     "roi_hi": 0.06049
+    },
+    {
+     "edge_lo": 0.05,
+     "edge_hi": 0.08,
+     "n": 359,
+     "implied": 0.35046,
+     "model": 0.3728,
+     "realized": 0.32033,
+     "realized_lo": 0.27298,
+     "realized_hi": 0.37326,
+     "roi": -0.0983,
+     "roi_lo": -0.25131,
+     "roi_hi": 0.0727
+    },
+    {
+     "edge_lo": 0.08,
+     "edge_hi": 0.12,
+     "n": 331,
+     "implied": 0.33527,
+     "model": 0.36842,
+     "realized": 0.34441,
+     "realized_lo": 0.29003,
+     "realized_hi": 0.39577,
+     "roi": -0.00825,
+     "roi_lo": -0.18345,
+     "roi_hi": 0.16473
+    },
+    {
+     "edge_lo": 0.12,
+     "edge_hi": 0.2,
+     "n": 441,
+     "implied": 0.28032,
+     "model": 0.32402,
+     "realized": 0.26077,
+     "realized_lo": 0.2199,
+     "realized_hi": 0.30159,
+     "roi": -0.01245,
+     "roi_lo": -0.19952,
+     "roi_hi": 0.19121
+    },
+    {
+     "edge_lo": 0.2,
+     "edge_hi": 0.3,
+     "n": 302,
+     "implied": 0.24537,
+     "model": 0.30462,
+     "realized": 0.19205,
+     "realized_lo": 0.14901,
+     "realized_hi": 0.2351,
+     "roi": -0.24785,
+     "roi_lo": -0.44451,
+     "roi_hi": -0.0448
+    },
+    {
+     "edge_lo": 0.3,
+     "edge_hi": null,
+     "n": 338,
+     "implied": 0.16763,
+     "model": 0.24429,
+     "realized": 0.11538,
+     "realized_lo": 0.08284,
+     "realized_hi": 0.15089,
+     "roi": -0.25743,
+     "roi_lo": -0.49888,
+     "roi_hi": 0.03684
+    }
+   ],
+   "source": {
+    "league": "I1",
+    "name": "Serie A",
+    "model": "a_dixon_coles (xG)",
+    "price": "Pinnacle early 1X2 (football-data)",
+    "workflow": "odds-check.yml task=lab-edge",
+    "run_id": 37845460440,
+    "holdout_locked": "2024/25 onward (bake-off 3 holdout)"
+   }
+  },
+  "F1": {
+   "min_edge": null,
+   "confidence": 0.95,
+   "method": "Smallest claimed edge t (0-30% in 1% steps) such that past bets claiming t to t+5% returned more than 0 per unit staked at the 95% lower bound, and so did every higher band with at least 30 bets; ranges resample whole matches; found on development seasons, then checked on the latest season (bets at t and up must have returned more than 0).",
+   "n_bets": 2236,
+   "seasons": {
+    "development": [
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022"
+    ],
+    "check": [
+     "2023"
+    ]
+   },
+   "note": "No minimum edge works. At every claimed edge from 0% to 30%, the 1975 past match bets at Pinnacle early lost money or could plausibly have lost it, so no edge the model claims is large enough to trust. The best band was 13%-18%: 267 bets returned +8.9% a bet (range -13.4% to +34.1%).",
+   "by_bucket": [
+    {
+     "edge_lo": 0.0,
+     "edge_hi": 0.02,
+     "n": 205,
+     "implied": 0.38241,
+     "model": 0.38654,
+     "realized": 0.37073,
+     "realized_lo": 0.30244,
+     "realized_hi": 0.43415,
+     "roi": -0.03893,
+     "roi_lo": -0.23635,
+     "roi_hi": 0.15051
+    },
+    {
+     "edge_lo": 0.02,
+     "edge_hi": 0.05,
+     "n": 339,
+     "implied": 0.36184,
+     "model": 0.37411,
+     "realized": 0.30678,
+     "realized_lo": 0.25664,
+     "realized_hi": 0.35406,
+     "roi": -0.16496,
+     "roi_lo": -0.31095,
+     "roi_hi": -0.0096
+    },
+    {
+     "edge_lo": 0.05,
+     "edge_hi": 0.08,
+     "n": 321,
+     "implied": 0.35453,
+     "model": 0.37741,
+     "realized": 0.34891,
+     "realized_lo": 0.29595,
+     "realized_hi": 0.40187,
+     "roi": -0.00336,
+     "roi_lo": -0.17113,
+     "roi_hi": 0.16338
+    },
+    {
+     "edge_lo": 0.08,
+     "edge_hi": 0.12,
+     "n": 303,
+     "implied": 0.32538,
+     "model": 0.35729,
+     "realized": 0.33663,
+     "realized_lo": 0.28383,
+     "realized_hi": 0.38944,
+     "roi": 0.03116,
+     "roi_lo": -0.15083,
+     "roi_hi": 0.21862
+    },
+    {
+     "edge_lo": 0.12,
+     "edge_hi": 0.2,
+     "n": 444,
+     "implied": 0.28977,
+     "model": 0.33424,
+     "realized": 0.24324,
+     "realized_lo": 0.2027,
+     "realized_hi": 0.28153,
+     "roi": -0.12664,
+     "roi_lo": -0.28971,
+     "roi_hi": 0.04231
+    },
+    {
+     "edge_lo": 0.2,
+     "edge_hi": 0.3,
+     "n": 290,
+     "implied": 0.25236,
+     "model": 0.31356,
+     "realized": 0.18621,
+     "realized_lo": 0.14138,
+     "realized_hi": 0.23103,
+     "roi": -0.24845,
+     "roi_lo": -0.44402,
+     "roi_hi": -0.03093
+    },
+    {
+     "edge_lo": 0.3,
+     "edge_hi": null,
+     "n": 334,
+     "implied": 0.18141,
+     "model": 0.26306,
+     "realized": 0.1976,
+     "realized_lo": 0.15569,
+     "realized_hi": 0.23952,
+     "roi": 0.11449,
+     "roi_lo": -0.1639,
+     "roi_hi": 0.42127
+    }
+   ],
+   "source": {
+    "league": "F1",
+    "name": "Ligue 1",
+    "model": "a_dixon_coles (xG)",
+    "price": "Pinnacle early 1X2 (football-data)",
+    "workflow": "odds-check.yml task=lab-edge",
+    "run_id": 37845463369,
+    "holdout_locked": "2024/25 onward (bake-off 3 holdout)"
+   }
+  }
+ }
+}

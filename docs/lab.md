@@ -686,3 +686,26 @@ already ran E1's goals-only bake-off and nothing passed.
   `edge_threshold` contract plus the run it came from, read with
   `lab.thresholds.league_levels()`. The same file records the big-four levels from
   bake-off 3 (all null). E0 keeps its level in `E0_dk.json`.
+
+### Results (2026-10-08 21:15 UTC; `odds-check.yml task=lab-edge`, 0 credits)
+
+| League | Run | Bets | Development / check | min_edge | Best development band |
+| --- | --- | --- | --- | --- | --- |
+| E1 (goals only) | 37845449673 | 4,052 | 2017/18–2023/24 / 2024/25 | none | 28–33%: 162 bets, +16.4% (−9.6% to +44.6%) |
+| SP1 | 37845453133 | 2,432 | 2017/18–2022/23 / 2023/24 | none | 24–29%: 115 bets, +30.7% (−16.7% to +84.6%) |
+| D1 | 37845456702 | 1,954 | same | none | 18–23%: 128 bets, +11.6% (−24.0% to +49.8%) |
+| I1 | 37845460440 | 2,395 | same | none | 12–17%: 259 bets, +19.7% (−5.5% to +47.9%) |
+| F1 | 37845463369 | 2,236 | same | none | 13–18%: 267 bets, +8.9% (−13.4% to +34.1%) |
+
+- **The Championship has no learned minimum edge.** E1 seasons 2016/17–2024/25 are all
+  at least 99% priced, so 2017/18–2024/25 are scored and 2025/26 (47%) is left out.
+  No 5-point band from 0% to 30% has a lower bound above 0. At the live 12% rule's
+  edges (12–20%) the model claimed 42.0% and won 32.8% against 36.3% implied: −10.7% a
+  bet (−19.7% to −1.1%). Realized win rates track Pinnacle's implied rate, not the
+  model's, as in every other league.
+- The big-four reruns reproduce bake-off 3's bet counts exactly (`--edge-only` runs the
+  same candidate a on the same seasons), and all four stay null.
+- Written to `src/soccer_stats/lab/min_edge.json` (read with
+  `lab.thresholds.league_levels()`), one entry per league in the `edge_threshold`
+  contract plus `source`. The development scans are in each run's `EDGE_JSON` log line,
+  not the file. Nothing in the live rule changes.
