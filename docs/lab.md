@@ -709,3 +709,76 @@ already ran E1's goals-only bake-off and nothing passed.
   `lab.thresholds.league_levels()`), one entry per league in the `edge_threshold`
   contract plus `source`. The development scans are in each run's `EDGE_JSON` log line,
   not the file. Nothing in the live rule changes.
+
+## Lineup surprises against Pinnacle's move (round 8; pre-registered 2026-10-08, before any data was loaded)
+
+**Question.** Does the starting XI explain how Pinnacle's price moves from early to
+close, and does the close already absorb it? This decides whether a live team-news
+check (16 Nov) and live odds logging for new leagues are worth pursuing. Research only:
+0 credits, nothing live changes.
+
+**Timing.** football-data's early price is taken one to three days before kickoff. The
+close is taken at kickoff. Starting XIs are public about an hour before kickoff. So a
+lineup surprise is news that arrives after the early price and before the close.
+- Tests 1 and 4 are the real questions.
+- Tests 2 and 3 (betting at the early price) are an upper bound: nobody knows the XI
+  when the early price is up.
+
+**Data.**
+- Understat match rosters: who started (position not "Sub") and each player's xG.
+- football-data's Pinnacle early and closing 1X2 prices, made margin-free with Shin's
+  method.
+- Matches are paired on home, away and a date within 2 days, as in `xg.attach_xg`.
+- Leagues: E0, SP1, D1, I1, F1.
+- Seasons: 2016/17–2024/25. 2016/17 trains only; 2017/18–2024/25 are scored, keeping
+  only seasons where Pinnacle's early and closing prices cover at least 90% of matches.
+- 2025/26 (about 50% covered) is dropped before anything is computed.
+
+**The surprise** (fixed; no variants are run):
+- For team T in match m, W is T's earlier league matches in the same season, the last
+  up to 6. With fewer than 3, the value is missing, so the first three rounds are out.
+- Regulars are players who started at least ⌈2/3·|W|⌉ of W.
+- Each regular's weight is their share of the team's xG over W: their xG in W divided
+  by the xG of all of T's players in W.
+- S(T, m) is the summed weight of the regulars who do not start m.
+- The signal is x = S(away) − S(home). A positive value means the away side is more
+  depleted, which should favour home.
+- Only matches before m are used for regulars and weights. The only information from m
+  itself is its starting XI, which is the news being tested.
+
+**Tests per league** (4):
+1. **Move.** OLS of the move in log(home/away) (close minus early, margin-free) on x.
+   - Passes if the slope range excludes 0; a positive slope is expected.
+   - Out-of-sample R², season by season on earlier seasons, is reported alongside.
+2–3. **Betting at the early price** (an upper bound).
+   - The candidate is a walk-forward conditional logit, score_k = a_k + b·log(early_k)
+     + d·z_k with z = (x/2, 0, −x/2). It is refitted every 28 days on earlier matches,
+     from 300 earlier rows.
+   - It goes through `lab.metrics.evaluate`: market = Pinnacle early, odds = Pinnacle
+     early, CLV vs Pinnacle's fair close.
+   - Pass rule: `lab.metrics.passes`, meaning the blend-weight range and the 12% rule's
+     CLV range are both above 0. ROI is reported but never passes on its own.
+4. **Does the close absorb it?** The same candidate, built on the fair close instead of
+   early and scored beside the close.
+   - A blend-weight range above 0 means the close does not fully absorb lineup news.
+   - The 12% rule's ROI at Pinnacle's closing price is reported.
+
+**Family.** 5 leagues × 4 tests = 20, so all ranges are Bonferroni 99.75%. Ranges
+resample whole matches. With ranges this wide and nothing tuned, there is no separate
+holdout: each test is run once.
+
+**Reading the result.**
+- The close absorbs lineup news in a league if test 4's range includes 0.
+- Lineups move the price there if test 1 passes.
+- If the close absorbs it everywhere, a team-news edge can only exist against books
+  slower than Pinnacle (DraftKings). The live check on 16 Nov answers that question;
+  this test can't.
+
+**Limits.**
+- An XI can't tell a known injury (already in the early price) from a late surprise.
+  This is a property of the data and isn't fixed here.
+- The weights are by xG, as specified, so absent defenders and goalkeepers count as
+  zero.
+
+**Code.** `edge/lineups.py`; `odds-check.yml` `task=lineups` with `league` (no key
+passed). Tests include no look-ahead.
