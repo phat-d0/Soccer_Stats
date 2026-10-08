@@ -593,3 +593,73 @@ Nothing is tuned on any of the data below.
 - **Cache:** each league's Understat files go to their own cache key prefix
   (`understat-<league>-`), so the Premier League jobs' `raw-data-` cache is never
   replaced.
+
+## 11. Multi-league goalscorer test: results (round 8, 2026-10-08)
+
+**Runs:** `odds-check.yml`, 0 credits, the forward window locked throughout.
+- `goal-league` runs 37852786515 (SP1), 37852789463, 37852793011 and 37852796818 (the
+  other three) downloaded and cached each league's Understat files.
+- `goal-leagues` run 37857461571 scored all five leagues and pooled them.
+
+**Data:** 2023/24–2025/26, appearances with at least 3 earlier ones. 0 Understat match
+files were missing in any league.
+
+**Match-model coverage:** the match model's team xG reached 75–77% of appearances in the
+new leagues. The rest fall back to neutral, mostly because the match model skips teams
+with fewer than 6 earlier matches (promoted sides early in a season).
+
+### The answer: does the model beat both benchmarks in each league?
+
+**Yes, in every league.** This is the gate: A, before lineups, on every appearance, with
+99.375% ranges.
+
+| League | Appearances (matches) | Log loss | Gain vs season goals | Gain vs season xG | Beats both |
+| --- | --- | --- | --- | --- | --- |
+| La Liga (SP1) | 34,235 (1,140) | 0.2305 | +0.123 (+0.108 to +0.138) | +0.023 (+0.018 to +0.029) | **yes** |
+| Bundesliga (D1) | 27,179 (917) | 0.2673 | +0.144 (+0.127 to +0.163) | +0.024 (+0.018 to +0.031) | **yes** |
+| Serie A (I1) | 34,103 (1,140) | 0.2331 | +0.129 (+0.115 to +0.144) | +0.023 (+0.018 to +0.028) | **yes** |
+| Ligue 1 (F1) | 26,465 (918) | 0.2492 | +0.144 (+0.126 to +0.163) | +0.028 (+0.021 to +0.035) | **yes** |
+| Pooled four (95%) | 121,982 (4,115) | 0.2435 | +0.134 (+0.128 to +0.140) | +0.024 (+0.022 to +0.026) | **yes** |
+| Premier League (reference; 2025/26 seen) | 33,067 (1,140) | 0.2586 | +0.133 (+0.118 to +0.151) | +0.025 (+0.019 to +0.031) | yes |
+
+### The betting view: B on starters with the lineup known
+
+| League | Starters | Log loss | vs season goals | vs season xG | vs A | AUC | 30%+ | 20–30% predicted / scored | 30%+ predicted / scored | Tail rule |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | 24,374 | 0.2482 | +0.136 | +0.024 | +0.0018 | 0.791 | 5.5% | 24.5% / 22.7% | 38.6% / 37.2% | ok |
+| D1 | 19,533 | 0.2885 | +0.164 | +0.027 | +0.0030 | 0.766 | 6.9% | 24.4% / 22.4% | 39.9% / 37.1% | fails |
+| I1 | 24,368 | 0.2520 | +0.143 | +0.024 | +0.0019 | 0.773 | 3.9% | 24.3% / 22.4% | 37.3% / 35.0% | fails |
+| F1 | 19,371 | 0.2672 | +0.160 | +0.029 | +0.0019 | 0.778 | 5.5% | 24.4% / 22.8% | 38.6% / 34.3% | fails |
+| Pooled four | 87,646 | 0.2624 | +0.149 (+0.142 to +0.157) | +0.026 (+0.023 to +0.029) | +0.0021 | 0.778 | 5.4% | 24.4% / 22.6% | 38.7% / 36.1% | fails |
+| E0 (reference) | 24,446 | 0.2817 | +0.148 | +0.027 | +0.0019 | 0.778 | 6.6% | 24.6% / 24.0% | 37.3% / 35.6% | ok |
+
+All of B's gains over both benchmarks have 99.375% ranges above 0.
+
+### What it means
+
+- **The free-data model travels.** Unchanged, it beats both season benchmarks in all four
+  new leagues by about the same margin as in the Premier League: log-loss gain +0.023 to
+  +0.028 over the season-xG benchmark. It discriminates about as well too (AUC 0.77–0.79).
+- **Knowing the lineup helps a little everywhere** (B vs A +0.002 to +0.003), as in the
+  Premier League.
+- **B is slightly over-confident at the top outside England and Spain.** It predicts its
+  confident starters about 2–3 points too high: pooled 38.7% vs 36.1% at 30%+, and
+  24.4% vs 22.6% at 20–30%. That fails the round-6 tail rule in Germany, Italy, France and
+  the pool.
+  - The same thing showed in the Premier League's seen 2025/26 (round 6).
+  - It matters for betting, because those confident starters are exactly the ones a bet
+    would be on.
+  - It is a reason to expect the December forward check to fail its tail rule unless it
+    shrinks. Any fix (such as recalibrating the top tail) must be pre-registered before
+    that check is opened, not fitted on it.
+- **No prices were used.** Beating season averages says the model ranks scorers well. It
+  doesn't say bookmakers misprice them. Round 5 found every book's Yes-only prices about
+  50% above scoring rates.
+
+### The forward check stays as registered (§10b)
+
+- **What:** five leagues, 2026/27 matches from 10 Oct, locked until at least 150 pooled
+  matches have been played (the owner's 7 Dec trigger).
+- **How:** `odds-check.yml` `task=goal-leagues` with `reason` set. The four league caches
+  now exist, so the run takes about 10 minutes.
+- **Gate:** B pooled beats both benchmarks (95%), and passes the tail rule.
