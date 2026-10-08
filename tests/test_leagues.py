@@ -363,3 +363,46 @@ def test_lab_levels_fill_in_for_leagues_without_a_backtest(tmp_path, monkeypatch
     paper.run(d, log, None, now=NOW)
     assert d["portfolio"]["rules"]["SP1"]["threshold"] == 0.07
     assert paper.load_ledger(log, "SP1")  # the SP1 trade (20% edge) opened at 7%
+
+
+def test_draftkings_names_map_to_football_data_in_new_leagues():
+    """DraftKings spellings from the first six-league publish land on football-data names,
+    so a priced match joins its scheduled fixture instead of being added a second time."""
+    seen = {
+        "Borussia Dortmund": "Dortmund",
+        "Borussia Monchengladbach": "M'gladbach",
+        "1. FC Köln": "FC Koln",
+        "Atlético Madrid": "Ath Madrid",
+        "Deportivo La Coruña": "La Coruna",
+        "AS Roma": "Roma",
+        "AC Milan": "Milan",
+        "Paris Saint Germain": "Paris SG",
+        "RC Lens": "Lens",
+    }
+    for dk, name in seen.items():
+        assert feed._team(dk, {name, "Barcelona"}) == name
+    events = [
+        {
+            "home_team": "Borussia Dortmund",
+            "away_team": "Werder Bremen",
+            "commence_time": "2026-10-09T18:30:00Z",
+            "bookmakers": [
+                {
+                    "key": feed.BOOKMAKER,
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Borussia Dortmund", "price": 1.6},
+                                {"name": "Draw", "price": 4.2},
+                                {"name": "Werder Bremen", "price": 5.0},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    row = feed.parse_odds(events, {"Dortmund", "Werder Bremen"}).iloc[0]
+    assert (row["home"], row["away"]) == ("Dortmund", "Werder Bremen")
+    assert row["odds_home"] == 1.6 and row["odds_away"] == 5.0

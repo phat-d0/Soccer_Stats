@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,6 +74,39 @@ TEAM_NAMES = {
     "Luton Town": "Luton",
     "Norwich City": "Norwich",
     "West Bromwich Albion": "West Brom",
+    # Spain (DraftKings spellings seen on the first six-league publish, 8 Oct 2026)
+    "Athletic Bilbao": "Ath Bilbao",
+    "Atlético Madrid": "Ath Madrid",
+    "Atletico Madrid": "Ath Madrid",
+    "Alavés": "Alaves",
+    "CA Osasuna": "Osasuna",
+    "Deportivo La Coruña": "La Coruna",
+    "Espanyol": "Espanol",
+    "Málaga": "Malaga",
+    "Rayo Vallecano": "Vallecano",
+    "Real Betis": "Betis",
+    "Real Racing Club de Santander": "Racing Santander",
+    "Real Sociedad": "Sociedad",
+    # Germany
+    "1. FC Köln": "FC Koln",
+    "Bayer Leverkusen": "Leverkusen",
+    "Borussia Dortmund": "Dortmund",
+    "Borussia Monchengladbach": "M'gladbach",
+    "Eintracht Frankfurt": "Ein Frankfurt",
+    "FC Schalke 04": "Schalke 04",
+    "FSV Mainz 05": "Mainz",
+    "Hamburger SV": "Hamburg",
+    "SC Freiburg": "Freiburg",
+    "SC Paderborn": "Paderborn",
+    "TSG Hoffenheim": "Hoffenheim",
+    "VfB Stuttgart": "Stuttgart",
+    # Italy
+    "AC Milan": "Milan",
+    "AS Roma": "Roma",
+    # France
+    "AS Monaco": "Monaco",
+    "Paris Saint Germain": "Paris SG",
+    "RC Lens": "Lens",
 }
 
 
@@ -86,11 +120,28 @@ class OddsStatus:
     error: str | None = None
 
 
+def _plain(name: str) -> str:
+    """Lower case without accents: "Atlético" -> "atletico"."""
+    text = unicodedata.normalize("NFKD", name)
+    return "".join(c for c in text if not unicodedata.combining(c)).casefold().strip()
+
+
 def _team(name: str, known: set[str] | None = None) -> str:
     name = TEAM_NAMES.get(name, name)
     if known and name not in known:
-        # e.g. "Burnley FC" -> "Burnley": accept a unique prefix match.
-        hits = [t for t in known if name.startswith(t + " ") or t.startswith(name + " ")]
+        plain = _plain(name)
+        same = [t for t in known if _plain(t) == plain]
+        if len(same) == 1:  # e.g. "Alavés" -> "Alaves"
+            return same[0]
+        # e.g. "Burnley FC" -> "Burnley", "AS Roma" -> "Roma": accept a unique
+        # prefix or suffix match on whole words.
+        hits = [
+            t
+            for t in known
+            if plain.startswith(_plain(t) + " ")
+            or _plain(t).startswith(plain + " ")
+            or plain.endswith(" " + _plain(t))
+        ]
         if len(hits) == 1:
             return hits[0]
     return name
