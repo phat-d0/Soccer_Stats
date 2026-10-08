@@ -16,6 +16,12 @@ does, and it budgets refreshes so the free allowance always lasts the month:
   case the allowance has reset early. The reset day comes from ODDS_API_RESET_DAY
   (default the 1st), and is learned automatically the first time a download shows more
   credits than the previous one.
+
+Other leagues (leagues.LEAGUES) are fetched only when their `live` flag is on, and then by
+the "matchday" policy (policy_floor): only with a match within MATCHDAY_HOURS, every
+MATCHDAY_FAR_HOURS until MATCHDAY_NEAR_WINDOW hours before a kickoff, then hourly, then
+every 30 minutes in the last two hours. The Premier League keeps its "always" policy.
+estimate_credits replays these rules over a fixture calendar to cost a league per month.
 """
 
 from __future__ import annotations
@@ -29,9 +35,10 @@ import pandas as pd
 import requests
 
 from soccer_stats.data import RAW_DIR
+from soccer_stats.leagues import LEAGUES
 
 URL = "https://api.the-odds-api.com/v4/sports/{sport}/odds"
-SPORTS = {"E0": "soccer_epl"}
+SPORTS = {code: lg.odds_sport for code, lg in LEAGUES.items()}
 BOOKMAKER = "draftkings"
 BOOKMAKER_NAME = "DraftKings"
 RESERVE_CREDITS = 20  # never spend below this
@@ -39,6 +46,9 @@ MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this...
 KICKOFF_INTERVAL_HOURS = 0.5  # ...except this close to a kickoff
 KICKOFF_WINDOW_HOURS = 2.0
 DEFAULT_COST = 2  # credits per refresh until the API tells us
+MATCHDAY_HOURS = 48.0  # "matchday" leagues: fetch only with a kickoff this close
+MATCHDAY_NEAR_WINDOW = 6.0  # ...hourly inside this many hours of it...
+MATCHDAY_FAR_HOURS = 3.0  # ...and every this many hours before that
 
 # The Odds API team name -> football-data team name, where they differ.
 TEAM_NAMES = {
@@ -95,14 +105,17 @@ def refresh_interval_hours(
     now: pd.Timestamp,
     reset_day: int = 1,
     min_hours: float = MIN_INTERVAL_HOURS,
+    share: int = 1,
 ) -> float:
     """Hours between refreshes so the remaining credits last until the next reset.
 
+    `share` is how many live leagues split the credits (each gets an equal part).
     Returns inf when nothing more can be spent this period.
     """
     if credits_left is None:
         return min_hours  # unknown budget: fetch once to find out
-    affordable = (credits_left - RESERVE_CREDITS) // max(cost or DEFAULT_COST, 1)
+    per_call = max(cost or DEFAULT_COST, 1)
+    affordable = (credits_left - RESERVE_CREDITS) // per_call // max(share, 1)
     if affordable <= 0:
         return float("inf")
     hours_left = (next_reset(now, reset_day) - now) / pd.Timedelta(hours=1)
@@ -121,18 +134,59 @@ def floor_hours(events: list[dict] | None, now: pd.Timestamp) -> float:
     return MIN_INTERVAL_HOURS
 
 
+def _kickoffs(events: list[dict] | None) -> list[pd.Timestamp]:
+    out = []
+    for ev in events or []:
+        try:
+            out.append(pd.Timestamp(ev["commence_time"]).tz_convert("UTC"))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return out
+
+
+def policy_floor(league: str, kickoffs, now: pd.Timestamp) -> float | None:
+    """Minimum hours between refreshes for a league's policy; None = don't fetch now.
+
+    "always" (the Premier League): as floor_hours. "matchday": nothing unless a kickoff
+    is within MATCHDAY_HOURS; then every MATCHDAY_FAR_HOURS, hourly within
+    MATCHDAY_NEAR_WINDOW hours, and every 30 minutes within KICKOFF_WINDOW_HOURS.
+    """
+    ahead = [k - now for k in kickoffs if k >= now]
+    lg = LEAGUES.get(league)
+    if lg is None or lg.odds_policy == "always":
+        near = any(d <= pd.Timedelta(hours=KICKOFF_WINDOW_HOURS) for d in ahead)
+        return KICKOFF_INTERVAL_HOURS if near else MIN_INTERVAL_HOURS
+    soonest = min(ahead, default=None)
+    if soonest is None or soonest > pd.Timedelta(hours=MATCHDAY_HOURS):
+        return None
+    if soonest <= pd.Timedelta(hours=KICKOFF_WINDOW_HOURS):
+        return KICKOFF_INTERVAL_HOURS
+    if soonest <= pd.Timedelta(hours=MATCHDAY_NEAR_WINDOW):
+        return MIN_INTERVAL_HOURS
+    return MATCHDAY_FAR_HOURS
+
+
 def fetch_odds(
     league: str = "E0",
     raw_dir: Path = RAW_DIR,
     api_key: str | None = None,
     now: pd.Timestamp | None = None,
+    kickoffs=None,
+    share: int = 1,
 ) -> tuple[list[dict] | None, OddsStatus]:
     """Cached DraftKings odds JSON for a league, plus status. Never raises.
 
     Downloads only when the budgeted refresh interval has passed (see module docstring).
     Returns (None, status) when no key is configured or nothing is cached yet and the
     download fails. Error messages never include the API key.
+
+    A league whose `live` flag is off is never fetched. `kickoffs` (the league's upcoming
+    kickoffs from the schedule) let a "matchday" league know a match is near before any
+    odds are cached; `share` splits the shared credit budget between the live leagues.
     """
+    lg = LEAGUES.get(league)
+    if lg is not None and not lg.live:
+        return None, OddsStatus(error=f"{lg.name} odds are off (league not live)")
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     reset_day = int(os.environ.get("ODDS_API_RESET_DAY", 1))
     now = now or pd.Timestamp.now(tz="UTC")
@@ -155,8 +209,11 @@ def fetch_odds(
     if last is not None and last < next_reset(now, reset_day) - pd.DateOffset(months=1):
         credits = None  # the allowance has reset since our last download
     cached = json.loads(path.read_text()) if path.exists() else None
-    floor = floor_hours(cached, now)
-    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day, floor)
+    floor = policy_floor(league, _kickoffs(cached) + list(kickoffs or []), now)
+    if floor is None:  # a "matchday" league with no match soon: keep what's cached
+        status.error = f"no {lg.name if lg else league} match within {MATCHDAY_HOURS:g} hours"
+        return cached, status
+    interval = refresh_interval_hours(credits, status.last_cost, now, reset_day, floor, share)
     status.refresh_hours = None if interval == float("inf") else round(interval, 2)
     hours_since = (now - last) / pd.Timedelta(hours=1) if last is not None else None
     # When paused, still check once a day in case the allowance reset on another day.
@@ -201,7 +258,7 @@ def fetch_odds(
                 status.fetched_at = meta["fetched_at"]
                 status.credits_left, status.last_cost = meta["credits_left"], meta["last_cost"]
                 interval = refresh_interval_hours(
-                    status.credits_left, status.last_cost, now, reset_day, floor
+                    status.credits_left, status.last_cost, now, reset_day, floor, share
                 )
                 status.refresh_hours = None if interval == float("inf") else round(interval, 2)
             else:
@@ -275,3 +332,57 @@ def apply_odds(fixtures: pd.DataFrame, odds: pd.DataFrame) -> pd.DataFrame:
         for h, a in zip(out["home"], out["away"], strict=True)
     ]
     return out
+
+
+# ---------- credit budget estimate ----------
+
+# Scheduled publish runs (publish.yml): every hour at :07, plus :22, :37 and :52 from 10:00
+# to 21:59 UTC. GitHub delays or drops some scheduled runs, so the estimate is an upper
+# bound for the refresh rules alone.
+RUN_MINUTES_ALWAYS = (7,)
+RUN_MINUTES_DAYTIME = (22, 37, 52)
+DAYTIME_HOURS = range(10, 22)
+
+
+def publish_runs(start: pd.Timestamp, end: pd.Timestamp) -> list[pd.Timestamp]:
+    """The scheduled publish times in [start, end)."""
+    out = []
+    t = start.floor("h")
+    while t < end:
+        mins = RUN_MINUTES_ALWAYS + (RUN_MINUTES_DAYTIME if t.hour in DAYTIME_HOURS else ())
+        out += [t + pd.Timedelta(minutes=m) for m in mins]
+        t += pd.Timedelta(hours=1)
+    return [r for r in out if start <= r < end]
+
+
+def estimate_credits(
+    league: str,
+    kickoffs,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cost: int = DEFAULT_COST,
+) -> dict:
+    """Odds API calls and credits one league would use between start and end.
+
+    Replays the scheduled publish runs against the league's refresh policy
+    (policy_floor) with an unlimited budget, so it is what the rules alone would spend:
+    each refresh is one call for h2h and totals from one bookmaker (`cost` credits).
+    The `live` flag is ignored: this prices switching a league on.
+    """
+    ks = sorted(pd.Timestamp(k).tz_convert("UTC") for k in kickoffs)
+    last = None
+    calls = 0
+    for t in publish_runs(start, end):
+        floor = policy_floor(league, ks, t)
+        if floor is None:
+            continue
+        if last is None or (t - last) >= pd.Timedelta(hours=floor):
+            calls += 1
+            last = t
+    return {
+        "league": league,
+        "matches": sum(start <= k < end for k in ks),
+        "calls": calls,
+        "credits": calls * cost,
+        "days": round((end - start) / pd.Timedelta(days=1), 1),
+    }
