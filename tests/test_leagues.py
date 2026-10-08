@@ -223,3 +223,22 @@ def test_second_league_flows_through_paper_without_trading(tmp_path):
     paper.run(d, tmp_path, res, now=after)
     led = {**paper.load_ledger(tmp_path, "E0"), **paper.load_ledger(tmp_path, "SP1")}
     assert all(t["status"] in ("won", "lost") for t in led.values())
+
+
+def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
+    (tmp_path / "backtest").mkdir()
+    e0 = {"summary": {"trades": 0}, "edge_threshold": {"min_edge": 0.08, "note": None}}
+    (tmp_path / "backtest" / "E0_dk.json").write_text(json.dumps(e0))
+    d = _two_league_data({"league": "SP1", **src()})
+    paper.run(d, tmp_path, None, now=NOW)
+    ml = next(p for p in d["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    by = ml["backtest"]["edge_threshold"]["by_league"]
+    assert by["E0"]["min_edge"] == 0.08
+    assert by["SP1"]["min_edge"] is None and "this league" in by["SP1"]["note"]
+    assert ml["backtest"]["edge_threshold"]["min_edge"] == 0.08  # top level unchanged
+
+    # One league only: no by_league (the app falls back to the top level).
+    d = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
+    paper.run(d, tmp_path, None, now=NOW)
+    ml = next(p for p in d["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    assert "by_league" not in ml["backtest"]["edge_threshold"]

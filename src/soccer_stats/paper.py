@@ -499,6 +499,24 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
+def _add_league_levels(bt: dict | None, codes: list[str], rules: dict, log_dir, primary: str):
+    """Moneyline backtest -> edge_threshold.by_league: each league's own learned level (its
+    <code>_dk.json edge_threshold), or min_edge None with the rule's note when it has none,
+    so the app flags exactly what the paper rule would trade. Only with 2+ leagues."""
+    et = (bt or {}).get("edge_threshold")
+    if not isinstance(et, dict) or len(codes) < 2:
+        return
+    by = {}
+    for lg in codes:
+        own = (
+            et
+            if lg == primary
+            else (_read_json(backtest_path(log_dir, lg)) or {}).get("edge_threshold")
+        )
+        by[lg] = own if isinstance(own, dict) else {"min_edge": None, "note": rules[lg]["note"]}
+    bt["edge_threshold"] = {**et, "by_league": by}
+
+
 def leagues_in_play(data: dict, primary: str = "E0") -> list[str]:
     """The primary league plus every league with fixtures in this build (data.json
     `leagues`, or the fixtures' own `league`), primary first."""
@@ -594,6 +612,7 @@ def run(
             backtests[p["id"]] = _read_json(
                 Path(log_dir) / "backtest" / f"{league}_{p['backtest']}.json"
             )
+        _add_league_levels(backtests.get("moneyline"), codes, rules, log_dir, league)
         bt = backtest_path(log_dir, league)
         if bt.exists():
             try:
