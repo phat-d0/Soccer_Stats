@@ -58,13 +58,14 @@ jobs:
             echo "No DraftKings backtest yet: match edges use the raw model"
 
       # Team-total snapshots already taken (docs/totals.md): every recorded call, so a
-      # match's look or close is never fetched twice, and this month's spend for the cap.
-      - name: Read the team-total call record
+      # match's look or close is never fetched twice, and this month's spend for the cap;
+      # plus the logged prices, which the match sheet shows beside the model (no calls).
+      - name: Read the team-total call record and prices
         continue-on-error: true
         run: |
           mkdir -p "$RUNNER_TEMP/tt_state"
           git fetch --depth=1 origin data-log || exit 0
-          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '/team_totals_calls_'); do
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E '/team_totals_calls_|_team_totals_'); do
             git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/tt_state/$(basename "$f")"
           done
 

@@ -506,6 +506,11 @@ table.bd th:first-child { width: 40%; }
 table.mkts.with-blend { font-size: 13px; }
 table.mkts.with-blend td, table.mkts.with-blend th { padding-left: 3px; padding-right: 3px; }
 table.mkts .blend-col { background: var(--track); }
+/* Match sheet "Goals": over/under tables; the line column stays narrow */
+table.mkts.goals { table-layout: fixed; }
+table.mkts.goals th:first-child { width: 34%; }
+.goals-team + .goals-team { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+details.goals-fold { margin-top: 10px; }
 /* A plain-English "why" box: no value bet, player trades off */
 .explain {
   font-size: 13px;
