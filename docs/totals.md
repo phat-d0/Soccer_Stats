@@ -653,8 +653,10 @@ reason. Ranges at 99.583% (12 tests).
   on the holdout. The app should not show a model total-corners line.
 - **Each team's corners:** the models know something. On the holdout the gain range clears
   0 in E0, Ligue 1 and the Championship, and in development it clears 0 almost everywhere.
-  But every finalist has at least one line outside the 0.80–1.25 slope band. Development
-  and holdout both say the same thing: the chances are too spread out. On ~300 holdout
+  But every finalist has at least one line outside the 0.80–1.25 slope band, and in every
+  league the failing lines are below 0.80 (a few holdout lines in Ligue 1 and the
+  Championship sit above 1, inside the band). Development and holdout both say the same
+  thing: the chances are mostly too spread out. On ~300 holdout
   matches the slope ranges are wide (roughly ±0.4), so the band test there is noisy, but
   the development slopes (2,000–3,700 matches) point the same way.
 - **What could follow (not done, needs its own pre-registration):** a per-league
