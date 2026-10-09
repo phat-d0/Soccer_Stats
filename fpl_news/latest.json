@@ -1,22 +1,14 @@
 {
 "Arsenal|Saliba": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Saliba",
 "status": "i",
 "chance": 0,
 "news": "Back injury - Unknown return date"
 },
-"Arsenal|White": {
-"at": "2026-10-08T21:57+00:00",
-"team": "Arsenal",
-"name": "White",
-"status": "d",
-"chance": 75,
-"news": "Groin injury - 75% chance of playing"
-},
 "Arsenal|Rice": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Rice",
 "status": "d",
@@ -24,7 +16,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Arsenal|Martinelli": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Martinelli",
 "status": "u",
@@ -32,7 +24,7 @@
 "news": "Has joined Al Hilal permanently"
 },
 "Arsenal|Dowman": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Dowman",
 "status": "d",
@@ -40,7 +32,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Arsenal|Nwaneri": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Nwaneri",
 "status": "u",
@@ -48,7 +40,7 @@
 "news": "Has joined Borussia Dortmund on loan for the rest of the season"
 },
 "Arsenal|F\u00e1bio Vieira": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "F\u00e1bio Vieira",
 "status": "u",
@@ -56,7 +48,7 @@
 "news": "Has joined Hamburger SV permanently"
 },
 "Arsenal|Nelson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Nelson",
 "status": "u",
@@ -64,7 +56,7 @@
 "news": "has departed the club as a free agent."
 },
 "Arsenal|Havertz": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Havertz",
 "status": "d",
@@ -72,7 +64,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Arsenal|G.Jesus": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "G.Jesus",
 "status": "u",
@@ -80,7 +72,7 @@
 "news": "Has joined FC Barcelona permanently"
 },
 "Arsenal|Konsa": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Konsa",
 "status": "d",
@@ -88,15 +80,15 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Arsenal|Tzolis": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Arsenal",
 "name": "Tzolis",
-"status": "d",
-"chance": 75,
-"news": "Hamstring injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Hamstring injury - Expected back 24 Oct"
 },
 "Aston Villa|M.Bizot": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "M.Bizot",
 "status": "i",
@@ -104,7 +96,7 @@
 "news": "Back injury - Expected back 10 Oct"
 },
 "Aston Villa|Digne": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Digne",
 "status": "u",
@@ -112,7 +104,7 @@
 "news": "Has joined Paris Saint-Germain permanently"
 },
 "Aston Villa|Pau": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Pau",
 "status": "i",
@@ -120,7 +112,7 @@
 "news": "Hamstring injury - Expected back 10 Oct"
 },
 "Aston Villa|Maatsen": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Maatsen",
 "status": "i",
@@ -128,7 +120,7 @@
 "news": "Ankle injury - Unknown return date"
 },
 "Aston Villa|Nedeljkovic": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Nedeljkovic",
 "status": "u",
@@ -136,7 +128,7 @@
 "news": "Has joined Rangers on loan for the rest of the season"
 },
 "Aston Villa|Bailey": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Bailey",
 "status": "u",
@@ -144,7 +136,7 @@
 "news": "Has joined Olympiakos permanently"
 },
 "Aston Villa|Onana": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Onana",
 "status": "i",
@@ -152,7 +144,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Aston Villa|Iling Jr": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Iling Jr",
 "status": "u",
@@ -160,7 +152,7 @@
 "news": "Has joined Bolton Wanderers on loan for the rest of the season"
 },
 "Aston Villa|Alysson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Alysson",
 "status": "d",
@@ -168,7 +160,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Aston Villa|Watkins": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Watkins",
 "status": "u",
@@ -176,7 +168,7 @@
 "news": "Has joined Al Hilal permanently"
 },
 "Aston Villa|Madjo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Madjo",
 "status": "i",
@@ -184,7 +176,7 @@
 "news": "Unspecified injury - Unknown return date"
 },
 "Aston Villa|Lynch": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Lynch",
 "status": "u",
@@ -192,7 +184,7 @@
 "news": "Has joined Oxford United on loan until January"
 },
 "Aston Villa|Goretzka": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Aston Villa",
 "name": "Goretzka",
 "status": "i",
@@ -200,7 +192,7 @@
 "news": "Knee injury - Expected back 10 Oct"
 },
 "Bournemouth|Dennis": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Dennis",
 "status": "u",
@@ -208,7 +200,7 @@
 "news": "Has joined MK Dons permanently"
 },
 "Bournemouth|Milosavljevi\u0107": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Milosavljevi\u0107",
 "status": "i",
@@ -216,7 +208,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Bournemouth|J.Araujo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "J.Araujo",
 "status": "i",
@@ -224,7 +216,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Bournemouth|Scott": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Scott",
 "status": "i",
@@ -232,7 +224,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Bournemouth|Kluivert": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Kluivert",
 "status": "i",
@@ -240,7 +232,7 @@
 "news": "Unspecified injury - Unknown return date"
 },
 "Bournemouth|Adli": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Adli",
 "status": "i",
@@ -248,7 +240,7 @@
 "news": "Calf injury - Unknown return date"
 },
 "Bournemouth|Kroupi.Jr": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Kroupi.Jr",
 "status": "i",
@@ -256,7 +248,7 @@
 "news": "Foot injury - Expected back 7 Nov"
 },
 "Bournemouth|Enes \u00dcnal": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Bournemouth",
 "name": "Enes \u00dcnal",
 "status": "u",
@@ -264,7 +256,7 @@
 "news": "Has joined Getafe permanently"
 },
 "Brentford|Collins": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Collins",
 "status": "i",
@@ -272,7 +264,7 @@
 "news": "Calf injury - Unknown return date"
 },
 "Brentford|Van den Berg": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Van den Berg",
 "status": "i",
@@ -280,7 +272,7 @@
 "news": "Groin injury - Unknown return date"
 },
 "Brentford|Damsgaard": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Damsgaard",
 "status": "d",
@@ -288,7 +280,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Brentford|Jensen": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Jensen",
 "status": "i",
@@ -296,7 +288,7 @@
 "news": "Unspecified injury - Expected back 10 Oct"
 },
 "Brentford|Milambo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Milambo",
 "status": "i",
@@ -304,7 +296,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Brentford|Dasilva": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Dasilva",
 "status": "i",
@@ -312,23 +304,15 @@
 "news": "Hamstring injury - Expected back 10 Oct"
 },
 "Brentford|Furo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brentford",
 "name": "Furo",
 "status": "i",
 "chance": 0,
 "news": "Unspecified injury - Unknown return date"
 },
-"Brighton|Dunk": {
-"at": "2026-10-08T21:57+00:00",
-"team": "Brighton",
-"name": "Dunk",
-"status": "d",
-"chance": 75,
-"news": "Neck injury - 75% chance of playing"
-},
 "Brighton|Igor": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Igor",
 "status": "u",
@@ -336,7 +320,7 @@
 "news": "Has joined Burnley permanently"
 },
 "Brighton|Mitoma": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Mitoma",
 "status": "i",
@@ -344,7 +328,7 @@
 "news": "Hamstring injury - Expected back 10 Oct"
 },
 "Brighton|Minteh": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Minteh",
 "status": "i",
@@ -352,15 +336,15 @@
 "news": "Leg injury - Expected back 28 Nov"
 },
 "Brighton|Hinshelwood": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Hinshelwood",
-"status": "i",
-"chance": 0,
-"news": "Ankle injury - Expected back 10 Oct"
+"status": "d",
+"chance": 50,
+"news": "Ankle injury - 50% chance of playing"
 },
 "Brighton|Buonanotte": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Buonanotte",
 "status": "u",
@@ -368,7 +352,7 @@
 "news": "Has joined Elche on loan for the rest of the season"
 },
 "Brighton|Wieffer": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Wieffer",
 "status": "i",
@@ -376,7 +360,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Brighton|Howell": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Howell",
 "status": "u",
@@ -384,7 +368,7 @@
 "news": "Has joined Leicester City on loan for the rest of the season"
 },
 "Brighton|Watson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Watson",
 "status": "u",
@@ -392,7 +376,7 @@
 "news": "Has joined Leicester City on loan for the rest of the season"
 },
 "Brighton|Yohanna": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Yohanna",
 "status": "i",
@@ -400,7 +384,7 @@
 "news": "Unspecified injury - Expected back 10 Oct"
 },
 "Brighton|Tzimas": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Tzimas",
 "status": "i",
@@ -408,7 +392,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Brighton|Ferguson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Ferguson",
 "status": "i",
@@ -416,7 +400,7 @@
 "news": "Ankle injury - Expected back 10 Oct"
 },
 "Brighton|Struijk": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Struijk",
 "status": "d",
@@ -424,7 +408,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Brighton|Cozier-Duberry": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Cozier-Duberry",
 "status": "u",
@@ -432,7 +416,7 @@
 "news": "Has joined Middlesbrough on loan for the rest of the season"
 },
 "Brighton|Azeez": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Brighton",
 "name": "Azeez",
 "status": "i",
@@ -440,7 +424,7 @@
 "news": "Hamstring injury - Expected back 10 Oct"
 },
 "Chelsea|S\u00e1nchez": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "S\u00e1nchez",
 "status": "u",
@@ -448,7 +432,7 @@
 "news": "Has joined Como on loan for the rest of the season"
 },
 "Chelsea|J\u00f6rgensen": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "J\u00f6rgensen",
 "status": "u",
@@ -456,7 +440,7 @@
 "news": "Has joined RC Strasbourg on loan for the rest of the season"
 },
 "Chelsea|James": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "James",
 "status": "d",
@@ -464,7 +448,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Chelsea|Chalobah": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Chalobah",
 "status": "u",
@@ -472,7 +456,7 @@
 "news": "Has joined Como permanently"
 },
 "Chelsea|B.Badiashile": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "B.Badiashile",
 "status": "u",
@@ -480,23 +464,15 @@
 "news": "Has joined Napoli on loan for the rest of the season"
 },
 "Chelsea|M.Sarr": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "M.Sarr",
 "status": "u",
 "chance": 0,
 "news": "Has joined Real Sociedad on loan for the rest of the season"
 },
-"Chelsea|Palestra": {
-"at": "2026-10-08T21:57+00:00",
-"team": "Chelsea",
-"name": "Palestra",
-"status": "d",
-"chance": 50,
-"news": "Thigh injury - 50% chance of playing"
-},
 "Chelsea|Palmer": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Palmer",
 "status": "d",
@@ -504,15 +480,15 @@
 "news": "Muscular injury - 75% chance of playing"
 },
 "Chelsea|Gittens": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Gittens",
-"status": "d",
-"chance": 75,
-"news": "Ankle injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Ankle injury - Unknown return date"
 },
 "Chelsea|Caicedo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Caicedo",
 "status": "d",
@@ -520,7 +496,7 @@
 "news": "Calf injury - 50% chance of playing"
 },
 "Chelsea|D.Essugo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "D.Essugo",
 "status": "u",
@@ -528,7 +504,7 @@
 "news": "Has joined RC Strasbourg on loan for the rest of the season"
 },
 "Chelsea|Jo\u00e3o Pedro": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Jo\u00e3o Pedro",
 "status": "d",
@@ -536,7 +512,7 @@
 "news": "Knee injury - 75% chance of playing"
 },
 "Chelsea|Marc Guiu": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Marc Guiu",
 "status": "u",
@@ -544,7 +520,7 @@
 "news": "Has joined RB Leipzig permanently"
 },
 "Chelsea|Emegha": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Chelsea",
 "name": "Emegha",
 "status": "i",
@@ -552,7 +528,7 @@
 "news": "Hamstring injury - Expected back 10 Oct"
 },
 "Coventry|Dovin": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Dovin",
 "status": "u",
@@ -560,7 +536,7 @@
 "news": "Has joined Leyton Orient on loan for the rest of the season"
 },
 "Coventry|Kitching": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Kitching",
 "status": "u",
@@ -568,7 +544,7 @@
 "news": "Has joined Sheffield United on loan for the rest of the season"
 },
 "Coventry|van Ewijk": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "van Ewijk",
 "status": "d",
@@ -576,7 +552,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Coventry|Kesler-Hayden": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Kesler-Hayden",
 "status": "d",
@@ -584,7 +560,7 @@
 "news": "Hamstring injury - 50% chance of playing"
 },
 "Coventry|Woolfenden": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Woolfenden",
 "status": "i",
@@ -592,7 +568,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Coventry|Brau": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Brau",
 "status": "u",
@@ -600,7 +576,7 @@
 "news": "Has joined Academico de Viseu on loan for the rest of the season"
 },
 "Coventry|Amenda": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Amenda",
 "status": "i",
@@ -608,7 +584,7 @@
 "news": "Calf injury - Unknown return date"
 },
 "Coventry|Eccles": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Eccles",
 "status": "i",
@@ -616,7 +592,7 @@
 "news": "Unspecified injury - Expected back 12 Oct"
 },
 "Coventry|Borges Rodrigues": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Borges Rodrigues",
 "status": "u",
@@ -624,7 +600,7 @@
 "news": "Has joined Burton Albion on loan for the rest of the season"
 },
 "Coventry|Andrews": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Andrews",
 "status": "u",
@@ -632,7 +608,7 @@
 "news": "Has joined Oxford United on loan for the rest of the season"
 },
 "Coventry|Wright": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Wright",
 "status": "i",
@@ -640,7 +616,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Coventry|Markelo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Markelo",
 "status": "u",
@@ -648,7 +624,7 @@
 "news": "Has joined Shabab Al-Ahli Dubai permanently"
 },
 "Coventry|Bassette": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Bassette",
 "status": "u",
@@ -656,7 +632,7 @@
 "news": "Has joined KVC Westerlo on loan for the rest of the season"
 },
 "Coventry|Awoniyi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Coventry",
 "name": "Awoniyi",
 "status": "s",
@@ -664,7 +640,7 @@
 "news": "Suspended until 19 Oct"
 },
 "Crystal Palace|Disasi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Disasi",
 "status": "s",
@@ -672,15 +648,15 @@
 "news": "Suspended until 25 Oct"
 },
 "Crystal Palace|Henderson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Henderson",
 "status": "i",
 "chance": 0,
-"news": "Foot injury - Expected back 11 Oct"
+"news": "Foot injury - Expected back 18 Oct"
 },
 "Crystal Palace|Sosa": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Sosa",
 "status": "u",
@@ -688,7 +664,7 @@
 "news": "Has joined FC Cologne on loan for the rest of the season"
 },
 "Crystal Palace|Chadi Riad": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Chadi Riad",
 "status": "i",
@@ -696,7 +672,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Crystal Palace|Devenny": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Devenny",
 "status": "u",
@@ -704,7 +680,7 @@
 "news": "Has joined Stoke City permanently"
 },
 "Crystal Palace|Esse": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Esse",
 "status": "u",
@@ -712,7 +688,7 @@
 "news": "Has joined Millwall on loan for the rest of the season"
 },
 "Crystal Palace|M.Fran\u00e7a": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "M.Fran\u00e7a",
 "status": "u",
@@ -720,7 +696,7 @@
 "news": "Has joined Alverca on loan for the rest of the season"
 },
 "Crystal Palace|J.Rak-Sakyi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "J.Rak-Sakyi",
 "status": "u",
@@ -728,7 +704,7 @@
 "news": "has joined  Kasimpasa on loan for the rest of the seaon."
 },
 "Crystal Palace|Cardines": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Cardines",
 "status": "u",
@@ -736,15 +712,15 @@
 "news": "Has joined Bristol City on loan for the rest of the season"
 },
 "Crystal Palace|Mateta": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Mateta",
 "status": "i",
 "chance": 0,
-"news": "Hamstring injury - Expected back 11 Oct"
+"news": "Hamstring injury - Expected back 18 Oct"
 },
 "Crystal Palace|Uche": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Uche",
 "status": "u",
@@ -752,23 +728,15 @@
 "news": "has returned to Getafe CF"
 },
 "Crystal Palace|Tomiyasu": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Crystal Palace",
 "name": "Tomiyasu",
-"status": "d",
-"chance": 75,
-"news": "Calf injury - 75% chance of playing"
-},
-"Crystal Palace|Khalaili": {
-"at": "2026-10-08T21:57+00:00",
-"team": "Crystal Palace",
-"name": "Khalaili",
-"status": "d",
-"chance": 75,
-"news": "Hamstring injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Calf injury - Expected back 18 Oct"
 },
 "Everton|N\u00f8rgaard": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "N\u00f8rgaard",
 "status": "i",
@@ -776,7 +744,7 @@
 "news": "Groin injury - Unknown return date"
 },
 "Everton|Mykolenko": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "Mykolenko",
 "status": "d",
@@ -784,7 +752,7 @@
 "news": "Leg injury - 75% chance of playing"
 },
 "Everton|Patterson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "Patterson",
 "status": "u",
@@ -792,7 +760,7 @@
 "news": "Has joined Torino permanently"
 },
 "Everton|Aznou": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "Aznou",
 "status": "u",
@@ -800,7 +768,7 @@
 "news": "Has joined Malaga on loan for the rest of the season"
 },
 "Everton|R\u00f6hl": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "R\u00f6hl",
 "status": "i",
@@ -808,7 +776,7 @@
 "news": "Unspecified injury - Expected back 11 Oct"
 },
 "Everton|Beto": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Everton",
 "name": "Beto",
 "status": "u",
@@ -816,23 +784,31 @@
 "news": "Has joined Fiorentina permanently"
 },
 "Fulham|McNally": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Fulham",
 "name": "McNally",
 "status": "u",
 "chance": 0,
 "news": "Has joined York City on loan for the rest of the season"
 },
+"Fulham|Robinson": {
+"at": "2026-10-09T14:06+00:00",
+"team": "Fulham",
+"name": "Robinson",
+"status": "d",
+"chance": 75,
+"news": "Ankle injury - 75% chance of playing"
+},
 "Fulham|Cairney": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Fulham",
 "name": "Cairney",
 "status": "i",
 "chance": 0,
-"news": "Knee injury - Expected back 10 Oct"
+"news": "Knee injury - Expected back 17 Oct"
 },
 "Fulham|De Fougerolles": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Fulham",
 "name": "De Fougerolles",
 "status": "u",
@@ -840,7 +816,7 @@
 "news": "has joined  Real Salt Lake on loan for the rest of the seaon."
 },
 "Hull|Butland": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Butland",
 "status": "i",
@@ -848,7 +824,7 @@
 "news": "Arm injury - Unknown return date"
 },
 "Hull|Cartwright": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Cartwright",
 "status": "u",
@@ -856,7 +832,7 @@
 "news": "Has joined Grimsby Town on loan for the rest of the season"
 },
 "Hull|Lo-Tutala": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Lo-Tutala",
 "status": "u",
@@ -864,7 +840,7 @@
 "news": "Has joined Colchester United on loan for the rest of the season"
 },
 "Hull|Hughes": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Hughes",
 "status": "i",
@@ -872,7 +848,7 @@
 "news": "Groin injury - Unknown return date"
 },
 "Hull|Drameh": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Drameh",
 "status": "u",
@@ -880,7 +856,7 @@
 "news": "Has joined Genoa permanently"
 },
 "Hull|Jacob": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Jacob",
 "status": "u",
@@ -888,7 +864,7 @@
 "news": "Has joined Newport County on loan until January"
 },
 "Hull|Millar": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Millar",
 "status": "u",
@@ -896,7 +872,7 @@
 "news": "Has joined Birmingham on loan for the rest of the season"
 },
 "Hull|Matazo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Matazo",
 "status": "i",
@@ -904,7 +880,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Hull|Kamara": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Kamara",
 "status": "u",
@@ -912,7 +888,7 @@
 "news": "Has joined Portsmouth permanently"
 },
 "Hull|Akintola": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Akintola",
 "status": "u",
@@ -920,7 +896,7 @@
 "news": "Has joined Omonoia FC permanently"
 },
 "Hull|Gyabi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Gyabi",
 "status": "i",
@@ -928,7 +904,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Hull|Destan": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Destan",
 "status": "u",
@@ -936,7 +912,7 @@
 "news": "Has joined Konyaspor permanently"
 },
 "Hull|Burstow": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Burstow",
 "status": "u",
@@ -944,7 +920,7 @@
 "news": "Has joined Sheffield Wednesday on loan for the rest of the season"
 },
 "Hull|Targett": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Targett",
 "status": "d",
@@ -952,7 +928,7 @@
 "news": "Ankle injury - 75% chance of playing"
 },
 "Hull|Morita": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Morita",
 "status": "i",
@@ -960,7 +936,7 @@
 "news": "Calf injury - Expected back 11 Oct"
 },
 "Hull|Ansah": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Ansah",
 "status": "i",
@@ -968,7 +944,7 @@
 "news": "Back injury - Unknown return date"
 },
 "Hull|Norton-Cuffy": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Hull",
 "name": "Norton-Cuffy",
 "status": "d",
@@ -976,7 +952,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Ipswich|Johnson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Johnson",
 "status": "u",
@@ -984,7 +960,7 @@
 "news": "Has joined Stoke City on loan for the rest of the season"
 },
 "Ipswich|Burns": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Burns",
 "status": "u",
@@ -992,7 +968,7 @@
 "news": "Has joined Leicester City permanently"
 },
 "Ipswich|Taylor": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Taylor",
 "status": "i",
@@ -1000,7 +976,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Ipswich|Ogbene": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Ogbene",
 "status": "u",
@@ -1008,7 +984,7 @@
 "news": "Has joined Lincoln City on loan until January"
 },
 "Ipswich|Fatawu": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Fatawu",
 "status": "s",
@@ -1016,7 +992,7 @@
 "news": "Suspended until 17 Oct"
 },
 "Ipswich|Hirst": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Hirst",
 "status": "u",
@@ -1024,7 +1000,7 @@
 "news": "Has joined Stoke City permanently"
 },
 "Ipswich|Szmodics": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Szmodics",
 "status": "u",
@@ -1032,7 +1008,7 @@
 "news": "Has joined Derby County on loan for the rest of the season"
 },
 "Ipswich|Al-Hamadi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Al-Hamadi",
 "status": "u",
@@ -1040,7 +1016,7 @@
 "news": "Has joined Sheffield Wednesday on loan for the rest of the season"
 },
 "Ipswich|Van Oevelen": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Van Oevelen",
 "status": "u",
@@ -1048,7 +1024,7 @@
 "news": "Has joined Valencia on loan for the rest of the season"
 },
 "Ipswich|Humphreys": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Ipswich",
 "name": "Humphreys",
 "status": "u",
@@ -1056,7 +1032,7 @@
 "news": "Has joined Huddersfield Town on loan for the rest of the season"
 },
 "Leeds|Wilson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Wilson",
 "status": "d",
@@ -1064,7 +1040,7 @@
 "news": "Thigh injury - 75% chance of playing"
 },
 "Leeds|Perri": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Perri",
 "status": "u",
@@ -1072,7 +1048,7 @@
 "news": "Has joined Torino on loan for the rest of the season"
 },
 "Leeds|Rodon": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Rodon",
 "status": "i",
@@ -1080,7 +1056,7 @@
 "news": "Hamstring injury - Expected back 21 Nov"
 },
 "Leeds|Bornauw": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Bornauw",
 "status": "u",
@@ -1088,7 +1064,7 @@
 "news": "Has joined Hamburg SV on loan for the rest of the season"
 },
 "Leeds|Gnonto": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Gnonto",
 "status": "u",
@@ -1096,7 +1072,7 @@
 "news": "Has joined ACF Fiorentina on loan for the rest of the season"
 },
 "Leeds|Harrison": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Harrison",
 "status": "u",
@@ -1104,7 +1080,7 @@
 "news": "Has joined New England Revolution permanently"
 },
 "Leeds|James": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "James",
 "status": "i",
@@ -1112,7 +1088,7 @@
 "news": "Back injury - Expected back 18 Oct"
 },
 "Leeds|Piroe": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Piroe",
 "status": "u",
@@ -1120,7 +1096,7 @@
 "news": "Has joined West Ham United on loan for the rest of the season"
 },
 "Leeds|Mateo Joseph": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Mateo Joseph",
 "status": "i",
@@ -1128,7 +1104,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Leeds|Bahoya": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Leeds",
 "name": "Bahoya",
 "status": "d",
@@ -1136,7 +1112,7 @@
 "news": "Ankle injury - 75% chance of playing"
 },
 "Liverpool|Pecsi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Pecsi",
 "status": "u",
@@ -1144,7 +1120,7 @@
 "news": "Has joined TSV Hartberg on loan for the rest of the season"
 },
 "Liverpool|Jaros": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Jaros",
 "status": "i",
@@ -1152,7 +1128,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Liverpool|Bradley": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Bradley",
 "status": "i",
@@ -1160,7 +1136,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Liverpool|Jacquet": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Jacquet",
 "status": "d",
@@ -1168,7 +1144,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Liverpool|Leoni": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Leoni",
 "status": "i",
@@ -1176,7 +1152,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Liverpool|Ramsay": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Ramsay",
 "status": "u",
@@ -1184,15 +1160,15 @@
 "news": "Has joined St Mirren on loan for the rest of the season"
 },
 "Liverpool|Gakpo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Gakpo",
-"status": "d",
-"chance": 75,
-"news": "Ankle injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Ankle injury - Unknown return date"
 },
 "Liverpool|Chiesa": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Chiesa",
 "status": "i",
@@ -1200,7 +1176,7 @@
 "news": "Back injury - Unknown return date"
 },
 "Liverpool|C.Jones": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "C.Jones",
 "status": "u",
@@ -1208,7 +1184,7 @@
 "news": "Has joined Internazionale permanently"
 },
 "Liverpool|Bajcetic": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Bajcetic",
 "status": "u",
@@ -1216,15 +1192,15 @@
 "news": "Has joined Celta Vigo permanently"
 },
 "Liverpool|Isak": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Isak",
-"status": "d",
-"chance": 75,
-"news": "Thigh injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Thigh injury - Unknown return date"
 },
 "Liverpool|Ekitik\u00e9": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Ekitik\u00e9",
 "status": "i",
@@ -1232,7 +1208,7 @@
 "news": "Achilles injury - Unknown return date"
 },
 "Liverpool|Elliott": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Liverpool",
 "name": "Elliott",
 "status": "u",
@@ -1240,7 +1216,7 @@
 "news": "Has joined Valencia on loan for the rest of the season"
 },
 "Man City|O'Reilly": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "O'Reilly",
 "status": "d",
@@ -1248,7 +1224,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Man City|Alleyne": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Alleyne",
 "status": "u",
@@ -1256,7 +1232,7 @@
 "news": "Has joined Burnley on loan for the rest of the season"
 },
 "Man City|Semenyo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Semenyo",
 "status": "d",
@@ -1264,7 +1240,7 @@
 "news": "Ankle injury - 75% chance of playing"
 },
 "Man City|Foden": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Foden",
 "status": "s",
@@ -1272,7 +1248,7 @@
 "news": "Suspended until 17 Oct"
 },
 "Man City|Rodrigo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Rodrigo",
 "status": "u",
@@ -1280,7 +1256,7 @@
 "news": "Has joined Barcelona permanently"
 },
 "Man City|Reijnders": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Reijnders",
 "status": "u",
@@ -1288,7 +1264,7 @@
 "news": "Has joined Al Qadsiah permanently"
 },
 "Man City|Echeverri": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Echeverri",
 "status": "u",
@@ -1296,7 +1272,7 @@
 "news": "Has joined Benfica on loan for the rest of the season"
 },
 "Man City|Phillips": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Phillips",
 "status": "u",
@@ -1304,7 +1280,7 @@
 "news": "Has joined Sheffield United on loan for the rest of the season"
 },
 "Man City|Mukasa": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Mukasa",
 "status": "u",
@@ -1312,7 +1288,7 @@
 "news": "has joined West Ham on loan for the rest of the seaon."
 },
 "Man City|Monga": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man City",
 "name": "Monga",
 "status": "u",
@@ -1320,7 +1296,7 @@
 "news": "Has joined Swansea City on loan for the rest of the season"
 },
 "Man United|Darlow": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Darlow",
 "status": "d",
@@ -1328,7 +1304,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Man United|Bayindir": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Bayindir",
 "status": "u",
@@ -1336,7 +1312,7 @@
 "news": "Has joined Celta Vigo on loan for the rest of the season"
 },
 "Man United|Heaton": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Heaton",
 "status": "i",
@@ -1344,15 +1320,15 @@
 "news": "Hamstring injury - Unknown return date"
 },
 "Man United|Dorgu": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Dorgu",
-"status": "d",
-"chance": 75,
-"news": "Hamstring injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Hamstring injury - Expected back 25 Oct"
 },
 "Man United|De Ligt": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "De Ligt",
 "status": "i",
@@ -1360,7 +1336,7 @@
 "news": "Back injury - Unknown return date"
 },
 "Man United|Mazraoui": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Mazraoui",
 "status": "d",
@@ -1368,7 +1344,7 @@
 "news": "Back injury - 75% chance of playing"
 },
 "Man United|Fredricson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Fredricson",
 "status": "u",
@@ -1376,7 +1352,7 @@
 "news": "Has joined Lausanne-Sport permanently"
 },
 "Man United|Rashford": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Rashford",
 "status": "d",
@@ -1384,7 +1360,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Man United|Amad": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Amad",
 "status": "i",
@@ -1392,7 +1368,7 @@
 "news": "Unspecified injury - Unknown return date"
 },
 "Man United|Mainoo": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Mainoo",
 "status": "d",
@@ -1400,7 +1376,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Man United|Ugarte": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Ugarte",
 "status": "i",
@@ -1408,7 +1384,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Man United|Collyer": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Collyer",
 "status": "u",
@@ -1416,15 +1392,15 @@
 "news": "Has joined West Brom permanently"
 },
 "Man United|\u0160e\u0161ko": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "\u0160e\u0161ko",
-"status": "d",
-"chance": 75,
-"news": "Shin injury - 75% chance of playing"
+"status": "i",
+"chance": 0,
+"news": "Shin injury - Expected back 18 Oct"
 },
 "Man United|Obi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Man United",
 "name": "Obi",
 "status": "u",
@@ -1432,7 +1408,7 @@
 "news": "Has joined Willem II on loan for the rest of the season"
 },
 "Newcastle|Jaouen": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Jaouen",
 "status": "i",
@@ -1440,7 +1416,7 @@
 "news": "Hamstring injury - Unknown return date"
 },
 "Newcastle|Burn": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Burn",
 "status": "i",
@@ -1448,7 +1424,7 @@
 "news": "Ankle injury - Expected back 12 Oct"
 },
 "Newcastle|Livramento": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Livramento",
 "status": "d",
@@ -1456,7 +1432,7 @@
 "news": "Unspecified injury - 50% chance of playing"
 },
 "Newcastle|A.Murphy": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "A.Murphy",
 "status": "u",
@@ -1464,7 +1440,7 @@
 "news": "Has joined FC Kaiserslautern on loan for the rest of the season"
 },
 "Newcastle|Elanga": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Elanga",
 "status": "i",
@@ -1472,7 +1448,7 @@
 "news": "Unspecified injury - Unknown return date"
 },
 "Newcastle|J.Ramsey": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "J.Ramsey",
 "status": "i",
@@ -1480,7 +1456,7 @@
 "news": "Thigh injury - Unknown return date"
 },
 "Newcastle|Joelinton": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Joelinton",
 "status": "d",
@@ -1488,7 +1464,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Newcastle|L.Miley": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "L.Miley",
 "status": "d",
@@ -1496,7 +1472,7 @@
 "news": "Unspecified injury - 75% chance of playing"
 },
 "Newcastle|Woltemade": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Woltemade",
 "status": "u",
@@ -1504,7 +1480,7 @@
 "news": "Has joined Juventus on loan for the rest of the season"
 },
 "Newcastle|Osula": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Osula",
 "status": "d",
@@ -1512,7 +1488,7 @@
 "news": "Foot injury - 50% chance of playing"
 },
 "Newcastle|Neave": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Neave",
 "status": "u",
@@ -1520,7 +1496,7 @@
 "news": "Has joined Wolves on loan for the rest of the season"
 },
 "Newcastle|Dedi\u0107": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Dedi\u0107",
 "status": "d",
@@ -1528,7 +1504,7 @@
 "news": "Unspecified injury - 50% chance of playing"
 },
 "Newcastle|Shahar": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Newcastle",
 "name": "Shahar",
 "status": "u",
@@ -1536,7 +1512,7 @@
 "news": "has joined Arouca on loan for the rest of the seaon."
 },
 "Nott'm Forest|Morato": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Morato",
 "status": "u",
@@ -1544,7 +1520,7 @@
 "news": "Has joined West Ham on loan for the rest of the season"
 },
 "Nott'm Forest|Milenkovi\u0107": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Milenkovi\u0107",
 "status": "i",
@@ -1552,7 +1528,7 @@
 "news": "Hamstring injury - Expected back 11 Oct"
 },
 "Nott'm Forest|Savona": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Savona",
 "status": "i",
@@ -1560,7 +1536,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Nott'm Forest|Abbott": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Abbott",
 "status": "u",
@@ -1568,7 +1544,7 @@
 "news": "Has joined Southampton on loan for the rest of the season"
 },
 "Nott'm Forest|Bindon": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Bindon",
 "status": "u",
@@ -1576,7 +1552,7 @@
 "news": "Has joined Charlton Athletic on loan for the rest of the season"
 },
 "Nott'm Forest|Hutchinson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Hutchinson",
 "status": "u",
@@ -1584,7 +1560,7 @@
 "news": "Has joined AC Milan on loan for the rest of the season"
 },
 "Nott'm Forest|Bakwa": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Nott'm Forest",
 "name": "Bakwa",
 "status": "u",
@@ -1592,7 +1568,7 @@
 "news": "Has joined Lille on loan for the rest of the season"
 },
 "Tottenham|Van Hecke": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Van Hecke",
 "status": "d",
@@ -1600,7 +1576,7 @@
 "news": "Foot injury - 75% chance of playing"
 },
 "Tottenham|Vicario": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Vicario",
 "status": "u",
@@ -1608,7 +1584,7 @@
 "news": "Has joined Juventus on loan for the rest of the season"
 },
 "Tottenham|Pedro Porro": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Pedro Porro",
 "status": "d",
@@ -1616,7 +1592,7 @@
 "news": "Hamstring injury - 75% chance of playing"
 },
 "Tottenham|Romero": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Romero",
 "status": "u",
@@ -1624,7 +1600,7 @@
 "news": "Has joined Atletico Madrid permanently"
 },
 "Tottenham|Spence": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Spence",
 "status": "u",
@@ -1632,7 +1608,7 @@
 "news": "Has joined Internazionale permanently"
 },
 "Tottenham|Phillips": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Phillips",
 "status": "u",
@@ -1640,7 +1616,7 @@
 "news": "Has joined Middlesbrough permanently"
 },
 "Tottenham|Souza": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Souza",
 "status": "u",
@@ -1648,7 +1624,7 @@
 "news": "Has joined FC Porto on loan for the rest of the season"
 },
 "Tottenham|Xavi": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Xavi",
 "status": "i",
@@ -1656,7 +1632,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Tottenham|Odobert": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Odobert",
 "status": "i",
@@ -1664,7 +1640,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Tottenham|P.M.Sarr": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "P.M.Sarr",
 "status": "u",
@@ -1672,7 +1648,7 @@
 "news": "Has joined Juventus on loan for the rest of the season"
 },
 "Tottenham|Kulusevski": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Kulusevski",
 "status": "i",
@@ -1680,7 +1656,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Tottenham|Moore": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Moore",
 "status": "u",
@@ -1688,7 +1664,7 @@
 "news": "Has joined FC K\u00f6ln on loan for the rest of the season"
 },
 "Tottenham|Richarlison": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Richarlison",
 "status": "u",
@@ -1696,7 +1672,7 @@
 "news": "not included in squad."
 },
 "Tottenham|Scarlett": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Scarlett",
 "status": "u",
@@ -1704,7 +1680,7 @@
 "news": "Has joined Leyton Orient permanently"
 },
 "Tottenham|Mudryk": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Tottenham",
 "name": "Mudryk",
 "status": "i",
@@ -1712,7 +1688,7 @@
 "news": "Ankle injury - Unknown return date"
 },
 "Sunderland|Patterson": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Patterson",
 "status": "u",
@@ -1720,7 +1696,7 @@
 "news": "Has joined Wrexham permanently"
 },
 "Sunderland|Ballard": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Ballard",
 "status": "i",
@@ -1728,7 +1704,7 @@
 "news": "Hamstring injury - Unknown return date"
 },
 "Sunderland|Seelt": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Seelt",
 "status": "u",
@@ -1736,7 +1712,7 @@
 "news": "Has joined Swansea City on loan for the rest of the season"
 },
 "Sunderland|Hjelde": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Hjelde",
 "status": "u",
@@ -1744,7 +1720,7 @@
 "news": "Has joined KV Mechelen on loan for the rest of the season"
 },
 "Sunderland|Masuaku": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Masuaku",
 "status": "u",
@@ -1752,7 +1728,7 @@
 "news": "Has joined Konyaspor permanently"
 },
 "Sunderland|Diarra": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Diarra",
 "status": "i",
@@ -1760,7 +1736,7 @@
 "news": "Hamstring injury - Expected back 18 Oct"
 },
 "Sunderland|Adingra": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Adingra",
 "status": "u",
@@ -1768,7 +1744,7 @@
 "news": "Has joined Ajax on loan for the rest of the season"
 },
 "Sunderland|Mundle": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Mundle",
 "status": "i",
@@ -1776,7 +1752,7 @@
 "news": "Knee injury - Unknown return date"
 },
 "Sunderland|Brobbey": {
-"at": "2026-10-08T21:57+00:00",
+"at": "2026-10-09T14:06+00:00",
 "team": "Sunderland",
 "name": "Brobbey",
 "status": "i",
