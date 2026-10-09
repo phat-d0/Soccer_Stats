@@ -328,3 +328,121 @@ across books):
   corners and BTTS.
 - No live change. No further spend is proposed here; logging FanDuel's team totals would
   be a new owner decision.
+
+## Cost of logging team totals live (round 9; estimate only, 0 credits, nothing switched on)
+
+The owner asked on 9 Oct for an exact cost before deciding whether to log team-total
+prices, so the model's CLV can be tested. **This is an estimate. No call was made and
+nothing is live.**
+
+**What would be logged.**
+- **Books:** FanDuel in E0, SP1, D1, I1 and F1, plus Bovada in E0. The Championship has no
+  team totals on The Odds API.
+- **Markets:** `team_totals` (the main line per team), and optionally
+  `alternate_team_totals` (0.5–5.5).
+- **Snapshot plans per match:**
+  - lean: the close only;
+  - base: 24 hours before kickoff and the close;
+  - rich: 24 hours, 6 hours and the close.
+
+**Cost per call** (the market probe's `x-requests-last`, run 37889595473):
+- One `/events/{id}/odds` call per match per snapshot. It costs 1 credit per market per
+  region. FanDuel and Bovada are both in `us`, and up to ten books cost one region, so a
+  call costs 1 credit (`team_totals`) or 2 (plus `alternate_team_totals`).
+- The events list that gives the ids is free (cost 0 in the probe log).
+- So the cost is matches × snapshots × markets. Matches kicking off together don't share
+  a call.
+
+**Method.**
+- `odds_feed.estimate_snapshot_credits` replays each league's real fixture calendar
+  (Understat) against the publish schedule (`publish_runs`).
+- A snapshot is the first scheduled run at or after its time. The close is the last
+  scheduled run before kickoff.
+- `soccer-stats estimate-team-totals --months 2026-10,2026-11,2026-12`; `backfill.yml`
+  `estimate_month` with a month list (no key).
+- Run: `backfill.yml` run 37940224476, 0 credits.
+
+### Credits per month (`team_totals` / with `alternate_team_totals`)
+
+| Month | Matches (5 leagues) | Lean (close) | Base (24 h + close) | Rich (24 h + 6 h + close) |
+| --- | --- | --- | --- | --- |
+| Oct 2026 | 189 | 189 / 378 | 378 / 756 | 567 / 1,134 |
+| Nov 2026 | 158 | 158 / 316 | 316 / 632 | 474 / 948 |
+| Dec 2026 | 165 | 165 / 330 | 330 / 660 | 495 / 990 |
+| **Average a month** | 171 | **171 / 341** | **341 / 683** | **512 / 1,024** |
+
+**Per league, base plan, `team_totals` only:**
+
+| League | Oct | Nov | Dec |
+| --- | --- | --- | --- |
+| Premier League | 76 | 64 | 120 |
+| La Liga | 72 | 70 | 60 |
+| Bundesliga | 72 | 54 | 54 |
+| Serie A | 86 | 74 | 60 |
+| Ligue 1 | 72 | 54 | 36 |
+
+- December's Premier League (60 matches) includes the festive midweek rounds.
+- November has an international break.
+- Every match's close lands within 30 minutes of kickoff on the schedule. European
+  kickoffs fall in the 10:00–22:00 UTC window, where publish runs every 15 minutes.
+- November and December still use placeholder kickoff times on Understat. That changes
+  when a snapshot is taken, not how many there are, so the cost holds.
+
+### Against the balance
+
+The balance is about 22,496 on the shared key. Live match odds already take about 4,050 a
+month (`docs/leagues.md`), which on its own lasts about 5½ months.
+
+| Plan | Extra a month | All live spend a month | Months on 22,496 |
+| --- | --- | --- | --- |
+| None (today) | 0 | ≈ 4,050 | ≈ 5.6 |
+| Lean, `team_totals` | 171 | ≈ 4,220 | ≈ 5.3 |
+| Base, `team_totals` | 341 | ≈ 4,390 | ≈ 5.1 |
+| Base, with alternates | 683 | ≈ 4,730 | ≈ 4.8 |
+| Rich, with alternates | 1,024 | ≈ 5,070 | ≈ 4.4 |
+
+These are upper bounds: GitHub throttles scheduled runs, so some snapshots would be
+missed. The baseball app's use of the shared key comes on top.
+
+### How fast priced matches build up (from 9 Oct 2026)
+
+| | All five leagues | Premier League alone |
+| --- | --- | --- |
+| After 4 weeks | 203 matches | 40 |
+| After 8 weeks | 357 matches | 80 |
+| Time to ~150 matches | about 3 weeks | about 13 weeks |
+
+Each match gives two team totals (home and away), so the number of priced lines is about
+twice the match count at the main line, and more with alternates.
+
+### How it would plug in (not built)
+
+1. **Fetch.** In `publish`, alongside the DraftKings match odds: for each top-five match
+   due a snapshot, one `/events/{id}/odds` call for FanDuel (and Bovada in E0), markets
+   `team_totals` (+ alternates).
+   - Use the same budget guard as the matchday leagues: stop below 3,000 credits on the
+     freshest balance (`MATCHDAY_RESERVE_CREDITS`), so the Premier League's match odds
+     and the baseball app keep priority.
+   - Cache each body per event and snapshot.
+2. **Log.** Write `odds_log/<code>_team_totals_<YYYY-MM>.jsonl` on `data-log`, append-only
+   and deduplicated like the DraftKings log. One row per match × team × line × snapshot:
+   - over and under prices, the margin-free chance and the book;
+   - `snapshot` (24h, 6h or close), `fetched_at` and minutes before kickoff;
+   - the model's chance at that moment: the team's goal marginal from the same score
+     matrix that sets `p`. The totals research found this marginal well calibrated in the
+     top five leagues.
+3. **Score.** CLV per row against FanDuel's own de-margined close for that team and line:
+   - the snapshot's chance vs the close's fair chance, and the model's side;
+   - plus log loss, model vs the close.
+   - Through `lab.metrics` with ranges that resample whole matches. With no sharp
+     reference (Pinnacle lists no goal team totals), the close is the only benchmark.
+4. **Rules.** No bets and no paper trades until CLV clears its range. Any rule would be
+   pre-registered in `docs/lab.md` before the data are read.
+
+**Recommendation, if the owner wants it:** the base plan with `team_totals` only, about 340
+credits a month.
+- CLV needs an entry price and a close. The lean plan (about 170) has only the close, so
+  it can compare the model with the closing price but can't measure CLV.
+- The rich plan's 6-hour snapshot adds a second entry point near team news. It is worth
+  adding only if the base plan shows something.
+- Alternates double the cost for lines far from the middle, which carry more margin.
