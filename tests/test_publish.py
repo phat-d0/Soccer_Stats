@@ -236,3 +236,26 @@ def test_team_block_matches_the_top_level_shape():
     assert set(block) == {"name", "teams", "params", "ratings", "xg"}
     assert {r["team"] for r in block["ratings"]} == set(block["teams"])
     assert {"goals_for", "goals_against", "goal_diff"} <= set(block["ratings"][0])
+
+
+def test_league_fixtures_keeps_cards_when_the_teams_block_fails(monkeypatch):
+    from conftest import simulate_league
+
+    from soccer_stats import publish
+
+    matches, _ = simulate_league(n_teams=6, seasons=2, seed=4)
+    matches["home_xg"] = float("nan")
+    fixtures = pd.DataFrame({"home": ["T00"], "away": ["T01"]})
+    monkeypatch.setattr(publish, "load_matches", lambda *a, **k: matches)
+    monkeypatch.setattr(publish, "with_xg", lambda m: (m, None))
+    monkeypatch.setattr(publish, "upcoming_fixtures", lambda *a, **k: fixtures)
+    monkeypatch.setattr(publish, "with_draftkings", lambda f, *a, **k: (f, {"name": None}))
+    monkeypatch.setattr(publish, "fixture_cards", lambda *a, **k: [{"home": "T00"}])
+
+    def broken(*a, **k):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(publish, "team_block", broken)
+    cards, source, block = publish.league_fixtures("SP1")
+    assert cards == [{"home": "T00"}] and block is None  # cards kept, Teams block dropped
+    assert "error" not in source

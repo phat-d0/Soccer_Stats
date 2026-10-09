@@ -78,7 +78,14 @@ const STEPS = [
   // goals-only with none. Ends on a Premier League player sheet for the next step.
   ["teams-sp1", async (p) => { await closeSheet(p); await p.click('button[data-tv="teams"]'); await p.click('.chip[data-league="SP1"]'); }],
   ["teams-e1", click('.chip[data-league="E1"]')],
-  ["players-stats-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-tv="players"]'); await p.click('button[data-plmode="stats"]'); await p.waitForSelector("#pl-list .bet-row"); }],
+  // The first load of La Liga's stats is held back 600 ms and the view re-renders meanwhile:
+  // the request in flight must be reused (the fetch counter above fails on a second one).
+  ["players-stats-sp1", async (p) => {
+    await p.route("**/players_stats_SP1.json", async (route) => { await new Promise((r) => setTimeout(r, 600)); await route.continue(); });
+    await p.click('.chip[data-league="SP1"]'); await p.click('button[data-tv="players"]'); await p.click('button[data-plmode="stats"]');
+    await p.click('button[data-plmode="stats"]'); // re-render while the file is still loading
+    await p.waitForSelector("#pl-list .bet-row");
+  }],
   ["players-chart-sp1", async (p) => { await p.click('button[data-plview="chart"]'); await p.waitForSelector("#dev-chart .dev-row"); await p.click("#dev-chart .dev-row >> nth=0"); }],
   ["players-stats-e1", click('.chip[data-league="E1"]')],
   ["players-model-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-plmode="model"]'); }],
@@ -129,6 +136,16 @@ try {
     let step = "load";
     page.on("console", (m) => { if (m.type() === "error") failures.push(`${mode}/${step}: console: ${m.text()}`); });
     page.on("pageerror", (e) => failures.push(`${mode}/${step}: page error: ${e.message}`));
+    // Each league's season stats file is fetched at most once (loadPlayerStats shares the
+    // request in flight across re-renders).
+    const statsFetches = new Map();
+    page.on("request", (r) => {
+      const name = new URL(r.url()).pathname.split("/").pop();
+      if (/^players_stats.*\.json$/.test(name)) {
+        statsFetches.set(name, (statsFetches.get(name) || 0) + 1);
+        if (statsFetches.get(name) > 1) failures.push(`${mode}/${step}: ${name} fetched ${statsFetches.get(name)} times`);
+      }
+    });
     await page.goto(BASE);
     await page.waitForSelector("button.match");
     for (const [name, run, isSheet] of STEPS) {
