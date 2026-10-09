@@ -469,3 +469,75 @@ def estimate_credits(
         "credits": calls * cost,
         "days": round((end - start) / pd.Timedelta(days=1), 1),
     }
+
+
+# ---------- team-total snapshots: a cost estimate only (docs/totals.md) ----------
+
+# FanDuel quotes goal team totals in the top five leagues (and Bovada in E0, same "us"
+# region); the Championship has none on The Odds API (market probe, run 37889595473).
+TEAM_TOTAL_LEAGUES = ("E0", "SP1", "D1", "I1", "F1")
+# Snapshots per match besides the close, as hours before kickoff.
+SNAPSHOT_PLANS = {"lean": (), "base": (24.0,), "rich": (24.0, 6.0)}
+CLOSE_WINDOW_MINUTES = 30  # a close quoted earlier than this is still logged, but counted
+EVENT_REGIONS = 1  # FanDuel and Bovada are both "us": up to ten books cost one region
+
+
+def snapshot_runs(kickoff: pd.Timestamp, offsets, runs: list[pd.Timestamp]) -> dict:
+    """The publish runs that would take a match's snapshots: for each offset (hours
+    before kickoff) the first run at or after that time, and for the close the last run
+    before kickoff. Runs taken by two snapshots are one call."""
+    before = [t for t in runs if t < kickoff]
+    out: dict = {}
+    for h in offsets:
+        due = kickoff - pd.Timedelta(hours=h)
+        t = next((t for t in before if t >= due), None)
+        if t is not None:
+            out[f"{h:g}h"] = t
+    if before:
+        out["close"] = before[-1]
+    return out
+
+
+def estimate_snapshot_credits(
+    league: str,
+    kickoffs,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    plan: str = "base",
+    markets: int = 1,
+) -> dict:
+    """Credits to snapshot every match kicking off in [start, end) under a snapshot plan.
+
+    One `/events/{id}/odds` call per match per snapshot; each costs `markets` ×
+    EVENT_REGIONS credits (`x-requests-last` in the market probe: 1 per market per region;
+    the events list that gives the ids is free). Runs follow the publish schedule
+    (publish_runs), so the close is the last scheduled run before kickoff; GitHub's
+    throttling of scheduled runs makes real closes later and real spend lower.
+    """
+    ks = sorted(pd.Timestamp(k).tz_convert("UTC") for k in kickoffs)
+    month = [k for k in ks if start <= k < end]
+    offsets = SNAPSHOT_PLANS[plan]
+    pad = pd.Timedelta(hours=max(offsets, default=0) + 2)
+    runs = publish_runs(start - pad, end)
+    calls, in_window = 0, 0
+    for k in month:
+        taken = snapshot_runs(k, offsets, runs)
+        calls += len(set(taken.values()))
+        close = taken.get("close")
+        if close is not None and k - close <= pd.Timedelta(minutes=CLOSE_WINDOW_MINUTES):
+            in_window += 1
+    return {
+        "league": league,
+        "plan": plan,
+        "markets": markets,
+        "matches": len(month),
+        "calls": calls,
+        "credits": calls * markets * EVENT_REGIONS,
+        "close_in_window": in_window,
+    }
+
+
+def matches_by(kickoffs, start: pd.Timestamp, weeks: float) -> int:
+    """Matches kicking off in the `weeks` from start (how fast priced matches build up)."""
+    end = start + pd.Timedelta(weeks=weeks)
+    return sum(start <= pd.Timestamp(k).tz_convert("UTC") < end for k in kickoffs)

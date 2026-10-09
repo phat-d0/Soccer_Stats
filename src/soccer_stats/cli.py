@@ -154,6 +154,72 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
     print(f"Live leagues now: {total} credits")
 
 
+def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
+    """Credits to log team-total prices per match under each snapshot plan (estimate only:
+    no key, no calls). Replays each league's real fixture calendar (Understat)."""
+    from soccer_stats.leagues import LEAGUES
+    from soccer_stats.odds_feed import (
+        SNAPSHOT_PLANS,
+        TEAM_TOTAL_LEAGUES,
+        estimate_snapshot_credits,
+        matches_by,
+    )
+    from soccer_stats.xg import load_schedule
+
+    months = [pd.Timestamp(f"{m.strip()}-01", tz="UTC") for m in args.months.split(",")]
+    year = months[0].year if months[0].month >= 7 else months[0].year - 1
+    kickoffs = {}
+    for code in TEAM_TOTAL_LEAGUES:
+        try:
+            kickoffs[code] = list(load_schedule(code, year, include_played=True)["kickoff"])
+        except Exception as exc:  # no schedule: say so rather than guess
+            print(f"  {LEAGUES[code].name}: schedule unavailable ({type(exc).__name__})")
+    markets = (1, 2)  # team_totals; + alternate_team_totals
+    print("Team-total snapshots: credits per month (estimate; 1 credit per market per call)")
+    print("  plan: lean = close only; base = 24 h + close; rich = 24 h + 6 h + close")
+    grand = {(p, m): 0 for p in SNAPSHOT_PLANS for m in markets}
+    for start in months:
+        end = start + pd.offsets.MonthBegin(1)
+        print(f"{start:%b %Y}")
+        month_total = {(p, m): 0 for p in SNAPSHOT_PLANS for m in markets}
+        for code, ks in kickoffs.items():
+            cells = []
+            for plan in SNAPSHOT_PLANS:
+                e = estimate_snapshot_credits(code, ks, start, end, plan)
+                for m in markets:
+                    month_total[(plan, m)] += e["calls"] * m
+                cells.append(f"{plan} {e['calls']:>3}/{2 * e['calls']:>3}")
+            base = estimate_snapshot_credits(code, ks, start, end, "base")
+            print(
+                f"  {LEAGUES[code].name:<15} {base['matches']:>3} matches  "
+                + "  ".join(cells)
+                + f"  (close within 30 min: {base['close_in_window']})"
+            )
+        for k, v in month_total.items():
+            grand[k] += v
+        print(
+            "  All five        "
+            + "  ".join(
+                f"{p} {month_total[(p, 1)]:>4}/{month_total[(p, 2)]:>4}" for p in SNAPSHOT_PLANS
+            )
+        )
+    n = len(months)
+    print(f"Average a month over {n} month(s) (team_totals / + alternate_team_totals):")
+    for plan in SNAPSHOT_PLANS:
+        print(f"  {plan:<5} {grand[(plan, 1)] / n:>6.0f} / {grand[(plan, 2)] / n:>6.0f}")
+    since = pd.Timestamp(args.since, tz="UTC")
+    allk = [k for ks in kickoffs.values() for k in ks]
+    print(f"Priced matches from {since:%d %b %Y} (all five leagues; E0 alone):")
+    e0 = kickoffs.get("E0", [])
+    for w in (4, 8):
+        print(f"  {w} weeks: {matches_by(allk, since, w)}; E0 {matches_by(e0, since, w)}")
+    for label, ks in (("all five", allk), ("E0", e0)):
+        weeks = next((w for w in range(1, 53) if matches_by(ks, since, w) >= 150), None)
+        print(
+            f"  150 matches ({label}): {weeks} weeks" if weeks else f"  150 ({label}): over a year"
+        )
+
+
 def cmd_paper(args: argparse.Namespace) -> None:
     import json
 
@@ -1341,6 +1407,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     ec.add_argument("--month", default=pd.Timestamp.now(tz="UTC").strftime("%Y-%m"))
     ec.set_defaults(func=cmd_estimate_credits)
+
+    ett = sub.add_parser(
+        "estimate-team-totals", help="credits to log team-total prices (estimate, no key)"
+    )
+    ett.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
+    ett.add_argument("--since", default="2026-10-09", help="start for the 4/8-week counts")
+    ett.set_defaults(func=cmd_estimate_team_totals)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")

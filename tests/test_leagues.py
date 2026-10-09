@@ -144,6 +144,30 @@ def test_estimate_credits():
     assert feed.estimate_credits("D1", k, start, end)["calls"] > 0
 
 
+def test_team_total_snapshots():
+    k = T.normalize() + pd.Timedelta(hours=15)  # a 15:00 UTC kickoff
+    runs = feed.publish_runs(k - pd.Timedelta(days=2), k + pd.Timedelta(hours=1))
+    taken = feed.snapshot_runs(k, (24.0, 6.0), runs)
+    assert taken["24h"] == k - pd.Timedelta(hours=24) + pd.Timedelta(minutes=7)
+    assert taken["6h"] == k - pd.Timedelta(hours=6) + pd.Timedelta(minutes=7)
+    assert taken["close"] == k - pd.Timedelta(minutes=8)  # the 14:52 run
+    # Never a run at or after kickoff.
+    assert all(t < k for t in taken.values())
+    start, end = T.normalize(), T.normalize() + pd.Timedelta(days=7)
+    early = T.normalize() + pd.Timedelta(days=1, hours=5)  # 05:00 UTC: hourly runs only
+    ks = [k, early]
+    lean = feed.estimate_snapshot_credits("E0", ks, start, end, "lean")
+    base = feed.estimate_snapshot_credits("E0", ks, start, end, "base")
+    rich = feed.estimate_snapshot_credits("E0", ks, start, end, "rich", markets=2)
+    assert (lean["calls"], base["calls"], rich["calls"]) == (2, 4, 6)
+    assert lean["credits"] == 2 and rich["credits"] == 12  # 1 credit per market per call
+    assert base["close_in_window"] == 1  # 05:00's close is the 04:07 run, 53 min out
+    # A match outside the month costs nothing in it; matches_by counts kickoffs.
+    assert feed.estimate_snapshot_credits("E0", ks, end, end + pd.Timedelta(days=7))["calls"] == 0
+    assert feed.matches_by(ks, start, 1) == 2 and feed.matches_by(ks, k, 12 / 168) == 1
+    assert "E1" not in feed.TEAM_TOTAL_LEAGUES  # no team totals on the API
+
+
 # ---------- a second league through publish, the odds log and paper trades ----------
 
 
