@@ -121,6 +121,8 @@ jobs:
             uv run soccer-stats log-news --snapshot _site/news_snapshot.json --log-dir ../log/fpl_news
             # The odds log must never block the ledger update below.
             uv run soccer-stats log-odds --site _site --log-dir ../log || echo "odds log failed; ledger continues"
+            uv run soccer-stats log-team-news --site _site --log-dir ../log ||
+              echo "team-news log failed; ledger continues"
             if [ -d "$RUNNER_TEMP/team_totals" ]; then
               uv run soccer-stats log-team-totals --pending "$RUNNER_TEMP/team_totals" --log-dir ../log ||
                 echo "team-total log failed; ledger continues"

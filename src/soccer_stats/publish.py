@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import dashboard, team_totals
+from soccer_stats import dashboard, espn_news, team_totals
 from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
@@ -796,6 +796,11 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         print(f"Team totals shown: {n_tt} fixtures with FanDuel prices")
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
+    # After the paid team-total fetch, so a slow ESPN can never delay a close snapshot.
+    try:  # free ESPN injuries and lineups; ESPN is unofficial, so it never stops the build
+        print(espn_news.summary_line(espn_news.add(data["fixtures"])))
+    except Exception as exc:  # noqa: BLE001
+        print(f"Team news (ESPN): failed ({type(exc).__name__}); no team news this run")
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])
