@@ -785,3 +785,61 @@ holdout: each test is run once.
 
 **Code.** `edge/lineups.py`; `odds-check.yml` `task=lineups` with `league` (no key
 passed). Tests include no look-ahead.
+
+### Results (2026-10-08, `odds-check.yml task=lineups`, 0 credits; ranges 99.75%)
+
+Runs: E0 37853078197, SP1 37857126948, D1 37857129940, I1 37857132611, F1 37857135194.
+- Every league's Understat rosters downloaded in full, with 0 missing.
+- 90–92% of football-data matches paired with a surprise value; the rest are each
+  season's first three rounds.
+- Every season from 2016/17 to 2024/25 is at least 99% priced, so all of 2017/18–2024/25
+  is scored.
+
+| League | Matches | 1. Move: slope (range) | R² out of sample | 2–3. Early: blend c (range) | 12% bets, CLV | 4. Close: blend c (range) |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 2,797 | +0.218 (+0.168 to +0.265) **pass** | 6.1% | +0.01 (−0.33 to +0.41) | 50, +1.2% (−2.1 to +5.0) | −0.09 (−0.41 to +0.31) |
+| SP1 | 2,794 | +0.203 (+0.154 to +0.256) **pass** | 5.1% | −0.21 (−0.50 to +0.07) | 0 | −0.22 (−0.51 to +0.05) |
+| D1 | 2,231 | +0.150 (+0.096 to +0.206) **pass** | 2.7% | −0.30 (−0.69 to +0.13) | 93, −5.8% (−10.2 to −0.2) | −0.25 (−0.67 to +0.19) |
+| I1 | 2,794 | +0.172 (+0.122 to +0.215) **pass** | 3.5% | −0.12 (−0.41 to +0.10) | 9, −0.2% (−8.7 to +6.6) | −0.12 (−0.39 to +0.14) |
+| F1 | 2,554 | +0.173 (+0.121 to +0.222) **pass** | 3.5% | −0.20 (−0.51 to +0.09) | 2, −3.6% | −0.23 (−0.55 to +0.05) |
+
+- **Lineups move the price, in every league (test 1 passes 5 of 5).**
+  - When the away side is missing a large share of its recent xG, Pinnacle's price moves
+    toward home between the early price and the close, and the reverse.
+  - The surprise explains 3–6% of the move's variance, out of sample.
+  - The move by band is monotone. In E0 it runs from −0.079 (away side much stronger
+    than usual) to +0.068 (away side depleted), against a spread of 0.17.
+- **The close absorbs it, in every league (test 4 fails 5 of 5).**
+  - Beside the fair close the surprise earns no blend weight: every range includes 0 and
+    every point estimate is at or below 0.
+  - Log loss beside the close is no better (every gain range includes 0).
+- **Betting at the early price doesn't pass anywhere (tests 2–3 fail 5 of 5),** even
+  though this test knows the XI before it could be known.
+  - Beside the early price the surprise earns no blend weight. The move is real, but too
+    small next to match noise to sharpen the result's odds.
+  - The 12% rule rarely fires (0–93 bets).
+  - Germany's 93 bets are long shots: average odds 7.7, CLV −5.8%, and a ROI of +51% whose
+    range runs from −39% to +168%. They pass nothing.
+- **Descriptive.**
+  - 91–94% of team-matches are missing at least one regular; rotation is the norm.
+  - The mean surprise is 0.15–0.17 of a team's recent xG, and a third of team-matches
+    exceed 0.2.
+
+## Verdict (lineup surprises)
+
+**The close already absorbs lineup news.**
+- In all five leagues the starting XI explains part of how Pinnacle's price moves from
+  early to close, and by kickoff Pinnacle has priced it.
+- The surprise adds nothing beside the close, and nothing measurable to the result
+  beside the early price.
+
+What this means for the work plan:
+- **The live team-news check (16 Nov)** can only find value where a book is slower than
+  Pinnacle: DraftKings near kickoff. It should compare DraftKings' last pre-lineup price
+  with its close (or with Pinnacle's close) after a surprise. It shouldn't look for
+  information Pinnacle lacks. Worth running, as that cheap check: the odds log already
+  holds the data.
+- **Live odds logging for new leagues** is worth it only for that same purpose: measuring
+  how fast DraftKings reacts. It isn't for any model edge, since nothing beats Pinnacle's
+  close here or in bake-offs 1–3.
+- No handover and no live change.
