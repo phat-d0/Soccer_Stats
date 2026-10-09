@@ -584,3 +584,50 @@ proper corners model. 0 credits; research only.
 **Code.** `edge/corners.py`; `odds-check.yml` `task=corners` with `league` (no key).
 - Holdout runs take `reason` and `finalists` ("total=<x>,team=<y>").
 - Tests include no look-ahead.
+
+### Corners bake-off: development results (2017/18–2023/24; recorded before any holdout)
+
+Runs: `odds-check.yml` `task=corners`, commit 3962d0d, 0 credits, no key: E0 38003805694,
+SP1 38003808230, D1 38003810294, I1 38003812234, F1 38003814395, E1 38003816937. (A first
+batch on ec0cb6a failed in five leagues on a read-only array in the ratings fit; fixed in
+3962d0d, with a test. The Spain run in that batch gave the same numbers.) Gain = mean
+per-match log-loss gain over the league average (a) across the group's lines, range at
+99.881%; slopes = the lowest and highest line slope (band 0.80–1.25).
+
+Each team's corners (over 3.5 / 4.5 / 5.5, home and away):
+
+| League | Matches | (b) team averages | (c) corner ratings | (d) ratings + context |
+| --- | --- | --- | --- | --- |
+| E0 | 2,558 | +0.046 (+0.032..+0.059), 0.84–0.98, **pass** | +0.046 (+0.031..+0.060), 0.73–0.94 | +0.047 (+0.032..+0.062), 0.73–0.88 |
+| SP1 | 2,570 | +0.016 (+0.005..+0.026), 0.67–0.75 | +0.016 (+0.004..+0.027), 0.62–0.70 | +0.015 (+0.003..+0.026), 0.56–0.72 |
+| D1 | 1,980 | +0.032 (+0.018..+0.045), 0.79–0.94 | +0.033 (+0.018..+0.047), 0.73–0.85 | +0.035 (+0.020..+0.051), 0.72–0.87 |
+| I1 | 2,562 | +0.036 (+0.024..+0.047), 0.85–0.93, **pass** | +0.038 (+0.026..+0.051), 0.78–0.89 | +0.038 (+0.025..+0.051), 0.75–0.84 |
+| F1 | 2,399 | +0.013 (+0.004..+0.022), 0.67–0.87 | +0.008 (−0.003..+0.019), 0.56–0.66 | +0.014 (+0.003..+0.024), 0.62–0.75 |
+| E1 | 3,701 | +0.009 (+0.002..+0.016), 0.59–0.72 | +0.009 (+0.000..+0.017), 0.53–0.66 | +0.011 (+0.002..+0.019), 0.57–0.72 |
+
+Match total (over 8.5 / 9.5 / 10.5 / 11.5):
+
+| League | (b) | (c) | (d) | (e) direct total |
+| --- | --- | --- | --- | --- |
+| E0 | +0.003 (−0.005..+0.011), 0.53–0.78 | +0.001, 0.42–0.62 | +0.001, 0.45–0.64 | +0.000, 0.41–0.57 |
+| SP1 | +0.006 (−0.002..+0.015), 0.57–0.87 | +0.004, 0.51–0.70 | +0.003, 0.49–0.71 | +0.001, 0.44–0.63 |
+| D1 | +0.001 (−0.008..+0.011), 0.38–0.53 | +0.001, 0.41–0.51 | −0.001, 0.33–0.45 | −0.003, 0.31–0.41 |
+| I1 | +0.009 (−0.001..+0.018), 0.72–0.87 | +0.007, 0.57–0.77 | +0.005, 0.58–0.74 | +0.003, 0.53–0.66 |
+| F1 | +0.000 (−0.008..+0.008), 0.36–0.64 | −0.007, 0.20–0.38 | −0.003, 0.32–0.48 | −0.005, 0.29–0.42 |
+| E1 | +0.001 (−0.006..+0.007), 0.43–0.58 | −0.004, 0.34–0.44 | −0.003, 0.36–0.44 | −0.004, 0.32–0.40 |
+
+Reading:
+- **Each team's corners carry real information.** Every candidate beats the league average
+  in every league, and the range clears 0 for 17 of 18 league × candidate pairs. The gain is
+  largest in E0 (+0.046 a line) and smallest in the Championship (+0.01).
+- **But almost all are over-confident** (slopes below 0.80). Two pass the full rule: (b), the
+  shrunk team averages, in E0 and Serie A. The ratings models, (c) and (d), spread their
+  chances further and are less calibrated.
+- **The match total is not predictable beyond the league average.** No candidate's range
+  clears 0 in any league, and every one is over-confident (slopes 0.20–0.87). The direct
+  total (e) is the worst of them, so the home/away correlation is not what goes wrong.
+- **Finalists, by the pre-registered rule (best development gain, passing or not):** total
+  (b) in all six leagues; team lines (d) in E0, D1, F1, E1 and (c) in SP1, I1. In E0 and I1
+  the rule picks a finalist that does not pass, over (b), which does. That is the rule as
+  written. The holdout runs exactly these finalists: E0, D1, F1, E1 `total=b,team=d`; SP1,
+  I1 `total=b,team=c`.
