@@ -353,7 +353,83 @@ def build(src: Path, out: Path) -> dict:
     (out / "data.json").write_text(dump(data))
     (out / "players_backtest.json").write_text(dump(sample))
     (out / "players_stats.json").write_text(dump(stats))
+    sp1_stats = add_teams_by_league(data)
+    (out / "players_stats_SP1.json").write_text(dump(sp1_stats))
+    (out / "data.json").write_text(dump(data))  # again, with teams_by_league
     return data
+
+
+# The Teams tab per league (round 9): La Liga with xG and Understat season stats, the
+# Championship goals-only with none. Simulated results with real names, fitted by the
+# same publish.team_block that builds data.json; the stats go through the real
+# publish.league_season_stats on a synthetic Understat file.
+SP1_CLUBS = [
+    "Real Madrid", "Barcelona", "Ath Madrid", "Sevilla", "Valencia", "Betis",
+    "Sociedad", "Villarreal", "Ath Bilbao", "Girona", "Celta", "Osasuna",
+]  # fmt: skip
+E1_CLUBS = ["Leeds", "Sheffield United", "Sunderland", "Norwich", "Hull", "Coventry",
+            "Middlesbrough", "Watford", "Stoke", "Bristol City"]  # fmt: skip
+SP1_PLAYERS = ["Lamine Yamal", "Vinicius Junior", "Kylian Mbappe", "Robert Lewandowski",
+               "Antoine Griezmann", "Isco", "Mikel Oyarzabal", "Gerard Moreno",
+               "Nico Williams", "Iago Aspas", "Ante Budimir", "Raphinha"]  # fmt: skip
+
+
+def _fit_block(clubs: list[str], code: str, seed: int, with_xg: bool) -> dict:
+    from soccer_stats import dashboard
+    from soccer_stats.publish import team_block
+
+    df, _ = simulate_league(n_teams=len(clubs), seasons=2, seed=seed)
+    names = {f"T{i:02d}": t for i, t in enumerate(clubs)}
+    df["home"], df["away"] = df["home"].map(names), df["away"].map(names)
+    df["date"] = df["date"] + (NOW.tz_localize(None) - pd.Timedelta(days=2) - df["date"].max())
+    rng = np.random.default_rng(seed)
+    df["home_xg"] = df["home_goals"] * 0.6 + rng.gamma(2, 0.3, len(df)) if with_xg else np.nan
+    df["away_xg"] = df["away_goals"] * 0.6 + rng.gamma(2, 0.3, len(df)) if with_xg else np.nan
+    model = dashboard.fit_model(df, xg_weight=0.7 if with_xg else 0.0)
+    return team_block(model, df, pd.DataFrame(), code)
+
+
+def add_teams_by_league(data: dict) -> dict:
+    from soccer_stats.publish import league_season_stats
+    from soccer_stats.xg import LEAGUES as US
+
+    data["teams_by_league"] = {
+        "E0": {
+            "name": data["league"],
+            "teams": data["teams"],
+            "params": data["params"],
+            "ratings": data["ratings"],
+            "xg": bool(data["xg_weight"]),
+        },
+        "SP1": _fit_block(SP1_CLUBS, "SP1", 11, True),
+        "E1": _fit_block(E1_CLUBS, "E1", 12, False),
+    }
+    rng = np.random.default_rng(5)
+    players = []
+    for i, name in enumerate(SP1_PLAYERS * 3):  # 36 player-seasons over 12 clubs
+        games = int(rng.integers(8, 34))
+        shots = int(rng.integers(5, 110))
+        players.append(
+            {
+                "id": str(9000 + i),
+                "player_name": name if i < len(SP1_PLAYERS) else f"{name} {i // len(SP1_PLAYERS)}",
+                "games": str(games),
+                "time": str(games * int(rng.integers(40, 90))),
+                "shots": str(shots),
+                "goals": str(int(shots * rng.uniform(0.05, 0.2))),
+                "xG": f"{shots * rng.uniform(0.06, 0.16):.2f}",
+                "position": ["F S", "M S", "D", "GK", "F M S", "M"][i % 6],
+                "team_title": SP1_CLUBS[i % len(SP1_CLUBS)],
+            }
+        )
+    with tempfile.TemporaryDirectory() as tmp:
+        for year in (2025, 2026):
+            (Path(tmp) / f"understat_{US['SP1']}_{year}.json").write_text(
+                json.dumps({"dates": [], "players": players[: 24 if year == 2026 else 36]})
+            )
+        rows = league_season_stats("SP1", [2025, 2026], raw_dir=Path(tmp))
+    data["players_stats_by_league"] = {"SP1": "players_stats_SP1.json"}
+    return {"seasons": sorted({r["season"] for r in rows}, reverse=True), "players": rows}
 
 
 # Settled live match trades with closing prices, until the real ledger has some: the

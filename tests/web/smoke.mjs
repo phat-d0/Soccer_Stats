@@ -74,6 +74,15 @@ const STEPS = [
   ["player-sheet", async (p) => { await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["players-model", async (p) => { await closeSheet(p); await p.click('button[data-plmode="model"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-model-sheet", async (p) => { await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
+  // Teams tab per league (round 9): La Liga with Understat season stats, the Championship
+  // goals-only with none. Ends on a Premier League player sheet for the next step.
+  ["teams-sp1", async (p) => { await closeSheet(p); await p.click('button[data-tv="teams"]'); await p.click('.chip[data-league="SP1"]'); }],
+  ["teams-e1", click('.chip[data-league="E1"]')],
+  ["players-stats-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-tv="players"]'); await p.click('button[data-plmode="stats"]'); await p.waitForSelector("#pl-list .bet-row"); }],
+  ["players-chart-sp1", async (p) => { await p.click('button[data-plview="chart"]'); await p.waitForSelector("#dev-chart .dev-row"); await p.click("#dev-chart .dev-row >> nth=0"); }],
+  ["players-stats-e1", click('.chip[data-league="E1"]')],
+  ["players-model-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-plmode="model"]'); }],
+  ["players-e0-sheet", async (p) => { await p.click('.chip[data-league="E0"]'); await p.click('button[data-plmode="stats"]'); await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
   ["record-match-bucket", click('.eb-row[data-ebrow="0"]')],
   ["record-match-raw", click('button[data-recdk="raw"]')],

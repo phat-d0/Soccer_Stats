@@ -19,7 +19,7 @@ uv run pytest           # run tests
 A phone-first web app, **Soccer Model**, that you add to your home screen. It opens full-screen with its own
 icon, works offline, and follows your phone's dark mode. Tabs: **Matches** (next round
 with value picks; tap for model, blend and DraftKings side by side, player lines and the
-scoreline heatmap), **Teams** (ratings + xG), **Record** (match bets: model alone vs
+scoreline heatmap), **Teams** (ratings + xG for every live league, and player season stats from Understat for the Premier League, La Liga, Bundesliga, Serie A and Ligue 1), **Record** (match bets: model alone vs
 blend against DraftKings' prices with the threshold sweep, then the longer Pinnacle
 replay; player shots: the FanDuel strategies), **Portfolio** (one portfolio per
 strategy: Moneyline live, Anytime goalscorer in testing, retired Player shots kept
