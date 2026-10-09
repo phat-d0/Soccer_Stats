@@ -742,3 +742,68 @@ cap 0; player paper trades stay off; the live weekly Premier League scoring
 - `soccer-stats goal-pool` computes B-cal from the league rows that `goal-league` writes
   (no new data, no refit of A or B). It runs in `odds-check.yml` `task=goal-leagues` with
   `reason` left blank, so the forward window stays locked.
+
+## 13. B-cal: development display (2026-10-09, descriptive only)
+
+**Run:** `odds-check.yml` `task=goal-leagues` with `reason` blank, run 37896011591, on
+996e458. 0 credits, and the forward window stayed locked: no forward rows were written
+and no window was opened. The history numbers it printed for A and B in every league
+match run 37857461571 (§11) exactly.
+
+**Coefficients**, logit(p_Bcal) = a + b · logit(p_B), per league, fitted on earlier seasons'
+starters:
+
+| League | 2024/25 (fit on 2023/24) | 2025/26 (fit on 2023/24–2024/25) |
+| --- | --- | --- |
+| E0 | a −0.125, b 0.944 (8,104 starters) | a −0.070, b 0.999 (16,280) |
+| SP1 | a +0.009, b 1.037 (8,142) | a −0.080, b 0.995 (16,249) |
+| D1 | a −0.146, b 0.980 (6,510) | a −0.146, b 0.985 (12,998) |
+| I1 | a −0.074, b 0.982 (8,136) | a −0.110, b 0.975 (16,235) |
+| F1 | a −0.297, b 0.912 (6,439) | a −0.160, b 0.946 (12,918) |
+
+The correction is mostly a downward shift (a below 0) with a slope near 1: B is a little
+too high on everyone, not only at the top.
+
+**B vs B-cal, starters, 2024/25 and 2025/26 (95%, whole-match resampling):**
+
+| League | Starters | Log loss B → B-cal | B-cal vs B | 30%+ share B → B-cal | Tail rule B → B-cal |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 16,342 | 0.27267 → 0.27263 | +0.00004 (−0.00022 to +0.00031) | 6.2% → 5.0% | ok → ok |
+| SP1 | 16,232 | 0.24817 → 0.24794 | +0.00023 (−0.00005 to +0.00050) | 5.6% → 5.1% | fails → ok |
+| D1 | 13,023 | 0.28622 → 0.28581 | +0.00041 (−0.00017 to +0.00099) | 6.7% → 4.9% | fails → ok |
+| I1 | 16,232 | 0.25264 → 0.25245 | +0.00019 (−0.00004 to +0.00042) | 3.7% → 3.1% | ok → ok |
+| F1 | 12,932 | 0.26967 → 0.27000 | −0.00033 (−0.00095 to +0.00033) | 5.1% → 3.5% | fails → ok |
+| **Pooled five** | **74,761** | **0.26484 → 0.26473** | **+0.00011 (−0.00007 to +0.00029)** | **5.4% → 4.3%** | **fails → ok** |
+
+Pooled tail buckets, predicted / scored (95% range of scored):
+- B: 20–30% 24.4% / 22.9% (21.9–23.9%), fails; 30%+ 38.3% / 35.2% (33.8–36.7%), fails.
+- B-cal: 20–30% 24.3% / 24.5% (23.4–25.5%), ok; 30%+ 37.7% / 37.1% (35.4–38.8%), ok.
+
+Both models still beat the season-xG benchmark by about the same margin (pooled +0.0257
+for B, +0.0258 for B-cal).
+
+### What it shows
+
+- **B-cal does what it is meant to.** On these seen seasons it fixes the over-confidence
+  at the top: the pooled tail rule goes from failing both buckets to passing both, and
+  every league passes after recalibration.
+- **It barely changes overall accuracy.** The pooled log-loss gain is +0.0001 with a range
+  that includes 0; per league it's −0.0003 to +0.0004, none clearly different from 0. The
+  calibration error B carries is small in log-loss terms. It matters only where a bet
+  would be: the confident starters.
+- It is fitted on earlier seasons only, so these are out-of-sample predictions. But these
+  seasons were seen in §11, so this isn't a test; the forward check is.
+
+### Departure from §12's wording (not a change of method)
+
+§12 said each league has "about 20,000 scored starters a season". In fact each league has
+about 6,400–8,100 a season (about 20,000 over the three scored seasons), so the fits use
+6,439–16,280 starters. That is still far above the 2,000 floor, and nothing in the method
+changes.
+
+### For the forward check (§10b, §12)
+
+Nothing changes. The window opens once at 150 pooled matches, with a reason. B is the
+primary; B-cal is scored beside it with the same gate. Its coefficients are fitted on each
+league's 2023/24–2025/26 starters from the locked rows, and the run prints and saves
+them (`b_cal_forward_coefficients`).
