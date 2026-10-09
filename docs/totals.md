@@ -86,6 +86,12 @@ nothing.
    - A line counts as well calibrated if both 95% ranges contain the ideal (observed −
      predicted = 0; slope = 1).
 
+**Note added before any real run** (from the synthetic tests): two checks at 95% per
+line flag about 1 perfectly calibrated line in 10 by chance. Across 96 market-lines,
+about 10 flags are expected from chance alone. A market counts as miscalibrated only
+if its flags are many, or if they point the same way (for example, every line
+over-predicting).
+
 ### Reading the result, per market
 
 - **Well calibrated:** the line's calibration in the large and its slope are both
