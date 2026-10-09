@@ -631,3 +631,37 @@ Reading:
   the rule picks a finalist that does not pass, over (b), which does. That is the rule as
   written. The holdout runs exactly these finalists: E0, D1, F1, E1 `total=b,team=d`; SP1,
   I1 `total=b,team=c`.
+
+### Corners bake-off: holdout results (2024/25, opened once per league) and verdict
+
+Runs: `odds-check.yml` `task=corners` with `reason` and `finalists`, commit c491838, 0
+credits, no key: E0 38004172501, SP1 38004174573, D1 38004177405, I1 38004179990, F1
+38004182745, E1 38004185144. Each log prints "HOLDOUT OPENED at 2026-10-09T23:24Z" with the
+reason. Ranges at 99.583% (12 tests).
+
+| League | Matches | Total: (b) gain, slopes | Team: finalist, gain, slopes | Passes |
+| --- | --- | --- | --- | --- |
+| E0 | 364 | −0.003 (−0.026..+0.019), 0.17–0.55 | (d) +0.045 (+0.007..+0.082), 0.66–0.98 | no |
+| SP1 | 363 | +0.003 (−0.016..+0.022), 0.32–0.88 | (c) +0.013 (−0.014..+0.040), 0.44–0.83 | no |
+| D1 | 284 | −0.001 (−0.023..+0.021), 0.27–0.74 | (d) +0.014 (−0.028..+0.051), 0.48–0.70 | no |
+| I1 | 352 | +0.015 (−0.011..+0.041), 0.67–1.05 | (c) +0.017 (−0.016..+0.049), 0.55–0.76 | no |
+| F1 | 291 | −0.005 (−0.025..+0.014), −0.18–0.52 | (d) +0.032 (+0.001..+0.061), 0.62–1.17 | no |
+| E1 | 522 | −0.001 (−0.019..+0.016), 0.18–0.62 | (d) +0.032 (+0.010..+0.053), 0.72–1.18 | no |
+
+**Verdict: no candidate passes in any league, so nothing is recommended for the app.**
+- **Match total corners:** the league average is as good as any model, in development and
+  on the holdout. The app should not show a model total-corners line.
+- **Each team's corners:** the models know something. On the holdout the gain range clears
+  0 in E0, Ligue 1 and the Championship, and in development it clears 0 almost everywhere.
+  But every finalist has at least one line outside the 0.80–1.25 slope band. Development
+  and holdout both say the same thing: the chances are too spread out. On ~300 holdout
+  matches the slope ranges are wide (roughly ±0.4), so the band test there is noisy, but
+  the development slopes (2,000–3,700 matches) point the same way.
+- **What could follow (not done, needs its own pre-registration):** a per-league
+  recalibration of the team-corner model, logit(p) = a + b·logit(p_model) fitted on earlier
+  seasons only, as B-cal did for the goalscorer. Testing it fairly needs fresh data: the
+  2024/25 holdout is now spent, and 2025/26 has not been touched. Display only.
+- **Prices:** football-data has no corner prices, so nothing here says anything about
+  beating a bookmaker. A price test would mean logging Pinnacle's live corner prices (about
+  5.5–6% margin in round 8's probe). That is a separate owner decision with its own cost
+  estimate. Nothing was spent.
