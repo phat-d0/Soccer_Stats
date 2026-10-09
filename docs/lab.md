@@ -709,3 +709,137 @@ already ran E1's goals-only bake-off and nothing passed.
   `lab.thresholds.league_levels()`), one entry per league in the `edge_threshold`
   contract plus `source`. The development scans are in each run's `EDGE_JSON` log line,
   not the file. Nothing in the live rule changes.
+
+## Lineup surprises against Pinnacle's move (round 8; pre-registered 2026-10-08, before any data was loaded)
+
+**Question.** Does the starting XI explain how Pinnacle's price moves from early to
+close, and does the close already absorb it? This decides whether a live team-news
+check (16 Nov) and live odds logging for new leagues are worth pursuing. Research only:
+0 credits, nothing live changes.
+
+**Timing.** football-data's early price is taken one to three days before kickoff. The
+close is taken at kickoff. Starting XIs are public about an hour before kickoff. So a
+lineup surprise is news that arrives after the early price and before the close.
+- Tests 1 and 4 are the real questions.
+- Tests 2 and 3 (betting at the early price) are an upper bound: nobody knows the XI
+  when the early price is up.
+
+**Data.**
+- Understat match rosters: who started (position not "Sub") and each player's xG.
+- football-data's Pinnacle early and closing 1X2 prices, made margin-free with Shin's
+  method.
+- Matches are paired on home, away and a date within 2 days, as in `xg.attach_xg`.
+- Leagues: E0, SP1, D1, I1, F1.
+- Seasons: 2016/17–2024/25. 2016/17 trains only; 2017/18–2024/25 are scored, keeping
+  only seasons where Pinnacle's early and closing prices cover at least 90% of matches.
+- 2025/26 (about 50% covered) is dropped before anything is computed.
+
+**The surprise** (fixed; no variants are run):
+- For team T in match m, W is T's earlier league matches in the same season, the last
+  up to 6. With fewer than 3, the value is missing, so the first three rounds are out.
+- Regulars are players who started at least ⌈2/3·|W|⌉ of W.
+- Each regular's weight is their share of the team's xG over W: their xG in W divided
+  by the xG of all of T's players in W.
+- S(T, m) is the summed weight of the regulars who do not start m.
+- The signal is x = S(away) − S(home). A positive value means the away side is more
+  depleted, which should favour home.
+- Only matches before m are used for regulars and weights. The only information from m
+  itself is its starting XI, which is the news being tested.
+
+**Tests per league** (4):
+1. **Move.** OLS of the move in log(home/away) (close minus early, margin-free) on x.
+   - Passes if the slope range excludes 0; a positive slope is expected.
+   - Out-of-sample R², season by season on earlier seasons, is reported alongside.
+2–3. **Betting at the early price** (an upper bound).
+   - The candidate is a walk-forward conditional logit, score_k = a_k + b·log(early_k)
+     + d·z_k with z = (x/2, 0, −x/2). It is refitted every 28 days on earlier matches,
+     from 300 earlier rows.
+   - It goes through `lab.metrics.evaluate`: market = Pinnacle early, odds = Pinnacle
+     early, CLV vs Pinnacle's fair close.
+   - Pass rule: `lab.metrics.passes`, meaning the blend-weight range and the 12% rule's
+     CLV range are both above 0. ROI is reported but never passes on its own.
+4. **Does the close absorb it?** The same candidate, built on the fair close instead of
+   early and scored beside the close.
+   - A blend-weight range above 0 means the close does not fully absorb lineup news.
+   - The 12% rule's ROI at Pinnacle's closing price is reported.
+
+**Family.** 5 leagues × 4 tests = 20, so all ranges are Bonferroni 99.75%. Ranges
+resample whole matches. With ranges this wide and nothing tuned, there is no separate
+holdout: each test is run once.
+
+**Reading the result.**
+- The close absorbs lineup news in a league if test 4's range is not above 0 (it
+  includes 0, or lies below it: adding x then only adds noise). Clarified before any
+  real run, after the synthetic tests showed a range wholly below 0 for a close that
+  already knows the XI.
+- Lineups move the price there if test 1 passes.
+- If the close absorbs it everywhere, a team-news edge can only exist against books
+  slower than Pinnacle (DraftKings). The live check on 16 Nov answers that question;
+  this test can't.
+
+**Limits.**
+- An XI can't tell a known injury (already in the early price) from a late surprise.
+  This is a property of the data and isn't fixed here.
+- The weights are by xG, as specified, so absent defenders and goalkeepers count as
+  zero.
+
+**Code.** `edge/lineups.py`; `odds-check.yml` `task=lineups` with `league` (no key
+passed). Tests include no look-ahead.
+
+### Results (2026-10-08, `odds-check.yml task=lineups`, 0 credits; ranges 99.75%)
+
+Runs: E0 37853078197, SP1 37857126948, D1 37857129940, I1 37857132611, F1 37857135194.
+- Every league's Understat rosters downloaded in full, with 0 missing.
+- 90–92% of football-data matches paired with a surprise value; the rest are each
+  season's first three rounds.
+- Every season from 2016/17 to 2024/25 is at least 99% priced, so all of 2017/18–2024/25
+  is scored.
+
+| League | Matches | 1. Move: slope (range) | R² out of sample | 2–3. Early: blend c (range) | 12% bets, CLV | 4. Close: blend c (range) |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 2,797 | +0.218 (+0.168 to +0.265) **pass** | 6.1% | +0.01 (−0.33 to +0.41) | 50, +1.2% (−2.1 to +5.0) | −0.09 (−0.41 to +0.31) |
+| SP1 | 2,794 | +0.203 (+0.154 to +0.256) **pass** | 5.1% | −0.21 (−0.50 to +0.07) | 0 | −0.22 (−0.51 to +0.05) |
+| D1 | 2,231 | +0.150 (+0.096 to +0.206) **pass** | 2.7% | −0.30 (−0.69 to +0.13) | 93, −5.8% (−10.2 to −0.2) | −0.25 (−0.67 to +0.19) |
+| I1 | 2,794 | +0.172 (+0.122 to +0.215) **pass** | 3.5% | −0.12 (−0.41 to +0.10) | 9, −0.2% (−8.7 to +6.6) | −0.12 (−0.39 to +0.14) |
+| F1 | 2,554 | +0.173 (+0.121 to +0.222) **pass** | 3.5% | −0.20 (−0.51 to +0.09) | 2, −3.6% | −0.23 (−0.55 to +0.05) |
+
+- **Lineups move the price, in every league (test 1 passes 5 of 5).**
+  - When the away side is missing a large share of its recent xG, Pinnacle's price moves
+    toward home between the early price and the close, and the reverse.
+  - The surprise explains 3–6% of the move's variance, out of sample.
+  - The move by band is monotone. In E0 it runs from −0.079 (away side much stronger
+    than usual) to +0.068 (away side depleted), against a spread of 0.17.
+- **The close absorbs it, in every league (test 4 fails 5 of 5).**
+  - Beside the fair close the surprise earns no blend weight: every range includes 0 and
+    every point estimate is at or below 0.
+  - Log loss beside the close is no better (every gain range includes 0).
+- **Betting at the early price doesn't pass anywhere (tests 2–3 fail 5 of 5),** even
+  though this test knows the XI before it could be known.
+  - Beside the early price the surprise earns no blend weight. The move is real, but too
+    small next to match noise to sharpen the result's odds.
+  - The 12% rule rarely fires (0–93 bets).
+  - Germany's 93 bets are long shots: average odds 7.7, CLV −5.8%, and a ROI of +51% whose
+    range runs from −39% to +168%. They pass nothing.
+- **Descriptive.**
+  - 91–94% of team-matches are missing at least one regular; rotation is the norm.
+  - The mean surprise is 0.15–0.17 of a team's recent xG, and a third of team-matches
+    exceed 0.2.
+
+## Verdict (lineup surprises)
+
+**The close already absorbs lineup news.**
+- In all five leagues the starting XI explains part of how Pinnacle's price moves from
+  early to close, and by kickoff Pinnacle has priced it.
+- The surprise adds nothing beside the close, and nothing measurable to the result
+  beside the early price.
+
+What this means for the work plan:
+- **The live team-news check (16 Nov)** can only find value where a book is slower than
+  Pinnacle: DraftKings near kickoff. It should compare DraftKings' last pre-lineup price
+  with its close (or with Pinnacle's close) after a surprise. It shouldn't look for
+  information Pinnacle lacks. Worth running, as that cheap check: the odds log already
+  holds the data.
+- **Live odds logging for new leagues** is worth it only for that same purpose: measuring
+  how fast DraftKings reacts. It isn't for any model edge, since nothing beats Pinnacle's
+  close here or in bake-offs 1–3.
+- No handover and no live change.
