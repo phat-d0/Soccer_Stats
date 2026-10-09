@@ -806,7 +806,7 @@ Runs: E0 37853078197, SP1 37857126948, D1 37857129940, I1 37857132611, F1 378571
 - **Lineups move the price, in every league (test 1 passes 5 of 5).**
   - When the away side is missing a large share of its recent xG, Pinnacle's price moves
     toward home between the early price and the close, and the reverse.
-  - The surprise explains 3–6% of the move's variance, out of sample.
+  - The surprise explains 2.7–6.1% of the move's variance out of sample (Bundesliga lowest, E0 highest).
   - The move by band is monotone. In E0 it runs from −0.079 (away side much stronger
     than usual) to +0.068 (away side depleted), against a spread of 0.17.
 - **The close absorbs it, in every league (test 4 fails 5 of 5).**

@@ -109,3 +109,96 @@ over-predicting).
 
 `src/soccer_stats/edge/totals.py`; `odds-check.yml` `task=totals` with `league`. Tests
 include no look-ahead.
+
+## Results (2026-10-09, `odds-check.yml task=totals`, 0 credits, no key)
+
+Runs: E0 37863800450, SP1 37863803667, D1 37863806642, I1 37863809156, F1 37863811872,
+E1 37863814409.
+- Scored seasons are 2017/18–2024/25: 2,374–4,236 matches per league. Corners score from
+  2017/18 (D1 from 2018/19), once 1,000 earlier matches exist.
+- Gain ranges are 99.954% (108 tests). Calibration ranges are 95%.
+
+**Corner prices.** None. Of 156–157 football-data columns per league, none is a corner
+price. Corners are untested against any price.
+
+### Does the model beat the simple baseline? (test 1, lines passing)
+
+| League | Goal totals (of 6) | Team totals (of 6) | Corners (of 4) |
+| --- | --- | --- | --- |
+| E0 | 0 | 6 | 0 |
+| SP1 | 3 (2.5, 4.5, 5.5) | 6 | 0 |
+| D1 | 1 (3.5) | 6 | 0 |
+| I1 | 0 | 6 | 0 |
+| F1 | 2 (2.5, 3.5) | 6 | 0 |
+| E1 | 0 | 0 | 0 |
+| **All** | **6 of 36** | **30 of 36** | **0 of 24** |
+
+- **Team totals** beat the league-rate baseline clearly. Log-loss gains are +0.02 to
+  +0.06 per match, with every range above 0, in all five top leagues.
+- **Goal totals:** the point gains are positive almost everywhere (+0.001 to +0.017),
+  but only 6 of 36 ranges clear the Bonferroni bar.
+- **Corners:** gains are −0.005 to +0.002 and no range clears 0.
+- **E1** (goals only): no line beats the baseline in any market. Its goal-total log loss
+  is worse than the baseline at 4 of 6 lines.
+
+### Is it well calibrated? (95%; about 1 line in 10 is flagged by chance)
+
+| Market | Lines calibrated | Recalibration slope (1 = ideal) | Reading |
+| --- | --- | --- | --- |
+| Team totals, top 5 | 24 of 30 | 0.83–1.06, mostly 0.94–1.05 | **Well calibrated.** Six flags, mostly the 2.5 line over-predicted by 1–2.5 points (SP1, I1). |
+| Goal totals, top 5 | 8 of 30 | 0.46–0.96, mostly 0.7–0.85 | **Over-confident.** Predictions spread too far: high totals too high, low totals too low. The average rate is close (within ±2 points). |
+| Corners, top 5 | 0 of 20 | 0.14–0.75 | **Badly over-confident.** The features carry almost no signal for the total. |
+| E1, every market | 0 of 16 | 0.25–0.69 | **Over-confident.** The goals-only model is too sharp for the Championship. |
+
+### Corners: independent vs bivariate check (descriptive)
+
+- The home and away residuals are negatively correlated in every league (−0.16 to
+  −0.23). When one side wins more corners, the other wins fewer, so independent counts
+  give the total too wide a spread.
+- The direct NB on the total has a better count log loss than the independent
+  convolution everywhere. It beats the league-average baseline only in E0, SP1 and I1, by
+  0.002–0.003 a match. The independent model never beats the baseline.
+
+### Goal totals at 2.5 against Pinnacle (test 2; 2019/20–2024/25, the seasons with prices)
+
+| League | Matches | Log loss: model / early / close | Blend c (range) | 12% bets | CLV (range) | Pass |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 2,192 | 0.6783 / 0.6732 / 0.6730 | +0.02 (−0.44 to +0.48) | 294 | −3.0% (−4.7 to −1.5) | no |
+| SP1 | 2,200 | 0.6780 / 0.6704 / 0.6688 | −0.03 (−0.43 to +0.33) | 416 | −4.1% (−5.3 to −3.0) | no |
+| D1 | 1,727 | 0.6574 / 0.6511 / 0.6470 | −0.00 (−0.43 to +0.50) | 215 | −3.7% (−5.4 to −1.8) | no |
+| I1 | 2,177 | 0.6828 / 0.6770 / 0.6749 | +0.02 (−0.41 to +0.42) | 321 | −3.0% (−4.5 to −1.5) | no |
+| F1 | 1,954 | 0.6846 / 0.6769 / 0.6718 | −0.06 (−0.54 to +0.39) | 327 | −3.4% (−4.8 to −1.8) | no |
+| E1 | 3,164 | 0.6957 / 0.6832 / 0.6824 | −0.05 (−0.36 to +0.28) | 857 | −3.7% (−4.4 to −3.1) | no |
+
+The model trails Pinnacle's early price by 0.005–0.013 log loss and earns no blend weight.
+The 12% rule's CLV range is below 0 everywhere. This repeats the round-2 E0 result (CLV
+−2.9%) in six leagues.
+
+## Verdict (totals), per market
+
+- **A. Corners: no.**
+  - The pre-registered model doesn't beat a league-average baseline at any line in any
+    league, and it is badly over-confident.
+  - Football-data has no corner prices, so there is nothing to test against.
+  - No plausible edge from this model. Corners would need different information
+    (playing styles, live game state), not a reworked version of these features.
+- **B. Goal totals at 0.5–5.5: no.**
+  - The model is directionally better than a league average but rarely significantly so,
+    and its spread is over-confident at every line.
+  - At 2.5, where prices exist, it loses to Pinnacle in all six leagues (CLV −3% to −4%).
+  - Other lines have no prices in football-data, so they are untested against any book.
+    The over-confidence and the 2.5 result make an edge at the other lines unlikely.
+- **C. Team totals: well calibrated and beats a simple baseline in the top five leagues,
+  but untested against any price.**
+  - This is the only market where the model is both calibrated and clearly better than
+    climatology.
+  - That isn't evidence it beats a bookmaker. Team totals come from the same expected
+    goals that lose to Pinnacle on 1X2 and on the 2.5 total, and books price them off
+    those same sharp lines.
+  - Any edge would have to come from a book pricing team totals more softly than its own
+    match lines. Only the owner's proposed ≤40-credit live probe can tell: which books
+    quote team totals on both sides, and at what margin. Worth that probe; not worth
+    building anything before it.
+- **E1:** the goals-only model is over-confident in every market. It shouldn't be shown
+  for E1 totals without recalibration.
+- Nothing passes; no handover; no live change.
