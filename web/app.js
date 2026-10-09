@@ -570,7 +570,7 @@ function viewMatches() {
   const nValue = shown.filter(([fx]) => bestPick(fx, fxEdge(fx))).length;
   const allNull = shown.every(([fx]) => fxEdge(fx) == null);
   const openTrades = new Map((pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
-  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches: live odds cover the Premier League only, so there are no value bets here.` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
+  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
@@ -1772,7 +1772,9 @@ function setUpdated() {
   const d = state.data;
   const mins = Math.round((Date.now() - Date.parse(d.generated_at)) / 60000);
   const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
-  $("#updated").textContent = `${d.league} ${d.season} · updated ${ago}`;
+  // One league: its name; several: how many (the app covers more than the Premier League).
+  const n = leaguesPresent().length;
+  $("#updated").textContent = `${n > 1 ? `${n} leagues ·` : d.league} ${d.season} · updated ${ago}`;
   const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {

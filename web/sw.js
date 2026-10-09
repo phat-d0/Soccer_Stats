@@ -1,6 +1,8 @@
 // Offline support: app shell is cached; data.json is network-first so you always get
 // the latest predictions when online and the last ones when not.
-const CACHE = "pl-model-v25";
+// Renamed from pl-model-vNN with the app (8 Oct); activate deletes every other cache,
+// old names included.
+const CACHE = "soccer-model-v27";
 const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

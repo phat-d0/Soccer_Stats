@@ -262,3 +262,61 @@ def test_paused_checks_daily_and_learns_reset_day(tmp_path, monkeypatch):
     assert next_reset(
         pd.Timestamp("2026-11-05 07:00", tz="UTC"), saved["reset_day"]
     ) == pd.Timestamp("2026-12-05", tz="UTC")
+
+
+def test_with_draftkings_never_duplicates_a_scheduled_match(tmp_path, monkeypatch):
+    """A priced match under another spelling joins its scheduled card; a match with
+    unknown names is listed as unmatched instead of becoming a second card (8 Oct bug:
+    36 duplicate cards across La Liga, Bundesliga, Serie A and Ligue 1)."""
+    from soccer_stats.publish import duplicate_fixtures, with_draftkings
+
+    events = [
+        event("Borussia Dortmund", "Werder Bremen", "2026-10-09T18:30:00Z", 1.6, 4.2, 5.0),
+        event("Atlético Madrid", "Alavés", "2026-10-10T14:15:00Z", 1.5, 4.0, 7.0),
+        event("Union Berlin", "Eintracht Frankfurt am Main", "2026-10-10T13:30:00Z", 3, 3.4, 2.3),
+        event("Nowhere United", "Elsewhere Town", "2026-10-10T16:30:00Z", 2, 3, 4),
+    ]
+    monkeypatch.setattr(feed, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(
+        "soccer_stats.publish.fetch_odds",
+        lambda league, **kw: (events, feed.OddsStatus(credits_left=4000)),
+    )
+    fixtures = pd.DataFrame(
+        {
+            "kickoff": pd.to_datetime(
+                ["2026-10-09 18:30", "2026-10-10 14:15", "2026-10-10 13:30"], utc=True
+            ),
+            "home": ["Dortmund", "Ath Madrid", "Union Berlin"],
+            "away": ["Werder Bremen", "Alaves", "Ein Frankfurt"],
+        }
+    )
+    for c in ["odds_home", "odds_draw", "odds_away", "odds_over25", "odds_under25"]:
+        fixtures[c] = np.nan
+    known = {"Dortmund", "Werder Bremen", "Ath Madrid", "Alaves", "Union Berlin", "Ein Frankfurt"}
+    out, source = with_draftkings(
+        fixtures, "D1", known, now=pd.Timestamp("2026-10-08 22:00", tz="UTC")
+    )
+    assert len(out) == 3 and out["odds_home"].notna().all()  # every scheduled card priced
+    cards = [
+        {"league": "D1", "home": h, "away": a, "kickoff": str(k)}
+        for h, a, k in zip(out["home"], out["away"], out["kickoff"], strict=True)
+    ]
+    assert duplicate_fixtures(cards) == []
+    assert source["unmatched"] == ["Nowhere United v Elsewhere Town (2026-10-10 16:30)"]
+
+
+def test_duplicate_fixtures_flags_a_repeated_card():
+    from soccer_stats.publish import duplicate_fixtures
+
+    card = {"league": "SP1", "home": "Betis", "away": "Osasuna", "kickoff": "k"}
+    assert duplicate_fixtures([card, {**card, "league": "E0"}]) == []
+    assert duplicate_fixtures([card, dict(card)]) == [("SP1", "Betis", "Osasuna", "k")]
+
+
+def test_web_fixture_has_no_duplicate_cards():
+    from pathlib import Path
+
+    from soccer_stats.publish import duplicate_fixtures
+
+    path = Path(__file__).parent / "fixtures" / "web" / "data.json"
+    assert duplicate_fixtures(json.loads(path.read_text())["fixtures"]) == []
