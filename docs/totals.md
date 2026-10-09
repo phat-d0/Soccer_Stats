@@ -281,8 +281,11 @@ props.
 - The corner keys counted as targets ahead of BTTS (the rule took every key containing
   "corner"). With a 6-credit share per league, BTTS and shots on target were priced only
   in the Championship. Discovery still says which books list them.
-- In E0 the ten books chosen didn't include Pinnacle. It lists only corner markets there,
-  as in every league, so no goal market is missing.
+- In E0 the ten books chosen didn't include Pinnacle. Pinnacle lists alternate goal
+  totals, corners and BTTS in every league, E0 included (the discovery bodies), so E0 has
+  no Pinnacle price for goal totals or corners: the Pinnacle ranges below cover five
+  leagues. It lists no goal team totals anywhere, so no team-total price is missing.
+  (Corrected by the lead at merge; the PR said Pinnacle listed only corners.)
 
 **Median two-sided margin per book** (1/over + 1/under − 1 at the same line; ranges
 across books):
@@ -291,8 +294,8 @@ across books):
 | --- | --- | --- | --- | --- | --- | --- |
 | Team totals, alternate lines 0.5–5.5 | 10 books, 5.0–8.7% (Bovada 5.0, FanDuel 6.0, BetMGM 7.0) | 7 books, 5.9–8.7% (FanDuel 5.9) | 7, 6.5–9.3% (FanDuel 6.5) | 7, 6.4–9.9% (FanDuel 6.4, BetMGM 6.5) | 7, 6.3–9.7% (FanDuel 6.3, DraftKings 6.4) | none offered |
 | Team totals, main line | FanDuel 6.3%, BetMGM 7.6% | 6.0%, 8.0% | 6.4%, 7.8% | 6.8%, 8.4% | 6.4%, 7.8% | none |
-| Alternate goal totals 0.5–8.5 | 10 books, 4.0–6.7% | Pinnacle 3.7%, others 5.0–6.5% | Pinnacle 4.8%, others 5.0–6.4% | Pinnacle 3.6%, others 4.7–8.8% | Pinnacle 3.7%, others 5.0–6.1% | Pinnacle 4.0%, UK books 6.1–10.0% |
-| Corner totals (match) | 10 books, 6.6–9.6% | Pinnacle 5.6%, others 7.0–9.8% | Pinnacle 6.0%, 7.0–9.4% | Pinnacle 5.6%, 7.6–9.7% | Pinnacle 6.2%, 8.0–10.1% | Pinnacle 5.4%, LeoVegas 8.8% |
+| Alternate goal totals 0.5–8.5 | 10 books, 4.0–6.7% (Pinnacle not asked) | Pinnacle 3.7%, others 5.0–6.5% | Pinnacle 4.8%, others 5.0–6.4% | Pinnacle 3.6%, others 4.7–8.8% | Pinnacle 3.7%, others 5.0–6.1% | Pinnacle 4.0%, UK books 6.1–10.0% |
+| Corner totals (match) | 10 books, 6.6–9.6% (Pinnacle not asked) | Pinnacle 5.6%, others 7.0–9.8% | Pinnacle 6.0%, 7.0–9.4% | Pinnacle 5.6%, 7.6–9.7% | Pinnacle 6.2%, 8.0–10.1% | Pinnacle 5.4%, LeoVegas 8.8% |
 | Corner team totals | 9 books, 6.6–11.1% | Pinnacle 6.9%, 7.0–11.1% | Pinnacle 6.9%, 7.5–11.2% | Pinnacle 7.0%, 7.5–11.1% | Pinnacle 6.6%, 8.2–11.1% | Pinnacle 5.8% |
 | BTTS | listed by 32 books | 24 | 24 | 23 | 22 | 10 books priced: Pinnacle 4.5%, others 6.9–8.2% |
 | Player shots on target (listed) | 7 books (FanDuel, Kambi books, William Hill) | 6 | 6 | 5 | 5 | none |
