@@ -202,3 +202,129 @@ The 12% rule's CLV range is below 0 everywhere. This repeats the round-2 E0 resu
 - **E1:** the goals-only model is over-confident in every market. It shouldn't be shown
   for E1 totals without recalibration.
 - Nothing passes; no handover; no live change.
+
+## Live market probe (round 8, third task; owner-approved 9 Oct, hard cap 40 credits; written before any call)
+
+**Question.** For each of the six leagues (E0, SP1, D1, I1, F1, E1): which bookmakers on
+The Odds API quote these markets on both sides, at which lines, and at what margin?
+- (a) team totals;
+- (b) alternate goal totals;
+- (c) corners totals.
+
+BTTS and player shots on target are noted in passing.
+
+**Budget.**
+- Hard cap 40 credits, counted from `x-requests-last`.
+- A call is skipped if its maximum cost would pass the cap, or would leave under 3,000
+  credits on the shared key (`player_goal_odds.CappedBudget`).
+- Cap 0 is a dry run: only the free events lists are fetched.
+- The key goes only to this task. It is never printed.
+
+**Method,** league by league in the order E0, SP1, D1, I1, F1, E1:
+1. **Events list** (free). Take the soonest upcoming match; markets open nearer
+   kickoff.
+2. **Discovery.** `/events/{id}/markets` in all five regions lists the market keys each
+   bookmaker offers. About 1 credit; the first call's real cost sets the estimate for the
+   rest.
+3. **One odds call.** `/events/{id}/odds` for the target keys discovery found, with a
+   `bookmakers=` list of up to 10 books (10 books cost one region), so the cost is
+   about one credit per market.
+   - Target keys, in priority order: team totals (`team_totals`,
+     `alternate_team_totals`), alternate goal totals (`alternate_totals`), any key with
+     "corner", `btts`. Player shots on target are added in E0 only.
+   - Each league gets an even share of the credits left. Lower-priority keys are
+     dropped first.
+
+**Outputs, per league and market** (no model, no bets):
+- the books listing it;
+- the books quoting both sides at the same line (and for team totals the same team);
+- the lines;
+- the margin per two-sided pair (1/over + 1/under − 1): median and range per book.
+
+Also reported:
+- every market key discovered;
+- the credits spent and the balance before and after.
+
+**Reading.**
+- A two-sided market with a median margin of 5% or less is "close to fair": a model
+  could be checked against it.
+- 5–8% is soft but testable.
+- Above 8%, or one-sided, isn't bettable at our level of accuracy. Player shots at
+  FanDuel were over-only, and the goalscorer books listed no "No" price at all.
+- Team totals are judged at the book with the lowest median margin.
+
+**Code.** `edge/market_probe.py`; `odds-check.yml` `task=markets` with `cap`. The key is
+passed only to this task, and cap 0 is a dry run.
+
+### Results (2026-10-09 05:39 UTC; `odds-check.yml task=markets cap=40`, run 37889595473)
+
+**Credits.** 39 of the 40-credit cap: 22,535 before, 22,496 after.
+- Events lists: free.
+- Discovery: 1 credit per league.
+- Odds: 4–6 per league, one per market.
+- The dry run before it (run 37889446400) spent 0.
+
+**Matches probed** (the soonest in each league):
+- E0: Arsenal v Leeds, 10 Oct.
+- SP1: Málaga v Espanyol, 9 Oct.
+- D1: Dortmund v Bremen, 9 Oct.
+- I1: Genoa v Fiorentina, 10 Oct.
+- F1: Lens v Lyon, 9 Oct.
+- E1: West Ham v QPR, 9 Oct.
+
+Discovery found 62–70 books per league. The top five leagues have about 75 market keys,
+including team totals, alternate goal totals, corners (match, team, first half), cards,
+BTTS and many player props. The Championship has 32 keys: no team totals and no player
+props.
+
+**Two deviations from the plan,** both found in the output:
+- The corner keys counted as targets ahead of BTTS (the rule took every key containing
+  "corner"). With a 6-credit share per league, BTTS and shots on target were priced only
+  in the Championship. Discovery still says which books list them.
+- In E0 the ten books chosen didn't include Pinnacle. Pinnacle lists alternate goal
+  totals, corners and BTTS in every league, E0 included (the discovery bodies), so E0 has
+  no Pinnacle price for goal totals or corners: the Pinnacle ranges below cover five
+  leagues. It lists no goal team totals anywhere, so no team-total price is missing.
+  (Corrected by the lead at merge; the PR said Pinnacle listed only corners.)
+
+**Median two-sided margin per book** (1/over + 1/under − 1 at the same line; ranges
+across books):
+
+| Market | E0 | SP1 | D1 | I1 | F1 | E1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Team totals, alternate lines 0.5–5.5 | 10 books, 5.0–8.7% (Bovada 5.0, FanDuel 6.0, BetMGM 7.0) | 7 books, 5.9–8.7% (FanDuel 5.9) | 7, 6.5–9.3% (FanDuel 6.5) | 7, 6.4–9.9% (FanDuel 6.4, BetMGM 6.5) | 7, 6.3–9.7% (FanDuel 6.3, DraftKings 6.4) | none offered |
+| Team totals, main line | FanDuel 6.3%, BetMGM 7.6% | 6.0%, 8.0% | 6.4%, 7.8% | 6.8%, 8.4% | 6.4%, 7.8% | none |
+| Alternate goal totals 0.5–8.5 | 10 books, 4.0–6.7% (Pinnacle not asked) | Pinnacle 3.7%, others 5.0–6.5% | Pinnacle 4.8%, others 5.0–6.4% | Pinnacle 3.6%, others 4.7–8.8% | Pinnacle 3.7%, others 5.0–6.1% | Pinnacle 4.0%, UK books 6.1–10.0% |
+| Corner totals (match) | 10 books, 6.6–9.6% (Pinnacle not asked) | Pinnacle 5.6%, others 7.0–9.8% | Pinnacle 6.0%, 7.0–9.4% | Pinnacle 5.6%, 7.6–9.7% | Pinnacle 6.2%, 8.0–10.1% | Pinnacle 5.4%, LeoVegas 8.8% |
+| Corner team totals | 9 books, 6.6–11.1% | Pinnacle 6.9%, 7.0–11.1% | Pinnacle 6.9%, 7.5–11.2% | Pinnacle 7.0%, 7.5–11.1% | Pinnacle 6.6%, 8.2–11.1% | Pinnacle 5.8% |
+| BTTS | listed by 32 books | 24 | 24 | 23 | 22 | 10 books priced: Pinnacle 4.5%, others 6.9–8.2% |
+| Player shots on target (listed) | 7 books (FanDuel, Kambi books, William Hill) | 6 | 6 | 5 | 5 | none |
+
+- **Every market here is quoted on both sides** at most books and lines. This is
+  unlike player shots (FanDuel over-only) and the goalscorer market (no "No" price
+  anywhere).
+- **Betfair's exchanges** (AU, UK) show 0.7–1.2% on goal totals, but their prices are
+  before commission (about 5% of winnings), so the real cost is higher.
+- **Pinnacle quotes no goal team totals on this API** in any league, only corners. The
+  team totals have no sharp reference price. The cheapest quotes are FanDuel's (5.9–6.8%
+  median) and Bovada's in E0 (5.0%).
+- Margins are medians over all lines a book quotes. Lines far from the middle carry more
+  margin.
+
+**Reading, as pre-registered.**
+- **Team totals: soft but testable, not close to fair.**
+  - The best book is 5.0% (Bovada, E0 only) and FanDuel is about 6% in every top league.
+    That is roughly twice Pinnacle's margin on the match total.
+  - The model was well calibrated on team totals and beat a league average. To be
+    bettable it would also have to beat a ~6% margin, with no sharp price to tell how
+    good the book's line is.
+  - Testing that needs prices over time: the closing team-total line at FanDuel, logged
+    like the DraftKings h2h log. A one-off probe can't show it.
+- **Alternate goal totals:** close to fair at Pinnacle (3.6–4.8%) and soft elsewhere
+  (5–7%). The model already loses to Pinnacle on the 2.5 line.
+- **Corners:** soft everywhere (Pinnacle 5.4–6.2%, others 6.6–11%), and the corner
+  model beats no baseline.
+- **Championship:** no team totals and no player props on this API. Only goal totals,
+  corners and BTTS.
+- No live change. No further spend is proposed here; logging FanDuel's team totals would
+  be a new owner decision.
