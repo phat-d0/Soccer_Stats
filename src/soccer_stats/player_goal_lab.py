@@ -17,6 +17,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from scipy.special import expit, logit
 from scipy.stats import rankdata
 
 from soccer_stats.factors import PRIOR_90S, before_kickoff
@@ -508,17 +509,25 @@ def bench_tests(rows: pd.DataFrame, level: float) -> dict:
     }
     allv["beats_both"] = all(v["beats"] for v in allv["vs"].values())
     st = rows[rows["started"]]
-    ys = st["scored"].to_numpy()
-    starters = {
-        "rows": len(st),
-        "model": describe(st["p_B"].to_numpy(), ys, st["match_id"].to_numpy()),
-        "vs": _gains(st, "p_B", level),
-    }
-    starters["beats_both"] = all(v["beats"] for v in starters["vs"].values())
-    d = _ll(st["p_A"], ys) - _ll(st["p_B"], ys)
-    rng = boot_range(d, st["match_id"].to_numpy(), level=level)
-    starters["vs_A"] = {"gain": round(float(d.mean()), 5), "range": rng}
+    starters = _starters_view(st, "p_B", level, ref="p_A")
+    starters["vs_A"] = starters.pop("vs_ref")
     return {"level": round(level, 5), "all_before_lineups": allv, "starters_lineup_known": starters}
+
+
+def _starters_view(st: pd.DataFrame, col: str, level: float, ref: str) -> dict:
+    """One model on starters: description, gains over both benchmarks, and the paired
+    log-loss gain over `ref` (ref minus model)."""
+    ys, g = st["scored"].to_numpy(), st["match_id"].to_numpy()
+    out = {
+        "rows": len(st),
+        "model": describe(st[col].to_numpy(), ys, g),
+        "vs": _gains(st, col, level),
+    }
+    out["beats_both"] = all(v["beats"] for v in out["vs"].values())
+    d = _ll(st[ref], ys) - _ll(st[col], ys)
+    rng = boot_range(d, g, level=level)
+    out["vs_ref"] = {"gain": round(float(d.mean()), 5), "range": rng}
+    return out
 
 
 def history_report(rows_by_league: dict[str, pd.DataFrame]) -> dict:
@@ -552,4 +561,67 @@ def forward_report(rows: pd.DataFrame) -> dict:
         "passes": bool(out["enough"] and st["beats_both"] and st["model"]["tail"]["ok"]),
     }
     out["leagues"] = {lg: bench_tests(r, 0.95) for lg, r in rows.groupby("league")}
+    if "p_Bcal" in rows:  # §12: B-cal beside B, same gate; B stays the primary
+        out["b_cal"] = _bcal_views(rows, 0.95)
+        bc = out["b_cal"]["pooled"]
+        out["b_cal"]["gate"] = {
+            "beats_both": bc["beats_both"],
+            "tail_ok": bc["model"]["tail"]["ok"],
+            "passes": bool(out["enough"] and bc["beats_both"] and bc["model"]["tail"]["ok"]),
+        }
     return out
+
+
+# ---------- B-cal: B recalibrated per league (docs/player_props.md §12) ----------
+
+CAL_MIN_ROWS = 2000
+
+
+def add_bcal(rows: pd.DataFrame, history: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """`rows` with p_Bcal: for each league and season S, logit(p) = a + b*logit(p_B), fitted
+    on that league's starters in `history` from seasons before S, applied to all of S.
+    Fewer than CAL_MIN_ROWS earlier starters: p_Bcal = p_B. No earlier season: NaN."""
+    from soccer_stats.player_lab import _fit_logit
+
+    out = rows.copy()
+    out["p_Bcal"] = np.nan
+    coefs: dict = {}
+    hist = history[history["started"].astype(bool)]
+    for (lg, season), idx in out.groupby(["league", "season"]).groups.items():
+        tr = hist[(hist["league"] == lg) & (hist["season"].astype(str) < str(season))]
+        key = f"{lg} {season}"
+        if tr.empty:
+            coefs[key] = None
+            continue
+        p = out.loc[idx, "p_B"].clip(1e-6, 1 - 1e-6)
+        if len(tr) < CAL_MIN_ROWS:
+            out.loc[idx, "p_Bcal"] = p
+            coefs[key] = {"rows": len(tr), "a": 0.0, "b": 1.0, "floor": True}
+            continue
+        a, b = _fit_logit(logit(tr["p_B"].clip(1e-6, 1 - 1e-6)), tr["scored"].to_numpy(float))
+        out.loc[idx, "p_Bcal"] = expit(a + b * logit(p))
+        seasons = sorted(tr["season"].astype(str).unique())
+        coefs[key] = {"rows": len(tr), "a": round(a, 4), "b": round(b, 4), "fit_on": seasons}
+    return out, coefs
+
+
+def _bcal_views(rows: pd.DataFrame, level: float) -> dict:
+    """B and B-cal on starters with B-cal defined, pooled and per league."""
+    st = rows[rows["started"] & rows["p_Bcal"].notna()]
+
+    def view(r):
+        if r.empty:
+            return {"rows": 0}
+        bc = _starters_view(r, "p_Bcal", level, ref="p_B")
+        bc["vs_B"] = bc.pop("vs_ref")
+        y, g = r["scored"].to_numpy(), r["match_id"].to_numpy()
+        bc["b"] = {"model": describe(r["p_B"].to_numpy(), y, g), "vs": _gains(r, "p_B", level)}
+        return bc
+
+    return {"pooled": view(st), "leagues": {lg: view(r) for lg, r in st.groupby("league")}}
+
+
+def bcal_development(rows: pd.DataFrame) -> dict:
+    """§12 development display: B vs B-cal on the seen seasons, descriptive (95%)."""
+    rows, coefs = add_bcal(rows, rows)
+    return {"coefficients": coefs, **_bcal_views(rows, 0.95)}

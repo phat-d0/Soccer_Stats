@@ -253,3 +253,94 @@ def test_goal_league_locked_never_loads_the_forward_season(monkeypatch):
     with pytest.raises(Stop):
         cli._goal_league_feats("SP1", "opened for the test")
     assert max(seen[-1]) == 2026
+
+
+# ---------- §12: B-cal ----------
+
+
+def _cal_rows(seed=0, n=3000, leagues=("D1", "E0"), seasons=("2324", "2425", "2526"), k=1.4):
+    """Synthetic scored rows where B is over-confident: p_B = expit(k * logit(q))."""
+    from scipy.special import expit, logit
+
+    rng = np.random.default_rng(seed)
+    out = []
+    for lg in leagues:
+        for s in seasons:
+            q = rng.beta(1.2, 6, n)
+            y = (rng.random(n) < q).astype(int)
+            out.append(
+                pd.DataFrame(
+                    {
+                        "league": lg,
+                        "season": s,
+                        "match_id": [f"{lg}|{s}|{j // 20}" for j in range(n)],
+                        "kickoff": pd.Timestamp(f"20{s[:2]}-09-01", tz="UTC")
+                        + pd.to_timedelta(np.arange(n) // 20, "D"),
+                        "started": True,
+                        "scored": y,
+                        "p_A": q,
+                        "p_B": expit(k * logit(q)),
+                        "bench_goals": np.full(n, y.mean()),
+                        "bench_xg": np.full(n, y.mean()),
+                    }
+                )
+            )
+    return pd.concat(out, ignore_index=True)
+
+
+def test_bcal_fits_earlier_seasons_of_its_own_league_only():
+    r = _cal_rows()
+    out, coefs = gl.add_bcal(r, r)
+    assert out.loc[out["season"] == "2324", "p_Bcal"].isna().all()  # no earlier season
+    assert coefs["D1 2324"] is None and coefs["D1 2526"]["fit_on"] == ["2324", "2425"]
+    assert 0.55 < coefs["D1 2526"]["b"] < 0.9  # shrinks the over-confident B (true 1/1.4)
+    # Changing a season's (or another league's) outcomes never moves that season's B-cal.
+    ch = r.copy()
+    later = (ch["season"] == "2526") | (ch["league"] == "E0")
+    ch.loc[later, "scored"] = 1 - ch.loc[later, "scored"]
+    out2, _ = gl.add_bcal(ch, ch)
+    keep = (out["league"] == "D1") & (out["season"] != "2324")
+    np.testing.assert_allclose(out.loc[keep, "p_Bcal"], out2.loc[keep, "p_Bcal"])
+
+
+def test_bcal_floor_and_development_view():
+    r = _cal_rows(n=500)  # 500 earlier starters < CAL_MIN_ROWS: B unchanged
+    out, coefs = gl.add_bcal(r, r)
+    nxt = out["season"] == "2425"
+    np.testing.assert_allclose(out.loc[nxt, "p_Bcal"], out.loc[nxt, "p_B"].clip(1e-6, 1 - 1e-6))
+    assert coefs["E0 2425"]["floor"] is True
+    dev = gl.bcal_development(_cal_rows())
+    pooled = dev["pooled"]
+    assert pooled["rows"] == 2 * 2 * 3000  # 2024/25 and 2025/26, two leagues
+    assert pooled["vs_B"]["gain"] > 0  # recalibration helps an over-confident B
+    assert pooled["model"]["log_loss"] < pooled["b"]["model"]["log_loss"]
+    assert set(dev["leagues"]) == {"D1", "E0"}
+
+
+def test_bcal_forward_uses_locked_history_only(tmp_path, capsys):
+    from soccer_stats import cli
+
+    hist = _cal_rows()
+    fwd = _cal_rows(seed=1, seasons=("2627",))
+    fwd["kickoff"] = fwd["kickoff"] + pd.Timedelta(days=40)  # after 10 Oct
+    out, coefs = gl.add_bcal(fwd, hist)
+    assert coefs["D1 2627"]["fit_on"] == ["2324", "2425", "2526"]
+    flipped = fwd.assign(scored=1 - fwd["scored"])  # forward outcomes never reach the fit
+    out2, _ = gl.add_bcal(flipped, hist)
+    np.testing.assert_allclose(out["p_Bcal"], out2["p_Bcal"])
+    rep = gl.forward_report(out)
+    assert rep["gate"]["passes"] == (rep["gate"]["beats_both"] and rep["gate"]["tail_ok"])
+    g = rep["b_cal"]["gate"]
+    assert g["passes"] == (rep["enough"] and g["beats_both"] and g["tail_ok"])
+    assert "vs_B" in rep["b_cal"]["pooled"] and set(rep["b_cal"]["leagues"]) == {"D1", "E0"}
+    for lg in ("D1", "E0"):
+        hist[hist["league"] == lg].to_csv(tmp_path / f"rows_{lg}.csv.gz", index=False)
+        fwd[fwd["league"] == lg].to_csv(tmp_path / f"forward_{lg}.csv.gz", index=False)
+    cli.main(["goal-pool", "--rows-dir", str(tmp_path), "--json", str(tmp_path / "p.json")])
+    printed = capsys.readouterr().out
+    assert "Forward check, B-cal:" in printed and "B-cal Pooled:" in printed
+    import json
+
+    rep = json.loads((tmp_path / "p.json").read_text())
+    assert rep["b_cal_forward_coefficients"]["E0 2627"]["fit_on"] == ["2324", "2425", "2526"]
+    assert "b_cal" in rep["forward"] and "b_cal_development" in rep

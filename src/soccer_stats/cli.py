@@ -726,6 +726,26 @@ def _print_bench(name: str, res: dict) -> None:
     )
 
 
+def _print_bcal(res: dict) -> None:
+    import json
+
+    for key, c in res["coefficients"].items():
+        print(f"B-cal {key}: {json.dumps(c)}")
+    for name, v in [("Pooled", res["pooled"]), *res["leagues"].items()]:
+        if not v.get("rows"):
+            continue
+        b, bc = v["b"], v
+        print(
+            f"B-cal {name}: {v['rows']} starters | log loss B {b['model']['log_loss']} -> "
+            f"B-cal {bc['model']['log_loss']}, B-cal vs B {bc['vs_B']['gain']} "
+            f"{bc['vs_B']['range']}, vs xG B {b['vs']['season_xg']['gain']} -> B-cal "
+            f"{bc['vs']['season_xg']['gain']}, 30%+ B {b['model']['share_30plus']:.1%} -> "
+            f"B-cal {bc['model']['share_30plus']:.1%}"
+        )
+        print(f"B-cal {name}: tail B {json.dumps(b['model']['tail'])}")
+        print(f"B-cal {name}: tail B-cal {json.dumps(bc['model']['tail'])}")
+
+
 def cmd_goal_pool(args: argparse.Namespace) -> None:
     """Pool the leagues' rows: the historical answer, and the forward check if present."""
     import json
@@ -748,12 +768,22 @@ def cmd_goal_pool(args: argparse.Namespace) -> None:
         "Beats both benchmarks (A, all appearances, 99.375%): "
         + json.dumps(out["history"]["answer"])
     )
+    allh = pd.concat(list(hist.values()), ignore_index=True) if hist else pd.DataFrame()
+    if not allh.empty:  # §12: B-cal on the seen seasons, descriptive
+        allh["season"] = allh["season"].astype(str)
+        out["b_cal_development"] = gl.bcal_development(allh)
+        _print_bcal(out["b_cal_development"])
     fwd = sorted(d.rglob("forward_*.csv.gz"))
     if fwd:
         fr = pd.concat([pd.read_csv(p) for p in fwd], ignore_index=True)
         fr["started"] = fr["started"].astype(bool)
+        fr["season"] = fr["season"].astype(str)
+        if not allh.empty:  # B-cal for the window is fitted on the locked history only
+            fr, out["b_cal_forward_coefficients"] = gl.add_bcal(fr, allh)
         out["forward"] = gl.forward_report(fr)
         print("Forward check: " + json.dumps(out["forward"].get("gate"), default=str))
+        if "b_cal" in out["forward"]:
+            print("Forward check, B-cal: " + json.dumps(out["forward"]["b_cal"]["gate"]))
     if args.json:
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
 
