@@ -343,3 +343,30 @@ def test_a_crash_part_way_keeps_the_calls_already_made(tmp_path):
     odd.headers = {"x-requests-last": "n/a", "x-requests-remaining": ""}
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=20), lambda *a, **k: odd)
     assert s["calls"] == 2 and s["credits"] == 2 and s["rows"] == 0 and s["stop"] is None
+
+
+def test_price_files_in_the_state_folder_never_count_as_calls(tmp_path):
+    """publish.yml copies data-log's `<code>_team_totals_*.jsonl` price rows into the same
+    state folder as the call record (for the match sheet). They must not change the call
+    dedup or the monthly spend: only `team_totals_calls_*.jsonl` (and the local record) count."""
+    call = {
+        "event_id": "e1",
+        "snapshot": "look",
+        "cost": 1,
+        "fetched_at": "2026-10-09T15:00:00+00:00",
+    }
+    (tmp_path / "team_totals_calls_2026-10.jsonl").write_text(json.dumps(call) + "\n")
+    price = {
+        "event_id": "e2",
+        "snapshot": "close",
+        "cost": 7,
+        "fetched_at": "2026-10-09T15:00:00+00:00",
+        "book": "fanduel",
+        "side": "home",
+        "line": 1.5,
+    }
+    for name in ("E0_team_totals_2026-10.jsonl", "SP1_team_totals_2026-09.jsonl"):
+        (tmp_path / name).write_text(json.dumps(price) + "\n")
+    calls = tt.load_calls(tmp_path)
+    assert [(c["event_id"], c["snapshot"]) for c in calls] == [("e1", "look")]
+    assert tt.month_spend(calls, pd.Timestamp("2026-10-20", tz="UTC")) == 1

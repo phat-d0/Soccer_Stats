@@ -61,6 +61,11 @@ TIMEOUT = 15
 RETRIES = 2
 PAUSE = 0.2
 MAX_SUMMARIES = 60  # per run, across leagues: keeps a busy weekend's request count modest
+# Wall-clock budget for one run's ESPN calls. Without it a hanging ESPN could take
+# 60 summaries x 3 attempts x TIMEOUT (~45 min) and, with publish's cancel-in-progress
+# concurrency, cancel runs before their data-log writes (ledger, odds log, team totals).
+RUN_SECONDS = 120
+MAX_FAILURES = 3  # failed requests (after retries) before the run stops asking ESPN
 CACHE = "espn"
 
 
@@ -74,8 +79,12 @@ def _iso(t) -> str:
 
 
 def _get_json(url: str, params: dict, get: Callable, stats: dict) -> dict | None:
-    """GET with a short timeout and a small retry; None on any failure."""
+    """GET with a short timeout and a small retry; None on any failure, and None without
+    a call once the run's time budget or failure limit is used up."""
     for attempt in range(RETRIES + 1):
+        if _spent(stats):
+            stats["stopped"] = True
+            return None
         stats["requests"] = stats.get("requests", 0) + 1
         try:
             r = get(url, params=params, timeout=TIMEOUT)
@@ -90,6 +99,14 @@ def _get_json(url: str, params: dict, get: Callable, stats: dict) -> dict | None
             time.sleep(PAUSE * (attempt + 1))
     stats["failures"] = stats.get("failures", 0) + 1
     return None
+
+
+def _spent(stats: dict) -> bool:
+    """True once this run has used its ESPN time budget or failure limit."""
+    if stats.get("failures", 0) >= MAX_FAILURES:
+        return True
+    start = stats.get("start")
+    return start is not None and time.monotonic() - start > RUN_SECONDS
 
 
 def _dicts(x) -> list[dict]:
@@ -297,7 +314,7 @@ def add(
 ) -> dict:
     """Attach `team_news` to the cards due it. Never raises; returns a summary."""
     now = _ts(now or pd.Timestamp.now(tz="UTC"))
-    stats: dict = {"requests": 0, "failures": 0, "summaries": 0}
+    stats: dict = {"requests": 0, "failures": 0, "summaries": 0, "start": time.monotonic()}
     out = {"matches": 0, "confirmed": 0, "unmatched": [], "errors": []}
     by_league: dict[str, list[dict]] = {}
     for c in cards:
@@ -335,6 +352,8 @@ def add(
         except Exception as exc:  # noqa: BLE001  ESPN is unofficial: never stop the build
             out["errors"].append(f"{league}: {type(exc).__name__}")
     out.update(requests=stats["requests"], failures=stats["failures"])
+    if stats.get("stopped"):
+        out["errors"].append("stopped early (ESPN slow or failing; cached news kept)")
     return out
 
 
