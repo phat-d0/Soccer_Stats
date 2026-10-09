@@ -39,7 +39,8 @@ from soccer_stats.players import (
 )
 from soccer_stats.trades import FILTER_PRESETS, PAPER_EDGE, STAKE
 from soccer_stats.xg import LEAGUES as XG_LEAGUES
-from soccer_stats.xg import load_schedule, with_xg
+from soccer_stats.xg import TEAM_NAMES as XG_TEAM_NAMES
+from soccer_stats.xg import fetch_season, load_schedule, with_xg
 
 WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 TRAIN_SEASONS = 3
@@ -550,12 +551,81 @@ def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, li
     return status, stats
 
 
+def team_block(
+    model: DixonColes, matches: pd.DataFrame, fixtures: pd.DataFrame, league: str
+) -> dict:
+    """One league's Teams tab: its teams, model parameters and ratings (with this
+    season's xG per game where Understat covers the league), as the top-level E0 fields."""
+    season = current_season()
+    this = matches[matches["date"] >= f"{season}-07-01"]
+    teams = sorted(
+        set(this["home"]) | set(fixtures.get("home", [])) | set(fixtures.get("away", []))
+    ) or sorted(model.teams)
+    ratings = dashboard.team_ratings(model, dashboard.match_counts(matches, teams), teams)
+    sxg = dashboard.season_xg(matches, f"{season}-07-01")
+    if not sxg.empty:
+        ratings = ratings.join(sxg, on="team")
+    return {
+        "name": lgs.name(league),
+        "teams": teams,
+        "params": model_params(model),
+        "ratings": ratings.to_dict("records"),
+        "xg": bool(matches["home_xg"].notna().any()),
+    }
+
+
+# Understat position codes -> the app's four groups ("F M S" = forward, sub appearances).
+def _position(code: str) -> str:
+    parts = (code or "").split()
+    if "GK" in parts:
+        return "GK"
+    return {"F": "FWD", "M": "MID", "D": "DEF"}.get(parts[0] if parts else "", "")
+
+
+def league_season_stats(league: str, years: list[int], raw_dir: Path = RAW_DIR) -> list[dict]:
+    """Season shooting stats per player for a league other than E0, from the league-season
+    file `with_xg` already downloads (Understat's `players` list): games, minutes, shots,
+    goals and xG. No shots on target, starts or per-club split (a player who moved has
+    one row, at his last club). Empty when Understat doesn't cover the league; never
+    raises."""
+    if league not in XG_LEAGUES:
+        return []
+    rows = []
+    for year in years:
+        try:
+            data = json.loads(fetch_season(league, year, raw_dir).read_text())
+        except Exception:  # noqa: BLE001  (a missing season leaves its rows out)
+            continue
+        players = data.get("players", []) if isinstance(data, dict) else []
+        code = f"{year % 100:02d}{(year + 1) % 100:02d}"
+        for p in players:
+            team = (p.get("team_title") or "").split(",")[-1].strip()
+            rows.append(
+                {
+                    "season": code,
+                    "team": XG_TEAM_NAMES.get(team, team),
+                    "player_id": str(p.get("id")),
+                    "player": p.get("player_name"),
+                    "position": _position(p.get("position", "")),
+                    "apps": int(p.get("games") or 0),
+                    "minutes": int(p.get("time") or 0),
+                    "shots": int(p.get("shots") or 0),
+                    "goals": int(p.get("goals") or 0),
+                    "xg": round(float(p.get("xG") or 0), 2),
+                    "sot": None,
+                    "starts": None,
+                }
+            )
+    return sorted(rows, key=lambda r: (r["season"], r["shots"]), reverse=True)
+
+
 def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None) -> tuple:
     """Fixture cards and odds source for a league other than the primary one.
 
     Its own Dixon-Coles fit (same settings as the primary league), its schedule and its
-    DraftKings odds. No blend (p_bet) and no team news: those exist for E0 only. Never
-    raises: a league that fails to load returns no cards and says why.
+    DraftKings odds, plus the fit's Teams-tab block (`team_block`). No blend (p_bet) and
+    no team news: those exist for E0 only. Never raises: a league that fails to load
+    returns no cards, no block, and says why.
     """
     season = current_season()
     try:
@@ -569,9 +639,10 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
         counts = dashboard.match_counts(matches, teams or sorted(model.teams))
         cards = fixture_cards(model, fixtures, counts, league=league)
+        block = team_block(model, matches, fixtures, league)
     except Exception as exc:  # one league failing never stops the site
-        return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}
-    return cards, source
+        return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}, None
+    return cards, source, block
 
 
 def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
@@ -615,10 +686,22 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     add_match_blend(data, match_blend())
     # Other live leagues: their fixtures join the list, each card tagged with its league.
     sources = {league: odds_source}
+    # Teams tab per league: the primary league's block from its top-level fields.
+    teams_by_league = {
+        league: {
+            "name": data["league"],
+            "teams": data["teams"],
+            "params": data["params"],
+            "ratings": data["ratings"],
+            "xg": bool(data["xg_weight"]),
+        }
+    }
     for code in live:
         if code == league:
             continue
-        cards, sources[code] = league_fixtures(code, share)
+        cards, sources[code], block = league_fixtures(code, share)
+        if block is not None:
+            teams_by_league[code] = _clean(block)
         data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])
         print(f"{lgs.name(code)}: {len(cards)} fixtures, odds {sources[code].get('name')}")
     for code, src in sources.items():
@@ -630,6 +713,7 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     dups = duplicate_fixtures(data["fixtures"])
     print(f"Duplicate fixtures: {len(dups)}" + (f" {dups}" if dups else ""))
     data["odds_sources"] = _clean(sources)
+    data["teams_by_league"] = teams_by_league
     data["leagues"] = league_list(data["fixtures"], sources)
     tt_dir = os.environ.get("TEAM_TOTALS_DIR")
     if tt_dir:  # set by publish.yml on the default branch only (data-log logs the rows)
@@ -712,6 +796,29 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
             )
         )
         data["players_stats"] = "players_stats.json"
+    # Season stats for the other Understat leagues, one file each, loaded when the Players
+    # view picks that league (no extra downloads: with_xg cached these files).
+    by_league_stats = {}
+    for code in live:
+        if code == league:
+            continue
+        rows = league_season_stats(code, [season - 1, season])
+        if rows:
+            name = f"players_stats_{code}.json"
+            (out / name).write_text(
+                json.dumps(
+                    _clean(
+                        {
+                            "seasons": sorted({r["season"] for r in rows}, reverse=True),
+                            "players": rows,
+                        }
+                    ),
+                    separators=(",", ":"),
+                )
+            )
+            by_league_stats[code] = name
+            print(f"{lgs.name(code)}: season stats for {len(rows)} player-seasons ({name})")
+    data["players_stats_by_league"] = by_league_stats
     (out / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
     # Picked up by the workflow and appended to the data-log branch (injury history).
     (out / "news_snapshot.json").write_text(json.dumps(snapshot, separators=(",", ":")))

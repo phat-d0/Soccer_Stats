@@ -25,7 +25,7 @@ const state = {
   teamsView: "teams", // Teams tab: "teams" or "players"
   pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true, view: "list", metric: "p90" }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
-  ps: null, // players_stats.json once loaded (or { error })
+  psBy: {}, // season stats per league once loaded: E0 players_stats.json, others players_stats_<code>.json (or { error })
   exploreHome: store.get("exploreHome", null),
   exploreAway: store.get("exploreAway", null),
 };
@@ -392,6 +392,8 @@ function closeSheet() {
 // ---------- competitions (football-data league codes) ----------
 const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"]];
 const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
+// "the Premier League", "the Championship", "the Bundesliga", but "La Liga", "Serie A", "Ligue 1".
+const theLeague = (c) => (["E0", "E1", "E2", "E3", "D1"].includes(c) ? `the ${leagueName(c)}` : leagueName(c));
 const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
 const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
 // Understat's xG covers these; elsewhere (the Championship) the model runs on goals only,
@@ -416,6 +418,31 @@ function leagueFilter() {
   const chip = (code, label) => `<button class="chip${cur === code ? " on" : ""}" data-league="${esc(code)}" aria-pressed="${cur === code}">${esc(label)}</button>`;
   return `<div class="chips" role="group" aria-label="Competition">${chip("", "All")}${leaguesPresent().map((c) => chip(c, leagueShort(c))).join("")}</div>`;
 }
+// ---------- Teams tab per league (data.teams_by_league; older data: E0 only) ----------
+function teamsLeagues() {
+  const by = state.data.teams_by_league || {};
+  const order = LEAGUES.map(([k]) => k);
+  const codes = Object.keys(by).length ? Object.keys(by) : ["E0"];
+  return codes.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+}
+// The Teams tab shows one league: the chosen competition, or the Premier League under "All".
+const teamsLeague = () => (teamsLeagues().includes(state.league) ? state.league : teamsLeagues().includes("E0") ? "E0" : teamsLeagues()[0]);
+function teamsBlock(lg = teamsLeague()) {
+  const d = state.data;
+  return d.teams_by_league?.[lg] || (lg === "E0" ? { name: d.league, teams: d.teams, ratings: d.ratings, xg: !!d.xg_weight } : null);
+}
+// One chip per league with ratings (no "All": the tab shows one table at a time).
+function teamsLeagueChips() {
+  const codes = teamsLeagues();
+  if (codes.length < 2) return "";
+  const cur = teamsLeague();
+  return `<div class="chips" role="group" aria-label="Competition">${codes.map((c) => `<button class="chip${c === cur ? " on" : ""}" data-league="${esc(c)}" aria-pressed="${c === cur}">${esc(leagueShort(c))}</button>`).join("")}</div>`;
+}
+// Season stats file per league; E0's players_stats.json also carries FPL's active flags.
+const psFile = (lg) => (lg === "E0" ? state.data.players_stats : state.data.players_stats_by_league?.[lg]);
+const curPs = () => state.psBy[teamsLeague()] || null;
+const psE0 = () => state.psBy.E0 || null;
+
 // With "All" and per-league levels: one short line per competition.
 function leagueEdgeList(pfId, lg) {
   const by = pfById(pfId)?.backtest?.edge_threshold?.by_league || {};
@@ -674,7 +701,7 @@ const foldName = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f
 function filteredPlayers() {
   const f = state.pl;
   const q = foldName(f.q.trim());
-  const act = state.ps?.players?.length ? activeMap() : null;
+  const act = psE0()?.players?.length ? activeMap() : null;
   const rows = playerRows().filter((r) =>
     (!f.active || !act || act.get(r.player_id)?.active || r.next) &&
     (!q || foldName(r.player).includes(q)) &&
@@ -707,14 +734,16 @@ function playersModeToggle() {
     </div>`;
 }
 
-async function loadPlayerStats() {
-  if (state.ps || !state.data.players_stats) return;
+async function loadPlayerStats(lg = teamsLeague()) {
+  const file = psFile(lg);
+  if (state.psBy[lg] || !file) return;
+  state.psBy[lg] = null;
   try {
-    const res = await fetch(state.data.players_stats, { cache: "no-cache" });
+    const res = await fetch(file, { cache: "no-cache" });
     if (!res.ok) throw new Error(res.statusText);
-    state.ps = await res.json();
+    state.psBy[lg] = await res.json();
   } catch (err) {
-    state.ps = { error: String(err.message || err), players: [], seasons: [] };
+    state.psBy[lg] = { error: String(err.message || err), players: [], seasons: [] };
   }
   if (state.tab === "ratings" && state.teamsView === "players") render();
 }
@@ -722,7 +751,7 @@ async function loadPlayerStats() {
 // Who's in a current Premier League squad (from players_stats.json's FPL matching).
 function activeMap() {
   const m = new Map();
-  for (const r of state.ps?.players || []) {
+  for (const r of psE0()?.players || []) {
     const cur = m.get(r.player_id);
     m.set(r.player_id, { active: (cur?.active || false) || !!r.active, team: r.current_team || cur?.team || null });
   }
@@ -744,15 +773,22 @@ const STAT_SORTS = {
   minutes: ["Minutes", (r) => r.minutes],
 };
 
+// Understat's league summaries (leagues other than E0) have no shots on target or starts.
+const hasSot = () => (curPs()?.players || []).some((r) => r.sot != null);
+const statSorts = () => Object.fromEntries(Object.entries(STAT_SORTS).filter(([k]) => hasSot() || !["sot", "sotpct"].includes(k)));
+const devMetrics = () => Object.fromEntries(Object.entries(DEV_METRICS).filter(([k]) => hasSot() || !["sot90", "sotpct"].includes(k)));
+
 function statRows() {
   const f = state.pl;
-  const season = f.season || state.ps?.seasons?.[0];
+  const ps = curPs();
+  const season = ps?.seasons?.includes(f.season) ? f.season : ps?.seasons?.[0];
   const q = foldName(f.q.trim());
+  const e0 = teamsLeague() === "E0"; // FPL's active flags exist for the Premier League only
   const act = activeMap();
-  const rows = (state.ps?.players || []).filter((r) => r.season === season &&
-    (!f.active || act.get(r.player_id)?.active) &&
+  const rows = (ps?.players || []).filter((r) => r.season === season &&
+    (!e0 || !f.active || act.get(r.player_id)?.active) &&
     (!q || foldName(r.player).includes(q)) && (!f.team || r.team === f.team) && (!f.pos || r.position === f.pos));
-  const key = STAT_SORTS[f.ssort][1];
+  const key = (STAT_SORTS[f.ssort] && statSorts()[f.ssort] ? STAT_SORTS[f.ssort] : STAT_SORTS.shots)[1];
   return rows.sort((a, b) => key(b) - key(a));
 }
 
@@ -762,21 +798,23 @@ function statListHtml() {
   const f = state.pl;
   let club = "";
   if (f.team) {
-    const t = rows.reduce((a, r) => ({ shots: a.shots + r.shots, sot: a.sot + r.sot, goals: a.goals + r.goals, xg: a.xg + r.xg }), { shots: 0, sot: 0, goals: 0, xg: 0 });
+    const t = rows.reduce((a, r) => ({ shots: a.shots + r.shots, sot: a.sot + (r.sot || 0), goals: a.goals + r.goals, xg: a.xg + r.xg }), { shots: 0, sot: 0, goals: 0, xg: 0 });
     const games = rows[0].team_games || Math.max(...rows.map((r) => r.apps));
-    club = `<div class="club-total"><b>${esc(f.team)}${f.pos ? ` · ${esc(f.pos)}` : ""}</b><span class="num">${t.shots} shots in ${games} games (${games ? (t.shots / games).toFixed(1) : "–"} a game) · ${t.sot} on target · ${t.goals} goals · ${t.xg.toFixed(1)} xG</span></div>`;
+    club = `<div class="club-total"><b>${esc(f.team)}${f.pos ? ` · ${esc(f.pos)}` : ""}</b><span class="num">${t.shots} shots in ${games} games (${games ? (t.shots / games).toFixed(1) : "–"} a game)${hasSot() ? ` · ${t.sot} on target` : ""} · ${t.goals} goals · ${t.xg.toFixed(1)} xG</span></div>`;
   }
   const shown = rows.slice(0, f.shown);
+  const e0 = teamsLeague() === "E0";
   const act = activeMap();
   const body = shown.map((r) => {
     const p = per90(r.shots, r.minutes);
     const now = act.get(r.player_id);
-    const moved = now?.team && now.team !== r.team ? ` <span class="muted small">· now ${esc(now.team)}</span>` : !now?.active ? ' <span class="muted small">· left the PL</span>' : "";
-    return `
-      <button class="bet-row trade" data-player="${esc(r.player_id)}">
-        <span>${esc(r.player)} <span class="muted small">${f.team ? "" : `${esc(r.team)} · `}${esc(r.position || "")}</span>${moved}<div class="meta">${r.apps} games (${r.starts} starts) · ${r.minutes} min</div><div class="meta">${p != null ? p.toFixed(2) : "–"} per 90 · ${r.sot} on target${r.shots ? ` (${Math.round((r.sot / r.shots) * 100)}%)` : ""} · ${r.goals} G · ${r.xg.toFixed(1)} xG</div></span>
-        <span class="pl num">${r.shots}<div class="meta">shots</div></span>
-      </button>`;
+    const moved = !e0 ? "" : now?.team && now.team !== r.team ? ` <span class="muted small">· now ${esc(now.team)}</span>` : !now?.active ? ' <span class="muted small">· left the PL</span>' : "";
+    const sot = r.sot == null ? "" : ` · ${r.sot} on target${r.shots ? ` (${Math.round((r.sot / r.shots) * 100)}%)` : ""}`;
+    const inner = `
+        <span>${esc(r.player)} <span class="muted small">${f.team ? "" : `${esc(r.team)} · `}${esc(r.position || "")}</span>${moved}<div class="meta">${r.apps} games${r.starts != null ? ` (${r.starts} starts)` : ""} · ${r.minutes} min</div><div class="meta">${p != null ? p.toFixed(2) : "–"} per 90${sot} · ${r.goals} G · ${r.xg.toFixed(1)} xG</div></span>
+        <span class="pl num">${r.shots}<div class="meta">shots</div></span>`;
+    // The player sheet (model record, next match) exists for the Premier League only.
+    return e0 ? `<button class="bet-row trade" data-player="${esc(r.player_id)}">${inner}</button>` : `<div class="bet-row">${inner}</div>`;
   }).join("");
   return `${club}${body}${rows.length > shown.length ? `<button class="more" id="pl-more">Show more (${rows.length - shown.length} left)</button>` : ""}`;
 }
@@ -793,7 +831,7 @@ const DEV_MAX_ROWS = 40;
 let devData = null;
 
 function devChartHtml() {
-  const [label, val, qualifies, dp, unit] = DEV_METRICS[state.pl.metric];
+  const [label, val, qualifies, dp, unit] = devMetrics()[state.pl.metric] || DEV_METRICS.p90;
   const group = statRows().filter(qualifies).map((r) => ({ r, v: val(r) })).filter((x) => x.v != null);
   if (group.length < 3) return '<p class="muted" style="padding:6px 0">Not enough qualifying players for a chart. Widen the filters.</p>';
   const mean = group.reduce((a, x) => a + x.v, 0) / group.length;
@@ -830,7 +868,8 @@ function devChartHtml() {
   const roomy = sx(sd) - x0 > 46;
   const ticks = [-1, 0, 1].filter((k) => k === 0 || roomy).map((k) => `<text class="xlab" x="${sx(k * sd)}" y="${H - 8}" text-anchor="${k < 0 ? "end" : k > 0 ? "start" : "middle"}" dx="${k * 4}">${k === 0 ? `avg ${mean.toFixed(dp)}${unit}` : `${k > 0 ? "+" : "−"}1 SD`}</text>`).join("");
   devData = { rows, mean, sd, dp, unit, label, W };
-  const scope = [seasonName(state.pl.season || state.ps.seasons[0]), state.pl.team || "all clubs", state.pl.pos || "all positions"].join(" · ");
+  const ps = curPs();
+  const scope = [seasonName(ps.seasons.includes(state.pl.season) ? state.pl.season : ps.seasons[0]), state.pl.team || "all clubs", state.pl.pos || "all positions"].join(" · ");
   return `
     <p class="note" style="margin-top:0"><b>${esc(label)}</b>, each player against the average of this group (${esc(scope)}, ${group.length} players${state.pl.metric === "shots" ? "" : " who qualify"}). Blue = above average, red = below; the gray band is ±1 standard deviation (${sd.toFixed(dp)}${unit}).${cut ? ` Showing the top and bottom ${DEV_MAX_ROWS / 2}.` : ""}</p>
     <div class="dev-readout" id="dev-readout" aria-live="polite">Tap a bar for that player's numbers.</div>
@@ -871,44 +910,53 @@ function statsBodyHtml() {
 }
 
 function viewPlayerStats() {
-  const d = state.data;
-  if (d.players_stats && !state.ps) {
-    loadPlayerStats();
-    return `${teamsToggle()}${playersModeToggle()}<div class="empty">Loading player stats…</div>`;
+  const lg = teamsLeague();
+  const top = `${teamsToggle()}${teamsLeagueChips()}${playersModeToggle()}`;
+  if (lg === "E1" || (lg !== "E0" && !psFile(lg) && !XG_LEAGUES.has(lg))) {
+    return `${top}<div class="empty">No player stats for ${esc(theLeague(lg))}: Understat, where these come from, doesn't cover it.</div>`;
   }
-  const ps = state.ps;
+  if (psFile(lg) && !curPs()) {
+    loadPlayerStats(lg);
+    return `${top}<div class="empty">Loading player stats…</div>`;
+  }
+  const ps = curPs();
   if (!ps || !ps.players?.length) {
-    return `${teamsToggle()}${playersModeToggle()}<div class="empty">${ps?.error ? `Couldn't load player stats (${esc(ps.error)}).` : "Player stats appear after the next update."}</div>`;
+    return `${top}<div class="empty">${ps?.error ? `Couldn't load player stats (${esc(ps.error)}).` : "Player stats appear after the next update."}</div>`;
   }
   const f = state.pl;
-  const season = f.season || ps.seasons[0];
+  const season = ps.seasons.includes(f.season) ? f.season : ps.seasons[0];
+  const e0 = lg === "E0";
   const teams = [...new Set(ps.players.filter((r) => r.season === season).map((r) => r.team))].sort();
   const opt = (vals, cur, label, fmt = (v) => v) => `${label ? `<option value="">${label}</option>` : ""}${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
   return `
-    ${teamsToggle()}
-    ${playersModeToggle()}
+    ${top}
     <input id="pl-q" class="search" type="search" placeholder="Search players" value="${esc(f.q)}" aria-label="Search players" autocomplete="off">
     <div class="filters">
       <select id="pl-season" aria-label="Season">${opt(ps.seasons, season, "", seasonName)}</select>
       <select id="pl-team" aria-label="Club">${opt(teams, f.team, "All clubs")}</select>
       <select id="pl-pos" aria-label="Position">${opt(["FWD", "MID", "DEF", "GK"], f.pos, "All positions")}</select>
-      <select id="pl-ssort" aria-label="Sort">${Object.entries(STAT_SORTS).map(([k, [l]]) => `<option value="${k}" ${k === f.ssort ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <select id="pl-ssort" aria-label="Sort">${Object.entries(statSorts()).map(([k, [l]]) => `<option value="${k}" ${k === f.ssort ? "selected" : ""}>${l}</option>`).join("")}</select>
     </div>
     <div class="row-controls">
-      ${activeToggle()}
+      ${e0 ? activeToggle() : "<span></span>"}
       <div class="segmented mini" role="group" aria-label="List or chart">
         ${[["list", "List"], ["chart", "Chart"]].map(([k, l]) => `<button data-plview="${k}" class="${f.view === k ? "on" : ""}" aria-pressed="${f.view === k}">${l}</button>`).join("")}
       </div>
     </div>
-    ${f.view === "chart" ? `<select id="pl-metric" class="metric" aria-label="Chart measure">${Object.entries(DEV_METRICS).map(([k, [l]]) => `<option value="${k}" ${k === f.metric ? "selected" : ""}>Chart: ${l}</option>`).join("")}</select>` : ""}
+    ${f.view === "chart" ? `<select id="pl-metric" class="metric" aria-label="Chart measure">${Object.entries(devMetrics()).map(([k, [l]]) => `<option value="${k}" ${k === f.metric ? "selected" : ""}>Chart: ${l}</option>`).join("")}</select>` : ""}
     <div class="card" id="pl-list">${statsBodyHtml()}</div>
-    <p class="note">Active players = in a current Premier League squad (Fantasy Premier League's list; injured or suspended players still count). Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record.</p>`;
+    <p class="note">${e0
+      ? "Active players = in a current Premier League squad (Fantasy Premier League's list; injured or suspended players still count). Premier League shots from Understat. On target = goals + saved shots. Pick a club to see its totals. Tap a player for his seasons, next match and model record."
+      : `${esc(leagueName(lg))} season totals from Understat: games, minutes, shots, goals and xG (no shots on target or starts there). A player who changed clubs in a season shows once, at his last club. Pick a club to see its totals. Player shot predictions cover the Premier League only.`}</p>`;
 }
 
 function viewPlayers() {
   if (state.pl.mode === "stats") return viewPlayerStats();
+  if (teamsLeague() !== "E0") {
+    return `${teamsToggle()}${teamsLeagueChips()}${playersModeToggle()}<div class="empty">The player shot model and its backtest cover the Premier League only. Season stats for ${esc(theLeague(teamsLeague()))} are under Season stats.</div>`;
+  }
   const d = state.data;
-  if (d.players_stats && !state.ps) loadPlayerStats();  // for the active-players filter
+  if (d.players_stats && !state.psBy.E0) loadPlayerStats("E0");  // for the active-players filter
   if (d.players_backtest && !state.pb) {
     loadPlayersBacktest();
     return `${teamsToggle()}<div class="empty">Loading player results…</div>`;
@@ -928,6 +976,7 @@ function viewPlayers() {
   })() : `<p class="note">${pb?.error ? `Couldn't load backtest results (${esc(pb.error)}). ` : ""}Showing next-match expected shots only; backtest results appear after the next Player model run.</p>`;
   return `
     ${teamsToggle()}
+    ${teamsLeagueChips()}
     ${playersModeToggle()}
     ${totals}
     <input id="pl-q" class="search" type="search" placeholder="Search players" value="${esc(f.q)}" aria-label="Search players" autocomplete="off">
@@ -942,7 +991,7 @@ function viewPlayers() {
 }
 
 function seasonStatsHtml(pid) {
-  const rows = (state.ps?.players || []).filter((x) => x.player_id === pid);
+  const rows = (psE0()?.players || []).filter((x) => x.player_id === pid);
   if (!rows.length) return "";
   const body = rows.map((x) => `<tr><td>${esc(seasonName(x.season))}<div class="meta">${esc(x.team)} · ${x.apps} games</div></td><td>${x.shots}</td><td>${per90(x.shots, x.minutes)?.toFixed(2) ?? "–"}</td><td>${x.sot}</td><td>${x.goals}</td><td>${x.xg.toFixed(1)}</td></tr>`).join("");
   return `
@@ -955,7 +1004,7 @@ function seasonStatsHtml(pid) {
 function playerHtml(pid) {
   let r = playerRows().find((x) => x.player_id === pid);
   if (!r) {  // only in the season stats (not in the backtest or next fixtures)
-    const st = (state.ps?.players || []).find((x) => x.player_id === pid);
+    const st = (psE0()?.players || []).find((x) => x.player_id === pid);
     if (!st) return "";
     r = { player_id: pid, player: st.player, team: st.team, position: st.position, apps: 0 };
   }
@@ -990,7 +1039,10 @@ function playerHtml(pid) {
 
 function viewRatings() {
   if (state.teamsView === "players") return viewPlayers();
-  const r = state.data.ratings;
+  const lg = teamsLeague();
+  const block = teamsBlock(lg);
+  if (!block?.ratings?.length) return `${teamsToggle()}${teamsLeagueChips()}<div class="empty">No ratings for ${esc(theLeague(lg))} yet.</div>`;
+  const r = block.ratings;
   const maxNet = Math.max(...r.map((t) => Math.abs(t.goal_diff)), 0.01);
   const hasXg = r.some((t) => t.xg_for != null);
   const rows = r.map((t, i) => {
@@ -998,7 +1050,7 @@ function viewRatings() {
     return `
       <div class="rating-row">
         <span class="rank">${i + 1}</span>
-        <span>${esc(t.team)}${hasXg && t.xg_for != null ? `<small>xG ${t.xg_for.toFixed(2)} – ${t.xg_against.toFixed(2)} a game</small>` : ""}${absText(t.team)}</span>
+        <span>${esc(t.team)}${hasXg && t.xg_for != null ? `<small>xG ${t.xg_for.toFixed(2)} – ${t.xg_against.toFixed(2)} a game</small>` : ""}${lg === "E0" ? absText(t.team) : ""}</span>
         <span class="r">${t.goals_for.toFixed(2)}</span>
         <span class="r">${t.goals_against.toFixed(2)}</span>
         <span class="netbar" title="Net ${signed(t.goal_diff, 2)}"><span class="axis"></span><span class="fill ${t.goal_diff >= 0 ? "pos" : "neg"}" style="width:${w}%"></span></span>
@@ -1006,7 +1058,8 @@ function viewRatings() {
   }).join("");
   return `
     ${teamsToggle()}
-    <p class="note">Goals each team would score and concede per game against an average Premier League side on a neutral pitch. Recent matches count more.${hasXg ? " The xG line is this season's raw average." : ""}</p>
+    ${teamsLeagueChips()}
+    <p class="note">Goals each team would score and concede per game against an average ${esc(leagueName(lg))} side on a neutral pitch. Recent matches count more.${hasXg ? " The xG line is this season's raw average." : XG_LEAGUES.has(lg) ? "" : ` ${esc(theLeague(lg).replace(/^the/, "The"))} has no xG data (Understat doesn't cover it), so these come from goals only.`}</p>
     <div class="card" style="margin-top:12px">
       <div class="rating-row head"><span></span><span>Team</span><span class="r">For</span><span class="r">Agst</span><span class="r">Net</span></div>
       ${rows}
@@ -1810,6 +1863,7 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.league !== undefined) {
     state.league = t.dataset.league; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    state.pl.team = ""; state.pl.season = ""; state.pl.shown = 40; // clubs and seasons differ by league
     store.set("league", state.league);
     render();
   } else if (t.dataset.pfid) {

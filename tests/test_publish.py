@@ -160,3 +160,79 @@ def test_build_data_applies_team_news(league):
     assert first["xg_mult"] == [0.8, 1.1]
     assert first["news"]["home"]["absences"][0]["name"] == "Star"
     assert data["team_news"]["T00"]["attack_mult"] == 0.8
+
+
+def _understat_file(tmp_path, league, year, players):
+    from soccer_stats.xg import LEAGUES as US
+
+    path = tmp_path / f"understat_{US[league]}_{year}.json"
+    path.write_text(json.dumps({"dates": [], "teams": {}, "players": players}))
+
+
+def test_league_season_stats_reads_understat_players(tmp_path, monkeypatch):
+    from soccer_stats import publish
+    from soccer_stats.publish import league_season_stats
+
+    real = publish.fetch_season
+
+    def no_network(league, year, raw_dir):  # a season not in the cache fails, as offline
+        path = tmp_path / f"understat_{publish.XG_LEAGUES[league]}_{year}.json"
+        if not path.exists():
+            raise OSError("offline")
+        return real(league, year, raw_dir)
+
+    monkeypatch.setattr(publish, "fetch_season", no_network)
+
+    _understat_file(
+        tmp_path,
+        "SP1",
+        2025,
+        [
+            {
+                "id": "1",
+                "player_name": "A",
+                "games": "30",
+                "time": "2500",
+                "goals": "12",
+                "xG": "10.42",
+                "shots": "80",
+                "position": "F S",
+                "team_title": "Atletico Madrid",
+            },
+            {
+                "id": "2",
+                "player_name": "B",
+                "games": "10",
+                "time": "700",
+                "goals": "0",
+                "xG": "0.1",
+                "shots": "3",
+                "position": "GK",
+                "team_title": "Sevilla,Real Betis",
+            },
+        ],
+    )
+    rows = league_season_stats("SP1", [2025, 2026], raw_dir=tmp_path)  # 2026 missing: skipped
+    assert [r["player"] for r in rows] == ["A", "B"]
+    a, b = rows
+    assert a["season"] == "2526" and a["team"] == "Ath Madrid"  # football-data's name
+    assert (a["apps"], a["minutes"], a["shots"], a["goals"], a["xg"]) == (30, 2500, 80, 12, 10.42)
+    assert a["position"] == "FWD" and a["sot"] is None and a["starts"] is None
+    assert b["position"] == "GK" and b["team"] == "Betis"  # moved: his last club
+    assert league_season_stats("E1", [2025], raw_dir=tmp_path) == []  # no Understat
+
+
+def test_team_block_matches_the_top_level_shape():
+    from conftest import simulate_league
+
+    from soccer_stats import dashboard
+    from soccer_stats.publish import team_block
+
+    matches, _ = simulate_league(n_teams=8, seasons=2, seed=3)
+    matches["home_xg"] = float("nan")
+    model = dashboard.fit_model(matches, xg_weight=0.0)
+    block = team_block(model, matches, pd.DataFrame(), "SP1")
+    assert block["name"] == "La Liga" and block["xg"] is False
+    assert set(block) == {"name", "teams", "params", "ratings", "xg"}
+    assert {r["team"] for r in block["ratings"]} == set(block["teams"])
+    assert {"goals_for", "goals_against", "goal_diff"} <= set(block["ratings"][0])
