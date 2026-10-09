@@ -139,7 +139,7 @@ price. Corners are untested against any price.
   but only 6 of 36 ranges clear the Bonferroni bar.
 - **Corners:** gains are −0.005 to +0.002 and no range clears 0.
 - **E1** (goals only): no line beats the baseline in any market. Its goal-total log loss
-  is worse than the baseline at 4 of 6 lines.
+  is worse than the baseline at 5 of 6 lines (all but 5.5).
 
 ### Is it well calibrated? (95%; about 1 line in 10 is flagged by chance)
 
@@ -196,7 +196,7 @@ The 12% rule's CLV range is below 0 everywhere. This repeats the round-2 E0 resu
     goals that lose to Pinnacle on 1X2 and on the 2.5 total, and books price them off
     those same sharp lines.
   - Any edge would have to come from a book pricing team totals more softly than its own
-    match lines. Only the owner's proposed ≤40-credit live probe can tell: which books
+    match lines. Only the ≤40-credit live probe the lead proposed (awaiting the owner's approval) can tell: which books
     quote team totals on both sides, and at what margin. Worth that probe; not worth
     building anything before it.
 - **E1:** the goals-only model is over-confident in every market. It shouldn't be shown
