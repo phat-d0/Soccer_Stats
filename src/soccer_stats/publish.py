@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import dashboard, team_totals
+from soccer_stats import dashboard, espn_news, team_totals
 from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
@@ -783,6 +783,10 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     data["odds_sources"] = _clean(sources)
     data["teams_by_league"] = teams_by_league
     data["leagues"] = league_list(data["fixtures"], sources)
+    try:  # free ESPN injuries and lineups; ESPN is unofficial, so it never stops the build
+        print(espn_news.summary_line(espn_news.add(data["fixtures"])))
+    except Exception as exc:  # noqa: BLE001
+        print(f"Team news (ESPN): failed ({type(exc).__name__}); no team news this run")
     tt_dir = os.environ.get("TEAM_TOTALS_DIR")
     if tt_dir:  # set by publish.yml on the default branch only (data-log logs the rows)
         state = os.environ.get("TEAM_TOTALS_STATE")
