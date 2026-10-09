@@ -663,3 +663,20 @@ All of B's gains over both benchmarks have 99.375% ranges above 0.
 - **How:** `odds-check.yml` `task=goal-leagues` with `reason` set. The four league caches
   now exist, so the run takes about 10 minutes.
 - **Gate:** B pooled beats both benchmarks (95%), and passes the tail rule.
+
+### Lead review notes (round 8)
+
+- **Timing:** §10 was committed at 2026-10-08 22:14 UTC (4bbf13f), before the code
+  (bb25d7f, 22:19) and before every run: the four `goal-league` runs started at 22:19–22:20
+  and the scoring run 37857461571 at 23:05, all on bb25d7f. No other run of this task exists.
+  Every number in §11 matches that job log.
+- **Two departures from §10's wording, neither a change of test:**
+  - The code loads Understat from 2021/22, not 2022/23, so the 730-day training window
+    that §10 names is full from the first scored block (2023/24). The scored seasons,
+    benchmarks, levels and gate are as registered.
+  - The run is `odds-check.yml` `task=goal-league` (per league) and `task=goal-leagues`
+    (all five, pooled), not a separate `goal-leagues.yml`. Opening the forward window in
+    `goal-leagues` logs one opening line per league (five lines in one run).
+- **Forward lock:** while locked, `goal-league` never loads the 2026/27 season at all and
+  also drops rows from 2026-10-10 before any feature or fit; a test checks the seasons
+  loaded for all five leagues.

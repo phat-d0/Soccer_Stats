@@ -228,3 +228,28 @@ def test_goal_pool_cli(feats, tmp_path, capsys):
 
     rep = json.loads((tmp_path / "p.json").read_text())
     assert set(rep["history"]["leagues"]) == {"SP1", "I1"} and "forward" not in rep
+
+
+def test_goal_league_locked_never_loads_the_forward_season(monkeypatch):
+    """Locked, the round-8 CLI never loads 2026/27 at all (dropped before computation);
+    only a reason widens the seasons loaded."""
+    from soccer_stats import cli, player_data
+
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    def fake_load(league, years):
+        seen.append(list(years))
+        raise Stop
+
+    monkeypatch.setattr(player_data, "load_appearances", fake_load)
+    monkeypatch.setattr(cli, "current_season", lambda: 2026)
+    for lg in gl.FORWARD_LEAGUES:
+        with pytest.raises(Stop):
+            cli._goal_league_feats(lg, "")
+        assert max(seen[-1]) == 2025
+    with pytest.raises(Stop):
+        cli._goal_league_feats("SP1", "opened for the test")
+    assert max(seen[-1]) == 2026
