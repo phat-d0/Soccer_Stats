@@ -60,12 +60,27 @@ const closeSheet = async (p) => { await p.click(".sheet-close"); };
 const STEPS = [
   ["matches", tab("matches")],
   ["match-sheet", async (p) => { await p.click('button.match[data-fixture="0"]'); await sheet(p); }, true],
+  // Goals over/under: total goals with DraftKings' 2.5, each team's goals with FanDuel's prices.
+  ["match-sheet-goals", async (p) => {
+    await p.click("details.goals-fold > summary");
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["Total goals", "DK over", "Each team's goals", "FD over", "doesn't beat the market"]) {
+      if (!text.includes(want)) throw new Error(`Goals section lacks "${want}"`);
+    }
+    await p.locator("details.goals-fold").scrollIntoViewIfNeeded();
+  }, true],
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
   ["matches-edge-2", async (p) => { await closeSheet(p); await p.click("details.edge-explore > summary"); await p.click('button[data-edge="0.02"]'); }],
   ["matches-edge-reset", click('button[data-edge="reset"]')],
   // The competition filter (shown because the fixture has a second league, SP1).
   ["matches-league-sp1", click('.chip[data-league="SP1"]')],
-  ["matches-league-all", click('.chip[data-league=""]')],
+  // A match with no odds: model-only goals, no bookmaker columns.
+  ["match-sheet-sp1-goals", async (p) => {
+    await p.click("button.match >> nth=0"); await sheet(p); await p.click("details.goals-fold > summary");
+    const text = await p.textContent("#sheet-body");
+    if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
+  }, true],
+  ["matches-league-all", async (p) => { await closeSheet(p); await p.click('.chip[data-league=""]'); }],
   ["teams", tab("ratings")],
   ["players-stats", async (p) => { await p.click('button[data-tv="players"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-stats-club", async (p) => { await p.selectOption("#pl-team", { index: 1 }); }],
