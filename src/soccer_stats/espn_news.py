@@ -37,19 +37,20 @@ BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}"
 SLUGS = {"E0": "eng.1", "SP1": "esp.1", "D1": "ger.1", "I1": "ita.1", "F1": "fra.1", "E1": "eng.2"}
 # ESPN spellings the shared map (odds_feed.TEAM_NAMES) and its fuzzy match don't cover.
 ESPN_NAMES: dict[str, str] = {
-    "AFC Bournemouth": "Bournemouth",
+    # Spellings seen in the probe (run 37964999592) that neither the shared map nor its
+    # unique prefix/suffix match turns into football-data's name.
     "Brighton & Hove Albion": "Brighton",
-    "Wolverhampton Wanderers": "Wolves",
-    "Sheffield Wednesday": "Sheffield Weds",
     "Queens Park Rangers": "QPR",
-    "West Bromwich Albion": "West Brom",
-    "Bayern Munich": "Bayern Munich",
-    "Borussia Mönchengladbach": "M'gladbach",
-    "Internazionale": "Inter",
-    "AC Milan": "Milan",
-    "Paris Saint-Germain": "Paris SG",
-    "Atlético Madrid": "Ath Madrid",
+    "Sheffield Wednesday": "Sheffield Weds",
     "Athletic Club": "Ath Bilbao",
+    "Celta Vigo": "Celta",
+    "Deportivo": "La Coruna",
+    "Borussia Mönchengladbach": "M'gladbach",
+    "FC Cologne": "FC Koln",
+    "SC Paderborn 07": "Paderborn",
+    "Internazionale": "Inter",
+    "Paris Saint-Germain": "Paris SG",
+    "Stade Rennais": "Rennes",
 }
 INJURY_HOURS = 36
 LINEUP_MINUTES = 90
@@ -427,7 +428,7 @@ def log(root: Path, rows: list[dict]) -> int:
 # ---------- probe (no key; run in Actions) ----------
 
 
-def probe(get: Callable = requests.get, back: int = 4, ahead: int = 2) -> dict:
+def probe(get: Callable = requests.get, back: int = 7, ahead: int = 2) -> dict:
     """Per league: which days' scoreboards answer, ESPN team names, and the shape of one
     finished and one upcoming match's summary (lineups, injuries, update time)."""
     now = pd.Timestamp.now(tz="UTC")

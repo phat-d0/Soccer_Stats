@@ -110,6 +110,57 @@ def test_slugs_and_name_mapping():
     assert ev[0]["espn_home"] == "Wolverhampton Wanderers"
 
 
+# ESPN's spellings from the probe (run 37964999592) -> football-data's.
+PROBED = {
+    "AFC Bournemouth": "Bournemouth",
+    "Brighton & Hove Albion": "Brighton",
+    "Manchester United": "Man United",
+    "Nottingham Forest": "Nott'm Forest",
+    "Tottenham Hotspur": "Tottenham",
+    "Leeds United": "Leeds",
+    "Hull City": "Hull",
+    "Athletic Club": "Ath Bilbao",
+    "Atlético Madrid": "Ath Madrid",
+    "Alavés": "Alaves",
+    "Celta Vigo": "Celta",
+    "Deportivo": "La Coruna",
+    "Espanyol": "Espanol",
+    "Málaga": "Malaga",
+    "Rayo Vallecano": "Vallecano",
+    "Real Betis": "Betis",
+    "1. FC Union Berlin": "Union Berlin",
+    "Bayer Leverkusen": "Leverkusen",
+    "Borussia Dortmund": "Dortmund",
+    "Borussia Mönchengladbach": "M'gladbach",
+    "Eintracht Frankfurt": "Ein Frankfurt",
+    "FC Augsburg": "Augsburg",
+    "FC Cologne": "FC Koln",
+    "Hamburg SV": "Hamburg",
+    "SC Paderborn 07": "Paderborn",
+    "SV Elversberg": "Elversberg",
+    "TSG Hoffenheim": "Hoffenheim",
+    "AC Milan": "Milan",
+    "AS Roma": "Roma",
+    "Internazionale": "Inter",
+    "AJ Auxerre": "Auxerre",
+    "AS Monaco": "Monaco",
+    "Le Havre AC": "Le Havre",
+    "Paris Saint-Germain": "Paris SG",
+    "Stade Rennais": "Rennes",
+    "Queens Park Rangers": "QPR",
+    "West Bromwich Albion": "West Brom",
+    "Wolverhampton Wanderers": "Wolves",
+    "Preston North End": "Preston",
+}
+
+
+def test_probed_espn_names_map_to_football_data():
+    known = set(PROBED.values()) | {"Paris FC", "Bristol City", "West Ham"}
+    wrong = {e: en.team_name(e, known) for e, f in PROBED.items() if en.team_name(e, known) != f}
+    assert wrong == {}
+    assert en.team_name("Paris FC", known) == "Paris FC"  # not taken for Paris SG
+
+
 def test_parse_summary_and_confirmed():
     p = en.parse_summary(summary())
     assert p["lineups"]["Manchester City"]["starters"][0] == "Manchester City S0"
