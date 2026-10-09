@@ -78,16 +78,31 @@ def _get_json(url: str, params: dict, get: Callable, stats: dict) -> dict | None
         stats["requests"] = stats.get("requests", 0) + 1
         try:
             r = get(url, params=params, timeout=TIMEOUT)
+            stats["last_status"] = r.status_code
             if r.status_code == 200:
                 return r.json()
             if r.status_code < 500:
                 return None  # 4xx: retrying won't help
-        except (requests.RequestException, ValueError):
-            pass
+        except (requests.RequestException, ValueError) as exc:
+            stats["last_status"] = type(exc).__name__
         if attempt < RETRIES:
             time.sleep(PAUSE * (attempt + 1))
     stats["failures"] = stats.get("failures", 0) + 1
     return None
+
+
+def _dicts(x) -> list[dict]:
+    """The dicts in a list from ESPN's JSON; anything else (a renamed or odd field) = []."""
+    return [v for v in x if isinstance(v, dict)] if isinstance(x, list) else []
+
+
+def _get(d, *keys):
+    """A nested value through dicts only, else None."""
+    for k in keys:
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d
 
 
 def team_name(name: str, known: set[str]) -> str:
@@ -100,11 +115,11 @@ def team_name(name: str, known: set[str]) -> str:
 def parse_scoreboard(body: dict | None, known: set[str]) -> list[dict]:
     """{id, kickoff, home, away, espn_home, espn_away} per event, names mapped."""
     out = []
-    for e in (body or {}).get("events", []) or []:
-        comp = ((e.get("competitions") or [{}])[0]) or {}
-        sides = {c.get("homeAway"): c for c in comp.get("competitors", []) or []}
-        h = ((sides.get("home") or {}).get("team") or {}).get("displayName")
-        a = ((sides.get("away") or {}).get("team") or {}).get("displayName")
+    for e in _dicts(_get(body, "events")):
+        comp = (_dicts(e.get("competitions")) or [{}])[0]
+        sides = {c.get("homeAway"): c for c in _dicts(comp.get("competitors"))}
+        h = _get(sides.get("home"), "team", "displayName")
+        a = _get(sides.get("away"), "team", "displayName")
         if not (e.get("id") and e.get("date") and h and a):
             continue
         out.append(
@@ -121,20 +136,16 @@ def parse_scoreboard(body: dict | None, known: set[str]) -> list[dict]:
 
 
 def _names(players) -> list[str]:
-    return [
-        (p.get("athlete") or {}).get("displayName") or ""
-        for p in players
-        if (p.get("athlete") or {}).get("displayName")
-    ]
+    return [n for p in players if isinstance(n := _get(p, "athlete", "displayName"), str) and n]
 
 
 def parse_summary(body: dict | None) -> dict:
     """{lineups: {espn team: {starters, subs}}, injuries: {espn team: [...]}, updated}."""
-    body = body or {}
+    body = body if isinstance(body, dict) else {}
     lineups = {}
-    for side in body.get("rosters", []) or []:
-        team = (side.get("team") or {}).get("displayName")
-        roster = side.get("roster", []) or []
+    for side in _dicts(body.get("rosters")):
+        team = _get(side, "team", "displayName")
+        roster = _dicts(side.get("roster"))
         if not team or not roster:
             continue
         lineups[team] = {
@@ -142,26 +153,24 @@ def parse_summary(body: dict | None) -> dict:
             "subs": _names(p for p in roster if not p.get("starter")),
         }
     injuries = {}
-    for block in body.get("injuries", []) or []:
-        team = (block.get("team") or {}).get("displayName")
+    for block in _dicts(body.get("injuries")):
+        team = _get(block, "team", "displayName")
         if not team:
             continue
         rows = []
-        for i in block.get("injuries", []) or []:
-            name = (i.get("athlete") or {}).get("displayName")
+        for i in _dicts(block.get("injuries")):
+            name = _get(i, "athlete", "displayName")
             if not name:
                 continue
-            details = i.get("details") or {}
             rows.append(
                 {
                     "name": name,
-                    "status": i.get("status") or i.get("type", {}).get("description"),
-                    "detail": details.get("type") or details.get("detail"),
+                    "status": i.get("status") or _get(i, "type", "description"),
+                    "detail": _get(i, "details", "type") or _get(i, "details", "detail"),
                 }
             )
         injuries[team] = rows
-    meta = body.get("meta") or {}
-    updated = meta.get("lastUpdatedAt") or (body.get("header") or {}).get("lastUpdated")
+    updated = _get(body, "meta", "lastUpdatedAt") or _get(body, "header", "lastUpdated")
     return {"lineups": lineups, "injuries": injuries, "updated": updated}
 
 
@@ -414,8 +423,15 @@ def probe(get: Callable = requests.get, back: int = 4, ahead: int = 7) -> dict:
         start, end = now - pd.Timedelta(days=back), now + pd.Timedelta(days=ahead)
         params = {"dates": f"{start:%Y%m%d}-{end:%Y%m%d}"}
         body = _get_json(BASE.format(slug=slug) + "/scoreboard", params, get, stats)
+        info = {"slug": slug, "range_status": stats.get("last_status")}
+        tries = [("range", params), ("today", {"dates": f"{now:%Y%m%d}"}), ("none", {})]
+        for label, prm in tries[1:]:
+            if body is not None:
+                break
+            body = _get_json(BASE.format(slug=slug) + "/scoreboard", prm, get, stats)
+            info[f"{label}_status"] = stats.get("last_status")
         events = parse_scoreboard(body, set())
-        info = {"slug": slug, "ok": body is not None, "events": len(events)}
+        info.update(ok=body is not None, events=len(events))
         info["teams"] = sorted({e["espn_home"] for e in events} | {e["espn_away"] for e in events})
         past = [e for e in events if e["kickoff"] < now - pd.Timedelta(hours=3)]
         future = [e for e in events if e["kickoff"] > now]
