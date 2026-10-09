@@ -282,3 +282,26 @@ def test_scoreboard_asks_one_date_per_call(tmp_path):
     en.scoreboard("E0", tmp_path, pd.Timestamp("2026-10-17 22:00", tz="UTC"), get, {})
     assert seen == ["20261017", "20261018", "20261019"]
     assert all("-" not in d for d in seen)
+
+
+def test_a_failing_or_slow_espn_stops_the_run_early(tmp_path, monkeypatch):
+    """A hanging ESPN must not hold up publish (cancel-in-progress would then cancel runs
+    before their data-log writes): MAX_FAILURES failures or RUN_SECONDS end the run's calls."""
+
+    def boom(url, params=None, timeout=None):
+        raise requests.Timeout("slow")
+
+    leagues = ["E0", "SP1", "D1", "I1", "F1", "E1"]
+    cards = [card(league=lg) for lg in leagues]
+    s = en.add(cards, tmp_path, NOW, boom)
+    assert s["failures"] == en.MAX_FAILURES
+    assert s["requests"] == en.MAX_FAILURES * (en.RETRIES + 1)
+    assert any("stopped early" in e for e in s["errors"])
+    assert all("team_news" not in c for c in cards)
+
+    clock = iter([0.0] + [en.RUN_SECONDS + 1.0] * 100)  # start, then past the budget
+    monkeypatch.setattr(en.time, "monotonic", lambda: next(clock))
+    calls = []
+    s = en.add([card()], tmp_path / "b", NOW, fake(calls))
+    assert calls == [] and s["requests"] == 0
+    assert any("stopped early" in e for e in s["errors"])
