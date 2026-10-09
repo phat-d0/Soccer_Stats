@@ -137,10 +137,10 @@ def test_add_attaches_compact_team_news(tmp_path):
 def test_windows_cache_and_first_confirmed(tmp_path):
     calls, cards = [], [card()]
     get = fake(calls, summary(n_start=0))
-    en.add(cards, tmp_path, NOW, get)  # 5 h out: scoreboard + summary
-    assert calls == ["scoreboard", "summary"]
+    en.add(cards, tmp_path, NOW, get)  # 5 h out: a scoreboard per day + the summary
+    assert calls == ["scoreboard", "scoreboard", "summary"]
     en.add([card()], tmp_path, NOW + pd.Timedelta(hours=1), get)  # cached for 3 h
-    assert calls == ["scoreboard", "summary"]
+    assert calls == ["scoreboard", "scoreboard", "summary"]
     en.add([card()], tmp_path, NOW + pd.Timedelta(hours=3, minutes=5), get)  # refreshed
     assert calls.count("summary") == 2
     # Inside 90 minutes: every run until the XI is confirmed...
@@ -183,13 +183,15 @@ def test_espn_failures_never_raise(tmp_path, monkeypatch):
 
     c = [card()]
     s = en.add(c, tmp_path, NOW, boom)
-    assert "team_news" not in c and s["failures"] == 1 and s["requests"] == en.RETRIES + 1
+    days = 2  # 10:00 + 36 h spans two UTC days: one scoreboard call each
+    assert "team_news" not in c and s["failures"] == days
+    assert s["requests"] == days * (en.RETRIES + 1)
     calls = []
     s = en.add([card()], tmp_path / "b", NOW, fake(calls, status=503))  # 5xx: retried
-    assert len(calls) == en.RETRIES + 1
+    assert len(calls) == days * (en.RETRIES + 1)
     calls = []
     s = en.add([card()], tmp_path / "c", NOW, fake(calls, status=404))  # 4xx: not retried
-    assert calls == ["scoreboard"]
+    assert calls == ["scoreboard"] * days
     # A broken body for one league never stops the others.
     monkeypatch.setattr(en, "parse_scoreboard", lambda *a: 1 / 0)
     s = en.add([card()], tmp_path / "d", NOW, fake([]))
@@ -216,3 +218,16 @@ def test_log_dedups_and_marks_the_first_confirmed_xi(tmp_path):
     logged = [json.loads(x) for x in path.read_text().splitlines()]
     assert [r["first_confirmed"] for r in logged] == [False, False, True, True]
     assert logged[2]["first_confirmed_at"] == t.isoformat() and len(logged[2]["starters"]) == 11
+
+
+def test_scoreboard_asks_one_date_per_call(tmp_path):
+    """ESPN answers a range (dates=A-B) with 400 (probe run 37964327038): one day each."""
+    seen = []
+
+    def get(url, params=None, timeout=None):
+        seen.append(params.get("dates"))
+        return Resp(scoreboard(("401", "Manchester City", "AFC Bournemouth", K)))
+
+    en.scoreboard("E0", tmp_path, pd.Timestamp("2026-10-17 22:00", tz="UTC"), get, {})
+    assert seen == ["20261017", "20261018", "20261019"]
+    assert all("-" not in d for d in seen)

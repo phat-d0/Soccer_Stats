@@ -219,17 +219,31 @@ def _write_cache(path: Path, obj: dict) -> None:
     path.write_text(json.dumps(obj))
 
 
+def _days(start: pd.Timestamp, end: pd.Timestamp) -> list[str]:
+    """YYYYMMDD for each UTC day from start to end (ESPN takes one date per call; a
+    range like 20261009-20261011 returns 400)."""
+    d0, d1 = start.normalize(), end.normalize()
+    return [f"{d:%Y%m%d}" for d in pd.date_range(d0, d1, freq="D")]
+
+
 def scoreboard(league: str, raw_dir: Path, now: pd.Timestamp, get, stats) -> dict | None:
-    """The league's scoreboard for today to INJURY_HOURS ahead (cached)."""
+    """The league's scoreboard for every day from now to INJURY_HOURS ahead (one call per
+    day, cached SCOREBOARD_HOURS), merged into one {events: [...]}."""
     path = _cache_dir(raw_dir) / f"{league}_scoreboard.json"
     cached = _read_cache(path)
     if cached and now - _ts(cached["fetched_at"]) < pd.Timedelta(hours=SCOREBOARD_HOURS):
         return cached["body"]
-    end = now + pd.Timedelta(hours=INJURY_HOURS + 24)
-    params = {"dates": f"{now:%Y%m%d}-{end:%Y%m%d}"}
-    body = _get_json(BASE.format(slug=SLUGS[league]) + "/scoreboard", params, get, stats)
-    if body is None:
+    events, ok = {}, False
+    for day in _days(now, now + pd.Timedelta(hours=INJURY_HOURS)):
+        url = BASE.format(slug=SLUGS[league]) + "/scoreboard"
+        body = _get_json(url, {"dates": day}, get, stats)
+        if body is not None:
+            ok = True
+            for e in _dicts(body.get("events")):
+                events.setdefault(str(e.get("id")), e)  # one entry per event
+    if not ok:
         return cached["body"] if cached else None
+    body = {"events": list(events.values())}
     _write_cache(path, {"fetched_at": _iso(now), "body": body})
     return body
 
@@ -413,42 +427,34 @@ def log(root: Path, rows: list[dict]) -> int:
 # ---------- probe (no key; run in Actions) ----------
 
 
-def probe(get: Callable = requests.get, back: int = 4, ahead: int = 7) -> dict:
-    """Per league: scoreboard reachable, events from `back` days ago to `ahead` days on,
-    ESPN team names, and the shape of one finished and one upcoming match's summary."""
+def probe(get: Callable = requests.get, back: int = 4, ahead: int = 2) -> dict:
+    """Per league: which days' scoreboards answer, ESPN team names, and the shape of one
+    finished and one upcoming match's summary (lineups, injuries, update time)."""
     now = pd.Timestamp.now(tz="UTC")
     out = {}
     for league, slug in SLUGS.items():
         stats: dict = {}
-        start, end = now - pd.Timedelta(days=back), now + pd.Timedelta(days=ahead)
-        params = {"dates": f"{start:%Y%m%d}-{end:%Y%m%d}"}
-        body = _get_json(BASE.format(slug=slug) + "/scoreboard", params, get, stats)
-        info = {"slug": slug, "range_status": stats.get("last_status")}
-        tries = [("range", params), ("today", {"dates": f"{now:%Y%m%d}"}), ("none", {})]
-        for label, prm in tries[1:]:
-            if body is not None:
-                break
-            body = _get_json(BASE.format(slug=slug) + "/scoreboard", prm, get, stats)
-            info[f"{label}_status"] = stats.get("last_status")
-        events = parse_scoreboard(body, set())
-        info.update(ok=body is not None, events=len(events))
+        events, statuses = [], {}
+        for day in _days(now - pd.Timedelta(days=back), now + pd.Timedelta(days=ahead)):
+            body = _get_json(BASE.format(slug=slug) + "/scoreboard", {"dates": day}, get, stats)
+            statuses[day] = stats.get("last_status")
+            events += parse_scoreboard(body, set())
+        info = {"slug": slug, "statuses": statuses, "events": len(events)}
         info["teams"] = sorted({e["espn_home"] for e in events} | {e["espn_away"] for e in events})
         past = [e for e in events if e["kickoff"] < now - pd.Timedelta(hours=3)]
         future = [e for e in events if e["kickoff"] > now]
         for label, pick in (("finished", past[-1:]), ("upcoming", future[:1])):
             if not pick:
                 continue
-            url = BASE.format(slug=slug) + "/summary"
-            s = _get_json(url, {"event": pick[0]["id"]}, get, stats)
+            s = _get_json(BASE.format(slug=slug) + "/summary", {"event": pick[0]["id"]}, get, stats)
             p = parse_summary(s)
             info[label] = {
                 "match": f"{pick[0]['espn_home']} v {pick[0]['espn_away']}",
-                "keys": sorted((s or {}).keys()),
                 "starters": {t: len(v["starters"]) for t, v in p["lineups"].items()},
                 "subs": {t: len(v["subs"]) for t, v in p["lineups"].items()},
-                "injuries": {t: len(v) for t, v in p["injuries"].items()},
-                "injury_sample": next((v[:2] for v in p["injuries"].values() if v), []),
-                "raw_injury_sample": ((s or {}).get("injuries") or [None])[:1],
+                "starter_sample": next((v["starters"][:3] for v in p["lineups"].values()), []),
+                "injuries_key": "injuries" in (s or {}),
+                "meta": (s or {}).get("meta"),
                 "updated": p["updated"],
             }
         out[league] = info
