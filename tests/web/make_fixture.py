@@ -48,6 +48,7 @@ from soccer_stats.players import Absence, TeamNews  # noqa: E402
 from soccer_stats.publish import (  # noqa: E402
     _clean,
     add_match_blend,
+    add_team_totals,
     build_data,
     match_blend,
     player_gate,
@@ -331,6 +332,7 @@ def build(src: Path, out: Path) -> dict:
     add_settled_live_matches(data)
     add_edge_thresholds(data)
     add_second_league(data)
+    add_team_total_prices(data)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -678,6 +680,31 @@ SP1_EDGE = {
 }
 
 
+# FanDuel team totals for the first match, through publish.add_team_totals, until the real
+# log's matches reach the fixture (its synthetic clubs never match data-log's rows): the
+# home side at 1.5, the away side at 0.5 and 1.5, a look and a close (the close wins).
+def add_team_total_prices(data: dict) -> None:
+    fx = data["fixtures"][0]
+    ko = pd.Timestamp(fx["kickoff"])
+    rows = []
+    for snap, before, shift in (("look", 24 * 60, 0.03), ("close", 20, 0.01)):
+        at = (ko - pd.Timedelta(minutes=before)).isoformat()
+        for side, line in (("home", 1.5), ("away", 0.5), ("away", 1.5)):
+            fair = round(1 - fx["goals_cdf"][side][int(line)] - shift, 4)
+            over, under = round(1 / (fair * 1.03), 2), round(1 / ((1 - fair) * 1.03), 2)
+            rows.append(
+                {"league": fx.get("league", "E0"), "home": fx["home"], "away": fx["away"]}
+                | {"kickoff": ko.isoformat(), "book": "fanduel", "side": side, "line": line}
+                | {"snapshot": snap, "over": over, "under": under, "fair_over": fair}
+                | {"fetched_at": at, "downloaded_at": at}
+            )
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "E0_team_totals_2026-10.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in rows) + "\n"
+        )
+        add_team_totals(data["fixtures"][:1], [tmp])
+
+
 def add_second_league(data: dict) -> None:
     for fx in data["fixtures"]:
         fx.setdefault("league", "E0")
@@ -696,6 +723,7 @@ def add_second_league(data: dict) -> None:
             "news": None,
             "news_applied": False,
             "players": [],
+            "team_totals": None,
         }
         data["fixtures"].append(sp)
     data["fixtures"].sort(key=lambda f: f["kickoff"])

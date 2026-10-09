@@ -326,6 +326,7 @@ function detailHtml(fx) {
       </div>
       <p class="note">${marketNote}</p>
       ${hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
+      ${goalsSection(fx)}
       ${playersSection(fx)}
       <div class="section-title">Scorelines</div>
       <div class="card">
@@ -333,6 +334,70 @@ function detailHtml(fx) {
         <p class="note" style="margin:10px 0 0">Most likely: ${top.map(([s, v]) => `${s} (${pct(v)})`).join(", ")}</p>
       </div>
     </div>`;
+}
+
+// Over/under goals from the model's score matrix: P(goals <= k) for k = 0..6. Cards carry
+// `total_goals_cdf` and `goals_cdf` (publish); Explore's full 0..10 matrix is summed here.
+// The shown card matrix stops at 5 a side, so it is only used when it reaches 7 goals.
+function goalCdfs(fx) {
+  const m = fx.matrix;
+  const fromMatrix = (f) => {
+    if (!m || m.length < 7) return null;
+    const by = [];
+    m.forEach((row, i) => row.forEach((v, j) => { const k = f(i, j); by[k] = (by[k] || 0) + v; }));
+    let c = 0;
+    return Array.from({ length: 7 }, (_, k) => (c += by[k] || 0));
+  };
+  return {
+    total: fx.total_goals_cdf || fromMatrix((i, j) => i + j),
+    home: fx.goals_cdf?.home || fromMatrix((i) => i),
+    away: fx.goals_cdf?.away || fromMatrix((i, j) => j),
+  };
+}
+const overFrom = (cdf, line) => (cdf && cdf[Math.floor(line)] != null ? 1 - cdf[Math.floor(line)] : null);
+
+function goalsSection(fx) {
+  const cdf = goalCdfs(fx);
+  if (!cdf.total && !cdf.home && !cdf.away) return "";
+  const lg = fxLeague(fx);
+  const e1 = lg === "E1";
+  const imp = fx.odds ? impliedFor(fx) : {};
+  const dk = imp.over25 != null ? imp : null;
+  const book = isDK() ? "DK" : "Book";
+  const totalRows = [0.5, 1.5, 2.5, 3.5, 4.5].map((line) => {
+    const over = overFrom(cdf.total, line);
+    const bk = dk ? `<td>${line === 2.5 ? pct(dk.over25) : "–"}</td>` : "";
+    return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td>${bk}</tr>`;
+  }).join("");
+  const tt = fx.team_totals;
+  const fd = tt && (tt.home?.length || tt.away?.length);
+  const team = (side) => {
+    const priced = Object.fromEntries((tt?.[side] || []).map((r) => [r.line, r]));
+    const rows = [0.5, 1.5, 2.5].map((line) => {
+      const over = overFrom(cdf[side], line);
+      const q = priced[line];
+      return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td>${fd ? `<td>${q ? pct(q.fair_over) : "–"}</td>` : ""}</tr>`;
+    }).join("");
+    return `<div class="goals-team"><b>${esc(fx[side])}</b>
+      <table class="mkts goals"><thead><tr><th>Over/under</th><th>Over</th><th>Under</th>${fd ? "<th>FD over</th>" : ""}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+  const when = fd && tt.fetched_at ? new Date(tt.fetched_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  const e1Note = e1 ? " These are less reliable in the Championship: it runs on goals only, and in testing its goal chances were too confident." : "";
+  return `
+    <div class="section-title">Goals</div>
+    <div class="card" style="padding:8px 14px">
+      <table class="mkts goals">
+        <thead><tr><th>Total goals</th><th>Over</th><th>Under</th>${dk ? `<th>${book} over</th>` : ""}</tr></thead>
+        <tbody>${totalRows}</tbody>
+      </table>
+    </div>
+    <p class="note">Model's chances of more or fewer goals in the match than each line (over 2.5 = 3 or more).${dk ? ` ${book} = ${bookPoss()} 2.5 line as a chance, margin removed.` : ""} Tested against Pinnacle; the model doesn't beat the market.${e1Note}</p>
+    ${cdf.home && cdf.away ? `
+    <details class="fold goals-fold">
+      <summary>Each team's goals <span class="muted">(${fd ? "with FanDuel's prices" : "model only"})</span></summary>
+      <div class="card" style="padding:8px 14px">${team("home")}${team("away")}</div>
+      <p class="note">Model's chances. We're testing these against FanDuel's prices; no edge proven yet, so nothing is flagged as a bet.${fd ? ` FD over = FanDuel's chance of the over, margin removed${when ? `, as of ${esc(when)}` : ""}; "–" where FanDuel has no line.` : " No FanDuel price for this match yet: they're logged about a day before kickoff and again just before it."}${e1Note}</p>
+    </details>` : ""}`;
 }
 
 function playersSection(fx) {

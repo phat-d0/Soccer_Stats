@@ -259,3 +259,52 @@ def test_league_fixtures_keeps_cards_when_the_teams_block_fails(monkeypatch):
     cards, source, block = publish.league_fixtures("SP1")
     assert cards == [{"home": "T00"}] and block is None  # cards kept, Teams block dropped
     assert "error" not in source
+
+
+def test_total_goals_cdf_sums_the_matrix_diagonals():
+    from soccer_stats.publish import total_goals_cdf
+
+    rng = np.random.default_rng(0)
+    m = rng.random((11, 11))
+    m /= m.sum()
+    cdf = total_goals_cdf(m, 6)
+    for k in range(7):
+        want = sum(m[i, j] for i in range(11) for j in range(11) if i + j <= k)
+        assert abs(cdf[k] - want) < 1e-12
+    assert len(cdf) == 7 and np.all(np.diff(cdf) >= 0)
+
+
+def test_add_team_totals_takes_the_latest_fanduel_quote_before_kickoff(tmp_path):
+    from soccer_stats.publish import add_team_totals
+
+    ko = "2026-10-10T14:00:00+00:00"
+
+    def row(book, side, line, fair, at, **kw):
+        r = {"league": "E0", "home": "Arsenal", "away": "Leeds", "kickoff": ko, "book": book}
+        r |= {"side": side, "line": line, "over": 1.8, "under": 2.0, "fair_over": fair}
+        r |= {"downloaded_at": at, "fetched_at": at}
+        return {**r, **kw}
+
+    logged = [
+        row("fanduel", "home", 1.5, 0.60, "2026-10-09T15:00:00+00:00"),  # look
+        row("fanduel", "home", 1.5, 0.64, "2026-10-10T13:40:00+00:00"),  # close wins
+        row("fanduel", "home", 1.5, 0.99, "2026-10-10T14:05:00+00:00"),  # after kickoff
+        row("bovada", "away", 0.5, 0.50, "2026-10-10T13:40:00+00:00"),  # other book
+        row("fanduel", "away", 0.5, 0.70, "2026-10-09T15:00:00+00:00", home="Spurs"),
+    ]
+    (tmp_path / "E0_team_totals_2026-10.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in logged[:3]) + "\n"
+    )
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "rows.jsonl").write_text("\n".join(json.dumps(r) for r in logged[3:]) + "\n")
+    cards = [
+        {"league": "E0", "home": "Arsenal", "away": "Leeds", "kickoff": "2026-10-10T14:00:00"},
+        {"league": "E0", "home": "Chelsea", "away": "Leeds", "kickoff": ko},
+    ]
+    assert add_team_totals(cards, [tmp_path, run_dir, None]) == 1
+    tt = cards[0]["team_totals"]
+    assert tt["book"] == "fanduel" and tt["away"] == []
+    assert tt["home"] == [{"line": 1.5, "fair_over": 0.64, "over": 1.8, "under": 2.0}]
+    assert tt["fetched_at"] == "2026-10-10T13:40:00+00:00"
+    assert "team_totals" not in cards[1]

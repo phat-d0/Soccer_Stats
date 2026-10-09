@@ -258,6 +258,67 @@ def _news_card(news: TeamNews | None) -> dict | None:
     }
 
 
+def total_goals_cdf(m: np.ndarray, k_max: int = GOALS_CDF) -> np.ndarray:
+    """P(home + away goals <= k) for k = 0..k_max from a score matrix."""
+    i, j = np.indices(m.shape)
+    by_total = np.bincount((i + j).ravel(), weights=m.ravel(), minlength=k_max + 1)
+    return np.cumsum(by_total)[: k_max + 1]
+
+
+TEAM_TOTAL_BOOK = "fanduel"  # the app shows one book: the one logged in all five leagues
+
+
+def add_team_totals(cards: list[dict], dirs) -> int:
+    """Each card's latest FanDuel team-total prices from the logged rows (data-log's
+    `<code>_team_totals_<YYYY-MM>.jsonl`, copied into the state folder, plus this run's
+    new rows.jsonl): `team_totals = {book, fetched_at, home: [{line, fair_over, over,
+    under}], away: [...]}`, newest quote per side and line, taken before kickoff.
+    Display only; no API calls. Returns the number of cards given prices."""
+    paths = []
+    for d in dirs:
+        if d:
+            paths += sorted(Path(d).glob("*_team_totals_*.jsonl")) + [Path(d) / "rows.jsonl"]
+    rows = [r for r in team_totals._read_jsonl(paths) if r.get("book") == TEAM_TOTAL_BOOK]
+    latest: dict[tuple, dict] = {}
+    for r in rows:
+        try:
+            key = (
+                r.get("league"),
+                r["home"],
+                r["away"],
+                team_totals._ts(r["kickoff"]),
+                r["side"],
+                float(r["line"]),
+            )
+            if team_totals._ts(r["downloaded_at"]) >= key[3]:
+                continue
+        except (KeyError, TypeError, ValueError):
+            continue
+        if key not in latest or r["downloaded_at"] > latest[key]["downloaded_at"]:
+            latest[key] = r
+    n = 0
+    for c in cards:
+        try:
+            ko = team_totals._ts(c["kickoff"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        out: dict = {"home": [], "away": []}
+        stamps = []
+        for (lg, h, a, k, side, line), r in latest.items():
+            if (lg, h, a, k) != (c.get("league"), c["home"], c["away"], ko):
+                continue
+            out[side].append(
+                {"line": line, "fair_over": r["fair_over"], "over": r["over"], "under": r["under"]}
+            )
+            stamps.append(r.get("fetched_at") or r["downloaded_at"])
+        if stamps:
+            for side in ("home", "away"):
+                out[side].sort(key=lambda x: x["line"])
+            c["team_totals"] = {"book": TEAM_TOTAL_BOOK, "fetched_at": max(stamps), **out}
+            n += 1
+    return n
+
+
 def fixture_cards(
     model: DixonColes,
     fixtures: pd.DataFrame,
@@ -328,6 +389,9 @@ def fixture_cards(
                     "home": np.cumsum(m.sum(axis=1))[: GOALS_CDF + 1],
                     "away": np.cumsum(m.sum(axis=0))[: GOALS_CDF + 1],
                 },
+                # P(total goals <= k), k = 0..GOALS_CDF, from the full matrix: the app's
+                # total-goals over/under (the shown matrix stops at MATRIX_GOALS a side).
+                "total_goals_cdf": total_goals_cdf(m),
             }
         )
     return cards
@@ -727,6 +791,11 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
             print(team_totals.summary_line(s))
         except Exception as exc:  # noqa: BLE001
             print(f"Team totals: failed ({type(exc).__name__}); nothing fetched after it")
+    try:  # the latest logged FanDuel prices beside the model on the match sheet (no calls)
+        n_tt = add_team_totals(data["fixtures"], [os.environ.get("TEAM_TOTALS_STATE"), tt_dir])
+        print(f"Team totals shown: {n_tt} fixtures with FanDuel prices")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Team totals shown: none ({type(exc).__name__})")
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])
