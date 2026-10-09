@@ -141,6 +141,27 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
     print(json.dumps(out, indent=1, default=str))
 
 
+def cmd_espn_probe(args: argparse.Namespace) -> None:
+    """Which ESPN league slugs answer, their team names and summary shape (no key)."""
+    import json
+
+    from soccer_stats import espn_news
+
+    print(json.dumps(espn_news.probe(), indent=1, ensure_ascii=False, default=str))
+
+
+def cmd_log_team_news(args: argparse.Namespace) -> None:
+    """Append the build's ESPN team news to team_news/ (deduplicated; no API calls)."""
+    import json
+
+    from soccer_stats import espn_news
+
+    data = json.loads((Path(args.site) / "data.json").read_text())
+    rows = espn_news.rows_from_data(data, pd.Timestamp.now(tz="UTC"))
+    n = espn_news.log(Path(args.log_dir), rows)
+    print(f"Team-news log: {n} new rows ({len(rows)} team rows this build)")
+
+
 def cmd_estimate_credits(args: argparse.Namespace) -> None:
     """Expected Odds API credits per league for a month under the refresh rules."""
     from soccer_stats.data import season_kickoffs
@@ -1425,6 +1446,14 @@ def main(argv: list[str] | None = None) -> None:
     lo.add_argument("--log-dir", required=True, help="data-log checkout")
     lo.add_argument("--league", default="E0")
     lo.set_defaults(func=cmd_log_odds)
+
+    ep = sub.add_parser("espn-probe", help="ESPN league slugs, team names and summary shape")
+    ep.set_defaults(func=cmd_espn_probe)
+
+    ltn = sub.add_parser("log-team-news", help="append the build's ESPN team news to team_news/")
+    ltn.add_argument("--site", default="_site", help="folder written by publish")
+    ltn.add_argument("--log-dir", required=True, help="data-log checkout")
+    ltn.set_defaults(func=cmd_log_team_news)
 
     ltt = sub.add_parser("log-team-totals", help="append team-total rows and calls to odds_log/")
     ltt.add_argument("--pending", required=True, help="folder publish wrote rows/calls to")

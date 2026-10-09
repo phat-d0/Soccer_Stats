@@ -43,7 +43,7 @@ on:
       task:
         description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, markets, goalscorer, player-lab, goal-lab, goal-league or goal-leagues"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets: most credits to spend (0 = dry run)"
@@ -190,6 +190,7 @@ jobs:
               rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
+            espn) uv run soccer-stats espn-probe ;;  # no key: ESPN slugs, names, summary shape
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log
