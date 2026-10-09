@@ -634,7 +634,11 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     tt_dir = os.environ.get("TEAM_TOTALS_DIR")
     if tt_dir:  # set by publish.yml on the default branch only (data-log logs the rows)
         state = os.environ.get("TEAM_TOTALS_STATE")
-        print(team_totals.summary_line(team_totals.run(data["fixtures"], Path(tt_dir), [state])))
+        try:  # a team-total bug must never stop the site build; the type only (no URL/key)
+            s = team_totals.run(data["fixtures"], Path(tt_dir), [state])
+            print(team_totals.summary_line(s))
+        except Exception as exc:  # noqa: BLE001
+            print(f"Team totals: failed ({type(exc).__name__}); nothing fetched after it")
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])

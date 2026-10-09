@@ -310,3 +310,36 @@ def test_report_scores_against_the_close():
     assert out["model"]["rows"] == 60 and "gain_vs_market" in out["model"]
     assert out["median_close_minutes"] == 20
     assert out["calibration_model"] and out["calibration_close"]
+
+
+def test_a_crash_part_way_keeps_the_calls_already_made(tmp_path):
+    """Lead review: an unexpected error after a paid call must not lose its record (the
+    next run would pay again), must not stop the build, and must not print the key."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    evs = (("ev1", "Arsenal", "Leeds United", K), ("ev2", "Chelsea", "Fulham", K))
+    dk_cache(raw, events=evs)
+    calls = []
+
+    def get(url, params=None, timeout=None):
+        calls.append(url)
+        if len(calls) == 2:
+            raise RuntimeError(f"boom {params['apiKey']}")
+        return Resp(body())
+
+    cards = [card(), card("Chelsea", "Fulham")]
+    s = tt.run(cards, out, [], raw, "secret-key", K - pd.Timedelta(hours=24), get)
+    assert s["calls"] == 1 and s["stop"] == "error (RuntimeError)"
+    assert "secret-key" not in tt.summary_line(s)
+    recorded = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert [c["event_id"] for c in recorded] == ["ev1"]
+
+    # A garbled header or body still records the call, counted at the worst case.
+    class Odd(Resp):
+        def json(self):
+            return {"bookmakers": [{"markets": [{"key": "team_totals", "outcomes": [1]}]}]}
+
+    odd = Odd(None)
+    odd.headers = {"x-requests-last": "n/a", "x-requests-remaining": ""}
+    s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=20), lambda *a, **k: odd)
+    assert s["calls"] == 2 and s["credits"] == 2 and s["rows"] == 0 and s["stop"] is None

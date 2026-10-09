@@ -286,72 +286,76 @@ def run(
         if c.get("league") in TEAM_TOTAL_LEAGUES and c.get("kickoff"):
             by_league.setdefault(c["league"], []).append(c)
     new_rows, new_calls = [], []
-    for league, lcards in by_league.items():
-        due = [(c, s) for c in lcards if (s := due_snapshot(c["kickoff"], now, runs))]
-        if not due:
-            continue
-        known = {c["home"] for c in lcards} | {c["away"] for c in lcards}
-        events = event_index(raw_dir, league, known)
-        for card, snap in due:
-            eid = match_event(card, events)
-            if eid is None or (eid, snap) in done:
+    try:  # a crash part-way still writes the calls already made (below)
+        for league, lcards in by_league.items():
+            due = [(c, s) for c in lcards if (s := due_snapshot(c["kickoff"], now, runs))]
+            if not due:
                 continue
-            summary["due"] += 1
-            if credits is not None and credits - COST_PER_CALL < MATCHDAY_RESERVE_CREDITS:
-                summary["stop"] = (
-                    f"reserve: {credits} credits left (keeping {MATCHDAY_RESERVE_CREDITS})"
-                )
-                break
-            if spent + COST_PER_CALL > MONTHLY_CAP:
-                summary["stop"] = f"monthly cap: {spent} of {MONTHLY_CAP} credits used"
-                break
-            books = ",".join(BOOKS.get(league, DEFAULT_BOOKS))
-            try:
-                resp = get(
-                    URL.format(sport=SPORTS[league], event_id=eid),
-                    params={
-                        "apiKey": api_key,
-                        "bookmakers": books,
-                        "markets": MARKET,
-                        "oddsFormat": "decimal",
-                        "dateFormat": "iso",
-                    },
-                    timeout=30,
-                )
-            except requests.RequestException as exc:  # message could contain the URL
-                summary["stop"] = f"could not reach The Odds API ({type(exc).__name__})"
-                break
-            cost = resp.headers.get("x-requests-last")
-            left = resp.headers.get("x-requests-remaining")
-            cost = int(float(cost)) if cost else (COST_PER_CALL if resp.ok else 0)
-            if left:
-                credits = int(float(left))
-            spent += cost
-            rows = []
-            if resp.ok:
+            known = {c["home"] for c in lcards} | {c["away"] for c in lcards}
+            events = event_index(raw_dir, league, known)
+            for card, snap in due:
+                eid = match_event(card, events)
+                if eid is None or (eid, snap) in done:
+                    continue
+                summary["due"] += 1
+                if credits is not None and credits - COST_PER_CALL < MATCHDAY_RESERVE_CREDITS:
+                    summary["stop"] = (
+                        f"reserve: {credits} credits left (keeping {MATCHDAY_RESERVE_CREDITS})"
+                    )
+                    break
+                if spent + COST_PER_CALL > MONTHLY_CAP:
+                    summary["stop"] = f"monthly cap: {spent} of {MONTHLY_CAP} credits used"
+                    break
+                books = ",".join(BOOKS.get(league, DEFAULT_BOOKS))
                 try:
-                    rows = rows_from_body(resp.json(), card, eid, snap, now)
-                except ValueError:
-                    rows = []
-            call = {
-                "league": league,
-                "event_id": eid,
-                "home": card["home"],
-                "away": card["away"],
-                "kickoff": _iso(card["kickoff"]),
-                "snapshot": snap,
-                "fetched_at": _iso(now),
-                "status": resp.status_code,
-                "cost": cost,
-                "credits_left": credits,
-                "books": books,
-                "rows": len(rows),
-            }
-            done.add((eid, snap))
-            new_calls.append(call)
-            new_rows += rows
-        if summary["stop"]:
-            break
+                    resp = get(
+                        URL.format(sport=SPORTS[league], event_id=eid),
+                        params={
+                            "apiKey": api_key,
+                            "bookmakers": books,
+                            "markets": MARKET,
+                            "oddsFormat": "decimal",
+                            "dateFormat": "iso",
+                        },
+                        timeout=30,
+                    )
+                except requests.RequestException as exc:  # message could contain the URL
+                    summary["stop"] = f"could not reach The Odds API ({type(exc).__name__})"
+                    break
+                cost = _header_int(resp, "x-requests-last")
+                left = _header_int(resp, "x-requests-remaining")
+                if cost is None:  # unknown: count the worst case of a successful call
+                    cost = COST_PER_CALL if resp.ok else 0
+                if left is not None:
+                    credits = left
+                spent += cost
+                rows = []
+                if resp.ok:
+                    try:
+                        rows = rows_from_body(resp.json(), card, eid, snap, now)
+                    except Exception:  # noqa: BLE001  odd body: keep the call record, no rows
+                        rows = []
+                call = {
+                    "league": league,
+                    "event_id": eid,
+                    "home": card["home"],
+                    "away": card["away"],
+                    "kickoff": _iso(card["kickoff"]),
+                    "snapshot": snap,
+                    "fetched_at": _iso(now),
+                    "status": resp.status_code,
+                    "cost": cost,
+                    "credits_left": credits,
+                    "books": books,
+                    "rows": len(rows),
+                }
+                done.add((eid, snap))
+                new_calls.append(call)
+                new_rows += rows
+            if summary["stop"]:
+                break
+    except Exception as exc:  # noqa: BLE001  type only: a message could hold the URL
+        summary["stop"] = f"error ({type(exc).__name__})"
     summary.update(
         calls=len(new_calls),
         credits=sum(c["cost"] for c in new_calls),
@@ -367,6 +371,14 @@ def run(
         raw_dir.mkdir(parents=True, exist_ok=True)
         _append(raw_dir / LOCAL_CALLS, new_calls)
     return summary
+
+
+def _header_int(resp, name: str) -> int | None:
+    try:
+        v = resp.headers.get(name)
+        return int(float(v)) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def summary_line(s: dict) -> str:
