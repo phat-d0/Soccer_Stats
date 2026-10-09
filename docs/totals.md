@@ -202,3 +202,56 @@ The 12% rule's CLV range is below 0 everywhere. This repeats the round-2 E0 resu
 - **E1:** the goals-only model is over-confident in every market. It shouldn't be shown
   for E1 totals without recalibration.
 - Nothing passes; no handover; no live change.
+
+## Live market probe (round 8, third task; owner-approved 9 Oct, hard cap 40 credits; written before any call)
+
+**Question.** For each of the six leagues (E0, SP1, D1, I1, F1, E1): which bookmakers on
+The Odds API quote these markets on both sides, at which lines, and at what margin?
+- (a) team totals;
+- (b) alternate goal totals;
+- (c) corners totals.
+
+BTTS and player shots on target are noted in passing.
+
+**Budget.**
+- Hard cap 40 credits, counted from `x-requests-last`.
+- A call is skipped if its maximum cost would pass the cap, or would leave under 3,000
+  credits on the shared key (`player_goal_odds.CappedBudget`).
+- Cap 0 is a dry run: only the free events lists are fetched.
+- The key goes only to this task. It is never printed.
+
+**Method,** league by league in the order E0, SP1, D1, I1, F1, E1:
+1. **Events list** (free). Take the soonest upcoming match; markets open nearer
+   kickoff.
+2. **Discovery.** `/events/{id}/markets` in all five regions lists the market keys each
+   bookmaker offers. About 1 credit; the first call's real cost sets the estimate for the
+   rest.
+3. **One odds call.** `/events/{id}/odds` for the target keys discovery found, with a
+   `bookmakers=` list of up to 10 books (10 books cost one region), so the cost is
+   about one credit per market.
+   - Target keys, in priority order: team totals (`team_totals`,
+     `alternate_team_totals`), alternate goal totals (`alternate_totals`), any key with
+     "corner", `btts`. Player shots on target are added in E0 only.
+   - Each league gets an even share of the credits left. Lower-priority keys are
+     dropped first.
+
+**Outputs, per league and market** (no model, no bets):
+- the books listing it;
+- the books quoting both sides at the same line (and for team totals the same team);
+- the lines;
+- the margin per two-sided pair (1/over + 1/under − 1): median and range per book.
+
+Also reported:
+- every market key discovered;
+- the credits spent and the balance before and after.
+
+**Reading.**
+- A two-sided market with a median margin of 5% or less is "close to fair": a model
+  could be checked against it.
+- 5–8% is soft but testable.
+- Above 8%, or one-sided, isn't bettable at our level of accuracy. Player shots at
+  FanDuel were over-only, and the goalscorer books listed no "No" price at all.
+- Team totals are judged at the book with the lowest median margin.
+
+**Code.** `edge/market_probe.py`; `odds-check.yml` `task=markets` with `cap`. The key is
+passed only to this task, and cap 0 is a dry run.
