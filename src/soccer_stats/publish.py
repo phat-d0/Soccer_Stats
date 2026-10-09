@@ -639,9 +639,13 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
         counts = dashboard.match_counts(matches, teams or sorted(model.teams))
         cards = fixture_cards(model, fixtures, counts, league=league)
-        block = team_block(model, matches, fixtures, league)
     except Exception as exc:  # one league failing never stops the site
         return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}, None
+    try:  # a Teams-tab failure costs only this league's Teams block, never its cards
+        block = team_block(model, matches, fixtures, league)
+    except Exception as exc:  # noqa: BLE001
+        print(f"{lgs.name(league)}: Teams block unavailable ({type(exc).__name__}: {exc})")
+        block = None
     return cards, source, block
 
 

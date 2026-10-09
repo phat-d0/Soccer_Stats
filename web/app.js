@@ -734,18 +734,25 @@ function playersModeToggle() {
     </div>`;
 }
 
-async function loadPlayerStats(lg = teamsLeague()) {
+// One fetch per league file: a re-render while it is loading reuses the request in flight.
+const psLoading = {};
+function loadPlayerStats(lg = teamsLeague()) {
   const file = psFile(lg);
-  if (state.psBy[lg] || !file) return;
-  state.psBy[lg] = null;
-  try {
-    const res = await fetch(file, { cache: "no-cache" });
-    if (!res.ok) throw new Error(res.statusText);
-    state.psBy[lg] = await res.json();
-  } catch (err) {
-    state.psBy[lg] = { error: String(err.message || err), players: [], seasons: [] };
-  }
-  if (state.tab === "ratings" && state.teamsView === "players") render();
+  if (state.psBy[lg] || !file) return Promise.resolve();
+  if (psLoading[lg]) return psLoading[lg];
+  psLoading[lg] = (async () => {
+    try {
+      const res = await fetch(file, { cache: "no-cache" });
+      if (!res.ok) throw new Error(res.statusText);
+      state.psBy[lg] = await res.json();
+    } catch (err) {
+      state.psBy[lg] = { error: String(err.message || err), players: [], seasons: [] };
+    } finally {
+      delete psLoading[lg];
+    }
+    if (state.tab === "ratings" && state.teamsView === "players") render();
+  })();
+  return psLoading[lg];
 }
 
 // Who's in a current Premier League squad (from players_stats.json's FPL matching).
