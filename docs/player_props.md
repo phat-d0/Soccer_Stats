@@ -680,3 +680,65 @@ All of B's gains over both benchmarks have 99.375% ranges above 0.
 - **Forward lock:** while locked, `goal-league` never loads the 2026/27 season at all and
   also drops rows from 2026-10-10 before any feature or fit; a test checks the seasons
   loaded for all five leagues.
+
+## 12. Recalibrated B (B-cal): pre-registration (2026-10-09, before any B-cal number)
+
+**Why:** §11 found B 2–3 points over-confident on its likeliest scorers in Germany, Italy,
+France and the pool (pooled 30%+: 38.7% predicted vs 36.1% scored), so the forward check
+(§10b) will probably fail its tail rule. The lead asked for one simple, fixed
+recalibration, registered before the forward window opens and scored beside B. Credit
+cap 0; player paper trades stay off; the live weekly Premier League scoring
+(`E0_goals.json`) is unchanged.
+
+### The method, fixed now
+
+- **B-cal** = a logistic recalibration of B's chance:
+  logit(p_Bcal) = a + b · logit(p_B), fitted by maximum likelihood.
+- **Per league**, not pooled. The over-confidence differs by league (the Premier League
+  and La Liga pass the tail rule, the other three don't), and each league has about
+  20,000 scored starters a season, so two coefficients per league are well determined.
+- **Fitted on starters only** (B is the lineup-known model, scored on starters), using
+  the same scored rows as §11: appearances with at least 3 earlier ones, B's walk-forward
+  chance and whether the player scored.
+- **Earlier seasons only, refitted once a season:** season S uses every starter of that
+  league in the scored seasons before S (from 2023/24), and the same (a, b) applies to
+  the whole of season S. So:
+  - 2023/24 has no B-cal (no earlier scored season);
+  - 2024/25 uses 2023/24; 2025/26 uses 2023/24–2024/25;
+  - **the forward window (2026/27 from 10 Oct) uses 2023/24–2025/26**, fitted from the
+    locked history rows only, so nothing in the window touches it.
+- **Floor:** a league with fewer than 2,000 earlier starters keeps B unchanged (B-cal =
+  B). That doesn't bind for any season above.
+- Coefficients are printed and saved per league and season.
+
+### Forward check (§10b) with B-cal beside B
+
+- **B stays the primary.** Its gate is unchanged: pooled starters, B beats both season
+  benchmarks (95% ranges above 0) and passes the round-6 tail rule.
+- **B-cal is scored beside it with the same gate:** pooled forward starters, both
+  benchmark gains with 95% ranges above 0, and the tail rule (20–30% and 30%+ buckets).
+  Also reported: B-cal vs B (paired log-loss gain, 95%), and B-cal per league (not gated).
+- **Reading:**
+  - B passes: nothing changes.
+  - B fails and B-cal passes: the recalibration works on unseen matches. Making B-cal the
+    model is then the owner's decision, not automatic.
+  - Both fail: recalibration isn't enough; no further variant is tried on this window.
+- The window is still opened once, at 150 pooled matches (the 7 Dec trigger), with a
+  reason. Nothing here opens it.
+
+### Development display (descriptive only)
+
+- **Seasons:** 2024/25 and 2025/26 in all five leagues, starters with B-cal defined,
+  per league and pooled. These rows have all been seen (§11 reported B's buckets on
+  them), so this is a check that B-cal does what it is meant to, **not a test**.
+- **Shown:** log loss, Brier, AUC, the share at 30%+, the tail rule and its buckets for
+  B and B-cal; both models' gains over the two season benchmarks; B-cal vs B (95%,
+  whole-match resampling); the coefficients.
+- **Nothing shown here can change B-cal's method or either gate.** If it looks bad, that is
+  reported as it is and the forward check still scores B-cal as registered.
+
+### Run
+
+- `soccer-stats goal-pool` computes B-cal from the league rows that `goal-league` writes
+  (no new data, no refit of A or B). It runs in `odds-check.yml` `task=goal-leagues` with
+  `reason` left blank, so the forward window stays locked.
