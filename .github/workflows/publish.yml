@@ -57,10 +57,25 @@ jobs:
             git show FETCH_HEAD:backtest/E0_dk.json > "$RUNNER_TEMP/dk_backtest.json" ||
             echo "No DraftKings backtest yet: match edges use the raw model"
 
+      # Team-total snapshots already taken (docs/totals.md): every recorded call, so a
+      # match's look or close is never fetched twice, and this month's spend for the cap.
+      - name: Read the team-total call record
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/tt_state"
+          git fetch --depth=1 origin data-log || exit 0
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '/team_totals_calls_'); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/tt_state/$(basename "$f")"
+          done
+
       - name: Build site
         env:
           PLAYER_GATE_FILE: ${{ runner.temp }}/players_gate.json
           DK_BACKTEST_FILE: ${{ runner.temp }}/dk_backtest.json
+          # Team-total prices (owner-approved base plan): fetched only on the default
+          # branch, where the next step logs them to data-log. Empty elsewhere = off.
+          TEAM_TOTALS_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/team_totals', runner.temp) || '' }}
+          TEAM_TOTALS_STATE: ${{ runner.temp }}/tt_state
           # DraftKings odds via the-odds-api.com; empty if the secret isn't set yet.
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           # Free allowance assumed to reset on the 5th (key created 5 Oct); the code
@@ -105,6 +120,10 @@ jobs:
             uv run soccer-stats log-news --snapshot _site/news_snapshot.json --log-dir ../log/fpl_news
             # The odds log must never block the ledger update below.
             uv run soccer-stats log-odds --site _site --log-dir ../log || echo "odds log failed; ledger continues"
+            if [ -d "$RUNNER_TEMP/team_totals" ]; then
+              uv run soccer-stats log-team-totals --pending "$RUNNER_TEMP/team_totals" --log-dir ../log ||
+                echo "team-total log failed; ledger continues"
+            fi
             uv run soccer-stats paper --site _site --log-dir ../log
             git -C ../log add -A
             if git -C ../log diff --cached --quiet; then exit 0; fi

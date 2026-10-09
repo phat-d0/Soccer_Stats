@@ -117,6 +117,30 @@ def cmd_log_odds(args: argparse.Namespace) -> None:
     print(f"Odds log: {n} new rows ({len(rows)} priced fixture markets this build)")
 
 
+def cmd_log_team_totals(args: argparse.Namespace) -> None:
+    """Append the build's team-total rows and calls to odds_log/ (deduplicated)."""
+    from soccer_stats import team_totals
+
+    rows, calls = team_totals.log(Path(args.pending), Path(args.log_dir))
+    print(f"Team-total log: {rows} new rows, {calls} new calls")
+
+
+def cmd_team_totals_report(args: argparse.Namespace) -> None:
+    """Model and look price vs FanDuel's de-margined team-total close (no key)."""
+    import json
+
+    from soccer_stats import team_totals
+    from soccer_stats.odds_feed import TEAM_TOTAL_LEAGUES
+
+    rows = team_totals.load_rows(Path(args.log_dir))
+    if rows.empty:
+        print("Team totals: nothing logged yet")
+        return
+    results = load_matches(list(TEAM_TOTAL_LEAGUES), [current_season()])
+    out = team_totals.report(rows, results, min_matches=args.min_matches)
+    print(json.dumps(out, indent=1, default=str))
+
+
 def cmd_estimate_credits(args: argparse.Namespace) -> None:
     """Expected Odds API credits per league for a month under the refresh rules."""
     from soccer_stats.data import season_kickoffs
@@ -1401,6 +1425,16 @@ def main(argv: list[str] | None = None) -> None:
     lo.add_argument("--log-dir", required=True, help="data-log checkout")
     lo.add_argument("--league", default="E0")
     lo.set_defaults(func=cmd_log_odds)
+
+    ltt = sub.add_parser("log-team-totals", help="append team-total rows and calls to odds_log/")
+    ltt.add_argument("--pending", required=True, help="folder publish wrote rows/calls to")
+    ltt.add_argument("--log-dir", required=True, help="data-log checkout")
+    ltt.set_defaults(func=cmd_log_team_totals)
+
+    ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")
+    ttr.add_argument("--log-dir", required=True, help="data-log checkout")
+    ttr.add_argument("--min-matches", type=int, default=50)
+    ttr.set_defaults(func=cmd_team_totals_report)
 
     ec = sub.add_parser(
         "estimate-credits", help="Odds API credits per league for a month (refresh rules)"

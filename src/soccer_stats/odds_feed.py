@@ -511,8 +511,10 @@ def estimate_snapshot_credits(
     One `/events/{id}/odds` call per match per snapshot; each costs `markets` ×
     EVENT_REGIONS credits (`x-requests-last` in the market probe: 1 per market per region;
     the events list that gives the ids is free). Runs follow the publish schedule
-    (publish_runs), so the close is the last scheduled run before kickoff; GitHub's
-    throttling of scheduled runs makes real closes later and real spend lower.
+    (publish_runs), so the close is the last scheduled run before kickoff. GitHub's
+    throttling skips or delays scheduled runs, so real closes come earlier (the last run
+    that actually happens is further from kickoff) and some snapshots are missed, which
+    makes real spend lower.
     """
     ks = sorted(pd.Timestamp(k).tz_convert("UTC") for k in kickoffs)
     month = [k for k in ks if start <= k < end]

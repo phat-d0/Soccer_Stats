@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import dashboard
+from soccer_stats import dashboard, team_totals
 from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
@@ -45,6 +45,7 @@ WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 TRAIN_SEASONS = 3
 XG_WEIGHT = 0.7
 MATRIX_GOALS = 5  # score grid shown in the app: 0..5 goals each side
+GOALS_CDF = 6  # team-goal cumulative chances kept per card (team totals up to 6.5)
 FIXTURE_DAYS = 14  # show fixtures this far ahead...
 MIN_FIXTURES = 10  # ...but always at least the next round
 ODDS_COLS = ["odds_home", "odds_draw", "odds_away", "odds_over25", "odds_under25"]
@@ -320,6 +321,12 @@ def fixture_cards(
                 else None,
                 "top_scores": dashboard.top_scorelines(m),
                 "matrix": m[: MATRIX_GOALS + 1, : MATRIX_GOALS + 1],
+                # P(team scores <= k), k = 0..GOALS_CDF, from the full matrix: the model's
+                # team-total chance (team_totals.model_over). Not shown in the app.
+                "goals_cdf": {
+                    "home": np.cumsum(m.sum(axis=1))[: GOALS_CDF + 1],
+                    "away": np.cumsum(m.sum(axis=0))[: GOALS_CDF + 1],
+                },
             }
         )
     return cards
@@ -624,6 +631,14 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     print(f"Duplicate fixtures: {len(dups)}" + (f" {dups}" if dups else ""))
     data["odds_sources"] = _clean(sources)
     data["leagues"] = league_list(data["fixtures"], sources)
+    tt_dir = os.environ.get("TEAM_TOTALS_DIR")
+    if tt_dir:  # set by publish.yml on the default branch only (data-log logs the rows)
+        state = os.environ.get("TEAM_TOTALS_STATE")
+        try:  # a team-total bug must never stop the site build; the type only (no URL/key)
+            s = team_totals.run(data["fixtures"], Path(tt_dir), [state])
+            print(team_totals.summary_line(s))
+        except Exception as exc:  # noqa: BLE001
+            print(f"Team totals: failed ({type(exc).__name__}); nothing fetched after it")
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])

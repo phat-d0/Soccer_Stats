@@ -446,3 +446,62 @@ credits a month.
 - The rich plan's 6-hour snapshot adds a second entry point near team news. It is worth
   adding only if the base plan shows something.
 - Alternates double the cost for lines far from the middle, which carry more margin.
+
+## Live team-total logging (built; owner approved the base plan on 9 Oct)
+
+FanDuel's `team_totals` (Bovada too in the Premier League, in the same `us` call; no
+alternates) in E0, SP1, D1, I1 and F1. Two snapshots per match, about 340 credits a
+month. Data only: no paper trades, nothing new in the app. Code: `team_totals.py`.
+
+**When a snapshot is taken (each publish run):**
+- **Look:** the first run that finds the kickoff 18 to 30 hours away.
+  - Runs are at least hourly, so a throttled or skipped run still leaves several chances
+    inside the 12-hour window.
+- **Close:** the first run within 30 minutes of kickoff.
+  - Up to 75 minutes out, a run also takes the close if no later scheduled run is left
+    before kickoff (kickoffs outside 10:00–22:00 UTC, where runs are hourly).
+  - A run that misses the window simply misses that snapshot. `minutes_before` records
+    how close each one was.
+- **Never twice:** every call is recorded (event, snapshot, cost, balance), and a recorded
+  pair is never fetched again, even when FanDuel returned nothing.
+  - The record lives on data-log (`odds_log/team_totals_calls_<YYYY-MM>.jsonl`, read
+    before each build) and in the local cache.
+- **Event ids:** taken from the league's cached DraftKings body, since every book shares
+  the same ids. A match with no event there is skipped, not looked up.
+
+**Budget:**
+- No call when the freshest balance seen is under 3,000 credits
+  (`MATCHDAY_RESERVE_CREDITS`). The freshest balance is the newest of any league's
+  DraftKings meta and the last team-total call; it is re-checked after every call from
+  the response header.
+- No call once this calendar month's team-total calls reach 450 credits (`MONTHLY_CAP`),
+  a hard stop above the ~340 estimate.
+- The Premier League's match odds and the baseball app keep priority.
+- Only the default branch fetches (`TEAM_TOTALS_DIR` is set there alone), so a dispatch
+  on another branch never spends credits it couldn't log.
+
+**Log:** `odds_log/<code>_team_totals_<YYYY-MM>.jsonl` on data-log, append-only and
+deduplicated. One row per book × team × line with both sides priced:
+- league, home, away, kickoff, event_id, snapshot (look/close), book, team, side, line;
+- over and under prices, the Shin margin-free `fair_over`/`fair_under`, and `margin`;
+- `fetched_at` (FanDuel's `last_update`, else the download time, with `time_source`),
+  `downloaded_at` and `minutes_before`;
+- `p_model_over`: the model's chance that the team scores more than the line. It comes
+  from the card's own score matrix, the same one that sets `p`, with team news applied
+  in the Premier League (`goals_cdf` on each card, cumulative to 6 goals).
+
+The DraftKings log reader only reads `<code>_<YYYY-MM>.jsonl`, so the two logs never mix.
+
+**Publish log line:** "Team totals: N calls, C credits, R rows; month M of 450 credits,
+credits left X", plus the reason when it stopped.
+
+**Analysis:** `odds-check.yml` `task=team-totals`, no key. It pairs each look with the
+close for the same match, book, team and line, adds the team's goals from football-data,
+and scores FanDuel rows through `lab.metrics.evaluate`:
+- the model against the look's fair price (gain, blend weight);
+- the 12% rule's CLV against FanDuel's de-margined close;
+- model vs close log loss;
+- calibration tables for the model and the close.
+
+It prints "not enough data yet" below 50 settled matches with both snapshots. That is
+about two weeks across the five leagues at the estimated pace.
