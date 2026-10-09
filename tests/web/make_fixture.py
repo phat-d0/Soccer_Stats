@@ -333,6 +333,7 @@ def build(src: Path, out: Path) -> dict:
     add_edge_thresholds(data)
     add_second_league(data)
     add_team_total_prices(data)
+    add_espn_team_news(data)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -705,6 +706,62 @@ def add_team_total_prices(data: dict) -> None:
         add_team_totals(data["fixtures"][:1], [tmp])
 
 
+# ESPN's card-level team news (espn_news, Moneyline PR #29): the first match has confirmed
+# lineups (and one ESPN injury beside FPL's list, plus one FPL already has, which the app
+# drops), the second has none yet. ESPN's soccer feed has no injuries today; the fixture
+# keeps two so the display is tested.
+def add_espn_team_news(data: dict) -> None:
+    def xi(fx: dict, side: str) -> list[str]:
+        out = {a["name"] for a in ((fx.get("news") or {}).get(side) or {}).get("absences", [])}
+        names = [
+            p["player"]
+            for p in fx.get("players", [])
+            if p.get("team") == fx[side] and p["player"] not in out
+        ]
+        return (names + [f"{fx[side]} player {i}" for i in range(1, 12)])[:11]
+
+    first, second = data["fixtures"][0], data["fixtures"][1]
+    ko = pd.Timestamp(first["kickoff"])
+    at = (ko - pd.Timedelta(minutes=50)).isoformat()
+    fpl = ((first.get("news") or {}).get("home") or {}).get("absences") or []
+    first["team_news"] = {
+        "source": "ESPN",
+        "event_id": "401879268",
+        "fetched_at": at,
+        "updated": None,
+        "injuries": {
+            "home": [{"name": fpl[0]["name"], "status": "Out", "detail": "Hamstring"}]
+            if fpl
+            else [],
+            "away": [{"name": "Jaka Bijol", "status": "Doubtful", "detail": "Knock"}],
+        },
+        "lineup": {
+            "confirmed": True,
+            "fetched_at": at,
+            "first_confirmed_at": (ko - pd.Timedelta(minutes=65)).isoformat(),
+            "home": {
+                "starters": xi(first, "home"),
+                "subs": [f"{first['home']} sub {i}" for i in range(1, 8)],
+            },
+            "away": {
+                "starters": xi(first, "away"),
+                "subs": [f"{first['away']} sub {i}" for i in range(1, 8)],
+            },
+        },
+    }
+    second["team_news"] = {
+        "source": "ESPN",
+        "event_id": "401879269",
+        "fetched_at": (pd.Timestamp(second["kickoff"]) - pd.Timedelta(hours=20)).isoformat(),
+        "updated": None,
+        "injuries": {"home": [], "away": []},
+        "lineup": {
+            "confirmed": False,
+            "fetched_at": (pd.Timestamp(second["kickoff"]) - pd.Timedelta(hours=20)).isoformat(),
+        },
+    }
+
+
 def add_second_league(data: dict) -> None:
     for fx in data["fixtures"]:
         fx.setdefault("league", "E0")
@@ -724,6 +781,7 @@ def add_second_league(data: dict) -> None:
             "news_applied": False,
             "players": [],
             "team_totals": None,
+            "team_news": None,
         }
         data["fixtures"].append(sp)
     data["fixtures"].sort(key=lambda f: f["kickoff"])

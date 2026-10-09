@@ -60,6 +60,17 @@ const closeSheet = async (p) => { await p.click(".sheet-close"); };
 const STEPS = [
   ["matches", tab("matches")],
   ["match-sheet", async (p) => { await p.click('button.match[data-fixture="0"]'); await sheet(p); }, true],
+  // ESPN lineups: confirmed XI with subs folded; an ESPN injury FPL already lists is dropped.
+  ["match-sheet-lineups", async (p) => {
+    await p.click("details.xi-subs > summary");
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["Confirmed XI", "Substitutes", "Source: ESPN", "Jaka Bijol"]) {
+      if (!text.includes(want)) throw new Error(`Lineups lack "${want}"`);
+    }
+    const saka = await p.locator("#sheet-body .absence", { hasText: "Bukayo Saka" }).count();
+    if (saka !== 1) throw new Error(`FPL's absence listed ${saka} times (ESPN repeat?)`);
+    await p.locator(".xi-grid").scrollIntoViewIfNeeded();
+  }, true],
   // Goals over/under: total goals with DraftKings' 2.5, each team's goals with FanDuel's prices.
   ["match-sheet-goals", async (p) => {
     await p.click("details.goals-fold > summary");
@@ -70,6 +81,14 @@ const STEPS = [
     await p.locator("details.goals-fold").scrollIntoViewIfNeeded();
   }, true],
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
+  ["match-sheet-no-lineups", async (p) => {
+    await closeSheet(p);
+    const badges = await p.locator("button.match .badge.lineup").count();
+    if (badges !== 1) throw new Error(`expected 1 "Lineups confirmed" badge, got ${badges}`);
+    await p.click('button.match[data-fixture="1"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    if (!text.includes("Not out yet") || text.includes("Confirmed XI")) throw new Error("unconfirmed lineup shown wrongly");
+  }, true],
   ["matches-edge-2", async (p) => { await closeSheet(p); await p.click("details.edge-explore > summary"); await p.click('button[data-edge="0.02"]'); }],
   ["matches-edge-reset", click('button[data-edge="reset"]')],
   // The competition filter (shown because the fixture has a second league, SP1).
