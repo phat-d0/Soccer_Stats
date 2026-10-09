@@ -146,3 +146,110 @@ def test_parse_pilot_log():
         "mybookieag",
         15.5,
     ]
+
+
+# ---------- round 8: five leagues ----------
+
+
+def _rows(feats, league):
+    sim = feats.copy()
+    lo = sim["kickoff"].min() + pd.Timedelta(days=400)
+    hi = sim["kickoff"].max() + pd.Timedelta(days=1)
+    return gl.scored_rows(sim, league, lo, hi)
+
+
+def test_scored_rows_and_bench_tests(feats):
+    r = _rows(feats, "SP1")
+    assert len(r) > 500 and set(r["league"]) == {"SP1"}
+    assert r["match_id"].str.startswith("SP1|").all()
+    assert r[["p_A", "p_B", "bench_goals", "bench_xg"]].apply(lambda c: c.between(0, 1)).all().all()
+    res = gl.bench_tests(r, gl.LEVEL_LEAGUE)
+    a, b = res["all_before_lineups"], res["starters_lineup_known"]
+    assert a["rows"] == len(r) and b["rows"] == int(r["started"].sum())
+    assert set(a["vs"]) == {"season_goals", "season_xg"}
+    for v in a["vs"].values():
+        lo_, hi_ = v["range"]
+        assert lo_ <= v["gain"] <= hi_ and v["beats"] == (lo_ > 0)
+    assert a["beats_both"] == all(v["beats"] for v in a["vs"].values())
+    assert res["level"] == pytest.approx(0.99375)
+
+
+def test_history_and_forward_reports(feats):
+    r = _rows(feats, "SP1")
+    rows = {lg: r.assign(league=lg, match_id=lg + "|" + r["match_id"]) for lg in ("E0", "D1")}
+    rep = gl.history_report(rows)
+    assert set(rep["leagues"]) == {"E0", "D1"} and set(rep["answer"]) == {"E0", "D1"}
+    assert rep["pooled_new_leagues"]["all_before_lineups"]["rows"] == len(r)  # D1 only
+    few = rows["D1"][rows["D1"]["match_id"].isin(rows["D1"]["match_id"].unique()[:20])]
+    fr = gl.forward_report(few)
+    assert fr["matches"] == 20 and not fr["enough"] and fr["gate"]["passes"] is False
+    big = gl.forward_report(pd.concat(rows.values(), ignore_index=True))
+    assert big["enough"] and set(big["leagues"]) == {"E0", "D1"}
+    assert big["gate"]["passes"] == (big["gate"]["beats_both"] and big["gate"]["tail_ok"])
+
+
+def test_forward_window_stays_locked(feats):
+    lo = feats["kickoff"].min() + pd.Timedelta(days=400)
+    hi = feats["kickoff"].max() + pd.Timedelta(days=1)
+    h = Holdout(lo + pd.Timedelta(days=90))
+    with pytest.raises(HoldoutLocked):
+        gl.scored_rows(feats, "E0", lo, hi, h)
+    assert gl.FORWARD_START == pd.Timestamp("2026-10-10", tz="UTC")
+    assert gl.FORWARD_LEAGUES == ("E0", "SP1", "D1", "I1", "F1")
+
+
+def test_scored_rows_do_not_see_the_future(feats):
+    lo = feats["kickoff"].min() + pd.Timedelta(days=400)
+    hi = lo + pd.Timedelta(days=60)
+    later = feats["kickoff"] >= lo
+    ch = feats.copy()
+    ch.loc[later, "goals"] = 4
+    a = gl.scored_rows(feats, "D1", lo, hi)
+    b = gl.scored_rows(ch, "D1", lo, hi)
+    first = a["kickoff"] < lo + pd.Timedelta(days=20)  # the first 28-day block
+    np.testing.assert_allclose(a.loc[first, "p_B"], b.loc[first, "p_B"])
+    np.testing.assert_allclose(a.loc[first, "p_A"], b.loc[first, "p_A"])
+
+
+def test_goal_pool_cli(feats, tmp_path, capsys):
+    from soccer_stats import cli
+
+    r = _rows(feats, "SP1")
+    for lg in ("SP1", "I1"):
+        d = tmp_path / f"goal-{lg}"
+        d.mkdir()
+        r.assign(league=lg, match_id=lg + "|" + r["match_id"]).to_csv(
+            d / f"rows_{lg}.csv.gz", index=False
+        )
+    cli.main(["goal-pool", "--rows-dir", str(tmp_path), "--json", str(tmp_path / "p.json")])
+    out = capsys.readouterr().out
+    assert "Pooled SP1+D1+I1+F1" in out and "Beats both benchmarks" in out
+    import json
+
+    rep = json.loads((tmp_path / "p.json").read_text())
+    assert set(rep["history"]["leagues"]) == {"SP1", "I1"} and "forward" not in rep
+
+
+def test_goal_league_locked_never_loads_the_forward_season(monkeypatch):
+    """Locked, the round-8 CLI never loads 2026/27 at all (dropped before computation);
+    only a reason widens the seasons loaded."""
+    from soccer_stats import cli, player_data
+
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    def fake_load(league, years):
+        seen.append(list(years))
+        raise Stop
+
+    monkeypatch.setattr(player_data, "load_appearances", fake_load)
+    monkeypatch.setattr(cli, "current_season", lambda: 2026)
+    for lg in gl.FORWARD_LEAGUES:
+        with pytest.raises(Stop):
+            cli._goal_league_feats(lg, "")
+        assert max(seen[-1]) == 2025
+    with pytest.raises(Stop):
+        cli._goal_league_feats("SP1", "opened for the test")
+    assert max(seen[-1]) == 2026

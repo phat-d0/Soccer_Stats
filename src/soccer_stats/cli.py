@@ -643,6 +643,121 @@ def cmd_player_odds_check(args: argparse.Namespace) -> None:
         print(line)
 
 
+def _goal_league_feats(league: str, open_forward: str):
+    """Understat appearances 2021/22-2025/26 (and 2026/27 only when the forward window is
+    opened) with the goal features and that league's match model."""
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.player_data import load_appearances
+
+    years = range(2021, current_season() + 1 if open_forward else 2026)
+    apps, missing = load_appearances(league, years)
+    print(f"{league}: {len(apps)} appearances ({missing} match files missing)")
+    matches, err = with_xg(load_matches([league], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=0.7 if not err else 0.0),
+    )
+    mi = pb.match_info(preds, apps)
+    feats = gl.extra_features(pg.goal_features(build_features(apps, mi)))
+    if not open_forward:  # nothing from the forward window is ever computed while locked
+        feats = feats[feats["kickoff"] < gl.FORWARD_START]
+    cover = feats["team_xg"].notna().mean() if "team_xg" in feats else 0.0
+    print(
+        f"{league}: match-model coverage {cover:.1%} of appearances" + (f" ({err})" if err else "")
+    )
+    return feats.reset_index(drop=True)
+
+
+def cmd_goal_league(args: argparse.Namespace) -> None:
+    """One league's goalscorer rows for the round-8 test (docs/player_props.md §10)."""
+    import json
+
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.publish import _clean
+
+    feats = _goal_league_feats(args.league, args.open_forward)
+    out = {"league": args.league}
+    lo = pd.Timestamp("2023-07-01", tz="UTC")
+    rows = gl.scored_rows(
+        feats, args.league, lo, gl.FORWARD_START, Holdout(gl.FORWARD_START), gl.LEAGUE_SEASONS
+    )
+    out["history"] = gl.bench_tests(rows, gl.LEVEL_LEAGUE)
+    _print_bench(args.league, out["history"])
+    if args.rows:
+        Path(args.rows).parent.mkdir(parents=True, exist_ok=True)
+        rows.to_csv(args.rows, index=False)
+    if args.open_forward:
+        fh = gl.forward_holdout(args.open_forward)
+        hi = feats["kickoff"].max() + pd.Timedelta(days=1)
+        fr = gl.scored_rows(feats, args.league, gl.FORWARD_START, hi, fh)
+        fr = fr[pd.to_datetime(fr["kickoff"], utc=True) >= gl.FORWARD_START]
+        out["forward_log"] = fh.events
+        if args.rows:
+            fr.to_csv(Path(args.rows).with_name(f"forward_{args.league}.csv.gz"), index=False)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
+def _print_bench(name: str, res: dict) -> None:
+    import json
+
+    a, b = res.get("all_before_lineups") or {}, res.get("starters_lineup_known") or {}
+    if not a:
+        print(f"{name}: no rows")
+        return
+    va, vb = a["vs"], b["vs"]
+    print(
+        f"{name}: {a['rows']} appearances, {a['matches']} matches | A before lineups: log loss "
+        f"{a['model']['log_loss']}, gain vs season goals {va['season_goals']['gain']} "
+        f"{va['season_goals']['range']}, vs season xG {va['season_xg']['gain']} "
+        f"{va['season_xg']['range']} -> beats both: {a['beats_both']}"
+    )
+    print(
+        f"{name}: {b['rows']} starters | B lineup known: log loss {b['model']['log_loss']}, "
+        f"vs goals {vb['season_goals']['gain']} {vb['season_goals']['range']}, vs xG "
+        f"{vb['season_xg']['gain']} {vb['season_xg']['range']}, vs A {b['vs_A']['gain']}, "
+        f"AUC {b['model']['auc']}, 30%+ {b['model']['share_30plus']:.1%}, "
+        f"tail {json.dumps(b['model']['tail'])}"
+    )
+
+
+def cmd_goal_pool(args: argparse.Namespace) -> None:
+    """Pool the leagues' rows: the historical answer, and the forward check if present."""
+    import json
+
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats.publish import _clean
+
+    d = Path(args.rows_dir)
+    hist = {
+        p.name.split("_")[1].split(".")[0]: pd.read_csv(p) for p in sorted(d.rglob("rows_*.csv.gz"))
+    }
+    for r in hist.values():
+        r["started"] = r["started"].astype(bool)
+    out = {"history": gl.history_report(hist)}
+    for lg, res in out["history"]["leagues"].items():
+        _print_bench(lg, res)
+    if "pooled_new_leagues" in out["history"]:
+        _print_bench("Pooled SP1+D1+I1+F1", out["history"]["pooled_new_leagues"])
+    print(
+        "Beats both benchmarks (A, all appearances, 99.375%): "
+        + json.dumps(out["history"]["answer"])
+    )
+    fwd = sorted(d.rglob("forward_*.csv.gz"))
+    if fwd:
+        fr = pd.concat([pd.read_csv(p) for p in fwd], ignore_index=True)
+        fr["started"] = fr["started"].astype(bool)
+        out["forward"] = gl.forward_report(fr)
+        print("Forward check: " + json.dumps(out["forward"].get("gate"), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
 def cmd_goal_lab(args: argparse.Namespace) -> None:
     """Goalscorer model improvements (docs/player_props.md §8), print-only."""
     import json
@@ -1266,6 +1381,18 @@ def main(argv: list[str] | None = None) -> None:
     poc = sub.add_parser("player-odds-check", help="diagnose player-prop coverage (~40-80 credits)")
     poc.add_argument("--league", default="E0")
     poc.set_defaults(func=cmd_player_odds_check)
+
+    glg = sub.add_parser("goal-league", help="one league's goalscorer rows (round 8)")
+    glg.add_argument("--league", required=True)
+    glg.add_argument("--rows", help="CSV(.gz) of scored rows")
+    glg.add_argument("--open-forward", default="", help="reason to open the forward window")
+    glg.add_argument("--json", help="write the results as JSON")
+    glg.set_defaults(func=cmd_goal_league)
+
+    gpl = sub.add_parser("goal-pool", help="pool the leagues' goalscorer rows (round 8)")
+    gpl.add_argument("--rows-dir", required=True)
+    gpl.add_argument("--json", help="write the results as JSON")
+    gpl.set_defaults(func=cmd_goal_pool)
 
     gl_ = sub.add_parser("goal-lab", help="goalscorer model improvements (pre-registered)")
     gl_.add_argument("--league", default="E0")
