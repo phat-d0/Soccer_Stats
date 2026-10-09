@@ -39,6 +39,9 @@ def _league(seed=0, seasons=range(2014, 2020)):
                 }
             )
     df = pd.DataFrame(rows)
+    # Float counts, as football-data loads them (and as read-only arrays under
+    # copy-on-write): the ratings fit must not write into them.
+    df[["home_corners", "away_corners"]] = df[["home_corners", "away_corners"]].astype(float)
     df["season_start"] = 2000 + df["season"].str[:2].astype(int)
     df["match"] = df["date"].dt.strftime("%Y-%m-%d") + " " + df["home"] + " v " + df["away"]
     return df

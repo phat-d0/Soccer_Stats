@@ -61,7 +61,9 @@ class HierPoisson:
         ix = {t: i for i, t in enumerate(teams)}
         n = len(teams)
         hi, ai = d["home"].map(ix).to_numpy(), d["away"].map(ix).to_numpy()
-        th, ta = d["home_goals"].to_numpy(float), d["away_goals"].to_numpy(float)
+        # Copies: under copy-on-write to_numpy can return a read-only view.
+        th = np.array(d["home_goals"], dtype=float)
+        ta = np.array(d["away_goals"], dtype=float)
         nan = np.full(len(d), np.nan)  # leagues without xG fit goals only
         hx = d["home_xg"].to_numpy(float) if "home_xg" in d else nan
         ax = d["away_xg"].to_numpy(float) if "away_xg" in d else nan
