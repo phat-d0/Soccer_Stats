@@ -175,7 +175,7 @@ Read its "Status and next steps" section first; this file is the technical map.
   - The pools are each rule's bets at a threshold of 0; the trade rules are unchanged.
 
 **Site and CLI**
-- `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site.
+- `publish.py`: builds `data.json`, `players_stats.json` and the rest of the site. Per live league (PR #26): `team_block` builds `data.teams_by_league[code]` = `{name, teams, params, ratings, xg}` from the fit in `league_fixtures` (which returns `(cards, source, block)`; a failure there drops that league's cards and block together), and E0's block repeats the top-level fields. `league_season_stats` turns the `players` list in Understat's cached league-season file (`xg.fetch_season`, the file `with_xg` already loaded in the same run) into `players_stats_<code>.json` for SP1, D1, I1 and F1, covering the last two seasons (`data.players_stats_by_league`). It makes no Odds API calls. Log line: "<League>: season stats for N player-seasons (players_stats_<code>.json)".
 - `cli.py`: the `soccer-stats` commands: `publish`, `log-odds`, `paper`, `estimate-credits`, `backtest-dk`, `backtest-players`, `backfill-odds`, `backfill-player-odds`, `player-odds-check`, `player-segments`, `match-markets`, `log-news`, `goalscorer-pilot`, `player-lab`, `log-team-totals`, `team-totals-report`.
 
 **App (`web/`)**
@@ -258,6 +258,8 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). If 
 - Session titles follow "Soccer team: <Role>", like the baseball team.
 - One shared Odds API key on the 100K plan: the owner decided against two keys on cost. Baseball usage is small in its post-season, which ends late October.
 - Credit caps are 0 unless the owner approves a spend.
+
+**Round 9, Teams tab per league (9 Oct, done):** PR #26 (UI; owner request, 0 credits) merged through the GitHub API (merge commit 3ecafeb). The Teams tab now has ratings for all six live leagues and Understat season stats for La Liga, Bundesliga, Serie A and Ligue 1; the shot model stays Premier League only, and `sw.js` is v28. Publish run 37955188057 succeeded; its "Build site" step took 8 s on a warm cache. Season stats: La Liga 1,061, Bundesliga 866, Serie A 1,034 and Ligue 1 977 player-seasons. Duplicate fixtures 0. The Championship had its first 12 fixtures with DraftKings odds. Team totals: 0 calls (none due), month 24 of 450. Credits left 22,406. 306 tests pass; smoke OK on 45 views × 3 modes.
 
 **Round 9, live team-total logging (9 Oct, done):** PR #25 (Moneyline; the owner-approved base plan) merged through the GitHub API (merge commit fc8ef3d) after a lead fix (fff879b: a run that errors part-way keeps its call records, and team totals can't stop the build). It spends real credits: about 340 a month, hard stop 450, none below 3,000. The first publish run, 37947050841, made 24 calls (24 credits, all look snapshots for Saturday's matches: E0 6, D1 6, F1 5, SP1 4, I1 3) and logged 47 rows, every call status 200 with 1–2 rows. Credits left 22,414. Details are under Open threads → Team totals.
 
