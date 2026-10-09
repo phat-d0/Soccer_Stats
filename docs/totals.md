@@ -505,3 +505,82 @@ and scores FanDuel rows through `lab.metrics.evaluate`:
 
 It prints "not enough data yet" below 50 settled matches with both snapshots. That is
 about two weeks across the five leagues at the estimated pace.
+
+## Corners bake-off (round 11; owner's request 9 Oct; pre-registered 2026-10-09, before any code or data)
+
+**Why.** In round 8 the corner model (independent home/away NB2 on form features) lost to
+a league average at all 24 lines and was badly over-confident. The owner asked for a
+proper corners model. 0 credits; research only.
+
+**Data and seasons.**
+- Data: football-data's corners (HC/AC), shots (HS/AS) and results, and the match model's
+  expected goals (the Dixon-Coles walk-forward, as in round 8). Leagues: E0, SP1, D1, I1,
+  F1 and E1.
+- Data years 2014/15–2024/25. 2025/26 is never loaded.
+- Development is scored on 2017/18–2023/24. Matches from 1 July 2024 are dropped before
+  anything is computed, including the match model's fit.
+- The holdout, 2024/25, is opened once per league in a separate run, with a logged reason
+  (`lab.harness.Holdout`), for the development finalists only.
+- Every candidate is refitted every 28 days on the 730 days before the block
+  (`lab.harness.walk_forward`) and needs 1,000 earlier matches.
+- Features use earlier matches only. The match model's expected goals come from its own
+  weekly walk-forward.
+
+**Candidates** (each gives home and away corner distributions, plus the total):
+- **(a) Baseline.** The league average over the window: an NB2 for home corners, one for
+  away corners and one for the total, at the league mean and moment-matched dispersion.
+- **(b) Team averages, shrunk.**
+  - Each team's corners for and against over the window, as ratios to the league's
+    home/away means, shrunk toward 1 with 10 pseudo-matches.
+  - λ_home = μ_home · for(home) · against(away); λ_away = μ_away · for(away) ·
+    against(home).
+  - NB2 per side with a moment-matched dispersion. The total is the convolution.
+- **(c) Corner ratings,** Dixon-Coles style.
+  - log λ_home = μ + h + att(home) + def(away); log λ_away = μ + att(away) + def(home).
+  - Time decay with a half-life of 180 days, and Gaussian priors on att/def (sd 0.2),
+    fitted by MAP on the corner counts (the lab's `HierPoisson`, one shared home edge).
+  - NB2 per side with a moment-matched dispersion. The total is the convolution.
+- **(d) Ratings plus match context.**
+  - An NB2 regression per side on log λ from (c) plus context: the match model's log
+    supremacy and log total, and each side's 10-match shots for/against form (log ratios
+    to the league).
+  - L2-regularised (`NBRegression`). The total is the convolution.
+- **(e) Direct total.**
+  - The total's mean is (d)'s λ_home + λ_away. Its NB2 dispersion is estimated on the
+    totals themselves (moment-matched on the window), which absorbs the negative
+    home/away correlation (about −0.2 in round 8).
+  - Total lines only; its team lines are (d)'s.
+- No separate bivariate model: (e) handles the correlation for the total, and team lines
+  are marginals.
+
+**Lines.**
+- Match total: over 8.5, 9.5, 10.5, 11.5 (four lines).
+- Team corners: home and away, each over 3.5, 4.5, 5.5 (six lines).
+
+**Metrics and pass rule.**
+- For each candidate and line group (total, team), the per-match mean log-loss gain over
+  baseline (a) across that group's lines. Ranges resample whole matches.
+- Each line's recalibration slope (logistic of the outcome on logit(p); 1 is ideal).
+- All candidates are scored on the same matches: those every candidate predicts.
+- A candidate **passes** a group in a league if:
+  - its gain range is above 0, at the Bonferroni level; and
+  - every line in the group has a slope point estimate within **0.80–1.25**.
+- **Development family:** (b), (c) and (d) on 2 groups, (e) on 1, so 7 tests per league
+  and 42 in all: 99.881%.
+- **Finalists:** per league and group, the candidate with the best development gain
+  (passing or not).
+- **Holdout family:** 2 groups × 6 leagues = 12 tests, 99.583%. A finalist passes if it
+  meets the same rule on 2024/25.
+- Log loss, Brier and calibration tables are also reported.
+
+**Reading.**
+- A league's corners model is recommended only where its finalist passes on the holdout.
+  It would go in the app as display-only corner over/unders on the match sheet, labelled
+  as model estimates that have not been tested against any bookmaker price.
+- A price test would mean logging Pinnacle's live corner prices, about a 5.5–6% margin in
+  round 8's probe. That is a separate owner decision with its own cost estimate. Nothing
+  is spent here.
+
+**Code.** `edge/corners.py`; `odds-check.yml` `task=corners` with `league` (no key).
+- Holdout runs take `reason` and `finalists` ("total=<x>,team=<y>").
+- Tests include no look-ahead.
