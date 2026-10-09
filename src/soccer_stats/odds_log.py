@@ -115,7 +115,8 @@ def _key(r: dict) -> tuple:
 
 def _read(root: Path, league: str) -> list[dict]:
     rows = []
-    for path in sorted(log_dir(root).glob(f"{league}_*.jsonl")):
+    # Month files only (<league>_<YYYY-MM>.jsonl): <league>_team_totals_* are another log.
+    for path in sorted(log_dir(root).glob(f"{league}_[0-9]*.jsonl")):
         for line in path.read_text().splitlines():
             if line.strip():
                 rows.append(json.loads(line))
