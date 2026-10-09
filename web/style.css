@@ -430,6 +430,15 @@ td.edge-pos { color: var(--good-text); font-weight: 600; }
 
 /* ---------- portfolio ---------- */
 .badge.paper { background: var(--track); color: var(--text-secondary); }
+.badge.lineup { background: var(--track); color: var(--text-primary); }
+/* Match sheet lineups: both XIs side by side (two narrow columns fit 390px) */
+.sub-title { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+.xi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.xi ol { margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.5; }
+.xi b { font-size: 14px; }
+details.xi-subs { margin-top: 8px; }
+.xi-bench { font-size: 13px; }
+.xi-bench + .xi-bench { margin-top: 8px; }
 .bet-row.trade { width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; cursor: pointer; }
 .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .filters select {

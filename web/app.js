@@ -263,10 +263,56 @@ function newsSection(fx) {
   const base = fx.p_base
     ? `<p class="note">Without team news the model had ${esc(fx.home)} ${pct(fx.p_base.home)}, draw ${pct(fx.p_base.draw)}, ${esc(fx.away)} ${pct(fx.p_base.away)}.</p>`
     : fx.news_applied ? "" : '<p class="note">Team news is applied to each team\'s next match only.</p>';
+  return `<div class="card">${team("home")}${team("away")}</div>${base}`;
+}
+
+// ESPN's card-level team news (publish → espn_news; all leagues, within 36 hours of kickoff).
+// Not the top-level `team_news`, which is FPL's dict. Injuries are empty today (ESPN's soccer
+// feed has none), so the block only shows when there are some, minus players FPL already lists.
+const plainName = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const sameName = (a, b) => { const x = plainName(a), y = plainName(b); return x === y || x.endsWith(` ${y}`) || y.endsWith(` ${x}`); };
+const espnTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null);
+const lineupConfirmed = (fx) => fx.team_news?.lineup?.confirmed === true && fx.team_news.lineup.home?.starters?.length > 0;
+
+function espnInjuries(fx) {
+  const inj = fx.team_news?.injuries || {};
+  const fplNames = (side) => (fx.news?.[side]?.absences || []).map((a) => a.name);
+  const sides = ["home", "away"].map((side) => [side, (inj[side] || []).filter((x) => x?.name && !fplNames(side).some((n) => sameName(n, x.name)))]);
+  if (!sides.some(([, list]) => list.length)) return "";
+  const team = ([side, list]) => (list.length ? `<div class="news-team"><div class="news-head"><b>${esc(fx[side])}</b></div>${list.map((x) => `
+    <div class="absence"><div><b>${esc(x.name)}</b>${x.detail ? `<div class="muted small">${esc(x.detail)}</div>` : ""}</div>${x.status ? `<span class="pill doubtful">${esc(x.status)}</span>` : ""}</div>`).join("")}</div>` : "");
+  return `<div class="card">${sides.map(team).join("")}</div><p class="note">Injuries and doubts from ESPN${fx.news ? ", where FPL doesn't already list them" : ""}.</p>`;
+}
+
+function lineupBlock(fx) {
+  const tn = fx.team_news;
+  const lu = tn?.lineup;
+  const checked = espnTime(tn?.fetched_at || lu?.fetched_at);
+  if (!lineupConfirmed(fx)) {
+    return `<div class="sub-title">Lineups</div><p class="note" style="margin-top:2px">Not out yet: lineups usually come about an hour before kickoff.${checked ? ` Last checked on ${esc(tn.source || "ESPN")} ${esc(checked)}.` : ""}</p>`;
+  }
+  const xi = (side) => {
+    const t = lu[side] || {};
+    return `<div class="xi"><b>${esc(fx[side])}</b><ol>${(t.starters || []).map((n) => `<li>${esc(n)}</li>`).join("")}</ol></div>`;
+  };
+  const subs = ["home", "away"].filter((side) => lu[side]?.subs?.length);
+  const since = espnTime(lu.first_confirmed_at);
+  return `
+    <div class="sub-title">Confirmed XI</div>
+    <div class="card xi-grid">${xi("home")}${xi("away")}</div>
+    ${subs.length ? `<details class="fold xi-subs"><summary>Substitutes</summary><div class="card">${subs.map((side) => `<div class="xi-bench"><b>${esc(fx[side])}</b> <span class="muted">${lu[side].subs.map(esc).join(", ")}</span></div>`).join("")}</div></details>` : ""}
+    <p class="note">Source: ${esc(tn.source || "ESPN")}${since ? `, lineups in since ${esc(since)}` : ""}${checked ? `, checked ${esc(checked)}` : ""}.</p>`;
+}
+
+// Match sheet "Team news": FPL injuries (Premier League, applied to the model), any ESPN
+// injuries FPL doesn't list, then lineups (every league).
+function teamNewsSection(fx) {
+  if (!fx.kickoff && !fx.news) return ""; // Explore: any two teams, no match
   return `
     <div class="section-title">Team news</div>
-    <div class="card">${team("home")}${team("away")}</div>
-    ${base}`;
+    ${fx.news ? newsSection(fx) : ""}
+    ${espnInjuries(fx)}
+    ${fx.kickoff ? lineupBlock(fx) : ""}`;
 }
 
 // How much weight the live match blend gives the model (match_calibration: c in
@@ -316,7 +362,7 @@ function detailHtml(fx) {
       <p class="muted" style="margin:0 0 10px">Expected goals <b class="num" style="color:var(--text-primary)">${xg[0].toFixed(2)} – ${xg[1].toFixed(2)}</b></p>
       ${probBar(p, home, away)}
       ${lowData ? '<p class="warn">⚠ One team has few matches in the data, so treat this one with extra caution.</p>' : ""}
-      ${newsSection(fx)}
+      ${teamNewsSection(fx)}
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
         <table class="mkts${blend ? " with-blend" : ""}">
@@ -677,6 +723,7 @@ function viewMatches() {
           </div>
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
+          ${lineupConfirmed(fx) ? `<span class="badge lineup">${CHECK}Lineups confirmed</span>` : ""}
           ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); const { cur } = currentPrice(t); const m = markToMarket(t, cur); return `<span class="badge paper">Paper trade open: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`; })() : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
