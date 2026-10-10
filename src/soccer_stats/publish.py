@@ -689,9 +689,12 @@ def add_lean(data: dict, blends: dict | None) -> int:
     Per card with DraftKings h2h odds and a fit for its league: `p_bet` home/draw/away =
     the blend of the model and DraftKings' margin-free price (for E0 this replaces the
     h2h part of E0_dk.json's blend, so p_bet and z use one fit; its totals part stays),
-    `z` per side = (p_bet - 1/decimal) / sigma, and `lean_pick` = {market, odds, p_bet,
-    model_p, edge, z, tier, sigma} or None (always None on low_data cards, which paper
-    trades skip). Cards without a fit get z and lean_pick None. `data.match_blends` =
+    `z` per side = (p_bet - 1/decimal) / sigma, `z_market` per side = the same with the
+    blend's model term removed (trades.market_side_z: c = 0, a_k and b kept), and
+    `lean_pick` = {market, odds, p_bet, model_p, edge, z, tier, sigma, z_market, driver}
+    or None (always None on low_data cards, which paper trades skip); driver "market"
+    when the pick reaches 1 sigma on the price alone, else "model". Cards without a fit
+    get z, z_market and lean_pick None. `data.match_blends` =
     {generated_at, note, leagues: {code: LEAN_CARD_KEYS}}.
     """
     leagues = (blends or {}).get("leagues") or {}
@@ -708,7 +711,7 @@ def add_lean(data: dict, blends: dict | None) -> int:
     for fx in data.get("fixtures", []):
         code = fx.get("league") or primary
         entry = leagues.get(code)
-        fx["z"], fx["lean_pick"] = None, None
+        fx["z"], fx["z_market"], fx["lean_pick"] = None, None, None
         if not entry:
             continue
         implied, p = fx.get("implied") or {}, fx.get("p") or {}
@@ -723,15 +726,20 @@ def add_lean(data: dict, blends: dict | None) -> int:
         fx["p_bet"] = {**base, **{m: float(v) for m, v in zip(mc.H2H, pb, strict=True)}}
         z = tr.side_z(fx["p_bet"], fx.get("odds"), entry["sigma"])
         fx["z"] = {m: None if v is None else round(v, 3) for m, v in z.items()} if z else None
+        zm = tr.market_side_z(entry["coef"], fx.get("odds"), entry["sigma"])
+        fx["z_market"] = (
+            {m: None if v is None else round(v, 3) for m, v in zm.items()} if zm else None
+        )
         pick = (
             None
             if fx.get("low_data")
-            else tr.lean_pick(fx["p_bet"], fx.get("odds"), entry["sigma"])
+            else tr.lean_pick(fx["p_bet"], fx.get("odds"), entry["sigma"], z_market=zm or {})
         )
         if pick:
             fx["lean_pick"] = {
                 **pick,
                 "z": round(pick["z"], 3),
+                "z_market": None if pick["z_market"] is None else round(pick["z_market"], 3),
                 "edge": round(pick["edge"], 4),
                 "p_bet": round(pick["p_bet"], 4),
                 "model_p": round(pick["model_p"], 4),

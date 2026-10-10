@@ -219,6 +219,34 @@ def pinnacle_only(raw: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
+PIN_EARLY = ("odds_home", "odds_draw", "odds_away")
+PIN_CLOSE = ("close_home", "close_draw", "close_away")
+
+
+def pinnacle_early_close(raw: pd.DataFrame) -> pd.DataFrame:
+    """Pinnacle's own 1X2 prices only, early (PSH/PSD/PSA: the price when football-data
+    collected the file, days before kickoff) and close (PSCH/PSCD/PSCA): NaN where the file
+    has no Pinnacle price, never the market average or Bet365 that load_matches falls back
+    to. date, home, away, odds_<side>, close_<side>."""
+    alts = {c for k in (*PIN_EARLY, *PIN_CLOSE) for c in FALLBACKS[k]}
+    return normalize(raw.drop(columns=[c for c in raw.columns if c in alts]))[
+        ["date", "home", "away", *PIN_EARLY, *PIN_CLOSE]
+    ]
+
+
+def pinnacle_prices(
+    league: str, start_years: Iterable[int], raw_dir: Path = RAW_DIR
+) -> pd.DataFrame:
+    """season plus pinnacle_early_close per played match, for every season listed."""
+    frames = []
+    for year in start_years:
+        raw = pd.read_csv(
+            download(league, year, raw_dir=raw_dir), encoding="latin-1", on_bad_lines="skip"
+        )
+        frames.append(pinnacle_early_close(raw).assign(season=season_code(year)))
+    return pd.concat(frames, ignore_index=True)
+
+
 def pinnacle_closes(
     league: str, start_years: Iterable[int], raw_dir: Path = RAW_DIR
 ) -> pd.DataFrame:
