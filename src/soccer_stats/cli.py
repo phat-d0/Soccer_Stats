@@ -289,6 +289,9 @@ def cmd_paper(args: argparse.Namespace) -> None:
         except Exception as exc:  # player trades settle on a later build
             print(f"Player data unavailable ({type(exc).__name__})")
     log_dir = Path(args.log_dir) if args.log_dir else None
+    from soccer_stats.trades import paper_rule_line
+
+    print(paper_rule_line())
     n = paper.run(data, log_dir, results, league=args.league, apps=apps)
     detail = log_dir / "backtest" / f"{args.league}_players_detail.json" if log_dir else None
     if detail and detail.exists():  # the Players view loads this on demand

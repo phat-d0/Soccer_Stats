@@ -10,9 +10,11 @@ value pick (bestPick in web/app.js) mirrors it:
 * One trade per match: the qualifying market with the highest edge.
 * No odds cap by default (results are reported with and without a 6.0 cap).
 * Skip a match if either team has fewer than MIN_TEAM_MATCHES in the training window.
-* Flat STAKE dollars. Live match paper trades use the minimum edge learned from history
-  (paper_threshold: E0_dk.json -> edge_threshold.min_edge), the same level the app flags
-  with; no learned level means no new match trades, and no file means PAPER_EDGE.
+* Flat STAKE dollars. Live match paper trades follow PAPER_RULE (paper_threshold):
+  "fixed_raw" (owner's live test, 10 Oct 2026) opens at PAPER_EDGE on the model's own
+  chance in every live league; "learned" uses the minimum edge learned from history
+  (E0_dk.json -> edge_threshold.min_edge) on the blended chance, where no learned level
+  means no new match trades and no file means PAPER_EDGE.
 
 This module does no network or file access, so it can be tested on synthetic leagues.
 """
@@ -62,25 +64,63 @@ ODDS_BUCKETS = [
 STALE_CLOSE_MINUTES = 60  # a live close quoted earlier than this before kickoff is stale
 SWEEP = (0.02, 0.05, 0.08, 0.12, 0.15, 0.20)
 
+# Owner decision (10 Oct 2026): live match paper trades run the old fixed rule as a live
+# test in every live league: PAPER_EDGE (12%) on the model's own chance (the card's `p`,
+# not the blend `p_bet`), edge against the quoted DraftKings price. "learned" is the
+# learned-minimum path (blend chance, per-league min_edge, null = no new trades), kept
+# intact: reverting is this one line.
+PAPER_RULE = "fixed_raw"
+PAPER_RULES = ("fixed_raw", "learned")
+OWNER_FIXED_NOTE = (
+    "Owner's live test (10 Oct): fixed 12% edge on the model alone. Backtests of this rule "
+    "lost money; this tests it live."
+)
+
 
 def _ok(x) -> bool:
     return x is not None and not (isinstance(x, float) and math.isnan(x))
 
 
-def paper_threshold(dk: dict | None, league: str = "E0") -> dict:
-    """The minimum edge live match paper trades open at, from backtest-dk's output.
+def paper_threshold(dk: dict | None, league: str = "E0", rule: str | None = None) -> dict:
+    """The rule live match paper trades open at: {threshold, source, note, rule, p_source}.
+
+    `rule` defaults to PAPER_RULE. Under "fixed_raw" every league gets PAPER_EDGE on the
+    model's own chance (p_source "model"), source "owner_fixed", whatever `dk` says.
+    Under "learned" (p_source "blend": p_bet when set, else p) it is the learned level:
 
     `dk` is <league>_dk.json (or None). A league other than the Premier League trades only
     with its own learned level: no file or no edge_threshold means no trades. The file's
     top-level `edge_threshold.min_edge` is the level learned from history for the chance
     the app trades on (lab/thresholds.py), the same one the app's bestPick flags with
-    (matchEdge). Returns {threshold, source, note}:
+    (matchEdge):
     - a learned level: threshold = min_edge, source "history";
     - min_edge null (no level beat the market): threshold None, so no new match trades,
       and the note says why;
     - no file or no edge_threshold (older data, first run): PAPER_EDGE, source "default"
       for the Premier League; None, source "none", for any other league.
     """
+    rule = rule or PAPER_RULE
+    if rule not in PAPER_RULES:
+        raise ValueError(f"unknown paper rule {rule!r}")
+    if rule == "fixed_raw":
+        return {
+            "threshold": PAPER_EDGE,
+            "source": "owner_fixed",
+            "note": OWNER_FIXED_NOTE,
+            "rule": "fixed_raw",
+            "p_source": "model",
+        }
+    return {**_learned_threshold(dk, league), "rule": "learned", "p_source": "blend"}
+
+
+def paper_rule_line(rule: str | None = None) -> str:
+    """The paper CLI's log line naming the live match rule."""
+    if (rule or PAPER_RULE) == "fixed_raw":
+        return f"Paper rule: fixed_raw ({PAPER_EDGE:.0%} on the model's own chance, all leagues)"
+    return "Paper rule: learned (each league's learned minimum edge on the blended chance)"
+
+
+def _learned_threshold(dk: dict | None, league: str) -> dict:
     et = (dk or {}).get("edge_threshold")
     if league != "E0" and (not isinstance(et, dict) or "min_edge" not in et):
         return {
@@ -213,7 +253,7 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
 ENTRY_FIELDS = (
     "id source bet_type league season opened_at kickoff hours_to_kickoff home away market "
     "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
-    "player player_id team line side position portfolio"
+    "player player_id team line side position portfolio rule p_source"
 ).split()
 
 
@@ -234,8 +274,13 @@ def new_trade(
     look: str | None = None,
     stake: float = STAKE,
     player: dict | None = None,
+    rule: str | None = None,
+    p_source: str | None = None,
 ) -> dict:
     """The record both the backtest and the live ledger store for a trade (one shape).
+
+    Live match trades record the paper `rule` ("fixed_raw" or "learned") and `p_source`
+    ("model": the raw chance; "blend": p_bet when set) beside `threshold`.
 
     Entry fields (ENTRY_FIELDS) never change after this; close, CLV and settlement
     fields are filled in later.
@@ -272,6 +317,8 @@ def new_trade(
         "side": pick.get("side"),
         "position": None,
         "portfolio": portfolio_of({"bet_type": "player" if player else "match", **pick}),
+        "rule": rule,
+        "p_source": p_source,
         "started": None,
         "actual": None,
         "close_odds": None,

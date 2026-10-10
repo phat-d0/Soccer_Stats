@@ -2,8 +2,9 @@
 
 Every scheduled build calls update_ledger, which:
 1. opens a trade for each upcoming fixture whose best pick passes the trade rule
-   (trades.best_pick at the minimum edge learned from history, trades.paper_threshold;
-   none learned = no new match trades; no backtest file = PAPER_EDGE), using
+   (trades.best_pick under trades.PAPER_RULE via trades.paper_threshold: "fixed_raw" =
+   12% on the model's own chance in every league; "learned" = the minimum edge learned
+   from history on the blend, none learned = no new match trades), using
    DraftKings odds fetched within the last FRESH_HOURS and only before kickoff;
 2. tracks the closing price of match trades: the last DraftKings price before kickoff
    in the odds log (odds_log.py; without a log, the last price seen by a build before
@@ -168,6 +169,7 @@ def update_ledger(
     players_on: bool = False,
     odds_log: pd.DataFrame | None = None,
     threshold: float | None = tr.PAPER_EDGE,
+    rule: dict | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -178,8 +180,13 @@ def update_ledger(
     opened, if so. With `odds_log` (odds_log.load), every live match trade's close is
     the last logged DraftKings price before kickoff; without it, the price each build
     sees until kickoff. Match trades open at `threshold` (trades.paper_threshold); None
-    opens no new match trades, while open ones still get their close and settle.
+    opens no new match trades, while open ones still get their close and settle. `rule`
+    (trades.paper_threshold's dict) picks the chance: p_source "model" trades on the
+    card's raw `p`; otherwise p_bet (the blend) when set, else p. New trades record the
+    rule name and p_source.
     """
+    rule = rule or {}
+    raw = rule.get("p_source") == "model"
     events: list[dict] = []
     note = None
     fetched = odds_source.get("fetched_at")
@@ -201,8 +208,9 @@ def update_ledger(
             kickoff = pd.Timestamp(c["kickoff"])
             if kickoff <= now or c.get("low_data"):
                 continue
-            # p_bet (the model blended with the price) when publish set it; as bestPick.
-            pick = tr.best_pick(c.get("p_bet") or c["p"], c.get("odds") or {}, threshold)
+            # The raw model under fixed_raw; else p_bet (the blend) when set, as bestPick.
+            probs = c["p"] if raw else (c.get("p_bet") or c["p"])
+            pick = tr.best_pick(probs, c.get("odds") or {}, threshold)
             if not pick:
                 continue
             tid = tr.trade_id(league, tr.season_label(kickoff), c["home"], c["away"])
@@ -221,7 +229,12 @@ def update_ledger(
                 threshold=threshold,
                 model_p_base=base.get(pick["market"]) if base else None,
                 news_applied=bool(c.get("news_applied")),
-                model_ref={**(ref or {}), "probs": "blend" if c.get("p_bet") else "raw"},
+                model_ref={
+                    **(ref or {}),
+                    "probs": "blend" if (c.get("p_bet") and not raw) else "raw",
+                },
+                rule=rule.get("rule"),
+                p_source="model" if raw else ("blend" if c.get("p_bet") else "model"),
             )
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
@@ -584,13 +597,19 @@ def run(
     live_trades: list[dict] = []
     backtests: dict[str, dict | None] = {}
     codes = leagues_in_play(data, league)
-    rules = {
-        lg: tr.paper_threshold(league_backtest(log_dir, lg) if log_dir is not None else None, lg)
-        for lg in codes
-    }
+    files = {lg: league_backtest(log_dir, lg) if log_dir is not None else None for lg in codes}
+    rules = {lg: tr.paper_threshold(files[lg], lg) for lg in codes}
+    # The app's flags (edge_threshold.by_league) keep showing the learned levels and their
+    # notes whatever PAPER_RULE is; the paper rule itself is in portfolio.rules.
+    learned = {lg: tr.paper_threshold(files[lg], lg, rule="learned") for lg in codes}
     rule = rules[league]
     portfolio.setdefault("rule", {}).update(
-        threshold=rule["threshold"], threshold_source=rule["source"], threshold_note=rule["note"]
+        threshold=rule["threshold"],
+        threshold_source=rule["source"],
+        threshold_note=rule["note"],
+        rule=rule.get("rule"),
+        p_source=rule.get("p_source"),
+        note=rule["note"],
     )
     portfolio["rules"] = rules  # per league: the minimum edge each one trades at
     if log_dir is None or not Path(log_dir).is_dir():
@@ -629,6 +648,7 @@ def run(
                     players_on=players_on and lg == league,
                     odds_log=log,
                     threshold=rules[lg]["threshold"],
+                    rule=rules[lg],
                 )
                 ledger.update(sub)
                 events += ev
@@ -641,7 +661,7 @@ def run(
             backtests[p["id"]] = _read_json(
                 Path(log_dir) / "backtest" / f"{league}_{p['backtest']}.json"
             )
-        _add_league_levels(backtests.get("moneyline"), codes, rules, log_dir, league)
+        _add_league_levels(backtests.get("moneyline"), codes, learned, log_dir, league)
         bt = backtest_path(log_dir, league)
         if bt.exists():
             try:
