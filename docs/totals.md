@@ -788,3 +788,21 @@ Reading:
 - Next, if wanted: a further season (2026/27, from about May 2027) scored the same way
   would double the sample. A price test still needs Pinnacle's live corner prices (a
   separate owner decision). Nothing is proposed now.
+
+
+Lead review notes (10 Oct):
+- Timeline checked against the commits and run start times: coverage commit fb7a69c
+  03:54:56 UTC, coverage run 38022238320 03:55:08 (prints only played / with HC and AC
+  counts per league), pre-registration 4ab84a3 03:55:48, code ed2caf1 04:02:17,
+  development runs 04:02:23–04:02:31 (no reason; 2025/26 dropped first, no opening
+  logged), development view recorded in 87e15d0 04:06:55, test runs 04:07:02–04:07:10,
+  each logging one "HOLDOUT OPENED" line (04:07:44–04:08:04). No other run opened 2025/26.
+  Every 2025/26 number in the table above matches its job log.
+- The development view printed inside the six test runs scores 9–12 more matches than the
+  development runs above (E0 2,576 vs 2,566, SP1 2,579 vs 2,569, D1 2,076 vs 2,067, I1
+  2,557 vs 2,547, F1 2,341 vs 2,332, E1 3,715 vs 3,703): one final matchday of 2024/25.
+  `backtest.walk_forward` (the match model's expected goals) predicts in weekly windows
+  that stop at the last window edge before the data ends, so when the data ends in May
+  2025 the last few days get no expected goals; with 2025/26 loaded they do. Those rows
+  are 2024/25 and predicted from earlier matches only, so it is not look-ahead; the
+  yearly fits agree to five decimals. The test's recalibration fit used the fuller set.

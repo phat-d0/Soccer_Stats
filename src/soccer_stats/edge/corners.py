@@ -27,7 +27,7 @@ from soccer_stats.models.player_counts import NBRegression, nb_pmf
 
 LEAGUES = totals.LEAGUES
 FIRST_DATA = 2014
-LAST_DATA = 2024  # the 2024/25 season; 2025/26 is never loaded
+LAST_DATA = 2024  # the 2024/25 season; only corner_recal's opened test loads 2025/26
 DEV_START = pd.Timestamp("2017-07-01")
 HOLDOUT_START = pd.Timestamp("2024-07-01")
 HOLDOUT_END = pd.Timestamp("2025-07-01")
