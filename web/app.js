@@ -407,13 +407,9 @@ function goalsSection(fx) {
   if (!cdf.total && !cdf.home && !cdf.away) return "";
   const lg = fxLeague(fx);
   const e1 = lg === "E1";
-  const imp = fx.odds ? impliedFor(fx) : {};
-  const dk = imp.over25 != null ? imp : null;
-  const book = isDK() ? "DK" : "Book";
   const totalRows = [0.5, 1.5, 2.5, 3.5, 4.5].map((line) => {
     const over = overFrom(cdf.total, line);
-    const bk = dk ? `<td>${line === 2.5 ? pct(dk.over25) : "–"}</td>` : "";
-    return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td>${bk}</tr>`;
+    return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td></tr>`;
   }).join("");
   const tt = fx.team_totals;
   const fd = tt && (tt.home?.length || tt.away?.length);
@@ -433,11 +429,11 @@ function goalsSection(fx) {
     <div class="section-title">Goals</div>
     <div class="card" style="padding:8px 14px">
       <table class="mkts goals">
-        <thead><tr><th>Total goals</th><th>Over</th><th>Under</th>${dk ? `<th>${book} over</th>` : ""}</tr></thead>
+        <thead><tr><th>Total goals</th><th>Over</th><th>Under</th></tr></thead>
         <tbody>${totalRows}</tbody>
       </table>
     </div>
-    <p class="note">Model's chances of more or fewer goals in the match than each line (over 2.5 = 3 or more).${dk ? ` ${book} = ${bookPoss()} 2.5 line as a chance, margin removed.` : ""} Tested against Pinnacle; the model doesn't beat the market.${e1Note}</p>
+    <p class="note">Model's chances of more or fewer goals in the match than each line (over 2.5 = 3 or more). Tested against Pinnacle; the model doesn't beat the market.${e1Note}</p>
     ${cdf.home && cdf.away ? `
     <details class="fold goals-fold">
       <summary>Each team's goals <span class="muted">(${fd ? "with FanDuel's prices" : "model only"})</span></summary>

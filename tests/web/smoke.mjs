@@ -71,13 +71,15 @@ const STEPS = [
     if (saka !== 1) throw new Error(`FPL's absence listed ${saka} times (ESPN repeat?)`);
     await p.locator(".xi-grid").scrollIntoViewIfNeeded();
   }, true],
-  // Goals over/under: total goals with DraftKings' 2.5, each team's goals with FanDuel's prices.
+  // Goals over/under: total goals (model only: DraftKings sends no 2.5 total on our feed),
+  // each team's goals with FanDuel's prices.
   ["match-sheet-goals", async (p) => {
     await p.click("details.goals-fold > summary");
     const text = await p.textContent("#sheet-body");
-    for (const want of ["Total goals", "DK over", "Each team's goals", "FD over", "doesn't beat the market"]) {
+    for (const want of ["Total goals", "Each team's goals", "FD over", "doesn't beat the market"]) {
       if (!text.includes(want)) throw new Error(`Goals section lacks "${want}"`);
     }
+    if (text.includes("DK over")) throw new Error("Goals section still shows a DraftKings 2.5 column");
     await p.locator("details.goals-fold").scrollIntoViewIfNeeded();
   }, true],
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
