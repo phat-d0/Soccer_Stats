@@ -42,6 +42,7 @@ from conftest import simulate_league  # noqa: E402
 
 from soccer_stats import corners_live, paper  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
+from soccer_stats import publish as pub  # noqa: E402
 from soccer_stats import trades as tr  # noqa: E402
 from soccer_stats.player_data import season_stats  # noqa: E402
 from soccer_stats.players import Absence, TeamNews  # noqa: E402
@@ -86,7 +87,7 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
-SAMPLE_PLAYERS = 62  # players kept from the real detail file (keeps fixtures < 1 MB)
+SAMPLE_PLAYERS = 58  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
 def fetch_data_log(dest: Path) -> Path:
@@ -337,6 +338,7 @@ def build(src: Path, out: Path) -> dict:
     add_espn_team_news(data)
     add_markets_research(data)
     add_corners(data)
+    add_lean_strategy(data)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -967,6 +969,92 @@ def add_corners(data: dict) -> None:
         backtests,
         ml["live"].get("rule"),
         {"corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}},
+    )
+
+
+# Blend Lean (round 14), the second Moneyline strategy, until data-log has
+# backtest/match_blends.json: a synthetic E0 fit with more model weight than the real one
+# (c 0.4, sigma 1.5 points) so the fixture has Lean and Strong picks, run through the real
+# publish.add_lean. Arsenal v Leeds then holds both strategies on one match: its 12%
+# trade (draw, from the real ledger) and a Lean trade on its Strong away pick. Newcastle v
+# Tottenham has a Lean pick with no Lean trade (only its 12% one). SP1 has a sigma but no
+# odds. Settled Lean trades: two E0 and one SP1, so Lean has tiles and by_league.
+SYNTHETIC_BLENDS = {
+    "generated_at": "2026-10-06T06:00:00+00:00",
+    "leagues": {
+        "E0": {"coef": [0.02, -0.016, 0.7, 0.4], "sigma": 0.015, "matches": 1308}
+        | {"fit_from": "2022-08-05", "fit_to": "2026-09-20", "fit_date": "2026-10-06"}
+        | {"refit": "synthetic"},
+        "SP1": {"coef": [0.076, 0.058, 1.073, 0.106], "sigma": 0.019, "matches": 1287}
+        | {"fit_from": "2022-08-12", "fit_to": "2026-09-21", "fit_date": "2026-10-06"}
+        | {"refit": "synthetic"},
+    },
+}
+LEAN_SETTLED = [
+    # league, home, away, kickoff, market, odds, z, close odds, score, won
+    ("E0", "Spurs", "Brentford", "2026-09-20T14:00:00Z", "home", 1.95, 1.21, 1.88, "2-1", True),
+    ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 3.1, 2.15, 3.2, "1-1", False),
+    ("SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 1.72, 1.04, 1.70, "2-0", True),
+]
+
+
+def add_lean_strategy(data: dict) -> None:
+    pub.add_lean(data, SYNTHETIC_BLENDS)
+    codes = list(data["portfolio"]["rules"])
+    leans = {lg: tr.lean_rule(data["match_blends"], lg) for lg in codes}
+    for lg in codes:
+        data["portfolio"]["rules"][lg] |= {"sigma": leans[lg]["sigma"], "lean": leans[lg]}
+    data["portfolio"]["strategy_order"] = list(tr.STRATEGY_ORDER)
+    pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
+    trades = [t for p in pfs.values() for t in p["live"]["trades"]]
+    for t in trades:
+        if t.get("bet_type", "match") == "match" and t.get("portfolio", "moneyline") == "moneyline":
+            t.setdefault("strategy", "edge12")
+    ref = {"commit": "synthetic", "xg_weight": 0.7, "matches_fit": 800, "probs": "blend"}
+
+    def lean_trade(lg, home, away, kick, pick, opened):
+        t = tr.new_trade(
+            pick, source="live", league=lg, home=home, away=away, kickoff=kick,
+            opened_at=opened, odds_fetched_at=(opened - pd.Timedelta(minutes=20)).isoformat(),
+            threshold=tr.LEAN_Z, model_ref=ref, rule=tr.LEAN_RULE, p_source="blend",
+            strategy="lean",
+        )  # fmt: skip
+        return t | {
+            "z": round(pick["z"], 3),
+            "tier": pick["tier"],
+            "sigma": pick["sigma"],
+            "p_bet": round(pick["p_bet"], 4),
+            "p_model": round(pick["p_bet"] - 0.02, 4),
+        }
+
+    fx = next(c for c in data["fixtures"] if (c["home"], c["away"]) == ("Arsenal", "Leeds"))
+    t = lean_trade("E0", fx["home"], fx["away"], pd.Timestamp(fx["kickoff"]), fx["lean_pick"], NOW)
+    t |= {"close_odds": fx["odds"][t["market"]], "close_fetched_at": t["odds_fetched_at"]}
+    lean = [t]
+    for lg, home, away, ko, market, odds, z, close, score, won in LEAN_SETTLED:
+        kick = pd.Timestamp(ko)
+        sigma = SYNTHETIC_BLENDS["leagues"][lg]["sigma"]
+        p = 1 / odds + z * sigma
+        pick = {"market": market, "odds": odds, "p_bet": p, "model_p": p, "edge": p * odds - 1}
+        pick |= {"z": z, "tier": "strong" if z >= tr.STRONG_Z else "lean", "sigma": sigma}
+        t = lean_trade(lg, home, away, kick, pick, kick - pd.Timedelta(hours=30))
+        clv = odds / close - 1
+        t |= {"close_odds": close, "close_fetched_at": (kick - pd.Timedelta(minutes=8)).isoformat()}
+        t |= {"close_minutes_before": 8, "clv_dk": round(clv, 4), "beat_close_dk": clv > 0}
+        t |= {"status": "won" if won else "lost", "score": score}
+        t |= {"profit": round(10 * (odds - 1), 2) if won else -10.0}
+        t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+        lean.append(t)
+    ml = pfs["moneyline"]
+    live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
+    rule = data["portfolio"]["rules"]["E0"]  # paper.run: rules[league], sigma and lean added
+    data["portfolio"]["portfolios"] = paper.portfolios_section(
+        live,
+        trades + lean,
+        {pid: p["backtest"] for pid, p in pfs.items()},
+        rule,
+        {"corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}},
+        paper.match_strategies(leans, rule),
     )
 
 

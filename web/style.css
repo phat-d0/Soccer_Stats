@@ -641,3 +641,15 @@ table.corners-t th:first-child { width: 14%; }
 table.corners-t td, table.corners-t th { padding-left: 2px; padding-right: 2px; }
 table.corners-t tr.pick td { background: var(--track); }
 .corner-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* ---------- Blend Lean (second Moneyline strategy, listed first) ---------- */
+.badge.lean { background: var(--good-bg); color: var(--good-text); }
+.badge.second { font-size: 12px; font-weight: 500; padding: 3px 8px; margin-top: 6px; }
+.badge.second svg { width: 12px; height: 12px; }
+table.mkts.with-z { font-size: 12.5px; }
+table.mkts.with-z td, table.mkts.with-z th { padding-left: 2px; padding-right: 2px; }
+table.mkts .lean-cell { font-weight: 700; }
+.edge-rec.second { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.edge-rec > .meta:first-child { display: block; margin: 0 0 2px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+.strat-seg button { font-size: 13px; }
+.lean-explain { margin-bottom: 8px; }

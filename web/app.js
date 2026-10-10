@@ -19,6 +19,7 @@ const state = {
   pfSeason: "",
   pfShown: 15,
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
+  pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
   recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
   recStrat: "", // Record tab, player shots: which backtest strategy's sweep to show
   recDk: "", // Record tab, match bets: which DraftKings backtest strategy ("raw" or "blend")
@@ -116,6 +117,27 @@ function bestPick(fx, minEdge) {
   }
   return best;
 }
+
+// ---------- Blend Lean (trades.lean_pick): the second Moneyline strategy, listed first ----------
+// Cards carry `z` per home/draw/away = (p_bet − 1/DraftKings' decimal) / σ and `lean_pick`
+// (publish.add_lean; null on low-data cards); σ per league is in data.match_blends: how far
+// the blend usually strays from the market there. Lean z ≥ 1, Strong z ≥ 2. Match trades
+// carry `strategy` ("lean" or "edge12"; missing = the 12% test), one trade per strategy.
+const stratOf = (t) => t.strategy || "edge12";
+const leanOn = () => (state.data?.portfolio?.strategy_order || []).includes("lean");
+const leanRule = (lg) => leagueRule(lg)?.lean || null;
+const leanSigma = (lg) => state.data?.match_blends?.leagues?.[lg || "E0"]?.sigma ?? leanRule(lg)?.sigma ?? null;
+const leanPick = (fx) => (leanOn() && !fx.low_data ? fx.lean_pick || null : null);
+const sigmaText = (z) => (z == null ? "–" : `${z < 0 ? "−" : z > 0 ? "+" : ""}${Math.abs(z).toFixed(1)}σ`);
+const ptsText = (x) => `${(x * 100).toFixed(1)} points`;
+const tierName = (pick) => (pick.tier === "strong" ? "Strong" : "Lean");
+// Open Moneyline match trades by match and strategy (a match can hold one of each).
+const tradeKey = (home, away, strat) => `${home}|${away}|${strat}`;
+function openMatchTrades() {
+  const open = (pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player" && !isCorner(t));
+  return new Map(open.map((t) => [tradeKey(t.home, t.away, stratOf(t)), t]));
+}
+const openTradeFor = (fx, strat) => openMatchTrades().get(tradeKey(fx.home, fx.away, strat));
 
 // Player shot picks (trades.player_picks): best line and side per player and market,
 // at most MAX_PLAYER_TRADES per match, highest edges first.
@@ -356,6 +378,8 @@ function detailHtml(fx) {
   const imp = o ? impliedFor(fx) : {};
   const hasOdds = o && Object.values(o).some((v) => v != null);
   const blend = hasOdds && fx.p_bet ? fx.p_bet : null;
+  const zs = hasOdds && leanOn() && fx.z ? fx.z : null; // Blend Lean: σ above break-even
+  const lp = leanPick(fx);
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
     const odds_ = o?.[k];
@@ -363,7 +387,7 @@ function detailHtml(fx) {
     const edge = odds_ != null && pb != null ? pb * odds_ - 1 : null;
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
-        ? `${blend ? `<td class="${fixedRule() ? "" : "blend-col"}">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
+        ? `${blend ? `<td class="${fixedRule() ? "" : "blend-col"}">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>${zs ? `<td class="${zs[k] != null && zs[k] >= 1 - 1e-9 ? "edge-pos" : ""}${lp?.market === k ? " lean-cell" : ""}">${zs[k] != null ? sigmaText(zs[k]) : ""}</td>` : ""}`
         : `<td>${odds(1 / p[k])}</td>`
     }</tr>`;
   }).join("");
@@ -372,7 +396,9 @@ function detailHtml(fx) {
   const marketNote = !hasOdds
     ? "Fair odds = the price that would exactly match the model's chance."
     : fixedRule()
-      ? `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
+      ? leanOn()
+        ? `Model = the model alone: the chance the 12% test trades on. ${blend ? "Blend = the model mixed with the market: the chance Blend Lean trades on. " : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.${zs ? " σ = how far the blend sits above the quoted price's break-even (1 ÷ decimal odds), in σ: Lean needs +1σ, Strong +2σ." : ""}`
+        : `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
       : blend
       ? `Model = the model alone. Blend = the model mixed with ${bookPoss()} price, the chance value picks use. ${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = blend × payout − 1.`
       : `${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1.`;
@@ -387,12 +413,13 @@ function detailHtml(fx) {
       ${teamNewsSection(fx)}
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
-        <table class="mkts${blend ? " with-blend" : ""}">
-          <thead><tr><th></th><th>Model</th>${hasOdds ? `${blend ? `<th class="${fixedRule() ? "" : "blend-col"}">Blend</th>` : ""}<th>${dk}</th><th>Odds</th><th>Edge</th>` : "<th>Fair odds</th>"}</tr></thead>
+        <table class="mkts${blend ? " with-blend" : ""}${zs ? " with-z" : ""}">
+          <thead><tr><th></th><th>Model</th>${hasOdds ? `${blend ? `<th class="${fixedRule() ? "" : "blend-col"}">Blend</th>` : ""}<th>${dk}</th><th>Odds</th><th>Edge</th>${zs ? "<th>σ</th>" : ""}` : "<th>Fair odds</th>"}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
       <p class="note">${marketNote}</p>
+      ${hasOdds && leanOn() ? `<div class="explain lean-explain">${leanPickText(fx)}</div>` : ""}
       ${hasOdds && fixedRule() ? `<div class="explain">${fixedPickText(fx, pick)} ${esc(fixedNote(fxLeague(fx)))}</div>` : hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
       ${goalsSection(fx)}
       ${cornersSection(fx)}
@@ -717,18 +744,48 @@ function edgePanel(pfId = "moneyline", lg = "") {
 // The owner's fixed live test: the level in force, the reason, and (folded) what the
 // backtests found, so the learned result stays visible beside the rule that overrides it.
 const fixedNote = (lg) => leagueRule(lg)?.note || paperRule()?.note || "";
+const leanNote = (lg) => leanRule(lg)?.note || (pfById("moneyline")?.live?.strategies || []).find((x) => x.key === "lean")?.rule?.note || "";
+// The match sheet's Blend Lean line: the pick (blend vs the price's break-even, in σ),
+// the open Lean trade, or why there is none.
+function leanPickText(fx) {
+  const lg = fxLeague(fx);
+  const sd = leanSigma(lg);
+  if (sd == null) return `<b>Blend Lean: no pick.</b> ${esc(state.data.match_blends?.note || leanRule(lg)?.note || "No blend fit for this competition yet.")}`;
+  const sdText = `${esc(leagueName(lg))} σ = ${ptsText(sd)}: how far the blend usually strays from the market in this competition.`;
+  if (fx.low_data) return `<b>Blend Lean: no pick.</b> One team has few matches in the model, so paper trades skip this match. ${sdText}`;
+  const z = fx.z;
+  if (!z || !fx.p_bet) return `<b>Blend Lean: no pick.</b> No blended chance for this match yet. ${sdText}`;
+  const lp = leanPick(fx);
+  const t = openTradeFor(fx, "lean");
+  const side = (m) => {
+    const be = 1 / fx.odds[m];
+    return `${esc(PICK_LABEL[m])} at ${price(fx.odds[m])}: the blend gives ${pct(fx.p_bet[m], 1)} against the ${pct(be, 1)} this price needs to break even, ${sigmaText(z[m])}`;
+  };
+  let head;
+  if (t) {
+    const same = lp && PICK_LABEL[lp.market] === PICK_LABEL[t.market];
+    head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened)` : ""}. One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."}`;
+  } else if (lp) {
+    head = `<b>Blend Lean pick (${tierName(lp)}):</b> ${side(lp.market)}. A $10 paper trade opens on it at the next update with fresh odds.`;
+  } else {
+    const best = ["home", "draw", "away"].filter((m) => z[m] != null && fx.odds?.[m]).sort((a, b) => z[b] - z[a])[0];
+    head = best ? `<b>Blend Lean: no pick.</b> Closest is ${side(best)}; a Lean pick needs +1σ.` : "<b>Blend Lean: no pick.</b>";
+  }
+  return `${head} ${sdText}`;
+}
 // The match sheet's live-test line. One paper trade per match: once one is open, a later
 // price move can flag another outcome (or none), but no second trade opens.
 function fixedPickText(fx, pick) {
-  const t = (pfById("moneyline")?.live?.trades || []).find((x) => x.status === "open" && x.bet_type !== "player" && x.home === fx.home && x.away === fx.away);
+  const t = openTradeFor(fx, "edge12"); // the 12% test's own trade, never the Lean one
   const now = pick ? `${esc(PICK_LABEL[pick.market] || pick.market)} at ${price(pick.odds)}, ${signedPct(pick.edge)} edge on the model alone` : "";
+  const l = leanOn();
   if (t) {
     const same = pick && PICK_LABEL[pick.market] === PICK_LABEL[t.market];
-    return `<b>Paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}. Only one trade per match, so nothing new opens here.${same ? ` It is still the live-test pick at today's price: ${now}.` : pick ? ` At today's price the live test would pick ${now}.` : !pick ? " At today's price no outcome reaches the live test's edge any more; the trade stays open until it settles." : ""}`;
+    return `<b>${l ? "Model 12%: paper trade already open" : "Paper trade already open"}:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}. Only one ${l ? "12% " : ""}trade per match, so nothing new opens here.${same ? ` It is still the ${l ? "12%" : "live-test"} pick at today's price: ${now}.` : pick ? ` At today's price the ${l ? "12% rule" : "live test"} would pick ${now}.` : !pick ? ` At today's price no outcome reaches the ${l ? "12% rule's" : "live test's"} edge any more; the trade stays open until it settles.` : ""}`;
   }
-  if (pick) return `<b>Live-test pick:</b> ${now}. A $10 paper trade opens on it at the next update with fresh odds.`;
-  if (fixedSkips(fx)) return "<b>No pick here.</b> One team has few matches in the model, so the live test skips this match.";
-  return `<b>No pick here.</b> No outcome reaches the ${pct(fxEdge(fx))} edge your live test needs.`;
+  if (pick) return `<b>${l ? "Model 12% pick" : "Live-test pick"}:</b> ${now}. A $10 paper trade opens on it at the next update with fresh odds.`;
+  if (fixedSkips(fx)) return `<b>${l ? "Model 12%: no pick" : "No pick here"}.</b> One team has few matches in the model, so the live test skips this match.`;
+  return `<b>${l ? "Model 12%: no pick" : "No pick here"}.</b> No outcome reaches the ${pct(fxEdge(fx))} edge your live test needs.`;
 }
 function learnedText(lg) {
   const et = edgeInfo("moneyline", lg);
@@ -739,13 +796,27 @@ function learnedText(lg) {
     : `<b>Backtests found that bets at ${aPct(et.min_edge)}+ edge made money</b> (on the model blended with the price).`;
   return `${head}${et.note ? ` ${esc(et.note)}` : ""}${basis ? `<div class="meta">Based on ${basis}.</div>` : ""}`;
 }
+// Blend Lean's line in the edge panel: the 1σ rule and the league's σ (or each league's).
+function leanEdgeRec(lg) {
+  const sd = leanSigma(lg);
+  const one = lg || !multiLeague();
+  const list = one ? "" : leaguesPresent().map((c) => `${esc(leagueShort(c))} ${leanSigma(c) == null ? "no fit yet" : ptsText(leanSigma(c))}`).join(" · ");
+  const head = one
+    ? `<b>Blend Lean: 1σ${sd != null ? ` (${esc(leagueName(lg || "E0"))} σ = ${ptsText(sd)})` : ""}.</b>`
+    : "<b>Blend Lean: 1σ.</b>";
+  const body = one && sd == null
+    ? ` ${esc(leanNote(lg) || "No blend fit for this competition yet, so nothing is flagged.")}`
+    : " Flagging the side where the blend of model and DraftKings' price beats the price's break-even by at least one σ (Strong at 2σ), one $10 paper trade per match. σ is how far the blend usually strays from the market in that competition.";
+  return `<div class="edge-rec"><span class="meta">First strategy</span>${head}${body}${list ? `<div class="meta">σ by competition: ${list}.</div>` : ""}</div>`;
+}
 function fixedEdgePanel(lg = "") {
   const th = edgeRule("moneyline", lg);
   const level = leagueRule(lg)?.threshold ?? PAPER_EDGE;
   const exploring = th.source === "explore";
   return `
     <div class="edge-panel">
-      <div class="edge-rec"><b>Fixed ${pct(level)} (your live test).</b> Flagging every pick where the model alone, without the market blend, shows at least ${aPct(level)} edge against DraftKings' price: exactly what paper trades take. This rule lost money in backtests; the live test measures it on real prices.${leagueEdgeList("moneyline", lg)}</div>
+      ${leanOn() ? leanEdgeRec(lg) : ""}
+      <div class="edge-rec${leanOn() ? " second" : ""}">${leanOn() ? '<span class="meta">Second strategy</span>' : ""}<b>Fixed ${pct(level)} (your live test).</b> Flagging every pick where the model alone, without the market blend, shows at least ${aPct(level)} edge against DraftKings' price: exactly what paper trades take. This rule lost money in backtests; the live test measures it on real prices.${leagueEdgeList("moneyline", lg)}</div>
       ${exploring ? `<div class="edge-exploring">Exploring: flagging ${pct(state.exploreEdge)}+ instead. <button class="linkish" data-edge="reset">Back to the live-test level</button></div>` : ""}
       <details class="fold edge-learned">
         <summary>What the backtests found</summary>
@@ -835,8 +906,18 @@ function viewMatches() {
   const minE = matchEdge(lg);
   const nValue = shown.filter(([fx]) => bestPick(fx, fxEdge(fx))).length;
   const allNull = shown.every(([fx]) => fxEdge(fx) == null);
-  const openTrades = new Map((pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
-  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() ? `<b>${nValue}</b> of ${shown.length} matches have a live-test pick: the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge against ${bookPoss()} price. A $10 paper trade opens on each match that doesn't have one yet (one per match).` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>${fixedRule() && fixedNote(lg) ? `<div class="explain live-test">${esc(fixedNote(lg))}</div>` : ""}`;
+  const openTrades = openMatchTrades(); // keyed by match and strategy: never mix Lean and 12%
+  const lean = leanOn();
+  const nLean = shown.filter(([fx]) => leanPick(fx)).length;
+  const leanNoFit = lean && (state.data.match_blends?.note || (lg && leanSigma(lg) == null ? leanRule(lg)?.note : ""));
+  const leanCount = lean ? `<b>${nLean}</b> of ${shown.length} matches have a Blend Lean pick (the blend beats ${bookPoss()} break-even by 1σ or more).${leanNoFit ? ` ${esc(leanNoFit)}` : ""} ` : "";
+  const countText = lean
+    ? `${leanCount}<b>${nValue}</b> have a 12% pick (the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge). Each strategy opens one $10 paper trade per match.`
+    : `<b>${nValue}</b> of ${shown.length} matches have a live-test pick: the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge against ${bookPoss()} price. A $10 paper trade opens on each match that doesn't have one yet (one per match).`;
+  const ruleBox = lean
+    ? `<div class="explain live-test"><b>Blend Lean (first):</b> ${esc(leanNote(lg))}${fixedRule() && fixedNote(lg) ? `<br><b>Model 12% (second):</b> ${esc(fixedNote(lg))}` : ""}</div>`
+    : fixedRule() && fixedNote(lg) ? `<div class="explain live-test">${esc(fixedNote(lg))}</div>` : "";
+  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() ? countText : `${lean ? leanCount : ""}${nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}`}</p>${ruleBox}`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
@@ -852,8 +933,9 @@ function viewMatches() {
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
           ${lineupConfirmed(fx) ? `<span class="badge lineup">${CHECK}Lineups confirmed</span>` : ""}
-          ${pick ? `<span class="badge">${CHECK}${pickBadge(pick, openTrades.get(`${fx.home}|${fx.away}`))}: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
-          ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); const { cur } = currentPrice(t); const m = markToMarket(t, cur); return `<span class="badge paper">Paper trade open: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`; })() : ""}
+          ${lean ? leanBadges(fx, openTrades.get(tradeKey(fx.home, fx.away, "lean"))) : ""}
+          ${pick ? `<span class="badge${lean ? " second" : ""}">${CHECK}${pickBadge(pick, openTrades.get(tradeKey(fx.home, fx.away, "edge12")))}: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
+          ${openTrades.has(tradeKey(fx.home, fx.away, "edge12")) ? openBadge(openTrades.get(tradeKey(fx.home, fx.away, "edge12"))) : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
@@ -1976,20 +2058,21 @@ function pfOpen(trades) {
   if (!open.length) return "";
   const rows = open.map((t) => {
     const { cur, live, fx } = currentPrice(t);
-    let curEdge = null;
+    let curEdge = null, curZ = null;
     if (isCorner(t)) {
       const q = fx?.corners?.pinnacle?.[t.team_side]?.find((x) => Number(x.line) === Number(t.line));
       const pw = q?.[t.side === "over" ? "p_over" : "p_under"];
       if (pw != null && live) curEdge = pw * cur + (q.p_push || 0) - 1;
     } else {
-      const p = t.bet_type === "player" ? null : fx?.p?.[t.market];
+      const p = t.bet_type === "player" ? null : (isLean(t) ? fx?.p_bet : fx?.p)?.[t.market];
       curEdge = p != null ? p * cur - 1 : null;
+      if (isLean(t) && p != null && t.sigma) curZ = (p - 1 / cur) / t.sigma;
     }
     const mtm = markToMarket(t, cur);
     const move = cur < t.odds ? "shortened" : cur > t.odds ? "drifted" : "unchanged";
     return `
       <button class="bet-row trade" data-trade="${esc(t.id)}">
-        <span>${tradeTitle(t)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
+        <span>${tradeTitle(t)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curZ != null ? ` · now ${sigmaText(curZ)}` : curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
         <span class="pl ${plClass(mtm)}">${usd(mtm, 2)}<div class="meta">if cashed out</div></span>
       </button>`;
   }).join("");
@@ -2082,8 +2165,39 @@ function leagueSet(set, lg) {
 
 // A card's pick badge. Under the live test, a match whose paper trade is already open on
 // another outcome says "Would pick now": one trade per match, so nothing new opens.
-const pickBadge = (pick, t) => (!fixedRule() ? "Value" : t && PICK_LABEL[t.market] !== PICK_LABEL[pick.market] ? "Would pick now" : "Live-test pick");
+const pickBadge = (pick, t) => {
+  if (!fixedRule()) return "Value";
+  const moved = t && PICK_LABEL[t.market] !== PICK_LABEL[pick.market];
+  if (leanOn()) return moved ? "12% would pick now" : "12% pick";
+  return moved ? "Would pick now" : "Live-test pick";
+};
+// An open match trade on a card: its bet, entry price, today's price and value if cashed out.
+function openBadge(t) {
+  const { cur } = currentPrice(t);
+  const m = markToMarket(t, cur);
+  const tag = leanOn() ? (stratOf(t) === "lean" ? " (Lean)" : " (12%)") : "";
+  return `<span class="badge paper">Paper trade open${tag}: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`;
+}
+// The headline Blend Lean badge ("Lean · 1.3σ" or "Strong · 2.4σ"), then its open trade.
+function leanBadges(fx, t) {
+  const lp = leanPick(fx);
+  const moved = lp && t && PICK_LABEL[t.market] !== PICK_LABEL[lp.market];
+  const pickB = lp ? `<span class="badge lean">${CHECK}${moved ? "Would pick now, " : ""}${tierName(lp)} · ${sigmaText(lp.z).replace("+", "")}: ${esc(PICK_LABEL[lp.market])} @ ${price(lp.odds)}</span>` : "";
+  return `${pickB}${t ? openBadge(t) : ""}`;
+}
 const isMoneylineFixed = (pf) => pf?.id === "moneyline" && fixedRule();
+// One match strategy's view of Moneyline's live section: its trades (trade_ids, else by
+// `strategy`), summary, breakdowns and by_league, with the section's error and note.
+function stratSet(set, st) {
+  const ids = st.trade_ids ? new Set(st.trade_ids) : null;
+  const trades = (set.trades || []).filter((t) => (ids ? ids.has(t.id) : stratOf(t) === st.key));
+  return { ...set, trades, summary: st.summary || { trades: trades.length }, breakdowns: st.breakdowns || {}, by_league: st.by_league || null, rule: st.rule, note: st.key === "lean" ? null : set.note };
+}
+// " (Premier League 0.6 points, La Liga 1.9 points)" from the Lean rule's sigma per league.
+function sigmaList(by) {
+  const items = Object.entries(by || {}).filter(([, v]) => v != null).map(([c, v]) => `${esc(leagueName(c))} ${ptsText(v)}`);
+  return items.length ? ` (${items.join(", ")})` : "";
+}
 function viewPortfolio() {
   const pf = state.data.portfolio || {};
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
@@ -2106,17 +2220,27 @@ function viewPortfolio() {
     <div class="segmented small-seg" role="group" aria-label="Which trades">
       ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
     </div>`;
-  const fullSet = pfSet();
+  // Moneyline's live record per match strategy (Blend Lean first, then Model 12%): each its
+  // own rule, summary, breakdowns, by_league; trade_ids point into the combined trades.
+  const strats = cur.id === "moneyline" && state.pfView === "live" ? pfSet()?.strategies || [] : [];
+  const strat = strats.find((x) => x.key === state.pfStrat) || strats[0] || null;
+  const fullSet = strat ? stratSet(pfSet(), strat) : pfSet();
+  const stratSwitch = strats.length > 1 ? `
+    <div class="segmented small-seg strat-seg" role="group" aria-label="Match strategy">
+      ${strats.map((x) => `<button data-pfstrat="${esc(x.key)}" class="${x.key === strat.key ? "on" : ""}" aria-pressed="${x.key === strat.key}">${esc(x.label)}</button>`).join("")}
+    </div>` : "";
   // Moneyline and Team corners: filtered by competition (by_league summaries from paper.py).
   const byComp = cur.id === "moneyline" || cur.id === "corners";
   const research = state.pfView === "backtest" && fullSet?.kind === "research";
   const lg = byComp && !research ? leagueOn() : "";
   const set = fullSet && lg ? leagueSet(fullSet, lg) : fullSet;
-  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}`;
+  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
   if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = cur.id === "corners" && state.pfView === "live"
     ? `<div class="explain live-test"><b>Live test: fixed ${pct(set?.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${set?.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(set?.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back.</div>`
+    : strat?.key === "lean"
+    ? `<div class="explain live-test"><b>Blend Lean (1σ+), listed first.</b> A $${strat.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(strat.rule?.sigma)}. Be warned: the baseball app's Lean tier hasn't proven itself either, and soccer's blend gives the model little weight, so expect few picks, mostly outside the Premier League.</div>`
     : state.pfView === "live" && cur.status === "live"
     ? (isMoneylineFixed(cur)
       ? `<div class="explain live-test"><b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.</div>`
@@ -2129,7 +2253,9 @@ function viewPortfolio() {
   const s = set?.summary || { trades: 0 };
   const banner = set?.error ? `<div class="banner">${esc(set.error)}</div>` : set?.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   if (!trades.length) {
-    const empty = cur.id === "corners" && state.pfView === "live"
+    const empty = strat?.key === "lean"
+      ? `No Blend Lean trades yet. One opens when a side's blended chance beats DraftKings' break-even by 1σ.${strat.rule?.source === "none" && strat.rule?.note ? ` ${esc(strat.rule.note)}` : ""}`
+      : cur.id === "corners" && state.pfView === "live"
       ? "No corner trades yet. One opens when a team's corner line shows a 12% edge against Pinnacle's price."
       : cur.status === "testing"
       ? "No trades yet. They start once this strategy passes its tests."
@@ -2227,10 +2353,12 @@ function playerModelHtml(pm) {
 // A label may be a function of the trade.
 const isPlayer = (t) => t.bet_type === "player";
 const hoursText = (h) => (h >= 48 ? `${(h / 24).toFixed(1)} days` : h >= 1 ? `${h.toFixed(1)} h` : `${Math.max(1, Math.round(h * 60))} min`);
+const isLean = (t) => t.strategy === "lean" && !isPlayer(t) && !isCorner(t);
 const TRADE_FIELDS = [
   ["Match", (t) => `${t.home} v ${t.away}`],
   ["Kickoff", (t) => kickoffText(t.kickoff)],
   ["Pick", (t) => tradeLabel(t)],
+  ["Strategy", (t) => (isLean(t) ? "Blend Lean (1σ+)" : "Model 12% (your live test)"), (t) => !isPlayer(t) && !isCorner(t) && t.source === "live" && (leanOn() || !!t.strategy)],
   ["Player", (t) => `${t.player} (${t.team || "?"}${t.position ? `, ${t.position}` : ""})`, "player"],
   ["Result", (t) => (t.actual != null ? `${countWord(t.market, t.actual)}${t.started != null ? (t.started ? ", started" : ", came on") : ""}` : "–"), "player"],
   ["Result", (t) => (t.actual != null ? `${t.team} had ${t.actual} corners${t.push ? ": exactly the line, a push (stake back)" : ""}` : "–"), "corners"],
@@ -2238,14 +2366,17 @@ const TRADE_FIELDS = [
   ["Entry odds", (t) => `${american(t.odds)} (${t.odds.toFixed(2)})`],
   ["Odds fetched", (t) => (t.odds_fetched_at ? kickoffText(t.odds_fetched_at) : "–")],
   ["Opened", (t) => `${kickoffText(t.opened_at)} (${hoursText(t.hours_to_kickoff)} before kickoff)`],
-  [(t) => (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4 ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
+  [(t) => (isLean(t) || (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4) ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
+  ["Raw model chance", (t) => pct(t.p_model, 1), (t) => isLean(t) && t.p_model != null],
+  ["Break-even at entry", (t) => pct(1 / t.odds, 1), isLean],
+  ["Above break-even", (t) => `${sigmaText(t.z)} (${tierName(t)}${t.sigma != null ? `; σ = ${ptsText(t.sigma)}` : ""})`, (t) => isLean(t) && t.z != null],
   ["Raw model chance", (t) => pct(t.model_p_base, 1), (t) => isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4],
   ["Push chance", (t) => pct(t.p_push, 1), (t) => isCorner(t) && t.p_push > 0],
-  ["Without team news", (t) => pct(t.model_p_base, 1), "match"],
+  ["Without team news", (t) => pct(t.model_p_base, 1), (t) => !isPlayer(t) && !isCorner(t) && !isLean(t)],
   ["Team news applied", (t) => (t.news_applied ? "Yes" : "No"), "match"],
   ["Edge at entry", (t) => signedPct(t.edge)],
-  ["Threshold", (t) => pct(t.threshold)],
-  ["Rule", (t) => (isCorner(t) ? "Fixed edge, model (f) vs Pinnacle (live test)" : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
+  ["Threshold", (t) => (isLean(t) ? `+${Number(t.threshold).toFixed(0)}σ` : pct(t.threshold))],
+  ["Rule", (t) => (isCorner(t) ? "Fixed edge, model (f) vs Pinnacle (live test)" : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : t.rule === "lean_1sigma" ? "Blend 1σ+ above the price's break-even" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
   [(t) => (t.status === "open" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
   [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
@@ -2324,6 +2455,10 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.pf) {
     state.pfView = t.dataset.pf; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    render();
+  } else if (t.dataset.pfstrat) {
+    state.pfStrat = t.dataset.pfstrat; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    store.set("pfStrat", state.pfStrat);
     render();
   } else if (t.dataset.recbet) {
     state.recBet = t.dataset.recbet;
