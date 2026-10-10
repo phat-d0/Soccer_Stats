@@ -341,10 +341,14 @@ def team_total_results(raw_dir: Path = RAW_DIR, leagues=team_totals.TEAM_TOTAL_L
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
+TEAM_TOTAL_NEVER_SCORE = 10**9  # publish counts team-total matches, never scores them
+
+
 def team_total_progress(dirs, results: pd.DataFrame) -> dict:
     """How far the live FanDuel team-total test has got (no API calls): matches with a
     look, with both look and close, settled (both plus a result, team_totals.report's
-    count) out of the 50 it needs; the report's headline once it has scored."""
+    count) out of the 50 it needs. Counts only: the outcomes are scored once, by the
+    pre-registered round-13 run (`odds-check.yml` `task=team-totals`), never by a build."""
     from soccer_stats.lab import metrics
 
     paths = []
@@ -356,9 +360,19 @@ def team_total_progress(dirs, results: pd.DataFrame) -> dict:
     if rows.empty:
         return out
     rows = rows[rows["book"] == TEAM_TOTAL_BOOK] if "book" in rows else rows
+    rows = rows[team_totals.market_kind(rows) == "team_totals"]  # not the totals anchors
+    if rows.empty:
+        return out
     match = ["league", "home", "away", "kickoff"]
     snaps = rows.groupby(match)["snapshot"].agg(set)
-    rep = team_totals.report(rows, results if results is not None else pd.DataFrame())
+    # Counts only: scoring these outcomes on every build would look at the model before
+    # the pre-registered round-13 development run (docs/totals.md, amendment 1), so the
+    # report never reaches its own gate here and `result` stays empty.
+    rep = team_totals.report(
+        rows,
+        results if results is not None else pd.DataFrame(),
+        min_matches=TEAM_TOTAL_NEVER_SCORE,
+    )
     out.update(
         rows=int(len(rows)),
         looks=int(sum("look" in s for s in snaps)),

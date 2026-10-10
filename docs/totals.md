@@ -806,3 +806,271 @@ Lead review notes (10 Oct):
   2025 the last few days get no expected goals; with 2025/26 loaded they do. Those rows
   are 2024/25 and predicted from earlier matches only, so it is not look-ahead; the
   yearly fits agree to five decimals. The test's recalibration fit used the fuller set.
+## Team totals against the main market (round 13; owner's request 10 Oct; pre-registered 2026-10-10, before any team-total outcome is read)
+
+**Why.** Soft books often price side markets off their own main lines. If FanDuel's team
+totals lag or mis-derive from the main match market, a price taken from that market
+could beat FanDuel's team-total price where our own model can't. This test scores that
+idea against FanDuel's own close. 0 credits, no key, data already logged; research only.
+
+**What is logged today (plumbing check, no results read; data-log on 10 Oct 07:55 UTC).**
+- FanDuel team totals: 51 look rows across E0, SP1, D1, I1 and F1 (lines 0.5 to 3.5, mostly
+  1.5), 0 close rows yet, all from the first run on 9 Oct.
+- DraftKings odds log: 1,521 h2h rows in six leagues and **0 over/under 2.5 rows**. DraftKings
+  returns no 2.5 total on the bulk odds endpoint, so the main-market price below rests on
+  h2h. The spec still uses a logged O/U 2.5 row if one ever appears (rule below).
+- Median gap between consecutive logged DraftKings h2h downloads per fixture: about 1.7 h in
+  E0, about 3.1 h in the matchday leagues (their refresh is every 3 h from 48 h out).
+
+**Unit.** One FanDuel row = one match × team × line, at the **look** snapshot (18–30 h
+before kickoff), paired with the same match × team × line at the **close**. Bovada rows,
+rows without a close, and lines that are not x.5 (pushes) are left out. The result is the
+team's full-time goals (football-data), 0 = over won, 1 = under won.
+
+**1. Market-derived chance (candidate a).**
+- Input: DraftKings' margin-free prices as logged (`fair`, Shin): h2h always; O/U 2.5 too if a
+  totals row exists. For each FanDuel look row, the last logged DraftKings row of that
+  fixture and market whose `downloaded_at` is at or before the FanDuel row's
+  `downloaded_at` (what we had in hand when the look was taken).
+- Freshness: dropped when that DraftKings download is more than **N = 6 hours** older than the
+  FanDuel download, or missing. The report counts drops per league.
+- Fit: independent **Poisson** goals (no Dixon-Coles correction, rho = 0), means λh and λa in
+  [0.05, 6], chosen to minimise the **sum of squared differences** between the score
+  matrix's probabilities and DraftKings' fair probabilities over every outcome supplied
+  (home/draw/away, plus over/under 2.5 when present), with equal weight per outcome.
+  Score matrix 0..10 goals a side. h2h alone gives two free numbers for two means, so it
+  is matched exactly; the total then rests on the draw price, which pins it only loosely.
+  This is the textbook "goals implied by the 1X2" method a soft book could itself use.
+- Chance: P(team goals > line) = 1 − Poisson CDF(floor(line); λ of that team).
+
+**2. Candidates.**
+- (a) market-derived, as above;
+- (b) our model: `p_model_over`, logged with the row at fetch time;
+- (c) **fixed 50/50 blend** on the logit scale: logit p = ½ logit(a) + ½ logit(b). No fitted
+  weight, in development or confirmation: a few hundred rows can't fit a weight reliably,
+  and changing the blend between the two stages would undo the confirmation. The weight
+  each candidate would earn beside FanDuel's look price (`lab.metrics.blend_weight`) is
+  reported, descriptive only.
+
+**3. Bet rule and scoring.**
+- At the look, bet the over or the under (the larger edge) when candidate chance ×
+  FanDuel's raw (margined) price − 1 ≥ t, for **t ∈ {2%, 5%, 10%}** (`lab.metrics.pick_bets`;
+  at most one bet per row). Flat 1 unit.
+- Scored through `lab.metrics.evaluate`: CLV = price × FanDuel's de-margined closing chance −
+  1; ROI; both with ranges resampling whole matches; log loss against FanDuel's de-margined
+  look and close; calibration tables (10 bins) for each candidate and for FanDuel's look.
+- Family: 3 candidates × 3 thresholds = **9 tests, 99.444% ranges** (Bonferroni).
+- **Pass** (per candidate × threshold): the CLV range's lower bound is above 0 AND there
+  are at least **30 bets**. ROI and its range are reported but don't gate: on a few dozen
+  bets they are too wide to decide anything, which is why the lab judges on CLV. The
+  blend-weight half of the lab's usual rule is dropped here: it needs a sharp market to
+  sit beside, and FanDuel's ~6% margin isn't one.
+- Descriptive, no results needed: how often FanDuel's price disagrees with the
+  market-derived chance by more than its margin, i.e. a·over > 1 or (1 − a)·under > 1 at the
+  look (an edge above 0 against the raw price), per league, and how many reach each t.
+
+**4. Samples and what a pass leads to.**
+- **Development.** Run when `team_totals.report`'s gate is met: at least **50 settled
+  matches** with a FanDuel look, a close, a result and a DraftKings quote within N. Every
+  eligible match up to the run is scored. This is the first and only look at those matches.
+- **Nothing passes:** stop. The report says so; no confirmatory sample, no app change.
+- **Something passes:** freeze one rule, the passing (candidate, t) with the largest CLV
+  lower bound (ties: the smaller t), and score it once on a **fresh forward sample**: matches
+  kicking off after the last kickoff in the development run, until **150 settled matches**
+  (about three to four weekends across five leagues). One test, 95% range, same pass rule
+  (CLV lower bound above 0 and at least 30 bets).
+- A confirmed rule goes to the owner as a proposal for **paper trades** only (pre-registered
+  again before any start), never live bets. A rule that fails confirmation is dropped.
+
+**5. Build.** An extension of `team_totals.report` and `odds-check.yml` `task=team-totals`
+(which then also copies data-log's DraftKings month files). Plumbing (counts, joins,
+freshness drops, the disagreement distribution) never reads results. The development run
+is dispatched by the lead once the gate is met.
+
+**Addendum, 2026-10-10 (plumbing check on the 51 logged look rows, no results read).**
+The h2h-only fit can't pin the total, and that decides the answer:
+- Plain Poisson (the spec): the implied totals run from 2.2 to 5.4 goals (Augsburg v Bayern
+  5.4, PSG v Le Mans 4.8). Against FanDuel's fair over chance the market-derived chance is
+  lower in 40 of 51 rows (mean −3.4 points; −5.4 at the 1.5 line). 40 rows beat FanDuel's
+  raw price on one side, 15 by 5% or more.
+- The same fit with a Dixon-Coles correction flips it: rho −0.1 puts the market-derived
+  chance above FanDuel's in 82% of rows (+1.6 points at 1.5), rho −0.2 in 100% (+7.7). Each
+  0.1 of rho moves the implied total by about 0.4–0.5 goals.
+- So with h2h alone, candidate (a) mostly measures the choice of rho, not the market. The
+  test would still be scored honestly (CLV against FanDuel's close), but it couldn't tell
+  "FanDuel mis-derives its team totals" from "our total is off".
+- What would fix it is a total from a real price: FanDuel's own main `totals` (the owner's
+  idea, a side market against the book's own main line), or Pinnacle's goal totals (sharper,
+  3.6–4.8% margin). Either is an extra market on calls we make anyway: about +340 credits a
+  month at the base plan's two snapshots. That is the owner's call.
+- The spec above stands unless the lead and owner amend it before the development run;
+  any amendment is written here, timestamped, before the gate is met. The code already
+  uses a logged O/U 2.5 row for the total when one exists.
+
+**Amendment 1, 2026-10-10 ~08:15 UTC (before any team-total outcome is read; nothing has been scored).**
+Why: the addendum above (a counts-only plumbing finding) showed the h2h-only total hangs
+on rho, and on 10 Oct the owner approved a paid total anchor. From Moneyline's next PR,
+every team-total snapshot call asks for `markets=team_totals,totals` at FanDuel, Bovada
+and Pinnacle (2 credits a call). The totals rows land in the same files with
+`market: "totals"`, `side: "match"`, `line` as returned (2.5, 2.75, 3.0 …) and Shin
+`fair_over`/`fair_under`; older rows have no `market` and count as team totals. This
+amendment replaces sections 1–4 where they differ; everything not mentioned stands.
+
+- **Anchor.** For a FanDuel team-total look row, the book's `totals` rows from the **same call**
+  (same event, snapshot and download time). If a book returns several lines, the one whose
+  fair over is nearest 0.5. A quarter or whole line is converted with half-stake splitting:
+  the break-even over chance under a score matrix is Σ win / Σ (win + lose) over the
+  line's halves (2.75 = 2.5 and 3.0; a push on 3.0 neither wins nor loses).
+- **Fit with an anchor.** Poisson means λh = s·T and λa = (1 − s)·T. For each split s, T is
+  solved so the matrix's break-even over chance at the anchor line equals the book's fair
+  over **exactly**; s is chosen to minimise the squared error against DraftKings'
+  margin-free h2h (the same quote, freshness rule and N = 6 h as before). So the total comes
+  from the totals price and the home/away split from the h2h.
+- **Candidates in the test family:**
+  - **(a′) FanDuel-anchored:** the total from FanDuel's own main totals. The owner's idea: a
+    side market against the same book's main line.
+  - **(a″) Pinnacle-anchored:** the total from Pinnacle's main totals (3.6–4.8% margin).
+  - **(b) our model**, unchanged.
+  - **(c) 50/50 logit blend of (a″) and (b):** if the model adds anything, it should add it to
+    the sharpest market estimate. Fixed weight, as before.
+  - Thresholds unchanged (2%, 5%, 10%): **4 × 3 = 12 tests, 99.583% ranges**. Pass rule unchanged
+    (CLV range above 0 and at least 30 bets).
+- **(a) h2h-only is now descriptive only**, outside the family: scored and printed beside
+  the others, never a pass and never frozen.
+- **Gates and the single development look.** The anchored candidates score only snapshots
+  that carry their anchor. The development run waits until **(a′) and (a″) each have 50
+  settled matches** with their anchor (counted from the first anchored snapshot, about
+  three weeks after Moneyline's PR merges). That one run scores every candidate at once, (b)
+  on all its eligible matches including the earlier, unanchored ones. Nothing is scored
+  before it, so it stays the only development look and one 12-test family.
+- **Coverage, reported every run (counts only):** FanDuel look rows with each anchor, with
+  each line type (x.5, quarter, whole), and the anchor's median line.
+- **Confirmation** unchanged: the one frozen rule, 150 settled matches kicking off after the
+  development run's last kickoff, at 95%; for an anchored rule, only matches with its
+  anchor count.
+
+Lead review notes (10 Oct): Amendment 1 says "~08:15 UTC"; it was committed at 08:05:26
+UTC (08ed591), before the anchored code (b88a80a, 08:13) and before any outcome was read
+(no `odds-check.yml` run since round 12's at 04:07 UTC). Lead fix: the older
+model-vs-close `report`, which `task=team-totals` also prints, scores the model's outcomes,
+so it now waits for this test's gate too (`team_totals.gated_min_matches`); otherwise a run
+before the anchors had 50 matches would have looked at candidate (b) early.
+
+## Corners: what's left to try (round 13, task 2; plan only, no runs, nothing spent)
+
+**Where things stand.** Rounds 8, 11 and 12 used up both recent seasons for corners: 2024/25
+was the bake-off holdout and 2025/26 the recalibration test. Both have been opened, so
+neither can judge a new corners model. What we know:
+- Each team's corners carry real information (gain over the league average +0.01 to
+  +0.05 a line, in every league and on both unseen seasons), but the chances come out
+  too spread out. Only the simplest model, shrunk team averages (b), passed the slope
+  band on development, and only in E0 and Serie A.
+- The match total isn't predictable beyond the league average in any league. The direct
+  total model (e) did worst of all, so the home/away correlation is not the main problem.
+- No price has ever been tested: football-data carries no corner prices.
+
+**The test season rule.** Any new corners model is tuned on 2017/18–2023/24 (already seen,
+fine for development), may then be refitted on everything up to 2025/26, and is judged
+only on **2026/27, scored forward**. Two pre-registered options:
+- a **mid-season check** on matches up to 31 Jan 2027 (about 170 in D1 and F1, 210–240 in E0, SP1 and I1, 340 in E1; football-data
+  publishes corner counts with each result), opened once, with the bake-off's pass rule;
+- or the **full season** in late May 2027 (306–552 per league).
+The mid-season check is the better use of time: it answers by February. Anything that
+passes then still needs the price test below before it could mean money.
+
+**Candidates (all free, data already cached or in football-data):**
+
+| # | Idea | What it tries to fix | Effort | Expected value |
+| --- | --- | --- | --- | --- |
+| 1 | **Shrink harder, by design.** Team corners for/against with a heavier, pre-registered prior (more pseudo-matches, or an empirical-Bayes prior fitted on earlier seasons). | The over-confidence: (b), the most shrunk model, was the only one near the band. | Small (a parameter of (b)) | **Highest.** It targets the one failure we keep seeing. |
+| 2 | **Market game state.** Pinnacle's pre-match 1X2 from football-data turned into an expected goal difference, plus the size of the favourite, as inputs to each team's corners. Favourites camp in the opponent's half and win corners; lopsided matches skew the split. | A sharper "who will dominate" signal than our match model's supremacy, which (d) already uses. | Medium | Medium. Pinnacle prices cover about 50% of 2025/26 but nearly all earlier seasons, so this can still be developed fully. |
+| 3 | **Richer style features** from football-data: shots, shots on target, fouls and cards, each for and against over the last 10 matches; and Understat's deep completions and PPDA for the top five leagues (free, already downloaded with xG). | Style: teams that cross and shoot from distance win corners; low-block opponents concede them. | Medium | Medium-low. (d) already had 10-match shots form and was the least calibrated, so more features risk more over-fitting. Pair with idea 1. |
+| 4 | **Both teams together** (the lead's (i)): total ~ NB, home share ~ beta-binomial given the total, or a Gaussian copula on NB sides with a fitted negative correlation (−0.16 to −0.23 seen). | The total's spread. | Medium | **Low.** The direct total (e) already modelled the total's own spread and still lost; the total's mean is the problem. Worth it only if ideas 1–3 make the team lines pass. |
+
+Recommended order: 1, then 2 (with 1), then 3 (with 1). 4 only if a team-line model passes.
+One bake-off, pre-registered before any code, in the six leagues, on development
+2017/18–2023/24, with each finalist frozen before 2026/27 is scored. Effort for 1–3 is
+about one round, 0 credits.
+
+**What a price test needs (the owner's call).**
+- Pinnacle quotes corners on The Odds API (eu region): match corner totals at 5.4–6.2% and
+  corner team totals at 5.8–7.0% (market probe, 9 Oct), all six leagues. Soft books are
+  6.6–11%.
+- Log them like the team totals: one `/events/{id}/odds` call per match per snapshot, one
+  credit per market per region, a look (18–30 h) and a close (≤30 min).
+- Credits per month (from the team-total estimate: about 171 a month per credit-per-call for
+  one snapshot in five leagues, about 225 with the Championship):
+  - corner team totals only, look + close, six leagues: **about 450 a month**;
+  - plus match corner totals: about 900 a month;
+  - close only, team corners (enough to score a model against Pinnacle's fair close, not
+    to test a bet rule's CLV): about 225 a month.
+- Sample: about 225 matches a month in six leagues, so 150 priced matches in about three
+  weeks and a full test (300+) in about six.
+- Best timing: start logging when a model passes the mid-season check (February 2027), or
+  earlier if the owner wants the prices on file anyway. Nothing is spent until the owner
+  says so.
+
+## Corners bake-off 2 (round 13; lead-approved 10 Oct; pre-registered 2026-10-10, before any code)
+
+**Why.** Rounds 11 and 12 found that each team's corner models carry information but are
+too confident, and that the simplest, most shrunk model came closest to calibration. The
+lead accepted the plan above: one bake-off of ideas 1–3, developed on 2017/18–2023/24 and
+judged once, on 2026/27 matches up to 31 January 2027. 0 credits, no key, no live change.
+
+**Scope.** Each team's corners only: home and away, over 3.5 / 4.5 / 5.5 (six lines), in
+E0, SP1, D1, I1, F1 and E1. Match totals are left out (they never beat the league
+average). Baseline: (a), the league average NB2, unchanged. The round-11 model (b), shrunk
+team averages with 10 pseudo-matches, is printed beside them as a reference, outside the
+family.
+
+**Fitting, for every candidate.** The round-11 walk-forward unchanged: refit every 28 days
+on the 730 days before each block, at least 1,000 earlier matches, features from earlier
+kickoffs only, NB2 dispersion moment-matched on the training window.
+
+**Candidates (the family):**
+- **(f) Empirical-Bayes team averages.** As (b), but the shrinkage is estimated on each
+  training window instead of fixed: for "for" and "against" separately, k = (average
+  within-team variance of a team's per-match ratio) / (variance of the true team ratios,
+  method of moments: variance of team means minus the average sampling variance, floored
+  at 1e-4). Each team's ratio = (sum + k) / (n + k). Nothing is tuned on outcomes.
+- **(g) (f) plus game state from Pinnacle.** NB2 regression per side (the bake-off's
+  `NBRegression`, same L2) on log of (f)'s rate plus two features from Pinnacle's early 1X2
+  in football-data (margin removed with Shin): log(P(home) / P(away)) and the favourite's
+  chance max(P(home), P(away)). A match without Pinnacle early prices gets (f)'s chances.
+- **(h) (f) plus style.** NB2 regression per side on log of (f)'s rate plus 10-match form,
+  for and against, as log ratios to the league's per-team mean over the year before (as
+  `totals.corner_features` does for corners and shots): shots, shots on target, fouls and
+  cards (yellow + 2 × red), all from football-data. Understat's deep completions and PPDA
+  are left out (not in the cached files; fetching them is a separate job). A match without
+  every feature gets (f)'s chances.
+
+**Development (2017/18–2023/24).** Every match from 1 July 2024 on is dropped before
+anything is computed (the match model's fit included). Pass, per league × candidate: the
+per-match mean log-loss gain over (a) across the six lines has a whole-match bootstrap
+range above 0 at the Bonferroni level, AND every line's recalibration slope is within
+0.80–1.25. Family: 3 candidates × 6 leagues = **18 tests, 99.722%**.
+
+**Finalist per league:** among the candidates that pass in that league, the one with the
+largest development gain (ties: f, then g, then h). **A league where nothing passes has no
+finalist and no test** (a change from round 11, whose rule took the best gain even when it
+failed).
+
+**Test: 2026/27, kickoffs from 1 July 2026 to 31 January 2027.**
+- Locked like the goalscorer forward window: every match from 1 July 2026 is dropped before
+  anything is computed unless the run is given a `reason`, which is logged with the time
+  (`lab.harness.Holdout`). Nobody has read a 2026/27 corner outcome: rounds 8, 11 and 12
+  loaded data only up to 2024/25 or 2025/26.
+- **Opened once, not before 3 February 2027** (football-data adds results within a day or
+  two). The window ends at kickoffs before 1 February 2027 whenever it is opened.
+- Training for the test: the same walk-forward, which by then fits on the 730 days before
+  each block (so 2024/25 and 2025/26 count as training data, never as a test).
+- Expected matches: about 170 in D1 and F1, 210–240 in E0, SP1 and I1, 340 in E1. A league
+  with fewer than 120 scored matches in the window is reported but not judged.
+- Pass: the same two conditions, at the Bonferroni level for the number of leagues with a
+  finalist (at most 6: 99.167%).
+- A pass means team corners can be shown on the match sheet as model estimates, untested
+  against any price, and makes the Pinnacle corner price test (about 450 credits a month)
+  worth putting to the owner. Nothing else changes.
+
+**Code.** `edge/corners2.py` (reusing `edge/corners.py`); `odds-check.yml`
+`task=corners2` with `league` (development) and with `reason` (the February test).
