@@ -23,7 +23,14 @@ from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
 from soccer_stats.backtest import simulate_bets
-from soccer_stats.data import RAW_DIR, current_season, load_fixtures, load_matches
+from soccer_stats.data import (
+    RAW_DIR,
+    current_season,
+    load_csv,
+    load_fixtures,
+    load_matches,
+    season_code,
+)
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
 from soccer_stats.odds_feed import BOOKMAKER_NAME, apply_odds, fetch_odds, parse_odds
@@ -317,6 +324,85 @@ def add_team_totals(cards: list[dict], dirs) -> int:
             c["team_totals"] = {"book": TEAM_TOTAL_BOOK, "fetched_at": max(stamps), **out}
             n += 1
     return n
+
+
+MARKETS_RESEARCH_FILE = Path(__file__).parent / "lab" / "markets_research.json"
+
+
+def team_total_results(raw_dir: Path = RAW_DIR, leagues=team_totals.TEAM_TOTAL_LEAGUES):
+    """This season's results from football-data files the build already cached (file
+    reads only: nothing is downloaded here)."""
+    code = season_code(current_season())
+    frames = []
+    for lg in leagues:
+        path = Path(raw_dir) / f"{lg}_{code}.csv"
+        if path.exists():
+            frames.append(load_csv(path, league=lg, season=code))
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def team_total_progress(dirs, results: pd.DataFrame) -> dict:
+    """How far the live FanDuel team-total test has got (no API calls): matches with a
+    look, with both look and close, settled (both plus a result, team_totals.report's
+    count) out of the 50 it needs; the report's headline once it has scored."""
+    from soccer_stats.lab import metrics
+
+    paths = []
+    for d in dirs:
+        if d:
+            paths += sorted(Path(d).glob("*_team_totals_*.jsonl")) + [Path(d) / "rows.jsonl"]
+    rows = pd.DataFrame(team_totals._read_jsonl(paths))
+    out = {"target": team_totals.MIN_MATCHES, "rows": 0, "looks": 0, "both": 0, "settled": 0}
+    if rows.empty:
+        return out
+    rows = rows[rows["book"] == TEAM_TOTAL_BOOK] if "book" in rows else rows
+    match = ["league", "home", "away", "kickoff"]
+    snaps = rows.groupby(match)["snapshot"].agg(set)
+    rep = team_totals.report(rows, results if results is not None else pd.DataFrame())
+    out.update(
+        rows=int(len(rows)),
+        looks=int(sum("look" in s for s in snaps)),
+        both=int(sum({"look", "close"} <= s for s in snaps)),
+        settled=int(rep.get("matches", 0)),
+    )
+    m = rep.get("model")
+    if m:
+        bets = m.get("bets") or {}
+        out["result"] = {
+            "fanduel_rows": rep.get("fanduel_rows"),
+            "log_loss": m.get("log_loss"),
+            "market_log_loss": m.get("market_log_loss"),
+            "gain": (m.get("gain_vs_market") or {}).get("mean"),
+            "gain_range": (m.get("gain_vs_market") or {}).get("range"),
+            "blend_c": (m.get("blend") or {}).get("c"),
+            "blend_range": (m.get("blend") or {}).get("c_range"),
+            "bets": bets.get("bets"),
+            "clv": bets.get("clv"),
+            "clv_range": bets.get("clv_range"),
+            "roi": bets.get("roi"),
+            "passes": metrics.passes(m),
+        }
+    return out
+
+
+def markets_research(dirs=(), results=None, path: Path = MARKETS_RESEARCH_FILE) -> dict | None:
+    """Record > Goals & corners: the committed research numbers (lab/markets_research.json)
+    plus the live team-total test's progress. None if the file is missing or unreadable;
+    a progress failure leaves an error note and keeps the research. Never raises."""
+    try:
+        data = json.loads(Path(path).read_text())
+        if not isinstance(data, dict):
+            return None
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        live = data.setdefault("team_goals", {}).setdefault("live", {})
+        live["progress"] = team_total_progress(dirs, results)
+    except Exception as exc:  # noqa: BLE001
+        live = (data.get("team_goals") or {}).get("live")
+        if isinstance(live, dict):
+            live["progress"] = {"error": type(exc).__name__}
+    return data
 
 
 def fixture_cards(
@@ -796,6 +882,28 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         print(f"Team totals shown: {n_tt} fixtures with FanDuel prices")
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
+    try:  # Record > Goals & corners: research numbers plus the live test's progress
+        state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
+        try:
+            results = team_total_results()
+        except Exception:  # noqa: BLE001  no results: progress counts only
+            results = None
+        data["markets_research"] = _clean(markets_research(state_dirs, results))
+        prog = ((data["markets_research"] or {}).get("team_goals") or {}).get("live") or {}
+        prog = prog.get("progress") or {}
+        print(
+            "Markets research: "
+            + (
+                "file missing"
+                if data["markets_research"] is None
+                else f"team totals {prog.get('settled', 0)} of {prog.get('target')} settled "
+                f"({prog.get('both', 0)} with look and close)"
+                + (f", progress failed ({prog['error']})" if prog.get("error") else "")
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        data["markets_research"] = None
+        print(f"Markets research: failed ({type(exc).__name__})")
     # After the paid team-total fetch, so a slow ESPN can never delay a close snapshot.
     try:  # free ESPN injuries and lineups; ESPN is unofficial, so it never stops the build
         print(espn_news.summary_line(espn_news.add(data["fixtures"])))

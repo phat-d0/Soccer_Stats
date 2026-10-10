@@ -407,13 +407,9 @@ function goalsSection(fx) {
   if (!cdf.total && !cdf.home && !cdf.away) return "";
   const lg = fxLeague(fx);
   const e1 = lg === "E1";
-  const imp = fx.odds ? impliedFor(fx) : {};
-  const dk = imp.over25 != null ? imp : null;
-  const book = isDK() ? "DK" : "Book";
   const totalRows = [0.5, 1.5, 2.5, 3.5, 4.5].map((line) => {
     const over = overFrom(cdf.total, line);
-    const bk = dk ? `<td>${line === 2.5 ? pct(dk.over25) : "–"}</td>` : "";
-    return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td>${bk}</tr>`;
+    return `<tr><td>${line}</td><td>${pct(over)}</td><td>${pct(over == null ? null : 1 - over)}</td></tr>`;
   }).join("");
   const tt = fx.team_totals;
   const fd = tt && (tt.home?.length || tt.away?.length);
@@ -433,11 +429,11 @@ function goalsSection(fx) {
     <div class="section-title">Goals</div>
     <div class="card" style="padding:8px 14px">
       <table class="mkts goals">
-        <thead><tr><th>Total goals</th><th>Over</th><th>Under</th>${dk ? `<th>${book} over</th>` : ""}</tr></thead>
+        <thead><tr><th>Total goals</th><th>Over</th><th>Under</th></tr></thead>
         <tbody>${totalRows}</tbody>
       </table>
     </div>
-    <p class="note">Model's chances of more or fewer goals in the match than each line (over 2.5 = 3 or more).${dk ? ` ${book} = ${bookPoss()} 2.5 line as a chance, margin removed.` : ""} Tested against Pinnacle; the model doesn't beat the market.${e1Note}</p>
+    <p class="note">Model's chances of more or fewer goals in the match than each line (over 2.5 = 3 or more). Tested against Pinnacle; the model doesn't beat the market.${e1Note}</p>
     ${cdf.home && cdf.away ? `
     <details class="fold goals-fold">
       <summary>Each team's goals <span class="muted">(${fd ? "with FanDuel's prices" : "model only"})</span></summary>
@@ -1288,12 +1284,154 @@ function bindChart() {
 function recordToggle() {
   return `
     <div class="segmented" role="group" aria-label="Bet type" style="margin-bottom:12px">
-      ${[["match", "Match bets"], ["player", "Player shots"]].map(([k, l]) => `<button data-recbet="${k}" class="${state.recBet === k ? "on" : ""}" aria-pressed="${state.recBet === k}">${l}</button>`).join("")}
+      ${[["match", "Match bets"], ["player", "Player shots"], ["markets", "Goals & corners"]].map(([k, l]) => `<button data-recbet="${k}" class="${state.recBet === k ? "on" : ""}" aria-pressed="${state.recBet === k}">${l}</button>`).join("")}
     </div>`;
 }
 
 function viewRecord() {
-  return recordToggle() + (state.recBet === "player" ? recordPlayerHtml() : recordMatchHtml());
+  const body = state.recBet === "player" ? recordPlayerHtml() : state.recBet === "markets" ? recordMarketsHtml() : recordMatchHtml();
+  return recordToggle() + body;
+}
+
+// ---------- Record → Goals & corners: research results (lab/markets_research.json) ----------
+// A range plot per league (dot = estimate, bar = its range, line at 0). Blue when the whole
+// range is above 0, red when it is all below, grey when it could be 0. Tap a row to read it.
+const rcCharts = {};
+function rangeChart(id, rows, fmt) {
+  rows = rows.filter((r) => r.v != null && r.lo != null && r.hi != null);
+  if (!rows.length) return "";
+  rcCharts[id] = rows;
+  const vals = rows.flatMap((r) => [r.lo, r.hi]).concat(0);
+  const span = Math.max(...vals) - Math.min(...vals) || 1;
+  const lo = Math.min(...vals) - span * 0.08, hi = Math.max(...vals) + span * 0.08;
+  const x = (v) => ((v - lo) / (hi - lo)) * 100;
+  const tone = (r) => (r.lo > 0 ? "pos" : r.hi < 0 ? "neg" : "mid");
+  const body = rows.map((r, i) => `
+    <button class="eb-row rc-row" data-rcrow="${i}" data-rc="${esc(id)}">
+      <span class="eb-label">${esc(r.label)}${r.sub ? `<span class="meta">${esc(r.sub)}</span>` : ""}</span>
+      <span class="eb-plot"><span class="rc-zero" style="left:${x(0)}%"></span><span class="eb-range ${tone(r)}" style="left:${x(r.lo)}%;width:${Math.max(0.5, x(r.hi) - x(r.lo))}%"></span><span class="eb-dot real ${tone(r)}" style="left:${x(r.v)}%"></span></span>
+    </button>`).join("");
+  // Ticks at 0 and near each end, skipping any that would crowd the 0 label.
+  const ticks = [lo + (hi - lo) * 0.1, hi - (hi - lo) * 0.1].filter((v) => Math.abs(x(v) - x(0)) > 18);
+  const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${fmt(v)}</span>`).join("")}<span style="left:${x(0)}%">0</span></span></div>`;
+  return `<div class="card eb-card">${body}${axis}<div class="eb-readout" id="rc-readout-${esc(id)}" aria-live="polite">${rows[0].readout}</div></div>`;
+}
+
+const gainFmt = (v, d = 3) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`);
+const pctPts = (v, d = 1) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}%`);
+const runsLine = (runs) => (runs ? Object.entries(runs).map(([lg, id]) => `${esc(leagueShort(lg))} ${esc(id)}`).join(", ") : "");
+const rangeMeta = (lo, hi) => (lo == null || hi == null ? "" : `<span class="mk-range">${gainFmt(lo)} to ${gainFmt(hi)}</span>`);
+const andList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+const capFirst = (t) => (t ? t[0].toUpperCase() + t.slice(1) : "");
+const sourceNote = (part) => `<p class="note small-note">Source: ${esc(part.source || "")}${part.runs ? `. Runs: ${runsLine(part.runs)}` : ""}.</p>`;
+
+function recordMarketsHtml() {
+  const mr = state.data.markets_research;
+  if (!mr || typeof mr !== "object" || !(mr.total_goals || mr.team_goals || mr.corners)) {
+    return `<div class="empty">The research results for goals and corners aren't in this update. They come back with the next site update.</div>`;
+  }
+  const cards = [marketTotalGoals(mr.total_goals), marketTeamGoals(mr.team_goals), marketCorners(mr.corners)].filter(Boolean).join("");
+  return `
+    <p class="note">What our tests found for three markets the model can price. Nothing here is a bet: no market has shown an edge yet.${mr.updated ? ` Updated ${esc(mr.updated)}.` : ""}</p>
+    ${cards}`;
+}
+
+function marketCard(title, verdict, tone, inner, fold) {
+  return `
+    <div class="section-title">${esc(title)}</div>
+    <div class="verdict ${tone}">${esc(verdict || "")}</div>
+    ${inner}
+    ${fold ? `<details class="fold mk-fold"><summary>Details by league</summary>${fold}</details>` : ""}`;
+}
+
+function marketTotalGoals(tg) {
+  if (!tg) return "";
+  const pin = tg.pinnacle || {}, base = tg.baseline || {};
+  const rows = (pin.rows || []).map((r) => ({
+    label: leagueShort(r.league), sub: `${r.bets} bets`, v: r.clv_pct, lo: r.clv_lo, hi: r.clv_hi,
+    readout: `<b>${esc(leagueName(r.league))}</b>, ${r.matches.toLocaleString()} matches: our picks at a 12% edge got ${pctPts(r.clv_pct)} against Pinnacle's closing price (range ${pctPts(r.clv_lo)} to ${pctPts(r.clv_hi)}), on ${r.bets} bets.`,
+  }));
+  const chart = rangeChart("tg", rows, (v) => pctPts(v, 0));
+  const table = pin.rows?.length ? `
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table">
+      <thead><tr><th></th><th>Model</th><th>Pinnacle early</th><th>Bets</th><th>CLV</th></tr></thead>
+      <tbody>${pin.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td>${r.ll_model.toFixed(4)}</td><td>${r.ll_early.toFixed(4)}</td><td>${r.bets}</td><td class="loss">${pctPts(r.clv_pct)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">Model and Pinnacle early: average log loss on the over/under 2.5 (lower is better). Pinnacle's early price is better in every league, and the model earns no weight when the two are mixed (its weight's range includes 0 everywhere). ${esc(pin.seasons || "")}, ranges at ${esc(pin.level || "")}.</p>
+    ${sourceNote(pin)}` : "";
+  const baseTable = base.rows?.length ? `
+    <div class="sub-title">Against the league's recent average, 0.5 to 5.5 goals</div>
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table">
+      <thead><tr><th></th><th>Lines better</th><th>Which</th></tr></thead>
+      <tbody>${base.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td>${r.beat} of ${r.of}</td><td>${esc(r.which || "–")}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">The model beats a simple league average at ${base.lines_beating} of ${base.lines} lines, and its chances are too spread out (well calibrated at ${esc(base.calibrated || "")}; slopes ${esc(base.slopes || "")}, where 1 is ideal). ${esc(base.seasons || "")}.</p>
+    ${sourceNote(base)}` : "";
+  return marketCard("Total goals", tg.verdict, "neg", `
+    <p class="note" style="margin-top:4px">Closing line value at Pinnacle, over/under 2.5 goals: how much better or worse our picks' prices were than Pinnacle's last price. Below 0 means the market moved against us.</p>
+    ${chart}`, table + baseTable);
+}
+
+function marketTeamGoals(tm) {
+  if (!tm) return "";
+  const res = tm.research || {}, live = tm.live || {};
+  const p = live.progress;
+  const target = p?.target || live.target || 50;
+  let liveHtml;
+  if (!p) liveHtml = `<p class="note">The live test's progress isn't in this update.</p>`;
+  else if (p.error) liveHtml = `<p class="note">The live test's progress couldn't be counted in this update (${esc(p.error)}); it is checked again on the next one.</p>`;
+  else {
+    const done = Math.min(1, (p.settled || 0) / target);
+    const r = p.result;
+    liveHtml = `
+      <div class="card">
+        <div class="mk-progress-head"><b>${p.settled || 0} of ${target}</b> matches ready to score</div>
+        <div class="mk-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${target}" aria-valuenow="${p.settled || 0}"><span style="width:${(done * 100).toFixed(1)}%"></span></div>
+        <p class="note" style="margin:8px 0 0">A match is ready when FanDuel's price was logged about a day before kickoff and again just before it, and the result is in. So far: ${p.looks || 0} with the early price, ${p.both || 0} with both prices.</p>
+        ${r ? `<p class="note" style="margin:8px 0 0"><b>${r.passes ? "Passes" : "No edge yet"}.</b> Against FanDuel's early price the model's log-loss gain is ${gainFmt(r.gain, 4)}${r.gain_range ? ` (range ${gainFmt(r.gain_range[0], 4)} to ${gainFmt(r.gain_range[1], 4)})` : ""}. At a 12% edge: ${r.bets ?? 0} bets, closing line value ${signedPct(r.clv)}${r.clv_range ? ` (range ${signedPct(r.clv_range[0])} to ${signedPct(r.clv_range[1])})` : ""}. An edge needs both ranges above 0.</p>` : ""}
+      </div>`;
+  }
+  const table = res.rows?.length ? `
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table">
+      <thead><tr><th></th><th>Lines better than the average</th></tr></thead>
+      <tbody>${res.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.beat === r.of ? "gain" : r.beat === 0 ? "loss" : ""}">${r.beat} of ${r.of}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">Each team over/under 0.5, 1.5 and 2.5 goals. Gains ${esc(res.gains || "")}. Well calibrated at ${esc(res.calibrated || "")} (slopes ${esc(res.slopes || "")}, 1 is ideal). ${esc(res.e1 || "")} ${esc(res.seasons || "")}.</p>
+    ${sourceNote(res)}` : "";
+  return marketCard("Each team's goals", tm.verdict, "mid", `
+    <p class="note" style="margin-top:4px">In past seasons the model beat the league average at ${res.lines_beating_top5 ?? "–"} of ${res.lines_top5 ?? "–"} lines in the top five leagues. ${esc(live.plan || "")}</p>
+    <div class="sub-title">${esc(live.title || "Live test against FanDuel")}</div>
+    ${liveHtml}`, table);
+}
+
+function marketCorners(co) {
+  if (!co) return "";
+  const ho = co.holdout || {}, rc = co.recalibration || {};
+  const band = (rc.slope_band || ho.slope_band || [0.8, 1.25]).map((v) => v.toFixed(2)).join("–");
+  const rows = (rc.rows || []).map((r) => ({
+    label: leagueShort(r.league), sub: `${r.matches} matches`, v: r.gain, lo: r.lo, hi: r.hi,
+    readout: `<b>${esc(leagueName(r.league))}</b>, 2025/26, recalibrated: gain ${gainFmt(r.gain)} a line (range ${gainFmt(r.lo)} to ${gainFmt(r.hi)}); line slopes ${esc(r.slopes)}. Outside ${band}: ${esc(r.outside || "none")}.`,
+  }));
+  const chart = rangeChart("co", rows, (v) => gainFmt(v, 2));
+  const hoTable = ho.rows?.length ? `
+    <div class="sub-title">${esc(ho.title || "")}</div>
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table mk-wide">
+      <thead><tr><th></th><th>Team gain</th><th>Slopes</th><th>Total gain</th></tr></thead>
+      <tbody>${ho.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.team_lo > 0 ? "gain" : ""}">${gainFmt(r.team_gain)}${rangeMeta(r.team_lo, r.team_hi)}</td><td>${esc(r.team_slopes)}</td><td>${gainFmt(r.total_gain)}${rangeMeta(r.total_lo, r.total_hi)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">Each team's corners (over 3.5, 4.5 and 5.5): the range clears 0 in ${andList(ho.rows.filter((r) => r.team_lo > 0).map((r) => esc(theLeague(r.league)))) || "no league"}, but every league has a line whose slope is outside ${band}. Total corners (8.5 to 11.5): no league's range clears 0. ${esc(capFirst(ho.seasons || ""))}, ranges at ${esc(ho.level || "")}.</p>
+    ${sourceNote(ho)}` : "";
+  const rcTable = rc.rows?.length ? `
+    <div class="sub-title">${esc(rc.title || "")}</div>
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table mk-wide">
+      <thead><tr><th></th><th>Gain</th><th>Slopes</th><th>Before</th></tr></thead>
+      <tbody>${rc.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.lo > 0 ? "gain" : ""}">${gainFmt(r.gain)}${rangeMeta(r.lo, r.hi)}</td><td>${esc(r.slopes)}</td><td>${gainFmt(r.raw_gain)}${rangeMeta(r.raw_lo, r.raw_hi)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">Each team's corners after recalibration (Before = the same model without it). Lines outside ${band}: ${rc.rows.map((r) => `${esc(leagueShort(r.league))} ${esc(r.outside)}`).join("; ")}. ${esc(capFirst(rc.seasons || ""))}, ranges at ${esc(rc.level || "")}.</p>
+    ${sourceNote(rc)}` : "";
+  return marketCard("Corners", co.verdict, "neg", `
+    <p class="note" style="margin-top:4px">Each team's corners, 2025/26 test after recalibration: how much better the model's chances scored than the league average (log loss a line; above 0 is better). Blue = the whole range is above 0. A model also needs every line's slope between ${band} (1 means its chances are spread just right), and none managed it, so nothing passes.</p>
+    ${chart}`, hoTable + rcTable);
 }
 
 const STRATEGY_LABEL = {
@@ -1974,6 +2112,11 @@ document.addEventListener("click", (ev) => {
     const src = edgeChartSource(t.dataset.eb, t.dataset.eb === "moneyline" ? leagueOn() : "");
     if (el && src) el.innerHTML = ebReadout(src.et, Number(t.dataset.ebrow));
     t.parentElement.querySelectorAll(".eb-row").forEach((r) => r.classList.toggle("sel", r === t));
+  } else if (t.dataset.rcrow !== undefined) {
+    const rows = rcCharts[t.dataset.rc];
+    const el = document.getElementById(`rc-readout-${t.dataset.rc}`);
+    if (rows && el) el.innerHTML = rows[Number(t.dataset.rcrow)]?.readout || "";
+    t.parentElement.querySelectorAll(".rc-row").forEach((r) => r.classList.toggle("sel", r === t));
   } else if (t.dataset.recdk) {
     state.recDk = t.dataset.recdk;
     render();
