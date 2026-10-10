@@ -235,3 +235,22 @@ def test_development_waits_for_both_anchors():
     out = tt.market_report(rows, dk, res)
     assert "fanduel_anchor 0 of 50" in out["note"] and "candidates" not in out
     assert out["matches"]["model"] == 60
+
+
+def test_the_older_report_waits_for_the_market_gate():
+    rows, dk, res = _league(60, anchored=False)
+    mm = tt.market_report(rows, dk, res)
+    assert "candidates" not in mm  # no anchors yet: below the round-13 gate
+    team = rows[tt.market_kind(rows) == "team_totals"]
+    out = tt.report(team, res, min_matches=tt.gated_min_matches(mm))
+    assert "not enough data yet" in out["note"] and "model" not in out
+    # Once the gate is met the older report scores as before.
+    rows, dk, res = _league(60)
+    mm = tt.market_report(rows, dk, res)
+    assert tt.gated_min_matches(mm) == tt.MIN_MATCHES
+
+
+def test_confirmation_accepts_a_naive_after_time():
+    rows, dk, res = _league(200)
+    out = tt.market_report(rows, dk, res, after="2026-10-23T03:00:00", rule=("model", 0.05))
+    assert out["matches"]["model"] == 150

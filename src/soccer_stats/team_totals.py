@@ -832,7 +832,7 @@ def market_report(
         ok = m.loc[m["dk_status"] == "ok", _KEY8 + cols].drop_duplicates(_KEY8)
         p = p.merge(ok, on=_KEY8)
     if after is not None and len(p):
-        p = p[pd.to_datetime(p["kickoff"], utc=True) > pd.Timestamp(after)]
+        p = p[pd.to_datetime(p["kickoff"], utc=True) > _utc(after)]
     cands = candidates(p) if len(p) else {}
     counts = {n: (_matches(p, np.isfinite(v)) if len(p) else 0) for n, v in cands.items()}
     out.update(stage="confirmation" if rule else "development", matches=counts)
@@ -904,3 +904,9 @@ def market_report(
         out["frozen_rule"] = f"{best[0]}:{best[1]:.2f}"
         out["confirm_after"] = out["last_kickoff"]
     return out
+
+
+def gated_min_matches(market: dict, min_matches: int = MIN_MATCHES) -> int:
+    """`report`'s minimum for this run: it scores the model's outcomes, so it waits until
+    `market_report` has passed its own gate (amendment 1: one development look)."""
+    return min_matches if "candidates" in market else 10**9

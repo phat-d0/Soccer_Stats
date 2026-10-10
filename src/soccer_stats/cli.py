@@ -137,8 +137,6 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
         print("Team totals: nothing logged yet")
         return
     results = load_matches(list(TEAM_TOTAL_LEAGUES), [current_season()])
-    out = team_totals.report(rows, results, min_matches=args.min_matches)
-    print(json.dumps(out, indent=1, default=str))
     # Round 13: FanDuel against the main market (docs/totals.md); counts only below the gate.
     rule = None
     if args.rule:
@@ -150,6 +148,13 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
     mm = team_totals.market_report(
         rows, dk, results, min_matches=args.min_matches, after=args.after or None, rule=rule
     )
+    # The older model-vs-close report scores candidate (b)'s outcomes, so it waits for the
+    # round-13 gate too: the development run stays the only look (amendment 1).
+    team = rows[team_totals.market_kind(rows) == "team_totals"]
+    out = team_totals.report(
+        team, results, min_matches=team_totals.gated_min_matches(mm, args.min_matches)
+    )
+    print(json.dumps(out, indent=1, default=str))
     print("MARKET_TEST_JSON " + json.dumps(mm, default=str))
 
 

@@ -949,6 +949,13 @@ amendment replaces sections 1–4 where they differ; everything not mentioned st
   development run's last kickoff, at 95%; for an anchored rule, only matches with its
   anchor count.
 
+Lead review notes (10 Oct): Amendment 1 says "~08:15 UTC"; it was committed at 08:05:26
+UTC (08ed591), before the anchored code (b88a80a, 08:13) and before any outcome was read
+(no `odds-check.yml` run since round 12's at 04:07 UTC). Lead fix: the older
+model-vs-close `report`, which `task=team-totals` also prints, scores the model's outcomes,
+so it now waits for this test's gate too (`team_totals.gated_min_matches`); otherwise a run
+before the anchors had 50 matches would have looked at candidate (b) early.
+
 ## Corners: what's left to try (round 13, task 2; plan only, no runs, nothing spent)
 
 **Where things stand.** Rounds 8, 11 and 12 used up both recent seasons for corners: 2024/25
