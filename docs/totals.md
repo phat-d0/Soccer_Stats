@@ -722,3 +722,25 @@ league average (a), as before. Match totals are left out (they never beat the av
 
 **Code.** `edge/corner_recal.py`; `odds-check.yml` `task=corner-recal` with `league`
 (development view, 2025/26 dropped first) and with `reason` (opens 2025/26 once).
+
+### Team-corner recalibration: development view (descriptive; recorded before 2025/26 is opened)
+
+Runs: `task=corner-recal`, commit ed2caf1, 2025/26 dropped first, 0 credits: E0 38022657681,
+SP1 38022659193, D1 38022660746, I1 38022662228, F1 38022663678, E1 38022665072. Each season
+2018/19–2024/25 is recalibrated with a fit on the seasons before it; ranges at 95%.
+
+| League | Matches | Fit b (2018→2024) | Raw: gain, slopes | Recalibrated: gain, slopes |
+| --- | --- | --- | --- | --- |
+| E0 | 2,566 | 0.89 → 0.86 | +0.047, 0.73–0.85 | +0.049 (+0.040..+0.057), **0.84–0.98** |
+| SP1 | 2,569 | 0.81 → 0.81 | +0.015, 0.57–0.73 | +0.017 (+0.011..+0.023), 0.71–0.88 |
+| D1 | 2,067 | 0.66 → 0.84 | +0.035, 0.73–0.82 | +0.035 (+0.027..+0.043), **0.89–0.99** |
+| I1 | 2,547 | 0.90 → 0.90 | +0.033, 0.77–0.82 | +0.033 (+0.026..+0.040), **0.87–0.93** |
+| F1 | 2,332 | 0.76 → 0.84 | +0.017, 0.68–0.81 | +0.018 (+0.013..+0.024), **0.83–1.00** |
+| E1 | 3,703 | 0.81 → 0.84 | +0.015, 0.64–0.80 | +0.016 (+0.011..+0.020), 0.76–0.95 |
+
+Reading (descriptive, not the test): the fits are stable from season to season (b about
+0.8–0.9, a near 0). Recalibrating keeps the gain, nudges it up slightly, and brings every
+line into the slope band in E0, D1, I1 and F1. La Liga (home 3.5 at 0.75, away 3.5 at
+0.71) and the Championship (home 4.5 at 0.76) stay below it. One pooled intercept for home
+and away leaves a small bias on some lines (E1 home 3.5: 75.5% over vs 71.8% predicted);
+that is the pre-registered spec and stays as is for the test.
