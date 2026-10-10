@@ -172,6 +172,7 @@ def update_ledger(
     odds_log: pd.DataFrame | None = None,
     threshold: float | None = tr.PAPER_EDGE,
     rule: dict | None = None,
+    lean: dict | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -185,7 +186,13 @@ def update_ledger(
     opens no new match trades, while open ones still get their close and settle. `rule`
     (trades.paper_threshold's dict) picks the chance: p_source "model" trades on the
     card's raw `p`; otherwise p_bet (the blend) when set, else p. New trades record the
-    rule name and p_source.
+    rule name and p_source, and `strategy` "edge12".
+
+    `lean` (trades.lean_rule) runs the second strategy beside it on the same gates (before
+    kickoff, fresh DraftKings odds, not low_data, priced): trades.lean_pick on the card's
+    blended `p_bet` at the rule's sigma, $10, one Lean trade per match (id "...|lean"),
+    recording z, tier, sigma, p_bet and the raw model chance. Without a sigma, no Lean
+    trades. Closes, CLV and settlement are the same for both.
     """
     rule = rule or {}
     raw = rule.get("p_source") == "model"
@@ -205,6 +212,15 @@ def update_ledger(
     cards = {(c["home"], c["away"]): c for c in fixtures if c.get("kickoff")}
 
     # 1. Open.
+    sigma = (lean or {}).get("sigma")
+    if fresh and sigma:
+        for c in cards.values():
+            kickoff = pd.Timestamp(c["kickoff"])
+            if kickoff <= now or c.get("low_data"):
+                continue
+            ev = _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean)
+            if ev:
+                events.append(ev)
     if fresh and threshold is not None:
         for c in cards.values():
             kickoff = pd.Timestamp(c["kickoff"])
@@ -237,6 +253,7 @@ def update_ledger(
                 },
                 rule=rule.get("rule"),
                 p_source="model" if raw else ("blend" if c.get("p_bet") else "model"),
+                strategy="edge12",
             )
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
@@ -312,6 +329,46 @@ def update_ledger(
                 )
             )
     return events, note
+
+
+def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | None:
+    """Open the Lean trade for one card (trades.lean_pick on its p_bet), unless the match
+    already has one or nothing reaches 1 sigma; returns its open event."""
+    pick = tr.lean_pick(c.get("p_bet"), c.get("odds"), lean["sigma"], lean.get("min_z", tr.LEAN_Z))
+    if not pick:
+        return None
+    t = tr.new_trade(
+        pick,
+        source="live",
+        league=league,
+        home=c["home"],
+        away=c["away"],
+        kickoff=kickoff,
+        opened_at=now,
+        odds_fetched_at=fetched,
+        threshold=lean.get("min_z", tr.LEAN_Z),
+        news_applied=bool(c.get("news_applied")),
+        model_ref={**(ref or {}), "probs": "blend"},
+        rule=tr.LEAN_RULE,
+        p_source="blend",
+        strategy="lean",
+    )
+    if t["id"] in ledger:
+        return None
+    t.update(
+        z=round(pick["z"], 3),
+        tier=pick["tier"],
+        sigma=round(pick["sigma"], 5),
+        p_bet=round(pick["p_bet"], 4),
+        p_model=round(float(c["p"][pick["market"]]), 4)
+        if (c.get("p") or {}).get(pick["market"]) is not None
+        else None,
+    )
+    group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
+    quoted = c.get("odds_updated") or fetched
+    t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
+    ledger[t["id"]] = t
+    return {"type": "open", **t}
 
 
 def _fresh(fetched: str | None, now: pd.Timestamp) -> bool:
@@ -712,12 +769,55 @@ def by_league(trades: list[dict]) -> dict | None:
     return out
 
 
+def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None) -> dict:
+    """One match strategy's live record (Moneyline -> live -> strategies): its rule, summary,
+    breakdowns, per-league view and its trades' ids, newest first (the trades themselves
+    are in the section's combined `trades`, so data.json carries each trade once)."""
+    mine = [t for t in trades if tr.strategy_of(t) == key]
+    sec = portfolio_section(mine)
+    return {
+        "key": key,
+        "label": label,
+        "rule": rule,
+        "summary": sec["summary"],
+        "breakdowns": sec["breakdowns"],
+        "by_league": by_league(mine),
+        "trade_ids": [t["id"] for t in sec["trades"]],
+    }
+
+
+def lean_overview(leans: dict[str, dict]) -> dict:
+    """The Lean rule across leagues for the strategy list: the shared fields, sigma per
+    league and one note (the rule's own when any league has a fit, else why not)."""
+    first = next(iter(leans.values()), tr.lean_rule(None, "E0"))
+    live = [r for r in leans.values() if r.get("sigma")]
+    return {
+        **{k: first[k] for k in ("key", "rule", "min_z", "strong_z", "p_source", "stake")},
+        "sigma": {lg: r.get("sigma") for lg, r in leans.items()},
+        "source": "match_blends" if live else "none",
+        "note": (live[0] if live else first)["note"],
+    }
+
+
+def match_strategies(leans: dict[str, dict], rule: dict) -> list[dict]:
+    """Moneyline's strategies in tr.STRATEGY_ORDER (Lean first): key, label, rule."""
+    edge_label = (
+        tr.STRATEGY_LABELS["edge12"]
+        if rule.get("rule") == "fixed_raw"
+        else "Learned minimum edge (blend)"
+    )
+    rules = {"lean": lean_overview(leans), "edge12": rule}
+    labels = {**tr.STRATEGY_LABELS, "edge12": edge_label}
+    return [{"key": k, "label": labels[k], "rule": rules[k]} for k in tr.STRATEGY_ORDER]
+
+
 def portfolios_section(
     live: dict,
     live_trades: list[dict],
     backtests: dict[str, dict | None],
     match_rule: dict | None = None,
     sections: dict[str, dict] | None = None,
+    strategies: list[dict] | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -728,7 +828,9 @@ def portfolios_section(
     (why no new trades, or the fallback) becomes that section's note when there's no other.
     `sections` overrides a portfolio's live `error`, `note` and adds its `rule` (corners:
     its own ledger and rule). A backtest of `kind` "research" (corners: the research
-    record, no prices) passes through unchanged.
+    record, no prices) passes through unchanged. `strategies` (match_strategies) gives
+    Moneyline's live section `strategies`: one strategy_section each, in that order; its
+    combined trades and summary stay for older app code.
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -753,6 +855,10 @@ def portfolios_section(
         if p["id"] == "moneyline" and match_rule is not None:
             section["rule"] = match_rule
             section["note"] = live.get("note") or match_rule.get("note")
+        if p["id"] == "moneyline" and strategies:
+            section["strategies"] = [
+                strategy_section(mine, st["key"], st["label"], st["rule"]) for st in strategies
+            ]
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
@@ -848,7 +954,13 @@ def run(
     # The app's flags (edge_threshold.by_league) keep showing the learned levels and their
     # notes whatever PAPER_RULE is; the paper rule itself is in portfolio.rules.
     learned = {lg: tr.paper_threshold(files[lg], lg, rule="learned") for lg in codes}
+    # The second match strategy (Blend Lean): each league's sigma from data.json's
+    # match_blends (publish.add_lean); none = no Lean trades in that league.
+    leans = {lg: tr.lean_rule(data.get("match_blends"), lg) for lg in codes}
+    for lg in codes:
+        rules[lg] = {**rules[lg], "sigma": leans[lg]["sigma"], "lean": leans[lg]}
     rule = rules[league]
+    portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
         threshold_source=rule["source"],
@@ -895,6 +1007,7 @@ def run(
                     odds_log=log,
                     threshold=rules[lg]["threshold"],
                     rule=rules[lg],
+                    lean=leans[lg],
                 )
                 ledger.update(sub)
                 events += ev
@@ -941,7 +1054,12 @@ def run(
     if live.get("error") and not corner_section["error"]:
         corner_section["error"] = live["error"]
     portfolio["portfolios"] = portfolios_section(
-        live, live_trades + corner_trades, backtests, rule, {"corners": corner_section}
+        live,
+        live_trades + corner_trades,
+        backtests,
+        rule,
+        {"corners": corner_section},
+        match_strategies(leans, rule),
     )
     return written
 

@@ -209,6 +209,29 @@ def load_csv(path: Path, league: str | None = None, season: str | None = None) -
     return normalize(raw, league=league, season=season)
 
 
+def pinnacle_only(raw: pd.DataFrame) -> pd.DataFrame:
+    """Matches with Pinnacle's own 1X2 close only: `close_home/draw/away` NaN where the
+    file has no PSCH/PSCD/PSCA price (load_matches falls back to the market average, then
+    Bet365, there; 2025/26 has Pinnacle prices for only about half of each league)."""
+    alts = {c for k in ("close_home", "close_draw", "close_away") for c in FALLBACKS[k]}
+    return normalize(raw.drop(columns=[c for c in raw.columns if c in alts]))[
+        ["date", "home", "away", "close_home", "close_draw", "close_away"]
+    ]
+
+
+def pinnacle_closes(
+    league: str, start_years: Iterable[int], raw_dir: Path = RAW_DIR
+) -> pd.DataFrame:
+    """season, date, home, away and Pinnacle's own 1X2 close (pinnacle_only) per match."""
+    frames = []
+    for year in start_years:
+        raw = pd.read_csv(
+            download(league, year, raw_dir=raw_dir), encoding="latin-1", on_bad_lines="skip"
+        )
+        frames.append(pinnacle_only(raw).assign(season=season_code(year)))
+    return pd.concat(frames, ignore_index=True)
+
+
 def load_matches(
     leagues: Iterable[str], start_years: Iterable[int], raw_dir: Path = RAW_DIR
 ) -> pd.DataFrame:

@@ -662,6 +662,88 @@ def add_match_blend(data: dict, blend: dict | None) -> dict:
     return data
 
 
+def match_blends(path: str | None = None) -> dict | None:
+    """The per-league h2h blends saved by fit-match-blends (data-log's
+    backtest/match_blends.json, MATCH_BLENDS_FILE): {generated_at, pool, leagues: {code:
+    {coef, sigma, matches, fit_from, fit_to, fit_date, refit, ...}}}, or None."""
+    path = path or os.environ.get("MATCH_BLENDS_FILE")
+    try:
+        d = json.loads(Path(path).read_text()) if path else {}
+    except (OSError, ValueError):
+        d = {}
+    leagues = {
+        code: e
+        for code, e in (d.get("leagues") or {}).items()
+        if isinstance(e, dict) and e.get("coef") and e.get("sigma")
+    }
+    return {**d, "leagues": leagues} if leagues else None
+
+
+LEAN_CARD_KEYS = ("coef", "sigma", "matches", "fit_from", "fit_to", "fit_date", "refit")
+
+
+def add_lean(data: dict, blends: dict | None) -> int:
+    """The Blend Lean fields on every card (trades.lean_pick), from each league's own h2h
+    blend (`blends` = match_blends()); returns how many cards have a Lean pick.
+
+    Per card with DraftKings h2h odds and a fit for its league: `p_bet` home/draw/away =
+    the blend of the model and DraftKings' margin-free price (for E0 this replaces the
+    h2h part of E0_dk.json's blend, so p_bet and z use one fit; its totals part stays),
+    `z` per side = (p_bet - 1/decimal) / sigma, and `lean_pick` = {market, odds, p_bet,
+    model_p, edge, z, tier, sigma} or None (always None on low_data cards, which paper
+    trades skip). Cards without a fit get z and lean_pick None. `data.match_blends` =
+    {generated_at, note, leagues: {code: LEAN_CARD_KEYS}}.
+    """
+    leagues = (blends or {}).get("leagues") or {}
+    data["match_blends"] = {
+        "generated_at": (blends or {}).get("generated_at"),
+        "note": None
+        if leagues
+        else "No Lean picks: the per-league blend fits (backtest/match_blends.json) aren't "
+        "available yet.",
+        "leagues": {c: {k: e.get(k) for k in LEAN_CARD_KEYS} for c, e in leagues.items()},
+    }
+    primary = data.get("league_code") or lgs.PRIMARY
+    n = 0
+    for fx in data.get("fixtures", []):
+        code = fx.get("league") or primary
+        entry = leagues.get(code)
+        fx["z"], fx["lean_pick"] = None, None
+        if not entry:
+            continue
+        implied, p = fx.get("implied") or {}, fx.get("p") or {}
+        mk = [implied.get(m) for m in mc.H2H]
+        md = [p.get(m) for m in mc.H2H]
+        if any(v is None for v in mk + md):
+            continue
+        pb = mc.apply(entry["coef"], [mk], [md])[0]
+        if not np.isfinite(pb).all():
+            continue
+        base = fx.get("p_bet") or {"over25": None, "under25": None}
+        fx["p_bet"] = {**base, **{m: float(v) for m, v in zip(mc.H2H, pb, strict=True)}}
+        z = tr.side_z(fx["p_bet"], fx.get("odds"), entry["sigma"])
+        fx["z"] = {m: None if v is None else round(v, 3) for m, v in z.items()} if z else None
+        pick = (
+            None
+            if fx.get("low_data")
+            else tr.lean_pick(fx["p_bet"], fx.get("odds"), entry["sigma"])
+        )
+        if pick:
+            fx["lean_pick"] = {
+                **pick,
+                "z": round(pick["z"], 3),
+                "edge": round(pick["edge"], 4),
+                "p_bet": round(pick["p_bet"], 4),
+                "model_p": round(pick["model_p"], 4),
+            }
+            n += 1
+    mb = data.get("match_blend")
+    if isinstance(mb, dict) and primary in leagues:  # the h2h fit E0's p_bet now uses
+        e = leagues[primary]
+        mb["h2h"] = {"coef": e["coef"], "matches": e.get("matches"), "source": "match_blends"}
+    return n
+
+
 def add_players(data: dict, league: str, fpl_df, credits_left) -> tuple[dict, list[dict]]:
     """Player shot lines for each upcoming fixture, plus season shooting stats per
     player and club (never raises)."""
@@ -927,6 +1009,25 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
             )
     dups = duplicate_fixtures(data["fixtures"])
     print(f"Duplicate fixtures: {len(dups)}" + (f" {dups}" if dups else ""))
+    try:  # Blend Lean (second match strategy): per-league blend, z and the Lean pick
+        blends = match_blends()
+        n_lean = add_lean(data, blends)
+        mbs = data["match_blends"]["leagues"]
+        print(
+            "Match blends: "
+            + (
+                "; ".join(
+                    f"{lgs.name(c)} sigma {e['sigma']:.4f} ({e['matches']} matches)"
+                    for c, e in mbs.items()
+                )
+                + f". Lean picks: {n_lean}"
+                if mbs
+                else "file missing, no Lean picks"
+            )
+        )
+    except Exception as exc:  # noqa: BLE001  the Lean fields never stop the build
+        data["match_blends"] = {"generated_at": None, "note": "Lean fields failed.", "leagues": {}}
+        print(f"Match blends: failed ({type(exc).__name__}); no Lean picks this run")
     data["odds_sources"] = _clean(sources)
     data["teams_by_league"] = teams_by_league
     data["leagues"] = league_list(data["fixtures"], sources)

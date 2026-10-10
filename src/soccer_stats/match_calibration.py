@@ -193,6 +193,23 @@ def training_rows(preds: pd.DataFrame, group: str, prefix: str = "close") -> pd.
     return out.dropna().reset_index(drop=True)
 
 
+def sigma(coef: list[float] | None, market, model) -> float | None:
+    """How far the blend usually strays from the price: the sd of p_blend - p_book over
+    every row and outcome (pooled; ddof 0), on the rows the coefficients were fitted on.
+
+    The confidence tiers (trades.lean_pick) measure a side's gap over break-even in these
+    units. None without coefficients or rows.
+    """
+    if coef is None:
+        return None
+    mk = np.atleast_2d(np.asarray(market, dtype=float))
+    if not mk.size:
+        return None
+    gap = apply(coef, mk, model) - mk
+    gap = gap[np.isfinite(gap).all(1)]
+    return float(gap.std(ddof=0)) if len(gap) else None
+
+
 def walk_forward(
     train: pd.DataFrame,
     target: pd.DataFrame,
@@ -200,17 +217,22 @@ def walk_forward(
     refit: str = REFIT,
     min_rows: int = MIN_ROWS,
     features: tuple[str, ...] = (),
+    with_sigma: bool = False,
 ) -> tuple[pd.DataFrame, list[dict]]:
     """Out-of-sample blended chances for `target` rows.
 
     `target` has `date` (the day the bet is decided, naive), mkt_<m> and p_<m>. Each
     block of `refit` days uses a fit on `train` matches played before the block starts;
     earlier blocks get NaN (no trade). A `w` column in `train` weights its rows;
-    `features` names extra signal columns present in both frames.
+    `features` names extra signal columns present in both frames. `with_sigma` adds a
+    `sigma` column (and key in each fit): `sigma` of that block's fit on its own
+    training rows, so a tier decided with it never sees a later match either.
     """
     names = names_of(group)
     feats = list(features)
     out = pd.DataFrame(np.nan, index=target.index, columns=list(names))
+    if with_sigma:
+        out["sigma"] = np.nan
     fits: list[dict] = []
     if target.empty or train.empty:
         return out, fits
@@ -234,7 +256,12 @@ def walk_forward(
             continue
         bx = block[feats] if feats else None
         out.loc[block.index, list(names)] = apply(coef, block[mk_cols], block[p_cols], bx)
-        fits.append({"from": lo.date().isoformat(), "matches": len(tr), "coef": coef})
+        fit_row = {"from": lo.date().isoformat(), "matches": len(tr), "coef": coef}
+        if with_sigma:
+            sd = sigma(coef, tr[mk_cols], tr[p_cols])
+            out.loc[block.index, "sigma"] = sd
+            fit_row["sigma"] = None if sd is None else round(sd, 5)
+        fits.append(fit_row)
     return out, fits
 
 
@@ -242,5 +269,59 @@ def live_fit(train: pd.DataFrame, group: str, min_rows: int = MIN_ROWS) -> dict:
     """A fit on every settled match, for the live app."""
     names = GROUPS[group]
     mk = train[[f"mkt_{m}" for m in names]]
-    coef = fit(mk, train[[f"p_{m}" for m in names]], train["y"], min_rows)
-    return {"coef": coef, "matches": len(train)}
+    md = train[[f"p_{m}" for m in names]]
+    coef = fit(mk, md, train["y"], min_rows)
+    sd = sigma(coef, mk, md) if len(train) else None
+    return {"coef": coef, "matches": len(train), "sigma": None if sd is None else round(sd, 5)}
+
+
+# ---------- per-league h2h blends (fit-match-blends; the Lean strategy) ----------
+
+
+def league_fit(rows: pd.DataFrame, fit_date, min_rows: int = MIN_ROWS) -> dict:
+    """The live h2h blend for one league from its training rows (training_rows output).
+
+    Only matches played before `fit_date` are used (no look-ahead): the coefficients, the
+    tier unit `sigma` (sd of p_blend - p_book, pooled over home/draw/away, p_book =
+    Pinnacle's margin-free close) and the date range. Also an out-of-sample check: the
+    same blend walk-forward (refit every REFIT on earlier matches only), log loss of the
+    model, the blend and Pinnacle on the matches it covers.
+    """
+    fit_date = pd.Timestamp(fit_date)
+    fit_date = fit_date.tz_convert(None) if fit_date.tz is not None else fit_date
+    rows = rows[pd.to_datetime(rows["date"]) < fit_date] if len(rows) else rows
+    mk_cols, p_cols = [f"mkt_{m}" for m in H2H], [f"p_{m}" for m in H2H]
+    out = {
+        "coef": None,
+        "sigma": None,
+        "matches": len(rows),
+        "fit_from": None,
+        "fit_to": None,
+        "fit_date": fit_date.date().isoformat(),
+        "refit": REFIT,
+    }
+    if rows.empty:
+        return out
+    dates = pd.to_datetime(rows["date"])
+    out.update(fit_from=dates.min().date().isoformat(), fit_to=dates.max().date().isoformat())
+    coef = fit(rows[mk_cols], rows[p_cols], rows["y"], min_rows)
+    out["coef"] = coef
+    sd = sigma(coef, rows[mk_cols], rows[p_cols])
+    out["sigma"] = None if sd is None else round(sd, 5)
+    blended, fits = walk_forward(rows, rows, "h2h", min_rows=min_rows)
+    ok = blended[list(H2H)].notna().all(axis=1).to_numpy()
+    if ok.any():
+        y = rows["y"].to_numpy(dtype=int)[ok]
+        idx = np.arange(ok.sum())
+
+        def ll(p) -> float:
+            return round(float(-np.log(np.clip(np.asarray(p)[idx, y], 1e-12, 1)).mean()), 5)
+
+        out["walk_forward"] = {
+            "matches": int(ok.sum()),
+            "refits": len(fits),
+            "model": ll(rows[p_cols].to_numpy(dtype=float)[ok]),
+            "blend": ll(blended[list(H2H)].to_numpy(dtype=float)[ok]),
+            "pinnacle": ll(rows[mk_cols].to_numpy(dtype=float)[ok]),
+        }
+    return out
