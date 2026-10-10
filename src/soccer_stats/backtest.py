@@ -38,7 +38,11 @@ def walk_forward(
     """
     matches = matches.sort_values("date").reset_index(drop=True)
     start = pd.Timestamp(start)
-    windows = pd.date_range(start, matches["date"].max() + pd.Timedelta(days=1), freq=refit_every)
+    # The last window must reach past the last match, or a final partial week (e.g. the
+    # season's last matchday) gets no prediction. It is fitted on earlier matches only.
+    windows = pd.date_range(
+        start, matches["date"].max() + pd.Timedelta(refit_every), freq=refit_every
+    )
 
     out = []
     for lo, hi in zip(windows[:-1], windows[1:], strict=True):
