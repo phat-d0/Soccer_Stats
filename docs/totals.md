@@ -744,3 +744,47 @@ line into the slope band in E0, D1, I1 and F1. La Liga (home 3.5 at 0.75, away 3
 0.71) and the Championship (home 4.5 at 0.76) stay below it. One pooled intercept for home
 and away leaves a small bias on some lines (E1 home 3.5: 75.5% over vs 71.8% predicted);
 that is the pre-registered spec and stays as is for the test.
+
+### Team-corner recalibration: 2025/26 test and verdict (opened once per league, 10 Oct)
+
+Runs: `task=corner-recal` with `reason`, commit 87e15d0, 0 credits, no key: E0 38022933421,
+SP1 38022934931, D1 38022936740, I1 38022938644, F1 38022940785, E1 38022942019. Each log
+records the opening, e.g. E0 "HOLDOUT OPENED at 2026-10-10T04:07:44Z (rows from
+2025-07-01): Round 12 team-corner recalibration: pre-registered 2025/26 test
+(pre-registration 4ab84a3, development view 87e15d0)". The recalibration was fitted on
+2017/18–2024/25 and applied unchanged. Ranges at 99.583% (12 tests).
+
+| League | Matches | Fit a, b | Raw: gain (range), slopes | Recalibrated: gain (range), slopes | Pass |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 358 | +0.025, 0.853 | +0.022 (−0.014..+0.057), 0.51–0.71 | +0.026 (−0.005..+0.057), 0.60–0.83 | no |
+| SP1 | 352 | +0.006, 0.814 | +0.018 (−0.014..+0.048), 0.39–0.80 | +0.021 (−0.006..+0.047), 0.48–0.99 | no |
+| D1 | 291 | +0.044, 0.829 | +0.016 (−0.016..+0.047), 0.47–0.82 | +0.017 (−0.010..+0.044), 0.56–0.99 | no |
+| I1 | 358 | −0.016, 0.873 | +0.027 (−0.004..+0.057), 0.58–0.91 | +0.028 (**+0.001..+0.055**), 0.66–1.04 | no |
+| F1 | 289 | −0.005, 0.847 | +0.029 (−0.002..+0.060), 0.62–1.13 | +0.029 (**+0.002..+0.057**), 0.73–1.33 | no |
+| E1 | 528 | +0.022, 0.864 | +0.022 (**+0.004..+0.040**), 0.65–1.15 | +0.022 (**+0.007..+0.038**), 0.75–1.33 | no |
+
+Lines outside 0.80–1.25 after recalibration: E0 away 3.5 (0.60), away 5.5 (0.65);
+SP1 home 5.5 (0.48); D1 home 3.5 (0.56), home 4.5 (0.66); I1 away 3.5 (0.66), away 4.5
+(0.79); F1 home 3.5 (1.33), away 4.5 (0.73); E1 home 5.5 (1.33), away 3.5 (1.29), away
+5.5 (0.75).
+
+**Verdict: nothing passes in any league, raw or recalibrated.** No team corners on the
+match sheet; no live change.
+
+Reading:
+- Each team's corner model still carries information on a season nothing had touched:
+  the gain over the league average is positive in every league (+0.016 to +0.029 a
+  line), and after recalibration its range clears 0 in Serie A, Ligue 1 and the
+  Championship (the Championship's raw range too).
+- Recalibration helps a little and as designed: gain up in every league but the
+  Championship (unchanged), and the median line slope moves towards 1. But it shrinks
+  every line by the same factor, and in 2025/26 some lines were still over-confident
+  (E0's away lines, D1's home lines) while others overshot (F1 home 3.5, E1 home 5.5 at
+  1.33).
+- The slope test is noisy on one season: each line's slope range is about ±0.3–0.5 on
+  290–530 matches, so a line can leave the band by chance. With 6 lines a league, all six
+  inside the band is a strict bar at this size. That is the rule as pre-registered; it
+  is not relaxed after the fact.
+- Next, if wanted: a further season (2026/27, from about May 2027) scored the same way
+  would double the sample. A price test still needs Pinnacle's live corner prices (a
+  separate owner decision). Nothing is proposed now.
