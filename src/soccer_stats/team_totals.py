@@ -517,3 +517,396 @@ def report(rows: pd.DataFrame, results: pd.DataFrame, min_matches: int = MIN_MAT
         out[f"calibration_{name}"] = t.reset_index(names="bin").to_dict("records")
     out["median_close_minutes"] = float(p["minutes_before_close"].median())
     return out
+
+
+# ---------- round 13: FanDuel's team totals against the main market (docs/totals.md) ----------
+
+DK_FRESH_HOURS = 6.0  # a DraftKings quote older than this at the FanDuel look is dropped
+ANCHORS = {"fanduel_anchor": "fanduel", "pinnacle_anchor": "pinnacle"}  # totals book
+MM_CANDIDATES = ("fanduel_anchor", "pinnacle_anchor", "model", "blend")  # the test family
+MM_DESCRIPTIVE = ("h2h",)  # scored and printed, never a pass (amendment 1)
+MM_THRESHOLDS = (0.02, 0.05, 0.10)
+MM_TESTS = len(MM_CANDIDATES) * len(MM_THRESHOLDS)  # 12: 99.583% ranges
+MM_MIN_BETS = 30
+CONFIRM_MATCHES = 150
+MAX_GOALS = 10
+_H2H = ("home", "draw", "away")
+_KEY8 = ["league", "home", "away", "kickoff", "book", "team", "side", "line"]
+
+
+def market_kind(rows: pd.DataFrame) -> pd.Series:
+    """Each row's market; rows logged before the totals anchor carry none (team totals)."""
+    if "market" not in rows:
+        return pd.Series("team_totals", index=rows.index)
+    return rows["market"].fillna("team_totals")
+
+
+def _score_probs(lh: float, la: float) -> np.ndarray:
+    from scipy.stats import poisson
+
+    k = np.arange(MAX_GOALS + 1)
+    m = np.outer(poisson.pmf(k, lh), poisson.pmf(k, la))
+    return m / m.sum()
+
+
+def _total_pmf(m: np.ndarray) -> np.ndarray:
+    k = np.arange(m.shape[0])
+    tot = (k[:, None] + k[None, :]).ravel()
+    return np.bincount(tot, weights=m.ravel())
+
+
+def _outcomes(m: np.ndarray) -> dict:
+    t = _total_pmf(m)
+    return {
+        "home": float(np.tril(m, -1).sum()),
+        "draw": float(np.trace(m)),
+        "away": float(np.triu(m, 1).sum()),
+        "over25": float(t[3:].sum()),
+        "under25": float(t[:3].sum()),
+    }
+
+
+def breakeven_over(total_pmf: np.ndarray, line: float) -> float:
+    """The over's break-even chance at `line` (x.5, whole or quarter, half-stake split):
+    sum of win over sum of win + lose across the line's halves (a push counts as neither)."""
+    parts = [line - 0.25, line + 0.25] if (line * 4) % 2 == 1 else [line]
+    goals = np.arange(len(total_pmf))
+    win = sum(float(total_pmf[goals > c].sum()) for c in parts)
+    lose = sum(float(total_pmf[goals < c].sum()) for c in parts)
+    return win / (win + lose)
+
+
+def implied_means(h2h: dict, totals: dict | None = None) -> tuple[float, float]:
+    """Poisson means (home, away) whose score matrix best matches the margin-free main
+    market: least squares over home/draw/away, plus over/under 2.5 when given."""
+    from scipy.optimize import minimize
+
+    target = {k: float(h2h[k]) for k in _H2H}
+    if totals:
+        target.update({k: float(totals[k]) for k in ("over25", "under25")})
+
+    def loss(x):
+        o = _outcomes(_score_probs(*np.exp(x)))
+        return sum((o[k] - v) ** 2 for k, v in target.items())
+
+    lo, hi = np.log(0.05), np.log(6.0)
+    res = minimize(loss, np.log([1.4, 1.1]), method="L-BFGS-B", bounds=[(lo, hi), (lo, hi)])
+    return float(np.exp(res.x[0])), float(np.exp(res.x[1]))
+
+
+def anchored_means(h2h: dict, line: float, fair_over: float) -> tuple[float, float]:
+    """Means s·T and (1 − s)·T: for each split s the total T matches the totals price's
+    fair over at `line` exactly; s is chosen to fit DraftKings' h2h (least squares)."""
+    from scipy.optimize import brentq, minimize_scalar
+
+    def total_for(s):
+        def gap(t):
+            return breakeven_over(_total_pmf(_score_probs(s * t, (1 - s) * t)), line) - fair_over
+
+        lo, hi = 0.1, 9.0
+        if gap(lo) > 0:
+            return lo
+        if gap(hi) < 0:
+            return hi
+        return brentq(gap, lo, hi, xtol=1e-6)
+
+    def loss(s):
+        t = total_for(s)
+        o = _outcomes(_score_probs(s * t, (1 - s) * t))
+        return sum((o[k] - float(h2h[k])) ** 2 for k in _H2H)
+
+    s = minimize_scalar(loss, bounds=(0.02, 0.98), method="bounded", options={"xatol": 1e-5}).x
+    t = total_for(s)
+    return float(s * t), float((1 - s) * t)
+
+
+def over_chance(lam: float, line: float) -> float:
+    """P(goals > line) for Poisson goals with mean `lam`."""
+    from scipy.stats import poisson
+
+    return float(1.0 - poisson.cdf(np.floor(line), lam))
+
+
+def load_dk(log_root: Path, leagues=TEAM_TOTAL_LEAGUES) -> pd.DataFrame:
+    """Every logged DraftKings main-market row in these leagues, with UTC times."""
+    from soccer_stats import odds_log
+
+    frames = [odds_log.load(Path(log_root), lg).assign(league=lg) for lg in leagues]
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return pd.DataFrame()
+    dk = pd.concat(frames, ignore_index=True)
+    dk["downloaded_at"] = pd.to_datetime(dk["downloaded_at"], utc=True)
+    return dk.sort_values("downloaded_at").reset_index(drop=True)
+
+
+def _utc(x) -> pd.Timestamp:
+    t = pd.Timestamp(x)
+    return t.tz_localize("UTC") if t.tz is None else t.tz_convert("UTC")
+
+
+def _anchor(totals: pd.DataFrame, book: str) -> tuple[float, float] | None:
+    """(line, fair over) of the book's main total in one call: the line nearest 50/50."""
+    t = totals[totals["book"] == book] if len(totals) else totals
+    if not len(t):
+        return None
+    r = t.iloc[int((t["fair_over"] - 0.5).abs().to_numpy().argmin())]
+    return float(r["line"]), float(r["fair_over"])
+
+
+def with_market(rows: pd.DataFrame, dk: pd.DataFrame, fresh_hours: float = DK_FRESH_HOURS):
+    """FanDuel team-total look rows (x.5 lines) with each market-derived over chance:
+    `p_h2h` (DraftKings h2h alone, plus O/U 2.5 if logged) and, where the same call
+    carried a book's main total, `p_fanduel_anchor` / `p_pinnacle_anchor`. A DraftKings
+    h2h quote is the last one downloaded at or before the FanDuel download, dropped when
+    more than `fresh_hours` older (`dk_status`). Reads no results."""
+    kind = market_kind(rows)
+    team = rows[kind == "team_totals"]
+    totals = rows[kind == "totals"]
+    look = team[(team["snapshot"] == "look") & (team["book"] == "fanduel")].copy()
+    look = look[(look["line"] % 1) == 0.5]
+    out = []
+    cache: dict = {}
+    for _, r in look.iterrows():
+        rec = r.to_dict()
+        rec.update(
+            p_h2h=np.nan, lam_home=np.nan, lam_away=np.nan, dk_age_hours=np.nan, dk_totals=False
+        )
+        for name in ANCHORS:
+            rec[f"p_{name}"] = np.nan
+            rec[f"{name}_line"] = np.nan
+        seen = _utc(r["downloaded_at"])
+        k = _utc(r["kickoff"])
+        q = (
+            dk[
+                (dk["league"] == r["league"])
+                & (dk["home"] == r["home"])
+                & (dk["away"] == r["away"])
+                & ((dk["kickoff"] - k).abs() <= KICKOFF_TOLERANCE)
+                & (dk["downloaded_at"] <= seen)
+            ]
+            if not dk.empty
+            else dk
+        )
+        h2h = q[q["market"] == "h2h"] if len(q) else q
+        if not len(h2h):
+            rec["dk_status"] = "no quote"
+            out.append(rec)
+            continue
+        last = h2h.iloc[-1]
+        age = (seen - last["downloaded_at"]) / pd.Timedelta(hours=1)
+        rec["dk_age_hours"] = round(float(age), 2)
+        if age > fresh_hours:
+            rec["dk_status"] = "stale"
+            out.append(rec)
+            continue
+        rec["dk_status"] = "ok"
+        side_home = r["side"] == "home"
+        fresh = q[q["downloaded_at"] >= seen - pd.Timedelta(hours=fresh_hours)]
+        tot = fresh[fresh["market"] == "totals"] if len(fresh) else fresh
+        dk_tot = tot.iloc[-1]["fair"] if len(tot) else None
+        h2h_key = tuple(sorted(last["fair"].items()))
+        key = ("h2h", h2h_key, tuple(sorted(dk_tot.items())) if dk_tot else None)
+        if key not in cache:
+            cache[key] = implied_means(last["fair"], dk_tot)
+        lh, la = cache[key]
+        rec["dk_totals"] = dk_tot is not None
+        rec.update(lam_home=round(lh, 4), lam_away=round(la, 4))
+        rec["p_h2h"] = round(over_chance(lh if side_home else la, r["line"]), 6)
+        same_call = (
+            totals[
+                (totals["event_id"] == r["event_id"])
+                & (totals["snapshot"] == r["snapshot"])
+                & (totals["downloaded_at"] == r["downloaded_at"])
+            ]
+            if len(totals)
+            else totals
+        )
+        for name, book in ANCHORS.items():
+            a = _anchor(same_call, book)
+            if a is None:
+                continue
+            key = (name, h2h_key, a)
+            if key not in cache:
+                cache[key] = anchored_means(last["fair"], *a)
+            lh, la = cache[key]
+            rec[f"{name}_line"] = a[0]
+            rec[f"p_{name}"] = round(over_chance(lh if side_home else la, r["line"]), 6)
+        out.append(rec)
+    return pd.DataFrame(out)
+
+
+def _logit(p):
+    p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
+    return np.log(p / (1 - p))
+
+
+def candidates(m: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Each candidate's over chance per row (NaN where it has no input)."""
+    b = pd.to_numeric(m["p_model_over"], errors="coerce").to_numpy(float)
+    a2 = m["p_pinnacle_anchor"].to_numpy(float)
+    c = 1 / (1 + np.exp(-(0.5 * _logit(a2) + 0.5 * _logit(b))))
+    c[~(np.isfinite(a2) & np.isfinite(b))] = np.nan
+    return {
+        "fanduel_anchor": m["p_fanduel_anchor"].to_numpy(float),
+        "pinnacle_anchor": a2,
+        "model": b,
+        "blend": c,
+        "h2h": m["p_h2h"].to_numpy(float),
+    }
+
+
+def _line_type(line) -> str:
+    if not np.isfinite(line):
+        return "none"
+    return "half" if line % 1 == 0.5 else ("whole" if line % 1 == 0 else "quarter")
+
+
+def plumbing(rows: pd.DataFrame, dk: pd.DataFrame) -> dict:
+    """Counts only (no results): FanDuel look rows, DraftKings joins and freshness, anchor
+    coverage, and how often each market-derived chance beats FanDuel's raw price."""
+    m = with_market(rows, dk) if len(rows) else pd.DataFrame()
+    out = {"look_rows": int(len(m)), "dk_status": {}, "by_league": {}, "anchors": {}}
+    if m.empty:
+        return out
+    out["dk_status"] = m["dk_status"].value_counts().to_dict()
+    out["dk_totals_rows"] = int(m["dk_totals"].sum())
+    for name in ANCHORS:
+        has = m[f"p_{name}"].notna()
+        lines = m.loc[has, f"{name}_line"]
+        out["anchors"][name] = {
+            "rows": int(has.sum()),
+            "line_types": lines.map(_line_type).value_counts().to_dict(),
+            "median_line": float(lines.median()) if has.any() else None,
+        }
+    ok = m[m["dk_status"] == "ok"]
+    cols = {"h2h": "p_h2h", **{n: f"p_{n}" for n in ANCHORS}}
+    for lg, g in ok.groupby("league"):
+        d = {}
+        for name, col in cols.items():
+            p = g[col]
+            x = g[p.notna()]
+            p = p.dropna()
+            edge = np.maximum(p * x["over"], (1 - p) * x["under"]) - 1
+            d[name] = {
+                "rows": int(len(x)),
+                "beats_raw_price": int((edge > 0).sum()),
+                **{f"edge_ge_{t:.0%}": int((edge >= t).sum()) for t in MM_THRESHOLDS},
+                "median_gap_vs_fanduel_fair": (
+                    round(float((p - x["fair_over"]).abs().median()), 4) if len(x) else None
+                ),
+            }
+        out["by_league"][lg] = d
+    if len(ok):
+        out["median_dk_age_hours"] = float(ok["dk_age_hours"].median())
+    return out
+
+
+def _matches(p: pd.DataFrame, ok) -> int:
+    x = p[ok]
+    return int(x[["league", "home", "away", "kickoff"]].drop_duplicates().shape[0])
+
+
+def market_report(
+    rows: pd.DataFrame,
+    dk: pd.DataFrame,
+    results: pd.DataFrame,
+    min_matches: int = MIN_MATCHES,
+    after=None,
+    rule: tuple[str, float] | None = None,
+) -> dict:
+    """The round-13 test (amendment 1). Development (rule None): one run, once each anchored
+    candidate has `min_matches` settled matches with its anchor; every candidate × threshold
+    at 99.583%, the h2h-only chance beside them (descriptive). Confirmation (`rule` and
+    `after`): one frozen rule at 95% on matches kicking off after `after`, from
+    CONFIRM_MATCHES settled matches carrying that rule's input."""
+    from soccer_stats.edge.stats import bonferroni_level
+    from soccer_stats.lab import metrics
+
+    out = {"plumbing": plumbing(rows, dk)}
+    m = with_market(rows, dk) if len(rows) else pd.DataFrame()
+    team = rows[market_kind(rows) == "team_totals"] if len(rows) else rows
+    p = pairs(team, results) if len(m) else pd.DataFrame()
+    if len(p):
+        cols = ["p_h2h"] + [f"p_{n}" for n in ANCHORS]
+        ok = m.loc[m["dk_status"] == "ok", _KEY8 + cols].drop_duplicates(_KEY8)
+        p = p.merge(ok, on=_KEY8)
+    if after is not None and len(p):
+        p = p[pd.to_datetime(p["kickoff"], utc=True) > _utc(after)]
+    cands = candidates(p) if len(p) else {}
+    counts = {n: (_matches(p, np.isfinite(v)) if len(p) else 0) for n, v in cands.items()}
+    out.update(stage="confirmation" if rule else "development", matches=counts)
+    if rule:
+        need = {rule[0]: CONFIRM_MATCHES}
+    else:
+        need = {n: min_matches for n in ANCHORS}
+    short = {n: f"{counts.get(n, 0)} of {k}" for n, k in need.items() if counts.get(n, 0) < k}
+    if short:
+        out["note"] = "not enough data yet: settled matches " + ", ".join(
+            f"{n} {v}" for n, v in short.items()
+        )
+        return out
+    level = 0.95 if rule else bonferroni_level(MM_TESTS)
+    groups = (p["league"] + "|" + p["home"] + "|" + p["kickoff"]).to_numpy()
+    y = p["y"].to_numpy()
+    look = p[["fair_over", "fair_under"]].to_numpy()
+    odds = p[["over", "under"]].to_numpy()
+    close = p[["fair_over_close", "fair_under_close"]].to_numpy()
+    out.update(level=level, rows=int(len(p)), last_kickoff=str(p["kickoff"].max()))
+    if rule:
+        tests, names = [rule], [rule[0]]
+    else:
+        tests = [(c, t) for c in MM_CANDIDATES + MM_DESCRIPTIVE for t in MM_THRESHOLDS]
+        names = list(MM_CANDIDATES + MM_DESCRIPTIVE)
+    res: dict = {}
+    for name in names:
+        q = cands[name]
+        ok = np.isfinite(q)
+        if ok.sum() < 2:
+            res[name] = {"rows": int(ok.sum())}
+            continue
+        two = np.column_stack([q, 1 - q])
+        ev = metrics.evaluate(two, y, look, odds, close, groups, level=level)
+        ev.pop("bets", None)
+        ev["descriptive"] = name in MM_DESCRIPTIVE
+        ev["vs_close"] = metrics.paired_gain(
+            metrics.log_loss_rows(close[ok], y[ok]),
+            metrics.log_loss_rows(two[ok], y[ok]),
+            groups[ok],
+            level=level,
+        )
+        ev["calibration"] = (
+            metrics.calibration_table(two[ok], y[ok]).reset_index(names="bin").to_dict("records")
+        )
+        ev["rules"] = {}
+        for c, t in tests:
+            if c != name:
+                continue
+            b = metrics.bet_scores(two[ok], y[ok], odds[ok], close[ok], groups[ok], t, level)
+            rng = b.get("clv_range")
+            passed = bool(rng and rng[0] > 0 and b.get("bets", 0) >= MM_MIN_BETS)
+            b["pass"] = passed and name not in MM_DESCRIPTIVE
+            ev["rules"][f"{t:.2f}"] = b
+        res[name] = ev
+    out["candidates"] = res
+    out["calibration_fanduel_look"] = (
+        metrics.calibration_table(look, y).reset_index(names="bin").to_dict("records")
+    )
+    passed = [
+        (c, float(t), b["clv_range"][0])
+        for c, r in res.items()
+        for t, b in r.get("rules", {}).items()
+        if b["pass"]
+    ]
+    out["passes"] = [f"{c}:{t:.2f}" for c, t, _ in passed]
+    if passed and not rule:
+        best = max(passed, key=lambda x: (x[2], -x[1]))
+        out["frozen_rule"] = f"{best[0]}:{best[1]:.2f}"
+        out["confirm_after"] = out["last_kickoff"]
+    return out
+
+
+def gated_min_matches(market: dict, min_matches: int = MIN_MATCHES) -> int:
+    """`report`'s minimum for this run: it scores the model's outcomes, so it waits until
+    `market_report` has passed its own gate (amendment 1: one development look)."""
+    return min_matches if "candidates" in market else 10**9
