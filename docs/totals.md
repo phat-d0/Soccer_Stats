@@ -907,6 +907,48 @@ The h2h-only fit can't pin the total, and that decides the answer:
   any amendment is written here, timestamped, before the gate is met. The code already
   uses a logged O/U 2.5 row for the total when one exists.
 
+**Amendment 1, 2026-10-10 ~08:15 UTC (before any team-total outcome is read; nothing has been scored).**
+Why: the addendum above (a counts-only plumbing finding) showed the h2h-only total hangs
+on rho, and on 10 Oct the owner approved a paid total anchor. From Moneyline's next PR,
+every team-total snapshot call asks for `markets=team_totals,totals` at FanDuel, Bovada
+and Pinnacle (2 credits a call). The totals rows land in the same files with
+`market: "totals"`, `side: "match"`, `line` as returned (2.5, 2.75, 3.0 …) and Shin
+`fair_over`/`fair_under`; older rows have no `market` and count as team totals. This
+amendment replaces sections 1–4 where they differ; everything not mentioned stands.
+
+- **Anchor.** For a FanDuel team-total look row, the book's `totals` rows from the **same call**
+  (same event, snapshot and download time). If a book returns several lines, the one whose
+  fair over is nearest 0.5. A quarter or whole line is converted with half-stake splitting:
+  the break-even over chance under a score matrix is Σ win / Σ (win + lose) over the
+  line's halves (2.75 = 2.5 and 3.0; a push on 3.0 neither wins nor loses).
+- **Fit with an anchor.** Poisson means λh = s·T and λa = (1 − s)·T. For each split s, T is
+  solved so the matrix's break-even over chance at the anchor line equals the book's fair
+  over **exactly**; s is chosen to minimise the squared error against DraftKings'
+  margin-free h2h (the same quote, freshness rule and N = 6 h as before). So the total comes
+  from the totals price and the home/away split from the h2h.
+- **Candidates in the test family:**
+  - **(a′) FanDuel-anchored:** the total from FanDuel's own main totals. The owner's idea: a
+    side market against the same book's main line.
+  - **(a″) Pinnacle-anchored:** the total from Pinnacle's main totals (3.6–4.8% margin).
+  - **(b) our model**, unchanged.
+  - **(c) 50/50 logit blend of (a″) and (b):** if the model adds anything, it should add it to
+    the sharpest market estimate. Fixed weight, as before.
+  - Thresholds unchanged (2%, 5%, 10%): **4 × 3 = 12 tests, 99.583% ranges**. Pass rule unchanged
+    (CLV range above 0 and at least 30 bets).
+- **(a) h2h-only is now descriptive only**, outside the family: scored and printed beside
+  the others, never a pass and never frozen.
+- **Gates and the single development look.** The anchored candidates score only snapshots
+  that carry their anchor. The development run waits until **(a′) and (a″) each have 50
+  settled matches** with their anchor (counted from the first anchored snapshot, about
+  three weeks after Moneyline's PR merges). That one run scores every candidate at once, (b)
+  on all its eligible matches including the earlier, unanchored ones. Nothing is scored
+  before it, so it stays the only development look and one 12-test family.
+- **Coverage, reported every run (counts only):** FanDuel look rows with each anchor, with
+  each line type (x.5, quarter, whole), and the anchor's median line.
+- **Confirmation** unchanged: the one frozen rule, 150 settled matches kicking off after the
+  development run's last kickoff, at 95%; for an anchored rule, only matches with its
+  anchor count.
+
 ## Corners: what's left to try (round 13, task 2; plan only, no runs, nothing spent)
 
 **Where things stand.** Rounds 8, 11 and 12 used up both recent seasons for corners: 2024/25
