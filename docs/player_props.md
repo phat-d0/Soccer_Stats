@@ -807,3 +807,31 @@ Nothing changes. The window opens once at 150 pooled matches, with a reason. B i
 primary; B-cal is scored beside it with the same gate. Its coefficients are fitted on each
 league's 2023/24–2025/26 starters from the locked rows, and the run prints and saves
 them (`b_cal_forward_coefficients`).
+
+### Lead review note (2026-10-10, before the forward window opened): match-model tail fix
+
+`backtest.walk_forward` used to drop the final partial week of whatever data it was given
+(PR #33 fixes it; the last window is fitted on earlier matches only, and every earlier
+prediction is unchanged). The goalscorer only takes the match model's team xG and game
+state from it, so the effect here is that appearances in that last week had team xG at the
+league average and game state 0; they now get the match model's values.
+
+- **Weekly `E0_goals.json`** loads the season in progress, so its tail was the latest
+  2026/27 matchday (the `live` split). The locked 2025/26 holdout is not at the tail and
+  should not move; the post-merge `players.yml` run checks this (Lead handoff in CLAUDE.md).
+- **§11 and §13 (multi-league history, B-cal)**: with the forward window locked,
+  `goal-league` loads up to 2025/26, so the tail was 2025/26's last matchday (about 10 of
+  380 matches a league, under 1% of the three scored seasons). Those numbers were made with
+  the old loop and are not re-run: the gate gains (+0.023 to +0.028, lower ends +0.018 or
+  more) cannot flip on that share of rows. The B-cal coefficients the forward run fits on
+  the locked 2023/24–2025/26 rows will differ slightly from a pre-fix run for the same
+  reason. **This change to the predictions was made before the window opened** (it opens
+  once at 150 pooled matches, about 1 November).
+- **Forward lock unchanged:** while locked, nothing from 2026/27 is loaded and rows from
+  2026-10-10 are dropped before any feature or fit; the fix only adds windows after the
+  last loaded match, so it cannot reach the locked window.
+- **Raised separately (not caused by PR #33):** the weekly `E0_goals.json` `live` split
+  scores all of 2026/27, so from the next Monday run it includes Premier League
+  appearances after 2026-10-10 (model A on all appearances, not the pooled B-starters gate
+  of §10b). Player props should decide whether that split should stop at 2026-10-10 until
+  the forward window opens.
