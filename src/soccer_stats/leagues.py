@@ -15,7 +15,9 @@ switches:
   "matchday" fetches only when the league has a match within MATCHDAY_HOURS, and less often
   away from kickoff (odds_feed.policy_floor).
 
-A league trades only with a learned minimum edge: its own backtest
+Live paper trades follow trades.PAPER_RULE. Under "fixed_raw" (owner's live test, 10 Oct
+2026) every live league trades at 12% on the model's own chance. Under "learned", a
+league trades only with a learned minimum edge: its own backtest
 (`backtest/<code>_dk.json` -> edge_threshold), else the research lab's
 `lab/min_edge.json`. Without one, or with a null level (all five non-E0 leagues today), a
 non-E0 league opens no paper trades (trades.paper_threshold).

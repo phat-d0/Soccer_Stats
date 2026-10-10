@@ -62,9 +62,9 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Rule | Value |
 | --- | --- |
 | Markets | Home, draw, away, over 2.5, under 2.5 |
-| Probability for the edge | the blend (model + DraftKings' margin-free price, below) when a fit is saved; else the model's own |
+| Probability for the edge | app value pick: the blend (model + DraftKings' margin-free price, below) when a fit is saved, else the model's own. Live paper trades: the model's own chance (`p`) while `trades.PAPER_RULE = "fixed_raw"` (owner's live test, 10 Oct 2026); the blend under `"learned"` |
 | Edge | that probability × DraftKings decimal odds − 1 |
-| Paper-trade threshold | the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`), the level the app flags with; none learned = no new match paper trades; no backtest file = 12% (`PAPER_EDGE`) |
+| Paper-trade threshold | `trades.PAPER_RULE`. Now `"fixed_raw"`: 12% (`PAPER_EDGE`) in every live league (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Championship), whatever the learned levels say; backtests of this rule lost money, and this tests it live. `"learned"` (one line to revert): the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`, `lab/min_edge.json` for other leagues), none learned = no new match paper trades. Each new trade records `threshold`, `rule` and `p_source` |
 | App minimum edge | learned from past bets (`edge_threshold` in each backtest); none when no level beat the market; 2/5/8/12% under "Explore other edges" |
 | Trades per match | one, the market with the highest edge |
 | Odds cap | none (the backtest also reports a 6.0 cap) |
@@ -77,7 +77,7 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Settlement | 90-minute result from football-data; void if kickoff moves 48h+ or no result in 14 days |
 
 **Live paper trades** (`paper.py`): after each build, `soccer-stats paper` updates an
-append-only ledger at `paper_trades/E0_<season>.jsonl` on the `data-log` branch. A trade's
+append-only ledger at `paper_trades/<league>_<season>.jsonl` on the `data-log` branch (one file per league), and its log names the rule in force ("Paper rule: fixed_raw (12% on the model's own chance, all leagues)"). A trade's
 entry (time, price, probability, edge) is written once and never edited; later lines only
 add the closing price and the settlement. Rebuilding adds nothing new. If the ledger or
 the odds are unavailable, the site still publishes, opens nothing, and the tab says why.

@@ -236,7 +236,8 @@ def test_odds_log_writes_each_league_to_its_own_file(tmp_path):
     assert set(ol.load(tmp_path, "SP1")["home"]) == {"Real Madrid"}
 
 
-def test_paper_threshold_per_league():
+def test_paper_threshold_per_league(monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")  # the learned path, kept intact
     assert tr.paper_threshold(None)["threshold"] == tr.PAPER_EDGE  # E0 fallback unchanged
     r = tr.paper_threshold(None, "SP1")
     assert r["threshold"] is None and r["source"] == "none" and "this league" in r["note"]
@@ -244,7 +245,8 @@ def test_paper_threshold_per_league():
     assert tr.paper_threshold(level, "SP1")["threshold"] == 0.05
 
 
-def test_second_league_flows_through_paper_without_trading(tmp_path):
+def test_second_league_flows_through_paper_without_trading(tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")
     d = _two_league_data({"league": "SP1", **src()})
     assert paper.leagues_in_play(d) == ["E0", "SP1"]
     assert paper.run(d, tmp_path, None, now=NOW) == 1  # the E0 trade only (12% fallback)
@@ -314,7 +316,8 @@ def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
     assert "by_league" not in ml["backtest"]["edge_threshold"]
 
 
-def test_championship_runs_goals_only(league, tmp_path):
+def test_championship_runs_goals_only(league, tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")
     """E1 has no Understat xG: the goals-only fit, its own cards, live odds, no trades."""
     from soccer_stats.publish import build_data
 
@@ -359,6 +362,7 @@ def test_season_kickoffs_from_football_data(tmp_path, monkeypatch):
 
 
 def test_lab_levels_fill_in_for_leagues_without_a_backtest(tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")
     lab = tmp_path / "min_edge.json"
     lab.write_text(
         json.dumps(
