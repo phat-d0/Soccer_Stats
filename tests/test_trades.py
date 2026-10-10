@@ -301,3 +301,28 @@ def test_the_app_flags_keep_the_learned_levels_under_fixed_raw(tmp_path, monkeyp
     by = ml["backtest"]["edge_threshold"]["by_league"]
     assert all(by[lg]["min_edge"] is None for lg in SIX)
     assert all(tr.OWNER_FIXED_NOTE not in (by[lg].get("note") or "") for lg in SIX)
+
+
+def test_fixed_raw_keeps_the_kickoff_freshness_and_odds_gates(tmp_path, monkeypatch):
+    """Lead review: the switch only changes the chance and threshold; every other gate
+    (before kickoff, fresh DraftKings odds, a priced card, enough data) still holds."""
+    from test_paper import NOW
+
+    from soccer_stats import paper
+
+    log = _null_levels(tmp_path, monkeypatch)
+    d = _six_league_data()
+    by = {c["league"]: c for c in d["fixtures"]}
+    by["SP1"]["kickoff"] = (NOW - pd.Timedelta(minutes=1)).isoformat()  # kicked off
+    stale = (NOW - pd.Timedelta(hours=paper.FRESH_HOURS, minutes=1)).isoformat()
+    d["odds_sources"]["D1"]["fetched_at"] = stale  # odds older than FRESH_HOURS
+    del d["odds_sources"]["I1"]  # a league without an odds source
+    by["F1"]["odds"] = {}  # a card without prices
+    by["E1"]["low_data"] = True
+    # A second card for the E0 match (same names) still opens one trade.
+    d["fixtures"].append(dict(by["E0"]))
+    assert paper.run(d, log, None, now=NOW) == 1
+    assert list(paper.load_ledger(log, "E0")) == ["E0|2627|Arsenal|Leeds"]
+    for lg in SIX[1:]:
+        assert paper.load_ledger(log, lg) == {}
+        assert not (log / "paper_trades" / f"{lg}_2627.jsonl").exists()
