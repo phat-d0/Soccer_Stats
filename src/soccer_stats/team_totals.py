@@ -517,3 +517,253 @@ def report(rows: pd.DataFrame, results: pd.DataFrame, min_matches: int = MIN_MAT
         out[f"calibration_{name}"] = t.reset_index(names="bin").to_dict("records")
     out["median_close_minutes"] = float(p["minutes_before_close"].median())
     return out
+
+
+# ---------- round 13: FanDuel's team totals against the main market (docs/totals.md) ----------
+
+DK_FRESH_HOURS = 6.0  # a DraftKings quote older than this at the FanDuel look is dropped
+MM_CANDIDATES = ("market", "model", "blend")
+MM_THRESHOLDS = (0.02, 0.05, 0.10)
+MM_TESTS = len(MM_CANDIDATES) * len(MM_THRESHOLDS)  # 9: 99.444% ranges
+MM_MIN_BETS = 30
+CONFIRM_MATCHES = 150
+MAX_GOALS = 10
+_H2H = ("home", "draw", "away")
+
+
+def _score_probs(lh: float, la: float) -> np.ndarray:
+    from scipy.stats import poisson
+
+    k = np.arange(MAX_GOALS + 1)
+    m = np.outer(poisson.pmf(k, lh), poisson.pmf(k, la))
+    return m / m.sum()
+
+
+def _outcomes(m: np.ndarray) -> dict:
+    k = np.arange(m.shape[0])
+    tot = k[:, None] + k[None, :]
+    return {
+        "home": float(np.tril(m, -1).sum()),
+        "draw": float(np.trace(m)),
+        "away": float(np.triu(m, 1).sum()),
+        "over25": float(m[tot > 2.5].sum()),
+        "under25": float(m[tot < 2.5].sum()),
+    }
+
+
+def implied_means(h2h: dict, totals: dict | None = None) -> tuple[float, float]:
+    """Poisson means (home, away) whose score matrix best matches the margin-free main
+    market: least squares over home/draw/away, plus over/under 2.5 when given."""
+    from scipy.optimize import minimize
+
+    target = {k: float(h2h[k]) for k in _H2H}
+    if totals:
+        target.update({k: float(totals[k]) for k in ("over25", "under25")})
+
+    def loss(x):
+        o = _outcomes(_score_probs(*np.exp(x)))
+        return sum((o[k] - v) ** 2 for k, v in target.items())
+
+    lo, hi = np.log(0.05), np.log(6.0)
+    res = minimize(loss, np.log([1.4, 1.1]), method="L-BFGS-B", bounds=[(lo, hi), (lo, hi)])
+    return float(np.exp(res.x[0])), float(np.exp(res.x[1]))
+
+
+def over_chance(lam: float, line: float) -> float:
+    """P(goals > line) for Poisson goals with mean `lam`."""
+    from scipy.stats import poisson
+
+    return float(1.0 - poisson.cdf(np.floor(line), lam))
+
+
+def load_dk(log_root: Path, leagues=TEAM_TOTAL_LEAGUES) -> pd.DataFrame:
+    """Every logged DraftKings main-market row in these leagues, with UTC times."""
+    from soccer_stats import odds_log
+
+    frames = [odds_log.load(Path(log_root), lg).assign(league=lg) for lg in leagues]
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return pd.DataFrame()
+    dk = pd.concat(frames, ignore_index=True)
+    dk["downloaded_at"] = pd.to_datetime(dk["downloaded_at"], utc=True)
+    return dk.sort_values("downloaded_at").reset_index(drop=True)
+
+
+def with_market(rows: pd.DataFrame, dk: pd.DataFrame, fresh_hours: float = DK_FRESH_HOURS):
+    """FanDuel look rows with the market-derived over chance `p_market`.
+
+    For each row: the last DraftKings h2h (and O/U 2.5, if logged) of the fixture
+    downloaded at or before the FanDuel download. Rows whose h2h is missing or more than
+    `fresh_hours` older get `p_market` NaN and a `dk_status`. Reads no results."""
+    look = rows[(rows["snapshot"] == "look") & (rows["book"] == "fanduel")].copy()
+    look = look[(look["line"] % 1) == 0.5]
+    out = []
+    cache: dict[tuple, tuple] = {}
+    for _, r in look.iterrows():
+        rec = r.to_dict()
+        rec.update(p_market=np.nan, lam_home=np.nan, lam_away=np.nan, dk_age_hours=np.nan)
+        rec["dk_totals"] = False
+        seen = pd.Timestamp(r["downloaded_at"])
+        seen = seen.tz_localize("UTC") if seen.tz is None else seen.tz_convert("UTC")
+        k = pd.Timestamp(r["kickoff"])
+        k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+        q = (
+            dk[
+                (dk["league"] == r["league"])
+                & (dk["home"] == r["home"])
+                & (dk["away"] == r["away"])
+                & ((dk["kickoff"] - k).abs() <= KICKOFF_TOLERANCE)
+                & (dk["downloaded_at"] <= seen)
+            ]
+            if not dk.empty
+            else dk
+        )
+        h2h = q[q["market"] == "h2h"] if len(q) else q
+        if not len(h2h):
+            rec["dk_status"] = "no quote"
+            out.append(rec)
+            continue
+        last = h2h.iloc[-1]
+        age = (seen - last["downloaded_at"]) / pd.Timedelta(hours=1)
+        rec["dk_age_hours"] = round(float(age), 2)
+        if age > fresh_hours:
+            rec["dk_status"] = "stale"
+            out.append(rec)
+            continue
+        tot = q[
+            (q["market"] == "totals")
+            & (q["downloaded_at"] >= seen - pd.Timedelta(hours=fresh_hours))
+        ]
+        totals = tot.iloc[-1]["fair"] if len(tot) else None
+        key = (
+            tuple(sorted(last["fair"].items())),
+            tuple(sorted(totals.items())) if totals else None,
+        )
+        if key not in cache:
+            cache[key] = implied_means(last["fair"], totals)
+        lh, la = cache[key]
+        rec.update(lam_home=round(lh, 4), lam_away=round(la, 4), dk_totals=totals is not None)
+        rec["p_market"] = round(over_chance(lh if r["side"] == "home" else la, r["line"]), 6)
+        rec["dk_status"] = "ok"
+        out.append(rec)
+    return pd.DataFrame(out)
+
+
+def _logit(p):
+    p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
+    return np.log(p / (1 - p))
+
+
+def candidates(m: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Each candidate's over chance per row: market (a), model (b), fixed 50/50 (c)."""
+    a = m["p_market"].to_numpy(float)
+    b = pd.to_numeric(m["p_model_over"], errors="coerce").to_numpy(float)
+    c = 1 / (1 + np.exp(-(0.5 * _logit(a) + 0.5 * _logit(b))))
+    c[~(np.isfinite(a) & np.isfinite(b))] = np.nan
+    return {"market": a, "model": b, "blend": c}
+
+
+def plumbing(rows: pd.DataFrame, dk: pd.DataFrame) -> dict:
+    """Counts only (no results): FanDuel look rows, DraftKings joins and freshness, and how
+    often the market-derived chance beats FanDuel's raw price, per league."""
+    m = with_market(rows, dk) if len(rows) else pd.DataFrame()
+    out = {"look_rows": int(len(m)), "dk_status": {}, "by_league": {}}
+    if m.empty:
+        return out
+    out["dk_status"] = m["dk_status"].value_counts().to_dict()
+    out["dk_totals_rows"] = int(m["dk_totals"].sum())
+    ok = m[m["dk_status"] == "ok"]
+    edge = np.maximum(ok["p_market"] * ok["over"], (1 - ok["p_market"]) * ok["under"]) - 1
+    gap = (ok["p_market"] - ok["fair_over"]).abs()
+    for lg, g in ok.assign(edge=edge, gap=gap).groupby("league"):
+        out["by_league"][lg] = {
+            "rows": int(len(g)),
+            "beats_raw_price": int((g["edge"] > 0).sum()),
+            **{f"edge_ge_{t:.0%}": int((g["edge"] >= t).sum()) for t in MM_THRESHOLDS},
+            "median_gap_vs_fanduel_fair": round(float(g["gap"].median()), 4),
+        }
+    if len(ok):
+        out["median_dk_age_hours"] = float(ok["dk_age_hours"].median())
+    return out
+
+
+def market_report(
+    rows: pd.DataFrame,
+    dk: pd.DataFrame,
+    results: pd.DataFrame,
+    min_matches: int = MIN_MATCHES,
+    after=None,
+    rule: tuple[str, float] | None = None,
+) -> dict:
+    """The round-13 test. Development (rule None): every candidate × threshold at 99.444%,
+    once at least `min_matches` settled matches qualify. Confirmation (`rule` and `after`):
+    one frozen rule at 95% on matches kicking off after `after`, from CONFIRM_MATCHES."""
+    from soccer_stats.edge.stats import bonferroni_level
+    from soccer_stats.lab import metrics
+
+    out = {"plumbing": plumbing(rows, dk)}
+    m = with_market(rows, dk) if len(rows) else pd.DataFrame()
+    need = CONFIRM_MATCHES if rule else min_matches
+    p = pairs(rows, results) if len(m) else pd.DataFrame()
+    if len(p):
+        k8 = ["league", "home", "away", "kickoff", "book", "team", "side", "line"]
+        ok = m.loc[m["dk_status"] == "ok", k8 + ["p_market"]].drop_duplicates(k8)
+        p = p.merge(ok, on=k8)
+    if after is not None and len(p):
+        p = p[pd.to_datetime(p["kickoff"], utc=True) > pd.Timestamp(after)]
+    key = ["league", "home", "away", "kickoff"]
+    matches = int(p[key].drop_duplicates().shape[0]) if len(p) else 0
+    out.update(stage="confirmation" if rule else "development", matches=matches)
+    if matches < need:
+        out["note"] = f"not enough data yet: {matches} of {need} settled matches qualify"
+        return out
+    level = 0.95 if rule else bonferroni_level(MM_TESTS)
+    groups = (p["league"] + "|" + p["home"] + "|" + p["kickoff"]).to_numpy()
+    y = p["y"].to_numpy()
+    look = p[["fair_over", "fair_under"]].to_numpy()
+    odds = p[["over", "under"]].to_numpy()
+    close = p[["fair_over_close", "fair_under_close"]].to_numpy()
+    out.update(level=level, rows=int(len(p)), last_kickoff=str(p["kickoff"].max()))
+    cands = candidates(p)
+    tests = [rule] if rule else [(c, t) for c in MM_CANDIDATES for t in MM_THRESHOLDS]
+    res: dict = {}
+    for name in dict.fromkeys(c for c, _ in tests):
+        q = cands[name]
+        two = np.column_stack([q, 1 - q])
+        ok = np.isfinite(q)
+        ev = metrics.evaluate(two, y, look, odds, close, groups, level=level)
+        ev["vs_close"] = metrics.paired_gain(
+            metrics.log_loss_rows(close[ok], y[ok]),
+            metrics.log_loss_rows(two[ok], y[ok]),
+            groups[ok],
+            level=level,
+        )
+        ev["calibration"] = (
+            metrics.calibration_table(two[ok], y[ok]).reset_index(names="bin").to_dict("records")
+        )
+        ev.pop("bets", None)
+        ev["rules"] = {}
+        for c, t in tests:
+            if c != name:
+                continue
+            b = metrics.bet_scores(two[ok], y[ok], odds[ok], close[ok], groups[ok], t, level)
+            rng = b.get("clv_range")
+            b["pass"] = bool(rng and rng[0] > 0 and b.get("bets", 0) >= MM_MIN_BETS)
+            ev["rules"][f"{t:.2f}"] = b
+        res[name] = ev
+    out["candidates"] = res
+    out["calibration_fanduel_look"] = (
+        metrics.calibration_table(look, y).reset_index(names="bin").to_dict("records")
+    )
+    passed = [
+        (c, float(t), b["clv_range"][0])
+        for c, r in res.items()
+        for t, b in r["rules"].items()
+        if b["pass"]
+    ]
+    out["passes"] = [f"{c}:{t:.2f}" for c, t, _ in passed]
+    if passed and not rule:
+        best = max(passed, key=lambda x: (x[2], -x[1]))
+        out["frozen_rule"] = f"{best[0]}:{best[1]:.2f}"
+        out["confirm_after"] = out["last_kickoff"]
+    return out

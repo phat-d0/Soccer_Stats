@@ -886,3 +886,23 @@ team's full-time goals (football-data), 0 = over won, 1 = under won.
 (which then also copies data-log's DraftKings month files). Plumbing (counts, joins,
 freshness drops, the disagreement distribution) never reads results. The development run
 is dispatched by the lead once the gate is met.
+
+**Addendum, 2026-10-10 (plumbing check on the 51 logged look rows, no results read).**
+The h2h-only fit can't pin the total, and that decides the answer:
+- Plain Poisson (the spec): the implied totals run from 2.2 to 5.4 goals (Augsburg v Bayern
+  5.4, PSG v Le Mans 4.8). Against FanDuel's fair over chance the market-derived chance is
+  lower in 40 of 51 rows (mean −3.4 points; −5.4 at the 1.5 line). 40 rows beat FanDuel's
+  raw price on one side, 15 by 5% or more.
+- The same fit with a Dixon-Coles correction flips it: rho −0.1 puts the market-derived
+  chance above FanDuel's in 82% of rows (+1.6 points at 1.5), rho −0.2 in 100% (+7.7). Each
+  0.1 of rho moves the implied total by about 0.4–0.5 goals.
+- So with h2h alone, candidate (a) mostly measures the choice of rho, not the market. The
+  test would still be scored honestly (CLV against FanDuel's close), but it couldn't tell
+  "FanDuel mis-derives its team totals" from "our total is off".
+- What would fix it is a total from a real price: FanDuel's own main `totals` (the owner's
+  idea, a side market against the book's own main line), or Pinnacle's goal totals (sharper,
+  3.6–4.8% margin). Either is an extra market on calls we make anyway: about +340 credits a
+  month at the base plan's two snapshots. That is the owner's call.
+- The spec above stands unless the lead and owner amend it before the development run;
+  any amendment is written here, timestamped, before the gate is met. The code already
+  uses a logged O/U 2.5 row for the total when one exists.

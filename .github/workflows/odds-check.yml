@@ -41,6 +41,9 @@
 #             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
 #             move and as blend inputs (no credits).
+#   team-totals: data-log's FanDuel team-total log, scored once enough matches settle; also
+#             the round-13 test against DraftKings' main market (docs/totals.md): counts only
+#             below its gate; `finalists` ("market:0.05") + `after` score a frozen rule.
 name: Player odds check
 
 on:
@@ -70,10 +73,13 @@ on:
         description: "lab-holdout / corners / corner-recal / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
         default: ""
       finalists:
-        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>"
+        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>; team-totals: the frozen rule, e.g. market:0.05"
         default: ""
       stack_base:
         description: "lab-holdout: the stack's base candidate (one of the finalists)"
+        default: ""
+      after:
+        description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
 
 permissions:
@@ -142,6 +148,7 @@ jobs:
           REASON: ${{ inputs.reason }}
           FINALISTS: ${{ inputs.finalists }}
           STACK_BASE: ${{ inputs.stack_base }}
+          AFTER: ${{ inputs.after }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -211,10 +218,12 @@ jobs:
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log
-              for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '_team_totals_'); do
+              # Team-total rows and DraftKings month files (the main market); not the call record.
+              for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '\.jsonl$' | grep -v 'team_totals_calls_'); do
                 git show "FETCH_HEAD:$f" > "out/log/odds_log/$(basename "$f")"
               done
-              uv run soccer-stats team-totals-report --log-dir out/log > out/team_totals.json
+              uv run soccer-stats team-totals-report --log-dir out/log \
+                --after "$AFTER" --rule "$FINALISTS" > out/team_totals.json
               cat out/team_totals.json
               rm -rf out/log ;;
           esac

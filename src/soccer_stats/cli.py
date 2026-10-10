@@ -139,6 +139,18 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
     results = load_matches(list(TEAM_TOTAL_LEAGUES), [current_season()])
     out = team_totals.report(rows, results, min_matches=args.min_matches)
     print(json.dumps(out, indent=1, default=str))
+    # Round 13: FanDuel against the main market (docs/totals.md); counts only below the gate.
+    rule = None
+    if args.rule:
+        cand, t = args.rule.split(":")
+        rule = (cand.strip(), float(t))
+        if rule[0] not in team_totals.MM_CANDIDATES or not args.after:
+            raise SystemExit("--rule needs a candidate (market, model, blend) and --after")
+    dk = team_totals.load_dk(Path(args.log_dir))
+    mm = team_totals.market_report(
+        rows, dk, results, min_matches=args.min_matches, after=args.after or None, rule=rule
+    )
+    print("MARKET_TEST_JSON " + json.dumps(mm, default=str))
 
 
 def cmd_espn_probe(args: argparse.Namespace) -> None:
@@ -1463,6 +1475,8 @@ def main(argv: list[str] | None = None) -> None:
     ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")
     ttr.add_argument("--log-dir", required=True, help="data-log checkout")
     ttr.add_argument("--min-matches", type=int, default=50)
+    ttr.add_argument("--after", default="", help="confirmation: only kickoffs after this time")
+    ttr.add_argument("--rule", default="", help="confirmation: the frozen rule, e.g. market:0.05")
     ttr.set_defaults(func=cmd_team_totals_report)
 
     ec = sub.add_parser(
