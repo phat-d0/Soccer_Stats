@@ -82,6 +82,28 @@ entry (time, price, probability, edge) is written once and never edited; later l
 add the closing price and the settlement. Rebuilding adds nothing new. If the ledger or
 the odds are unavailable, the site still publishes, opens nothing, and the tab says why.
 
+**Team corners (owner's live test, 10 Oct 2026).** A second paper portfolio, *Team
+corners* (`trades.PORTFOLIOS` id `corners`, status testing), in all six live leagues:
+
+| Rule | Value |
+| --- | --- |
+| Market | each team's corners (Pinnacle's `alternate_team_totals_corners`, one line per team) |
+| Probability | corners bake-off 2's model (f), empirical-Bayes team averages, refitted every build on each league's football-data corner counts from earlier matches only (`corners_live.TeamCornersF`) |
+| Edge | P(win) × Pinnacle's decimal odds + P(push) − 1 (= p × odds − 1 on a half line); at least 12% (`trades.CORNERS_EDGE`) |
+| Trades | at most one per match, team and line, the better of over and under; quarter lines are skipped |
+| Stake | flat $10 |
+| Entry | the newest logged Pinnacle quote (look 18–30 h or close ≤30 min before kickoff), downloaded within 3 hours, kickoff still ahead |
+| Close | the newest quote at the trade's line before kickoff (the close snapshot), CLV against Pinnacle's de-margined close (`clv_pinnacle`) |
+| Settlement | football-data's corner counts: over wins at count > line; a whole line that lands exactly is a push (void, stake back); void if the match moves 48h+ or no result in 14 days |
+
+Prices come from `corners_live.run` inside `publish` (default branch only): one
+1-credit `/events/{id}/odds` call per match and snapshot, its own 500-credit monthly cap
+and the shared 3,000-credit reserve, logged to `odds_log/<code>_corners_<YYYY-MM>.jsonl`
+by `soccer-stats log-corners`. Trades go to `paper_trades/<code>_corners_<season>.jsonl`.
+There are no historical corner prices, so the portfolio's backtest is the research record
+(`kind: "research"`), not money. The locked February test of model (f) is unchanged: the
+live test reports paper P/L and CLV only.
+
 **Odds log.** Each publish run appends the DraftKings prices it downloaded (no extra API
 calls) to `odds_log/E0_<YYYY-MM>.jsonl` on the `data-log` branch: one row per fixture and
 market, with each outcome's price and margin-free chance, when DraftKings quoted it, and
