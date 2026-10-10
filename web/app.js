@@ -131,6 +131,11 @@ const leanPick = (fx) => (leanOn() && !fx.low_data ? fx.lean_pick || null : null
 const sigmaText = (z) => (z == null ? "–" : `${z < 0 ? "−" : z > 0 ? "+" : ""}${Math.abs(z).toFixed(1)}σ`);
 const ptsText = (x) => `${(x * 100).toFixed(1)} points`;
 const tierName = (pick) => (pick.tier === "strong" ? "Strong" : "Lean");
+// Lead review (PR #43): most Lean picks come from the blend's price weight b > 1 (fitted on
+// Pinnacle's closes, it sharpens DraftKings' price: favourites shorter, long shots longer),
+// not from the model; with b capped at 1 only 2 of the 12 matches that reached 1σ from
+// 1 to 10 Oct still would. Say so wherever a Lean pick is shown.
+const LEAN_CAVEAT = "Lean picks lean mostly on the part of the blend that sharpens the market's own price (favourites a little likelier, long shots less), not on the model, and they haven't proven themselves.";
 // Open Moneyline match trades by match and strategy (a match can hold one of each).
 const tradeKey = (home, away, strat) => `${home}|${away}|${strat}`;
 function openMatchTrades() {
@@ -764,9 +769,9 @@ function leanPickText(fx) {
   let head;
   if (t) {
     const same = lp && PICK_LABEL[lp.market] === PICK_LABEL[t.market];
-    head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened)` : ""}. One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."}`;
+    head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened)` : ""}. One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."} ${LEAN_CAVEAT}`;
   } else if (lp) {
-    head = `<b>Blend Lean pick (${tierName(lp)}):</b> ${side(lp.market)}. A $10 paper trade opens on it at the next update with fresh odds.`;
+    head = `<b>Blend Lean pick (${tierName(lp)}):</b> ${side(lp.market)}. A $10 paper trade opens on it at the next update with fresh odds. ${LEAN_CAVEAT}`;
   } else {
     const best = ["home", "draw", "away"].filter((m) => z[m] != null && fx.odds?.[m]).sort((a, b) => z[b] - z[a])[0];
     head = best ? `<b>Blend Lean: no pick.</b> Closest is ${side(best)}; a Lean pick needs +1σ.` : "<b>Blend Lean: no pick.</b>";
@@ -806,7 +811,7 @@ function leanEdgeRec(lg) {
     : "<b>Blend Lean: 1σ.</b>";
   const body = one && sd == null
     ? ` ${esc(leanNote(lg) || "No blend fit for this competition yet, so nothing is flagged.")}`
-    : " Flagging the side where the blend of model and DraftKings' price beats the price's break-even by at least one σ (Strong at 2σ), one $10 paper trade per match. σ is how far the blend usually strays from the market in that competition.";
+    : ` Flagging the side where the blend of model and DraftKings' price beats the price's break-even by at least one σ (Strong at 2σ), one $10 paper trade per match. σ is how far the blend usually strays from the market in that competition. ${LEAN_CAVEAT}`;
   return `<div class="edge-rec"><span class="meta">First strategy</span>${head}${body}${list ? `<div class="meta">σ by competition: ${list}.</div>` : ""}</div>`;
 }
 function fixedEdgePanel(lg = "") {
@@ -2240,7 +2245,7 @@ function viewPortfolio() {
   const ruleNote = cur.id === "corners" && state.pfView === "live"
     ? `<div class="explain live-test"><b>Live test: fixed ${pct(set?.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${set?.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(set?.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back.</div>`
     : strat?.key === "lean"
-    ? `<div class="explain live-test"><b>Blend Lean (1σ+), listed first.</b> A $${strat.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(strat.rule?.sigma)}. Be warned: the baseball app's Lean tier hasn't proven itself either, and soccer's blend gives the model little weight, so expect few picks, mostly outside the Premier League.</div>`
+    ? `<div class="explain live-test"><b>Blend Lean (1σ+), listed first.</b> A $${strat.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(strat.rule?.sigma)}. Be warned: most Lean picks come from the part of the blend that sharpens DraftKings' own price (it makes favourites a little likelier and long shots less likely, a pattern fitted on Pinnacle's prices), not from the model, which gets little weight. With that sharpening switched off, only 2 of the 12 matches that reached 1σ from 1 to 10 Oct would still have qualified. Lean hasn't proven itself, and neither has the baseball app's Lean tier it comes from. Expect few picks, mostly outside the Premier League, and judge it on closing line value rather than a few dozen results.</div>`
     : state.pfView === "live" && cur.status === "live"
     ? (isMoneylineFixed(cur)
       ? `<div class="explain live-test"><b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.</div>`

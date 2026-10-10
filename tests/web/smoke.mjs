@@ -182,10 +182,16 @@ const STEPS = [
     const open = await card.locator(".badge.paper").allInnerTexts();
     if (!open.some((t) => t.includes("(Lean): Away")) || !open.some((t) => t.includes("(12%): Draw"))) throw new Error(`open badges: ${open.join(" | ")}`);
     const second = await card.locator(".badge.second").innerText();
-    if (!second.startsWith("12%")) throw new Error(`12% badge: ${second}`);
+    // The 12% pick (away) differs from the 12% trade (draw): "would pick now", even though
+    // the Lean trade is on the away side. Keyed on the Lean trade, it would read "12% pick".
+    if (!second.startsWith("12% would pick now")) throw new Error(`12% badge: ${second}`);
     // Newcastle v Tottenham: a Lean pick (home) with only a 12% trade open (over 2.5).
     const nt = p.locator("button.match", { hasText: "Tottenham" }).first();
-    if (!(await nt.locator(".badge.lean").innerText()).includes("Lean · 1.1σ: Home")) throw new Error("Newcastle Lean badge");
+    // Keyed on the 12% trade (over 2.5), the Lean badge would read "Would pick now".
+    const ntLean = await nt.locator(".badge.lean").innerText();
+    if (!ntLean.includes("Lean · 1.1σ: Home") || ntLean.includes("Would pick")) throw new Error(`Newcastle Lean badge: ${ntLean}`);
+    const ntSecond = await nt.locator(".badge.second").innerText();
+    if (!ntSecond.startsWith("12% pick")) throw new Error(`Newcastle 12% badge: ${ntSecond}`);
     if ((await nt.locator(".badge.paper").allInnerTexts()).some((t) => t.includes("(Lean)"))) throw new Error("Newcastle shows a Lean trade it doesn't have");
     const text = await p.textContent("#view");
     for (const want of ["Blend Lean pick", "Blend Lean (first)", "Blend Lean: 1σ", "σ by competition"]) if (!text.includes(want)) throw new Error(`Matches lacks "${want}"`);
@@ -193,7 +199,7 @@ const STEPS = [
   ["match-sheet-lean", async (p) => {
     await p.locator("button.match", { hasText: "Leeds" }).first().click(); await sheet(p);
     const text = await p.textContent("#sheet-body");
-    for (const want of ["Blend Lean: paper trade already open", "Away", "+2.6σ", "Premier League σ = 1.5 points", "Model 12%: paper trade already open", "Draw"]) {
+    for (const want of ["Blend Lean: paper trade already open", "Away", "+2.6σ", "Premier League σ = 1.5 points", "Model 12%: paper trade already open", "Draw", "not on the model"]) {
       if (!text.includes(want)) throw new Error(`Lean match sheet lacks "${want}"`);
     }
     if (!(await p.locator("table.mkts.with-z th", { hasText: "σ" }).count())) throw new Error("no σ column");
@@ -286,7 +292,7 @@ const STEPS = [
     const on = await p.locator('button[data-pfstrat].on').innerText();
     if (!on.includes("Blend Lean")) throw new Error(`default strategy: ${on}`);
     const text = await p.textContent("#view");
-    for (const want of ["Blend Lean (1σ+), listed first", "baseball app's Lean tier", "Wolves v Everton"]) if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    for (const want of ["Blend Lean (1σ+), listed first", "baseball app's Lean tier", "not from the model", "Wolves v Everton"]) if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
     if (text.includes("Nott'm Forest v Arsenal")) throw new Error("a 12% trade shows under Blend Lean");
   }],
   ["portfolio-live-lean-trade", async (p) => {
