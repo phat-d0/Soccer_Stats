@@ -667,3 +667,142 @@ reason. Ranges at 99.583% (12 tests).
   beating a bookmaker. A price test would mean logging Pinnacle's live corner prices (about
   5.5–6% margin in round 8's probe). That is a separate owner decision with its own cost
   estimate. Nothing was spent.
+
+## Team-corner recalibration (round 12; owner's request 10 Oct; pre-registered 2026-10-10, before any code or run reads a 2025/26 corner outcome)
+
+**Why.** In the corners bake-off, each team's corner models carried information (gain over
+the league average, ranges above 0 in E0, Ligue 1 and the Championship on the 2024/25
+holdout) but were over-confident (slopes below 0.80). This test asks whether a simple
+recalibration, as goalscorer B-cal did, fixes that on data no corners work has touched:
+2025/26. 0 credits; research only.
+
+**Coverage (counts only, `task=corner-coverage` run 38022238320).** Every 2025/26 match has both corner counts: E0 380 of 380, SP1 380/380, D1 306/306, I1
+380/380, F1 306/306, E1 552/552. No outcomes were read.
+
+**Models: no re-choosing.** The 2024/25 holdout finalists stay: team (d) ratings + match
+context in E0, D1, F1 and E1; (c) corner ratings in SP1 and I1. Their raw chances come
+from the bake-off code unchanged (`edge/corners.py`, the same walk-forward: refit every 28
+days on the 730 days before each block, 1,000 earlier matches). The baseline is the
+league average (a), as before. Match totals are left out (they never beat the average).
+
+**Recalibration.**
+- Per league: logit p = a + b·logit(p_model), **one fit per league pooled across the six
+  team lines** (home and away, over 3.5 / 4.5 / 5.5), each match contributing six rows.
+  Pooling: two parameters per league, fitted on about 15,000–22,000 rows; the
+  over-confidence was similar across lines in the bake-off (slopes 0.55–0.90).
+- Fitted by maximum likelihood (plain logistic, no penalty) on the finalist's
+  walk-forward predictions for 2017/18–2024/25 only. 2024/25 now counts as seen.
+- Development view (descriptive, no pass rule): each season 2018/19–2024/25 recalibrated
+  with a fit on the seasons before it only, raw and recalibrated side by side.
+
+**Test season: 2025/26.**
+- Every run that does not open it drops all matches from 1 July 2025 before anything is
+  computed (the match model's fit included). The test run opens it once per league with
+  a logged reason (`lab.harness.Holdout`), predicts it with the same walk-forward, and
+  applies the 2017/18–2024/25 fit unchanged.
+- Raw and recalibrated are scored side by side, each against the league average (a).
+
+**Pass rule** (the bake-off's, unchanged):
+- the per-match mean log-loss gain over (a) across the six team lines has a whole-match
+  bootstrap range above 0 at the Bonferroni level; and
+- every line's recalibration slope point estimate is within **0.80–1.25**.
+- Family: 6 leagues × 2 (raw, recalibrated) = 12 tests, **99.583%**. Log loss, Brier and
+  calibration tables are also reported.
+
+**Reading.**
+- A league's recalibrated model that passes would be recommended as display-only team
+  corner over/unders on the match sheet, labelled as model estimates not tested against
+  any price. A raw model that passes is reported but not recommended over a passing
+  recalibrated one.
+- Power: 2025/26 has 306 matches in D1 and F1, 380 in E0, SP1 and I1, and 552 in E1
+  (fewer get scored: the walk-forward needs each side's earlier form), like the 2024/25 holdout (284–522). On ~300 matches each line's slope range is about
+  ±0.4, so the band test is noisy there; D1 and F1 are the thinnest.
+- A price test would still need Pinnacle's live corner prices (a separate owner
+  decision). Nothing is spent.
+
+**Code.** `edge/corner_recal.py`; `odds-check.yml` `task=corner-recal` with `league`
+(development view, 2025/26 dropped first) and with `reason` (opens 2025/26 once).
+
+### Team-corner recalibration: development view (descriptive; recorded before 2025/26 is opened)
+
+Runs: `task=corner-recal`, commit ed2caf1, 2025/26 dropped first, 0 credits: E0 38022657681,
+SP1 38022659193, D1 38022660746, I1 38022662228, F1 38022663678, E1 38022665072. Each season
+2018/19–2024/25 is recalibrated with a fit on the seasons before it; ranges at 95%.
+
+| League | Matches | Fit b (2018→2024) | Raw: gain, slopes | Recalibrated: gain, slopes |
+| --- | --- | --- | --- | --- |
+| E0 | 2,566 | 0.89 → 0.86 | +0.047, 0.73–0.85 | +0.049 (+0.040..+0.057), **0.84–0.98** |
+| SP1 | 2,569 | 0.81 → 0.81 | +0.015, 0.57–0.73 | +0.017 (+0.011..+0.023), 0.71–0.88 |
+| D1 | 2,067 | 0.66 → 0.84 | +0.035, 0.73–0.82 | +0.035 (+0.027..+0.043), **0.89–0.99** |
+| I1 | 2,547 | 0.90 → 0.90 | +0.033, 0.77–0.82 | +0.033 (+0.026..+0.040), **0.87–0.93** |
+| F1 | 2,332 | 0.76 → 0.84 | +0.017, 0.68–0.81 | +0.018 (+0.013..+0.024), **0.83–1.00** |
+| E1 | 3,703 | 0.81 → 0.84 | +0.015, 0.64–0.80 | +0.016 (+0.011..+0.020), 0.76–0.95 |
+
+Reading (descriptive, not the test): the fits are stable from season to season (b about
+0.8–0.9, a near 0). Recalibrating keeps the gain, nudges it up slightly, and brings every
+line into the slope band in E0, D1, I1 and F1. La Liga (home 3.5 at 0.75, away 3.5 at
+0.71) and the Championship (home 4.5 at 0.76) stay below it. One pooled intercept for home
+and away leaves a small bias on some lines (E1 home 3.5: 75.5% over vs 71.8% predicted);
+that is the pre-registered spec and stays as is for the test.
+
+### Team-corner recalibration: 2025/26 test and verdict (opened once per league, 10 Oct)
+
+Runs: `task=corner-recal` with `reason`, commit 87e15d0, 0 credits, no key: E0 38022933421,
+SP1 38022934931, D1 38022936740, I1 38022938644, F1 38022940785, E1 38022942019. Each log
+records the opening, e.g. E0 "HOLDOUT OPENED at 2026-10-10T04:07:44Z (rows from
+2025-07-01): Round 12 team-corner recalibration: pre-registered 2025/26 test
+(pre-registration 4ab84a3, development view 87e15d0)". The recalibration was fitted on
+2017/18–2024/25 and applied unchanged. Ranges at 99.583% (12 tests).
+
+| League | Matches | Fit a, b | Raw: gain (range), slopes | Recalibrated: gain (range), slopes | Pass |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 358 | +0.025, 0.853 | +0.022 (−0.014..+0.057), 0.51–0.71 | +0.026 (−0.005..+0.057), 0.60–0.83 | no |
+| SP1 | 352 | +0.006, 0.814 | +0.018 (−0.014..+0.048), 0.39–0.80 | +0.021 (−0.006..+0.047), 0.48–0.99 | no |
+| D1 | 291 | +0.044, 0.829 | +0.016 (−0.016..+0.047), 0.47–0.82 | +0.017 (−0.010..+0.044), 0.56–0.99 | no |
+| I1 | 358 | −0.016, 0.873 | +0.027 (−0.004..+0.057), 0.58–0.91 | +0.028 (**+0.001..+0.055**), 0.66–1.04 | no |
+| F1 | 289 | −0.005, 0.847 | +0.029 (−0.002..+0.060), 0.62–1.13 | +0.029 (**+0.002..+0.057**), 0.73–1.33 | no |
+| E1 | 528 | +0.022, 0.864 | +0.022 (**+0.004..+0.040**), 0.65–1.15 | +0.022 (**+0.007..+0.038**), 0.75–1.33 | no |
+
+Lines outside 0.80–1.25 after recalibration: E0 away 3.5 (0.60), away 5.5 (0.65);
+SP1 home 5.5 (0.48); D1 home 3.5 (0.56), home 4.5 (0.66); I1 away 3.5 (0.66), away 4.5
+(0.79); F1 home 3.5 (1.33), away 4.5 (0.73); E1 home 5.5 (1.33), away 3.5 (1.29), away
+5.5 (0.75).
+
+**Verdict: nothing passes in any league, raw or recalibrated.** No team corners on the
+match sheet; no live change.
+
+Reading:
+- Each team's corner model still carries information on a season nothing had touched:
+  the gain over the league average is positive in every league (+0.016 to +0.029 a
+  line), and after recalibration its range clears 0 in Serie A, Ligue 1 and the
+  Championship (the Championship's raw range too).
+- Recalibration helps a little and as designed: gain up in every league but the
+  Championship (unchanged), and the median line slope moves towards 1. But it shrinks
+  every line by the same factor, and in 2025/26 some lines were still over-confident
+  (E0's away lines, D1's home lines) while others overshot (F1 home 3.5, E1 home 5.5 at
+  1.33).
+- The slope test is noisy on one season: each line's slope range is about ±0.3–0.5 on
+  290–530 matches, so a line can leave the band by chance. With 6 lines a league, all six
+  inside the band is a strict bar at this size. That is the rule as pre-registered; it
+  is not relaxed after the fact.
+- Next, if wanted: a further season (2026/27, from about May 2027) scored the same way
+  would double the sample. A price test still needs Pinnacle's live corner prices (a
+  separate owner decision). Nothing is proposed now.
+
+
+Lead review notes (10 Oct):
+- Timeline checked against the commits and run start times: coverage commit fb7a69c
+  03:54:56 UTC, coverage run 38022238320 03:55:08 (prints only played / with HC and AC
+  counts per league), pre-registration 4ab84a3 03:55:48, code ed2caf1 04:02:17,
+  development runs 04:02:23–04:02:31 (no reason; 2025/26 dropped first, no opening
+  logged), development view recorded in 87e15d0 04:06:55, test runs 04:07:02–04:07:10,
+  each logging one "HOLDOUT OPENED" line (04:07:44–04:08:04). No other run opened 2025/26.
+  Every 2025/26 number in the table above matches its job log.
+- The development view printed inside the six test runs scores 9–12 more matches than the
+  development runs above (E0 2,576 vs 2,566, SP1 2,579 vs 2,569, D1 2,076 vs 2,067, I1
+  2,557 vs 2,547, F1 2,341 vs 2,332, E1 3,715 vs 3,703): one final matchday of 2024/25.
+  `backtest.walk_forward` (the match model's expected goals) predicts in weekly windows
+  that stop at the last window edge before the data ends, so when the data ends in May
+  2025 the last few days get no expected goals; with 2025/26 loaded they do. Those rows
+  are 2024/25 and predicted from earlier matches only, so it is not look-ahead; the
+  yearly fits agree to five decimals. The test's recalibration fit used the fuller set.
