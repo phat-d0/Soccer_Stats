@@ -308,3 +308,81 @@ def test_add_team_totals_takes_the_latest_fanduel_quote_before_kickoff(tmp_path)
     assert tt["home"] == [{"line": 1.5, "fair_over": 0.64, "over": 1.8, "under": 2.0}]
     assert tt["fetched_at"] == "2026-10-10T13:40:00+00:00"
     assert "team_totals" not in cards[1]
+
+
+def test_markets_research_file_is_complete_and_passes_nothing():
+    from soccer_stats.publish import MARKETS_RESEARCH_FILE
+
+    r = json.loads(MARKETS_RESEARCH_FILE.read_text())
+    six = ["E0", "SP1", "D1", "I1", "F1", "E1"]
+    tables = [
+        r["total_goals"]["pinnacle"],
+        r["total_goals"]["baseline"],
+        r["team_goals"]["research"],
+        r["corners"]["holdout"],
+        r["corners"]["recalibration"],
+    ]
+    for t in tables:
+        assert [row["league"] for row in t["rows"]] == six and t["source"]
+    for key in ("pinnacle", "holdout", "recalibration"):
+        part = r["total_goals"].get(key) or r["corners"].get(key)
+        assert set(part["runs"]) == set(six)
+        assert not any(row["passes"] for row in part["rows"])
+    assert sum(x["beat"] for x in r["total_goals"]["baseline"]["rows"]) == 6
+    assert all(r[m]["verdict"] for m in ("total_goals", "team_goals", "corners"))
+
+
+def test_markets_research_missing_or_broken_file_is_none(tmp_path):
+    from soccer_stats.publish import markets_research
+
+    assert markets_research(path=tmp_path / "nope.json") is None
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert markets_research(path=bad) is None
+    bad.write_text("[1, 2]")
+    assert markets_research(path=bad) is None
+
+
+def test_markets_research_counts_the_live_team_total_test(tmp_path):
+    from soccer_stats.publish import markets_research
+
+    def row(home, snap, at, ko="2026-10-10T14:00:00+00:00", book="fanduel"):
+        return (
+            {"league": "E0", "home": home, "away": "Leeds", "kickoff": ko, "book": book}
+            | {"team": home, "side": "home", "line": 1.5, "snapshot": snap, "over": 2.0}
+            | {"under": 1.8, "fair_over": 0.48, "fair_under": 0.52, "p_model_over": 0.5}
+            | {"downloaded_at": at, "fetched_at": at, "minutes_before": 20.0}
+        )
+
+    rows = [
+        row("Arsenal", "look", "2026-10-09T14:00:00+00:00"),
+        row("Arsenal", "close", "2026-10-10T13:40:00+00:00"),
+        row("Chelsea", "look", "2026-10-09T14:00:00+00:00"),
+        row("Spurs", "look", "2026-10-09T14:00:00+00:00", book="bovada"),
+    ]
+    (tmp_path / "E0_team_totals_2026-10.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n"
+    )
+    results = pd.DataFrame(
+        {"league": ["E0"], "home": ["Arsenal"], "away": ["Leeds"]}
+        | {"date": [pd.Timestamp("2026-10-10")], "home_goals": [2], "away_goals": [1]}
+    )
+    out = markets_research([tmp_path, None], results)
+    prog = out["team_goals"]["live"]["progress"]
+    assert prog == {"target": 50, "rows": 3, "looks": 2, "both": 1, "settled": 1}
+    assert out["corners"]["recalibration"]["rows"]  # the research is kept
+    empty = markets_research([tmp_path / "none"], None)["team_goals"]["live"]["progress"]
+    assert empty["settled"] == 0 and empty["looks"] == 0
+
+
+def test_markets_research_keeps_the_research_when_progress_fails(monkeypatch):
+    from soccer_stats import publish
+
+    def boom(*a, **k):
+        raise RuntimeError("bad log")
+
+    monkeypatch.setattr(publish, "team_total_progress", boom)
+    out = publish.markets_research([], None)
+    assert out["team_goals"]["live"]["progress"] == {"error": "RuntimeError"}
+    assert out["total_goals"]["pinnacle"]["rows"]
+    json.dumps(publish._clean(out), allow_nan=False)

@@ -615,3 +615,23 @@ details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; 
 .chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 0.5px solid var(--border); background: var(--surface-2); color: var(--text-secondary); cursor: pointer; }
 .chip.on { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-2); font-weight: 600; }
 .pf-head + .chips, .segmented + .chips { margin-top: 10px; }
+
+/* Record → Goals & corners: verdict line, range plot extras, progress bar */
+.verdict { font-weight: 600; font-size: 15px; line-height: 1.35; padding: 10px 14px; border-radius: 12px; background: var(--track); border-left: 4px solid var(--text-muted); }
+.verdict.neg { border-left-color: var(--neg); }
+.verdict.mid { border-left-color: var(--text-muted); }
+.eb-range.mid, .eb-dot.real.mid { background: var(--text-muted); }
+.rc-row.sel .eb-label { color: var(--text-primary); font-weight: 600; }
+.rc-zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--text-muted); }
+.eb-axis .eb-plot .rc-zero { display: none; }
+.mk-progress-head { font-size: 14px; margin-bottom: 8px; }
+.mk-progress { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.mk-progress span { display: block; height: 100%; background: var(--pos); }
+table.mk-table { table-layout: fixed; font-size: 13px; }
+table.mk-table th:first-child { width: 28%; }
+.mk-range { display: block; font-size: 11px; color: var(--text-muted); }
+table.mk-table.mk-wide td, table.mk-table.mk-wide th { padding-left: 2px; padding-right: 2px; }
+table.mk-table td.gain { color: var(--pos); }
+table.mk-table td.loss { color: var(--neg); }
+details.mk-fold { margin-top: 10px; }
+.small-note { font-size: 11px; }
