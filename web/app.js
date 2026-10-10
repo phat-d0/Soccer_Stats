@@ -496,19 +496,24 @@ function cornersSection(fx) {
       const eo = q.p_over != null ? q.p_over * q.over + (q.p_push || 0) - 1 : null;
       const eu = q.p_under != null ? q.p_under * q.under + (q.p_push || 0) - 1 : null;
       const best = eo == null && eu == null ? null : (eu ?? -9) > (eo ?? -9) ? ["under", eu] : ["over", eo];
-      if (q.pick) picks.push({ side, q, trade: cornerTrade(fx, side, q.line) });
-      return `<tr class="${q.pick ? "pick" : ""}"><td>${Number(q.line)}</td><td>${pct(q.p_over)}</td><td>${pct(q.fair_over)}</td><td>${american(q.over)}</td><td>${american(q.under)}</td><td class="${q.pick ? "edge-pos" : ""}">${best ? `${signedPct(best[1], 0)}<span class="mk-range">${best[0]}</span>` : "–"}</td></tr>`;
+      // One trade per team line, ever: an open trade is marked by its own side and entry
+      // price (the pick may have moved or lapsed since); otherwise the pick as it stands.
+      const trade = cornerTrade(fx, side, q.line);
+      if (trade || q.pick) picks.push({ side, q, trade });
+      return `<tr class="${q.pick || trade ? "pick" : ""}"><td>${Number(q.line)}</td><td>${pct(q.p_over)}</td><td>${pct(q.fair_over)}</td><td>${american(q.over)}</td><td>${american(q.under)}</td><td class="${q.pick ? "edge-pos" : ""}">${best ? `${signedPct(best[1], 0)}<span class="mk-range">${best[0]}</span>` : "–"}</td></tr>`;
     }).join("");
     return `<div class="goals-team"><b>${name}</b> <span class="muted small">model expects ${Number(m.mean).toFixed(1)}</span>
       <table class="mkts corners-t"><thead><tr><th>Line</th><th>Model</th><th>PIN</th><th>Over</th><th>Under</th><th>Edge</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   };
   const body = team("home") + team("away");
-  const pickHtml = picks.map(({ side, q, trade }) => `<span class="badge${trade ? " paper" : ""}">${CHECK}${trade ? "Paper trade open" : "Live-test pick"}: ${esc(fx[side])} ${q.pick.side} ${Number(q.line)} @ ${american(q.pick.odds)} <span class="num">(${signedPct(q.pick.edge)})</span></span>`).join("");
+  const pickHtml = picks.map(({ side, q, trade }) => (trade
+    ? `<span class="badge paper">${CHECK}Paper trade open: ${esc(fx[side])} ${trade.side} ${Number(q.line)} @ ${american(trade.odds)} <span class="num">(${signedPct(trade.edge)} at entry)</span></span>`
+    : `<span class="badge">${CHECK}Live-test pick: ${esc(fx[side])} ${q.pick.side} ${Number(q.line)} @ ${american(q.pick.odds)} <span class="num">(${signedPct(q.pick.edge)})</span></span>`)).join("");
   const when = pin?.fetched_at ? espnTime(pin.fetched_at) : null;
-  const weak = WEAK_CORNER_FIT.has(lg) ? ` Model (f) fits less well in ${esc(theLeague(lg))}: in testing its chances there were too spread out.` : "";
+  const weak = WEAK_CORNER_FIT.has(lg) ? ` Model (f) fits less well in ${esc(theLeague(lg))}: in testing its chances there were too spread out, so this league isn't in the February test and its live record is the only check.` : "";
   return `
     <div class="section-title">Corners</div>
-    <div class="explain live-test"><b>Live test.</b> Team corners are paper-traded: model (f) against Pinnacle's price, a $10 trade at ${pct(level)}+ edge. No edge is proven yet; the February test decides. <button class="linkish" data-goto-pf="corners">Team corners portfolio</button></div>
+    <div class="explain live-test"><b>Live test.</b> Team corners are paper-traded: model (f) against Pinnacle's price, a $10 trade at ${pct(level)}+ edge. No edge is proven yet; the February test (Premier League, Serie A and Ligue 1) decides. <button class="linkish" data-goto-pf="corners">Team corners portfolio</button></div>
     <div class="card" style="padding:8px 14px">${body}${pickHtml ? `<div class="corner-picks">${pickHtml}</div>` : ""}</div>
     <p class="note">${pin ? `Model = model (f)'s chance of the over; on a whole line (say 5) exactly 5 is a push and the stake comes back. PIN = Pinnacle's chance of the over, margin removed. Over/Under = Pinnacle's odds${when ? `, logged ${esc(when)}` : ""}. Edge = the better side's model chance × odds (+ push chance) − 1. A pick here uses Pinnacle's latest logged price; a paper trade also needs a price from the last 3 hours, so not every pick becomes a trade.` : "Model = model (f)'s chance of each team going over the line. No Pinnacle price for this match yet: team corners are logged about a day before kickoff and again just before it."} Teams with little top-flight history are pulled toward the league average.${weak}</p>`;
 }
