@@ -25,7 +25,13 @@ The Odds API key is shared with the baseball app. The balance was about 22,600 o
 
 ## Refresh rule
 
-One refresh is one call: h2h and totals from one bookmaker, which costs 2 credits.
+One refresh is one call: h2h from one bookmaker, which costs 1 credit. Until 10 Oct it also
+asked for `totals` and cost 2: DraftKings lists no main `totals` market for soccer on The
+Odds API (the market probe's key discovery, run 37889595473: only `alternate_totals`, which
+the bulk endpoint can't return), so the call was billed for a market that never came back
+(0 over/under rows in October's odds log). The budget still counts each refresh at 2
+credits (`odds_feed.BUDGET_COST`), so at any balance the refresh rhythm is exactly what it
+was; the leagues still never refresh more often than the floors below.
 
 | League | Rule |
 | --- | --- |
@@ -67,20 +73,21 @@ that month's fixtures (from Understat) under the rule above. You can also run it
 *Backfill DraftKings odds* → `estimate_month`, which needs no key and spends nothing.
 
 The figures are upper bounds: GitHub delays or skips some scheduled runs, so real use is
-lower.
+lower. The table was made at 2 credits a call; since 10 Oct a call costs 1 (h2h only), so
+the calls are unchanged and the credits halve (last column).
 
 **October 2026** (most kickoff times fixed; `backfill.yml` runs 37841834127 and 37843392959):
 
-| League | Matches | Calls | Credits / month |
-| --- | --- | --- | --- |
-| Premier League | 38 | 774 | **1,548** |
-| La Liga | 36 | 310 | 620 |
-| Bundesliga | 36 | 207 | 414 |
-| Serie A | 43 | 311 | 622 |
-| Ligue 1 | 36 | 224 | 448 |
-| Championship (October 2025 calendar*) | 53 | 198 | 396 |
-| **All five new leagues** | | | **2,500** |
-| **All six** | | | **4,048** |
+| League | Matches | Calls | Credits / month (2 a call, until 10 Oct) | Credits / month (1 a call) |
+| --- | --- | --- | --- | --- |
+| Premier League | 38 | 774 | **1,548** | **774** |
+| La Liga | 36 | 310 | 620 | 310 |
+| Bundesliga | 36 | 207 | 414 | 207 |
+| Serie A | 43 | 311 | 622 | 311 |
+| Ligue 1 | 36 | 224 | 448 | 224 |
+| Championship (October 2025 calendar*) | 53 | 198 | 396 | 198 |
+| **All five new leagues** | | | **2,500** | **1,250** |
+| **All six** | | | **4,048** | **2,024** |
 
 \* Understat has no Championship schedule, and football-data lists only played matches,
 so the Championship is priced on the same month a season earlier. It has the most
@@ -97,15 +104,17 @@ rounds, usual kickoff slots) gave 478–720 credits per league, in line with Oct
 
 - **Premier League alone (until 8 Oct):** about 1,500 a month, so roughly 15 months on
   22,600 credits before counting the baseball app.
-- **All six leagues (live from 8 Oct):** about 4,050 a month, so roughly 5½ months. The
-  new leagues stop at 3,000 credits, so E0 then runs on alone.
+- **All six leagues (live from 8 Oct):** about 4,050 a month at 2 credits a call; about
+  2,025 a month from 10 Oct at 1 credit a call (h2h only), so roughly 11 months on
+  22,300 before team totals (~340 a month) and the baseball app. The new leagues stop at
+  3,000 credits, so E0 then runs on alone.
 - **One extra league:** about 400–620 a month. Serie A and La Liga cost the most, with
   more matches spread over Friday to Monday. The Bundesliga is cheapest, because most of
   its round kicks off at the same Saturday time.
 
 Ways to spend less, if needed (none are built yet):
 - refresh the new leagues only from 24 hours out instead of 48 (saves roughly a third);
-- drop the totals market for them, which halves each call to 1 credit.
+- (done 10 Oct, all leagues) drop the totals market, which halved each call to 1 credit.
 
 ## Things to check on the first live runs
 

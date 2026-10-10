@@ -134,7 +134,7 @@ def test_estimate_credits():
     # No matches: a matchday league costs nothing; the Premier League refreshes hourly.
     assert feed.estimate_credits("SP1", [], start, end)["credits"] == 0
     e0 = feed.estimate_credits("E0", [], start, end)
-    assert e0["calls"] == 24 * 7 and e0["credits"] == 2 * 24 * 7
+    assert e0["calls"] == 24 * 7 and e0["credits"] == 24 * 7  # 1 credit (h2h)
     # One kickoff: calls start 48 hours out and thicken toward kickoff.
     k = [start + pd.Timedelta(days=3, hours=15)]
     one = feed.estimate_credits("SP1", k, start, end)
