@@ -102,6 +102,48 @@ const STEPS = [
     if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
   }, true],
   ["matches-league-all", async (p) => { await closeSheet(p); await p.click('.chip[data-league=""]'); }],
+  // The owner's fixed live test (portfolio.rule.p_source "model"): the app flags exactly the
+  // matches paper trades take (raw model, 12% against DraftKings' quoted price).
+  ["matches-live-test", async (p) => {
+    const text = await p.textContent("#view");
+    for (const want of ["Owner's live test", "Fixed 12% (your live test)", "live-test pick", "with the model alone"]) {
+      if (!text.includes(want)) throw new Error(`Matches lacks "${want}"`);
+    }
+    const flagged = await p.evaluate(() => [...document.querySelectorAll("button.match")].filter((b) => b.querySelector(".badge:not(.paper):not(.lineup)")).map((b) => b.querySelector(".teams").innerText.replace(/\s+/g, " ")));
+    const d = await (await p.request.get(new URL("data.json", p.url()).href)).json();
+    const ml = d.portfolio.portfolios.find((x) => x.id === "moneyline");
+    const taken = ml.live.trades.filter((t) => t.rule === "fixed_raw" && t.status === "open");
+    for (const t of taken) {
+      if (!flagged.some((f) => f.includes(t.home) && f.includes(t.away))) throw new Error(`paper trade ${t.id} isn't flagged on Matches`);
+    }
+    if (flagged.length < taken.length) throw new Error(`${flagged.length} flagged, ${taken.length} fixed-rule paper trades`);
+    await p.click("details.edge-learned > summary");
+    if (!(await p.textContent("details.edge-learned")).includes("Backtests found no edge level that made money")) throw new Error("learned result not shown");
+  }],
+  ["match-sheet-live-test", async (p) => {
+    await p.click("button.match:has(.badge:not(.paper):not(.lineup)) >> nth=0"); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    if (!text.includes("Live-test pick") || !text.includes("model alone")) throw new Error("match sheet doesn't explain the live-test pick");
+  }, true],
+  // The learned rule (p_source "blend"): today's behaviour comes back.
+  ["matches-learned-rule", async (p) => {
+    await closeSheet(p);
+    await p.route("**/data.json", async (route) => {
+      const res = await route.fetch();
+      const d = await res.json();
+      d.portfolio.rule = { ...d.portfolio.rule, rule: "learned", p_source: "blend", threshold: null, threshold_source: "history" };
+      for (const c of Object.keys(d.portfolio.rules)) d.portfolio.rules[c] = { threshold: null, source: "history", note: "No edge level beat the market.", rule: "learned", p_source: "blend" };
+      await route.fulfill({ response: res, json: d });
+    });
+    await p.reload(); await p.waitForSelector("button.match");
+    const text = await p.textContent("#view");
+    if (text.includes("live test") || text.includes("Live-test pick")) throw new Error("learned rule still shows the live test");
+    if (!text.includes("Nothing is flagged")) throw new Error("learned rule should flag nothing");
+  }],
+  ["matches-restored", async (p) => {
+    await p.unroute("**/data.json");
+    await p.reload(); await p.waitForSelector("button.match");
+  }],
   ["teams", tab("ratings")],
   ["players-stats", async (p) => { await p.click('button[data-tv="players"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-stats-club", async (p) => { await p.selectOption("#pl-team", { index: 1 }); }],

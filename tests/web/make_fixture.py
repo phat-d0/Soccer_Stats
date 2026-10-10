@@ -859,15 +859,13 @@ def add_second_league(data: dict) -> None:
     ]
     for lg in data["leagues"]:
         lg["fixtures"] = sum(f["league"] == lg["code"] for f in data["fixtures"])
-    r = data["portfolio"].get("rule") or {}
-    data["portfolio"]["rules"] = {
-        "E0": {
-            "threshold": r.get("threshold"),
-            "source": r.get("threshold_source"),
-            "note": r.get("threshold_note"),
-        },
-        "SP1": {"threshold": SP1_EDGE["min_edge"], "source": "history", "note": SP1_EDGE["note"]},
-    }
+    # The live paper rule per league (trades.paper_threshold: under PAPER_RULE "fixed_raw"
+    # the owner's 12% on the raw model everywhere), and SP1's learned level as research
+    # data in the backtest's by_league, where paper.run puts it with 2+ leagues in play.
+    data["portfolio"]["rules"] = {lg: tr.paper_threshold(None, lg) for lg in ("E0", "SP1")}
+    if backtests["moneyline"] is not None:
+        et = backtests["moneyline"].setdefault("edge_threshold", {})
+        et.setdefault("by_league", {})["SP1"] = SP1_EDGE
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     data["portfolio"]["portfolios"] = paper.portfolios_section(
         live, live_trades, backtests, ml["live"].get("rule")

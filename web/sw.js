@@ -2,7 +2,7 @@
 // the latest predictions when online and the last ones when not.
 // Renamed from pl-model-vNN with the app (8 Oct); activate deletes every other cache,
 // old names included.
-const CACHE = "soccer-model-v32";
+const CACHE = "soccer-model-v33";
 const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
