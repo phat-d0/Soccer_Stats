@@ -82,6 +82,14 @@ const STEPS = [
     if (text.includes("DK over")) throw new Error("Goals section still shows a DraftKings 2.5 column");
     await p.locator("details.goals-fold").scrollIntoViewIfNeeded();
   }, true],
+  // Team corners: model (f) beside Pinnacle; the first card's pick already has an open trade.
+  ["match-sheet-corners", async (p) => {
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["Corners", "model expects", "PIN", "Paper trade open", "push", "pulled toward the league average"]) {
+      if (!text.includes(want)) throw new Error(`Corners section lacks "${want}"`);
+    }
+    await p.locator("table.corners-t").first().scrollIntoViewIfNeeded();
+  }, true],
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
   ["match-sheet-no-lineups", async (p) => {
     await closeSheet(p);
@@ -100,6 +108,7 @@ const STEPS = [
     await p.click("button.match >> nth=0"); await sheet(p); await p.click("details.goals-fold > summary");
     const text = await p.textContent("#sheet-body");
     if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
+    if (!text.includes("No Pinnacle price for this match yet") || !text.includes("fits less well in La Liga")) throw new Error("SP1 corners should be model only, with the weaker-fit note");
   }, true],
   ["matches-league-all", async (p) => { await closeSheet(p); await p.click('.chip[data-league=""]'); }],
   // The owner's fixed live test (portfolio.rule.p_source "model"): the app flags exactly the
@@ -245,7 +254,36 @@ const STEPS = [
   ["portfolio-retired-live", click('button.linkish[data-pfid="player_shots"]')],
   ["portfolio-retired-backtest", click('button[data-pf="backtest"]')],
   ["portfolio-retired-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  ["portfolio-moneyline", async (p) => { await closeSheet(p); await p.click('button[data-pfid="moneyline"]'); }],
+  // Team corners (in testing): live paper with Pinnacle CLV and a push, a league chip, the
+  // trade sheet, then the research backtest (no money tiles) with a range-plot readout.
+  ["portfolio-corners", async (p) => {
+    await closeSheet(p); await p.click('button[data-pfid="corners"]'); await p.click('button[data-pf="live"]');
+    const text = await p.textContent("#view");
+    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)"]) {
+      if (!text.includes(want)) throw new Error(`Team corners lacks "${want}"`);
+    }
+  }],
+  ["portfolio-corners-sp1", click('.chip[data-league="SP1"]')],
+  ["portfolio-corners-push", async (p) => {
+    await p.click('.chip[data-league=""]');
+    await p.click('button[data-trade="E0|2627|Everton|Fulham|corners|away|5"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    if (!text.includes("a push (stake back)") || !text.includes("CLV vs Pinnacle's close")) throw new Error("push trade sheet");
+  }, true],
+  ["portfolio-corners-backtest", async (p) => {
+    await closeSheet(p); await p.click('button[data-pf="backtest"]');
+    await p.click('.rc-row[data-rc="pfco"][data-rcrow="0"]');
+    const text = await p.textContent("#view");
+    for (const want of ["No money tiles", "finalist", "February"]) if (!text.includes(want)) throw new Error(`research backtest lacks "${want}"`);
+    if (await p.locator(".tiles").count()) throw new Error("research backtest shows money tiles");
+    await p.click("details.mk-fold > summary");
+  }],
+  ["record-markets-corners-link", async (p) => {
+    await tab("record")(p); await p.click('button[data-recbet="markets"]');
+    await p.click('button[data-goto-pf="corners"]');
+    if (!(await p.textContent("#view")).includes("Team corners")) throw new Error("corners link didn't open the portfolio");
+  }],
+  ["portfolio-moneyline", async (p) => { await p.click('button[data-pfid="moneyline"]'); }],
   ["explore", tab("explore")],
 ];
 const MODES = [

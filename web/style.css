@@ -635,3 +635,9 @@ table.mk-table td.gain { color: var(--pos); }
 table.mk-table td.loss { color: var(--neg); }
 details.mk-fold { margin-top: 10px; }
 .small-note { font-size: 11px; }
+/* Match sheet "Corners": six narrow columns at 390px; a pick row is tinted */
+table.corners-t { font-size: 13px; table-layout: fixed; }
+table.corners-t th:first-child { width: 14%; }
+table.corners-t td, table.corners-t th { padding-left: 2px; padding-right: 2px; }
+table.corners-t tr.pick td { background: var(--track); }
+.corner-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
