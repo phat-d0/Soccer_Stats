@@ -450,8 +450,17 @@ credits a month.
 ## Live team-total logging (built; owner approved the base plan on 9 Oct)
 
 FanDuel's `team_totals` (Bovada too in the Premier League, in the same `us` call; no
-alternates) in E0, SP1, D1, I1 and F1. Two snapshots per match, about 340 credits a
-month. Data only: no paper trades, nothing new in the app. Code: `team_totals.py`.
+alternates) in E0, SP1, D1, I1 and F1. Two snapshots per match. Data only: no paper
+trades. Code: `team_totals.py`.
+
+**From 10 Oct (owner-approved): match totals and Pinnacle in the same call.** Each
+snapshot call asks for `markets=team_totals,totals` at `bookmakers=fanduel,bovada,pinnacle`.
+Up to ten books count as one region, and the API bills per market requested, so a call
+costs 2 credits instead of 1 (counted from `x-requests-last` as before). Pinnacle quotes
+no goal team totals on this API, so it adds the match total only: a sharp, margin-free
+reference beside FanDuel's team totals. FanDuel's and Bovada's match totals come back in
+the same call and are logged too. About **682 credits a month** (base plan, 341 calls ×
+2; Oct ~756, Nov ~632, Dec ~660 as upper bounds), with the hard cap raised to 800.
 
 **When a snapshot is taken (each publish run):**
 - **Look:** the first run that finds the kickoff 18 to 30 hours away.
@@ -474,30 +483,46 @@ month. Data only: no paper trades, nothing new in the app. Code: `team_totals.py
   (`MATCHDAY_RESERVE_CREDITS`). The freshest balance is the newest of any league's
   DraftKings meta and the last team-total call; it is re-checked after every call from
   the response header.
-- No call once this calendar month's team-total calls reach 450 credits (`MONTHLY_CAP`),
-  a hard stop above the ~340 estimate.
+- No call that would take this calendar month's team-total calls past 800 credits
+  (`MONTHLY_CAP`; 450 until 10 Oct), a hard stop above the ~682 estimate. A call is
+  budgeted at `COST_PER_CALL` = 2.
 - The Premier League's match odds and the baseball app keep priority.
 - Only the default branch fetches (`TEAM_TOTALS_DIR` is set there alone), so a dispatch
   on another branch never spends credits it couldn't log.
 
 **Log:** `odds_log/<code>_team_totals_<YYYY-MM>.jsonl` on data-log, append-only and
-deduplicated. One row per book × team × line with both sides priced:
-- league, home, away, kickoff, event_id, snapshot (look/close), book, team, side, line;
+deduplicated. Both markets share the file. One row per market × book × team (or the
+match) × line with both sides priced:
+- `market`: `"team_totals"` or `"totals"` (the match total). **Rows logged before 10 Oct
+  have no `market` field and are team totals**: read them with `team_totals.market_of`,
+  or `load_rows`, which fills it in.
+- league, home, away, kickoff, event_id, snapshot (look/close), book, team, side, line.
+  On a `totals` row `team` is null, `side` is `"match"`, and `line` is the point exactly
+  as the book returned it (Pinnacle's main line may be 2.25, 2.5, 2.75 or 3.0; it is
+  never rounded or assumed to be 2.5).
 - over and under prices, the Shin margin-free `fair_over`/`fair_under`, and `margin`;
 - `fetched_at` (FanDuel's `last_update`, else the download time, with `time_source`),
   `downloaded_at` and `minutes_before`;
 - `p_model_over`: the model's chance that the team scores more than the line. It comes
   from the card's own score matrix, the same one that sets `p`, with team news applied
-  in the Premier League (`goals_cdf` on each card, cumulative to 6 goals).
+  in the Premier League (`goals_cdf` on each card, cumulative to 6 goals). On a `totals`
+  row it is the chance that both teams together score more than the line
+  (`total_goals_cdf`). For a quarter or whole line it is P(goals > floor(line)), so
+  settle pushes and half stakes yourself rather than reading it as the bet's chance.
+
+The call record gains `markets` ("team_totals,totals") beside `books`; it is still one
+row per (event, snapshot), deduplicated, and a recorded pair is never fetched again.
 
 The DraftKings log reader only reads `<code>_<YYYY-MM>.jsonl`, so the two logs never mix.
 
-**Publish log line:** "Team totals: N calls, C credits, R rows; month M of 450 credits,
-credits left X", plus the reason when it stopped.
+**Publish log line:** "Team totals: N calls, C credits, R rows (T match totals); month M
+of 800 credits, credits left X", plus the reason when it stopped.
 
-**Analysis:** `odds-check.yml` `task=team-totals`, no key. It pairs each look with the
-close for the same match, book, team and line, adds the team's goals from football-data,
-and scores FanDuel rows through `lab.metrics.evaluate`:
+**Analysis:** `odds-check.yml` `task=team-totals`, no key. It reads team totals only
+(`team_totals.pairs(rows, results, market="team_totals")`, the default; the match totals
+are `market="totals"`, with `y` = 1 when the total is at or under the line). It pairs
+each look with the close for the same match, book, team and line, adds the team's goals
+from football-data, and scores FanDuel rows through `lab.metrics.evaluate`:
 - the model against the look's fair price (gain, blend weight);
 - the 12% rule's CLV against FanDuel's de-margined close;
 - model vs close log loss;

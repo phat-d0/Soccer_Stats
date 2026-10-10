@@ -2,7 +2,12 @@
 
 Owner-approved on 9 Oct (the "base" plan): FanDuel's `team_totals` (Bovada too in the
 Premier League, same `us` call) in E0, SP1, D1, I1 and F1, one look about 24 hours before
-kickoff and one close just before it. Data only: no paper trades, nothing in the app.
+kickoff and one close just before it. From 10 Oct (owner-approved) the same call also asks
+for the match `totals` and adds Pinnacle (`bookmakers=fanduel,bovada,pinnacle`, up to ten
+books cost one region), so each call is 2 credits and Pinnacle's margin-free match total
+sits beside FanDuel's team totals. Pinnacle quotes no team totals here. Rows carry a
+`market` field ("team_totals" or "totals"; rows from before it have none and are team
+totals: `market_of`). Data only: no paper trades.
 
 Per publish run (`run`):
 
@@ -49,13 +54,17 @@ from soccer_stats.odds_feed import (
 
 URL = "https://api.the-odds-api.com/v4/sports/{sport}/events/{event_id}/odds"
 MARKET = "team_totals"
-BOOKS = {"E0": ("fanduel", "bovada")}  # both "us": one region, one credit per market
-DEFAULT_BOOKS = ("fanduel",)
+TOTALS = "totals"  # the match total (Pinnacle's sharp reference; FanDuel and Bovada too)
+MARKETS = (MARKET, TOTALS)
+# Bovada quotes team totals only in the Premier League, but a book that returns nothing
+# costs nothing extra: up to ten books cost one region, billed per market requested.
+BOOKS = ("fanduel", "bovada", "pinnacle")
+MATCH_SIDE = "match"  # `side` on a totals row (team rows: "home"/"away")
 LOOK_WINDOW_HOURS = (18.0, 30.0)
 CLOSE_MINUTES = 30
 CLOSE_LATEST_MINUTES = 75
-MONTHLY_CAP = 450  # credits a calendar month (UTC); the estimate is about 340
-COST_PER_CALL = 1  # one market, one region (market probe, run 37889595473)
+MONTHLY_CAP = 800  # credits a calendar month (UTC); the estimate is about 682
+COST_PER_CALL = 2  # two markets, one region (billed per market requested; run 37889595473)
 KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 LOCAL_CALLS = "team_totals_calls.jsonl"  # local copy of the call record (raw-data cache)
 MIN_MATCHES = 50  # report: fewer settled matches with both snapshots is "not enough yet"
@@ -191,9 +200,19 @@ def match_event(card: dict, events: list[dict]) -> str | None:
     return one[0]["id"] if len(one) == 1 else None
 
 
+def market_of(row: dict) -> str:
+    """A logged row's market: rows from before 10 Oct have no `market` and are team totals."""
+    return row.get("market") or MARKET
+
+
 def model_over(card: dict, side: str, line: float) -> float | None:
-    """P(team goals > line) from the card's score matrix (`goals_cdf`, cumulative)."""
-    cdf = (card.get("goals_cdf") or {}).get(side)
+    """P(team goals > line) from the card's score matrix (`goals_cdf`, cumulative); for
+    side MATCH_SIDE, P(total goals > line) from `total_goals_cdf`. A quarter or whole line
+    gives P(goals > floor(line)): settle pushes and half stakes downstream."""
+    if side == MATCH_SIDE:
+        cdf = card.get("total_goals_cdf")
+    else:
+        cdf = (card.get("goals_cdf") or {}).get(side)
     k = int(np.floor(line))
     if not cdf or k < 0 or k >= len(cdf) or cdf[k] is None:
         return None
@@ -203,33 +222,46 @@ def model_over(card: dict, side: str, line: float) -> float | None:
 def rows_from_body(
     body: dict | None, card: dict, event_id: str, snapshot: str, downloaded: pd.Timestamp
 ) -> list[dict]:
-    """One row per book, team and line with both sides priced."""
+    """One row per market, book, team (or the match) and line with both sides priced.
+
+    `team_totals`: team = the club, side = "home"/"away". `totals` (the match total):
+    team = None, side = MATCH_SIDE, line = the point exactly as the book returned it."""
     k = _ts(card["kickoff"])
     known = {card["home"], card["away"]}
     pairs: dict[tuple, dict] = {}
     for b in (body or {}).get("bookmakers", []) or []:
         for m in b.get("markets", []) or []:
-            if m.get("key") != MARKET:
+            market = m.get("key")
+            if market not in MARKETS:
                 continue
             updated = m.get("last_update") or b.get("last_update")
             for o in m.get("outcomes", []) or []:
                 side = str(o.get("name", "")).lower()
-                team = _team(str(o.get("description", "")), known)
-                if side not in ("over", "under") or team not in known:
+                if market == MARKET:
+                    team = _team(str(o.get("description", "")), known)
+                    if team not in known:
+                        continue
+                else:
+                    team = None
+                if side not in ("over", "under"):
                     continue
                 if o.get("point") is None or o.get("price") is None:
                     continue
-                key = (b.get("key"), team, float(o["point"]))
+                key = (market, b.get("key"), team or "", float(o["point"]))
                 pairs.setdefault(key, {"last_update": updated})[side] = float(o["price"])
     rows = []
-    for (book, team, line), q in sorted(pairs.items()):
+    for (market, book, team, line), q in sorted(pairs.items()):
         if "over" not in q or "under" not in q or min(q["over"], q["under"]) <= 1:
             continue
         fair = devig_shin(np.array([q["over"], q["under"]]))
         quoted = _ts(q["last_update"]) if q.get("last_update") else downloaded
-        side = "home" if team == card["home"] else "away"
+        if market == MARKET:
+            side = "home" if team == card["home"] else "away"
+        else:
+            team, side = None, MATCH_SIDE
         rows.append(
             {
+                "market": market,
                 "league": card.get("league"),
                 "home": card["home"],
                 "away": card["away"],
@@ -306,14 +338,14 @@ def run(
                 if spent + COST_PER_CALL > MONTHLY_CAP:
                     summary["stop"] = f"monthly cap: {spent} of {MONTHLY_CAP} credits used"
                     break
-                books = ",".join(BOOKS.get(league, DEFAULT_BOOKS))
+                books = ",".join(BOOKS)
                 try:
                     resp = get(
                         URL.format(sport=SPORTS[league], event_id=eid),
                         params={
                             "apiKey": api_key,
                             "bookmakers": books,
-                            "markets": MARKET,
+                            "markets": ",".join(MARKETS),
                             "oddsFormat": "decimal",
                             "dateFormat": "iso",
                         },
@@ -347,6 +379,7 @@ def run(
                     "cost": cost,
                     "credits_left": credits,
                     "books": books,
+                    "markets": ",".join(MARKETS),
                     "rows": len(rows),
                 }
                 done.add((eid, snap))
@@ -360,6 +393,7 @@ def run(
         calls=len(new_calls),
         credits=sum(c["cost"] for c in new_calls),
         rows=len(new_rows),
+        totals_rows=sum(r.get("market") == TOTALS for r in new_rows),
         month_spent=spent,
         credits_left=credits,
     )
@@ -384,7 +418,8 @@ def _header_int(resp, name: str) -> int | None:
 def summary_line(s: dict) -> str:
     return (
         f"Team totals: {s.get('calls', 0)} calls, {s.get('credits', 0)} credits, "
-        f"{s.get('rows', 0)} rows; month {s.get('month_spent', 0)} of {MONTHLY_CAP} credits"
+        f"{s.get('rows', 0)} rows ({s.get('totals_rows', 0)} match totals); "
+        f"month {s.get('month_spent', 0)} of {MONTHLY_CAP} credits"
         + (f", credits left {s['credits_left']}" if s.get("credits_left") is not None else "")
         + (f" (stopped: {s['stop']})" if s.get("stop") else "")
     )
@@ -402,6 +437,7 @@ def _append(path: Path, rows: list[dict]) -> None:
 
 def _row_key(r: dict) -> tuple:
     return (
+        market_of(r),
         r.get("event_id"),
         r.get("snapshot"),
         r.get("book"),
@@ -450,22 +486,35 @@ def log(pending: Path, log_root: Path) -> tuple[int, int]:
 
 
 def load_rows(log_root: Path) -> pd.DataFrame:
-    """Every logged team-total row (all leagues and months)."""
+    """Every logged row (all leagues and months, both markets), with `market` filled in
+    for rows logged before it existed."""
     paths = sorted((Path(log_root) / "odds_log").glob("*_team_totals_*.jsonl"))
-    return pd.DataFrame(_read_jsonl(paths))
+    rows = _read_jsonl(paths)
+    for r in rows:
+        r["market"] = market_of(r)
+    return pd.DataFrame(rows)
 
 
 # ---------- analysis (run later, no key) ----------
 
 
-def pairs(rows: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
-    """Look and close for the same match, book, team and line, with the team's goals.
+def pairs(rows: pd.DataFrame, results: pd.DataFrame, market: str = MARKET) -> pd.DataFrame:
+    """Look and close for the same match, book, team (or the match) and line in one
+    market, with the goals: the team's for `team_totals`, both teams' for `totals`.
+    `y` = 1 if goals <= line (under won or pushed: quarter and whole lines need their own
+    settlement downstream).
 
     `results` has league, home, away, date and FTHG/FTAG-style `home_goals`/`away_goals`.
     """
     if rows.empty:
         return pd.DataFrame()
-    key = ["league", "home", "away", "kickoff", "book", "team", "side", "line"]
+    rows = rows.copy()
+    rows["market"] = rows["market"].fillna(MARKET) if "market" in rows else MARKET
+    rows = rows[rows["market"] == market]
+    if rows.empty:
+        return pd.DataFrame()
+    rows["side"] = rows["side"].fillna(MATCH_SIDE)
+    key = ["league", "home", "away", "kickoff", "book", "side", "line"]
     look = rows[rows["snapshot"] == "look"].drop_duplicates(key, keep="first")
     close = rows[rows["snapshot"] == "close"].drop_duplicates(key, keep="last")
     both = look.merge(
@@ -482,14 +531,19 @@ def pairs(rows: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
         res[["league", "home", "away", "day", "home_goals", "away_goals"]],
         on=["league", "home", "away", "day"],
     )
-    goals = np.where(m["side"] == "home", m["home_goals"], m["away_goals"])
+    goals = np.select(
+        [m["side"] == "home", m["side"] == "away"],
+        [m["home_goals"], m["away_goals"]],
+        m["home_goals"] + m["away_goals"],
+    )
     m["y"] = (goals <= m["line"]).astype(int)  # 0 = over won, 1 = under won
     return m
 
 
 def report(rows: pd.DataFrame, results: pd.DataFrame, min_matches: int = MIN_MATCHES) -> dict:
-    """The model and the look price vs FanDuel's de-margined close (lab.metrics), plus
-    calibration. Refuses to score fewer than `min_matches` settled matches."""
+    """FanDuel's team totals only: the model and the look price vs FanDuel's de-margined
+    close (lab.metrics), plus calibration. Refuses to score fewer than `min_matches`
+    settled matches. Totals rows are ignored here (`pairs(..., market="totals")`)."""
     from soccer_stats.lab import metrics
 
     p = pairs(rows, results)

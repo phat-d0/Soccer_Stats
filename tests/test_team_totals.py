@@ -57,7 +57,7 @@ def body(home="Arsenal", away="Leeds United", books=("fanduel",)):
 
 
 class Resp:
-    def __init__(self, b, left=19999, cost=1, status=200):
+    def __init__(self, b, left=19999, cost=2, status=200):
         self.b, self.status_code, self.ok = b, status, status == 200
         self.headers = {"x-requests-remaining": str(left), "x-requests-last": str(cost)}
 
@@ -109,10 +109,11 @@ def test_run_fetches_each_snapshot_once(tmp_path):
     calls = []
     cards = [card(), card("Real Madrid", "Getafe", "E1")]  # the Championship never fetches
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(hours=24), fake_get(calls))
-    assert s["calls"] == 1 and s["credits"] == 1 and s["rows"] == 2 and s["stop"] is None
+    assert s["calls"] == 1 and s["credits"] == 2 and s["rows"] == 2 and s["stop"] is None
     url, params = calls[0]
     assert "/events/ev1/odds" in url and "soccer_epl" in url
-    assert params["markets"] == "team_totals" and params["bookmakers"] == "fanduel,bovada"
+    assert params["markets"] == "team_totals,totals"
+    assert params["bookmakers"] == "fanduel,bovada,pinnacle"
     # An hour later the look is already taken: no call, even with no data-log state.
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(hours=23), fake_get(calls))
     assert s["calls"] == 0 and len(calls) == 1
@@ -342,7 +343,8 @@ def test_a_crash_part_way_keeps_the_calls_already_made(tmp_path):
     odd = Odd(None)
     odd.headers = {"x-requests-last": "n/a", "x-requests-remaining": ""}
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=20), lambda *a, **k: odd)
-    assert s["calls"] == 2 and s["credits"] == 2 and s["rows"] == 0 and s["stop"] is None
+    assert s["calls"] == 2 and s["credits"] == 2 * tt.COST_PER_CALL and s["rows"] == 0
+    assert s["stop"] is None
 
 
 def test_price_files_in_the_state_folder_never_count_as_calls(tmp_path):
@@ -370,3 +372,130 @@ def test_price_files_in_the_state_folder_never_count_as_calls(tmp_path):
     calls = tt.load_calls(tmp_path)
     assert [(c["event_id"], c["snapshot"]) for c in calls] == [("e1", "look")]
     assert tt.month_spend(calls, pd.Timestamp("2026-10-20", tz="UTC")) == 1
+
+
+# ---------- match totals beside team totals (owner-approved 10 Oct) ----------
+
+
+def mixed_body():
+    """FanDuel quotes team totals and the 2.5 total; Pinnacle only a 2.75 total."""
+    b = body()
+    upd = (K - pd.Timedelta(hours=1)).isoformat()
+    b["bookmakers"][0]["markets"].append(
+        {
+            "key": "totals",
+            "outcomes": [
+                {"name": "Over", "price": 1.95, "point": 2.5},
+                {"name": "Under", "price": 1.87, "point": 2.5},
+            ],
+        }
+    )
+    b["bookmakers"].append(
+        {
+            "key": "pinnacle",
+            "last_update": upd,
+            "markets": [
+                {
+                    "key": "totals",
+                    "last_update": upd,
+                    "outcomes": [
+                        {"name": "Over", "price": 2.02, "point": 2.75},
+                        {"name": "Under", "price": 1.89, "point": 2.75},
+                    ],
+                }
+            ],
+        }
+    )
+    return b
+
+
+def test_cap_is_800_and_a_call_costs_two():
+    assert tt.MONTHLY_CAP == 800 and tt.COST_PER_CALL == 2
+    assert tt.MARKETS == ("team_totals", "totals")
+    assert "pinnacle" in tt.BOOKS and len(tt.BOOKS) <= 10  # one region
+
+
+@pytest.mark.parametrize("spent, allowed", [(798, True), (799, False)])
+def test_cap_counts_the_two_credit_call(tmp_path, spent, allowed):
+    raw, out, state = tmp_path / "raw", tmp_path / "out", tmp_path / "state"
+    raw.mkdir()
+    state.mkdir()
+    dk_cache(raw)
+    done = {"event_id": "old", "snapshot": "look", "fetched_at": "2026-10-03T12:00:00+00:00"}
+    (state / "team_totals_calls_2026-10.jsonl").write_text(json.dumps({**done, "cost": spent}))
+    calls = []
+    s = tt.run([card()], out, [state], raw, "k", K - pd.Timedelta(hours=24), fake_get(calls))
+    if allowed:
+        assert s["calls"] == 1 and s["month_spent"] == 800 and s["stop"] is None
+    else:
+        assert calls == [] and "monthly cap: 799 of 800" in s["stop"]
+
+
+def test_mixed_rows_keep_the_markets_apart(tmp_path):
+    raw, out, root = tmp_path / "raw", tmp_path / "out", tmp_path / "log"
+    raw.mkdir()
+    dk_cache(raw)
+    c = card()
+    c["total_goals_cdf"] = [0.07, 0.25, 0.5, 0.72, 0.87, 0.95, 0.98]
+    calls = []
+    s = tt.run([c], out, [], raw, "k", K - pd.Timedelta(hours=24), fake_get(calls, mixed_body()))
+    assert s["calls"] == 1 and s["credits"] == 2 and s["rows"] == 4 and s["totals_rows"] == 2
+    assert "(2 match totals)" in tt.summary_line(s) and "of 800 credits" in tt.summary_line(s)
+    rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
+    team = [r for r in rows if r["market"] == "team_totals"]
+    tot = {r["book"]: r for r in rows if r["market"] == "totals"}
+    assert len(team) == 2 and {r["side"] for r in team} == {"home", "away"}
+    pin = tot["pinnacle"]
+    assert pin["team"] is None and pin["side"] == "match" and pin["line"] == 2.75  # as returned
+    assert pin["fair_over"] + pin["fair_under"] == pytest.approx(1, abs=1e-6)
+    assert pin["margin"] == pytest.approx(1 / 2.02 + 1 / 1.89 - 1, abs=1e-6)
+    assert pin["p_model_over"] == pytest.approx(1 - 0.5)  # P(total > 2) for the 2.75 line
+    assert tot["fanduel"]["line"] == 2.5 and tot["fanduel"]["p_model_over"] == pytest.approx(0.5)
+    assert pin["snapshot"] == "look" and pin["time_source"] == "last_update"
+    # One call record per (event, snapshot), naming both markets; never fetched again.
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert len(rec) == 1 and rec[0]["markets"] == "team_totals,totals" and rec[0]["cost"] == 2
+    s = tt.run([c], out, [], raw, "k", K - pd.Timedelta(hours=23), fake_get(calls, mixed_body()))
+    assert s["calls"] == 0 and len(calls) == 1
+    # data-log: both markets in the league's file, deduplicated; one call row.
+    assert tt.log(out, root) == (4, 1)
+    assert tt.log(out, root) == (0, 0)
+    assert len(tt.load_calls(root / "odds_log")) == 1
+    # A row logged before `market` existed reads as a team total.
+    old = {k: v for k, v in team[0].items() if k != "market"}
+    path = root / "odds_log" / "E0_team_totals_2026-10.jsonl"
+    path.write_text(path.read_text() + json.dumps({**old, "line": 3.5}) + "\n")
+    df = tt.load_rows(root)
+    assert df["market"].value_counts().to_dict() == {"team_totals": 3, "totals": 2}
+    assert tt.market_of(old) == "team_totals"
+
+
+def test_pairs_and_report_tell_the_markets_apart():
+    rows, res = _logged(60)
+    totals = rows.assign(market="totals", team=None, side="match", line=2.5, book="pinnacle")
+    both = pd.concat([rows, totals], ignore_index=True)  # old team rows have no market
+    out = tt.report(both, res)
+    assert out["fanduel_rows"] == 60 and out["pairs"] == 60  # team totals only
+    p = tt.pairs(both, res, market="totals")
+    assert len(p) == 60 and set(p["book"]) == {"pinnacle"}
+    goals = res.set_index("home").loc[p["home"], ["home_goals", "away_goals"]].sum(axis=1)
+    assert (p["y"].to_numpy() == (goals.to_numpy() <= 2.5)).all()
+    assert len(tt.pairs(both, res)) == 60
+
+
+def test_match_sheet_shows_only_fanduel_team_totals(tmp_path):
+    from soccer_stats.publish import add_team_totals
+
+    out, raw = tmp_path / "out", tmp_path / "raw"
+    raw.mkdir()
+    dk_cache(raw)
+    c = card()
+    c["total_goals_cdf"] = [0.07, 0.25, 0.5, 0.72, 0.87, 0.95, 0.98]
+    tt.run([c], out, [], raw, "k", K - pd.Timedelta(hours=24), fake_get([], mixed_body()))
+    cards = [card()]
+    assert add_team_totals(cards, [out]) == 1
+    shown = cards[0]["team_totals"]
+    assert set(shown) == {"book", "fetched_at", "home", "away"}
+    assert [x["line"] for x in shown["home"]] == [1.5] and [x["line"] for x in shown["away"]] == [
+        0.5
+    ]

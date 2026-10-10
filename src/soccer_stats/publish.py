@@ -285,7 +285,11 @@ def add_team_totals(cards: list[dict], dirs) -> int:
     for d in dirs:
         if d:
             paths += sorted(Path(d).glob("*_team_totals_*.jsonl")) + [Path(d) / "rows.jsonl"]
-    rows = [r for r in team_totals._read_jsonl(paths) if r.get("book") == TEAM_TOTAL_BOOK]
+    rows = [
+        r
+        for r in team_totals._read_jsonl(paths)
+        if r.get("book") == TEAM_TOTAL_BOOK and team_totals.market_of(r) == team_totals.MARKET
+    ]
     latest: dict[tuple, dict] = {}
     for r in rows:
         try:

@@ -236,7 +236,7 @@ def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
             kickoffs[code] = list(load_schedule(code, year, include_played=True)["kickoff"])
         except Exception as exc:  # no schedule: say so rather than guess
             print(f"  {LEAGUES[code].name}: schedule unavailable ({type(exc).__name__})")
-    markets = (1, 2)  # team_totals; + alternate_team_totals
+    markets = (1, 2)  # team_totals; + totals (live from 10 Oct: 2 credits a call)
     print("Team-total snapshots: credits per month (estimate; 1 credit per market per call)")
     print("  plan: lean = close only; base = 24 h + close; rich = 24 h + 6 h + close")
     grand = {(p, m): 0 for p in SNAPSHOT_PLANS for m in markets}
@@ -266,7 +266,7 @@ def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
             )
         )
     n = len(months)
-    print(f"Average a month over {n} month(s) (team_totals / + alternate_team_totals):")
+    print(f"Average a month over {n} month(s) (team_totals / + totals, live since 10 Oct):")
     for plan in SNAPSHOT_PLANS:
         print(f"  {plan:<5} {grand[(plan, 1)] / n:>6.0f} / {grand[(plan, 2)] / n:>6.0f}")
     since = pd.Timestamp(args.since, tz="UTC")
