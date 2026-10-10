@@ -371,3 +371,15 @@
 {"at": "2026-10-10T13:33+00:00", "team": "Leeds", "name": "Wilson", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-10-10T13:33+00:00", "team": "Leeds", "name": "Bahoya", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-10-10T15:53+00:00", "team": "Chelsea", "name": "James", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Aston Villa", "name": "George Hemmings", "status": "d", "chance": 75, "news": "Knee injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Aston Villa", "name": "Ruggeri", "status": "d", "chance": 75, "news": "Hamstring injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Brentford", "name": "Schuster", "status": "d", "chance": 75, "news": "Ankle injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Brentford", "name": "Schade", "status": "d", "chance": 75, "news": "Shoulder injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Brighton", "name": "Struijk", "status": "s", "chance": 0, "news": "Suspended until 25 Oct"}
+{"at": "2026-10-10T18:28+00:00", "team": "Sunderland", "name": "Meunier", "status": "d", "chance": 75, "news": "Groin injury - 75% chance of playing"}
+{"at": "2026-10-10T18:28+00:00", "team": "Aston Villa", "name": "Alysson", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-10T18:28+00:00", "team": "Ipswich", "name": "Fatawu", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-10T18:28+00:00", "team": "Man United", "name": "Darlow", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-10T18:28+00:00", "team": "Man United", "name": "Rashford", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-10T18:28+00:00", "team": "Man United", "name": "Amad", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-10T18:28+00:00", "team": "Man United", "name": "Mainoo", "status": "a", "chance": 100, "news": ""}
