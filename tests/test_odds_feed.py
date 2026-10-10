@@ -320,3 +320,78 @@ def test_web_fixture_has_no_duplicate_cards():
 
     path = Path(__file__).parent / "fixtures" / "web" / "data.json"
     assert duplicate_fixtures(json.loads(path.read_text())["fixtures"]) == []
+
+
+def _simulate_month(tmp_path, monkeypatch, cost, params_seen=None):
+    """Publish every 15 minutes for October against a fake API charging `cost` a call."""
+    credits = {"left": 500}
+
+    def fake_get(url, params, timeout):
+        if params_seen is not None:
+            params_seen.append(params)
+        credits["left"] -= cost
+        r = FakeResp(body="[]", left=str(credits["left"]))
+        r.headers["x-requests-last"] = str(cost)
+        return r
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    t, end = pd.Timestamp("2026-10-01 00:05", tz="UTC"), pd.Timestamp("2026-10-31 23:50", tz="UTC")
+    times = []
+    while t <= end:
+        before = credits["left"]
+        fetch_odds(raw_dir=tmp_path, api_key="k", now=t)
+        if credits["left"] != before:
+            times.append(t)
+        t += pd.Timedelta(minutes=15)
+    return times, 500 - credits["left"]
+
+
+def test_request_asks_only_for_h2h(tmp_path, monkeypatch):
+    seen = []
+    _simulate_month(tmp_path, monkeypatch, 1, seen)
+    assert seen and all(p["markets"] == "h2h" for p in seen)
+    assert all(p["bookmakers"] == "draftkings" for p in seen)
+
+
+def test_cheaper_call_does_not_refresh_more_often(tmp_path, monkeypatch):
+    """Dropping totals halves the price, but at any balance the budget still counts each
+    call at BUDGET_COST, so the interval is what the two-credit call gave."""
+    now = pd.Timestamp("2026-10-05 09:00", tz="UTC")
+    for credits in (60, 497, 3_000, 4_000, 22_000):
+        for share, reserve in ((1, feed.RESERVE_CREDITS), (6, feed.MATCHDAY_RESERVE_CREDITS)):
+            kw = {"share": share, "reserve": reserve}
+            assert feed.refresh_interval_hours(credits, 1, now, **kw) == (
+                feed.refresh_interval_hours(credits, 2, now, **kw)
+            )
+    # A whole month at 1 credit a call never goes past the hourly floor or the reserve.
+    times, spent = _simulate_month(tmp_path, monkeypatch, 1)
+    gaps = pd.Series(times).diff().dropna() / pd.Timedelta(hours=1)
+    assert gaps.min() >= 1.0 and spent <= 500 - feed.RESERVE_CREDITS
+
+
+def test_parse_still_reads_a_totals_market():
+    ev = {
+        "home_team": "Arsenal",
+        "away_team": "Chelsea",
+        "commence_time": "2026-10-10T14:00:00Z",
+        "bookmakers": [
+            {
+                "key": "draftkings",
+                "markets": [
+                    {"key": "h2h", "outcomes": [{"name": "Arsenal", "price": 2.0}]},
+                    {
+                        "key": "totals",
+                        "outcomes": [
+                            {"name": "Over", "point": 2.5, "price": 1.9},
+                            {"name": "Under", "point": 2.5, "price": 1.95},
+                        ],
+                    },
+                ],
+            }
+        ],
+    }
+    row = feed.parse_odds([ev]).iloc[0]
+    assert row["odds_home"] == 2.0 and row["odds_over25"] == 1.9 and row["odds_under25"] == 1.95
+    ev["bookmakers"][0]["markets"].pop()  # h2h only, as requested now
+    row = feed.parse_odds([ev]).iloc[0]
+    assert row["odds_home"] == 2.0 and pd.isna(row["odds_over25"])
