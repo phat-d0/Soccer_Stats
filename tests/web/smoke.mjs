@@ -112,7 +112,11 @@ const STEPS = [
     const flagged = await p.evaluate(() => [...document.querySelectorAll("button.match")].filter((b) => b.querySelector(".badge:not(.paper):not(.lineup)")).map((b) => b.querySelector(".teams").innerText.replace(/\s+/g, " ")));
     const d = await (await p.request.get(new URL("data.json", p.url()).href)).json();
     const ml = d.portfolio.portfolios.find((x) => x.id === "moneyline");
-    const taken = ml.live.trades.filter((t) => t.rule === "fixed_raw" && t.status === "open");
+    // Open fixed-rule trades on matches with a card in this build (the real ledger also has
+    // trades on matches outside the synthetic fixture list).
+    const cards = new Set(d.fixtures.map((f) => `${f.home}|${f.away}`));
+    const taken = ml.live.trades.filter((t) => t.rule === "fixed_raw" && t.status === "open" && cards.has(`${t.home}|${t.away}`));
+    if (!taken.length) throw new Error("the fixture has no open fixed-rule trade on a listed match");
     for (const t of taken) {
       if (!flagged.some((f) => f.includes(t.home) && f.includes(t.away))) throw new Error(`paper trade ${t.id} isn't flagged on Matches`);
     }
