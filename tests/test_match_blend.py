@@ -201,3 +201,22 @@ def test_blend_card_leaves_unpriced_markets_empty():
     # b = 1, c = 0: the blend is the price.
     assert p["home"] == pytest.approx(0.4) and p["away"] == pytest.approx(0.3)
     assert p["over25"] is None and p["under25"] is None
+
+
+def test_tiers_replay_the_lean_rule_on_draftkings(setup):
+    *_, blended, fits, _ = setup
+    assert "sb_h2h" in blended and blended["sb_h2h"].notna().any()
+    assert all(f.get("sigma") is not None for f in fits["h2h"])
+    for min_z in (tr.LEAN_Z, tr.STRONG_Z):
+        t = backtest.dk_tier_trades(blended, min_z)
+        if t.empty:
+            continue
+        assert (t["z"] >= min_z - 1e-9).all() and (t["strategy"] == "lean").all()
+        assert t.duplicated(["home", "away", "season"]).sum() == 0  # one bet per match
+        assert set(t["market"]) <= set(tr.LEAN_MARKETS)
+    tiers = backtest.dk_tiers(blended)
+    assert set(tiers) == {"lean", "strong", "sigma", "note"}
+    keys = {"bets", "won", "breakeven", "roi", "roi_ci95", "clv_dk", "z_realized"}
+    assert keys <= set(tiers["lean"])
+    # No sigma column (no blend): no tier trades.
+    assert backtest.dk_tier_trades(blended.drop(columns=["sb_h2h"])).empty

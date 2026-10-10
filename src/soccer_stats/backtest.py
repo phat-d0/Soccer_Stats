@@ -315,7 +315,8 @@ def add_blend(
     refit: str = mc.REFIT,
     min_rows: int = mc.MIN_ROWS,
 ) -> tuple[pd.DataFrame, dict]:
-    """Add pb_<market>: the model blended with DraftKings' margin-free price at each look.
+    """Add pb_<market>: the model blended with DraftKings' margin-free price at each look,
+    and sb_<group>: the sigma of the fit each look used (match_calibration.sigma).
 
     `pool` maps "h2h"/"totals" to match_calibration.training_rows (settled matches with
     the model's walk-forward chances and Pinnacle's close). Each look uses a fit on
@@ -339,9 +340,10 @@ def add_blend(
         train = pool.get(g)
         if train is None:
             train = pd.DataFrame()
-        blended, fits[g] = mc.walk_forward(train, target, g, refit, min_rows)
+        blended, fits[g] = mc.walk_forward(train, target, g, refit, min_rows, with_sigma=True)
         for m in names:
             df[f"pb_{m}"] = blended[m]
+        df[f"sb_{g}"] = blended["sigma"]  # that block's fit sigma (the Lean tiers' unit)
     return df, fits
 
 
@@ -376,6 +378,11 @@ def dk_trades(
     picked = tr.select_trades(candidates, threshold=threshold, max_odds=max_odds)
     if picked.empty:
         return pd.DataFrame(columns=tr.ENTRY_FIELDS)
+    return _first_look_trades(picked, order, threshold, league, model_ref)
+
+
+def _first_look_trades(picked, order, threshold, league, model_ref, **extra) -> pd.DataFrame:
+    """Each match's trade at its first qualifying look, settled with closing line value."""
     picked = picked.assign(_o=picked["look"].map(order)).sort_values(["kickoff", "_o"])
     first = picked.groupby(["home", "away", "season"], sort=False).head(1)
     out = []
@@ -394,6 +401,7 @@ def dk_trades(
             news_applied=False,  # team news history starts Oct 2026: not replayable
             model_ref=model_ref,
             look=r["look"],
+            **extra,
         )
         close = r["close"]
         t["close_odds"] = close.get(t["market"])
@@ -402,8 +410,97 @@ def dk_trades(
         t["clv_pinnacle"] = tr.clv(t["odds"], t["market"], r["pinnacle_close"])
         t.update(tr.settle(t, r["home_goals"], r["away_goals"], void=r["void"]))
         t["settled_at"] = t["kickoff"]
+        for k in ("z", "tier", "sigma"):
+            if k in r:
+                t[k] = r[k]
         out.append(t)
     return pd.DataFrame(out)
+
+
+def dk_tier_trades(
+    candidates: pd.DataFrame, min_z: float = tr.LEAN_Z, league: str = "E0"
+) -> pd.DataFrame:
+    """The Blend Lean rule replayed on DraftKings' prices: at each look, trades.lean_pick
+    on the walk-forward blend (pb_<market>) with that look's fit sigma (sb_h2h), at
+    `min_z`; a match trades at its first qualifying look, as dk_trades. Teams with too
+    few matches in the training window are skipped, as in the trade rule."""
+    if candidates.empty or "pb_home" not in candidates or "sb_h2h" not in candidates:
+        return pd.DataFrame(columns=tr.ENTRY_FIELDS)
+    order = {k: i for i, k in enumerate(dict.fromkeys(candidates["look"]))}
+    rows = []
+    for r in candidates.to_dict("records"):
+        if min(r.get("home_n", np.inf), r.get("away_n", np.inf)) < tr.MIN_TEAM_MATCHES:
+            continue
+        pb = {m: r.get(f"pb_{m}") for m in tr.LEAN_MARKETS}
+        if not all(v is not None and np.isfinite(v) for v in pb.values()):
+            continue
+        sd = r.get("sb_h2h")
+        pick = tr.lean_pick(pb, {m: r.get(f"odds_{m}") for m in tr.LEAN_MARKETS}, sd, min_z)
+        if pick:
+            rows.append({**r, **pick})
+    if not rows:
+        return pd.DataFrame(columns=tr.ENTRY_FIELDS)
+    return _first_look_trades(
+        pd.DataFrame(rows),
+        order,
+        min_z,
+        league,
+        None,
+        rule=tr.LEAN_RULE,
+        p_source="blend",
+        strategy="lean",
+    )
+
+
+def tier_metrics(trades: pd.DataFrame) -> dict:
+    """Bets, win rate vs break-even, return with its 95% range (match weeks resampled),
+    CLV vs DraftKings, and z_realized: how many standard errors the win rate sits above
+    break-even (the baseball app's measure)."""
+    s = tr.summarize(trades)
+    out = {
+        "bets": s.get("settled", 0),
+        "won": s.get("win_rate"),
+        "breakeven": s.get("breakeven"),
+        "roi": s.get("roi"),
+        "roi_ci95": None,
+        "profit": s.get("profit"),
+        "clv_dk": s.get("clv_dk"),
+        "beat_close_dk": s.get("beat_close_dk"),
+        "avg_odds": s.get("avg_odds"),
+        "z_realized": None,
+    }
+    if not s.get("settled"):
+        return out
+    ci = tr.bootstrap_roi(trades)
+    out["roi_ci95"] = list(ci) if ci else None
+    settled = trades[trades["status"].isin(["won", "lost"])]
+    be = 1 / settled["odds"].astype(float)
+    se = float(np.sqrt((be * (1 - be)).mean() / len(settled)))
+    out["z_realized"] = (s["win_rate"] - s["breakeven"]) / se if se > 0 else None
+    out["avg_z"] = float(settled["z"].mean()) if "z" in settled else None
+    by_market = settled["market"].value_counts().to_dict()
+    out["by_market"] = {k: int(v) for k, v in by_market.items()}
+    return out
+
+
+TIERS_NOTE = (
+    "Blend Lean tiers replayed on DraftKings' prices (walk-forward blend and sigma, each "
+    "look using a fit on earlier matches only). The blend gives the model almost no weight, "
+    "so few matches qualify; a few dozen bets can't tell skill from luck (the baseball app's "
+    "own tier backtest was noise)."
+)
+
+
+def dk_tiers(candidates: pd.DataFrame, league: str = "E0") -> dict:
+    """E0_dk.json -> tiers: tier_metrics for Lean (z >= 1) and Strong (z >= 2)."""
+    out = {
+        t["key"]: tier_metrics(dk_tier_trades(candidates, t["min_z"], league))
+        for t in tr.EDGE_TIERS
+    }
+    sd = candidates["sb_h2h"].dropna() if "sb_h2h" in candidates else pd.Series(dtype=float)
+    out["sigma"] = {"min": float(sd.min()), "max": float(sd.max())} if len(sd) else None
+    out["note"] = TIERS_NOTE
+    return out
 
 
 def dk_strategies(

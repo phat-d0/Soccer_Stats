@@ -4,6 +4,9 @@
 # match_markets: research only. Runs `soccer-stats match-markets` on football-data
 # (Asian handicap, O/U 2.5 and 1X2 vs Pinnacle, plus the xG signal test): no API key,
 # no download from The Odds API, no push; results in the log and a 7-day artifact.
+# match_blends: fits each live league's h2h blend and sigma (Blend Lean) on football-data
+# and Understat (no key, no credits); pushes backtest/match_blends.json to data-log only
+# from the default branch.
 name: Backfill DraftKings odds
 
 on:
@@ -33,6 +36,10 @@ on:
       markets_seasons:
         description: "match_markets: seasons to predict (start years)"
         default: "2017-2025"
+      match_blends:
+        description: "Fit each live league's h2h blend and sigma for Blend Lean (no key; saved to data-log from the default branch only)"
+        type: boolean
+        default: false
       estimate_month:
         description: "Only estimate Odds API credits per league (YYYY-MM, or YYYY-MM,YYYY-MM,... for the team-total and team-corner snapshots too; no key, no push)"
         default: ""
@@ -55,7 +62,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
+        if: ${{ !inputs.print_only && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -64,14 +71,14 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only || inputs.match_markets || inputs.estimate_month != '' }}
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.estimate_month != '' }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
+        if: ${{ inputs.print_only && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -104,14 +111,52 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # Blend Lean (owner, 10 Oct): each live league's h2h blend of the model and Pinnacle's
+      # margin-free close, with sigma, from football-data and Understat only (no key, no
+      # credits). Saved to data-log (backtest/match_blends.json) only from the default
+      # branch; elsewhere it prints and uploads a 7-day artifact.
+      - name: Fit the per-league match blends
+        if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          uv run soccer-stats fit-match-blends --json out/match_blends.json
+          if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Not the default branch: printed only, nothing pushed to data-log."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/backtest
+            cp out/match_blends.json ../log/backtest/match_blends.json
+            git -C ../log add backtest/match_blends.json
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Per-league match blends"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.match_blends && always() }}
+        with:
+          name: match-blends
+          path: out/match_blends.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Backtest from cached odds (print only)
-        if: ${{ inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
+        if: ${{ inputs.print_only && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
+        if: ${{ !inputs.print_only && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -121,7 +166,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets && inputs.estimate_month == '' }}
+        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

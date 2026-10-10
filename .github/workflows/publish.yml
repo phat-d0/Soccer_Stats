@@ -57,6 +57,15 @@ jobs:
             git show FETCH_HEAD:backtest/E0_dk.json > "$RUNNER_TEMP/dk_backtest.json" ||
             echo "No DraftKings backtest yet: match edges use the raw model"
 
+      # Blend Lean (second match strategy): each league's h2h blend and sigma, fitted by
+      # fit-match-blends (backfill.yml match_blends). Without it there are no Lean picks.
+      - name: Read the per-league match blends
+        continue-on-error: true
+        run: |
+          git fetch --depth=1 origin data-log &&
+            git show FETCH_HEAD:backtest/match_blends.json > "$RUNNER_TEMP/match_blends.json" ||
+            echo "No per-league match blends yet: no Lean picks"
+
       # Team-total snapshots already taken (docs/totals.md): every recorded call, so a
       # match's look or close is never fetched twice, and this month's spend for the cap;
       # plus the logged prices, which the match sheet shows beside the model (no calls).
@@ -85,6 +94,7 @@ jobs:
         env:
           PLAYER_GATE_FILE: ${{ runner.temp }}/players_gate.json
           DK_BACKTEST_FILE: ${{ runner.temp }}/dk_backtest.json
+          MATCH_BLENDS_FILE: ${{ runner.temp }}/match_blends.json
           # Team-total prices (owner-approved base plan): fetched only on the default
           # branch, where the next step logs them to data-log. Empty elsewhere = off.
           TEAM_TOTALS_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/team_totals', runner.temp) || '' }}

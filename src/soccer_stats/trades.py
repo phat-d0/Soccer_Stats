@@ -15,6 +15,10 @@ value pick (bestPick in web/app.js) mirrors it:
   chance in every live league; "learned" uses the minimum edge learned from history
   (E0_dk.json -> edge_threshold.min_edge) on the blended chance, where no learned level
   means no new match trades and no file means PAPER_EDGE.
+* A second live match strategy, Blend Lean (owner, 10 Oct 2026), runs beside it: the
+  per-league blend `p_bet` against DraftKings' break-even in units of sigma (lean_pick,
+  z >= LEAN_Z), one trade per match with an id ending "|lean". Trades carry `strategy`
+  ("lean" or "edge12"; missing = "edge12").
 
 This module does no network or file access, so it can be tested on synthetic leagues.
 """
@@ -146,6 +150,114 @@ def _learned_threshold(dk: dict | None, league: str) -> dict:
     return {"threshold": float(et["min_edge"]), "source": "history", "note": None}
 
 
+# ---------- Blend Lean: the second live match strategy (owner, 10 Oct 2026) ----------
+
+# Ported from the owner's baseball app (confidence tiers): the blended chance `p_bet` (the
+# per-league h2h blend, match_calibration.league_fit) against the break-even rate of
+# DraftKings' quoted price, in units of sigma (how far the blend usually strays from the
+# margin-free price on its fit rows). z = (p_bet - 1/decimal) / sigma; Lean z >= 1,
+# Strong z >= 2 (cumulative: a Strong pick is a Lean one). One bet per match, home/draw/
+# away only: the side with the highest z. It runs beside the fixed 12% test, not instead.
+LEAN_Z = 1.0
+STRONG_Z = 2.0
+EDGE_TIERS = [
+    {"key": "lean", "label": "Lean", "min_z": LEAN_Z},
+    {"key": "strong", "label": "Strong", "min_z": STRONG_Z},
+]
+LEAN_RULE = "lean_1sigma"
+LEAN_MARKETS = MARKETS[:3]
+LEAN_NOTE = (
+    "Owner's second live test (10 Oct), ported from the baseball app: the blend of model "
+    "and DraftKings' margin-free price, one bet per match on the side whose chance beats the "
+    "price's break-even by at least one sigma. The blend gives the model almost no weight, so "
+    "expect few picks; baseball's own tier backtest was noise."
+)
+# Match strategies paper traded side by side, in the order the app lists them. A match
+# trade without a `strategy` field (all of them before 10 Oct) is the fixed 12% test.
+STRATEGY_ORDER = ["lean", "edge12"]
+STRATEGY_LABELS = {"lean": "Blend Lean (1σ+)", "edge12": "Model 12% (your live test)"}
+
+
+def strategy_of(trade: dict) -> str:
+    """A match trade's strategy: its own `strategy` field, else "edge12"."""
+    return trade.get("strategy") or "edge12"
+
+
+def side_z(p_bet: dict | None, odds: dict | None, sigma: float | None) -> dict | None:
+    """z per home/draw/away: (p_bet - 1/decimal price) / sigma; None when unknown.
+
+    The price keeps its margin (break-even = 1/decimal), as in the baseball app.
+    """
+    if not p_bet or not odds or not _ok(sigma) or sigma <= 0:
+        return None
+    out = {}
+    for m in LEAN_MARKETS:
+        p, o = p_bet.get(m), odds.get(m)
+        out[m] = float((p - 1 / o) / sigma) if _ok(p) and _ok(o) and o > 1 else None
+    return out
+
+
+def lean_pick(
+    p_bet: dict | None, odds: dict | None, sigma: float | None, min_z: float = LEAN_Z
+) -> dict | None:
+    """The Lean pick: the home/draw/away side with the highest z, if z >= min_z.
+
+    Returns {market, odds, p_bet, model_p (= p_bet, the chance it trades on), edge (p_bet x
+    odds - 1), z, tier ("strong" at z >= STRONG_Z, else "lean"), sigma}, or None. Ties keep
+    the first side in market order, as best_pick does.
+    """
+    z = side_z(p_bet, odds, sigma)
+    if not z:
+        return None
+    best = None
+    for m in LEAN_MARKETS:
+        if z[m] is not None and (best is None or z[m] > z[best]):
+            best = m
+    if best is None or z[best] < min_z - EPS:
+        return None
+    p, o = float(p_bet[best]), float(odds[best])
+    return {
+        "market": best,
+        "odds": o,
+        "p_bet": p,
+        "model_p": p,
+        "edge": p * o - 1,
+        "z": z[best],
+        "tier": "strong" if z[best] >= STRONG_Z - EPS else "lean",
+        "sigma": float(sigma),
+    }
+
+
+def lean_rule(blends: dict | None, league: str) -> dict:
+    """The Lean rule for one league: {key, rule, min_z, strong_z, p_source, stake, sigma,
+    matches, source, note}. `blends` is data.json's `match_blends` (publish.add_lean); no
+    file or no fit for the league = sigma None, so no Lean picks, and the note says why."""
+    entry = ((blends or {}).get("leagues") or {}).get(league) or {}
+    sd = entry.get("sigma")
+    ok = bool(entry.get("coef")) and _ok(sd) and sd > 0
+    if ok:
+        note = LEAN_NOTE
+    elif not (blends or {}).get("leagues"):
+        note = (
+            "No Lean picks: the per-league blend fits (backtest/match_blends.json) aren't "
+            "available yet."
+        )
+    else:
+        note = "No Lean picks in this league: it has no blend fit yet."
+    return {
+        "key": "lean",
+        "rule": LEAN_RULE,
+        "min_z": LEAN_Z,
+        "strong_z": STRONG_Z,
+        "p_source": "blend",
+        "stake": STAKE,
+        "sigma": float(sd) if ok else None,
+        "matches": entry.get("matches"),
+        "source": "match_blends" if ok else "none",
+        "note": note,
+    }
+
+
 def best_pick(
     probs: dict, odds: dict, threshold: float | None = PAPER_EDGE, max_odds: float | None = None
 ) -> dict | None:
@@ -268,8 +380,10 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
 ENTRY_FIELDS = (
     "id source bet_type league season opened_at kickoff hours_to_kickoff home away market "
     "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
-    "player player_id team line side position portfolio rule p_source"
+    "player player_id team line side position portfolio rule p_source strategy"
 ).split()
+# A Lean trade also records how it qualified (trades.lean_pick) and the raw model chance.
+LEAN_ENTRY_FIELDS = (*ENTRY_FIELDS, "z", "tier", "sigma", "p_bet", "p_model")
 
 
 def new_trade(
@@ -291,11 +405,14 @@ def new_trade(
     player: dict | None = None,
     rule: str | None = None,
     p_source: str | None = None,
+    strategy: str | None = None,
 ) -> dict:
     """The record both the backtest and the live ledger store for a trade (one shape).
 
-    Live match trades record the paper `rule` ("fixed_raw" or "learned") and `p_source`
-    ("model": the raw chance; "blend": p_bet when set) beside `threshold`.
+    Live match trades record the paper `rule` ("fixed_raw", "learned" or "lean_1sigma"),
+    `p_source` ("model": the raw chance; "blend": p_bet when set) beside `threshold`, and
+    their `strategy` ("edge12" or "lean"; STRATEGY_ORDER). A Lean trade's id ends "|lean",
+    so a match can hold one trade per strategy.
 
     Entry fields (ENTRY_FIELDS) never change after this; close, CLV and settlement
     fields are filled in later.
@@ -303,6 +420,8 @@ def new_trade(
     kickoff, opened_at = pd.Timestamp(kickoff), pd.Timestamp(opened_at)
     season = season_label(kickoff)
     extra = (player["player"], pick["market"]) if player else ()
+    if strategy == "lean":
+        extra = ("lean",)
     return {
         "id": trade_id(league, season, home, away, *extra),
         "source": source,
@@ -334,6 +453,7 @@ def new_trade(
         "portfolio": portfolio_of({"bet_type": "player" if player else "match", **pick}),
         "rule": rule,
         "p_source": p_source,
+        "strategy": strategy,
         "started": None,
         "actual": None,
         "close_odds": None,

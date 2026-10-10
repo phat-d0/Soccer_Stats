@@ -82,6 +82,33 @@ entry (time, price, probability, edge) is written once and never edited; later l
 add the closing price and the settlement. Rebuilding adds nothing new. If the ledger or
 the odds are unavailable, the site still publishes, opens nothing, and the tab says why.
 
+**Blend Lean (owner's second live test, 10 Oct 2026).** A second match strategy runs
+beside the fixed 12% test in Moneyline, ported from the owner's baseball app (confidence
+tiers). Each trade carries `strategy`: `"lean"` or `"edge12"` (trades opened before the
+field existed read as `edge12`). The app lists Lean first (`portfolio.strategy_order`).
+
+| Rule | Value |
+| --- | --- |
+| Probability | `p_bet`: each league's own h2h blend of the model and DraftKings' margin-free price, `score_k = a_k + b·log(price_k) + c·log(model_k)` (`backtest/match_blends.json` on `data-log`) |
+| Unit | σ per league: the sd of (blend − Pinnacle's margin-free close) on the fit rows, pooled over home/draw/away |
+| z per side | (p_bet − 1/DraftKings' quoted decimal) / σ, margin included |
+| Tiers | Lean z ≥ 1, Strong z ≥ 2 (`trades.EDGE_TIERS`) |
+| Trades per match | one: the home/draw/away side with the highest z, if z ≥ 1 (`trades.lean_pick`); id ends `\|lean`, so a match can also hold its 12% trade |
+| Gates, stake, close, settlement | as the 12% test: before kickoff, DraftKings odds under 3 hours old, not thin data, $10, same close, CLV and settlement |
+| Recorded | `z`, `tier`, `sigma`, `p_bet`, `p_model`, `rule: "lean_1sigma"`, `p_source: "blend"` |
+| No fits file | no Lean picks; the rule's note says why |
+
+The fits come from `soccer-stats fit-match-blends` (football-data and Understat only, no
+key, 0 credits): for each live league, the model's walk-forward chances from 2022/23
+(weekly refits on earlier matches only, goals-only for the Championship) beside
+Pinnacle's own close (rows without a Pinnacle price are left out, not filled from the
+market average), one fit on every match before the fit date, plus a walk-forward check
+(log loss of model, blend and Pinnacle). Run it from the Actions tab: *Backfill DraftKings
+odds* with `match_blends` ticked; only the default branch saves the file to `data-log`.
+Expect few Lean picks: the blend gives the model almost no weight, so σ is small and the
+blend rarely clears DraftKings' margin. `backtest-dk` also replays both tiers on the
+DraftKings backtest (`E0_dk.json` → `tiers`; research, not a gate).
+
 **Team corners (owner's live test, 10 Oct 2026).** A second paper portfolio, *Team
 corners* (`trades.PORTFOLIOS` id `corners`, status testing), in all six live leagues:
 

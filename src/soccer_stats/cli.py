@@ -386,6 +386,22 @@ def cmd_paper(args: argparse.Namespace) -> None:
         f"{s.get('open', 0)} open"
         + (f". {live['note']}" if live.get("note") else "")
     )
+    pm = next((p for p in data["portfolio"].get("portfolios", []) if p["id"] == "moneyline"), None)
+    for st in (pm or {}).get("live", {}).get("strategies") or []:
+        ss, rl = st.get("summary") or {}, st.get("rule") or {}
+        sig = rl.get("sigma") if isinstance(rl.get("sigma"), dict) else None
+        print(
+            f"Match strategy {st['label']}: {ss.get('trades', 0)} trades, "
+            f"{ss.get('open', 0)} open, {ss.get('settled', 0)} settled"
+            + (
+                " (sigma "
+                + ", ".join(f"{lg} {'none' if v is None else f'{v:.4f}'}" for lg, v in sig.items())
+                + ")"
+                if sig
+                else ""
+            )
+            + (f". {rl['note']}" if st["key"] == "lean" and rl.get("source") == "none" else "")
+        )
     pc = next((p for p in data["portfolio"].get("portfolios", []) if p["id"] == "corners"), None)
     if pc:
         cs = pc["live"].get("summary", {})
@@ -475,6 +491,30 @@ def _print_edge_threshold(name: str, et: dict | None) -> None:
         )
 
 
+def _print_tiers(tiers: dict | None) -> None:
+    if not tiers:
+        return
+    print("\n== Blend Lean tiers on DraftKings' prices (walk-forward blend and sigma) ==")
+    sd = tiers.get("sigma") or {}
+    if sd:
+        print(f"  sigma per fit: {sd['min']:.4f} to {sd['max']:.4f}")
+    for key in ("lean", "strong"):
+        t = tiers.get(key) or {}
+        if not t.get("bets"):
+            print(f"  {key}: 0 bets")
+            continue
+        ci = t.get("roi_ci95")
+        print(
+            f"  {key}: {t['bets']} bets, won {t['won']:.1%} vs break-even {t['breakeven']:.1%}, "
+            f"return {t['roi']:+.1%}"
+            + (f" (95% {ci[0]:+.1%} to {ci[1]:+.1%})" if ci else "")
+            + (f", CLV {t['clv_dk']:+.1%}" if t.get("clv_dk") is not None else "")
+            + (f", z_realized {t['z_realized']:+.2f}" if t.get("z_realized") is not None else "")
+            + f", markets {t.get('by_market')}"
+        )
+    print(f"  {tiers.get('note')}")
+
+
 def cmd_backtest_dk(args: argparse.Namespace) -> None:
     import json
 
@@ -552,6 +592,8 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         "edge_threshold": strategies.get("blend", strategies["raw"])["edge_threshold"],
         "edge_threshold_strategy": "blend" if "blend" in strategies else "raw",
         "edge_threshold_pinnacle": _pinnacle_edge_threshold(preds, args.league),
+        # Blend Lean tiers (owner, 10 Oct): research, not a gate.
+        "tiers": backtest.dk_tiers(cands, args.league),
         "blend": {
             "pool": "Pinnacle closing odds (football-data) with the model's walk-forward chances",
             "fits": fits,
@@ -566,6 +608,7 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
     for k, v in strategies.items():
         _print_edge_threshold(f"DraftKings, {k}", v.get("edge_threshold"))
     _print_edge_threshold("Pinnacle early (football-data)", out["edge_threshold_pinnacle"])
+    _print_tiers(out["tiers"])
     blend_trades = strategies["blend"]["trades_df"]
     if args.out and not blend_trades.empty:
         bpath = Path(args.out).with_name(Path(args.out).stem + "_blend.csv")
@@ -585,6 +628,99 @@ def cmd_backtest_dk(args: argparse.Namespace) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(_clean(out), separators=(",", ":")))
         print(f"App data written to {path}")
+
+
+def league_blend_rows(league: str, matches: pd.DataFrame, pins: pd.DataFrame, start, factory):
+    """The h2h blend's training rows for one league: the model's walk-forward chances from
+    `start` (weekly refits on earlier matches only, backtest.walk_forward) beside
+    Pinnacle's own close (`pins`, data.pinnacle_closes: no average/Bet365 fallback), plus
+    the per-season coverage (matches predicted, matches with a Pinnacle close)."""
+    from soccer_stats import match_calibration as mc
+
+    preds = backtest.walk_forward(matches, start=start, model_factory=factory)
+    if preds.empty:
+        return mc.training_rows(preds, "h2h"), []
+    keys = ["season", "home", "away"]
+    preds = preds.drop(columns=["close_home", "close_draw", "close_away"], errors="ignore")
+    preds = preds.merge(pins.drop(columns="date").drop_duplicates(keys), on=keys, how="left")
+    rows = mc.training_rows(preds, "h2h")
+    priced = preds[["close_home", "close_draw", "close_away"]].notna().all(axis=1)
+    cov = [
+        {"season": str(s), "predicted": int(len(g)), "pinnacle": int(priced[g.index].sum())}
+        for s, g in preds.groupby("season")
+    ]
+    return rows, cov
+
+
+def cmd_fit_match_blends(args: argparse.Namespace) -> None:
+    """Fit every league's h2h blend (model + Pinnacle's margin-free close) and its sigma,
+    for the Blend Lean strategy (publish.add_lean). Football-data and Understat only: no
+    Odds API key, no credits."""
+    import json
+
+    from soccer_stats import leagues as lgs
+    from soccer_stats import match_calibration as mc
+    from soccer_stats.data import pinnacle_closes
+    from soccer_stats.publish import XG_WEIGHT, _clean
+
+    codes = args.leagues or lgs.live_codes()
+    now = pd.Timestamp.now(tz="UTC").tz_convert(None)
+    fit_date = pd.Timestamp(args.fit_date) if args.fit_date else now.normalize()
+    last = current_season()
+    years = range(args.from_season - args.burn_in, last + 1)
+    out = {
+        "generated_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
+        "pool": "Pinnacle's own 1X2 close (football-data, margin removed) beside the model's "
+        "walk-forward chances (weekly refits on earlier matches only)",
+        "from_season": args.from_season,
+        "leagues": {},
+    }
+    for code in codes:
+        try:
+            matches = load_matches([code], years)
+            matches, err = with_xg(matches)
+            if err and lgs.LEAGUES[code].understat:
+                print(f"{lgs.name(code)}: {err}")
+            weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+            factory = functools.partial(DixonColes, xg_weight=weight)
+            pins = pinnacle_closes(code, years)
+            rows, cov = league_blend_rows(code, matches, pins, f"{args.from_season}-07-01", factory)
+            entry = {**mc.league_fit(rows, fit_date), "xg_weight": weight, "coverage": cov}
+        except Exception as exc:  # one league failing never costs the others
+            entry = {"coef": None, "sigma": None, "error": f"{type(exc).__name__}: {exc}"}
+        out["leagues"][code] = entry
+        wf = entry.get("walk_forward") or {}
+        print(
+            f"{lgs.name(code)}: "
+            + (
+                entry["error"]
+                if entry.get("error")
+                else f"coef {entry['coef']}, sigma {entry['sigma']}, {entry['matches']} matches "
+                f"{entry['fit_from']} to {entry['fit_to']} (fit date {entry['fit_date']}, "
+                f"xG weight {entry['xg_weight']})"
+            )
+        )
+        if entry.get("coverage"):
+            print(
+                "  Pinnacle close coverage: "
+                + ", ".join(f"{c['season']} {c['pinnacle']}/{c['predicted']}" for c in cov)
+            )
+        if wf:
+            print(
+                f"  Walk-forward log loss on {wf['matches']} matches ({wf['refits']} refits): "
+                f"model {wf['model']:.4f}, blend {wf['blend']:.4f}, Pinnacle {wf['pinnacle']:.4f}"
+            )
+    print("MATCH_BLENDS_JSON " + json.dumps(_clean(out), separators=(",", ":")))
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = Path(args.log_dir) / "backtest" / "match_blends.json"
+    else:
+        path = None
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"Match blends written to {path}")
 
 
 def _print_goals(goals: dict) -> None:
@@ -1627,6 +1763,23 @@ def main(argv: list[str] | None = None) -> None:
     dk.add_argument("--json", help="path for the app's backtest data")
     dk.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_dk.json")
     dk.set_defaults(func=cmd_backtest_dk)
+
+    mb = sub.add_parser(
+        "fit-match-blends",
+        help="fit each league's h2h blend and sigma for the Blend Lean strategy (no key)",
+    )
+    mb.add_argument("--leagues", nargs="+", help="football-data codes (default: every live one)")
+    mb.add_argument(
+        "--from-season",
+        type=int,
+        default=2022,
+        help="first season of blend rows (start year; E0's backtest-dk blend starts 2022)",
+    )
+    mb.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    mb.add_argument("--fit-date", help="fit on matches before this date (default: today)")
+    mb.add_argument("--json", help="path for the fits")
+    mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
+    mb.set_defaults(func=cmd_fit_match_blends)
 
     bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
     bp.add_argument("--league", default="E0")
