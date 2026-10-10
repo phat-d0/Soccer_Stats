@@ -19,6 +19,8 @@
 #            2017/18-2023/24; with `reason` and `finalists` ("total=<x>,team=<y>") it
 #            opens the 2024/25 holdout once instead. football-data only, no key.
 #   corner-coverage: 2025/26 corner-count coverage in all six leagues (counts only).
+#   corner-recal: team-corner recalibration for `league` (docs/totals.md, round 12):
+#            development view with 2025/26 dropped first; `reason` opens 2025/26 once.
 #   markets: live market probe (team totals, alternate totals, corners; docs/totals.md),
 #            all six leagues, never past `cap` credits (0 = dry run: free events list only).
 #   lab-coverage: Pinnacle and xG coverage per season for `league` (counts only).
@@ -45,9 +47,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corner-coverage, markets, goalscorer, player-lab, goal-lab, goal-league or goal-leagues"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corner-coverage, corner-recal, markets, goalscorer, player-lab, goal-lab, goal-league or goal-leagues"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corner-coverage, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corner-coverage, corner-recal, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets: most credits to spend (0 = dry run)"
@@ -59,13 +61,13 @@ on:
         description: "match/signals: seasons to bet (start years); shots: seasons to load"
         default: "2017-2025"
       league:
-        description: "lab/lab-holdout/lab-coverage/lab-edge/lineups/totals/corners: football-data division (E0-E3, SP1, D1, I1, F1)"
+        description: "lab/lab-holdout/lab-coverage/lab-edge/lineups/totals/corners/corner-recal: football-data division (E0-E3, SP1, D1, I1, F1)"
         default: "E0"
       holdout_season:
         description: "lab/lab-holdout/lab-edge: start year of the locked holdout season (blank = 2025)"
         default: ""
       reason:
-        description: "lab-holdout / corners / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
+        description: "lab-holdout / corners / corner-recal / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
         default: ""
       finalists:
         description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>"
@@ -170,6 +172,8 @@ jobs:
                   --json out/corners.json
               fi ;;
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
+            corner-recal) uv run python -m soccer_stats.edge.corner_recal --league "$LEAGUE" \
+                     --reason "$REASON" --json out/corner_recal.json ;;
             lab-coverage) uv run python -m soccer_stats.lab.run --league "$LEAGUE" \
                      --coverage-only --json out/lab_coverage.json ;;
             lab-holdout) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS --open-holdout \

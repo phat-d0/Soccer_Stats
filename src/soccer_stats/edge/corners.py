@@ -373,10 +373,10 @@ def run(df: pd.DataFrame, level: float, open_reason: str | None = None, final=No
 # ---------- loading (network: GitHub Actions) ----------
 
 
-def load(league: str, cut: pd.Timestamp) -> pd.DataFrame:
-    """football-data corners/shots/results 2014/15-2024/25 with the match model's
-    expected goals; every match from `cut` on is dropped before the match model is
-    fitted."""
+def load(league: str, cut: pd.Timestamp, last: int = LAST_DATA) -> pd.DataFrame:
+    """football-data corners/shots/results from 2014/15 to the season starting in `last`
+    (default 2024/25) with the match model's expected goals; every match from `cut` on is
+    dropped before the match model is fitted."""
     from soccer_stats import backtest
     from soccer_stats.data import download, load_matches, season_code
     from soccer_stats.edge import books
@@ -384,7 +384,7 @@ def load(league: str, cut: pd.Timestamp) -> pd.DataFrame:
     from soccer_stats.xg import LEAGUES as XG_LEAGUES
     from soccer_stats.xg import with_xg
 
-    years = range(FIRST_DATA, LAST_DATA + 1)
+    years = range(FIRST_DATA, last + 1)
     frames = []
     for y in years:
         raw = pd.read_csv(download(league, y), encoding="latin-1", on_bad_lines="skip")
