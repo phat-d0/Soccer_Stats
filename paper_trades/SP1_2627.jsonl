@@ -86,3 +86,5 @@
 {"type":"update","id":"SP1|2627|Valencia|Ath Bilbao","at":"2026-10-10T21:49:39+00:00","close_odds":3.6,"close_prices":{"home":3.6,"draw":3.45,"away":2.05},"close_fetched_at":"2026-10-10T21:48:19+00:00","close_minutes_before":9911.7,"clv_dk":-0.06290072402044389,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Villarreal|Elche|lean","at":"2026-10-10T21:49:39+00:00","close_odds":1.47,"close_prices":{"home":1.47,"draw":4.8,"away":6.0},"close_fetched_at":"2026-10-10T21:48:19+00:00","close_minutes_before":9626.7,"clv_dk":-0.0335737778619527,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Betis|Barcelona|lean","at":"2026-10-10T21:49:39+00:00","close_odds":1.41,"close_prices":{"home":6.0,"draw":5.5,"away":1.41},"close_fetched_at":"2026-10-10T21:48:19+00:00","close_minutes_before":9761.7,"clv_dk":-0.03416097593895806,"beat_close_dk":false}
+{"type":"update","id":"SP1|2627|Villarreal|Elche|lean","at":"2026-10-10T23:21:41+00:00","z_market":-0.859,"driver":"model","driver_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Betis|Barcelona|lean","at":"2026-10-10T23:21:41+00:00","z_market":0.095,"driver":"model","driver_from":"odds_log"}
