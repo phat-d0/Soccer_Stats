@@ -139,11 +139,18 @@ function playerPicks(fx, minEdge) {
 const lineText = (side, line) =>
   Number.isInteger(Number(line)) && side === "over" ? `${line}+` : `${side === "over" ? "Over" : "Under"} ${line}`;
 const lineLabel = (x) => `${lineText(x.side, x.line)} ${PLAYER_MARKET[x.market] || x.market}`;
+// Team corners (portfolio "corners", bet_type "corners"): "Valencia over 4.5 corners".
+const isCorner = (t) => t.bet_type === "corners";
+const cornerLabel = (t) => `${t.team || (t.team_side === "away" ? t.away : t.home)} ${t.side} ${Number(t.line)} corners`;
 function tradeLabel(t) {
+  if (isCorner(t)) return cornerLabel(t);
   return t.bet_type === "player" ? `${t.player} ${lineLabel(t).toLowerCase()}` : PICK_LABEL[t.market] || t.market;
 }
-// A trade row's first line: the player's bet for player trades, the match otherwise (HTML).
-const tradeTitle = (t) => (t.bet_type === "player" ? `${esc(t.player)} · ${esc(lineLabel(t))}` : `${esc(t.home)} v ${esc(t.away)}`);
+// A trade row's first line: the bet for player and corner trades, the match otherwise (HTML).
+const tradeTitle = (t) => (isCorner(t) ? esc(cornerLabel(t)) : t.bet_type === "player" ? `${esc(t.player)} · ${esc(lineLabel(t))}` : `${esc(t.home)} v ${esc(t.away)}`);
+// Closing line value: against Pinnacle's close for corners, DraftKings' for match bets.
+const tradeClv = (t) => (isCorner(t) ? t.clv_pinnacle : t.clv_dk);
+const tradeBeat = (t) => (isCorner(t) ? t.beat_close_pinnacle : t.beat_close_dk);
 
 // Which bookmaker the upcoming-match odds come from (DraftKings when configured).
 const isDK = () => state.data?.odds_source?.name === "DraftKings";
@@ -388,6 +395,7 @@ function detailHtml(fx) {
       <p class="note">${marketNote}</p>
       ${hasOdds && fixedRule() ? `<div class="explain">${fixedPickText(fx, pick)} ${esc(fixedNote(fxLeague(fx)))}</div>` : hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
       ${goalsSection(fx)}
+      ${cornersSection(fx)}
       ${playersSection(fx)}
       <div class="section-title">Scorelines</div>
       <div class="card">
@@ -455,6 +463,54 @@ function goalsSection(fx) {
       <div class="card" style="padding:8px 14px">${team("home")}${team("away")}</div>
       <p class="note">Model's chances. We're testing these against FanDuel's prices; no edge proven yet, so nothing is flagged as a bet.${fd ? ` FD over = FanDuel's chance of the over, margin removed${when ? `, as of ${esc(when)}` : ""}; "–" where FanDuel has no line.` : " No FanDuel price for this match yet: they're logged about a day before kickoff and again just before it."}${e1Note}</p>
     </details>` : ""}`;
+}
+
+// Match sheet "Corners": each team's corner lines, model (f) beside Pinnacle (owner's live
+// test, portfolio "corners"). corners = {model, home: {mean, cdf}, away, pinnacle?}; each
+// Pinnacle line has p_over/p_under/p_push from the model and `pick` at the 12% rule.
+const WEAK_CORNER_FIT = new Set(["SP1", "D1", "E1"]);
+function cornerTrade(fx, side, line) {
+  return (pfById("corners")?.live?.trades || []).find((t) => t.status === "open" && t.home === fx.home && t.away === fx.away && t.team_side === side && Number(t.line) === Number(line));
+}
+function cornersSection(fx) {
+  const co = fx.corners;
+  const lg = fxLeague(fx);
+  if (!co?.home || !co?.away) {
+    const err = state.data.corners_model?.[lg]?.error;
+    return err && fx.kickoff ? `<div class="section-title">Corners</div><p class="note">No corners model for ${esc(theLeague(lg))} in this update: there weren't enough recent matches with corner counts.</p>` : "";
+  }
+  const pin = co.pinnacle;
+  const rule = pfById("corners")?.live?.rule;
+  const level = rule?.threshold ?? PAPER_EDGE;
+  const picks = [];
+  const team = (side) => {
+    const m = co[side];
+    const lines = pin?.[side] || [];
+    const name = esc(fx[side]);
+    if (!lines.length) {
+      const rows = [3.5, 4.5, 5.5].map((line) => `<tr><td>Over ${line}</td><td>${pct(overFrom(m.cdf, line))}</td></tr>`).join("");
+      return `<div class="goals-team"><b>${name}</b> <span class="muted small">model expects ${Number(m.mean).toFixed(1)}</span>
+        <table class="mkts goals"><thead><tr><th>Corners</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    const rows = lines.map((q) => {
+      const eo = q.p_over != null ? q.p_over * q.over + (q.p_push || 0) - 1 : null;
+      const eu = q.p_under != null ? q.p_under * q.under + (q.p_push || 0) - 1 : null;
+      const best = eo == null && eu == null ? null : (eu ?? -9) > (eo ?? -9) ? ["under", eu] : ["over", eo];
+      if (q.pick) picks.push({ side, q, trade: cornerTrade(fx, side, q.line) });
+      return `<tr class="${q.pick ? "pick" : ""}"><td>${Number(q.line)}</td><td>${pct(q.p_over)}</td><td>${pct(q.fair_over)}</td><td>${american(q.over)}</td><td>${american(q.under)}</td><td class="${q.pick ? "edge-pos" : ""}">${best ? `${signedPct(best[1], 0)}<span class="mk-range">${best[0]}</span>` : "–"}</td></tr>`;
+    }).join("");
+    return `<div class="goals-team"><b>${name}</b> <span class="muted small">model expects ${Number(m.mean).toFixed(1)}</span>
+      <table class="mkts corners-t"><thead><tr><th>Line</th><th>Model</th><th>PIN</th><th>Over</th><th>Under</th><th>Edge</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+  const body = team("home") + team("away");
+  const pickHtml = picks.map(({ side, q, trade }) => `<span class="badge${trade ? " paper" : ""}">${CHECK}${trade ? "Paper trade open" : "Live-test pick"}: ${esc(fx[side])} ${q.pick.side} ${Number(q.line)} @ ${american(q.pick.odds)} <span class="num">(${signedPct(q.pick.edge)})</span></span>`).join("");
+  const when = pin?.fetched_at ? espnTime(pin.fetched_at) : null;
+  const weak = WEAK_CORNER_FIT.has(lg) ? ` Model (f) fits less well in ${esc(theLeague(lg))}: in testing its chances there were too spread out.` : "";
+  return `
+    <div class="section-title">Corners</div>
+    <div class="explain live-test"><b>Live test.</b> Team corners are paper-traded: model (f) against Pinnacle's price, a $10 trade at ${pct(level)}+ edge. No edge is proven yet; the February test decides. <button class="linkish" data-goto-pf="corners">Team corners portfolio</button></div>
+    <div class="card" style="padding:8px 14px">${body}${pickHtml ? `<div class="corner-picks">${pickHtml}</div>` : ""}</div>
+    <p class="note">${pin ? `Model = model (f)'s chance of the over; on a whole line (say 5) exactly 5 is a push and the stake comes back. PIN = Pinnacle's chance of the over, margin removed. Over/Under = Pinnacle's odds${when ? `, logged ${esc(when)}` : ""}. Edge = the better side's model chance × odds (+ push chance) − 1. A pick here uses Pinnacle's latest logged price; a paper trade also needs a price from the last 3 hours, so not every pick becomes a trade.` : "Model = model (f)'s chance of each team going over the line. No Pinnacle price for this match yet: team corners are logged about a day before kickoff and again just before it."} Teams with little top-flight history are pulled toward the league average.${weak}</p>`;
 }
 
 function playersSection(fx) {
@@ -526,7 +582,8 @@ const tLeague = (t) => t.league || "E0";
 // Competitions in the data: fixtures plus Moneyline's trades, in LEAGUES order.
 function leaguesPresent() {
   const ml = pfById("moneyline");
-  const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || [])].map(tLeague)]);
+  const co = pfById("corners");
+  const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || []), ...(co?.live?.trades || [])].map(tLeague)]);
   const order = LEAGUES.map(([k]) => k);
   return [...codes].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) || a.localeCompare(b));
 }
@@ -1474,34 +1531,88 @@ function marketTeamGoals(tm) {
     ${liveHtml}`, table);
 }
 
-function marketCorners(co) {
-  if (!co) return "";
-  const ho = co.holdout || {}, rc = co.recalibration || {};
-  const band = (rc.slope_band || ho.slope_band || [0.8, 1.25]).map((v) => v.toFixed(2)).join("–");
-  const rows = (rc.rows || []).map((r) => ({
-    label: leagueShort(r.league), sub: `${r.matches} matches`, v: r.gain, lo: r.lo, hi: r.hi,
-    readout: `<b>${esc(leagueName(r.league))}</b>, 2025/26, recalibrated: gain ${gainFmt(r.gain)} a line (range ${gainFmt(r.lo)} to ${gainFmt(r.hi)}); line slopes ${esc(r.slopes)}. Outside ${band}: ${esc(r.outside || "none")}.`,
-  }));
-  const chart = rangeChart("co", rows, (v) => gainFmt(v, 2));
-  const hoTable = ho.rows?.length ? `
+const bandText = (part) => ((part?.slope_band || [0.8, 1.25]).map((v) => v.toFixed(2)).join("–"));
+// Round 11: the 2024/25 bake-off holdout (each team's and total corners), per league.
+function cornerHoldoutHtml(ho) {
+  if (!ho?.rows?.length) return "";
+  const band = bandText(ho);
+  return `
     <div class="sub-title">${esc(ho.title || "")}</div>
     <div class="card" style="padding:8px 14px"><table class="mkts mk-table mk-wide">
       <thead><tr><th></th><th>Team gain</th><th>Slopes</th><th>Total gain</th></tr></thead>
       <tbody>${ho.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.team_lo > 0 ? "gain" : ""}">${gainFmt(r.team_gain)}${rangeMeta(r.team_lo, r.team_hi)}</td><td>${esc(r.team_slopes)}</td><td>${gainFmt(r.total_gain)}${rangeMeta(r.total_lo, r.total_hi)}</td></tr>`).join("")}</tbody>
     </table></div>
     <p class="note">Each team's corners (over 3.5, 4.5 and 5.5): the range clears 0 in ${andList(ho.rows.filter((r) => r.team_lo > 0).map((r) => esc(theLeague(r.league)))) || "no league"}, but every league has a line whose slope is outside ${band}. Total corners (8.5 to 11.5): no league's range clears 0. ${esc(capFirst(ho.seasons || ""))}, ranges at ${esc(ho.level || "")}.</p>
-    ${sourceNote(ho)}` : "";
-  const rcTable = rc.rows?.length ? `
+    ${sourceNote(ho)}`;
+}
+// Round 12: the same models recalibrated, tested on 2025/26, per league.
+function cornerRecalHtml(rc) {
+  if (!rc?.rows?.length) return "";
+  const band = bandText(rc);
+  return `
     <div class="sub-title">${esc(rc.title || "")}</div>
     <div class="card" style="padding:8px 14px"><table class="mkts mk-table mk-wide">
       <thead><tr><th></th><th>Gain</th><th>Slopes</th><th>Before</th></tr></thead>
       <tbody>${rc.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.lo > 0 ? "gain" : ""}">${gainFmt(r.gain)}${rangeMeta(r.lo, r.hi)}</td><td>${esc(r.slopes)}</td><td>${gainFmt(r.raw_gain)}${rangeMeta(r.raw_lo, r.raw_hi)}</td></tr>`).join("")}</tbody>
     </table></div>
     <p class="note">Each team's corners after recalibration (Before = the same model without it). Lines outside ${band}: ${rc.rows.map((r) => `${esc(leagueShort(r.league))} ${esc(r.outside)}`).join("; ")}. ${esc(capFirst(rc.seasons || ""))}, ranges at ${esc(rc.level || "")}.</p>
-    ${sourceNote(rc)}` : "";
+    ${sourceNote(rc)}`;
+}
+// Round 13: corners bake-off 2, model (f) in development: the model the live test trades.
+function cornerDevChart(dev, id) {
+  const rows = (dev?.rows || []).map((r) => ({
+    label: leagueShort(r.league), sub: r.finalist ? "finalist" : "not in band", v: r.gain, lo: r.lo, hi: r.hi,
+    readout: `<b>${esc(leagueName(r.league))}</b>, ${r.matches.toLocaleString()} matches: model (f) gain ${gainFmt(r.gain, 4)} a line (range ${gainFmt(r.lo, 4)} to ${gainFmt(r.hi, 4)}); line slopes ${esc(r.slopes)}. ${r.passes ? "Every line in the slope band: a finalist for the February test." : "At least one line outside the slope band: no February test in this league."}`,
+  }));
+  return rangeChart(id, rows, (v) => gainFmt(v, 2));
+}
+function cornerDevHtml(dev) {
+  if (!dev?.rows?.length) return "";
+  const band = bandText(dev);
+  return `
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table mk-wide">
+      <thead><tr><th></th><th>Gain</th><th>Slopes</th><th>Result</th></tr></thead>
+      <tbody>${dev.rows.map((r) => `<tr><td>${esc(leagueShort(r.league))}</td><td class="${r.lo > 0 ? "gain" : ""}">${gainFmt(r.gain, 4)}${rangeMeta(r.lo, r.hi)}</td><td>${esc(r.slopes)}</td><td class="${r.passes ? "gain" : ""}">${r.passes ? "Passes: finalist" : "Too spread out"}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="note">Gain = how much better model (f)'s chances score than the league average, log loss a line (above 0 is better). A model passes only if the gain's range is above 0 and every line's slope is in ${band} (1 means its chances are spread just right). ${esc(dev.seasons || "")}, ranges at ${esc(dev.level || "")}. ${esc(dev.test || "")}</p>
+    ${sourceNote(dev)}`;
+}
+
+function marketCorners(co) {
+  if (!co) return "";
+  const ho = co.holdout || {}, rc = co.recalibration || {};
+  const band = bandText(rc.slope_band ? rc : ho);
+  const rows = (rc.rows || []).map((r) => ({
+    label: leagueShort(r.league), sub: `${r.matches} matches`, v: r.gain, lo: r.lo, hi: r.hi,
+    readout: `<b>${esc(leagueName(r.league))}</b>, 2025/26, recalibrated: gain ${gainFmt(r.gain)} a line (range ${gainFmt(r.lo)} to ${gainFmt(r.hi)}); line slopes ${esc(r.slopes)}. Outside ${band}: ${esc(r.outside || "none")}.`,
+  }));
+  const chart = rangeChart("co", rows, (v) => gainFmt(v, 2));
+  const live = pfById("corners");
+  const link = live ? `<div class="explain live-test"><b>Now in a live test.</b> The owner is paper-trading model (f), a newer team-corner model, against Pinnacle's live prices in every competition. <button class="linkish" data-goto-pf="corners">Open the ${esc(live.name)} portfolio</button></div>` : "";
   return marketCard("Corners", co.verdict, "neg", `
+    ${link}
     <p class="note" style="margin-top:4px">Each team's corners, 2025/26 test after recalibration: how much better the model's chances scored than the league average (log loss a line; above 0 is better). Blue = the whole range is above 0. A model also needs every line's slope between ${band} (1 means its chances are spread just right), and none managed it, so nothing passes.</p>
-    ${chart}`, hoTable + rcTable);
+    ${chart}`, (co.development?.rows?.length ? `<div class="sub-title">${esc(co.development.title || "")}</div>${cornerDevHtml(co.development)}` : "") + cornerHoldoutHtml(ho) + cornerRecalHtml(rc));
+}
+
+// Portfolio → Team corners → Backtest: the research record (kind "research"). No corner
+// prices exist historically, so there is no money here: verdict, model (f) per league and
+// the earlier tests, folded.
+function researchBacktestHtml(bt) {
+  const dev = bt.development;
+  return `
+    <div class="verdict mid" style="margin-top:12px">${esc(bt.verdict || "")}</div>
+    <p class="note">${esc(bt.note || "")}</p>
+    ${dev?.rows?.length ? `
+      <div class="section-title">${esc(dev.title || "Model (f), development")}</div>
+      <p class="note" style="margin-top:4px">Model (f) = ${esc(dev.model_name || "")}. Its gain over the league average, per league; tap a row for its numbers.</p>
+      ${cornerDevChart(dev, "pfco")}
+      ${cornerDevHtml(dev)}` : ""}
+    ${bt.holdout || bt.recalibration ? `
+      <details class="fold mk-fold"><summary>Earlier corner tests <span class="muted">(rounds 11 and 12)</span></summary>
+        ${cornerHoldoutHtml(bt.holdout)}${cornerRecalHtml(bt.recalibration)}
+      </details>` : ""}
+    <p class="note">No money tiles: football-data has no historical corner prices, so this strategy can't be replayed for profit. The live paper trades are its only money record.</p>`;
 }
 
 const STRATEGY_LABEL = {
@@ -1776,7 +1887,10 @@ const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired" };
 function currentPrice(t) {
   const fx = state.data.fixtures.find((f) => f.home === t.home && f.away === t.away);
   let cur = null;
-  if (t.bet_type === "player") {
+  if (isCorner(t)) {
+    const q = fx?.corners?.pinnacle?.[t.team_side]?.find((x) => Number(x.line) === Number(t.line));
+    cur = q ? q[t.side] : null;
+  } else if (t.bet_type === "player") {
     const pl = fx?.players?.find((p) => p.player_id === t.player_id);
     cur = pl?.lines?.find((l) => l.market === t.market && l.line === t.line && l.side === t.side)?.odds ?? null;
   } else {
@@ -1803,7 +1917,8 @@ const priceBoth = (d) => (d ? `${american(d)} (${d.toFixed(2)})` : "–");
 function closeLine(t) {
   if (t.status === "open" || isPlayer(t)) return "";
   const m = closeMinutes(t);
-  return `<div class="meta">Close ${priceBoth(t.close_odds)}${m != null ? ` · ${minutesText(m)} before` : ""} · <span class="nowrap">CLV <span class="${plClass(t.clv_dk)}">${signedPct(t.clv_dk)}</span></span>${closeApprox(t) ? ' · <span class="approx">approx.</span>' : ""}</div>`;
+  const clv = tradeClv(t);
+  return `<div class="meta">${isCorner(t) ? "Pinnacle's close" : "Close"} ${priceBoth(t.close_odds)}${m != null ? ` · ${minutesText(m)} before` : ""} · <span class="nowrap">CLV <span class="${plClass(clv)}">${signedPct(clv)}</span></span>${closeApprox(t) ? ' · <span class="approx">approx.</span>' : ""}</div>`;
 }
 const plClass = (v) => (v == null || Math.abs(v) < 0.005 ? "" : v > 0 ? "gain" : "loss");
 
@@ -1825,9 +1940,12 @@ function pfTiles(s, trades = []) {
       <div class="tile"><div class="label">Total gain/loss</div><div class="value ${plClass(total)}">${usd(total, 2)}</div><div class="sub">settled + open</div></div>` : "";
   const profit = `<div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>`;
   const roi = `<div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>`;
-  const book = trades.length && trades.every(isPlayer) ? playerBook() : "DraftKings";
-  const clv = `<div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(s.clv_dk)}">${signedPct(s.clv_dk)}</div><div class="sub">avg vs ${esc(book)} close</div></div>`;
-  const beat = `<div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">${s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of settled trades"}</div></div>`;
+  const corners = trades.length > 0 && trades.every(isCorner);
+  const book = corners ? "Pinnacle's" : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
+  const sClv = corners ? s.clv_pinnacle : s.clv_dk;
+  const sBeat = corners ? s.beat_close_pinnacle : s.beat_close_dk;
+  const clv = `<div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(sClv)}">${signedPct(sClv)}</div><div class="sub">avg vs ${esc(book)} close</div></div>`;
+  const beat = `<div class="tile"><div class="label">Beat the close</div><div class="value">${pct(sBeat)}</div><div class="sub">${corners ? "vs Pinnacle's close" : s.clv_pinnacle != null ? `Pinnacle CLV ${signedPct(s.clv_pinnacle)}` : "share of settled trades"}</div></div>`;
   const count = `<div class="tile"><div class="label">Trades</div><div class="value">${s.trades || 0}</div><div class="sub">${s.open || 0} open · ${s.settled || 0} settled${s.void ? ` · ${s.void} void` : ""}</div></div>`;
   const dd = `<div class="tile"><div class="label">Max drawdown</div><div class="value">${s.max_drawdown != null ? `$${s.max_drawdown.toFixed(0)}` : "–"}</div><div class="sub">peak to trough</div></div>`;
   return state.pfView === "live"
@@ -1839,6 +1957,9 @@ function pfTiles(s, trades = []) {
 
 // Live view: why CLV matters, and how many closes were taken early (approximate CLV).
 function clvNote(s, trades) {
+  if (trades.length && trades.every(isCorner)) {
+    return `<p class="note">Closing line value compares the price you got with Pinnacle's last team-corner price before kickoff, margin removed. Until that close is logged, a trade's close is its entry price, so its CLV is just Pinnacle's margin (slightly negative). Profit takes hundreds of bets to tell skill from luck; beating Pinnacle's close shows up much sooner.</p>`;
+  }
   const match = trades.filter((t) => !isPlayer(t) && t.status !== "open");
   if (!trades.some((t) => !isPlayer(t))) return "";
   const early = s.close_early ?? s.close_over_60min ?? match.filter(closeApprox).length; // either name: moneyline uses close_early
@@ -1850,18 +1971,25 @@ function pfOpen(trades) {
   if (!open.length) return "";
   const rows = open.map((t) => {
     const { cur, live, fx } = currentPrice(t);
-    const p = t.bet_type === "player" ? null : fx?.p?.[t.market];
-    const curEdge = p != null ? p * cur - 1 : null;
+    let curEdge = null;
+    if (isCorner(t)) {
+      const q = fx?.corners?.pinnacle?.[t.team_side]?.find((x) => Number(x.line) === Number(t.line));
+      const pw = q?.[t.side === "over" ? "p_over" : "p_under"];
+      if (pw != null && live) curEdge = pw * cur + (q.p_push || 0) - 1;
+    } else {
+      const p = t.bet_type === "player" ? null : fx?.p?.[t.market];
+      curEdge = p != null ? p * cur - 1 : null;
+    }
     const mtm = markToMarket(t, cur);
     const move = cur < t.odds ? "shortened" : cur > t.odds ? "drifted" : "unchanged";
     return `
       <button class="bet-row trade" data-trade="${esc(t.id)}">
-        <span>${tradeTitle(t)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
+        <span>${tradeTitle(t)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
         <span class="pl ${plClass(mtm)}">${usd(mtm, 2)}<div class="meta">if cashed out</div></span>
       </button>`;
   }).join("");
   return `<div class="section-title">Open positions</div><div class="card">${rows}</div>
-    <p class="note">Gain/loss on open bets is what each would be worth at the current price (DraftKings for match bets, ${esc(playerBook())} for player shots: stake × entry odds ÷ current odds), before any cash-out fee. A shortened price means the bet gained value. Bets settle after the final whistle.</p>`;
+    <p class="note">Gain/loss on open bets is what each would be worth at the current price (${open.every(isCorner) ? "Pinnacle's latest logged team-corner price" : `DraftKings for match bets, ${esc(playerBook())} for player shots`}: stake × entry odds ÷ current odds), before any cash-out fee. A shortened price means the bet gained value. Bets settle after the final whistle.</p>`;
 }
 
 function pfSettled(trades) {
@@ -1873,26 +2001,27 @@ function pfSettled(trades) {
   const shown = sel.slice(0, state.pfShown);
   const rows = shown.map((t) => `
     <button class="bet-row trade" data-trade="${esc(t.id)}">
-      <span>${tradeTitle(t)}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${countWord(t.market, t.actual)}` : ""}</div>${closeLine(t)}</span>
-      <span class="pl ${t.profit > 0 ? "win" : t.profit < 0 ? "loss" : ""}">${t.status === "void" ? "Void" : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
+      <span>${tradeTitle(t)}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${isCorner(t) ? `${t.actual} corners` : countWord(t.market, t.actual)}` : ""}</div>${closeLine(t)}</span>
+      <span class="pl ${t.profit > 0 ? "win" : t.profit < 0 ? "loss" : ""}">${t.status === "void" ? (t.push ? "Push<div class=\"meta\">stake back</div>" : "Void") : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
     </button>`).join("");
   const opt = (vals, cur, label, fmt) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
   return `
     <div class="section-title">Settled trades</div>
     <div class="filters">
-      <select id="pf-market" aria-label="Filter by market">${opt(markets, state.pfMarket, "All markets", (m) => PICK_LABEL[m] || (PLAYER_MARKET[m] ? `Player ${PLAYER_MARKET[m]}` : m))}</select>
+      <select id="pf-market" aria-label="Filter by market">${opt(markets, state.pfMarket, "All markets", marketName)}</select>
       <select id="pf-season" aria-label="Filter by season">${opt(seasons, state.pfSeason, "All seasons", seasonName)}</select>
     </div>
     <div class="card">${rows || '<p class="muted">No settled trades match these filters.</p>'}</div>
     ${sel.length > shown.length ? `<button class="more" id="pf-more">Show more (${sel.length - shown.length} left)</button>` : ""}`;
 }
 
+const marketName = (m) => (m === "team_corners" ? "Team corners" : PICK_LABEL[m] || (PLAYER_MARKET[m] ? `Player ${PLAYER_MARKET[m]}` : m));
 function pfTable(title, rows, label = (g) => g) {
   if (!rows || !rows.length) return "";
   // Range groups ("under 2.0", "2.0–3.5", "over 6.0", "12–15%") in numeric order.
   const lo = (g) => (/^under/i.test(g) ? -Infinity : /^over/i.test(g) ? Infinity : parseFloat(g));
   if (rows.every((r) => !Number.isNaN(lo(String(r.group))))) rows = rows.slice().sort((a, b) => lo(String(a.group)) - lo(String(b.group)));
-  const body = rows.map((r) => `<tr><td>${esc(label(r.group))}</td><td>${r.trades}</td><td>${signedPct(r.roi)}</td><td>${signedPct(r.clv_dk)}</td></tr>`).join("");
+  const body = rows.map((r) => `<tr><td>${esc(label(r.group))}</td><td>${r.trades}</td><td>${signedPct(r.roi)}</td><td>${signedPct(pfCurrent()?.id === "corners" ? r.clv_pinnacle : r.clv_dk)}</td></tr>`).join("");
   return `
     <div class="section-title">${esc(title)}</div>
     <div class="card" style="padding:8px 14px">
@@ -1920,8 +2049,8 @@ function pfBacktestExtras(bt) {
 function pfBreakdowns(b) {
   const backtest = state.pfView === "backtest";
   const tables = [
-    pfTable("By market", b.market, (g) => PICK_LABEL[g] || (PLAYER_MARKET[g] ? `Player ${PLAYER_MARKET[g]}` : g)),
-    pfTable("By line", b.line, (g) => (Number.isInteger(Number(g)) ? `${Number(g)}+` : `${g}`)),
+    pfTable("By market", b.market, marketName),
+    pfTable("By line", b.line, (g) => (Number.isInteger(Number(g)) && pfCurrent()?.id !== "corners" ? `${Number(g)}+` : `${g}`)),
     pfTable("By position", b.position),
     pfTable("Starter or substitute", b.started, (g) => (g === "True" || g === "true" ? "Started" : "Came on")),
     pfTable("By edge at entry", b.edge_bucket),
@@ -1973,24 +2102,31 @@ function viewPortfolio() {
       ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
     </div>`;
   const fullSet = pfSet();
-  // Moneyline: one portfolio, filtered by competition (by_league summaries from paper.py).
-  const lg = cur.id === "moneyline" ? leagueOn() : "";
+  // Moneyline and Team corners: filtered by competition (by_league summaries from paper.py).
+  const byComp = cur.id === "moneyline" || cur.id === "corners";
+  const research = state.pfView === "backtest" && fullSet?.kind === "research";
+  const lg = byComp && !research ? leagueOn() : "";
   const set = fullSet && lg ? leagueSet(fullSet, lg) : fullSet;
-  const top = `${switcher}${head}${cur.id === "moneyline" ? leagueFilter() : ""}${toggle}`;
+  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}`;
+  if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
   const isMoneyline = cur.id === "moneyline";
-  const ruleNote = state.pfView === "live" && cur.status === "live"
+  const ruleNote = cur.id === "corners" && state.pfView === "live"
+    ? `<div class="explain live-test"><b>Live test: fixed ${pct(set?.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${set?.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(set?.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back.</div>`
+    : state.pfView === "live" && cur.status === "live"
     ? (isMoneylineFixed(cur)
       ? `<div class="explain live-test"><b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.</div>`
       : rule.threshold == null ? "" : `<p class="note">A $${rule.stake ?? 10} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.</p>`) : "";
   const foot = `<p class="note">${state.pfView === "live"
-    ? (isMoneyline ? oddsAge() || "Odds: DraftKings." : "")
+    ? (isMoneyline ? oddsAge() || "Odds: DraftKings." : cur.id === "corners" ? "Prices: Pinnacle's team corners, logged about a day before kickoff and again just before it." : "")
     : isMoneyline ? `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`
       : set?.generated_at ? `Backtest run ${shortDate(set.generated_at)}.` : ""} Paper trades: no money is staked.</p>`.replace('class="note"> ', 'class="note">');
   const trades = set?.trades || [];
   const s = set?.summary || { trades: 0 };
   const banner = set?.error ? `<div class="banner">${esc(set.error)}</div>` : set?.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   if (!trades.length) {
-    const empty = cur.status === "testing"
+    const empty = cur.id === "corners" && state.pfView === "live"
+      ? "No corner trades yet. One opens when a team's corner line shows a 12% edge against Pinnacle's price."
+      : cur.status === "testing"
       ? "No trades yet. They start once this strategy passes its tests."
       : cur.status === "retired" && state.pfView === "live"
         ? "No live trades: this strategy was retired before any opened. Its testing history is under Backtest."
@@ -2000,7 +2136,7 @@ function viewPortfolio() {
     return `${top}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" && set ? pfBacktestExtras(set) : ""}${retiredLinks}${foot}`;
   }
   const settled = trades.filter((t) => t.status === "won" || t.status === "lost").slice().reverse()
-    .map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, t.clv_dk, t.profit]);
+    .map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, tradeClv(t), t.profit]);
   const ci = s.roi_ci95 ? `<p class="note">95% interval on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Win rate ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
   return `
     ${top}
@@ -2092,40 +2228,43 @@ const TRADE_FIELDS = [
   ["Pick", (t) => tradeLabel(t)],
   ["Player", (t) => `${t.player} (${t.team || "?"}${t.position ? `, ${t.position}` : ""})`, "player"],
   ["Result", (t) => (t.actual != null ? `${countWord(t.market, t.actual)}${t.started != null ? (t.started ? ", started" : ", came on") : ""}` : "–"), "player"],
+  ["Result", (t) => (t.actual != null ? `${t.team} had ${t.actual} corners${t.push ? ": exactly the line, a push (stake back)" : ""}` : "–"), "corners"],
+  ["Model's expected corners", (t) => (t.model_mean != null ? `${t.team} ${Number(t.model_mean).toFixed(1)}` : "–"), "corners"],
   ["Entry odds", (t) => `${american(t.odds)} (${t.odds.toFixed(2)})`],
   ["Odds fetched", (t) => (t.odds_fetched_at ? kickoffText(t.odds_fetched_at) : "–")],
   ["Opened", (t) => `${kickoffText(t.opened_at)} (${hoursText(t.hours_to_kickoff)} before kickoff)`],
   [(t) => (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4 ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
   ["Raw model chance", (t) => pct(t.model_p_base, 1), (t) => isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4],
+  ["Push chance", (t) => pct(t.p_push, 1), (t) => isCorner(t) && t.p_push > 0],
   ["Without team news", (t) => pct(t.model_p_base, 1), "match"],
   ["Team news applied", (t) => (t.news_applied ? "Yes" : "No"), "match"],
   ["Edge at entry", (t) => signedPct(t.edge)],
   ["Threshold", (t) => pct(t.threshold)],
-  ["Rule", (t) => (t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
+  ["Rule", (t) => (isCorner(t) ? "Fixed edge, model (f) vs Pinnacle (live test)" : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
   [(t) => (t.status === "open" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
-  [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, "match"],
-  ["Bookmaker", (t) => t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings")],
+  [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
+  ["Bookmaker", (t) => ({ pinnacle: "Pinnacle", draftkings: "DraftKings", fanduel: "FanDuel" })[t.bookmaker] || t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings")],
   ["Book implied chance", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
-  [(t) => (isPlayer(t) ? "Price move to close" : t.status === "open" ? "CLV so far" : "CLV vs DraftKings"), (t) => signedPct(t.clv_dk)],
-  ["Beat the close", (t) => (t.beat_close_dk == null ? (t.clv_dk == null || t.status === "open" ? "–" : t.clv_dk > 0 ? "Yes" : "No") : t.beat_close_dk ? "Yes" : "No"), "match"],
+  [(t) => (isPlayer(t) ? "Price move to close" : t.status === "open" ? "CLV so far" : isCorner(t) ? "CLV vs Pinnacle's close" : "CLV vs DraftKings"), (t) => signedPct(tradeClv(t))],
+  ["Beat the close", (t) => { const b = tradeBeat(t), c = tradeClv(t); return b == null ? (c == null || t.status === "open" ? "–" : c > 0 ? "Yes" : "No") : b ? "Yes" : "No"; }, (t) => !isPlayer(t)],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle), "match"],
   ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],
-  ["Score", (t) => t.score || "–", "match"],
+  ["Score", (t) => t.score || "–", (t) => !isPlayer(t)],
   ["Profit", (t) => (t.profit == null ? "–" : usd(t.profit, 2))],
   ["Season", (t) => seasonName(t.season)],
-  ["Look", (t) => (t.look === "lineup" ? "after lineups" : t.look ? `${t.look} before kickoff` : "–")],
+  ["Look", (t) => (isCorner(t) ? ({ look: "about a day before kickoff", close: "just before kickoff" })[t.look] || "–" : t.look === "lineup" ? "after lineups" : t.look ? `${t.look} before kickoff` : "–")],
   ["Model", (t) => [t.model_ref?.commit, t.model_ref?.xg_weight != null ? `xG weight ${t.model_ref.xg_weight}` : null, t.model_ref?.matches_fit ? `${t.model_ref.matches_fit} matches` : null].filter(Boolean).join(" · ") || "–"],
   ["Trade id", (t) => t.id],
 ];
 
 function tradeHtml(t) {
-  const kind = isPlayer(t) ? "player" : "match";
+  const kind = isPlayer(t) ? "player" : isCorner(t) ? "corners" : "match";
   const rows = TRADE_FIELDS.filter(([, , only]) => (typeof only === "function" ? only(t) : !only || only === kind))
     .map(([k, f]) => `<tr><td>${esc(typeof k === "function" ? k(t) : k)}</td><td>${esc(f(t))}</td></tr>`).join("");
   return `
     <div class="detail">
-      <p class="muted" style="margin:0;font-size:13px">${t.source === "live" ? "Live paper trade" : "Backtest trade"}${isPlayer(t) ? ` · ${esc(t.home)} v ${esc(t.away)}` : ""}</p>
+      <p class="muted" style="margin:0;font-size:13px">${t.source === "live" ? "Live paper trade" : "Backtest trade"}${isPlayer(t) || isCorner(t) ? ` · ${esc(t.home)} v ${esc(t.away)}` : ""}</p>
       <h2 id="sheet-title">${tradeTitle(t)}</h2>
       <div class="card" style="padding:8px 14px;margin-top:10px">
         <table class="kv"><tbody>${rows}</tbody></table>
@@ -2189,6 +2328,10 @@ document.addEventListener("click", (ev) => {
     const src = edgeChartSource(t.dataset.eb, t.dataset.eb === "moneyline" ? leagueOn() : "");
     if (el && src) el.innerHTML = ebReadout(src.et, Number(t.dataset.ebrow));
     t.parentElement.querySelectorAll(".eb-row").forEach((r) => r.classList.toggle("sel", r === t));
+  } else if (t.dataset.gotoPf) {
+    state.pfId = t.dataset.gotoPf; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    store.set("pfId", state.pfId);
+    setTab("portfolio");
   } else if (t.dataset.rcrow !== undefined) {
     const rows = rcCharts[t.dataset.rc];
     const el = document.getElementById(`rc-readout-${t.dataset.rc}`);

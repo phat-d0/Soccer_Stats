@@ -40,7 +40,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from conftest import simulate_league  # noqa: E402
 
-from soccer_stats import paper  # noqa: E402
+from soccer_stats import corners_live, paper  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
 from soccer_stats import trades as tr  # noqa: E402
 from soccer_stats.player_data import season_stats  # noqa: E402
@@ -86,7 +86,7 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
-SAMPLE_PLAYERS = 70  # players kept from the real detail file (keeps fixtures < 1 MB)
+SAMPLE_PLAYERS = 62  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
 def fetch_data_log(dest: Path) -> Path:
@@ -336,6 +336,7 @@ def build(src: Path, out: Path) -> dict:
     add_team_total_prices(data)
     add_espn_team_news(data)
     add_markets_research(data)
+    add_corners(data)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -790,6 +791,183 @@ def add_markets_research(data: dict) -> None:
             "\n".join(json.dumps(r) for r in rows) + "\n"
         )
         data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
+
+
+# Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture
+# (its synthetic clubs never match data-log's rows): a model (f) on every card (an NB2 from
+# the card's xG, through the real cdf shape), Pinnacle team-corner quotes on the first three
+# Premier League matches through corners_live.add_quotes (one whole line, one live-test pick),
+# corners_model per league (one failed fit), and corner trades: one open on the first card's
+# pick, then won, lost and a push on earlier matches, in two leagues.
+def _corner_cdf(mean: float, r: float = 12.0) -> list[float]:
+    from scipy.stats import nbinom
+
+    k = np.arange(corners_live.CDF_MAX + 1)
+    return [round(float(x), 5) for x in nbinom.cdf(k, r, r / (r + mean))]
+
+
+def add_corners(data: dict) -> None:
+    cards = [c for c in data["fixtures"] if c.get("league") in ("E0", "SP1")]
+    for c in cards:
+        mh, ma = round(3.4 + 1.5 * c["xg"][0], 3), round(2.9 + 1.4 * c["xg"][1], 3)
+        c["corners"] = {
+            "model": "f",
+            "home": {"mean": mh, "cdf": _corner_cdf(mh)},
+            "away": {"mean": ma, "cdf": _corner_cdf(ma)},
+        }
+    data["corners_model"] = {
+        "E0": {"model": "f", "matches": 731, "window_from": "2024-10-06", "window_to": "2026-10-05"}
+        | {"k_for": 9.4, "k_against": 12.1, "mean_home": 5.62, "mean_away": 4.57}
+        | {"cards": sum(c["league"] == "E0" for c in cards)},
+        "SP1": {
+            "model": "f",
+            "matches": 742,
+            "window_from": "2024-10-06",
+            "window_to": "2026-10-05",
+        }
+        | {"k_for": 7.8, "k_against": 10.5, "mean_home": 5.31, "mean_away": 4.12}
+        | {"cards": sum(c["league"] == "SP1" for c in cards)},
+        "D1": {"error": "ValueError: 120 matches with corner counts in the window (need 300)"},
+    }
+    e0 = [c for c in cards if c["league"] == "E0"][:3]
+    rows = []
+    # (card, side, line, shift of Pinnacle's fair over chance from the model's): the first
+    # card's home 4.5 is priced far below the model (a 12%+ pick), the rest close to it.
+    plan = [(0, "home", 4.5, -0.16), (0, "home", 5.0, -0.02), (0, "away", 3.5, 0.03)]
+    plan += [(1, "home", 4.5, 0.01), (1, "away", 4.5, -0.03), (2, "home", 5.5, 0.02)]
+    at = (NOW - pd.Timedelta(hours=2)).isoformat()
+    for i, side, line, shift in plan:
+        c = e0[i]
+        probs = corners_live.side_probs(c["corners"][side]["cdf"], line)
+        q = min(0.9, max(0.1, probs["over"] / max(1e-9, 1 - probs["push"]) + shift))
+        over, under = round(1 / (q * 1.035), 2), round(1 / ((1 - q) * 1.035), 2)
+        fair = 1 / over / (1 / over + 1 / under)
+        rows.append(
+            {"market": corners_live.ROW_MARKET, "league": "E0", "home": c["home"]}
+            | {"away": c["away"], "kickoff": pd.Timestamp(c["kickoff"]).isoformat()}
+            | {"event_id": f"fx{i}", "snapshot": "look", "book": "pinnacle", "side": side}
+            | {"team": c[side], "line": line, "over": over, "under": under}
+            | {"fair_over": round(fair, 6), "fair_under": round(1 - fair, 6)}
+            | {"margin": round(1 / over + 1 / under - 1, 6), "fetched_at": at}
+            | {"time_source": "download", "downloaded_at": at, "minutes_before": 5000.0}
+        )
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "E0_corners_2026-10.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in rows) + "\n"
+        )
+        corners_live.add_quotes(cards, [tmp])
+
+    def trade(c, side, line, pick, at, snapshot="look"):
+        return tr.new_corner_trade(
+            pick,
+            league=c["league"],
+            home=c["home"],
+            away=c["away"],
+            team_side=side,
+            line=line,
+            kickoff=pd.Timestamp(c["kickoff"]),
+            opened_at=pd.Timestamp(at),
+            odds_fetched_at=pd.Timestamp(at).isoformat(),
+            snapshot=snapshot,
+        ) | {"model_mean": c.get("corners", {}).get(side, {}).get("mean")}
+
+    first = e0[0]
+    ln = next(x for x in first["corners"]["pinnacle"]["home"] if x["pick"])
+    open_t = trade(first, "home", ln["line"], ln["pick"], at)
+    open_t |= {
+        "close_odds": ln["pick"]["odds"],
+        "close_prices": {"over": ln["over"], "under": ln["under"]},
+    }
+    open_t |= {"close_fetched_at": at, "close_snapshot": "look"}
+    open_t |= {
+        "close_minutes_before": round(
+            (pd.Timestamp(first["kickoff"]) - pd.Timestamp(at)).total_seconds() / 60, 1
+        )
+    }
+    open_t["clv_pinnacle"] = tr.corner_clv(open_t["odds"], open_t["side"], ln["over"], ln["under"])
+    open_t["beat_close_pinnacle"] = open_t["clv_pinnacle"] > 0
+    settled = []
+    # league, home, away, kickoff, side, line, pick side, odds, model_p, push, count, close o/u
+    past = [
+        (
+            "E0",
+            "Chelsea",
+            "Brentford",
+            "2026-09-27T14:00:00Z",
+            "home",
+            5.5,
+            "over",
+            2.05,
+            0.58,
+            0.0,
+            8,
+            1.88,
+            1.96,
+        ),
+        (
+            "SP1",
+            "Sevilla",
+            "Getafe",
+            "2026-09-28T19:00:00Z",
+            "away",
+            3.5,
+            "under",
+            2.2,
+            0.55,
+            0.0,
+            6,
+            2.30,
+            1.65,
+        ),
+        (
+            "E0",
+            "Everton",
+            "Fulham",
+            "2026-10-04T14:00:00Z",
+            "away",
+            5.0,
+            "over",
+            2.1,
+            0.5,
+            0.12,
+            5,
+            2.05,
+            1.80,
+        ),
+    ]
+    for lg, h, a, ko, side, line, ps, odds, mp, push, count, co, cu in past:
+        c = {"league": lg, "home": h, "away": a, "kickoff": ko}
+        pk = {"side": ps, "odds": odds, "model_p": mp, "p_push": push}
+        pk["edge"] = round(mp * odds + push - 1, 4)
+        kick = pd.Timestamp(ko)
+        t = trade(c, side, line, pk, kick - pd.Timedelta(hours=26))
+        t |= {"model_mean": round(line + (0.9 if ps == "over" else -0.8), 2)}
+        clv = tr.corner_clv(odds, ps, co, cu)
+        t |= {"close_odds": co if ps == "over" else cu, "close_prices": {"over": co, "under": cu}}
+        t |= {"close_fetched_at": (kick - pd.Timedelta(minutes=20)).isoformat()}
+        t |= {"close_minutes_before": 20.0, "close_snapshot": "close"}
+        t |= {"clv_pinnacle": clv, "beat_close_pinnacle": clv > 0}
+        hc, ac = (count, 4) if side == "home" else (6, count)
+        t |= tr.settle_corner(t, count) | {"score": f"{hc}-{ac} corners"}
+        t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+        settled.append(t)
+    corner_trades = [open_t, *settled]
+    pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
+    live_trades = [
+        t for p in pfs.values() for t in p["live"]["trades"] if tr.portfolio_of(t) != "corners"
+    ]
+    backtests = {pid: p["backtest"] for pid, p in pfs.items()}
+    if backtests.get("corners") is None:
+        backtests["corners"] = paper.corners_research()
+    ml = pfs["moneyline"]
+    live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
+    data["portfolio"]["portfolios"] = paper.portfolios_section(
+        live,
+        live_trades + corner_trades,
+        backtests,
+        ml["live"].get("rule"),
+        {"corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}},
+    )
 
 
 def add_second_league(data: dict) -> None:
