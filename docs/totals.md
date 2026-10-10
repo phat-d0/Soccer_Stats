@@ -667,3 +667,58 @@ reason. Ranges at 99.583% (12 tests).
   beating a bookmaker. A price test would mean logging Pinnacle's live corner prices (about
   5.5–6% margin in round 8's probe). That is a separate owner decision with its own cost
   estimate. Nothing was spent.
+
+## Team-corner recalibration (round 12; owner's request 10 Oct; pre-registered 2026-10-10, before any code or run reads a 2025/26 corner outcome)
+
+**Why.** In the corners bake-off, each team's corner models carried information (gain over
+the league average, ranges above 0 in E0, Ligue 1 and the Championship on the 2024/25
+holdout) but were over-confident (slopes below 0.80). This test asks whether a simple
+recalibration, as goalscorer B-cal did, fixes that on data no corners work has touched:
+2025/26. 0 credits; research only.
+
+**Coverage (counts only, `task=corner-coverage` run 38022238320).** Every 2025/26 match has both corner counts: E0 380 of 380, SP1 380/380, D1 306/306, I1
+380/380, F1 306/306, E1 552/552. No outcomes were read.
+
+**Models: no re-choosing.** The 2024/25 holdout finalists stay: team (d) ratings + match
+context in E0, D1, F1 and E1; (c) corner ratings in SP1 and I1. Their raw chances come
+from the bake-off code unchanged (`edge/corners.py`, the same walk-forward: refit every 28
+days on the 730 days before each block, 1,000 earlier matches). The baseline is the
+league average (a), as before. Match totals are left out (they never beat the average).
+
+**Recalibration.**
+- Per league: logit p = a + b·logit(p_model), **one fit per league pooled across the six
+  team lines** (home and away, over 3.5 / 4.5 / 5.5), each match contributing six rows.
+  Pooling: two parameters per league, fitted on about 15,000–22,000 rows; the
+  over-confidence was similar across lines in the bake-off (slopes 0.55–0.90).
+- Fitted by maximum likelihood (plain logistic, no penalty) on the finalist's
+  walk-forward predictions for 2017/18–2024/25 only. 2024/25 now counts as seen.
+- Development view (descriptive, no pass rule): each season 2018/19–2024/25 recalibrated
+  with a fit on the seasons before it only, raw and recalibrated side by side.
+
+**Test season: 2025/26.**
+- Every run that does not open it drops all matches from 1 July 2025 before anything is
+  computed (the match model's fit included). The test run opens it once per league with
+  a logged reason (`lab.harness.Holdout`), predicts it with the same walk-forward, and
+  applies the 2017/18–2024/25 fit unchanged.
+- Raw and recalibrated are scored side by side, each against the league average (a).
+
+**Pass rule** (the bake-off's, unchanged):
+- the per-match mean log-loss gain over (a) across the six team lines has a whole-match
+  bootstrap range above 0 at the Bonferroni level; and
+- every line's recalibration slope point estimate is within **0.80–1.25**.
+- Family: 6 leagues × 2 (raw, recalibrated) = 12 tests, **99.583%**. Log loss, Brier and
+  calibration tables are also reported.
+
+**Reading.**
+- A league's recalibrated model that passes would be recommended as display-only team
+  corner over/unders on the match sheet, labelled as model estimates not tested against
+  any price. A raw model that passes is reported but not recommended over a passing
+  recalibrated one.
+- Power: 2025/26 has 306 matches in D1 and F1, 380 in E0, SP1 and I1, and 552 in E1
+  (fewer get scored: the walk-forward needs each side's earlier form), like the 2024/25 holdout (284–522). On ~300 matches each line's slope range is about
+  ±0.4, so the band test is noisy there; D1 and F1 are the thinnest.
+- A price test would still need Pinnacle's live corner prices (a separate owner
+  decision). Nothing is spent.
+
+**Code.** `edge/corner_recal.py`; `odds-check.yml` `task=corner-recal` with `league`
+(development view, 2025/26 dropped first) and with `reason` (opens 2025/26 once).
