@@ -50,6 +50,7 @@ from soccer_stats.publish import (  # noqa: E402
     add_match_blend,
     add_team_totals,
     build_data,
+    markets_research,
     match_blend,
     player_gate,
     portfolio_placeholder,
@@ -334,6 +335,7 @@ def build(src: Path, out: Path) -> dict:
     add_second_league(data)
     add_team_total_prices(data)
     add_espn_team_news(data)
+    add_markets_research(data)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -760,6 +762,34 @@ def add_espn_team_news(data: dict) -> None:
             "fetched_at": (pd.Timestamp(second["kickoff"]) - pd.Timedelta(hours=20)).isoformat(),
         },
     }
+
+
+# Record > Goals & corners: the committed research file through publish.markets_research,
+# with the live team-total test's progress counted from synthetic logged rows (fixed, so
+# the fixture is reproducible; the real log grows every build): 12 matches with FanDuel's
+# early price, 8 with both prices, 5 of them with a result.
+def add_markets_research(data: dict) -> None:
+    rows, results = [], []
+    for i in range(12):
+        ko = NOW + pd.Timedelta(days=i - 8)
+        base = {"league": "E0", "home": f"Home {i}", "away": f"Away {i}", "book": "fanduel"}
+        base |= {"kickoff": ko.isoformat(), "team": f"Home {i}", "side": "home", "line": 1.5}
+        base |= {"over": 2.0, "under": 1.8, "fair_over": 0.48, "fair_under": 0.52}
+        base |= {"p_model_over": 0.5, "minutes_before": 20.0}
+        snaps = ("look", "close") if i < 8 else ("look",)
+        for snap in snaps:
+            at = (ko - pd.Timedelta(hours=24 if snap == "look" else 0.3)).isoformat()
+            rows.append(base | {"snapshot": snap, "downloaded_at": at, "fetched_at": at})
+        if i < 5:
+            results.append(
+                {"league": "E0", "home": f"Home {i}", "away": f"Away {i}", "date": ko.normalize()}
+                | {"home_goals": i % 3, "away_goals": 1}
+            )
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "E0_team_totals_2026-10.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in rows) + "\n"
+        )
+        data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
 
 
 def add_second_league(data: dict) -> None:

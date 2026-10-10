@@ -1,0 +1,103 @@
+{
+  "about": "Research results for goal and corner markets, shown on Record > Goals & corners. Every number is copied verbatim from docs/totals.md (rounds 8, 11 and 12) and CLAUDE.md's Status; nothing here is recomputed. Ranges are as published (Bonferroni-widened where the doc says so).",
+  "updated": "2026-10-10",
+  "total_goals": {
+    "verdict": "No edge. The model loses to Pinnacle's price at 2.5 goals in all six leagues.",
+    "pinnacle": {
+      "title": "Against Pinnacle at 2.5 goals",
+      "seasons": "2019/20–2024/25",
+      "level": "99.954%",
+      "source": "docs/totals.md, Goal totals at 2.5 against Pinnacle (round 8)",
+      "runs": {"E0": "37863800450", "SP1": "37863803667", "D1": "37863806642", "I1": "37863809156", "F1": "37863811872", "E1": "37863814409"},
+      "rows": [
+        {"league": "E0", "matches": 2192, "ll_model": 0.6783, "ll_early": 0.6732, "ll_close": 0.6730, "blend_c": 0.02, "blend_lo": -0.44, "blend_hi": 0.48, "bets": 294, "clv_pct": -3.0, "clv_lo": -4.7, "clv_hi": -1.5, "passes": false},
+        {"league": "SP1", "matches": 2200, "ll_model": 0.6780, "ll_early": 0.6704, "ll_close": 0.6688, "blend_c": -0.03, "blend_lo": -0.43, "blend_hi": 0.33, "bets": 416, "clv_pct": -4.1, "clv_lo": -5.3, "clv_hi": -3.0, "passes": false},
+        {"league": "D1", "matches": 1727, "ll_model": 0.6574, "ll_early": 0.6511, "ll_close": 0.6470, "blend_c": -0.00, "blend_lo": -0.43, "blend_hi": 0.50, "bets": 215, "clv_pct": -3.7, "clv_lo": -5.4, "clv_hi": -1.8, "passes": false},
+        {"league": "I1", "matches": 2177, "ll_model": 0.6828, "ll_early": 0.6770, "ll_close": 0.6749, "blend_c": 0.02, "blend_lo": -0.41, "blend_hi": 0.42, "bets": 321, "clv_pct": -3.0, "clv_lo": -4.5, "clv_hi": -1.5, "passes": false},
+        {"league": "F1", "matches": 1954, "ll_model": 0.6846, "ll_early": 0.6769, "ll_close": 0.6718, "blend_c": -0.06, "blend_lo": -0.54, "blend_hi": 0.39, "bets": 327, "clv_pct": -3.4, "clv_lo": -4.8, "clv_hi": -1.8, "passes": false},
+        {"league": "E1", "matches": 3164, "ll_model": 0.6957, "ll_early": 0.6832, "ll_close": 0.6824, "blend_c": -0.05, "blend_lo": -0.36, "blend_hi": 0.28, "bets": 857, "clv_pct": -3.7, "clv_lo": -4.4, "clv_hi": -3.1, "passes": false}
+      ]
+    },
+    "baseline": {
+      "title": "Against the league's recent average, 0.5 to 5.5 goals",
+      "seasons": "2017/18–2024/25",
+      "source": "docs/totals.md, Does the model beat the simple baseline? (round 8)",
+      "lines_beating": 6,
+      "lines": 36,
+      "calibrated": "8 of 30 lines in the top five leagues",
+      "slopes": "0.46–0.96, mostly 0.7–0.85",
+      "rows": [
+        {"league": "E0", "beat": 0, "of": 6, "which": ""},
+        {"league": "SP1", "beat": 3, "of": 6, "which": "2.5, 4.5, 5.5"},
+        {"league": "D1", "beat": 1, "of": 6, "which": "3.5"},
+        {"league": "I1", "beat": 0, "of": 6, "which": ""},
+        {"league": "F1", "beat": 2, "of": 6, "which": "2.5, 3.5"},
+        {"league": "E1", "beat": 0, "of": 6, "which": ""}
+      ]
+    }
+  },
+  "team_goals": {
+    "verdict": "Promising but unproven. The model is well calibrated and beats the league average, but it hasn't been tested against a bookmaker yet.",
+    "research": {
+      "title": "Against the league's recent average, 0.5 to 2.5 goals a team",
+      "seasons": "2017/18–2024/25",
+      "source": "docs/totals.md, Does the model beat the simple baseline? and Is it well calibrated? (round 8)",
+      "runs": {"E0": "37863800450", "SP1": "37863803667", "D1": "37863806642", "I1": "37863809156", "F1": "37863811872", "E1": "37863814409"},
+      "lines_beating_top5": 30,
+      "lines_top5": 30,
+      "gains": "+0.02 to +0.06 a match, every range above 0, in all five top leagues",
+      "calibrated": "24 of 30 lines in the top five leagues",
+      "slopes": "0.83–1.06, mostly 0.94–1.05",
+      "e1": "The Championship (goals only) beats the average at none of its lines and is over-confident everywhere.",
+      "rows": [
+        {"league": "E0", "beat": 6, "of": 6},
+        {"league": "SP1", "beat": 6, "of": 6},
+        {"league": "D1", "beat": 6, "of": 6},
+        {"league": "I1", "beat": 6, "of": 6},
+        {"league": "F1", "beat": 6, "of": 6},
+        {"league": "E1", "beat": 0, "of": 6}
+      ]
+    },
+    "live": {
+      "title": "Live test against FanDuel",
+      "source": "docs/totals.md, Live team-total logging (owner approved 9 Oct); team_totals.report",
+      "target": 50,
+      "plan": "FanDuel's team-total prices are logged about a day before kickoff and again just before it, in the Premier League, La Liga, Bundesliga, Serie A and Ligue 1. Once 50 matches have both prices and a result, the model is scored against FanDuel's closing price."
+    }
+  },
+  "corners": {
+    "verdict": "No edge shown. Each team's corners beat the league average, but the chances are too spread out; total corners do no better than the average.",
+    "holdout": {
+      "title": "Bake-off, tested on 2024/25",
+      "seasons": "development 2017/18–2023/24, holdout 2024/25",
+      "level": "99.583%",
+      "slope_band": [0.80, 1.25],
+      "source": "docs/totals.md, Corners bake-off: holdout results (round 11)",
+      "runs": {"E0": "38004172501", "SP1": "38004174573", "D1": "38004177405", "I1": "38004179990", "F1": "38004182745", "E1": "38004185144"},
+      "rows": [
+        {"league": "E0", "matches": 364, "total_gain": -0.003, "total_lo": -0.026, "total_hi": 0.019, "total_slopes": "0.17–0.55", "team_model": "d", "team_gain": 0.045, "team_lo": 0.007, "team_hi": 0.082, "team_slopes": "0.66–0.98", "passes": false},
+        {"league": "SP1", "matches": 363, "total_gain": 0.003, "total_lo": -0.016, "total_hi": 0.022, "total_slopes": "0.32–0.88", "team_model": "c", "team_gain": 0.013, "team_lo": -0.014, "team_hi": 0.040, "team_slopes": "0.44–0.83", "passes": false},
+        {"league": "D1", "matches": 284, "total_gain": -0.001, "total_lo": -0.023, "total_hi": 0.021, "total_slopes": "0.27–0.74", "team_model": "d", "team_gain": 0.014, "team_lo": -0.028, "team_hi": 0.051, "team_slopes": "0.48–0.70", "passes": false},
+        {"league": "I1", "matches": 352, "total_gain": 0.015, "total_lo": -0.011, "total_hi": 0.041, "total_slopes": "0.67–1.05", "team_model": "c", "team_gain": 0.017, "team_lo": -0.016, "team_hi": 0.049, "team_slopes": "0.55–0.76", "passes": false},
+        {"league": "F1", "matches": 291, "total_gain": -0.005, "total_lo": -0.025, "total_hi": 0.014, "total_slopes": "−0.18–0.52", "team_model": "d", "team_gain": 0.032, "team_lo": 0.001, "team_hi": 0.061, "team_slopes": "0.62–1.17", "passes": false},
+        {"league": "E1", "matches": 522, "total_gain": -0.001, "total_lo": -0.019, "total_hi": 0.016, "total_slopes": "0.18–0.62", "team_model": "d", "team_gain": 0.032, "team_lo": 0.010, "team_hi": 0.053, "team_slopes": "0.72–1.18", "passes": false}
+      ]
+    },
+    "recalibration": {
+      "title": "Recalibrated, tested on 2025/26",
+      "seasons": "fitted on 2017/18–2024/25, tested on 2025/26",
+      "level": "99.583%",
+      "slope_band": [0.80, 1.25],
+      "source": "docs/totals.md, Team-corner recalibration: 2025/26 test and verdict (round 12)",
+      "runs": {"E0": "38022933421", "SP1": "38022934931", "D1": "38022936740", "I1": "38022938644", "F1": "38022940785", "E1": "38022942019"},
+      "rows": [
+        {"league": "E0", "matches": 358, "fit_a": 0.025, "fit_b": 0.853, "raw_gain": 0.022, "raw_lo": -0.014, "raw_hi": 0.057, "raw_slopes": "0.51–0.71", "gain": 0.026, "lo": -0.005, "hi": 0.057, "slopes": "0.60–0.83", "outside": "away 3.5 (0.60), away 5.5 (0.65)", "passes": false},
+        {"league": "SP1", "matches": 352, "fit_a": 0.006, "fit_b": 0.814, "raw_gain": 0.018, "raw_lo": -0.014, "raw_hi": 0.048, "raw_slopes": "0.39–0.80", "gain": 0.021, "lo": -0.006, "hi": 0.047, "slopes": "0.48–0.99", "outside": "home 5.5 (0.48)", "passes": false},
+        {"league": "D1", "matches": 291, "fit_a": 0.044, "fit_b": 0.829, "raw_gain": 0.016, "raw_lo": -0.016, "raw_hi": 0.047, "raw_slopes": "0.47–0.82", "gain": 0.017, "lo": -0.010, "hi": 0.044, "slopes": "0.56–0.99", "outside": "home 3.5 (0.56), home 4.5 (0.66)", "passes": false},
+        {"league": "I1", "matches": 358, "fit_a": -0.016, "fit_b": 0.873, "raw_gain": 0.027, "raw_lo": -0.004, "raw_hi": 0.057, "raw_slopes": "0.58–0.91", "gain": 0.028, "lo": 0.001, "hi": 0.055, "slopes": "0.66–1.04", "outside": "away 3.5 (0.66), away 4.5 (0.79)", "passes": false},
+        {"league": "F1", "matches": 289, "fit_a": -0.005, "fit_b": 0.847, "raw_gain": 0.029, "raw_lo": -0.002, "raw_hi": 0.060, "raw_slopes": "0.62–1.13", "gain": 0.029, "lo": 0.002, "hi": 0.057, "slopes": "0.73–1.33", "outside": "home 3.5 (1.33), away 4.5 (0.73)", "passes": false},
+        {"league": "E1", "matches": 528, "fit_a": 0.022, "fit_b": 0.864, "raw_gain": 0.022, "raw_lo": 0.004, "raw_hi": 0.040, "raw_slopes": "0.65–1.15", "gain": 0.022, "lo": 0.007, "hi": 0.038, "slopes": "0.75–1.33", "outside": "home 5.5 (1.33), away 3.5 (1.29), away 5.5 (0.75)", "passes": false}
+      ]
+    }
+  }
+}

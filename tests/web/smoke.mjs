@@ -132,6 +132,40 @@ const STEPS = [
   ["record-player", click('button[data-recbet="player"]')],
   ["record-player-blend_3h", click('button[data-recstrat="blend_3h"]')],
   ["record-player-raw_3h", click('button[data-recstrat="raw_3h"]')],
+  // Record → Goals & corners: three research cards, details folded, a range-plot readout.
+  ["record-markets", async (p) => {
+    await p.click('button[data-recbet="markets"]');
+    const text = await p.textContent("#view");
+    for (const want of ["Total goals", "Each team's goals", "Corners", "5 of 50", "No edge"]) {
+      if (!text.includes(want)) throw new Error(`Goals & corners lacks "${want}"`);
+    }
+  }],
+  ["record-markets-details", async (p) => {
+    for (const d of await p.locator("details.mk-fold > summary").all()) await d.click();
+    await p.click('.rc-row[data-rc="co"][data-rcrow="4"]');
+    const readout = await p.textContent("#rc-readout-co");
+    if (!readout.includes("Ligue 1") || !readout.includes("2025/26")) throw new Error(`corner readout: ${readout}`);
+    const text = await p.textContent("#view");
+    for (const run of ["37863800450", "38004172501", "38022942019"]) if (!text.includes(run)) throw new Error(`run ${run} not shown`);
+  }],
+  // The publish field missing (a broken or old build): a plain note, nothing else breaks.
+  ["record-markets-missing", async (p) => {
+    await p.route("**/data.json", async (route) => {
+      const res = await route.fetch();
+      const d = await res.json();
+      delete d.markets_research;
+      await route.fulfill({ response: res, json: d });
+    });
+    await p.reload(); await p.waitForSelector("button.match");
+    await tab("record")(p); await p.click('button[data-recbet="markets"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("aren't in this update")) throw new Error("no plain note when markets_research is missing");
+  }],
+  ["record-player-restored", async (p) => {
+    await p.unroute("**/data.json");
+    await p.reload(); await p.waitForSelector("button.match");
+    await tab("record")(p); await p.click('button[data-recbet="player"]');
+  }],
   ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-live", async (p) => { await closeSheet(p); await tab("portfolio")(p); }],
   ["portfolio-live-sp1", click('.chip[data-league="SP1"]')],
