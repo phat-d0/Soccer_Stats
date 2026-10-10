@@ -142,14 +142,21 @@ def test_run_fails_safe_and_fills_portfolio(tmp_path):
 # ---------- the live threshold: the minimum edge learned from history ----------
 
 
-def test_paper_threshold_from_the_backtest_file():
+def test_paper_threshold_from_the_backtest_file(monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")  # the learned path, kept intact
     assert tr.paper_threshold(None)["threshold"] == tr.PAPER_EDGE
     assert tr.paper_threshold({"summary": {}})["source"] == "default"  # older file
     assert tr.paper_threshold({"edge_threshold": None})["threshold"] == tr.PAPER_EDGE
     r = tr.paper_threshold({"edge_threshold": {"min_edge": None, "note": "Too few bets."}})
     assert r["threshold"] is None and r["source"] == "history" and "Too few bets." in r["note"]
     r = tr.paper_threshold({"edge_threshold": {"min_edge": 0.07, "note": None}})
-    assert r == {"threshold": 0.07, "source": "history", "note": None}
+    assert r == {
+        "threshold": 0.07,
+        "source": "history",
+        "note": None,
+        "rule": "learned",
+        "p_source": "blend",
+    }
     assert tr.best_pick({"home": 0.9}, {"home": 2.0}, None) is None  # as the app's bestPick
 
 
@@ -182,7 +189,8 @@ def test_a_learned_level_trades_only_at_or_above_it(tmp_path):
     assert led["E0|2627|Arsenal|Leeds"]["threshold"] == 0.20
 
 
-def test_run_uses_the_backtest_level_and_says_why(tmp_path):
+def test_run_uses_the_backtest_level_and_says_why(tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "learned")
     (tmp_path / "backtest").mkdir()
     bt = tmp_path / "backtest" / "E0_dk.json"
     data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
