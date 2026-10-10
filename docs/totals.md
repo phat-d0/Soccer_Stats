@@ -1099,3 +1099,61 @@ failed).
 
 **Code.** `edge/corners2.py` (reusing `edge/corners.py`); `odds-check.yml`
 `task=corners2` with `league` (development) and with `reason` (the February test).
+
+### Corners bake-off 2: development results (2017/18–2023/24; recorded before any test)
+
+Runs: `odds-check.yml` `task=corners2`, commit 7bb70b0, no reason (2026/27 locked), 0
+credits, no key: E0 38039635517, SP1 38039636958, D1 38039638336, I1 38039639516, F1
+38039640916, E1 38039642433. 18 tests, gain ranges at 99.722%, slope band 0.80–1.25.
+Gain = per-match mean log-loss gain over (a) across the six team lines.
+
+| League | Matches | (b) reference | (f) EB team averages | (g) (f) + Pinnacle | (h) (f) + style | Finalist |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 2,660 | +0.0473 (+0.0351 to +0.0595), slopes 0.86–1.00 | **+0.0471 (+0.0348 to +0.0594), slopes 0.86–0.98, pass** | +0.0488 (+0.0351 to +0.0628), slopes 0.77–0.89 | +0.0458 (+0.0323 to +0.0598), slopes 0.73–0.88 | (f) |
+| SP1 | 2,660 | +0.0152 (+0.0056 to +0.0248), slopes 0.66–0.74 | +0.0147 (+0.0063 to +0.0230), slopes 0.69–0.79 | +0.0130 (+0.0024 to +0.0236), slopes 0.59–0.69 | +0.0100 (−0.0012 to +0.0212), slopes 0.54–0.66 | none |
+| D1 | 2,042 | +0.0303 (+0.0181 to +0.0424), slopes 0.76–0.94 | +0.0294 (+0.0178 to +0.0410), slopes 0.78–0.97 | +0.0297 (+0.0160 to +0.0436), slopes 0.69–0.84 | +0.0261 (+0.0121 to +0.0398), slopes 0.65–0.79 | none |
+| I1 | 2,660 | +0.0343 (+0.0242 to +0.0451), slopes 0.84–0.91 | **+0.0340 (+0.0239 to +0.0444), slopes 0.84–0.92, pass** | +0.0344 (+0.0230 to +0.0466), slopes 0.74–0.84 | +0.0309 (+0.0192 to +0.0431), slopes 0.72–0.79 | (f) |
+| F1 | 2,485 | +0.0123 (+0.0038 to +0.0207), slopes 0.67–0.85 | **+0.0125 (+0.0059 to +0.0191), slopes 0.84–1.01, pass** | +0.0127 (+0.0032 to +0.0219), slopes 0.62–0.82 | +0.0116 (+0.0016 to +0.0214), slopes 0.60–0.75 | (f) |
+| E1 | 3,863 | +0.0090 (+0.0028 to +0.0153), slopes 0.58–0.74 | +0.0099 (+0.0045 to +0.0151), slopes 0.65–0.85 | +0.0097 (+0.0026 to +0.0168), slopes 0.59–0.70 | +0.0069 (−0.0001 to +0.0140), slopes 0.53–0.65 | none |
+
+(f)'s slope per line (home 3.5 / 4.5 / 5.5, away 3.5 / 4.5 / 5.5): E0 0.98 / 0.89 / 0.94,
+0.91 / 0.92 / 0.86; SP1 0.69 / 0.77 / 0.79, 0.77 / 0.78 / 0.77; D1 0.78 / 0.79 / 0.79,
+0.90 / 0.97 / 0.92; I1 0.89 / 0.91 / 0.88, 0.92 / 0.88 / 0.84; F1 1.01 / 0.89 / 0.98, 0.96 /
+0.86 / 0.84; E1 0.74 / 0.65 / 0.78, 0.85 / 0.79 / 0.77. Feature coverage: (g) 99.9–100%,
+(h) 98.9–99.4% of scored matches.
+
+- Every candidate beats the league average in every league; (f) and (g) have their gain
+  range above 0 everywhere, (h) everywhere but SP1 and E1.
+- Only (f) keeps every line's slope in 0.80–1.25, and only in E0, I1 and F1: those three
+  have a finalist and a February test. SP1, D1 and E1 have none (D1 misses on its three
+  home lines, 0.78–0.79).
+- (g) and (h) add a little gain in places but spread the chances out (slopes 0.53–0.89)
+  and pass nowhere. Round 11's fixed shrinkage (b, reference) is in band in E0 and I1
+  with about the same gain.
+
+### Live corner prices and paper trades (owner's decision, 10 Oct; February test unchanged)
+
+On 10 Oct the owner approved, in the lead session, logging Pinnacle's team-corner prices
+live and a corners paper portfolio, in all six live leagues:
+- **Prices:** Pinnacle's `alternate_team_totals_corners` (each team's corners; the market
+  probe's discovery bodies list it at Pinnacle in all six leagues, one line per team,
+  two-sided, median margin 5.8–7.0%). A look 18–30 h and a close ≤30 min before kickoff,
+  on the team-total schedule, one `/events/{id}/odds` call per snapshot with
+  `bookmakers=pinnacle` and that one market (1 credit). Own monthly cap of 500 credits
+  (`corners_live.CORNERS_MONTHLY_CAP`, separate from the team-total test's 800), the
+  shared 3,000-credit reserve, a call record per (event, snapshot, market group). Rows in
+  `odds_log/<code>_corners_<YYYY-MM>.jsonl` (`market: "team_corners"`), calls in
+  `odds_log/corners_calls_<YYYY-MM>.jsonl`. Estimate about 450 credits a month.
+- **Paper trades:** model (f) refitted every build on each league's football-data corner
+  counts (730 days before the last earlier match, earlier matches only), the model's own
+  chance against Pinnacle's quoted price, edge = P(win) × decimal odds + P(push) − 1
+  (= p × odds − 1 on a half line) of at least 12%, $10, at most one trade per match, team
+  and line (the better of over and under), from a quote downloaded within 3 hours and
+  before kickoff. CLV against Pinnacle's de-margined close; settled on football-data's
+  corner counts (a whole line that lands exactly is a push). Ledger:
+  `paper_trades/<code>_corners_<season>.jsonl`.
+- **The February test is unchanged.** Trading these matches live is the owner's explicit
+  choice. Its window (2026/27 kickoffs to 31 Jan 2027) stays locked for scoring until 3 Feb
+  2027; no live code computes the pre-registered metrics (gain over the league average,
+  slopes). The live test reports paper P/L and CLV only. SP1, D1 and E1 have no finalist,
+  so their paper trades run model (f) where development found it over-confident.

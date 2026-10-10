@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import dashboard, espn_news, team_totals
+from soccer_stats import corners_live, dashboard, espn_news, team_totals
 from soccer_stats import leagues as lgs
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
@@ -817,6 +817,48 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
     return cards, source, block
 
 
+def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
+    """Team corners on every card (owner's live test, 10 Oct): the corners model (f) fitted
+    per league on cached football-data files (`corners = {model, home: {mean, cdf}, away}`,
+    `data.corners_model`), then Pinnacle's team-corner snapshots (fetched only on the
+    default branch, CORNERS_DIR; a separate monthly cap) and the newest logged quote per
+    team line (`corners.pinnacle`). Each step is wrapped: corners never stop the build."""
+    cards = data.get("fixtures") or []
+    try:
+        fits = corners_live.add_model(cards, now=now)
+        data["corners_model"] = _clean(fits)
+        print(
+            "Corners model (f): "
+            + (
+                "; ".join(
+                    f"{lgs.name(code)} {f['matches']} matches"
+                    if "error" not in f
+                    else f"{lgs.name(code)} unavailable ({f['error']})"
+                    for code, f in fits.items()
+                )
+                or "no cards"
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        data["corners_model"] = None
+        print(f"Corners model (f): failed ({type(exc).__name__})")
+    c_dir = os.environ.get("CORNERS_DIR")
+    c_state = os.environ.get("CORNERS_STATE")
+    if c_dir:  # set by publish.yml on the default branch only (data-log logs the rows)
+        try:  # the type only: never a URL or the key
+            s = corners_live.run(
+                cards, Path(c_dir), [c_state], balance_dirs=[os.environ.get("TEAM_TOTALS_STATE")]
+            )
+            print(corners_live.summary_line(s))
+        except Exception as exc:  # noqa: BLE001
+            print(f"Corners (Pinnacle): failed ({type(exc).__name__}); nothing fetched after it")
+    try:  # the newest logged Pinnacle quote per team line, with the live-test pick (no calls)
+        n = corners_live.add_quotes(cards, [c_state, c_dir])
+        print(f"Corners shown: {n} fixtures with Pinnacle team-corner prices")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Corners shown: none ({type(exc).__name__})")
+
+
 def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
     """Every registry league for data.json: code, name, live flag, fixtures, odds source."""
     return [
@@ -900,6 +942,7 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         print(f"Team totals shown: {n_tt} fixtures with FanDuel prices")
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
+    add_corners(data)
     try:  # Record > Goals & corners: research numbers plus the live test's progress
         state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
         try:

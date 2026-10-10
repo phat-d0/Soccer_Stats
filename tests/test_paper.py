@@ -200,8 +200,10 @@ def test_run_uses_the_backtest_level_and_says_why(tmp_path, monkeypatch):
     ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
     assert ml["live"]["rule"]["threshold"] is None and "No new match" in ml["live"]["note"]
     assert data["portfolio"]["rule"]["threshold"] is None
-    others = [p for p in data["portfolio"]["portfolios"] if p["id"] != "moneyline"]
+    others = [p for p in data["portfolio"]["portfolios"] if p["id"] not in ("moneyline", "corners")]
     assert all("rule" not in p["live"] for p in others)
+    corners = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")
+    assert corners["live"]["rule"]["p_source"] == "model_f"  # its own rule, not the match one
 
     bt.write_text(json.dumps({"summary": {}}))  # older file: the fixed 12%
     data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}

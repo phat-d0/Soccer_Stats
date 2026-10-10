@@ -125,6 +125,61 @@ def cmd_log_team_totals(args: argparse.Namespace) -> None:
     print(f"Team-total log: {rows} new rows, {calls} new calls")
 
 
+def cmd_log_corners(args: argparse.Namespace) -> None:
+    """Append the build's Pinnacle team-corner rows and calls to odds_log/ (deduplicated)."""
+    from soccer_stats import corners_live
+
+    rows, calls = corners_live.log(Path(args.pending), Path(args.log_dir))
+    print(f"Corner log: {rows} new rows, {calls} new calls")
+
+
+def cmd_estimate_corners(args: argparse.Namespace) -> None:
+    """Credits to log Pinnacle's team corners, a look (24 h) and a close per match, one
+    credit a call, in the six live leagues (estimate only: no key, no calls)."""
+    from soccer_stats import corners_live
+    from soccer_stats.data import season_kickoffs
+    from soccer_stats.leagues import LEAGUES
+    from soccer_stats.xg import load_schedule
+
+    months = [pd.Timestamp(f"{m.strip()}-01", tz="UTC") for m in args.months.split(",")]
+    print("Team-corner snapshots at Pinnacle: credits per month (estimate; look + close,")
+    print("1 credit a call; the Championship uses its calendar a year earlier)")
+    grand = 0
+    for start in months:
+        end = start + pd.offsets.MonthBegin(1)
+        year = start.year if start.month >= 7 else start.year - 1
+        total, parts = 0, []
+        for code in corners_live.LEAGUES:
+            s, e = start, end
+            try:
+                if LEAGUES[code].understat:
+                    ks = list(load_schedule(code, year, include_played=True)["kickoff"])
+                else:  # football-data has played matches only: the month a year earlier
+                    s = start - pd.DateOffset(years=1)
+                    e = s + pd.offsets.MonthBegin(1)
+                    ks = list(season_kickoffs(code, year - 1))
+            except Exception as exc:  # no schedule: say so rather than guess
+                parts.append(f"{code} unavailable ({type(exc).__name__})")
+                continue
+            est = corners_live.estimate({code: ks}, s, e)[code]
+            total += est["credits"]
+            parts.append(f"{code} {est['matches']} matches {est['credits']}")
+        grand += total
+        print(f"  {start:%b %Y}: {total} credits ({'; '.join(parts)})")
+    print(
+        f"Average a month over {len(months)} month(s): {grand / max(len(months), 1):.0f} "
+        f"(cap {corners_live.CORNERS_MONTHLY_CAP})"
+    )
+    # A check of the live model (f) on whatever football-data files are cached (no calls).
+    now = pd.Timestamp.now(tz="UTC")
+    for code in corners_live.LEAGUES:
+        try:
+            info = corners_live.TeamCornersF().fit(corners_live.corner_matches(code), now).info()
+            print(f"  model (f) {code}: {info}")
+        except Exception as exc:  # noqa: BLE001  files not cached here
+            print(f"  model (f) {code}: unavailable ({type(exc).__name__}: {exc})")
+
+
 def cmd_team_totals_report(args: argparse.Namespace) -> None:
     """Model and look price vs FanDuel's de-margined team-total close (no key)."""
     import json
@@ -309,7 +364,15 @@ def cmd_paper(args: argparse.Namespace) -> None:
     from soccer_stats.trades import paper_rule_line
 
     print(paper_rule_line())
-    n = paper.run(data, log_dir, results, league=args.league, apps=apps)
+    try:  # corner counts (HC/AC) from the cached football-data files, for corner settlement
+        from soccer_stats import corners_live
+
+        codes = [c for c in paper.leagues_in_play(data, args.league) if c in corners_live.LEAGUES]
+        corner_res = corners_live.corner_results(codes, seasons=[season - 1, season])
+    except Exception as exc:  # corner trades settle on a later build
+        print(f"Corner results unavailable ({type(exc).__name__})")
+        corner_res = None
+    n = paper.run(data, log_dir, results, league=args.league, apps=apps, corner_results=corner_res)
     detail = log_dir / "backtest" / f"{args.league}_players_detail.json" if log_dir else None
     if detail and detail.exists():  # the Players view loads this on demand
         shutil.copy(detail, site / "players_backtest.json")
@@ -323,6 +386,15 @@ def cmd_paper(args: argparse.Namespace) -> None:
         f"{s.get('open', 0)} open"
         + (f". {live['note']}" if live.get("note") else "")
     )
+    pc = next((p for p in data["portfolio"].get("portfolios", []) if p["id"] == "corners"), None)
+    if pc:
+        cs = pc["live"].get("summary", {})
+        print(
+            pc["live"].get("error")
+            or f"Corner paper trades: {cs.get('trades', 0)} trades, {cs.get('open', 0)} open, "
+            f"{cs.get('settled', 0)} settled (rule: {pc['live']['rule']['threshold']:.0%} on "
+            "model (f) vs Pinnacle)"
+        )
 
 
 def _plan(league: str, seasons: list[int], looks: list[float]):
@@ -1479,6 +1551,15 @@ def main(argv: list[str] | None = None) -> None:
     ltt.add_argument("--pending", required=True, help="folder publish wrote rows/calls to")
     ltt.add_argument("--log-dir", required=True, help="data-log checkout")
     ltt.set_defaults(func=cmd_log_team_totals)
+
+    lco = sub.add_parser("log-corners", help="append Pinnacle team-corner rows and calls")
+    lco.add_argument("--pending", required=True, help="folder publish wrote rows/calls to")
+    lco.add_argument("--log-dir", required=True, help="data-log checkout")
+    lco.set_defaults(func=cmd_log_corners)
+
+    eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
+    eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
+    eco.set_defaults(func=cmd_estimate_corners)
 
     ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")
     ttr.add_argument("--log-dir", required=True, help="data-log checkout")

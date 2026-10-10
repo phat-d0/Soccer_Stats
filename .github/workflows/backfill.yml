@@ -34,7 +34,7 @@ on:
         description: "match_markets: seasons to predict (start years)"
         default: "2017-2025"
       estimate_month:
-        description: "Only estimate Odds API credits per league (YYYY-MM, or YYYY-MM,YYYY-MM,... for the team-total snapshots too; no key, no push)"
+        description: "Only estimate Odds API credits per league (YYYY-MM, or YYYY-MM,YYYY-MM,... for the team-total and team-corner snapshots too; no key, no push)"
         default: ""
 
 permissions:
@@ -85,6 +85,8 @@ jobs:
           uv run soccer-stats estimate-credits --month "${months%%,*}"
           # Team-total snapshots (docs/totals.md): an estimate only, no key, no calls.
           uv run soccer-stats estimate-team-totals --months "$months"
+          # Pinnacle team-corner snapshots, six leagues (owner's live test, 10 Oct).
+          uv run soccer-stats estimate-corners --months "$months"
 
       - name: Match markets vs Pinnacle (research, print only)
         if: ${{ inputs.match_markets && inputs.estimate_month == '' }}
