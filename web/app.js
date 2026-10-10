@@ -92,11 +92,24 @@ function marketsFrom(m) {
 
 // ---------- value picks (the trade rule in trades.py: best_pick) ----------
 const TRADE_MARKETS = ["home", "draw", "away", "over25", "under25"];
+// The live paper rule (trades.paper_threshold, published as portfolio.rule and
+// portfolio.rules[code]): p_source "model" = the owner's fixed live test (rule fixed_raw),
+// a fixed threshold on the model's own chance in every league; otherwise the learned
+// minimum on the blend. The app flags exactly what paper trades take.
+const paperRule = () => state.data?.portfolio?.rule || null;
+const fixedRule = () => paperRule()?.p_source === "model";
+const leagueRule = (lg) => state.data?.portfolio?.rules?.[lg || "E0"] || paperRule();
+// The chance picks use: the raw model under the fixed rule, else p_bet (the blend) when set.
+const pickProbs = (fx) => (fixedRule() ? fx.p : fx.p_bet || fx.p);
+// Paper trades skip a match where one team has few matches in the model (paper.py,
+// low_data); under the live test the app skips it too, so it flags exactly those trades.
+const fixedSkips = (fx) => fixedRule() && !!fx.low_data;
 function bestPick(fx, minEdge) {
   if (minEdge == null) return null; // history found no edge level that beats the market
+  if (fixedSkips(fx)) return null;
   let best = null;
   for (const k of TRADE_MARKETS) {
-    const o = fx.odds?.[k], p = (fx.p_bet || fx.p)?.[k]; // p_bet: model blended with the price
+    const o = fx.odds?.[k], p = pickProbs(fx)?.[k]; // edge against the quoted price
     if (o == null || p == null || o <= 1) continue;
     const e = p * o - 1;
     if (e > 0 && e >= minEdge - 1e-9 && (!best || e > best.edge)) best = { market: k, odds: o, edge: e };
@@ -339,11 +352,11 @@ function detailHtml(fx) {
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
     const odds_ = o?.[k];
-    const pb = (fx.p_bet || p)[k]; // the chance bestPick uses
+    const pb = pickProbs(fx)[k]; // the chance bestPick uses
     const edge = odds_ != null && pb != null ? pb * odds_ - 1 : null;
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
-        ? `${blend ? `<td class="blend-col">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
+        ? `${blend ? `<td class="${fixedRule() ? "" : "blend-col"}">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>`
         : `<td>${odds(1 / p[k])}</td>`
     }</tr>`;
   }).join("");
@@ -351,7 +364,9 @@ function detailHtml(fx) {
   const dk = isDK() ? "DK" : "Book";
   const marketNote = !hasOdds
     ? "Fair odds = the price that would exactly match the model's chance."
-    : blend
+    : fixedRule()
+      ? `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
+      : blend
       ? `Model = the model alone. Blend = the model mixed with ${bookPoss()} price, the chance value picks use. ${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = blend × payout − 1.`
       : `${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1.`;
   const pick = hasOdds ? bestPick(fx, fxEdge(fx)) : null;
@@ -366,12 +381,12 @@ function detailHtml(fx) {
       <div class="section-title">Markets</div>
       <div class="card" style="padding:8px 14px">
         <table class="mkts${blend ? " with-blend" : ""}">
-          <thead><tr><th></th><th>Model</th>${hasOdds ? `${blend ? '<th class="blend-col">Blend</th>' : ""}<th>${dk}</th><th>Odds</th><th>Edge</th>` : "<th>Fair odds</th>"}</tr></thead>
+          <thead><tr><th></th><th>Model</th>${hasOdds ? `${blend ? `<th class="${fixedRule() ? "" : "blend-col"}">Blend</th>` : ""}<th>${dk}</th><th>Odds</th><th>Edge</th>` : "<th>Fair odds</th>"}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
       <p class="note">${marketNote}</p>
-      ${hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
+      ${hasOdds && fixedRule() ? `<div class="explain">${fixedPickText(fx, pick)} ${esc(fixedNote(fxLeague(fx)))}</div>` : hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
       ${goalsSection(fx)}
       ${playersSection(fx)}
       <div class="section-title">Scorelines</div>
@@ -552,6 +567,11 @@ const psE0 = () => state.psBy.E0 || null;
 
 // With "All" and per-league levels: one short line per competition.
 function leagueEdgeList(pfId, lg) {
+  if (pfId === "moneyline" && fixedRule()) {
+    if (lg || !multiLeague()) return "";
+    const levels = [...new Set(leaguesPresent().map((c) => leagueRule(c)?.threshold).filter((v) => v != null))];
+    return levels.length === 1 ? `<div class="meta">The same ${pct(levels[0])} in every competition.</div>` : "";
+  }
   const by = pfById(pfId)?.backtest?.edge_threshold?.by_league || {};
   const rules = pfId === "moneyline" ? state.data.portfolio?.rules || {} : {};
   if (lg || !multiLeague() || (!Object.keys(by).length && !Object.keys(rules).length)) return "";
@@ -568,7 +588,8 @@ function leagueEdgeList(pfId, lg) {
 function edgeInfo(pfId, lg = "") {
   const et = pfById(pfId)?.backtest?.edge_threshold || null;
   if (lg && et?.by_league?.[lg]) return et.by_league[lg];
-  const r = pfId === "moneyline" && lg && lg !== "E0" ? state.data.portfolio?.rules?.[lg] : null;
+  // Under the owner's fixed rule, rules[code] is the paper rule, not a learned level.
+  const r = pfId === "moneyline" && lg && lg !== "E0" && !fixedRule() ? state.data.portfolio?.rules?.[lg] : null;
   if (r) return { min_edge: r.source === "none" ? null : r.threshold ?? null, note: r.note || "", by_bucket: [] };
   return et;
 }
@@ -576,6 +597,7 @@ function edgeInfo(pfId, lg = "") {
 // else (no edge_threshold yet) the paper-trade rule. edge null = flag nothing.
 function edgeRule(pfId, lg = "") {
   if (state.exploreEdge != null) return { edge: state.exploreEdge, source: "explore" };
+  if (pfId === "moneyline" && fixedRule()) return { edge: leagueRule(lg)?.threshold ?? PAPER_EDGE, source: "owner_fixed" };
   const et = edgeInfo(pfId, lg);
   if (!et) return { edge: PAPER_EDGE, source: "default" };
   return { edge: et.min_edge ?? null, source: "history" };
@@ -606,6 +628,7 @@ function noEdgeText(pfId, lg = "") {
 // The recommendation, in plain English, with the old edge buttons folded away under
 // "Explore other edges" (they override the recommendation until reset).
 function edgePanel(pfId = "moneyline", lg = "") {
+  if (pfId === "moneyline" && fixedRule()) return fixedEdgePanel(lg);
   const et = edgeInfo(pfId, lg);
   const rule = edgeRule(pfId, lg);
   const basis = et ? [et.n_bets ? `${et.n_bets.toLocaleString()} past bets` : "", esc(seasonsText(et.seasons)), confText(et.confidence)].filter(Boolean).join(" · ") : "";
@@ -625,6 +648,53 @@ function edgePanel(pfId = "moneyline", lg = "") {
           ${EDGE_STEPS.map((e) => `<button data-edge="${e}" class="${e === state.exploreEdge ? "on" : ""}" aria-pressed="${e === state.exploreEdge}">${pct(e)}</button>`).join("")}
         </div>
         <p class="note">For a look only: this changes what the app flags until you go back. Paper trades always follow the recommended minimum above.</p>
+      </details>
+    </div>`;
+}
+
+// The owner's fixed live test: the level in force, the reason, and (folded) what the
+// backtests found, so the learned result stays visible beside the rule that overrides it.
+const fixedNote = (lg) => leagueRule(lg)?.note || paperRule()?.note || "";
+// The match sheet's live-test line. One paper trade per match: once one is open, a later
+// price move can flag another outcome (or none), but no second trade opens.
+function fixedPickText(fx, pick) {
+  const t = (pfById("moneyline")?.live?.trades || []).find((x) => x.status === "open" && x.bet_type !== "player" && x.home === fx.home && x.away === fx.away);
+  const now = pick ? `${esc(PICK_LABEL[pick.market] || pick.market)} at ${price(pick.odds)}, ${signedPct(pick.edge)} edge on the model alone` : "";
+  if (t) {
+    const same = pick && PICK_LABEL[pick.market] === PICK_LABEL[t.market];
+    return `<b>Paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}. Only one trade per match, so nothing new opens here.${same ? ` It is still the live-test pick at today's price: ${now}.` : pick ? ` At today's price the live test would pick ${now}.` : !pick ? " At today's price no outcome reaches the live test's edge any more; the trade stays open until it settles." : ""}`;
+  }
+  if (pick) return `<b>Live-test pick:</b> ${now}. A $10 paper trade opens on it at the next update with fresh odds.`;
+  if (fixedSkips(fx)) return "<b>No pick here.</b> One team has few matches in the model, so the live test skips this match.";
+  return `<b>No pick here.</b> No outcome reaches the ${pct(fxEdge(fx))} edge your live test needs.`;
+}
+function learnedText(lg) {
+  const et = edgeInfo("moneyline", lg);
+  if (!et) return "No backtest result yet for this competition.";
+  const basis = [et.n_bets ? `${et.n_bets.toLocaleString()} past bets` : "", esc(seasonsText(et.seasons))].filter(Boolean).join(" · ");
+  const head = et.min_edge == null
+    ? "<b>Backtests found no edge level that made money.</b>"
+    : `<b>Backtests found that bets at ${aPct(et.min_edge)}+ edge made money</b> (on the model blended with the price).`;
+  return `${head}${et.note ? ` ${esc(et.note)}` : ""}${basis ? `<div class="meta">Based on ${basis}.</div>` : ""}`;
+}
+function fixedEdgePanel(lg = "") {
+  const th = edgeRule("moneyline", lg);
+  const level = leagueRule(lg)?.threshold ?? PAPER_EDGE;
+  const exploring = th.source === "explore";
+  return `
+    <div class="edge-panel">
+      <div class="edge-rec"><b>Fixed ${pct(level)} (your live test).</b> Flagging every pick where the model alone, without the market blend, shows at least ${aPct(level)} edge against DraftKings' price: exactly what paper trades take. This rule lost money in backtests; the live test measures it on real prices.${leagueEdgeList("moneyline", lg)}</div>
+      ${exploring ? `<div class="edge-exploring">Exploring: flagging ${pct(state.exploreEdge)}+ instead. <button class="linkish" data-edge="reset">Back to the live-test level</button></div>` : ""}
+      <details class="fold edge-learned">
+        <summary>What the backtests found</summary>
+        <div class="edge-rec" style="margin-top:8px">${learnedText(lg)}</div>
+      </details>
+      <details class="fold edge-explore"${exploring ? " open" : ""}>
+        <summary>Explore other edges</summary>
+        <div class="segmented" role="group" aria-label="Minimum edge to explore" style="margin-top:10px">
+          ${EDGE_STEPS.map((e) => `<button data-edge="${e}" class="${e === state.exploreEdge ? "on" : ""}" aria-pressed="${e === state.exploreEdge}">${pct(e)}</button>`).join("")}
+        </div>
+        <p class="note">For a look only: this changes what the app flags until you go back. Paper trades always follow the fixed ${pct(level)} live test above.</p>
       </details>
     </div>`;
 }
@@ -704,7 +774,7 @@ function viewMatches() {
   const nValue = shown.filter(([fx]) => bestPick(fx, fxEdge(fx))).length;
   const allNull = shown.every(([fx]) => fxEdge(fx) == null);
   const openTrades = new Map((pfById("moneyline")?.live?.trades || []).filter((t) => t.status === "open" && t.bet_type !== "player").map((t) => [`${t.home}|${t.away}`, t]));
-  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>`;
+  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() ? `<b>${nValue}</b> of ${shown.length} matches have a live-test pick: the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge against ${bookPoss()} price. A $10 paper trade opens on each match that doesn't have one yet (one per match).` : nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}</p>${fixedRule() && fixedNote(lg) ? `<div class="explain live-test">${esc(fixedNote(lg))}</div>` : ""}`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
@@ -720,7 +790,7 @@ function viewMatches() {
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
           ${lineupConfirmed(fx) ? `<span class="badge lineup">${CHECK}Lineups confirmed</span>` : ""}
-          ${pick ? `<span class="badge">${CHECK}Value: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
+          ${pick ? `<span class="badge">${CHECK}${pickBadge(pick, openTrades.get(`${fx.home}|${fx.away}`))}: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${openTrades.has(`${fx.home}|${fx.away}`) ? (() => { const t = openTrades.get(`${fx.home}|${fx.away}`); const { cur } = currentPrice(t); const m = markToMarket(t, cur); return `<span class="badge paper">Paper trade open: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`; })() : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
@@ -736,7 +806,7 @@ function viewMatches() {
   }
   html += `
     <div class="section-title">How to read this</div>
-    <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.${d.match_blend?.live ? " The value check uses the model blended with DraftKings' price, weighted by how much the model added in past matches." : ""}</p>
+    <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.${fixedRule() ? " Your live test checks value with the model alone, not blended with the price." : d.match_blend?.live ? " The value check uses the model blended with DraftKings' price, weighted by how much the model added in past matches." : ""}</p>
     <div class="section-title">Minimum edge</div>
     ${edgePanel("moneyline", lg)}`;
   return html;
@@ -1876,6 +1946,10 @@ function leagueSet(set, lg) {
   return { ...set, trades, ...(part || fallback) };
 }
 
+// A card's pick badge. Under the live test, a match whose paper trade is already open on
+// another outcome says "Would pick now": one trade per match, so nothing new opens.
+const pickBadge = (pick, t) => (!fixedRule() ? "Value" : t && PICK_LABEL[t.market] !== PICK_LABEL[pick.market] ? "Would pick now" : "Live-test pick");
+const isMoneylineFixed = (pf) => pf?.id === "moneyline" && fixedRule();
 function viewPortfolio() {
   const pf = state.data.portfolio || {};
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
@@ -1905,7 +1979,9 @@ function viewPortfolio() {
   const top = `${switcher}${head}${cur.id === "moneyline" ? leagueFilter() : ""}${toggle}`;
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = state.pfView === "live" && cur.status === "live"
-    ? (rule.threshold == null ? "" : `<p class="note">A $${rule.stake} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.</p>`) : "";
+    ? (isMoneylineFixed(cur)
+      ? `<div class="explain live-test"><b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.</div>`
+      : rule.threshold == null ? "" : `<p class="note">A $${rule.stake ?? 10} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.</p>`) : "";
   const foot = `<p class="note">${state.pfView === "live"
     ? (isMoneyline ? oddsAge() || "Odds: DraftKings." : "")
     : isMoneyline ? `Historical DraftKings odds from The Odds API${set?.generated_at ? `, run ${shortDate(set.generated_at)}` : ""}. Probabilities without team news (its history starts Oct 2026).`
@@ -2025,6 +2101,7 @@ const TRADE_FIELDS = [
   ["Team news applied", (t) => (t.news_applied ? "Yes" : "No"), "match"],
   ["Edge at entry", (t) => signedPct(t.edge)],
   ["Threshold", (t) => pct(t.threshold)],
+  ["Rule", (t) => (t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
   [(t) => (t.status === "open" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
   [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, "match"],
