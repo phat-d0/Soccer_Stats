@@ -1002,3 +1002,68 @@ about one round, 0 credits.
 - Best timing: start logging when a model passes the mid-season check (February 2027), or
   earlier if the owner wants the prices on file anyway. Nothing is spent until the owner
   says so.
+
+## Corners bake-off 2 (round 13; lead-approved 10 Oct; pre-registered 2026-10-10, before any code)
+
+**Why.** Rounds 11 and 12 found that each team's corner models carry information but are
+too confident, and that the simplest, most shrunk model came closest to calibration. The
+lead accepted the plan above: one bake-off of ideas 1–3, developed on 2017/18–2023/24 and
+judged once, on 2026/27 matches up to 31 January 2027. 0 credits, no key, no live change.
+
+**Scope.** Each team's corners only: home and away, over 3.5 / 4.5 / 5.5 (six lines), in
+E0, SP1, D1, I1, F1 and E1. Match totals are left out (they never beat the league
+average). Baseline: (a), the league average NB2, unchanged. The round-11 model (b), shrunk
+team averages with 10 pseudo-matches, is printed beside them as a reference, outside the
+family.
+
+**Fitting, for every candidate.** The round-11 walk-forward unchanged: refit every 28 days
+on the 730 days before each block, at least 1,000 earlier matches, features from earlier
+kickoffs only, NB2 dispersion moment-matched on the training window.
+
+**Candidates (the family):**
+- **(f) Empirical-Bayes team averages.** As (b), but the shrinkage is estimated on each
+  training window instead of fixed: for "for" and "against" separately, k = (average
+  within-team variance of a team's per-match ratio) / (variance of the true team ratios,
+  method of moments: variance of team means minus the average sampling variance, floored
+  at 1e-4). Each team's ratio = (sum + k) / (n + k). Nothing is tuned on outcomes.
+- **(g) (f) plus game state from Pinnacle.** NB2 regression per side (the bake-off's
+  `NBRegression`, same L2) on log of (f)'s rate plus two features from Pinnacle's early 1X2
+  in football-data (margin removed with Shin): log(P(home) / P(away)) and the favourite's
+  chance max(P(home), P(away)). A match without Pinnacle early prices gets (f)'s chances.
+- **(h) (f) plus style.** NB2 regression per side on log of (f)'s rate plus 10-match form,
+  for and against, as log ratios to the league's per-team mean over the year before (as
+  `totals.corner_features` does for corners and shots): shots, shots on target, fouls and
+  cards (yellow + 2 × red), all from football-data. Understat's deep completions and PPDA
+  are left out (not in the cached files; fetching them is a separate job). A match without
+  every feature gets (f)'s chances.
+
+**Development (2017/18–2023/24).** Every match from 1 July 2024 on is dropped before
+anything is computed (the match model's fit included). Pass, per league × candidate: the
+per-match mean log-loss gain over (a) across the six lines has a whole-match bootstrap
+range above 0 at the Bonferroni level, AND every line's recalibration slope is within
+0.80–1.25. Family: 3 candidates × 6 leagues = **18 tests, 99.722%**.
+
+**Finalist per league:** among the candidates that pass in that league, the one with the
+largest development gain (ties: f, then g, then h). **A league where nothing passes has no
+finalist and no test** (a change from round 11, whose rule took the best gain even when it
+failed).
+
+**Test: 2026/27, kickoffs from 1 July 2026 to 31 January 2027.**
+- Locked like the goalscorer forward window: every match from 1 July 2026 is dropped before
+  anything is computed unless the run is given a `reason`, which is logged with the time
+  (`lab.harness.Holdout`). Nobody has read a 2026/27 corner outcome: rounds 8, 11 and 12
+  loaded data only up to 2024/25 or 2025/26.
+- **Opened once, not before 3 February 2027** (football-data adds results within a day or
+  two). The window ends at kickoffs before 1 February 2027 whenever it is opened.
+- Training for the test: the same walk-forward, which by then fits on the 730 days before
+  each block (so 2024/25 and 2025/26 count as training data, never as a test).
+- Expected matches: about 170 in D1 and F1, 210–240 in E0, SP1 and I1, 340 in E1. A league
+  with fewer than 120 scored matches in the window is reported but not judged.
+- Pass: the same two conditions, at the Bonferroni level for the number of leagues with a
+  finalist (at most 6: 99.167%).
+- A pass means team corners can be shown on the match sheet as model estimates, untested
+  against any price, and makes the Pinnacle corner price test (about 450 credits a month)
+  worth putting to the owner. Nothing else changes.
+
+**Code.** `edge/corners2.py` (reusing `edge/corners.py`); `odds-check.yml`
+`task=corners2` with `league` (development) and with `reason` (the February test).
