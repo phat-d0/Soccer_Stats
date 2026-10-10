@@ -386,3 +386,31 @@ def test_markets_research_keeps_the_research_when_progress_fails(monkeypatch):
     assert out["team_goals"]["live"]["progress"] == {"error": "RuntimeError"}
     assert out["total_goals"]["pinnacle"]["rows"]
     json.dumps(publish._clean(out), allow_nan=False)
+
+
+def test_team_total_progress_never_scores_outcomes(tmp_path, monkeypatch):
+    """Publishing the model's team-total scores on every build would look at the outcomes
+    before the pre-registered round-13 run; the progress is counts only."""
+    from soccer_stats import publish, team_totals
+
+    seen = {}
+    real = team_totals.report
+
+    def spy(rows, results, min_matches=team_totals.MIN_MATCHES):
+        seen["min"] = min_matches
+        seen["markets"] = set(team_totals.market_kind(rows))
+        return real(rows, results, min_matches=min_matches)
+
+    monkeypatch.setattr(team_totals, "report", spy)
+    base = {"league": "E0", "home": "Arsenal", "away": "Leeds"}
+    base |= {"kickoff": "2026-10-10T14:00:00+00:00", "book": "fanduel", "snapshot": "look"}
+    base |= {"over": 2.0, "under": 1.8, "fair_over": 0.48, "fair_under": 0.52}
+    base |= {"downloaded_at": "2026-10-09T14:00:00+00:00", "line": 1.5, "minutes_before": 1440.0}
+    rows = [base | {"team": "Arsenal", "side": "home", "p_model_over": 0.5}]
+    rows.append(base | {"market": "totals", "team": None, "side": "match", "line": 2.5})
+    (tmp_path / "E0_team_totals_2026-10.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n"
+    )
+    prog = publish.team_total_progress([tmp_path], pd.DataFrame())
+    assert seen["min"] >= 10**9 and seen["markets"] == {"team_totals"}
+    assert "result" not in prog and prog["rows"] == 1 and prog["looks"] == 1

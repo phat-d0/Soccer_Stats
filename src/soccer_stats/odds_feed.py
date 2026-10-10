@@ -1,9 +1,11 @@
 """DraftKings odds for upcoming Premier League matches, via The Odds API (the-odds-api.com).
 
 Needs an API key in the ODDS_API_KEY environment variable (a GitHub Actions secret in the
-publish workflow). The free plan allows 500 credits a month; a refresh costs a couple of
-credits (two markets, one bookmaker). Phones never call the API: only the publish job
-does, and it budgets refreshes so the free allowance always lasts the month:
+publish workflow). The free plan allows 500 credits a month; a refresh costs 1 credit
+(h2h only, one bookmaker: DraftKings lists no main `totals` market for soccer on this API,
+and the bulk endpoint bills every market asked for, quoted or not). Phones never call the
+API: only the publish job does, and it budgets refreshes so the free allowance always
+lasts the month:
 
 * After each download we record the credits left and what that call cost (the API's
   x-requests-remaining / x-requests-last headers).
@@ -49,7 +51,11 @@ MATCHDAY_RESERVE_CREDITS = 3000
 MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this...
 KICKOFF_INTERVAL_HOURS = 0.5  # ...except this close to a kickoff
 KICKOFF_WINDOW_HOURS = 2.0
-DEFAULT_COST = 2  # credits per refresh until the API tells us
+MARKETS = "h2h"  # DraftKings quotes no `totals` for soccer here (market probe, 9 Oct)
+DEFAULT_COST = 1  # credits per refresh until the API tells us
+# The budget still counts each refresh at the old two-market price, so dropping `totals`
+# leaves the refresh rhythm exactly as before: the saving stays unspent.
+BUDGET_COST = 2
 MATCHDAY_HOURS = 48.0  # "matchday" leagues: fetch only with a kickoff this close
 MATCHDAY_NEAR_WINDOW = 6.0  # ...hourly inside this many hours of it...
 MATCHDAY_FAR_HOURS = 3.0  # ...and every this many hours before that
@@ -167,11 +173,12 @@ def refresh_interval_hours(
     `share` is how many live leagues split the credits (each gets an equal part); the
     Premier League always budgets with share 1, so other leagues never slow it down.
     `reserve` is the balance never spent below. Returns inf when nothing more can be
-    spent this period.
+    spent this period. Each call is budgeted at no less than BUDGET_COST, so a cheaper
+    call never turns into more frequent refreshes.
     """
     if credits_left is None:
         return min_hours  # unknown budget: fetch once to find out
-    per_call = max(cost or DEFAULT_COST, 1)
+    per_call = max(cost or DEFAULT_COST, BUDGET_COST)
     affordable = (credits_left - reserve) // per_call // max(share, 1)
     if affordable <= 0:
         return float("inf")
@@ -311,7 +318,7 @@ def fetch_odds(
                 params={
                     "apiKey": api_key,
                     "bookmakers": BOOKMAKER,
-                    "markets": "h2h,totals",
+                    "markets": MARKETS,
                     "oddsFormat": "decimal",
                     "dateFormat": "iso",
                 },
@@ -381,7 +388,7 @@ def parse_odds(events: list[dict], known_teams: set[str] | None = None) -> pd.Da
                         row["odds_away"] = o["price"]
                     elif o["name"].lower() == "draw":
                         row["odds_draw"] = o["price"]
-            elif market["key"] == "totals":
+            elif market["key"] == "totals":  # not requested now (MARKETS); kept in case
                 for o in market["outcomes"]:
                     if o.get("point") == 2.5:
                         row["odds_over25" if o["name"] == "Over" else "odds_under25"] = o["price"]
@@ -449,7 +456,7 @@ def estimate_credits(
 
     Replays the scheduled publish runs against the league's refresh policy
     (policy_floor) with an unlimited budget, so it is what the rules alone would spend:
-    each refresh is one call for h2h and totals from one bookmaker (`cost` credits).
+    each refresh is one call for h2h from one bookmaker (`cost` credits).
     The `live` flag is ignored: this prices switching a league on.
     """
     ks = sorted(pd.Timestamp(k).tz_convert("UTC") for k in kickoffs)
