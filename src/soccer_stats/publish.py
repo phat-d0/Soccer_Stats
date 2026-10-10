@@ -831,7 +831,8 @@ def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
             "Corners model (f): "
             + (
                 "; ".join(
-                    f"{lgs.name(code)} {f['matches']} matches"
+                    f"{lgs.name(code)} {f['matches']} matches "
+                    f"{f['window_from']} to {f['window_to']}"
                     if "error" not in f
                     else f"{lgs.name(code)} unavailable ({f['error']})"
                     for code, f in fits.items()

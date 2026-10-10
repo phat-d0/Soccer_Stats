@@ -618,6 +618,18 @@ def test_publish_corners_never_stop_the_build(tmp_path, monkeypatch, capsys):
     assert "Corners (Pinnacle): failed (RuntimeError)" in capsys.readouterr().out
 
 
+def test_publish_log_names_each_fit_window(monkeypatch, capsys):
+    """The log shows how fresh each league's fit is (its first and last match)."""
+    fit = {"matches": 770, "window_from": "2024-10-06", "window_to": "2026-10-05", "cards": 1}
+    monkeypatch.delenv("CORNERS_DIR", raising=False)
+    monkeypatch.setattr(cl, "add_model", lambda cards, now=None: {"E0": fit, "E1": {"error": "x"}})
+    monkeypatch.setattr(cl, "add_quotes", lambda cards, dirs: 0)
+    publish.add_corners({"fixtures": [card(model=False)]})
+    out = capsys.readouterr().out
+    assert "Premier League 770 matches 2024-10-06 to 2026-10-05" in out
+    assert "Championship unavailable (x)" in out
+
+
 def test_corner_trades_belong_to_the_corners_portfolio():
     assert tr.portfolio_of({"market": "team_corners"}) == "corners"
     assert tr.portfolio_of({"bet_type": "corners", "market": "x"}) == "corners"
