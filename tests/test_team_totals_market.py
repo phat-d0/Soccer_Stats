@@ -79,10 +79,10 @@ def test_with_market_uses_only_earlier_fresh_quotes():
     assert (m["dk_status"] == "ok").all()
     home = m[m["side"] == "home"].iloc[0]
     assert home["lam_home"] == pytest.approx(1.6, abs=0.02)
-    assert home["p_market"] == pytest.approx(tt.over_chance(1.6, 1.5), abs=0.01)
+    assert home["p_h2h"] == pytest.approx(tt.over_chance(1.6, 1.5), abs=0.01)
     # Older than DK_FRESH_HOURS: dropped as stale; none at all: "no quote".
     stale = tt.with_market(rows, pd.DataFrame([_dk("2026-10-16T07:00:00+00:00")]))
-    assert (stale["dk_status"] == "stale").all() and stale["p_market"].isna().all()
+    assert (stale["dk_status"] == "stale").all() and stale["p_h2h"].isna().all()
     none = tt.with_market(rows, pd.DataFrame([_dk("2026-10-16T15:00:00+00:00")]))
     assert (none["dk_status"] == "no quote").all()
 
@@ -94,7 +94,34 @@ def test_with_market_skips_push_lines_and_other_books():
     assert len(m) == 1 and m.iloc[0]["line"] == 1.5
 
 
-def _league(n, seed=0, start="2026-10-17"):
+def _totals(home, away, kickoff, seen, lh, la, line=2.5, books=("fanduel", "pinnacle")):
+    """The match totals rows one team-total call returns (market "totals")."""
+    p = tt.breakeven_over(tt._total_pmf(tt._score_probs(lh, la)), line)
+    return [
+        {
+            "league": "E0",
+            "home": home,
+            "away": away,
+            "kickoff": kickoff,
+            "event_id": "e",
+            "snapshot": "look",
+            "book": b,
+            "team": None,
+            "side": "match",
+            "line": line,
+            "over": round(0.97 / p, 2),
+            "under": round(0.97 / (1 - p), 2),
+            "fair_over": p,
+            "fair_under": 1 - p,
+            "market": "totals",
+            "fetched_at": seen,
+            "downloaded_at": seen,
+        }
+        for b in books
+    ]
+
+
+def _league(n, seed=0, start="2026-10-17", anchored=True):
     """n matches, each with a look, a close, a DraftKings quote and a result."""
     rng = np.random.default_rng(seed)
     rows, dk, res = [], [], []
@@ -110,6 +137,8 @@ def _league(n, seed=0, start="2026-10-17"):
                 r.update(kickoff=ko.isoformat(), fair_over=p, fair_under=1 - p)
                 r.update(over=round(0.95 / p, 2), under=round(0.95 / (1 - p), 2))
                 rows.append(r)
+            if anchored and snap == "look":
+                rows += _totals(h, a, ko.isoformat(), t.isoformat(), lh, la)
         q = _dk(seen - pd.Timedelta(hours=1), lh, la, h, a)
         q["kickoff"] = ko
         dk.append(q)
@@ -138,24 +167,71 @@ def test_below_the_gate_only_counts():
 def test_development_scores_every_rule_and_freezes_one():
     rows, dk, res = _league(60)
     out = tt.market_report(rows, dk, res)
-    assert out["stage"] == "development" and out["matches"] == 60
-    assert out["level"] == pytest.approx(1 - 0.05 / 9)
-    assert set(out["candidates"]) == set(tt.MM_CANDIDATES)
+    assert out["stage"] == "development" and out["matches"]["fanduel_anchor"] == 60
+    assert out["level"] == pytest.approx(1 - 0.05 / 12)
+    assert set(out["candidates"]) == set(tt.MM_CANDIDATES + tt.MM_DESCRIPTIVE)
     for c in out["candidates"].values():
         assert set(c["rules"]) == {"0.02", "0.05", "0.10"}
-    # The market candidate equals FanDuel's fair price here, so it can't clear the margin.
-    assert out["candidates"]["market"]["rules"]["0.02"]["bets"] == 0
+    # The anchored chance recovers FanDuel's fair price here, so it can't clear the margin.
+    assert out["candidates"]["fanduel_anchor"]["rules"]["0.02"]["bets"] == 0
+    # h2h-only is descriptive: never a pass, never frozen.
+    assert not any(b["pass"] for b in out["candidates"]["h2h"]["rules"].values())
     assert ("frozen_rule" in out) == bool(out["passes"])
+    assert not any(x.startswith("h2h") for x in out["passes"])
 
 
 def test_confirmation_uses_only_later_kickoffs():
     rows, dk, res = _league(200)
     after = pd.Timestamp("2026-10-17", tz="UTC") + pd.Timedelta(hours=3 * 49)
     out = tt.market_report(rows, dk, res, after=after, rule=("model", 0.05))
-    assert out["stage"] == "confirmation" and out["matches"] == 150 and out["level"] == 0.95
-    assert set(out["candidates"]) == {"model"}
+    assert out["stage"] == "confirmation" and out["matches"]["model"] == 150
+    assert out["level"] == 0.95 and set(out["candidates"]) == {"model"}
     assert set(out["candidates"]["model"]["rules"]) == {"0.05"}
     short = tt.market_report(
         rows, dk, res, after=after + pd.Timedelta(hours=3), rule=("model", 0.05)
     )
     assert "not enough data yet" in short["note"]
+
+
+def test_breakeven_over_handles_whole_and_quarter_lines():
+    pmf = tt._total_pmf(tt._score_probs(1.5, 1.1))
+    gt = lambda c: pmf[np.arange(len(pmf)) > c].sum()  # noqa: E731
+    lt = lambda c: pmf[np.arange(len(pmf)) < c].sum()  # noqa: E731
+    assert tt.breakeven_over(pmf, 2.5) == pytest.approx(gt(2.5))
+    assert tt.breakeven_over(pmf, 3.0) == pytest.approx(gt(3) / (gt(3) + lt(3)))
+    q = (gt(2.5) + gt(3)) / (gt(2.5) + gt(3) + lt(2.5) + lt(3))
+    assert tt.breakeven_over(pmf, 2.75) == pytest.approx(q)
+
+
+def test_anchored_means_take_the_total_from_the_totals_price():
+    for lh, la, line in [(1.6, 1.0, 2.5), (1.1, 1.3, 2.75), (2.2, 0.8, 3.0)]:
+        pmf = tt._total_pmf(tt._score_probs(lh, la))
+        fh, fa = tt.anchored_means(_fair_h2h(lh, la), line, tt.breakeven_over(pmf, line))
+        assert (fh, fa) == pytest.approx((lh, la), abs=0.03)
+    # A higher total price moves the total, not just the split.
+    pmf = tt._total_pmf(tt._score_probs(1.4, 1.0))
+    base = sum(tt.anchored_means(_fair_h2h(1.4, 1.0), 2.5, tt.breakeven_over(pmf, 2.5)))
+    up = sum(tt.anchored_means(_fair_h2h(1.4, 1.0), 2.5, tt.breakeven_over(pmf, 2.5) + 0.08))
+    assert up > base + 0.2
+
+
+def test_anchor_comes_only_from_the_same_call():
+    seen = "2026-10-16T14:00:00+00:00"
+    rows = pd.DataFrame(_fd(seen=seen) + _totals("A", "B", KO, seen, 1.6, 1.0, books=("fanduel",)))
+    dk = pd.DataFrame([_dk("2026-10-16T12:00:00+00:00")])
+    m = tt.with_market(rows, dk)
+    assert len(m) == 2 and m["p_fanduel_anchor"].notna().all()
+    assert m["p_pinnacle_anchor"].isna().all()
+    # A totals row from another download is not this call's anchor.
+    other = _totals("A", "B", KO, "2026-10-16T13:00:00+00:00", 1.6, 1.0, books=("pinnacle",))
+    m = tt.with_market(pd.concat([rows, pd.DataFrame(other)]), dk)
+    assert m["p_pinnacle_anchor"].isna().all()
+    cov = tt.plumbing(rows, dk)["anchors"]
+    assert cov["fanduel_anchor"] == {"rows": 2, "line_types": {"half": 2}, "median_line": 2.5}
+
+
+def test_development_waits_for_both_anchors():
+    rows, dk, res = _league(60, anchored=False)
+    out = tt.market_report(rows, dk, res)
+    assert "fanduel_anchor 0 of 50" in out["note"] and "candidates" not in out
+    assert out["matches"]["model"] == 60

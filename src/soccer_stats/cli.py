@@ -145,7 +145,7 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
         cand, t = args.rule.split(":")
         rule = (cand.strip(), float(t))
         if rule[0] not in team_totals.MM_CANDIDATES or not args.after:
-            raise SystemExit("--rule needs a candidate (market, model, blend) and --after")
+            raise SystemExit(f"--rule needs one of {team_totals.MM_CANDIDATES} and --after")
     dk = team_totals.load_dk(Path(args.log_dir))
     mm = team_totals.market_report(
         rows, dk, results, min_matches=args.min_matches, after=args.after or None, rule=rule
@@ -1476,7 +1476,9 @@ def main(argv: list[str] | None = None) -> None:
     ttr.add_argument("--log-dir", required=True, help="data-log checkout")
     ttr.add_argument("--min-matches", type=int, default=50)
     ttr.add_argument("--after", default="", help="confirmation: only kickoffs after this time")
-    ttr.add_argument("--rule", default="", help="confirmation: the frozen rule, e.g. market:0.05")
+    ttr.add_argument(
+        "--rule", default="", help="confirmation: the frozen rule, e.g. fanduel_anchor:0.05"
+    )
     ttr.set_defaults(func=cmd_team_totals_report)
 
     ec = sub.add_parser(

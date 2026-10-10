@@ -43,7 +43,7 @@
 #             move and as blend inputs (no credits).
 #   team-totals: data-log's FanDuel team-total log, scored once enough matches settle; also
 #             the round-13 test against DraftKings' main market (docs/totals.md): counts only
-#             below its gate; `finalists` ("market:0.05") + `after` score a frozen rule.
+#             below its gate; `finalists` ("fanduel_anchor:0.05") + `after` score a frozen rule.
 name: Player odds check
 
 on:
@@ -73,7 +73,7 @@ on:
         description: "lab-holdout / corners / corner-recal / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
         default: ""
       finalists:
-        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>; team-totals: the frozen rule, e.g. market:0.05"
+        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>; team-totals: the frozen rule, e.g. fanduel_anchor:0.05"
         default: ""
       stack_base:
         description: "lab-holdout: the stack's base candidate (one of the finalists)"
