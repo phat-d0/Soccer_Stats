@@ -106,7 +106,9 @@ market average), one fit on every match before the fit date, plus a walk-forward
 (log loss of model, blend and Pinnacle). Run it from the Actions tab: *Backfill DraftKings
 odds* with `match_blends` ticked; only the default branch saves the file to `data-log`.
 Expect few Lean picks: the blend gives the model almost no weight, so σ is small and the
-blend rarely clears DraftKings' margin. `backtest-dk` also replays both tiers on the
+blend rarely clears DraftKings' margin. In La Liga, the Bundesliga, Serie A and Ligue 1 the fits' price
+weight b is above 1 (1.07–1.52), so the blend sharpens the price itself; most Lean picks so far come from that
+(favourites), not from the model (see CLAUDE.md, Blend Lean). `backtest-dk` also replays both tiers on the
 DraftKings backtest (`E0_dk.json` → `tiers`; research, not a gate).
 
 **Team corners (owner's live test, 10 Oct 2026).** A second paper portfolio, *Team
