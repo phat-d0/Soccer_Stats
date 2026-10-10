@@ -906,3 +906,57 @@ The h2h-only fit can't pin the total, and that decides the answer:
 - The spec above stands unless the lead and owner amend it before the development run;
   any amendment is written here, timestamped, before the gate is met. The code already
   uses a logged O/U 2.5 row for the total when one exists.
+
+## Corners: what's left to try (round 13, task 2; plan only, no runs, nothing spent)
+
+**Where things stand.** Rounds 8, 11 and 12 used up both recent seasons for corners: 2024/25
+was the bake-off holdout and 2025/26 the recalibration test. Both have been opened, so
+neither can judge a new corners model. What we know:
+- Each team's corners carry real information (gain over the league average +0.01 to
+  +0.05 a line, in every league and on both unseen seasons), but the chances come out
+  too spread out. Only the simplest model, shrunk team averages (b), passed the slope
+  band on development, and only in E0 and Serie A.
+- The match total isn't predictable beyond the league average in any league. The direct
+  total model (e) did worst of all, so the home/away correlation is not the main problem.
+- No price has ever been tested: football-data carries no corner prices.
+
+**The test season rule.** Any new corners model is tuned on 2017/18–2023/24 (already seen,
+fine for development), may then be refitted on everything up to 2025/26, and is judged
+only on **2026/27, scored forward**. Two pre-registered options:
+- a **mid-season check** on matches up to 31 Jan 2027 (about 190–270 per league; football-data
+  publishes corner counts with each result), opened once, with the bake-off's pass rule;
+- or the **full season** in late May 2027 (about 300–550 per league).
+The mid-season check is the better use of time: it answers by February. Anything that
+passes then still needs the price test below before it could mean money.
+
+**Candidates (all free, data already cached or in football-data):**
+
+| # | Idea | What it tries to fix | Effort | Expected value |
+| --- | --- | --- | --- | --- |
+| 1 | **Shrink harder, by design.** Team corners for/against with a heavier, pre-registered prior (more pseudo-matches, or an empirical-Bayes prior fitted on earlier seasons). | The over-confidence: (b), the most shrunk model, was the only one near the band. | Small (a parameter of (b)) | **Highest.** It targets the one failure we keep seeing. |
+| 2 | **Market game state.** Pinnacle's pre-match 1X2 from football-data turned into an expected goal difference, plus the size of the favourite, as inputs to each team's corners. Favourites camp in the opponent's half and win corners; lopsided matches skew the split. | A sharper "who will dominate" signal than our match model's supremacy, which (d) already uses. | Medium | Medium. Pinnacle prices cover about 50% of 2025/26 but nearly all earlier seasons, so this can still be developed fully. |
+| 3 | **Richer style features** from football-data: shots, shots on target, fouls and cards, each for and against over the last 10 matches; and Understat's deep completions and PPDA for the top five leagues (free, already downloaded with xG). | Style: teams that cross and shoot from distance win corners; low-block opponents concede them. | Medium | Medium-low. (d) already had 10-match shots form and was the least calibrated, so more features risk more over-fitting. Pair with idea 1. |
+| 4 | **Both teams together** (the lead's (i)): total ~ NB, home share ~ beta-binomial given the total, or a Gaussian copula on NB sides with a fitted negative correlation (−0.16 to −0.23 seen). | The total's spread. | Medium | **Low.** The direct total (e) already modelled the total's own spread and still lost; the total's mean is the problem. Worth it only if ideas 1–3 make the team lines pass. |
+
+Recommended order: 1, then 2 (with 1), then 3 (with 1). 4 only if a team-line model passes.
+One bake-off, pre-registered before any code, in the six leagues, on development
+2017/18–2023/24, with each finalist frozen before 2026/27 is scored. Effort for 1–3 is
+about one round, 0 credits.
+
+**What a price test needs (the owner's call).**
+- Pinnacle quotes corners on The Odds API (eu region): match corner totals at 5.4–6.2% and
+  corner team totals at 5.8–7.0% (market probe, 9 Oct), all six leagues. Soft books are
+  6.6–11%.
+- Log them like the team totals: one `/events/{id}/odds` call per match per snapshot, one
+  credit per market per region, a look (18–30 h) and a close (≤30 min).
+- Credits per month (from the team-total estimate: about 171 a month per credit-per-call for
+  one snapshot in five leagues, about 225 with the Championship):
+  - corner team totals only, look + close, six leagues: **about 450 a month**;
+  - plus match corner totals: about 900 a month;
+  - close only, team corners (enough to score a model against Pinnacle's fair close, not
+    to test a bet rule's CLV): about 225 a month.
+- Sample: about 225 matches a month in six leagues, so 150 priced matches in about three
+  weeks and a full test (300+) in about six.
+- Best timing: start logging when a model passes the mid-season check (February 2027), or
+  earlier if the owner wants the prices on file anyway. Nothing is spent until the owner
+  says so.
