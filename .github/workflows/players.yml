@@ -23,6 +23,9 @@ on:
         description: "Dry run for the player-odds download (spend nothing)"
         type: boolean
         default: true
+      goal_forward_reason:
+        description: "Opens the goalscorer forward window (from 2026-10-10) in E0_goals.json; blank keeps it locked"
+        default: ""
 
 permissions:
   contents: write
@@ -64,6 +67,8 @@ jobs:
             --max-credits "${{ inputs.max_credits }}" ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Test the player model and save the result
+        env:
+          GOAL_FORWARD_REASON: ${{ inputs.goal_forward_reason || '' }}
         run: |
           uv sync --frozen
           git config user.name "github-actions[bot]"
@@ -75,7 +80,8 @@ jobs:
             git fetch --depth=1 origin data-log
             git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
             uv run soccer-stats backtest-players --seasons "$SEASONS" \
-              --out ../log/backtest/E0_player_trades.csv --log-dir ../log
+              --out ../log/backtest/E0_player_trades.csv --log-dir ../log \
+              --goal-forward-reason "$GOAL_FORWARD_REASON"
             git -C ../log add -A backtest
             if git -C ../log diff --cached --quiet; then exit 0; fi
             git -C ../log commit -q -m "Player model $SEASONS ($(date -u +%F))"

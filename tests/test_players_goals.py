@@ -133,3 +133,51 @@ def test_lab_metrics_on_goal_predictions(feats):
     assert r["rows"] == len(preds) and r["gain"] > 0  # beats the season-xG benchmark
     lo, hi = r["gain_range95"]
     assert lo <= r["gain"] <= hi and r["blend_c"] > 0
+
+
+def test_weekly_goals_never_see_the_locked_forward_window(apps, monkeypatch):
+    """While the forward window is locked, no appearance on or after its start is fitted,
+    scored or saved in E0_goals.json, and changing those matches changes nothing."""
+    start = apps["kickoff"].min() + pd.Timedelta(days=365)
+    cut = pd.Timestamp("2025-08-15", tz="UTC")  # inside the simulated 2025/26
+    feats = pg.goal_features(build_features(apps))
+    assert (feats["kickoff"] >= cut).sum() > 100
+
+    seen = []
+    real = pg.walk_forward
+
+    def spy(f, *a, **k):
+        seen.append(f["kickoff"].max())
+        return real(f, *a, **k)
+
+    monkeypatch.setattr(pg, "walk_forward", spy)
+    locked = pg.stage1_goals(feats, start, None, cut)
+    assert seen and max(seen) < cut  # nothing from the window reaches a fit or a score
+    fw = locked["forward_window"]
+    assert fw["open"] is False and fw["dropped"] == int((feats["kickoff"] >= cut).sum())
+    assert fw["log"] == []
+
+    # The window's own matches can change freely: the saved report is identical.
+    later = apps["kickoff"] >= cut
+    changed = apps.copy()
+    changed.loc[later, "goals"] = 3
+    changed.loc[later, "xg"] = 2.0
+    other = pg.stage1_goals(pg.goal_features(build_features(changed)), start, None, cut)
+    strip = ("holdout_log", "forward_window")
+    assert {k: v for k, v in locked.items() if k not in strip} == {
+        k: v for k, v in other.items() if k not in strip
+    }
+
+    # Opened with a reason, the window's rows come back and the opening is logged.
+    seen.clear()
+    opened = pg.stage1_goals(feats, start, "test: forward window opened", cut)
+    assert max(seen) >= cut and opened["forward_window"]["open"] is True
+    assert opened["forward_window"]["log"][0].startswith("HOLDOUT OPENED")
+    n = lambda r: sum(v.get("n", 0) for v in r["before_lineups"].values())  # noqa: E731
+    assert n(opened) > n(locked)
+
+
+def test_forward_start_is_shared():
+    from soccer_stats import player_goal_lab as gl
+
+    assert pg.FORWARD_START == gl.FORWARD_START == pd.Timestamp("2026-10-10", tz="UTC")

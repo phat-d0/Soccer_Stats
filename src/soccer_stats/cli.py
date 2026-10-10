@@ -637,17 +637,17 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
             trades.to_csv(args.out, index=False)
 
     # Anytime goalscorer, stage 1 (no odds): same appearances and match model.
-    gfeats = pg.goal_features(feats)
-    hold = pg.stage1_holdout()
+    # The forward window (from 2026-10-10) stays out until opened with its reason.
     goals = {
         "generated_at": out["generated_at"],
         "seasons": args.seasons,
-        **pg.report(
-            pg.walk_forward(gfeats, start, holdout=hold),
-            pg.walk_forward(gfeats, start, lineup_known=True, holdout=hold),
-        ),
-        "holdout_log": hold.events,
+        **pg.stage1_goals(pg.goal_features(feats), start, args.goal_forward_reason or None),
     }
+    fw = goals["forward_window"]
+    print(
+        f"Goalscorer forward window from {fw['start']}: "
+        + ("open" if fw["open"] else f"locked, {fw['dropped']} appearances left out")
+    )
     _print_goals(goals)
 
     print(f"\n=== Player model, {args.seasons} (stage 1: no odds) ===")
@@ -1534,6 +1534,12 @@ def main(argv: list[str] | None = None) -> None:
     bp.add_argument("--out", help="CSV of priced player trades (stage 2)")
     bp.add_argument("--json", help="path for the results (the gate the app reads)")
     bp.add_argument("--log-dir", help="data-log checkout: writes backtest/<league>_players.json")
+    bp.add_argument(
+        "--goal-forward-reason",
+        default="",
+        help="opens the goalscorer forward window (from 2026-10-10) in E0_goals.json; "
+        "blank keeps it locked (docs/player_props.md §10b)",
+    )
     bp.set_defaults(func=cmd_backtest_players)
 
     bfp = sub.add_parser("backfill-player-odds", help="historical FanDuel player shot odds")

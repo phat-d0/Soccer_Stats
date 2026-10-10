@@ -79,6 +79,50 @@ def stage1_holdout(reason: str | None = STAGE1_REASON) -> Holdout:
     return h
 
 
+FORWARD_START = pd.Timestamp("2026-10-10", tz="UTC")
+
+
+def lock_forward(
+    feats: pd.DataFrame, reason: str | None = None, start: pd.Timestamp | None = None
+) -> tuple[pd.DataFrame, dict]:
+    """The goalscorer forward window (docs/player_props.md §10b, 2026/27 from 10 Oct):
+    appearances from its start are dropped before any fit or score unless the window has
+    been opened with a reason (printed and logged). Goal features use earlier kickoffs
+    only, so dropping later rows leaves every earlier row unchanged."""
+    start = FORWARD_START if start is None else start
+    h = Holdout(start)
+    if reason:
+        h.unlock(reason)
+        kept = feats
+    else:
+        kept = feats[feats["kickoff"] < start]
+    info = {
+        "start": str(start.date()),
+        "open": bool(reason),
+        "dropped": int(len(feats) - len(kept)),
+        "log": h.events,
+    }
+    return kept, info
+
+
+def stage1_goals(
+    gfeats: pd.DataFrame,
+    start,
+    forward_reason: str | None = None,
+    forward_start: pd.Timestamp | None = None,
+) -> dict:
+    """The weekly E0_goals.json body: the stage-1 report with the 2025/26 holdout opened
+    for its pre-registered scoring and the forward window locked unless `forward_reason`
+    is given, so nothing from that window is fitted, scored or saved while it is locked."""
+    gfeats, fwd = lock_forward(gfeats, forward_reason, forward_start)
+    hold = stage1_holdout()
+    rep = report(
+        walk_forward(gfeats, start, holdout=hold),
+        walk_forward(gfeats, start, lineup_known=True, holdout=hold),
+    )
+    return {**rep, "holdout_log": hold.events, "forward_window": fwd}
+
+
 class GoalCandidate:
     """The goalscorer model as a lab-harness candidate (lab/harness.py).
 

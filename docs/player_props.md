@@ -835,3 +835,22 @@ league average and game state 0; they now get the match model's values.
   appearances after 2026-10-10 (model A on all appearances, not the pooled B-starters gate
   of §10b). Player props should decide whether that split should stop at 2026-10-10 until
   the forward window opens.
+
+### Weekly `E0_goals.json` stops at the forward window (2026-10-10, before it opened)
+
+This answers the lead's 10 Oct note above. From now on, the weekly stage-1 file locks the
+forward window the same way `goal-league` does:
+
+- **How:** `player_goals.stage1_goals` drops Premier League appearances from 2026-10-10
+  before any fit or score (`lock_forward`). Its `live` split (2026/27) therefore stops at
+  9 Oct.
+- **Nothing reaches the file:** goal features use earlier kickoffs only, so the rows kept
+  are unchanged. A test changes the window's results and checks the saved report is
+  identical.
+- **The file records the lock:** it carries `forward_window`: start, open or locked, the
+  number of appearances left out, and the opening log. The players.yml log prints the same.
+- **After the window opens** (once, at 150 pooled matches, with its reason): the weekly
+  file includes those matches again only when `players.yml` is dispatched with
+  `goal_forward_reason` (CLI `--goal-forward-reason`), which prints and logs the opening.
+  Scheduled Monday runs pass nothing, so they stay locked until the lead switches them.
+- The development seasons and the 2025/26 holdout are unaffected, so the gate is unchanged.

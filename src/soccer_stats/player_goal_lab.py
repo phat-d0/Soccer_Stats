@@ -25,8 +25,8 @@ from soccer_stats.lab import harness
 from soccer_stats.lab.harness import Holdout
 from soccer_stats.lab.metrics import boot_range
 from soccer_stats.models.player_goals import GOAL_FACTORS, GoalscorerModel, p_zero
+from soccer_stats.player_goals import FORWARD_START
 
-FORWARD_START = pd.Timestamp("2026-10-10", tz="UTC")
 SEEN_START = pd.Timestamp("2025-07-01", tz="UTC")
 DEV_SEASONS = ("2324", "2425")
 TUNE_SEASON = "2223"
