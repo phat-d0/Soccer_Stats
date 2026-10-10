@@ -806,3 +806,83 @@ Lead review notes (10 Oct):
   2025 the last few days get no expected goals; with 2025/26 loaded they do. Those rows
   are 2024/25 and predicted from earlier matches only, so it is not look-ahead; the
   yearly fits agree to five decimals. The test's recalibration fit used the fuller set.
+## Team totals against the main market (round 13; owner's request 10 Oct; pre-registered 2026-10-10, before any team-total outcome is read)
+
+**Why.** Soft books often price side markets off their own main lines. If FanDuel's team
+totals lag or mis-derive from the main match market, a price taken from that market
+could beat FanDuel's team-total price where our own model can't. This test scores that
+idea against FanDuel's own close. 0 credits, no key, data already logged; research only.
+
+**What is logged today (plumbing check, no results read; data-log on 10 Oct 07:55 UTC).**
+- FanDuel team totals: 51 look rows across E0, SP1, D1, I1 and F1 (lines 0.5 to 3.5, mostly
+  1.5), 0 close rows yet, all from the first run on 9 Oct.
+- DraftKings odds log: 1,521 h2h rows in six leagues and **0 over/under 2.5 rows**. DraftKings
+  returns no 2.5 total on the bulk odds endpoint, so the main-market price below rests on
+  h2h. The spec still uses a logged O/U 2.5 row if one ever appears (rule below).
+- Median gap between consecutive logged DraftKings h2h downloads per fixture: about 1.7 h in
+  E0, about 3.1 h in the matchday leagues (their refresh is every 3 h from 48 h out).
+
+**Unit.** One FanDuel row = one match × team × line, at the **look** snapshot (18–30 h
+before kickoff), paired with the same match × team × line at the **close**. Bovada rows,
+rows without a close, and lines that are not x.5 (pushes) are left out. The result is the
+team's full-time goals (football-data), 0 = over won, 1 = under won.
+
+**1. Market-derived chance (candidate a).**
+- Input: DraftKings' margin-free prices as logged (`fair`, Shin): h2h always; O/U 2.5 too if a
+  totals row exists. For each FanDuel look row, the last logged DraftKings row of that
+  fixture and market whose `downloaded_at` is at or before the FanDuel row's
+  `downloaded_at` (what we had in hand when the look was taken).
+- Freshness: dropped when that DraftKings download is more than **N = 6 hours** older than the
+  FanDuel download, or missing. The report counts drops per league.
+- Fit: independent **Poisson** goals (no Dixon-Coles correction, rho = 0), means λh and λa in
+  [0.05, 6], chosen to minimise the **sum of squared differences** between the score
+  matrix's probabilities and DraftKings' fair probabilities over every outcome supplied
+  (home/draw/away, plus over/under 2.5 when present), with equal weight per outcome.
+  Score matrix 0..10 goals a side. h2h alone gives two free numbers for two means, so it
+  is matched exactly; the total then rests on the draw price, which pins it only loosely.
+  This is the textbook "goals implied by the 1X2" method a soft book could itself use.
+- Chance: P(team goals > line) = 1 − Poisson CDF(floor(line); λ of that team).
+
+**2. Candidates.**
+- (a) market-derived, as above;
+- (b) our model: `p_model_over`, logged with the row at fetch time;
+- (c) **fixed 50/50 blend** on the logit scale: logit p = ½ logit(a) + ½ logit(b). No fitted
+  weight, in development or confirmation: a few hundred rows can't fit a weight reliably,
+  and changing the blend between the two stages would undo the confirmation. The weight
+  each candidate would earn beside FanDuel's look price (`lab.metrics.blend_weight`) is
+  reported, descriptive only.
+
+**3. Bet rule and scoring.**
+- At the look, bet the over or the under (the larger edge) when candidate chance ×
+  FanDuel's raw (margined) price − 1 ≥ t, for **t ∈ {2%, 5%, 10%}** (`lab.metrics.pick_bets`;
+  at most one bet per row). Flat 1 unit.
+- Scored through `lab.metrics.evaluate`: CLV = price × FanDuel's de-margined closing chance −
+  1; ROI; both with ranges resampling whole matches; log loss against FanDuel's de-margined
+  look and close; calibration tables (10 bins) for each candidate and for FanDuel's look.
+- Family: 3 candidates × 3 thresholds = **9 tests, 99.444% ranges** (Bonferroni).
+- **Pass** (per candidate × threshold): the CLV range's lower bound is above 0 AND there
+  are at least **30 bets**. ROI and its range are reported but don't gate: on a few dozen
+  bets they are too wide to decide anything, which is why the lab judges on CLV. The
+  blend-weight half of the lab's usual rule is dropped here: it needs a sharp market to
+  sit beside, and FanDuel's ~6% margin isn't one.
+- Descriptive, no results needed: how often FanDuel's price disagrees with the
+  market-derived chance by more than its margin, i.e. a·over > 1 or (1 − a)·under > 1 at the
+  look (an edge above 0 against the raw price), per league, and how many reach each t.
+
+**4. Samples and what a pass leads to.**
+- **Development.** Run when `team_totals.report`'s gate is met: at least **50 settled
+  matches** with a FanDuel look, a close, a result and a DraftKings quote within N. Every
+  eligible match up to the run is scored. This is the first and only look at those matches.
+- **Nothing passes:** stop. The report says so; no confirmatory sample, no app change.
+- **Something passes:** freeze one rule, the passing (candidate, t) with the largest CLV
+  lower bound (ties: the smaller t), and score it once on a **fresh forward sample**: matches
+  kicking off after the last kickoff in the development run, until **150 settled matches**
+  (about three to four weekends across five leagues). One test, 95% range, same pass rule
+  (CLV lower bound above 0 and at least 30 bets).
+- A confirmed rule goes to the owner as a proposal for **paper trades** only (pre-registered
+  again before any start), never live bets. A rule that fails confirmation is dropped.
+
+**5. Build.** An extension of `team_totals.report` and `odds-check.yml` `task=team-totals`
+(which then also copies data-log's DraftKings month files). Plumbing (counts, joins,
+freshness drops, the disagreement distribution) never reads results. The development run
+is dispatched by the lead once the gate is met.
