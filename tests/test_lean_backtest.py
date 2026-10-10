@@ -365,9 +365,10 @@ def test_coverage_filter_scores_only_well_priced_seasons():
     assert rep["fits"] > 0 and rep["sigma"]["min"] > 0
     assert rep["lean"]["bets"] == len(b)
     # Exactly 90% passes.
-    assert lb.coverage(pins.assign(season="x").iloc[:10].assign(odds_home=[np.nan] + [2.0] * 9))[0][
-        "included"
-    ]
+    ten = pins.assign(season="x").iloc[:10].assign(odds_home=[np.nan] + [2.0] * 9)
+    assert lb.coverage(ten)[0]["included"]
+    eight = ten.assign(odds_home=[np.nan, np.nan] + [2.0] * 8)
+    assert not lb.coverage(eight)[0]["included"]
 
 
 def test_build_pools_leagues_and_keeps_compact_rows():
