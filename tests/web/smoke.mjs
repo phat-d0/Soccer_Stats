@@ -127,7 +127,7 @@ const STEPS = [
   ["match-sheet-live-test", async (p) => {
     await p.click("button.match:has(.badge:not(.paper):not(.lineup)) >> nth=0"); await sheet(p);
     const text = await p.textContent("#sheet-body");
-    if (!text.includes("Live-test pick") || !text.includes("model alone")) throw new Error("match sheet doesn't explain the live-test pick");
+    if (!(text.includes("Live-test pick") || text.includes("Paper trade already open")) || !text.includes("model alone")) throw new Error("match sheet doesn't explain the live-test pick");
   }, true],
   // The learned rule (p_source "blend"): today's behaviour comes back.
   ["matches-learned-rule", async (p) => {
@@ -143,6 +143,20 @@ const STEPS = [
     const text = await p.textContent("#view");
     if (text.includes("live test") || text.includes("Live-test pick")) throw new Error("learned rule still shows the live test");
     if (!text.includes("Nothing is flagged")) throw new Error("learned rule should flag nothing");
+  }],
+  // Paper trades skip low_data matches (paper.py); under the live test the app does too.
+  ["matches-live-test-low-data", async (p) => {
+    await p.unroute("**/data.json");
+    await p.route("**/data.json", async (route) => {
+      const res = await route.fetch();
+      const d = await res.json();
+      for (const f of d.fixtures) f.low_data = true;
+      await route.fulfill({ response: res, json: d });
+    });
+    await p.reload(); await p.waitForSelector("button.match");
+    const picks = await p.evaluate(() => document.querySelectorAll("button.match .badge:not(.paper):not(.lineup)").length);
+    if (picks) throw new Error(`${picks} live-test picks on low-data matches, which paper trades skip`);
+    if (!(await p.textContent("#view")).includes("have a live-test pick")) throw new Error("live test note missing");
   }],
   ["matches-restored", async (p) => {
     await p.unroute("**/data.json");
