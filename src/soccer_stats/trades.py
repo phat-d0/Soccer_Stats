@@ -198,6 +198,17 @@ def side_z(p_bet: dict | None, odds: dict | None, sigma: float | None) -> dict |
     return out
 
 
+# What `driver` means, in plain English, for the app (Lean live section and the backtest).
+DRIVER_NOTE = (
+    "Market-driven: the pick still clears 1 sigma when the model's term is taken out of the "
+    "fitted blend (the blend's other weights are kept as fitted, not refitted). Model-driven: "
+    "it clears 1 sigma only with the model's term in. The model's term compares the model's "
+    "chances across home, draw and away, not against the price, so where the model's weight "
+    "is positive it lifts the outcome the model rates highest relative to the others, even "
+    "when the model rates that outcome below the market."
+)
+
+
 def lean_driver(z_market: float | None) -> str | None:
     """What carried a Lean pick: "market" when it reaches LEAN_Z even with the model term
     removed (z_market, market_side_z), else "model"; None when z_market is unknown."""

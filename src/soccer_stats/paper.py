@@ -849,6 +849,7 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
     }
     if key == "lean":
         out["by_driver"] = by_driver(mine)
+        out["driver_note"] = tr.DRIVER_NOTE
     return out
 
 

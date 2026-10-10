@@ -155,6 +155,59 @@ def test_old_lean_trades_get_their_driver_once_from_the_odds_log(tmp_path):
     assert back["driver"] == upd[0]["driver"] and back["driver_from"] == "odds_log"
 
 
+def test_driver_update_leaves_twelve_percent_trades_alone():
+    """Only Lean trades get the one-time driver event: a 12% trade on the same match (no
+    strategy field, or "edge12") never does, and its fields are untouched."""
+    led, t = old_lean_trade()
+    for tid, strategy in (("E0|2627|Arsenal|Leeds", None), ("E0|2627|Arsenal|Leeds|x", "edge12")):
+        e12 = {k: v for k, v in t.items() if k not in ("z", "tier", "sigma", "strategy")}
+        led[tid] = {**e12, "id": tid, "rule": "fixed_raw", "threshold": 0.12, "sigma": 0.02}
+        if strategy:
+            led[tid]["strategy"] = strategy
+    before = {tid: dict(v) for tid, v in led.items() if tid != t["id"]}
+    prices = {m: card()["odds"][m] for m in tr.LEAN_MARKETS}
+    log = pd.DataFrame([odds_log_row(t, prices, t["odds_fetched_at"])])
+    rule = {**lean(), "coef": [0.0, 0.0, 1.6, 0.0]}
+    later = NOW + pd.Timedelta(hours=1)
+    ev, _ = paper.update_ledger(led, [], src(later), None, later, odds_log=log, lean=rule)
+    assert [e["id"] for e in ev if "driver" in e] == [t["id"]]
+    for tid, was in before.items():
+        assert "driver" not in led[tid] and "z_market" not in led[tid]
+        entry = {k for k in was if k not in paper.UPDATE_FIELDS}
+        assert {k: led[tid][k] for k in entry} == {k: was[k] for k in entry}
+
+
+def test_betis_barcelona_is_model_driven_through_the_relative_model_term():
+    """The live SP1 trade of 10 Oct (Betis v Barcelona, away at 1.41): the model gave
+    Barcelona 52.7%, below DraftKings' fair 68.5%, yet the pick is model-driven. The
+    conditional logit's model term c * log(model_k) only matters relative to the other
+    outcomes (softmax), and with SP1's c > 0 it lifts the model's own favourite
+    (Barcelona, 52.7% against 26.8% and 20.5%). Without it (c = 0, a and b kept) Barcelona
+    is 71.1% against a 70.9% break-even: z 0.095, short of 1."""
+    coef = [0.0758, 0.0576, 1.0725, 0.1057]  # match_blends.json SP1, data-log 696a25b
+    sigma = 0.019
+    odds = {"home": 6.0, "draw": 5.5, "away": 1.41}
+    model = {"home": 0.2683, "draw": 0.2045, "away": 0.5271}
+    fair_p = fair(odds)
+    assert fair_p[2] == pytest.approx(0.685, abs=1e-3)
+    pb = mc.apply(coef, [fair_p], [[model[m] for m in tr.LEAN_MARKETS]])[0]
+    pick = tr.lean_pick(
+        dict(zip(tr.LEAN_MARKETS, pb, strict=True)),
+        odds,
+        sigma,
+        z_market=tr.market_side_z(coef, odds, sigma),
+    )
+    assert pick["market"] == "away" and pick["z"] == pytest.approx(1.017, abs=2e-3)
+    assert pick["z_market"] == pytest.approx(0.095, abs=2e-3)
+    assert pick["driver"] == "model"
+    pm = mc.without_model(coef, [fair_p])[0]
+    assert pm[2] == pytest.approx(0.711, abs=1e-3) and pb[2] > pm[2]
+    # The same model chance with c < 0 would pull Barcelona down instead: the direction
+    # comes from c's sign and the model's ranking across outcomes, not from model < market.
+    neg = [*coef[:3], -coef[3]]
+    assert mc.apply(neg, [fair_p], [[model[m] for m in tr.LEAN_MARKETS]])[0][2] < pm[2]
+
+
 def test_by_driver_splits_lean_trades_and_counts_unknown_ones():
     base = {"kickoff": "2026-10-10T14:00:00+00:00", "stake": 10.0, "edge": 0.05}
     trades = [

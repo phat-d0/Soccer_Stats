@@ -96,7 +96,7 @@ field existed read as `edge12`). The app lists Lean first (`portfolio.strategy_o
 | Trades per match | one: the home/draw/away side with the highest z, if z ≥ 1 (`trades.lean_pick`); id ends `\|lean`, so a match can also hold its 12% trade |
 | Gates, stake, close, settlement | as the 12% test: before kickoff, DraftKings odds under 3 hours old, not thin data, $10, same close, CLV and settlement |
 | Recorded | `z`, `tier`, `sigma`, `p_bet`, `p_model`, `z_market`, `driver`, `rule: "lean_1sigma"`, `p_source: "blend"` |
-| Driver | `z_market` = the picked side's z with the blend's model term removed (c = 0, the league's a_k and b kept; `trades.market_side_z`); `driver` = `"market"` if z_market ≥ 1, else `"model"` (`trades.lean_driver`). Lean trades opened before 11 Oct get both once from the logged DraftKings quote they opened on (an update event, `driver_from: "odds_log"`) |
+| Driver | `z_market` = the picked side's z with the blend's model term removed (c = 0, the league's a_k and b kept; `trades.market_side_z`); `driver` = `"market"` if z_market ≥ 1, else `"model"` (`trades.lean_driver`). "Market" means the pick still qualifies with the model's term taken out of the fitted blend (no refit); the model's term compares the model's chances across the three outcomes, not against the price, so it can lift a side the model rates below the market (Betis v Barcelona: model 52.7% vs DraftKings 68.5%, still model-driven). Lean trades opened before 11 Oct get both once from the logged DraftKings quote they opened on (an update event, `driver_from: "odds_log"`) |
 | No fits file | no Lean picks; the rule's note says why |
 
 The fits come from `soccer-stats fit-match-blends` (football-data and Understat only, no

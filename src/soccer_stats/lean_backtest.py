@@ -454,8 +454,9 @@ def build(
             "stake": STAKE,
             "coverage_min": COVERAGE_MIN,
             "clv": "entry odds x Pinnacle's margin-free (Shin) close - 1",
-            "driver": "market = still at least 1 sigma with the model term removed "
-            "(c = 0, a and b kept); model = only with it",
+            "driver": "market = still at least 1 sigma with the model's term taken out of "
+            "the fitted blend (c = 0, a and b kept as fitted, no refit); model = only with it",
+            "driver_note": tr.DRIVER_NOTE,
         },
         "leagues": {
             code: {"name": (names or {}).get(code, code), **rep} for code, rep in reports.items()
