@@ -54,11 +54,25 @@ def test_walk_forward_predicts_the_final_partial_window(league):
     assert len(preds) == (df["date"] >= start).sum()
     assert preds["date"].max() == df["date"].max()
 
-    # No look-ahead: the final window's chances match a run that sees later matches too.
+    # No look-ahead: every fit, the final one included, sees only matches before its window.
+    seen = []
+
+    class Recording(backtest.DixonColes):
+        def fit(self, matches, as_of=None):
+            seen.append((matches["date"].max(), as_of))
+            return super().fit(matches, as_of=as_of)
+
+    backtest.walk_forward(
+        df, start=start, refit_every="30D", min_team_matches=0, model_factory=Recording
+    )
+    assert seen and all(last < as_of for last, as_of in seen)
+    assert seen[-1][1] <= df["date"].max() < seen[-1][1] + pd.Timedelta("30D")
+
+    # And its chances match a run that sees later matches too (optimizer noise aside).
     later = df.assign(date=df["date"] + pd.Timedelta(days=60))
     longer = pd.concat([df, later[later["date"] > df["date"].max()]], ignore_index=True)
     more = backtest.walk_forward(longer, start=start, refit_every="30D", min_team_matches=0)
     cols = ["date", "home", "away"]
     both = preds.merge(more, on=cols, suffixes=("", "_l"))
     assert len(both) == len(preds)
-    np.testing.assert_allclose(both["p_home"], both["p_home_l"], atol=1e-4)
+    np.testing.assert_allclose(both["p_home"], both["p_home_l"], atol=2e-3)
