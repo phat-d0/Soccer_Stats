@@ -923,9 +923,9 @@ neither can judge a new corners model. What we know:
 **The test season rule.** Any new corners model is tuned on 2017/18–2023/24 (already seen,
 fine for development), may then be refitted on everything up to 2025/26, and is judged
 only on **2026/27, scored forward**. Two pre-registered options:
-- a **mid-season check** on matches up to 31 Jan 2027 (about 190–270 per league; football-data
+- a **mid-season check** on matches up to 31 Jan 2027 (about 170 in D1 and F1, 210–240 in E0, SP1 and I1, 340 in E1; football-data
   publishes corner counts with each result), opened once, with the bake-off's pass rule;
-- or the **full season** in late May 2027 (about 300–550 per league).
+- or the **full season** in late May 2027 (306–552 per league).
 The mid-season check is the better use of time: it answers by February. Anything that
 passes then still needs the price test below before it could mean money.
 
