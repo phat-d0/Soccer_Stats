@@ -20,6 +20,8 @@ const state = {
   pfShown: 15,
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
+  pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
+  lbShown: 20, // Blend Lean backtest: bet rows shown
   recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
   recStrat: "", // Record tab, player shots: which backtest strategy's sweep to show
   recDk: "", // Record tab, match bets: which DraftKings backtest strategy ("raw" or "blend")
@@ -131,6 +133,12 @@ const leanPick = (fx) => (leanOn() && !fx.low_data ? fx.lean_pick || null : null
 const sigmaText = (z) => (z == null ? "–" : `${z < 0 ? "−" : z > 0 ? "+" : ""}${Math.abs(z).toFixed(1)}σ`);
 const ptsText = (x) => `${(x * 100).toFixed(1)} points`;
 const tierName = (pick) => (pick.tier === "strong" ? "Strong" : "Lean");
+// What carried a Lean pick (trades.lean_driver): "market" = it still clears 1σ with the
+// model's term taken out of the blend (z_market), "model" = only with it. Unknown = null.
+const DRIVER_NAME = { market: "Market-driven", model: "Model-driven", unknown: "Driver unknown" };
+const driverOf = (x) => (x?.driver === "market" || x?.driver === "model" ? x.driver : null);
+const driverChip = (x) => { const d = driverOf(x); return d ? `<span class="drv drv-${d}">${d === "model" ? "Model" : "Market"}</span>` : ""; };
+const driverNote = () => (pfById("moneyline")?.live?.strategies || []).find((x) => x.key === "lean")?.driver_note || state.data?.portfolio?.strategy_backtests?.lean?.rule?.driver_note || "";
 // Lead review (PR #43): most Lean picks come from the blend's price weight b > 1 (fitted on
 // Pinnacle's closes, it sharpens DraftKings' price: favourites shorter, long shots longer),
 // not from the model; with b capped at 1 only 2 of the 12 matches that reached 1σ from
@@ -384,6 +392,7 @@ function detailHtml(fx) {
   const hasOdds = o && Object.values(o).some((v) => v != null);
   const blend = hasOdds && fx.p_bet ? fx.p_bet : null;
   const zs = hasOdds && leanOn() && fx.z ? fx.z : null; // Blend Lean: σ above break-even
+  const zms = zs && fx.z_market ? fx.z_market : null; // the same without the model's term
   const lp = leanPick(fx);
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
@@ -392,7 +401,7 @@ function detailHtml(fx) {
     const edge = odds_ != null && pb != null ? pb * odds_ - 1 : null;
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
-        ? `${blend ? `<td class="${fixedRule() ? "" : "blend-col"}">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>${zs ? `<td class="${zs[k] != null && zs[k] >= 1 - 1e-9 ? "edge-pos" : ""}${lp?.market === k ? " lean-cell" : ""}">${zs[k] != null ? sigmaText(zs[k]) : ""}</td>` : ""}`
+        ? `${blend ? `<td class="${fixedRule() ? "" : "blend-col"}">${pct(blend[k])}</td>` : ""}<td>${pct(imp[k])}</td><td>${price(odds_)}</td><td class="${edge > 0 ? "edge-pos" : ""}">${signedPct(edge)}</td>${zs ? `<td class="${zs[k] != null && zs[k] >= 1 - 1e-9 ? "edge-pos" : ""}${lp?.market === k ? " lean-cell" : ""}">${zs[k] != null ? sigmaText(zs[k]) : ""}${zms?.[k] != null ? `<span class="zm">mkt ${sigmaText(zms[k])}</span>` : ""}</td>` : ""}`
         : `<td>${odds(1 / p[k])}</td>`
     }</tr>`;
   }).join("");
@@ -402,7 +411,7 @@ function detailHtml(fx) {
     ? "Fair odds = the price that would exactly match the model's chance."
     : fixedRule()
       ? leanOn()
-        ? `Model = the model alone: the chance the 12% test trades on. ${blend ? "Blend = the model mixed with the market: the chance Blend Lean trades on. " : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.${zs ? " σ = how far the blend sits above the quoted price's break-even (1 ÷ decimal odds), in σ: Lean needs +1σ, Strong +2σ." : ""}`
+        ? `Model = the model alone: the chance the 12% test trades on. ${blend ? "Blend = the model mixed with the market: the chance Blend Lean trades on. " : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.${zs ? ` σ = how far the blend sits above the quoted price's break-even (1 ÷ decimal odds), in σ: Lean needs +1σ, Strong +2σ.${zms ? " mkt = the same with the model's term taken out of the blend: a Lean pick whose mkt is still +1σ or more is market-driven, otherwise model-driven." : ""}` : ""}`
         : `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
       : blend
       ? `Model = the model alone. Blend = the model mixed with ${bookPoss()} price, the chance value picks use. ${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = blend × payout − 1.`
@@ -752,6 +761,14 @@ const fixedNote = (lg) => leagueRule(lg)?.note || paperRule()?.note || "";
 const leanNote = (lg) => leanRule(lg)?.note || (pfById("moneyline")?.live?.strategies || []).find((x) => x.key === "lean")?.rule?.note || "";
 // The match sheet's Blend Lean line: the pick (blend vs the price's break-even, in σ),
 // the open Lean trade, or why there is none.
+// "Market-driven: without the model's term it is still +1.4σ." (pick or trade; z_market)
+function driverText(x) {
+  const d = driverOf(x);
+  if (!d || x.z_market == null) return "";
+  return d === "market"
+    ? `Market-driven: with the model's term taken out of the blend it is still ${sigmaText(x.z_market)}, so the price alone carries it. `
+    : `Model-driven: with the model's term taken out of the blend it would be ${sigmaText(x.z_market)}, so the model pushed it over 1σ. `;
+}
 function leanPickText(fx) {
   const lg = fxLeague(fx);
   const sd = leanSigma(lg);
@@ -769,9 +786,9 @@ function leanPickText(fx) {
   let head;
   if (t) {
     const same = lp && PICK_LABEL[lp.market] === PICK_LABEL[t.market];
-    head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened)` : ""}. One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."} ${LEAN_CAVEAT}`;
+    head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened${driverOf(t) ? `, ${DRIVER_NAME[driverOf(t)].toLowerCase()}` : ""})` : ""}. ${driverText(t)}One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."} ${LEAN_CAVEAT}`;
   } else if (lp) {
-    head = `<b>Blend Lean pick (${tierName(lp)}):</b> ${side(lp.market)}. A $10 paper trade opens on it at the next update with fresh odds. ${LEAN_CAVEAT}`;
+    head = `<b>Blend Lean pick (${tierName(lp)}, ${DRIVER_NAME[driverOf(lp) || "unknown"].toLowerCase()}):</b> ${side(lp.market)}. ${driverText(lp)}A $10 paper trade opens on it at the next update with fresh odds. ${LEAN_CAVEAT}`;
   } else {
     const best = ["home", "draw", "away"].filter((m) => z[m] != null && fx.odds?.[m]).sort((a, b) => z[b] - z[a])[0];
     head = best ? `<b>Blend Lean: no pick.</b> Closest is ${side(best)}; a Lean pick needs +1σ.` : "<b>Blend Lean: no pick.</b>";
@@ -2077,7 +2094,7 @@ function pfOpen(trades) {
     const move = cur < t.odds ? "shortened" : cur > t.odds ? "drifted" : "unchanged";
     return `
       <button class="bet-row trade" data-trade="${esc(t.id)}">
-        <span>${tradeTitle(t)}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curZ != null ? ` · now ${sigmaText(curZ)}` : curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
+        <span>${tradeTitle(t)}${isLean(t) ? driverChip(t) : ""}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curZ != null ? ` · now ${sigmaText(curZ)}` : curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
         <span class="pl ${plClass(mtm)}">${usd(mtm, 2)}<div class="meta">if cashed out</div></span>
       </button>`;
   }).join("");
@@ -2094,7 +2111,7 @@ function pfSettled(trades) {
   const shown = sel.slice(0, state.pfShown);
   const rows = shown.map((t) => `
     <button class="bet-row trade" data-trade="${esc(t.id)}">
-      <span>${tradeTitle(t)}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${isCorner(t) ? `${t.actual} corners` : countWord(t.market, t.actual)}` : ""}</div>${closeLine(t)}</span>
+      <span>${tradeTitle(t)}${isLean(t) ? driverChip(t) : ""}<div class="meta">${esc(shortDate(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} @ ${american(t.odds)} · edge ${signedPct(t.edge)}${t.score ? ` · ${esc(t.score)}` : ""}${t.actual != null ? ` · had ${isCorner(t) ? `${t.actual} corners` : countWord(t.market, t.actual)}` : ""}</div>${closeLine(t)}</span>
       <span class="pl ${t.profit > 0 ? "win" : t.profit < 0 ? "loss" : ""}">${t.status === "void" ? (t.push ? "Push<div class=\"meta\">stake back</div>" : "Void") : `${t.status === "won" ? "Won" : "Lost"} ${usd(t.profit, 0)}`}</span>
     </button>`).join("");
   const opt = (vals, cur, label, fmt) => `<option value="">${label}</option>${vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(fmt(v))}</option>`).join("")}`;
@@ -2187,7 +2204,7 @@ function openBadge(t) {
 function leanBadges(fx, t) {
   const lp = leanPick(fx);
   const moved = lp && t && PICK_LABEL[t.market] !== PICK_LABEL[lp.market];
-  const pickB = lp ? `<span class="badge lean">${CHECK}${moved ? "Would pick now, " : ""}${tierName(lp)} · ${sigmaText(lp.z).replace("+", "")}: ${esc(PICK_LABEL[lp.market])} @ ${price(lp.odds)}</span>` : "";
+  const pickB = lp ? `<span class="badge lean">${CHECK}${moved ? "Would pick now, " : ""}${tierName(lp)} · ${sigmaText(lp.z).replace("+", "")}: ${esc(PICK_LABEL[lp.market])} @ ${price(lp.odds)}${driverOf(lp) ? ` · ${DRIVER_NAME[driverOf(lp)]}` : ""}</span>` : "";
   return `${pickB}${t ? openBadge(t) : ""}`;
 }
 const isMoneylineFixed = (pf) => pf?.id === "moneyline" && fixedRule();
@@ -2197,6 +2214,157 @@ function stratSet(set, st) {
   const ids = st.trade_ids ? new Set(st.trade_ids) : null;
   const trades = (set.trades || []).filter((t) => (ids ? ids.has(t.id) : stratOf(t) === st.key));
   return { ...set, trades, summary: st.summary || { trades: trades.length }, breakdowns: st.breakdowns || {}, by_league: st.by_league || null, rule: st.rule, note: st.key === "lean" ? null : set.note };
+}
+// ---------- Blend Lean backtest (portfolio.strategy_backtests.lean; lean_backtest.py) ----------
+// A replay at Pinnacle's early prices from football-data, $1 a bet (units), CLV against
+// Pinnacle's margin-free close. `all` pools the leagues; leagues[code] has the same shape.
+const unitsText = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(d)} units`);
+const ciText = (ci, d = 1) => (ci && ci[0] != null ? `${signedPct(ci[0], d)} to ${signedPct(ci[1], d)}` : "");
+const lbBets = (bt) => (bt.bets || []).map((r) => Object.fromEntries((bt.bet_fields || []).map((k, i) => [k, r[i]])));
+function leanVerdict(bt) {
+  const a = bt.all?.lean || {};
+  const lgs = Object.values(bt.leagues || {}).filter((l) => l.lean?.clv != null);
+  const negClv = lgs.filter((l) => l.lean.clv < 0).length;
+  const anyRoiClear = lgs.some((l) => l.lean.roi_ci95?.[0] > 0);
+  const roiWord = a.roi == null ? "had no bets" : a.roi < 0 ? "lost slightly" : "made a little";
+  const roiRange = a.roi_ci95 && a.roi_ci95[0] < 0 && a.roi_ci95[1] > 0 ? " (a range that includes break-even)" : "";
+  const clvWord = negClv === lgs.length ? "got worse prices than the close, on average, in every league" : `got worse prices than the close in ${negClv} of ${lgs.length} leagues`;
+  return `In the replay at Pinnacle's prices Lean ${roiWord}${roiRange} and ${clvWord}.${anyRoiClear ? "" : " No league's return range clears zero."}`;
+}
+function lbTiles(m) {
+  if (!m) return "";
+  return `<div class="tiles" style="margin-top:12px">
+    <div class="tile"><div class="label">Bets</div><div class="value">${(m.bets || 0).toLocaleString()}</div><div class="sub">$1 each · avg odds ${m.avg_odds != null ? m.avg_odds.toFixed(2) : "–"}</div></div>
+    <div class="tile"><div class="label">Won</div><div class="value">${pct(m.win_rate, 1)}</div><div class="sub">needed ${pct(m.breakeven, 1)} to break even</div></div>
+    <div class="tile"><div class="label">ROI</div><div class="value ${plClass(m.roi)}">${signedPct(m.roi)}</div><div class="sub">${m.roi_ci95 ? `range ${ciText(m.roi_ci95)}` : "too few bets for a range"} · ${unitsText(m.profit)}</div></div>
+    <div class="tile"><div class="label">Closing line value</div><div class="value ${plClass(m.clv)}">${signedPct(m.clv)}</div><div class="sub">${m.clv_ci95 ? `range ${ciText(m.clv_ci95)}` : "vs Pinnacle's close"} · beat it ${pct(m.beat_close)}</div></div>
+  </div>`;
+}
+// Two or three groups side by side (Lean vs Strong, market vs model).
+function lbCompare(cols) {
+  const keys = cols.filter(([, m]) => m);
+  if (!keys.length) return "";
+  const row = (label, f) => `<tr><td>${label}</td>${keys.map(([, m]) => `<td>${f(m)}</td>`).join("")}</tr>`;
+  return `<div class="card" style="padding:8px 14px"><table class="mkts mk-table drv-table">
+    <thead><tr><th></th>${keys.map(([l]) => `<th>${esc(l)}</th>`).join("")}</tr></thead>
+    <tbody>
+      ${row("Bets", (m) => (m.bets || 0).toLocaleString())}
+      ${row("Won", (m) => (m.win_rate == null ? "–" : `${pct(m.win_rate, 1)}<span class="mk-range">needs ${pct(m.breakeven, 1)}</span>`))}
+      ${row("ROI", (m) => `<span class="${plClass(m.roi)}">${signedPct(m.roi)}</span>${m.roi_ci95 ? `<span class="mk-range">${ciText(m.roi_ci95, 0)}</span>` : ""}`)}
+      ${row("CLV", (m) => `<span class="${plClass(m.clv)}">${signedPct(m.clv)}</span>${m.clv_ci95 ? `<span class="mk-range">${ciText(m.clv_ci95)}</span>` : ""}`)}
+      ${row("Avg odds", (m) => (m.avg_odds != null ? m.avg_odds.toFixed(2) : "–"))}
+      ${row("Mostly", (m) => { const e = Object.entries(m.by_market || {}).sort((a, b) => b[1] - a[1])[0]; return e && m.bets ? `${esc(PICK_LABEL[e[0]] || e[0])} ${pct(e[1] / m.bets)}` : "–"; })}
+    </tbody></table></div>`;
+}
+function lbLeagueCharts(bt) {
+  const rows = Object.entries(bt.leagues || {}).filter(([, l]) => l.lean?.bets);
+  if (!rows.length) return "";
+  const mk = (key, ci) => rows.map(([c, l]) => ({
+    label: leagueShort(c), sub: `${l.lean.bets} bets`, v: l.lean[key], lo: l.lean[ci]?.[0], hi: l.lean[ci]?.[1],
+    readout: `<b>${esc(l.name || leagueName(c))}</b>, ${l.lean.bets} bets: ROI ${signedPct(l.lean.roi)} (range ${ciText(l.lean.roi_ci95)}), ${unitsText(l.lean.profit)}; CLV ${signedPct(l.lean.clv)} (range ${ciText(l.lean.clv_ci95)}); won ${pct(l.lean.win_rate, 1)} vs ${pct(l.lean.breakeven, 1)} needed. Seasons ${esc((l.seasons_included || []).join(", "))}${l.sigma ? `; σ ${ptsText(l.sigma.min)} to ${ptsText(l.sigma.max)}` : ""}.`,
+  }));
+  return `
+    <div class="section-title">Return by league</div>
+    ${rangeChart("lbroi", mk("roi", "roi_ci95"), (v) => signedPct(v, 0))}
+    <div class="section-title">Closing line value by league</div>
+    ${rangeChart("lbclv", mk("clv", "clv_ci95"), (v) => signedPct(v, 1))}
+    <p class="note">Dot = the league's result, bar = its 95% range. Blue when the whole range is above 0, red when below, grey when it could be either. Tap a league for the numbers.</p>`;
+}
+function lbSeasons(rows) {
+  if (!rows?.length) return "";
+  return `<details class="fold mk-fold"><summary>By season</summary>
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table">
+      <thead><tr><th></th><th>Bets</th><th>ROI</th><th>CLV</th><th>Market / model</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><td>${esc(r.label || seasonName(r.season))}</td><td>${r.bets}</td><td class="${plClass(r.roi)}">${signedPct(r.roi)}</td><td class="${plClass(r.clv)}">${signedPct(r.clv)}</td><td>${r.market_bets ?? "–"} / ${r.model_bets ?? "–"}</td></tr>`).join("")}</tbody>
+    </table></div></details>`;
+}
+function lbBetList(bt, lg) {
+  const all = lbBets(bt).filter((b) => (!lg || b.league === lg) && (!state.pfDriver || b.driver === state.pfDriver));
+  if (!all.length) return `<div class="section-title">Bets</div><p class="note">No bets in the newest ${bt.bets_shown || 0} shown here${lg || state.pfDriver ? " for this choice" : ""}.</p>`;
+  const shown = all.slice(0, state.lbShown);
+  const rows = shown.map((b) => `
+    <div class="bet-row">
+      <span>${esc(b.home)} v ${esc(b.away)}${driverChip(b)}<div class="meta">${esc(shortDate(b.date))}${!lg ? ` · ${esc(leagueShort(b.league))}` : ""} · ${esc(PICK_LABEL[b.market] || b.market)} @ ${american(b.odds)} (${Number(b.odds).toFixed(2)}) · ${sigmaText(b.z)}${b.tier === "strong" ? " Strong" : ""}</div><div class="meta">Blend ${pct(b.p_bet, 1)} · model ${pct(b.p_model, 1)} · CLV <span class="${plClass(b.clv)}">${signedPct(b.clv)}</span></div></span>
+      <span class="pl ${b.profit > 0 ? "win" : b.profit < 0 ? "loss" : ""}">${b.won ? "Won" : "Lost"}<div class="meta">${unitsText(b.profit, 2)}</div></span>
+    </div>`).join("");
+  return `
+    <div class="section-title">Bets, newest first</div>
+    <div class="card">${rows}</div>
+    ${all.length > shown.length ? `<button class="more" data-lbmore>Show more (${all.length - shown.length} left)</button>` : ""}
+    <p class="note">The newest ${(bt.bets_shown || 0).toLocaleString()} of ${(bt.bets_total || 0).toLocaleString()} bets are listed; every figure above uses all of them.</p>`;
+}
+function leanBacktestHtml(bt, lg = "") {
+  if (!bt || !bt.available) return `<div class="empty">${esc(bt?.note || "The Lean backtest isn't in this update.")}</div>`;
+  const part = lg ? bt.leagues?.[lg] : bt.all;
+  if (lg && !part) return `<div class="empty">No Lean backtest for ${esc(leagueName(lg))}.</div>`;
+  if (part?.error) return `<div class="empty">${esc(leagueName(lg))}: ${esc(part.error)}</div>`;
+  const m = part.lean || {};
+  const by = m.by_driver || {};
+  const note = bt.rule?.driver_note || driverNote();
+  const dk = bt.draftkings_replay;
+  const opts = [["", "All bets"], ["market", "Market-driven"], ["model", "Model-driven"]];
+  return `
+    <div class="verdict ${m.roi_ci95?.[0] > 0 ? "" : m.roi < 0 || m.clv < 0 ? "neg" : "mid"}">${esc(leanVerdict(bt))}</div>
+    <p class="note">${esc(bt.title || "Blend Lean replayed on Pinnacle's early prices")}${lg ? `, ${esc(leagueName(lg))}` : ", all six leagues"}. Money is in units: $1 a bet.</p>
+    ${lbTiles(m)}
+    ${lg ? "" : lbLeagueCharts(bt)}
+    <div class="section-title">Lean and Strong</div>
+    ${lbCompare([["Lean (1σ+, every bet)", m], ["Strong (2σ+)", part.strong]])}
+    <p class="note">Strong picks are the ones at 2σ or more; they are also counted in Lean.</p>
+    <div class="section-title">Market-driven and model-driven</div>
+    ${lbCompare([["Market-driven", by.market], ["Model-driven", by.model]])}
+    ${note ? `<p class="note">${esc(note)}</p>` : ""}
+    ${lbSeasons(part.by_season)}
+    ${lg ? lbLeagueDetails(part) : ""}
+    ${dk ? `<details class="fold mk-fold"><summary>${esc(dk.label || "DraftKings replay")}</summary><p class="note">${esc(dk.note || "")} ${dk.lean ? `Lean: ${dk.lean.bets} bet${dk.lean.bets === 1 ? "" : "s"}${dk.lean.roi != null ? `, ROI ${signedPct(dk.lean.roi)}` : ""}${dk.lean.clv_dk != null ? `, CLV vs DraftKings ${signedPct(dk.lean.clv_dk)}` : ""}.` : ""} ${dk.strong ? `Strong: ${dk.strong.bets} bets.` : ""}</p></details>` : ""}
+    <div class="segmented small-seg drv-seg" role="group" aria-label="Which backtest bets">
+      ${opts.map(([k, l]) => `<button data-pfdriver="${k}" class="${state.pfDriver === k ? "on" : ""}" aria-pressed="${state.pfDriver === k}">${esc(l)}</button>`).join("")}
+    </div>
+    ${lbBetList(bt, lg)}
+    <p class="note">${esc(bt.note || "")}${bt.generated_at ? ` Run ${esc(shortDate(bt.generated_at))}.` : ""}</p>`;
+}
+function lbLeagueDetails(l) {
+  const cov = (l.coverage || []).map((c) => `<tr><td>${esc(c.label || seasonName(c.season))}</td><td>${c.matches}</td><td>${pct(c.early_share)}</td><td>${pct(c.close_share)}</td><td>${c.included ? "Yes" : "No"}</td></tr>`).join("");
+  return `<details class="fold mk-fold"><summary>Seasons and fits</summary>
+    <p class="note">${l.training_matches ? `${l.training_matches.toLocaleString()} matches to fit on, ` : ""}${l.fits ? `${l.fits} fits (refitted every 28 days), ` : ""}${l.sigma ? `σ ${ptsText(l.sigma.min)} to ${ptsText(l.sigma.max)}` : ""}${l.seasons_excluded?.length ? `. Left out (too few Pinnacle prices): ${esc(l.seasons_excluded.join(", "))}` : ""}.</p>
+    ${cov ? `<div class="card" style="padding:8px 14px"><table class="mkts mk-table"><thead><tr><th></th><th>Matches</th><th>Early</th><th>Close</th><th>Used</th></tr></thead><tbody>${cov}</tbody></table></div>` : ""}
+  </details>`;
+}
+// Blend Lean's live trades of one driver: their trades, and the strategy's by_driver
+// summary for that group (a count only once a competition is also chosen: by_driver isn't
+// split by league).
+function driverSet(set, st, drv, lg) {
+  const trades = (set.trades || []).filter((t) => (driverOf(t) || "unknown") === drv);
+  const summary = !lg && st.by_driver?.[drv] ? st.by_driver[drv] : { trades: trades.length, open: trades.filter((t) => t.status === "open").length, settled: trades.filter((t) => t.status === "won" || t.status === "lost").length };
+  return { ...set, trades, summary, breakdowns: {}, by_league: null };
+}
+// Live: market-driven vs model-driven, side by side, with a filter for the rest of the view.
+function leanDriverPanel(st, lg) {
+  const by = st.by_driver || {};
+  const keys = ["market", "model", ...(by.unknown ? ["unknown"] : [])];
+  const cell = (k, f) => `<td>${f(by[k] || {})}</td>`;
+  const row = (label, f) => `<tr><td>${label}</td>${keys.map((k) => cell(k, f)).join("")}</tr>`;
+  const table = `
+    <div class="card" style="padding:8px 14px"><table class="mkts mk-table drv-table">
+      <thead><tr><th></th>${keys.map((k) => `<th>${esc(DRIVER_NAME[k])}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${row("Trades", (g) => `${g.trades || 0}<span class="mk-range">${g.open || 0} open · ${g.settled || 0} settled</span>`)}
+        ${row("Settled profit", (g) => `<span class="${plClass(g.profit)}">${usd(g.profit || 0)}</span>`)}
+        ${row("ROI", (g) => signedPct(g.roi))}
+        ${row("Win rate", (g) => (g.win_rate == null ? "–" : `${pct(g.win_rate)}<span class="mk-range">needs ${pct(g.breakeven)}</span>`))}
+        ${row("CLV vs DraftKings' close", (g) => `<span class="${plClass(g.clv_dk)}">${signedPct(g.clv_dk)}</span>`)}
+      </tbody>
+    </table></div>`;
+  const opts = [["", "All Lean"], ...keys.map((k) => [k, DRIVER_NAME[k]])];
+  const note = driverNote();
+  return `
+    <div class="section-title">What carried each pick</div>
+    ${table}
+    <p class="note">${lg ? "Every competition: this split isn't kept per competition. " : ""}Few trades so far, so these are counts, not a verdict.</p>
+    ${note ? `<details class="fold mk-fold"><summary>Market-driven or model-driven?</summary><p class="note">${esc(note)}</p></details>` : ""}
+    <div class="segmented small-seg drv-seg" role="group" aria-label="Which Lean picks">
+      ${opts.map(([k, l]) => `<button data-pfdriver="${k}" class="${state.pfDriver === k ? "on" : ""}" aria-pressed="${state.pfDriver === k}">${esc(l)}</button>`).join("")}
+    </div>`;
 }
 // " (Premier League 0.6 points, La Liga 1.9 points)" from the Lean rule's sigma per league.
 function sigmaList(by) {
@@ -2227,9 +2395,12 @@ function viewPortfolio() {
     </div>`;
   // Moneyline's live record per match strategy (Blend Lean first, then Model 12%): each its
   // own rule, summary, breakdowns, by_league; trade_ids point into the combined trades.
-  const strats = cur.id === "moneyline" && state.pfView === "live" ? pfSet()?.strategies || [] : [];
+  // The switch shows on Backtest too: Blend Lean's backtest is its own replay at Pinnacle
+  // (portfolio.strategy_backtests.lean); Model 12%'s is the DraftKings backtest.
+  const strats = cur.id === "moneyline" ? cur.live?.strategies || [] : [];
   const strat = strats.find((x) => x.key === state.pfStrat) || strats[0] || null;
-  const fullSet = strat ? stratSet(pfSet(), strat) : pfSet();
+  const leanBt = state.pfView === "backtest" && strat?.key === "lean";
+  const fullSet = state.pfView === "live" && strat ? stratSet(pfSet(), strat) : pfSet();
   const stratSwitch = strats.length > 1 ? `
     <div class="segmented small-seg strat-seg" role="group" aria-label="Match strategy">
       ${strats.map((x) => `<button data-pfstrat="${esc(x.key)}" class="${x.key === strat.key ? "on" : ""}" aria-pressed="${x.key === strat.key}">${esc(x.label)}</button>`).join("")}
@@ -2238,9 +2409,14 @@ function viewPortfolio() {
   const byComp = cur.id === "moneyline" || cur.id === "corners";
   const research = state.pfView === "backtest" && fullSet?.kind === "research";
   const lg = byComp && !research ? leagueOn() : "";
-  const set = fullSet && lg ? leagueSet(fullSet, lg) : fullSet;
+  const lgSet = fullSet && lg ? leagueSet(fullSet, lg) : fullSet;
+  // Blend Lean live: narrowed to market- or model-driven picks when one is chosen.
+  const leanLive = state.pfView === "live" && strat?.key === "lean";
+  const drv = leanLive ? state.pfDriver : "";
+  const set = drv && lgSet ? driverSet(lgSet, strat, drv, lg) : lgSet;
   const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
   if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
+  if (leanBt) return `${top}${leanBacktestHtml(state.data.portfolio?.strategy_backtests?.lean, lg)}${retiredLinks}`;
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = cur.id === "corners" && state.pfView === "live"
     ? `<div class="explain live-test"><b>Live test: fixed ${pct(set?.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${set?.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(set?.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back.</div>`
@@ -2269,7 +2445,7 @@ function viewPortfolio() {
         : state.pfView === "live"
           ? (rule.threshold == null ? "No new paper trades: no minimum edge has beaten the market in past bets." : `No paper trades yet. One opens when a pick reaches a ${pct(rule.threshold)} edge.`)
           : set ? "The backtest found no trades at this threshold." : "No backtest yet.";
-    return `${top}${ruleNote}${banner}<div class="empty">${empty}</div>${state.pfView === "backtest" && set ? pfBacktestExtras(set) : ""}${retiredLinks}${foot}`;
+    return `${top}${ruleNote}${leanLive ? leanDriverPanel(strat, lg) : ""}${banner}<div class="empty">${drv ? `No ${DRIVER_NAME[drv].toLowerCase()} Lean trades yet.` : empty}</div>${state.pfView === "backtest" && set ? pfBacktestExtras(set) : ""}${retiredLinks}${foot}`;
   }
   const settled = trades.filter((t) => t.status === "won" || t.status === "lost").slice().reverse()
     .map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, tradeClv(t), t.profit]);
@@ -2277,6 +2453,7 @@ function viewPortfolio() {
   return `
     ${top}
     ${ruleNote}
+    ${leanLive ? leanDriverPanel(strat, lg) : ""}
     ${banner}
     ${pfTiles(s, trades)}
     ${ci}
@@ -2374,6 +2551,7 @@ const TRADE_FIELDS = [
   [(t) => (isLean(t) || (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4) ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
   ["Raw model chance", (t) => pct(t.p_model, 1), (t) => isLean(t) && t.p_model != null],
   ["Break-even at entry", (t) => pct(1 / t.odds, 1), isLean],
+  ["What carried it", (t) => `${DRIVER_NAME[driverOf(t) || "unknown"]}${t.z_market != null ? ` (${sigmaText(t.z_market)} without the model's term)` : ""}${t.driver_from === "odds_log" ? "; worked out later from the logged price" : ""}`, isLean],
   ["Above break-even", (t) => `${sigmaText(t.z)} (${tierName(t)}${t.sigma != null ? `; σ = ${ptsText(t.sigma)}` : ""})`, (t) => isLean(t) && t.z != null],
   ["Raw model chance", (t) => pct(t.model_p_base, 1), (t) => isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4],
   ["Push chance", (t) => pct(t.p_push, 1), (t) => isCorner(t) && t.p_push > 0],
@@ -2460,6 +2638,12 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.pf) {
     state.pfView = t.dataset.pf; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    render();
+  } else if (t.dataset.pfdriver !== undefined) {
+    state.pfDriver = t.dataset.pfdriver; state.pfShown = 15; state.lbShown = 20;
+    render();
+  } else if (t.dataset.lbmore !== undefined) {
+    state.lbShown += 20;
     render();
   } else if (t.dataset.pfstrat) {
     state.pfStrat = t.dataset.pfstrat; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";

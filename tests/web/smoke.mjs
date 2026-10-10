@@ -178,7 +178,7 @@ const STEPS = [
     await p.click('.chip[data-league=""]');
     const card = p.locator("button.match", { hasText: "Leeds" }).first();
     const lean = await card.locator(".badge.lean").innerText();
-    if (!/Strong · 2\.6σ: Away/.test(lean) || lean.includes("Would pick")) throw new Error(`Lean badge: ${lean}`);
+    if (!/Strong · 2\.6σ: Away/.test(lean) || lean.includes("Would pick") || !lean.includes("Market-driven")) throw new Error(`Lean badge: ${lean}`);
     const open = await card.locator(".badge.paper").allInnerTexts();
     if (!open.some((t) => t.includes("(Lean): Away")) || !open.some((t) => t.includes("(12%): Draw"))) throw new Error(`open badges: ${open.join(" | ")}`);
     const second = await card.locator(".badge.second").innerText();
@@ -189,7 +189,7 @@ const STEPS = [
     const nt = p.locator("button.match", { hasText: "Tottenham" }).first();
     // Keyed on the 12% trade (over 2.5), the Lean badge would read "Would pick now".
     const ntLean = await nt.locator(".badge.lean").innerText();
-    if (!ntLean.includes("Lean · 1.1σ: Home") || ntLean.includes("Would pick")) throw new Error(`Newcastle Lean badge: ${ntLean}`);
+    if (!ntLean.includes("Lean · 1.1σ: Home") || ntLean.includes("Would pick") || !ntLean.includes("Model-driven")) throw new Error(`Newcastle Lean badge: ${ntLean}`);
     const ntSecond = await nt.locator(".badge.second").innerText();
     if (!ntSecond.startsWith("12% pick")) throw new Error(`Newcastle 12% badge: ${ntSecond}`);
     if ((await nt.locator(".badge.paper").allInnerTexts()).some((t) => t.includes("(Lean)"))) throw new Error("Newcastle shows a Lean trade it doesn't have");
@@ -199,7 +199,7 @@ const STEPS = [
   ["match-sheet-lean", async (p) => {
     await p.locator("button.match", { hasText: "Leeds" }).first().click(); await sheet(p);
     const text = await p.textContent("#sheet-body");
-    for (const want of ["Blend Lean: paper trade already open", "Away", "+2.6σ", "Premier League σ = 1.5 points", "Model 12%: paper trade already open", "Draw", "not on the model"]) {
+    for (const want of ["Blend Lean: paper trade already open", "Away", "+2.6σ", "Premier League σ = 1.5 points", "Model 12%: paper trade already open", "Draw", "not on the model", "market-driven", "mkt +2.2σ"]) {
       if (!text.includes(want)) throw new Error(`Lean match sheet lacks "${want}"`);
     }
     if (!(await p.locator("table.mkts.with-z th", { hasText: "σ" }).count())) throw new Error("no σ column");
@@ -207,7 +207,7 @@ const STEPS = [
   ["match-sheet-lean-new", async (p) => {
     await closeSheet(p); await p.locator("button.match", { hasText: "Tottenham" }).first().click(); await sheet(p);
     const text = await p.textContent("#sheet-body");
-    if (!text.includes("Blend Lean pick (Lean): Home") || !text.includes("A $10 paper trade opens")) throw new Error("Lean pick without a trade");
+    if (!text.includes("Blend Lean pick (Lean, model-driven): Home") || !text.includes("A $10 paper trade opens") || !text.includes("so the model pushed it over 1σ")) throw new Error("Lean pick without a trade");
   }, true],
   ["match-sheet-lean-none", async (p) => {
     await closeSheet(p); await p.locator("button.match", { hasText: "Liverpool" }).first().click(); await sheet(p);
@@ -301,7 +301,42 @@ const STEPS = [
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
   }, true],
   ["portfolio-live-lean-sp1", async (p) => { await closeSheet(p); await p.click('.chip[data-league="SP1"]'); if (!(await p.textContent("#view")).includes("Betis v Celta")) throw new Error("SP1 Lean trade"); }],
+  // Blend Lean live split by driver: the side-by-side table, a chip on each Lean trade and
+  // a filter (Wolves v Everton is model-driven, Spurs v Brentford market-driven).
+  ["portfolio-live-lean-drivers", async (p) => {
+    await p.click('.chip[data-league=""]');
+    const text = await p.textContent("#view");
+    for (const want of ["What carried each pick", "Market-driven", "Model-driven"]) if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    const chip = await p.locator('button[data-trade="E0|2627|Wolves|Everton|lean"] .drv').innerText();
+    if (chip !== "Model") throw new Error(`Wolves chip: ${chip}`);
+    await p.click('button[data-pfdriver="model"]');
+    const only = await p.textContent("#view");
+    if (!only.includes("Wolves v Everton") || only.includes("Spurs v Brentford")) throw new Error("model-driven filter");
+  }],
+  ["portfolio-live-lean-market", click('button[data-pfdriver="market"]')],
+  // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
+  ["portfolio-lean-backtest", async (p) => {
+    await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
+    const text = await p.textContent("#view");
+    for (const want of ["In the replay at Pinnacle's prices Lean", "Return by league", "Lean and Strong", "Market-driven and model-driven", "Bets, newest first", "units"]) {
+      if (!text.includes(want)) throw new Error(`Lean backtest lacks "${want}"`);
+    }
+    await p.click('.rc-row[data-rc="lbroi"][data-rcrow="0"]');
+    if (!(await p.textContent("#rc-readout-lbroi")).includes("bets")) throw new Error("ROI readout");
+  }],
+  ["portfolio-lean-backtest-model", async (p) => {
+    await p.click('button[data-pfdriver="model"]');
+    const chips = await p.locator(".bet-row .drv").allInnerTexts();
+    if (!chips.length || chips.some((c) => c !== "Model")) throw new Error(`model filter chips: ${chips.join(",")}`);
+    if (await p.locator("button[data-lbmore]").count()) await p.click("button[data-lbmore]");
+  }],
+  ["portfolio-lean-backtest-sp1", async (p) => {
+    await p.click('button[data-pfdriver=""]'); await p.click('.chip[data-league="SP1"]');
+    await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
+    if (!(await p.textContent("#view")).includes("matches to fit on")) throw new Error("SP1 fits");
+  }],
   ["portfolio-live-edge12", async (p) => {
+    await p.click('button[data-pf="live"]');
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
     const text = await p.textContent("#view");
     if (!text.includes("Your live test: fixed 12%") || text.includes("Wolves v Everton")) throw new Error("12% strategy view");
