@@ -69,6 +69,18 @@ jobs:
             git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/tt_state/$(basename "$f")"
           done
 
+      # Pinnacle team-corner snapshots already taken (owner's live test, 10 Oct): the corner
+      # call record (never fetch a snapshot twice; this month's spend for its own cap) and
+      # the logged prices, which the match sheet and the corners paper trades read.
+      - name: Read the corner call record and prices
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/corners_state"
+          git fetch --depth=1 origin data-log || exit 0
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E '/corners_calls_|_corners_'); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/corners_state/$(basename "$f")"
+          done
+
       - name: Build site
         env:
           PLAYER_GATE_FILE: ${{ runner.temp }}/players_gate.json
@@ -77,6 +89,10 @@ jobs:
           # branch, where the next step logs them to data-log. Empty elsewhere = off.
           TEAM_TOTALS_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/team_totals', runner.temp) || '' }}
           TEAM_TOTALS_STATE: ${{ runner.temp }}/tt_state
+          # Pinnacle team corners (owner-approved 10 Oct, own monthly cap): fetched only on
+          # the default branch, logged to data-log below. Empty elsewhere = off.
+          CORNERS_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/corners', runner.temp) || '' }}
+          CORNERS_STATE: ${{ runner.temp }}/corners_state
           # DraftKings odds via the-odds-api.com; empty if the secret isn't set yet.
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           # Free allowance assumed to reset on the 5th (key created 5 Oct); the code
@@ -126,6 +142,10 @@ jobs:
             if [ -d "$RUNNER_TEMP/team_totals" ]; then
               uv run soccer-stats log-team-totals --pending "$RUNNER_TEMP/team_totals" --log-dir ../log ||
                 echo "team-total log failed; ledger continues"
+            fi
+            if [ -d "$RUNNER_TEMP/corners" ]; then
+              uv run soccer-stats log-corners --pending "$RUNNER_TEMP/corners" --log-dir ../log ||
+                echo "corner log failed; ledger continues"
             fi
             uv run soccer-stats paper --site _site --log-dir ../log
             git -C ../log add -A

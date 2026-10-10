@@ -1,5 +1,5 @@
 {
-  "about": "Research results for goal and corner markets, shown on Record > Goals & corners. Every number is copied verbatim from docs/totals.md (rounds 8, 11 and 12) and CLAUDE.md's Status; nothing here is recomputed. Ranges are as published (Bonferroni-widened where the doc says so).",
+  "about": "Research results for goal and corner markets, shown on Record > Goals & corners. Every number is copied verbatim from docs/totals.md (rounds 8, 11, 12 and 13) and CLAUDE.md's Status; nothing here is recomputed. Ranges are as published (Bonferroni-widened where the doc says so).",
   "updated": "2026-10-10",
   "total_goals": {
     "verdict": "No edge. The model loses to Pinnacle's price at 2.5 goals in all six leagues.",
@@ -67,6 +67,26 @@
   },
   "corners": {
     "verdict": "No edge shown. Each team's corners beat the league average, but the chances are too spread out; total corners do no better than the average.",
+    "development": {
+      "title": "Bake-off 2: model (f), development",
+      "model": "f",
+      "model_name": "team averages, empirical-Bayes shrinkage",
+      "seasons": "2017/18–2023/24",
+      "level": "99.722%",
+      "slope_band": [0.8, 1.25],
+      "source": "docs/totals.md, Corners bake-off 2: development results (round 13)",
+      "runs": {"E0": "38039635517", "SP1": "38039636958", "D1": "38039638336", "I1": "38039639516", "F1": "38039640916", "E1": "38039642433"},
+      "test": "Locked: 2026/27 kickoffs to 31 Jan 2027, opened once no earlier than 3 Feb 2027, for the finalists (E0, I1, F1).",
+      "others_names": {"b": "team averages, 10 pseudo-matches (round 11, reference)", "g": "(f) + Pinnacle game state", "h": "(f) + style form"},
+      "rows": [
+        {"league": "E0", "matches": 2660, "gain": 0.0471, "lo": 0.0348, "hi": 0.0594, "slopes": "0.86–0.98", "line_slopes": {"home_3.5": 0.98, "home_4.5": 0.89, "home_5.5": 0.94, "away_3.5": 0.91, "away_4.5": 0.92, "away_5.5": 0.86}, "passes": true, "finalist": "f", "others": {"b": {"gain": 0.0473, "lo": 0.0351, "hi": 0.0595, "slopes": "0.86–1.00", "passes": false}, "g": {"gain": 0.0488, "lo": 0.0351, "hi": 0.0628, "slopes": "0.77–0.89", "passes": false}, "h": {"gain": 0.0458, "lo": 0.0323, "hi": 0.0598, "slopes": "0.73–0.88", "passes": false}}},
+        {"league": "SP1", "matches": 2660, "gain": 0.0147, "lo": 0.0063, "hi": 0.023, "slopes": "0.69–0.79", "line_slopes": {"home_3.5": 0.69, "home_4.5": 0.77, "home_5.5": 0.79, "away_3.5": 0.77, "away_4.5": 0.78, "away_5.5": 0.77}, "passes": false, "finalist": null, "others": {"b": {"gain": 0.0152, "lo": 0.0056, "hi": 0.0248, "slopes": "0.66–0.74", "passes": false}, "g": {"gain": 0.013, "lo": 0.0024, "hi": 0.0236, "slopes": "0.59–0.69", "passes": false}, "h": {"gain": 0.01, "lo": -0.0012, "hi": 0.0212, "slopes": "0.54–0.66", "passes": false}}},
+        {"league": "D1", "matches": 2042, "gain": 0.0294, "lo": 0.0178, "hi": 0.041, "slopes": "0.78–0.97", "line_slopes": {"home_3.5": 0.78, "home_4.5": 0.79, "home_5.5": 0.79, "away_3.5": 0.9, "away_4.5": 0.97, "away_5.5": 0.92}, "passes": false, "finalist": null, "others": {"b": {"gain": 0.0303, "lo": 0.0181, "hi": 0.0424, "slopes": "0.76–0.94", "passes": false}, "g": {"gain": 0.0297, "lo": 0.016, "hi": 0.0436, "slopes": "0.69–0.84", "passes": false}, "h": {"gain": 0.0261, "lo": 0.0121, "hi": 0.0398, "slopes": "0.65–0.79", "passes": false}}},
+        {"league": "I1", "matches": 2660, "gain": 0.034, "lo": 0.0239, "hi": 0.0444, "slopes": "0.84–0.92", "line_slopes": {"home_3.5": 0.89, "home_4.5": 0.91, "home_5.5": 0.88, "away_3.5": 0.92, "away_4.5": 0.88, "away_5.5": 0.84}, "passes": true, "finalist": "f", "others": {"b": {"gain": 0.0343, "lo": 0.0242, "hi": 0.0451, "slopes": "0.84–0.91", "passes": false}, "g": {"gain": 0.0344, "lo": 0.023, "hi": 0.0466, "slopes": "0.74–0.84", "passes": false}, "h": {"gain": 0.0309, "lo": 0.0192, "hi": 0.0431, "slopes": "0.72–0.79", "passes": false}}},
+        {"league": "F1", "matches": 2485, "gain": 0.0125, "lo": 0.0059, "hi": 0.0191, "slopes": "0.84–1.01", "line_slopes": {"home_3.5": 1.01, "home_4.5": 0.89, "home_5.5": 0.98, "away_3.5": 0.96, "away_4.5": 0.86, "away_5.5": 0.84}, "passes": true, "finalist": "f", "others": {"b": {"gain": 0.0123, "lo": 0.0038, "hi": 0.0207, "slopes": "0.67–0.85", "passes": false}, "g": {"gain": 0.0127, "lo": 0.0032, "hi": 0.0219, "slopes": "0.62–0.82", "passes": false}, "h": {"gain": 0.0116, "lo": 0.0016, "hi": 0.0214, "slopes": "0.60–0.75", "passes": false}}},
+        {"league": "E1", "matches": 3863, "gain": 0.0099, "lo": 0.0045, "hi": 0.0151, "slopes": "0.65–0.85", "line_slopes": {"home_3.5": 0.74, "home_4.5": 0.65, "home_5.5": 0.78, "away_3.5": 0.85, "away_4.5": 0.79, "away_5.5": 0.77}, "passes": false, "finalist": null, "others": {"b": {"gain": 0.009, "lo": 0.0028, "hi": 0.0153, "slopes": "0.58–0.74", "passes": false}, "g": {"gain": 0.0097, "lo": 0.0026, "hi": 0.0168, "slopes": "0.59–0.70", "passes": false}, "h": {"gain": 0.0069, "lo": -0.0001, "hi": 0.014, "slopes": "0.53–0.65", "passes": false}}}
+      ]
+    },
     "holdout": {
       "title": "Bake-off, tested on 2024/25",
       "seasons": "development 2017/18–2023/24, holdout 2024/25",

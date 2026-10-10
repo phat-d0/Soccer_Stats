@@ -218,6 +218,18 @@ PORTFOLIOS = [
         "backtest": "goalscorer",
     },
     {
+        "id": "corners",
+        "name": "Team corners",
+        "status": "testing",
+        "note": "Owner's live test (10 Oct): each team's corners, model (f) at a 12% edge "
+        "against Pinnacle's team-corner prices in six leagues, $10 a trade. In development the "
+        "model beat the league average in all six leagues, but its chances were well "
+        "calibrated only in the Premier League, Serie A and Ligue 1; the locked February test "
+        "decides it. There are no historical corner prices, so its backtest is the research "
+        "record, not money.",
+        "backtest": "corners",
+    },
+    {
         "id": "player_shots",
         "name": "Player shots",
         "status": "retired",
@@ -232,6 +244,7 @@ PORTFOLIO_MARKETS = {
     "player_shots": "player_shots",
     "player_shots_on_target": "player_shots",
     "player_goal_scorer_anytime": "goalscorer",
+    "team_corners": "corners",
 }
 
 
@@ -242,6 +255,8 @@ def portfolio_of(trade: dict) -> str:
         return trade["portfolio"]
     if trade.get("market") in PORTFOLIO_MARKETS:
         return PORTFOLIO_MARKETS[trade["market"]]
+    if trade.get("bet_type") == "corners":
+        return "corners"
     return "player_shots" if trade.get("bet_type") == "player" else "moneyline"
 
 
@@ -420,6 +435,113 @@ def clv(entry_odds: float, market: str, close: dict) -> float | None:
         return None
     p = devig_shin(np.array(prices, dtype=float))[group.index(market)]
     return float(entry_odds * p - 1)
+
+
+# ---------- team corners (owner's live test, 10 Oct 2026) ----------
+
+# Corners model (f) (edge/corners2.py) against Pinnacle's team-corner prices in every live
+# league: the model's own chance, edge = P(win) x Pinnacle's decimal price + P(push) - 1
+# (= p x odds - 1 on a half line), at least CORNERS_EDGE, $10, at most one trade per match,
+# team and line (the better of over and under). Paper only; P/L and CLV only, no metric of
+# the locked February test (docs/totals.md, corners bake-off 2).
+CORNERS_EDGE = PAPER_EDGE
+CORNERS_MARKET = "team_corners"
+CORNERS_NOTE = (
+    "Owner's live test (10 Oct): corners model (f) at a fixed 12% edge on its own chance "
+    "against Pinnacle's team-corner prices, all six leagues. The February test is unchanged."
+)
+
+CORNER_ENTRY_FIELDS = (*ENTRY_FIELDS, "team_side", "p_push", "bookmaker")
+
+
+def corners_rule() -> dict:
+    """The corners paper rule, as paper_threshold's dict (the app reads the same shape)."""
+    return {
+        "threshold": CORNERS_EDGE,
+        "source": "owner_fixed",
+        "note": CORNERS_NOTE,
+        "rule": "fixed_raw",
+        "p_source": "model_f",
+        "book": "pinnacle",
+        "stake": STAKE,
+    }
+
+
+def new_corner_trade(
+    pick: dict,
+    *,
+    league: str,
+    home: str,
+    away: str,
+    team_side: str,
+    line: float,
+    kickoff: pd.Timestamp,
+    opened_at: pd.Timestamp,
+    odds_fetched_at: str | None,
+    snapshot: str | None,
+    ref: dict | None = None,
+) -> dict:
+    """A corners paper trade: new_trade's shape plus the team line. `pick` is
+    corners_live.pick's {side, odds, model_p, p_push, edge}. The id adds the team side and
+    line, so a match can hold one trade per team line."""
+    t = new_trade(
+        {
+            "market": CORNERS_MARKET,
+            "odds": pick["odds"],
+            "model_p": pick["model_p"],
+            "edge": pick["edge"],
+            "line": float(line),
+            "side": pick["side"],
+        },
+        source="live",
+        league=league,
+        home=home,
+        away=away,
+        kickoff=kickoff,
+        opened_at=opened_at,
+        odds_fetched_at=odds_fetched_at,
+        threshold=CORNERS_EDGE,
+        model_ref=ref,
+        look=snapshot,
+        rule="fixed_raw",
+        p_source="model_f",
+    )
+    t.update(
+        id=trade_id(league, t["season"], home, away, "corners", team_side, f"{float(line):g}"),
+        bet_type="corners",
+        portfolio="corners",
+        team=home if team_side == "home" else away,
+        team_side=team_side,
+        p_push=pick.get("p_push", 0.0),
+        bookmaker="pinnacle",
+    )
+    return t
+
+
+def settle_corner(trade: dict, count: int | None) -> dict:
+    """Settlement for a team-corner bet from the team's corner count: over wins at count
+    > line, under at count < line; count == line (a whole line) is a push, voided with the
+    stake back. No count: void."""
+    if count is None or (isinstance(count, float) and math.isnan(count)):
+        return {"status": "void", "actual": None, "push": False, "profit": 0.0}
+    count, line = int(count), float(trade["line"])
+    if count == line:
+        return {"status": "void", "actual": count, "push": True, "profit": 0.0}
+    w = count > line if trade["side"] == "over" else count < line
+    return {
+        "status": "won" if w else "lost",
+        "actual": count,
+        "push": False,
+        "profit": round(trade["stake"] * (trade["odds"] - 1), 2) if w else -trade["stake"],
+    }
+
+
+def corner_clv(entry_odds: float, side: str, over: float | None, under: float | None):
+    """Entry odds x Pinnacle's margin-free closing chance of the side - 1 (Shin)."""
+    fair = devig_pair(over, under)
+    if fair is None:
+        return None
+    return float(entry_odds * (fair[0] if side == "over" else fair[1]) - 1)
 
 
 def bucket(x: float, buckets) -> str | None:
