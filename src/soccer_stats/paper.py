@@ -28,10 +28,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from soccer_stats import lean_backtest as lb
 from soccer_stats import odds_log as ol
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
+LEAN_BACKTEST = "lean_backtest.json"  # on data-log under backtest/ (soccer-stats backtest-lean)
 FRESH_HOURS = 3.0  # only open on odds fetched this recently
 VOID_MOVED_HOURS = 48.0
 VOID_AFTER_DAYS = 14
@@ -49,6 +51,10 @@ UPDATE_FIELDS = {
     "score",
     "profit",
     "settled_at",
+    # Lean trades opened before 11 Oct get their driver once (_lean_driver_update).
+    "z_market",
+    "driver",
+    "driver_from",
 }
 
 
@@ -274,6 +280,13 @@ def update_ledger(
             ev = _log_close(t, odds_log, now)
             if ev:
                 events.append(ev)
+        # Lean trades opened before trades recorded their driver get it once, from the
+        # logged quote they opened on (an update event; entry fields never change).
+        for t in ledger.values():
+            if t["source"] == "live":
+                ev = _lean_driver_update(t, odds_log, (lean or {}).get("coef"), now)
+                if ev:
+                    events.append(ev)
 
     # 2. Track the close and catch moved fixtures; 3. settle.
     for t in ledger.values():
@@ -334,7 +347,10 @@ def update_ledger(
 def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | None:
     """Open the Lean trade for one card (trades.lean_pick on its p_bet), unless the match
     already has one or nothing reaches 1 sigma; returns its open event."""
-    pick = tr.lean_pick(c.get("p_bet"), c.get("odds"), lean["sigma"], lean.get("min_z", tr.LEAN_Z))
+    zm = tr.market_side_z(lean.get("coef"), c.get("odds"), lean["sigma"])
+    pick = tr.lean_pick(
+        c.get("p_bet"), c.get("odds"), lean["sigma"], lean.get("min_z", tr.LEAN_Z), zm or {}
+    )
     if not pick:
         return None
     t = tr.new_trade(
@@ -357,6 +373,8 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | No
         return None
     t.update(
         z=round(pick["z"], 3),
+        z_market=None if pick.get("z_market") is None else round(pick["z_market"], 3),
+        driver=pick.get("driver"),
         tier=pick["tier"],
         sigma=round(pick["sigma"], 5),
         p_bet=round(pick["p_bet"], 4),
@@ -369,6 +387,51 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | No
     t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
     ledger[t["id"]] = t
     return {"type": "open", **t}
+
+
+def _entry_quote(t: dict, log: pd.DataFrame) -> dict | None:
+    """The logged DraftKings h2h quote a live trade opened on: the row downloaded with the
+    trade's odds (`odds_fetched_at`), else the last one quoted at or before it opened."""
+    if log is None or log.empty or "prices" not in log:
+        return None
+    k = pd.Timestamp(t["kickoff"])
+    k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+    m = log[
+        (log["home"] == t["home"])
+        & (log["away"] == t["away"])
+        & (log["market"] == "h2h")
+        & ((log["kickoff"] - k).abs() <= ol.KICKOFF_TOLERANCE)
+    ]
+    if m.empty:
+        return None
+    if t.get("odds_fetched_at") and "downloaded_at" in m:
+        at = pd.Timestamp(t["odds_fetched_at"])
+        at = at.tz_localize("UTC") if at.tz is None else at.tz_convert("UTC")
+        same = m[pd.to_datetime(m["downloaded_at"], utc=True) == at]
+        if not same.empty:
+            return same.iloc[-1].to_dict()
+    opened = pd.Timestamp(t["opened_at"])
+    opened = opened.tz_localize("UTC") if opened.tz is None else opened.tz_convert("UTC")
+    before = m[m["fetched_at"] <= opened]
+    return before.iloc[-1].to_dict() if not before.empty else None
+
+
+def _lean_driver_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> dict | None:
+    """For a Lean trade opened before trades recorded their driver (no `z_market` field):
+    an update event with z_market (trades.market_side_z on the logged DraftKings h2h
+    prices it opened on, the league's blend coefficients and the trade's own sigma), its
+    driver and `driver_from` "odds_log". Entry fields never change; None when the quote
+    or the coefficients aren't there (it tries again next build)."""
+    if "z_market" in t or tr.strategy_of(t) != "lean" or not coef or not t.get("sigma"):
+        return None
+    row = _entry_quote(t, log)
+    prices = (row or {}).get("prices")
+    if not isinstance(prices, dict):
+        return None
+    zm = (tr.market_side_z(coef, prices, t["sigma"]) or {}).get(t["market"])
+    if zm is None:
+        return None
+    return _update(t, now, z_market=round(zm, 3), driver=tr.lean_driver(zm), driver_from="odds_log")
 
 
 def _fresh(fetched: str | None, now: pd.Timestamp) -> bool:
@@ -775,7 +838,7 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
     are in the section's combined `trades`, so data.json carries each trade once)."""
     mine = [t for t in trades if tr.strategy_of(t) == key]
     sec = portfolio_section(mine)
-    return {
+    out = {
         "key": key,
         "label": label,
         "rule": rule,
@@ -784,6 +847,24 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
         "by_league": by_league(mine),
         "trade_ids": [t["id"] for t in sec["trades"]],
     }
+    if key == "lean":
+        out["by_driver"] = by_driver(mine)
+        out["driver_note"] = tr.DRIVER_NOTE
+    return out
+
+
+def by_driver(trades: list[dict]) -> dict:
+    """Lean trades split by what carried each pick (trades.lean_driver): {market: summary,
+    model: summary}, plus `unknown` only when some trade has no driver yet (opened before
+    trades recorded it and not yet matched to the odds log). Same summary as the
+    section's (trades, settled, profit, roi, roi_ci95, clv_dk, beat_close_dk, ...)."""
+    groups: dict[str, list[dict]] = {"market": [], "model": []}
+    for t in trades:
+        d = t.get("driver")
+        if d not in groups and "unknown" not in groups:
+            groups["unknown"] = []
+        groups[d if d in ("market", "model") else "unknown"].append(t)
+    return {k: portfolio_section(v)["summary"] for k, v in groups.items()}
 
 
 def lean_overview(leans: dict[str, dict]) -> dict:
@@ -1048,6 +1129,10 @@ def run(
                 combined = (b.get("trades") or []) + ptrades
                 merged = portfolio_section(combined)
                 portfolio["backtest"] = {**b, **merged}
+    # Blend Lean's own backtest (backtest-lean on Pinnacle's early prices), trimmed for
+    # data.json; no file = {available: False, note}.
+    found = _read_json(Path(log_dir) / "backtest" / LEAN_BACKTEST) if log_dir else None
+    portfolio["strategy_backtests"] = {"lean": lb.app_section(found)}
     portfolio["live"] = live
     # One portfolio per strategy (the app reads these); live, backtest and player_model
     # above stay for one release.

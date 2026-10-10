@@ -127,6 +127,22 @@ def apply(coef: list[float] | None, market, model, extra=None) -> np.ndarray:
     return out
 
 
+def without_model(coef: list[float] | None, market) -> np.ndarray:
+    """The blend with its model term removed: c = 0, a_k and b kept (and no extra signal
+    terms), so the chance moves only through the price. (n, K); NaN without coefficients.
+
+    Blend Lean's driver test (trades.lean_driver): a pick that still reaches 1 sigma on
+    this alone comes from the price ("market"), otherwise from the model term ("model").
+    """
+    market = np.atleast_2d(np.asarray(market, dtype=float))
+    if coef is None:
+        return np.full(market.shape, np.nan)
+    k = market.shape[1]
+    w = [float(v) for v in coef[: k + 1]]
+    w[k] = 0.0
+    return apply(w, market, market)
+
+
 def blend_card(coefs: dict | None, probs: dict, implied: dict) -> dict | None:
     """The blended chance per market for one fixture (live), or None without a fit.
 

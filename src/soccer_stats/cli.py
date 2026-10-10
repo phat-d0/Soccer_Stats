@@ -723,6 +723,123 @@ def cmd_fit_match_blends(args: argparse.Namespace) -> None:
         print(f"Match blends written to {path}")
 
 
+def _fmt_range(r) -> str:
+    return f"{r[0]:+.1%} to {r[1]:+.1%}" if r else "n/a"
+
+
+def _print_lean_block(label: str, m: dict) -> None:
+    if not m.get("bets"):
+        print(f"  {label}: 0 bets")
+        return
+    clv = "n/a" if m.get("clv") is None else f"{m['clv']:+.1%}"
+    print(
+        f"  {label}: {m['bets']} bets, won {m['win_rate']:.1%} vs break-even "
+        f"{m['breakeven']:.1%}, ROI {m['roi']:+.1%} ({_fmt_range(m.get('roi_ci95'))}), "
+        f"CLV {clv} ({_fmt_range(m.get('clv_ci95'))}, {m['clv_bets']} with a close), "
+        f"avg odds {m['avg_odds']:.2f}"
+    )
+
+
+def _print_lean(name: str, rep: dict) -> None:
+    print(f"\n=== Blend Lean on Pinnacle early: {name} ===")
+    if rep.get("error"):
+        print(f"  {rep['error']}")
+        return
+    if rep.get("coverage"):
+        print(
+            "  Pinnacle early/close coverage: "
+            + ", ".join(
+                f"{c['label']} {c['early_share']:.0%}/{c['close_share']:.0%}"
+                + ("" if c["included"] else " (left out)")
+                for c in rep["coverage"]
+            )
+        )
+    if "fits" in rep:
+        sig = rep.get("sigma") or {}
+        print(
+            f"  {rep['fits']} fits from {rep.get('first_fit')}, sigma "
+            + (f"{sig['min']:.4f}-{sig['max']:.4f}" if sig else "n/a")
+            + f", {rep.get('candidates', 0)} matches scored"
+        )
+    for tier in ("lean", "strong"):
+        m = rep.get(tier) or {}
+        _print_lean_block(tier.capitalize(), m)
+        for d, dm in (m.get("by_driver") or {}).items():
+            _print_lean_block(f"  {tier} / {d}", dm)
+    for s in rep.get("by_season") or []:
+        _print_lean_block(f"{s['label']}", s)
+
+
+def cmd_backtest_lean(args: argparse.Namespace) -> None:
+    """Blend Lean replayed walk-forward on Pinnacle's early prices, per league
+    (lean_backtest.py). Football-data and Understat only: no Odds API key, no credits."""
+    import json
+
+    from soccer_stats import leagues as lgs
+    from soccer_stats import lean_backtest as lb
+    from soccer_stats.data import pinnacle_prices
+    from soccer_stats.publish import XG_WEIGHT, _clean
+
+    codes = args.leagues or lgs.live_codes()
+    last = current_season()
+    years = range(args.from_season - args.burn_in, last + 1)
+    reports: dict[str, dict] = {}
+    all_bets: list[pd.DataFrame] = []
+    for code in codes:
+        try:
+            matches = load_matches([code], years)
+            matches, err = with_xg(matches)
+            if err and lgs.LEAGUES[code].understat:
+                print(f"{lgs.name(code)}: {err}")
+            weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+            factory = functools.partial(DixonColes, xg_weight=weight)
+            preds = backtest.walk_forward(
+                matches, start=f"{args.from_season}-07-01", model_factory=factory
+            )
+            pins = pinnacle_prices(code, range(args.from_season, last + 1))
+            rep, b = lb.league_report(code, preds, pins)
+            rep["xg_weight"] = weight
+        except Exception as exc:  # one league failing never costs the others
+            rep, b = {"error": f"{type(exc).__name__}: {exc}"}, lb.bets(pd.DataFrame(), code)
+        reports[code] = rep
+        all_bets.append(b)
+        _print_lean(lgs.name(code), rep)
+    dk = None
+    if args.dk_file and Path(args.dk_file).exists():
+        try:
+            dk = json.loads(Path(args.dk_file).read_text())
+        except ValueError:
+            dk = None
+    out = lb.build(
+        reports,
+        all_bets,
+        from_season=args.from_season,
+        dk=dk,
+        names={c: lgs.name(c) for c in codes},
+    )
+    _print_lean("all leagues pooled", out["all"])
+    for code, m in out["all"]["by_league"].items():
+        _print_lean_block(code, m)
+    rep = out["draftkings_replay"]
+    if rep:
+        print(f"\n=== {rep['label']} ===")
+        for tier in ("lean", "strong"):
+            m = rep.get(tier) or {}
+            roi = "n/a" if m.get("roi") is None else f"{m['roi']:+.1%}"
+            print(f"  {tier.capitalize()}: {m.get('bets', 0)} bets, ROI {roi}")
+    print(f"\n{out['bets_total']} bets in all ({len(out['bets'])} rows kept)")
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = Path(args.log_dir) / "backtest" / "lean_backtest.json"
+    else:
+        path = None
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"Lean backtest written to {path}")
+
+
 def _print_goals(goals: dict) -> None:
     print("\n=== Anytime goalscorer (stage 1: no odds), P(scores | plays) ===")
     for view in ("before_lineups", "lineup_known"):
@@ -1780,6 +1897,23 @@ def main(argv: list[str] | None = None) -> None:
     mb.add_argument("--json", help="path for the fits")
     mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
     mb.set_defaults(func=cmd_fit_match_blends)
+
+    lbk = sub.add_parser(
+        "backtest-lean",
+        help="replay Blend Lean walk-forward on Pinnacle's early prices per league (no key)",
+    )
+    lbk.add_argument("--leagues", nargs="+", help="football-data codes (default: every live one)")
+    lbk.add_argument(
+        "--from-season",
+        type=int,
+        default=2019,
+        help="first season of blend rows and bets (start year; the live fit starts 2022)",
+    )
+    lbk.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    lbk.add_argument("--dk-file", help="E0_dk.json, for the DraftKings tiers beside the replay")
+    lbk.add_argument("--json", help="path for the results")
+    lbk.add_argument("--log-dir", help="data-log checkout: writes backtest/lean_backtest.json")
+    lbk.set_defaults(func=cmd_backtest_lean)
 
     bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
     bp.add_argument("--league", default="E0")

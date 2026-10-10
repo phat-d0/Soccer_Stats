@@ -31,6 +31,7 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from soccer_stats import match_calibration as mc
 from soccer_stats.odds import devig_shin
 
 PAPER_EDGE = 0.12  # the fixed edge: backtest sweeps, and live trades before any learned level
@@ -197,14 +198,55 @@ def side_z(p_bet: dict | None, odds: dict | None, sigma: float | None) -> dict |
     return out
 
 
+# What `driver` means, in plain English, for the app (Lean live section and the backtest).
+DRIVER_NOTE = (
+    "Market-driven: the pick still clears 1 sigma when the model's term is taken out of the "
+    "fitted blend (the blend's other weights are kept as fitted, not refitted). Model-driven: "
+    "it clears 1 sigma only with the model's term in. The model's term compares the model's "
+    "chances across home, draw and away, not against the price, so where the model's weight "
+    "is positive it lifts the outcome the model rates highest relative to the others, even "
+    "when the model rates that outcome below the market."
+)
+
+
+def lean_driver(z_market: float | None) -> str | None:
+    """What carried a Lean pick: "market" when it reaches LEAN_Z even with the model term
+    removed (z_market, market_side_z), else "model"; None when z_market is unknown."""
+    if not _ok(z_market):
+        return None
+    return "market" if z_market >= LEAN_Z - EPS else "model"
+
+
+def market_side_z(coef: list | None, odds: dict | None, sigma: float | None) -> dict | None:
+    """z per home/draw/away with the blend's model term removed (c = 0; the league's a_k
+    and b kept): the blend of the price alone, from the margin-free (Shin) chances of
+    these `odds`, against their break-even (1/decimal) in units of `sigma`. None without
+    coefficients, sigma or a full priced home/draw/away."""
+    if not coef or not odds:
+        return None
+    prices = [odds.get(m) for m in LEAN_MARKETS]
+    if not all(_ok(o) and o > 1 for o in prices):
+        return None
+    fair = devig_shin(np.array(prices, dtype=float))
+    pm = mc.without_model(coef, [fair])[0]
+    if not np.isfinite(pm).all():
+        return None
+    return side_z({m: float(v) for m, v in zip(LEAN_MARKETS, pm, strict=True)}, odds, sigma)
+
+
 def lean_pick(
-    p_bet: dict | None, odds: dict | None, sigma: float | None, min_z: float = LEAN_Z
+    p_bet: dict | None,
+    odds: dict | None,
+    sigma: float | None,
+    min_z: float = LEAN_Z,
+    z_market: dict | None = None,
 ) -> dict | None:
     """The Lean pick: the home/draw/away side with the highest z, if z >= min_z.
 
     Returns {market, odds, p_bet, model_p (= p_bet, the chance it trades on), edge (p_bet x
     odds - 1), z, tier ("strong" at z >= STRONG_Z, else "lean"), sigma}, or None. Ties keep
-    the first side in market order, as best_pick does.
+    the first side in market order, as best_pick does. With `z_market` (market_side_z) the
+    pick adds the picked side's `z_market` and its `driver` (lean_driver).
     """
     z = side_z(p_bet, odds, sigma)
     if not z:
@@ -216,7 +258,7 @@ def lean_pick(
     if best is None or z[best] < min_z - EPS:
         return None
     p, o = float(p_bet[best]), float(odds[best])
-    return {
+    out = {
         "market": best,
         "odds": o,
         "p_bet": p,
@@ -226,11 +268,16 @@ def lean_pick(
         "tier": "strong" if z[best] >= STRONG_Z - EPS else "lean",
         "sigma": float(sigma),
     }
+    if z_market is not None:
+        zm = z_market.get(best)
+        out["z_market"] = float(zm) if _ok(zm) else None
+        out["driver"] = lean_driver(out["z_market"])
+    return out
 
 
 def lean_rule(blends: dict | None, league: str) -> dict:
     """The Lean rule for one league: {key, rule, min_z, strong_z, p_source, stake, sigma,
-    matches, source, note}. `blends` is data.json's `match_blends` (publish.add_lean); no
+    coef, matches, source, note}. `blends` is data.json's `match_blends` (publish.add_lean); no
     file or no fit for the league = sigma None, so no Lean picks, and the note says why."""
     entry = ((blends or {}).get("leagues") or {}).get(league) or {}
     sd = entry.get("sigma")
@@ -252,6 +299,7 @@ def lean_rule(blends: dict | None, league: str) -> dict:
         "p_source": "blend",
         "stake": STAKE,
         "sigma": float(sd) if ok else None,
+        "coef": entry.get("coef") if ok else None,  # for the driver test (market_side_z)
         "matches": entry.get("matches"),
         "source": "match_blends" if ok else "none",
         "note": note,
@@ -382,8 +430,10 @@ ENTRY_FIELDS = (
     "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
     "player player_id team line side position portfolio rule p_source strategy"
 ).split()
-# A Lean trade also records how it qualified (trades.lean_pick) and the raw model chance.
-LEAN_ENTRY_FIELDS = (*ENTRY_FIELDS, "z", "tier", "sigma", "p_bet", "p_model")
+# A Lean trade also records how it qualified (trades.lean_pick), the raw model chance and
+# its driver (z with the model term removed; trades opened before 11 Oct get both from a
+# paper update event instead, paper._lean_driver_update).
+LEAN_ENTRY_FIELDS = (*ENTRY_FIELDS, "z", "tier", "sigma", "p_bet", "p_model", "z_market", "driver")
 
 
 def new_trade(
