@@ -126,7 +126,7 @@ corners* (`trades.PORTFOLIOS` id `corners`, status testing), in all six live lea
 | Settlement | football-data's corner counts: over wins at count > line; a whole line that lands exactly is a push (void, stake back); void if the match moves 48h+ or no result in 14 days |
 
 Prices come from `corners_live.run` inside `publish` (default branch only): one
-1-credit `/events/{id}/odds` call per match and snapshot, its own 500-credit monthly cap
+1-credit `/events/{id}/odds` call per match and snapshot, its own 550-credit monthly cap
 and the shared 3,000-credit reserve, logged to `odds_log/<code>_corners_<YYYY-MM>.jsonl`
 by `soccer-stats log-corners`. Trades go to `paper_trades/<code>_corners_<season>.jsonl`.
 There are no historical corner prices, so the portfolio's backtest is the research record

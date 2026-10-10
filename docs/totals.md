@@ -1139,8 +1139,8 @@ live and a corners paper portfolio, in all six live leagues:
   probe's discovery bodies list it at Pinnacle in all six leagues, one line per team,
   two-sided, median margin 5.8–7.0%). A look 18–30 h and a close ≤30 min before kickoff,
   on the team-total schedule, one `/events/{id}/odds` call per snapshot with
-  `bookmakers=pinnacle` and that one market (1 credit). Own monthly cap of 500 credits
-  (`corners_live.CORNERS_MONTHLY_CAP`, separate from the team-total test's 800), the
+  `bookmakers=pinnacle` and that one market (1 credit). Own monthly cap of 550 credits
+  (`corners_live.CORNERS_MONTHLY_CAP`; 500 until the owner raised it on 10 Oct, separate from the team-total test's 800), the
   shared 3,000-credit reserve, a call record per (event, snapshot, market group). Rows in
   `odds_log/<code>_corners_<YYYY-MM>.jsonl` (`market: "team_corners"`), calls in
   `odds_log/corners_calls_<YYYY-MM>.jsonl`. Estimate about 450 credits a month.

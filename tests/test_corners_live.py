@@ -246,7 +246,7 @@ def _record(path, cost, credits=None, at=DAY_BEFORE, name="corners_calls"):
     (path / f"{name}_{at:%Y-%m}.jsonl").write_text(json.dumps(row) + "\n")
 
 
-@pytest.mark.parametrize("spent, allowed", [(499, True), (500, False)])
+@pytest.mark.parametrize("spent, allowed", [(549, True), (550, False)])
 def test_own_monthly_cap(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -259,7 +259,7 @@ def test_own_monthly_cap(tmp_path, spent, allowed):
     )
     assert (len(calls) == 1) == allowed
     if not allowed:
-        assert s["stop"].startswith("monthly cap: 500 of 500")
+        assert s["stop"].startswith("monthly cap: 550 of 550")
 
 
 def test_team_total_spend_never_counts_toward_the_corner_cap_or_back(tmp_path):
