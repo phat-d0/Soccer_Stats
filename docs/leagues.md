@@ -173,11 +173,22 @@ Runs:
   `claude/soccer-stats-scaffold` with `task=markets`, `cap=10`, `leagues=E2,E3` (other
   inputs default).
 
-Results (the lead fills these in):
-- Estimate run: _run id_. Odds credits a month, E2 / E3: Oct _ / _, Nov _ / _, Dec _ / _.
-  Corner snapshots a month, E2 / E3: Oct _ / _, Nov _ / _, Dec _ / _.
-- Dry run (`cap=0`): _run id_. Events listed: E2 _, E3 _.
-- football-data coverage, 2025/26 and 2026/27: corners (HC/AC) _; Pinnacle early _;
-  Pinnacle close _.
+Results:
+- Estimate (`backfill.yml` run 38178582402, branch `lead/l1-l2-check`, no key; each month
+  replayed on the same month of 2025/26, an upper bound since GitHub throttles scheduled
+  runs). DraftKings h2h, credits a month (matches), E2 / E3: Oct 211 (46) / 167 (49),
+  Nov 183 (43) / 145 (48), Dec 210 (61) / 176 (60); both together about 364 a month
+  (378 / 328 / 386). The six live leagues are unchanged by the registry entries (Oct
+  2,024, Nov 1,241, Dec 1,276). Pinnacle team-corner snapshots (look + close, 1 credit
+  each), E2 / E3: Oct 92 / 98, Nov 86 / 96, Dec 122 / 120; average 100 / 105 a month,
+  which would not fit under the current 550 corner cap beside the six (~471).
+- Dry run (`odds-check.yml` run 38178580830, `task=markets`, `leagues=E2,E3`, `cap=0`;
+  0 credits, balance 22,038): the events lists are non-empty, 12 upcoming events in each
+  (E2 first: Mansfield Town v Oxford United, Thu 15 Oct 19:00 UTC; E3 first: Shrewsbury
+  Town v Bristol Rovers, Sat 17 Oct 11:30 UTC). Discovery was not run (cap 0).
+- football-data coverage (same run): 2025/26 552 matches in each league, corner counts
+  (HC/AC) 100%, Pinnacle early and close 1X2 30% (E2 29.9%, E3 30.3%: Pinnacle prices
+  stop part-way through the season, as in E1 and the top flights); 2026/27 so far E2 90
+  and E3 102 matches, corners 100%, Pinnacle 0%.
 - Paid probe: _run id_, _ credits. DraftKings h2h: _. Pinnacle team corners: _.
-  FanDuel: _. Verdict: _.
+  FanDuel: _. Verdict: _ (the lead fills this in).
