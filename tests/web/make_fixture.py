@@ -64,6 +64,7 @@ DATA_LOG_FILES = [
     "backtest/E0_dk.json",
     "backtest/E0_players.json",
     "backtest/E0_players_detail.json",
+    "backtest/lean_backtest.json",
 ]
 TEAMS = [
     "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", "Chelsea",
@@ -87,7 +88,8 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
-SAMPLE_PLAYERS = 58  # players kept from the real detail file (keeps fixtures < 1 MB)
+LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
+SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
 def fetch_data_log(dest: Path) -> Path:
@@ -339,6 +341,12 @@ def build(src: Path, out: Path) -> dict:
     add_markets_research(data)
     add_corners(data)
     add_lean_strategy(data)
+    # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
+    # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
+    lb = (data["portfolio"].get("strategy_backtests") or {}).get("lean") or {}
+    if lb.get("bets"):
+        lb["bets"] = lb["bets"][:LEAN_BETS]
+        lb["bets_shown"] = len(lb["bets"])
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -991,10 +999,23 @@ SYNTHETIC_BLENDS = {
     },
 }
 LEAN_SETTLED = [
-    # league, home, away, kickoff, market, odds, z, close odds, score, won
-    ("E0", "Spurs", "Brentford", "2026-09-20T14:00:00Z", "home", 1.95, 1.21, 1.88, "2-1", True),
-    ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 3.1, 2.15, 3.2, "1-1", False),
-    ("SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 1.72, 1.04, 1.70, "2-0", True),
+    # league, home, away, kickoff, market, odds, z, z without the model's term, close odds,
+    # score, won (driver: market when the second z is still >= 1, else model)
+    (
+        "E0",
+        "Spurs",
+        "Brentford",
+        "2026-09-20T14:00:00Z",
+        "home",
+        1.95,
+        1.21,
+        1.12,
+        1.88,
+        "2-1",
+        True,
+    ),
+    ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 3.1, 2.15, 0.4, 3.2, "1-1", False),
+    ("SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 1.72, 1.04, 0.71, 1.70, "2-0", True),
 ]
 
 
@@ -1025,18 +1046,21 @@ def add_lean_strategy(data: dict) -> None:
             "sigma": pick["sigma"],
             "p_bet": round(pick["p_bet"], 4),
             "p_model": round(pick["p_bet"] - 0.02, 4),
+            "z_market": pick.get("z_market"),
+            "driver": pick.get("driver"),
         }
 
     fx = next(c for c in data["fixtures"] if (c["home"], c["away"]) == ("Arsenal", "Leeds"))
     t = lean_trade("E0", fx["home"], fx["away"], pd.Timestamp(fx["kickoff"]), fx["lean_pick"], NOW)
     t |= {"close_odds": fx["odds"][t["market"]], "close_fetched_at": t["odds_fetched_at"]}
     lean = [t]
-    for lg, home, away, ko, market, odds, z, close, score, won in LEAN_SETTLED:
+    for lg, home, away, ko, market, odds, z, zm, close, score, won in LEAN_SETTLED:
         kick = pd.Timestamp(ko)
         sigma = SYNTHETIC_BLENDS["leagues"][lg]["sigma"]
         p = 1 / odds + z * sigma
         pick = {"market": market, "odds": odds, "p_bet": p, "model_p": p, "edge": p * odds - 1}
         pick |= {"z": z, "tier": "strong" if z >= tr.STRONG_Z else "lean", "sigma": sigma}
+        pick |= {"z_market": zm, "driver": tr.lean_driver(zm)}
         t = lean_trade(lg, home, away, kick, pick, kick - pd.Timedelta(hours=30))
         clv = odds / close - 1
         t |= {"close_odds": close, "close_fetched_at": (kick - pd.Timedelta(minutes=8)).isoformat()}
