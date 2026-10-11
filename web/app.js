@@ -397,7 +397,7 @@ function detailHtml(fx) {
   const rows = MARKETS.map(([k, label]) => {
     const name = k === "home" ? `${esc(home)} win` : k === "away" ? `${esc(away)} win` : label;
     const odds_ = o?.[k];
-    const pb = pickProbs(fx)[k]; // the chance bestPick uses
+    const pb = (leanOn() ? fx.p_bet || p : pickProbs(fx))[k]; // Lean: the blend; else the chance bestPick uses
     const edge = odds_ != null && pb != null ? pb * odds_ - 1 : null;
     return `<tr><td>${name}</td><td>${pct(p[k])}</td>${
       hasOdds
@@ -409,10 +409,10 @@ function detailHtml(fx) {
   const dk = isDK() ? "DK" : "Book";
   const marketNote = !hasOdds
     ? "Fair odds = the price that would exactly match the model's chance."
-    : fixedRule()
-      ? leanOn()
-        ? `Model = the model alone: the chance the 12% test trades on. ${blend ? "Blend = the model mixed with the market: the chance Blend Lean trades on. " : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.${zs ? ` σ = how far the blend sits above the quoted price's break-even (1 ÷ decimal odds), in σ: Lean needs +1σ, Strong +2σ.${zms ? " mkt = the same with the model's term taken out of the blend: a Lean pick whose mkt is still +1σ or more is market-driven, otherwise model-driven." : ""}` : ""}`
-        : `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
+    : leanOn()
+      ? `Model = the model alone. ${blend ? "Blend = the model mixed with the market: the chance Blend Lean trades on. " : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = ${blend ? "blend" : "model chance"} × payout − 1, against the quoted odds.${zs ? ` σ = how far the blend sits above the quoted price's break-even (1 ÷ decimal odds), in σ: Lean needs +1σ, Strong +2σ.${zms ? " mkt = the same with the model's term taken out of the blend: a Lean pick whose mkt is still +1σ or more is market-driven, otherwise model-driven." : ""}` : ""}`
+      : fixedRule()
+        ? `Model = the model alone: the chance your live test trades on. ${blend ? `Blend = the model mixed with ${bookPoss()} price, shown for comparison. ` : ""}${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1, against the quoted odds.`
       : blend
       ? `Model = the model alone. Blend = the model mixed with ${bookPoss()} price, the chance value picks use. ${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = blend × payout − 1.`
       : `${dk} = ${bookPoss()} odds as a chance, margin removed. Edge = model chance × payout − 1.`;
@@ -434,7 +434,7 @@ function detailHtml(fx) {
       </div>
       <p class="note">${marketNote}</p>
       ${hasOdds && leanOn() ? `<div class="explain lean-explain">${leanPickText(fx)}</div>` : ""}
-      ${hasOdds && fixedRule() ? `<div class="explain">${fixedPickText(fx, pick)} ${esc(fixedNote(fxLeague(fx)))}</div>` : hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
+      ${leanOn() ? "" : hasOdds && fixedRule() ? `<div class="explain">${fixedPickText(fx, pick)} ${esc(fixedNote(fxLeague(fx)))}</div>` : hasOdds && fxEdge(fx) == null ? `<div class="explain"><b>Why no value bet here?</b> ${noEdgeText("moneyline", fxLeague(fx))}</div>` : blend && !pick ? `<div class="explain"><b>Why no value bet here?</b> ${blendWhyText(imp.margin)}</div>` : ""}
       ${goalsSection(fx)}
       ${cornersSection(fx)}
       ${playersSection(fx)}
@@ -819,7 +819,7 @@ function learnedText(lg) {
   return `${head}${et.note ? ` ${esc(et.note)}` : ""}${basis ? `<div class="meta">Based on ${basis}.</div>` : ""}`;
 }
 // Blend Lean's line in the edge panel: the 1σ rule and the league's σ (or each league's).
-function leanEdgeRec(lg) {
+function leanEdgeRec(lg, labelled = true) {
   const sd = leanSigma(lg);
   const one = lg || !multiLeague();
   const list = one ? "" : leaguesPresent().map((c) => `${esc(leagueShort(c))} ${leanSigma(c) == null ? "no fit yet" : ptsText(leanSigma(c))}`).join(" · ");
@@ -829,7 +829,7 @@ function leanEdgeRec(lg) {
   const body = one && sd == null
     ? ` ${esc(leanNote(lg) || "No blend fit for this competition yet, so nothing is flagged.")}`
     : ` Flagging the side where the blend of model and DraftKings' price beats the price's break-even by at least one σ (Strong at 2σ), one $10 paper trade per match. σ is how far the blend usually strays from the market in that competition. ${LEAN_CAVEAT}`;
-  return `<div class="edge-rec"><span class="meta">First strategy</span>${head}${body}${list ? `<div class="meta">σ by competition: ${list}.</div>` : ""}</div>`;
+  return `<div class="edge-rec">${labelled ? '<span class="meta">First strategy</span>' : ""}${head}${body}${list ? `<div class="meta">σ by competition: ${list}.</div>` : ""}</div>`;
 }
 function fixedEdgePanel(lg = "") {
   const th = edgeRule("moneyline", lg);
@@ -934,16 +934,16 @@ function viewMatches() {
   const leanNoFit = lean && (state.data.match_blends?.note || (lg && leanSigma(lg) == null ? leanRule(lg)?.note : ""));
   const leanCount = lean ? `<b>${nLean}</b> of ${shown.length} matches have a Blend Lean pick (the blend beats ${bookPoss()} break-even by 1σ or more).${leanNoFit ? ` ${esc(leanNoFit)}` : ""} ` : "";
   const countText = lean
-    ? `${leanCount}<b>${nValue}</b> have a 12% pick (the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge). Each strategy opens one $10 paper trade per match.`
+    ? `${leanCount}Each Lean pick opens one $10 paper trade per match. The Model 12% test still runs alongside; its picks and trades are under Portfolio → Moneyline.`
     : `<b>${nValue}</b> of ${shown.length} matches have a live-test pick: the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge against ${bookPoss()} price. A $10 paper trade opens on each match that doesn't have one yet (one per match).`;
   const ruleBox = lean
-    ? `<div class="explain live-test"><b>Blend Lean (first):</b> ${esc(leanNote(lg))}${fixedRule() && fixedNote(lg) ? `<br><b>Model 12% (second):</b> ${esc(fixedNote(lg))}` : ""}</div>`
+    ? `<div class="explain live-test"><b>Blend Lean:</b> ${esc(leanNote(lg))}</div>`
     : fixedRule() && fixedNote(lg) ? `<div class="explain live-test">${esc(fixedNote(lg))}</div>` : "";
-  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() ? countText : `${lean ? leanCount : ""}${nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}`}</p>${ruleBox}`;
+  let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() || lean ? countText : `${nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}`}</p>${ruleBox}`;
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
-      const pick = bestPick(fx, fxEdge(fx));
+      const pick = lean ? null : bestPick(fx, fxEdge(fx)); // with Lean on, Matches shows Lean only
       const time = new Date(fx.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
       html += `
         <button class="card match" data-fixture="${idx}">
@@ -957,7 +957,7 @@ function viewMatches() {
           ${lineupConfirmed(fx) ? `<span class="badge lineup">${CHECK}Lineups confirmed</span>` : ""}
           ${lean ? leanBadges(fx, openTrades.get(tradeKey(fx.home, fx.away, "lean"))) : ""}
           ${pick ? `<span class="badge${lean ? " second" : ""}">${CHECK}${pickBadge(pick, openTrades.get(tradeKey(fx.home, fx.away, "edge12")))}: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
-          ${openTrades.has(tradeKey(fx.home, fx.away, "edge12")) ? openBadge(openTrades.get(tradeKey(fx.home, fx.away, "edge12"))) : ""}
+          ${!lean && openTrades.has(tradeKey(fx.home, fx.away, "edge12")) ? openBadge(openTrades.get(tradeKey(fx.home, fx.away, "edge12"))) : ""}
           ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
@@ -972,9 +972,9 @@ function viewMatches() {
   }
   html += `
     <div class="section-title">How to read this</div>
-    <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.${fixedRule() ? " Your live test checks value with the model alone, not blended with the price." : d.match_blend?.live ? " The value check uses the model blended with DraftKings' price, weighted by how much the model added in past matches." : ""}</p>
-    <div class="section-title">Minimum edge</div>
-    ${edgePanel("moneyline", lg)}`;
+    <p class="note" style="margin-top:0">${bookName()} = ${isDK() ? "DraftKings'" : "the bookmaker's"} odds turned into chances, with the built-in margin taken out so the three add up to 100%. A value bet is where the model rates an outcome high enough that the odds pay more than it's worth.${lean ? " Blend Lean mixes the model with DraftKings' price and picks the side whose blended chance beats the price's break-even by at least 1σ." : fixedRule() ? " Your live test checks value with the model alone, not blended with the price." : d.match_blend?.live ? " The value check uses the model blended with DraftKings' price, weighted by how much the model added in past matches." : ""}</p>
+    <div class="section-title">${lean ? "Blend Lean rule" : "Minimum edge"}</div>
+    ${lean ? `<div class="edge-panel">${leanEdgeRec(lg, false)}</div>` : edgePanel("moneyline", lg)}`;
   return html;
 }
 
