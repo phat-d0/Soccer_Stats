@@ -1205,3 +1205,36 @@ answers availability and prices the backtest.
   look only) to fit; that is the next decision, not this one. The historical bulk odds
   endpoint takes featured markets only, so team corners need one event-odds call a match
   and snapshot.
+
+### Historical corner prices probe: result and the owner's decision (11 Oct)
+
+- **Run:** `odds-check.yml` run 38119813128 (`task=corner-history`, `cap=50`, from
+  `claude/soccer-stats-scaffold` at cf7008b), 06:59 UTC. **4 credits spent** (four events
+  calls at 1 credit each; every odds call came back empty and cost 0); balance 22,102 →
+  22,098.
+- **Every point empty.** HTTP 200, a snapshot within 5 minutes of the time asked, and no
+  bookmaker at all for `alternate_team_totals_corners` with `bookmakers=pinnacle`:
+  - E0 2025/26, Manchester United v Tottenham Hotspur (7 Feb 2026), the look (24 h before)
+    and the close (15 min before);
+  - E0 2023/24, Brentford v Chelsea (2 Mar 2024);
+  - I1 2025/26, Genoa v Napoli (7 Feb 2026);
+  - F1 2024/25, Saint Etienne v Nice (1 Mar 2025).
+  - The events lists themselves came back (18–21 matches each), so the empty replies are
+    about the market, not the match ids.
+- **Verdict: not available.** The Odds API's history carries no Pinnacle team-corner
+  prices at any point tried, so a priced historical backtest of model (f) against
+  Pinnacle can't be bought (the projection above is moot). Other books' historical corner
+  prices were not tried: they carry larger margins and no sharp reference.
+- **Owner's decision (11 Oct, lead session):** "let's just do live corners test on all
+  leagues and see". No historical backtest; the live test (section above: model (f), 12% on
+  its own chance vs Pinnacle's quoted price, $10, one trade per match, team and line, all
+  six live leagues, CLV vs Pinnacle's de-margined close) is the priced test. Nothing in the
+  live code changes. The app's Team corners backtest stays the research view (model
+  accuracy, no money).
+- **Reading the live test:** under a few hundred settled bets the P/L is mostly luck, so
+  CLV against Pinnacle's close is the main sign. Judge E0, I1 and F1 (where (f) passed
+  development) apart from SP1, D1 and E1 (no finalist; (f) over-confident there). Review
+  armed for 8 Dec 2026 (lead session, `trig_01SJk1xh2PSaKfKEe6VfHW2m`): trades, ROI and CLV
+  with 95% ranges per league, credit use against the 550 cap, settlement working. The
+  February test (3 Feb 2027, model accuracy on 2026/27 kickoffs to 31 Jan) stays locked and
+  separate.
