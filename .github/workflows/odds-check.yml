@@ -26,6 +26,9 @@
 #            development view with 2025/26 dropped first; `reason` opens 2025/26 once.
 #   markets: live market probe (team totals, alternate totals, corners; docs/totals.md),
 #            all six leagues, never past `cap` credits (0 = dry run: free events list only).
+#            `leagues` (e.g. E2,E3) probes only those: League One / League Two check
+#            (docs/leagues.md): h2h, team corners and totals at DraftKings, Pinnacle and
+#            FanDuel, a verdict per league, and football-data's HC/AC and Pinnacle coverage.
 #   corner-history: historical Pinnacle team-corner prices (alternate_team_totals_corners;
 #            docs/totals.md, "Historical corner prices probe"): four probe points, one events
 #            and one odds call each, never past `cap` credits (0 = dry run: no calls), plus
@@ -87,6 +90,9 @@ on:
         default: ""
       after:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
+        default: ""
+      leagues:
+        description: "markets: comma-separated leagues to probe, e.g. E2,E3 (blank = the six live leagues)"
         default: ""
 
 permissions:
@@ -156,6 +162,7 @@ jobs:
           FINALISTS: ${{ inputs.finalists }}
           STACK_BASE: ${{ inputs.stack_base }}
           AFTER: ${{ inputs.after }}
+          LEAGUES: ${{ inputs.leagues }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -197,8 +204,14 @@ jobs:
             lab-holdout) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS --open-holdout \
                      --reason "$REASON" --finalists "$FINALISTS" --stack-base "$STACK_BASE" \
                      --json out/lab_holdout.json ;;
-            markets) uv run python -m soccer_stats.edge.market_probe --cap "$CAP" \
-                     --json out/markets.json --bodies out/market_bodies ;;
+            markets)  # blank leagues = the six (unchanged); E2,E3 = the L1/L2 check + coverage
+              if [ -n "$LEAGUES" ]; then
+                uv run python -m soccer_stats.edge.market_probe --cap "$CAP" --leagues "$LEAGUES" \
+                  --coverage --json out/markets.json --bodies out/market_bodies
+              else
+                uv run python -m soccer_stats.edge.market_probe --cap "$CAP" \
+                  --json out/markets.json --bodies out/market_bodies
+              fi ;;
             corner-history)  # bodies cached in data/raw/corner_history, copied to the artifact
               uv run soccer-stats corner-history-probe --cap "$CAP" \
                 --json out/corner_history.json

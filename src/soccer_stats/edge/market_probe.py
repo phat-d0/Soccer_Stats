@@ -7,6 +7,14 @@ one odds call for the target keys discovery found, with a `bookmakers=` list of 
 ten books. `player_goal_odds.CappedBudget` skips any call whose maximum cost would pass
 the cap or leave under 3,000 credits on the shared key; the cost counted is
 `x-requests-last`. Bodies are cached; the key is never printed.
+
+League One and League Two check (owner, 11 Oct; docs/leagues.md): `--leagues E2,E3`
+probes only those leagues, and a league outside the six above gets the check's targets
+instead (`CHECK_KEYS`: DraftKings' h2h, Pinnacle's team corners, the match total for
+reference) at books that always include DraftKings, Pinnacle and FanDuel when discovery
+lists them (`CHECK_BOOKS`), with a verdict line per league. h2h margins are
+sum(1/price) - 1 over home, draw and away. `--coverage` adds football-data's corner
+counts (HC/AC) and Pinnacle 1X2 (PSH, PSCH) per season for those leagues (free).
 """
 
 from __future__ import annotations
@@ -35,6 +43,34 @@ PRIORITY = ("team_totals", "alternate_team_totals", "alternate_totals")
 EXTRA = ("btts",)
 E0_EXTRA = ("player_shots_on_target",)
 TWO_SIDED = {"over": "over", "under": "under", "yes": "over", "no": "under"}
+# The League One / League Two check (any league outside LEAGUES): the markets a live
+# league would need, in priority order (the last is dropped first when credits are short).
+CHECK_KEYS = ("h2h", "alternate_team_totals_corners", "totals")
+CHECK_BOOKS = ("draftkings", "pinnacle", "fanduel")  # always asked when discovery lists them
+# What the verdict asks: DraftKings' h2h (match odds), Pinnacle's team corners, FanDuel.
+VERDICT = (
+    ("draftkings", "h2h", "DraftKings h2h"),
+    ("pinnacle", "alternate_team_totals_corners", "Pinnacle team corners"),
+    ("fanduel", None, "FanDuel"),
+)
+
+
+def is_check(league: str) -> bool:
+    """A league outside the six the probe was written for gets the check's targets."""
+    return league not in LEAGUES
+
+
+def check_keys(discovered: set[str]) -> list[str]:
+    """The check's markets that discovery found, in priority order."""
+    return [k for k in CHECK_KEYS if k in discovered]
+
+
+def check_books(books: dict[str, list[str]], keys: list[str]) -> list[str]:
+    """DraftKings, Pinnacle and FanDuel whenever discovery lists them, then the books
+    listing most of `keys`, up to MAX_BOOKS (one region's price)."""
+    must = [b for b in CHECK_BOOKS if b in books]
+    rest = [b for b in choose_books(books, keys) if b not in must]
+    return (must + rest)[:MAX_BOOKS]
 
 
 def target_keys(discovered: set[str], league: str) -> list[str]:
@@ -87,6 +123,77 @@ def quotes(body: dict | None) -> pd.DataFrame:
                 )
     cols = ["book", "market", "subject", "line", "side", "odds"]
     return pd.DataFrame(rows, columns=cols)
+
+
+def h2h_quotes(body: dict | None) -> list[dict]:
+    """Per book with an h2h market: the outcomes quoted and the margin
+    sum(1/price) - 1, which counts only when home, draw and away are all quoted."""
+    out = []
+    for b in (body or {}).get("bookmakers", []) or []:
+        for m in b.get("markets", []) or []:
+            if m.get("key") != "h2h":
+                continue
+            prices = [float(o["price"]) for o in m.get("outcomes", []) or [] if o.get("price")]
+            full = len(prices) == 3
+            out.append(
+                {
+                    "book": b.get("key"),
+                    "outcomes": len(prices),
+                    "margin": sum(1 / p for p in prices) - 1 if full else None,
+                }
+            )
+    return out
+
+
+def h2h_summary(body: dict | None) -> list[dict]:
+    """h2h rows in `summarize`'s shape: a book counts as two-sided when home, draw and
+    away are all quoted (one 1X2 price set; no lines)."""
+    return [
+        {
+            "market": "h2h",
+            "book": q["book"],
+            "quotes": q["outcomes"],
+            "two_sided": int(q["margin"] is not None),
+            "lines": [],
+            "subjects": 0,
+            "margin_median": q["margin"],
+            "margin_min": q["margin"],
+            "margin_max": q["margin"],
+        }
+        for q in h2h_quotes(body)
+    ]
+
+
+def verdict(r: dict) -> str:
+    """One line per league for the check: whether the events list had matches, then
+    DraftKings' h2h, Pinnacle's team corners and FanDuel: listed in discovery, priced in
+    the odds call, both sides quoted, median margin."""
+    if not r.get("events"):
+        return "no events listed: the API doesn't cover this league now"
+    if "books_markets" not in r:
+        return f"{r['events']} events listed; discovery not run ({r.get('note') or 'dry run'})"
+    books = r["books_markets"]
+    summ = r.get("summary") or []
+    parts = []
+    for book, market, label in VERDICT:
+        listed = book in books and (market is None or market in books[book])
+        if not listed:
+            parts.append(f"{label} not listed")
+            continue
+        rows = [x for x in summ if x["book"] == book and market in (None, x["market"])]
+        if not rows:
+            what = "listed" if market else f"listed ({', '.join(books[book]) or 'no markets'})"
+            parts.append(f"{label} {what}, not priced in the odds call")
+            continue
+        cells = []
+        for x in rows:
+            m, full = x["margin_median"], "all three sides" if x["market"] == "h2h" else "two-sided"
+            cells.append(
+                (f"{x['market']} " if market is None else "")
+                + (f"{full}, margin {m:.1%}" if m is not None else "one-sided")
+            )
+        parts.append(f"{label}: " + "; ".join(cells))
+    return f"{r['events']} events listed; " + " | ".join(parts)
 
 
 def pairs(q: pd.DataFrame) -> pd.DataFrame:
@@ -178,6 +285,7 @@ def run(
             [e for e in evs or [] if pd.Timestamp(e["commence_time"]) > now],
             key=lambda e: e["commence_time"],
         )
+        r["events"], r["upcoming"] = len(evs or []), len(upcoming)
         if not upcoming:
             r["note"] = "no upcoming events"
             continue
@@ -202,16 +310,19 @@ def run(
         r["books_markets"] = books
         found = set().union(*books.values()) if books else set()
         r["market_keys"] = sorted(found)
-        keys = target_keys(found, lg)
+        check = is_check(lg)
+        targets = check_keys if check else (lambda f, lg=lg: target_keys(f, lg))
+        pick_books = check_books if check else choose_books
+        keys = targets(found)
         # Even share of what is left, kept for this and the leagues after it.
         share = (cap - budget.spent) // max(len(leagues) - i, 1)
-        chosen = choose_books(books, keys)
+        chosen = pick_books(books, keys)
         groups = max(math.ceil(len(chosen) / MAX_BOOKS), 1)
         while keys and len(keys) * groups > max(share, 1):
             keys = keys[:-1]
-        r["requested"] = {"markets": keys, "bookmakers": choose_books(books, keys)}
+        r["requested"] = {"markets": keys, "bookmakers": pick_books(books, keys)}
         if not keys:
-            r["note"] = "no target market listed" if not target_keys(found, lg) else "no credits"
+            r["note"] = "no target market listed" if not targets(found) else "no credits"
             continue
         body = _get(
             get,
@@ -231,8 +342,45 @@ def run(
             continue
         save(f"{lg}_{e['id']}_odds.json", body)
         p = pairs(quotes(body))
-        r["summary"] = summarize(p)
+        r["summary"] = summarize(p) + (h2h_summary(body) if "h2h" in keys else [])
+    for lg, r in res["leagues"].items():
+        if is_check(lg):
+            r["verdict"] = verdict(r)
     return {**res, "spent": budget.spent, "left": budget.left}
+
+
+def football_data_coverage(leagues, seasons=(2025, 2026), raw_dir=None, download=None) -> dict:
+    """Per league and season (start year), from football-data's file (free; downloaded
+    if not cached): matches, and the share with corner counts (HC and AC), Pinnacle's
+    early 1X2 (PSH/PSD/PSA) and Pinnacle's close (PSCH/PSCD/PSCA)."""
+    from soccer_stats import data as fd
+
+    download = download or fd.download
+    out: dict = {}
+    for lg in leagues:
+        for year in seasons:
+            key = f"{lg} {fd.season_code(year)}"
+            try:
+                kw = {"raw_dir": raw_dir} if raw_dir is not None else {}
+                raw = pd.read_csv(download(lg, year, **kw), encoding="latin-1")
+            except Exception as exc:  # noqa: BLE001  not posted yet, or unreachable
+                out[key] = {"error": type(exc).__name__}
+                continue
+            raw = raw.dropna(subset=["Date"]) if "Date" in raw else raw.iloc[0:0]
+            n = len(raw)
+
+            def share(cols, raw=raw, n=n):
+                if not n or any(c not in raw for c in cols):
+                    return 0.0
+                return round(float(raw[list(cols)].notna().all(axis=1).mean()), 3)
+
+            out[key] = {
+                "matches": n,
+                "corners": share(("HC", "AC")),
+                "pinnacle_early": share(("PSH", "PSD", "PSA")),
+                "pinnacle_close": share(("PSCH", "PSCD", "PSCA")),
+            }
+    return out
 
 
 def report(res: dict) -> str:
@@ -242,6 +390,8 @@ def report(res: dict) -> str:
     ]
     for lg, r in res["leagues"].items():
         lines.append(f"{lg} ({r.get('event', '-')}, {r.get('kickoff', '-')}): {r.get('note', '')}")
+        if "events" in r:
+            lines.append(f"  events listed: {r['events']} ({r['upcoming']} upcoming)")
         if "market_keys" in r:
             lines.append(f"  market keys found: {', '.join(r['market_keys']) or 'none'}")
             lines.append(f"  requested: {r.get('requested')}")
@@ -257,8 +407,32 @@ def report(res: dict) -> str:
                 )
                 + f" -> {reading(m)}"
             )
+        if "verdict" in r:
+            lines.append(f"  VERDICT {lg}: {r['verdict']}")
+    for key, c in (res.get("coverage") or {}).items():
+        lines.append(
+            f"football-data {key}: "
+            + (
+                f"unavailable ({c['error']})"
+                if "error" in c
+                else f"{c['matches']} matches, corners (HC/AC) {c['corners']:.0%}, Pinnacle "
+                f"early {c['pinnacle_early']:.0%}, close {c['pinnacle_close']:.0%}"
+            )
+        )
     lines += ["Log:", *[f"  {x}" for x in res["log"]]]
     return "\n".join(lines)
+
+
+def parse_leagues(text: str) -> tuple[str, ...]:
+    """'E2,E3' -> ('E2', 'E3'); blank = LEAGUES. Unknown codes are refused (SPORTS is
+    the registry's, so a league must be registered, live or not, to be probed)."""
+    codes = tuple(c.strip().upper() for c in (text or "").split(",") if c.strip())
+    if not codes:
+        return LEAGUES
+    bad = [c for c in codes if c not in SPORTS]
+    if bad:
+        raise SystemExit(f"unknown league(s) {bad}; known: {sorted(SPORTS)}")
+    return codes
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -268,8 +442,17 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--cap", type=int, default=0)
     ap.add_argument("--json")
     ap.add_argument("--bodies", default="out/market_bodies")
+    ap.add_argument(
+        "--leagues", default="", help="comma-separated codes, e.g. E2,E3 (blank = the six)"
+    )
+    ap.add_argument(
+        "--coverage", action="store_true", help="football-data HC/AC and Pinnacle coverage"
+    )
     args = ap.parse_args(argv)
-    res = run(args.cap, out_dir=Path(args.bodies) if args.cap > 0 else None)
+    leagues = parse_leagues(args.leagues)
+    res = run(args.cap, leagues=leagues, out_dir=Path(args.bodies) if args.cap > 0 else None)
+    if args.coverage:
+        res["coverage"] = football_data_coverage(leagues)
     print(report(res))
     text = json.dumps(res, default=str)
     if args.json:

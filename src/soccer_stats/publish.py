@@ -951,17 +951,25 @@ def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
 
 
 def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
-    """Every registry league for data.json: code, name, live flag, fixtures, odds source."""
-    return [
-        {
-            "code": code,
-            "name": lg.name,
-            "live": lg.live,
-            "fixtures": sum(f.get("league") == code for f in fixtures),
-            "odds": (sources.get(code) or {}).get("name"),
-        }
-        for code, lg in lgs.LEAGUES.items()
-    ]
+    """The registry's live leagues (plus any league with fixtures in this build) for
+    data.json: code, name, live flag, fixtures, odds source. A league registered off and
+    without fixtures (League One and League Two, priced only: docs/leagues.md) is left
+    out, so registering one changes nothing in the build or the app."""
+    rows = []
+    for code, lg in lgs.LEAGUES.items():
+        n = sum(f.get("league") == code for f in fixtures)
+        if not lg.live and not n:
+            continue
+        rows.append(
+            {
+                "code": code,
+                "name": lg.name,
+                "live": lg.live,
+                "fixtures": n,
+                "odds": (sources.get(code) or {}).get("name"),
+            }
+        )
+    return rows
 
 
 def publish(out: Path, league: str = lgs.PRIMARY) -> Path:

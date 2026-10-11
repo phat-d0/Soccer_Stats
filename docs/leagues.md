@@ -131,3 +131,53 @@ Ways to spend less, if needed (none are built yet):
 - **The Championship has no xG.** Understat doesn't cover it, so it runs the goals-only
   model (the research lab's round-5 bake-off also used goals only for E1). Its upcoming
   fixtures come from football-data's fixtures file, which covers about the next week.
+
+## League One and League Two check (11 Oct)
+
+Owner's request (11 Oct, lead session): more midweek fixtures. Among our six leagues only
+the Championship plays midweek, so League One (E2) and League Two (E3) are candidates.
+Owner-approved at **10 credits at most** for the paid part. Nothing goes live from this
+check; switching either on is a separate owner decision.
+
+What is built:
+- **Registry.** E2 and E3 are in `leagues.py` with `live=False`, Odds API sport keys
+  `soccer_england_league1` / `soccer_england_league2`, `understat=None` (goals-only, like
+  the Championship) and the "matchday" policy. A league that isn't live is never fetched
+  (`odds_feed.fetch_odds`), never built (`publish` loops over `live_codes()` only) and is
+  left out of `data.json`'s `leagues` list (`publish.league_list`), so the app shows no
+  chip and paper trading never sees it. Corners, team totals and ESPN keep their own
+  six-league lists. Tests in `tests/test_leagues.py`.
+- **Free estimate.** `soccer-stats estimate-credits --month YYYY-MM` prices every
+  registry league; E2/E3 print as "off" and are summed apart ("Not live (switching each
+  on would add)"). football-data's season files only hold played matches, so, as for the
+  Championship in round 7, a month is replayed on the same month of the 2025/26 calendar.
+  `soccer-stats estimate-corners --extra-leagues E2,E3` adds the Pinnacle team-corner
+  snapshot cost (look + close, 1 credit each), not counted in the live total.
+  `backfill.yml` with `estimate_month` = `2026-10,2026-11,2026-12` runs both for every
+  month listed (no key, no push).
+- **Market probe.** `python -m soccer_stats.edge.market_probe --leagues E2,E3 --coverage`
+  (`odds-check.yml` `task=markets`, `leagues=E2,E3`). Per league: the free events list,
+  one `/events/{id}/markets` discovery call (1 credit), then one `/events/{id}/odds` call
+  for the keys discovery found among `h2h`, `alternate_team_totals_corners` and `totals`
+  (dropped in that reverse order if credits are short) at up to ten books, always
+  including DraftKings, Pinnacle and FanDuel when listed: 1 credit per market, about 4 a
+  league, about 8 in all. `CappedBudget` keeps the cap and the 3,000-credit reserve and
+  counts `x-requests-last`; the key is never printed. The report lists books and keys,
+  two-sided pairs and margins (h2h: sum of 1/price − 1 over home, draw and away), and a
+  `VERDICT` line per league for DraftKings h2h, Pinnacle team corners and FanDuel.
+  `--coverage` adds football-data's corner counts (HC/AC) and Pinnacle 1X2 (PSH/PSCH)
+  shares for 2025/26 and 2026/27 (free download).
+
+Runs:
+- Paid probe (needs the lead's go, ≤10 credits): dispatch `odds-check.yml` on
+  `claude/soccer-stats-scaffold` with `task=markets`, `cap=10`, `leagues=E2,E3` (other
+  inputs default).
+
+Results (the lead fills these in):
+- Estimate run: _run id_. Odds credits a month, E2 / E3: Oct _ / _, Nov _ / _, Dec _ / _.
+  Corner snapshots a month, E2 / E3: Oct _ / _, Nov _ / _, Dec _ / _.
+- Dry run (`cap=0`): _run id_. Events listed: E2 _, E3 _.
+- football-data coverage, 2025/26 and 2026/27: corners (HC/AC) _; Pinnacle early _;
+  Pinnacle close _.
+- Paid probe: _run id_, _ credits. DraftKings h2h: _. Pinnacle team corners: _.
+  FanDuel: _. Verdict: _.

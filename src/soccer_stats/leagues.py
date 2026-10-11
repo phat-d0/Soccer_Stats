@@ -6,10 +6,12 @@ league Understat doesn't cover, such as the Championship, which then runs the go
 model and takes its schedule from football-data), The Odds API sport key, and two
 switches:
 
-* `live`: publish builds the league's fixtures and fetches its DraftKings odds. All six
-  are live (owner, 8 Oct 2026). The Odds API key is shared with the baseball app, so each
-  league costs credits; the Premier League budgets first, and the others pause below
-  odds_feed.MATCHDAY_RESERVE_CREDITS (docs/leagues.md).
+* `live`: publish builds the league's fixtures and fetches its DraftKings odds. Six are
+  live (owner, 8 Oct 2026); League One and League Two (E2, E3) are registered off, for the
+  credit estimate and the market probe only (owner's check, 11 Oct 2026). The Odds API
+  key is shared with the baseball app, so each league costs credits; the Premier League
+  budgets first, and the others pause below odds_feed.MATCHDAY_RESERVE_CREDITS
+  (docs/leagues.md).
 * `odds_policy`: when its odds are refreshed. "always" is the Premier League's rule since
   launch (every hour, every 30 minutes within 2 hours of a kickoff, budget permitting).
   "matchday" fetches only when the league has a match within MATCHDAY_HOURS, and less often
@@ -47,6 +49,11 @@ LEAGUES: dict[str, League] = {
         League("I1", "Serie A", "Serie_A", "soccer_italy_serie_a", live=True),
         League("F1", "Ligue 1", "Ligue_1", "soccer_france_ligue_one", live=True),
         League("E1", "Championship", None, "soccer_efl_champ", live=True),
+        # League One and League Two: off, priced and probed only (owner's check, 11 Oct;
+        # docs/leagues.md). Goals-only like the Championship. A league that isn't live is
+        # never fetched, built, logged or listed in data.json (publish.league_list).
+        League("E2", "League One", None, "soccer_england_league1"),
+        League("E3", "League Two", None, "soccer_england_league2"),
     )
 }
 PRIMARY = "E0"  # the league whose fields fill data.json's top level (params, teams, ...)
