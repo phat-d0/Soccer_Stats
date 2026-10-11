@@ -339,6 +339,8 @@ const STEPS = [
     if (!text.includes("Betis v Celta") || text.includes("nothing settled yet")) throw new Error("SP1 model-driven trades");
     const rec = await p.locator(".tile", { hasText: "Record" }).locator(".value").innerText();
     if (rec !== "1–0") throw new Error(`SP1 model-driven record: ${rec}`);
+    // No summary covers a competition plus a driver, so no ROI range may show.
+    if (text.includes("95% range on ROI")) throw new Error("SP1 model-driven shows a ROI range it has no summary for");
   }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
@@ -373,6 +375,7 @@ const STEPS = [
     const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
     if (!avg.endsWith("%")) throw new Error(`12% avg edge should be a %: ${avg}`);
     if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
+    if (!text.includes("95% range on ROI")) throw new Error("12% live lacks paper.py's ROI range");
   }],
   ["portfolio-live-sp1", click('.chip[data-league="SP1"]')],
   ["portfolio-backtest-sp1", click('button[data-pf="backtest"]')],

@@ -677,6 +677,8 @@ table.drv-table th:not(:first-child), table.drv-table td:not(:first-child) { tex
 .row-btn .who { min-width: 0; }
 .row-btn .who b { font-weight: 600; }
 .row-btn .meta { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Trade rows wrap their meta lines so the score and CLV never get cut off at 390px. */
+.row-btn.trade-row .meta { white-space: normal; }
 .row-btn .vals { text-align: right; font-variant-numeric: tabular-nums; min-width: 64px; }
 .row-btn .vals b { font-size: 16px; font-weight: 600; }
 .row-btn .vals small { display: block; font-size: 11px; color: var(--text-muted); }

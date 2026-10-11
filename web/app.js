@@ -2565,7 +2565,7 @@ function pfTradeRow(t) {
   const how = isLean(t) && t.z != null ? sigmaText(t.z) : t.edge != null ? `edge ${signedPct(t.edge)}` : "";
   let extra = "";
   if (open) { const { cur, live } = currentPrice(t); extra = cur && cur !== t.odds && live ? ` · now ${american(cur)}` : ""; }
-  else extra = `${t.score ? ` · ${esc(t.score)}` : ""}${clv != null ? ` · CLV ${signedPct(clv)}` : ""}`;
+  else extra = `${t.score ? ` · ${esc(t.score)}` : ""}${clv != null ? ` · <span class="nowrap">CLV ${signedPct(clv)}</span>` : ""}`;
   const right = open
     ? `<b>$${Number(t.stake).toFixed(0)}</b><small>to win $${(t.stake * (dec - 1)).toFixed(2)}</small>`
     : t.status === "void"
@@ -2664,7 +2664,15 @@ function liveStrategyHtml(cur, x, lg) {
       <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk</div></div>
       <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${lean ? " (σ above break-even)" : ""}</div></div>
     </div>`;
-  const caveat = m.n < 200 ? `<p class="note">${m.n ? `Only ${m.n} settled so far` : "Nothing settled yet"}; until a few hundred, results are mostly luck. Closing line value (CLV, against ${book} close) is the faster sign of an edge.</p>` : "";
+  // Closes taken over an hour before kickoff (throttled scheduled builds): approximate CLV.
+  const early = trades.filter((t) => !isPlayer(t) && !isCorner(t) && (t.status === "won" || t.status === "lost") && tradeClv(t) != null && closeApprox(t)).length;
+  const earlyText = early ? ` ${early} close${early > 1 ? "s were" : " was"} taken more than an hour before kickoff, so ${early > 1 ? "their" : "its"} CLV is approximate.` : "";
+  const caveat = m.n < 200 || early ? `<p class="note">${m.n < 200 ? `${m.n ? `Only ${m.n} settled so far` : "Nothing settled yet"}; until a few hundred, results are mostly luck. Closing line value (CLV, against ${book} close) is the faster sign of an edge.` : ""}${earlyText}</p>` : "";
+  // paper.py's 95% range on ROI, shown only when its summary covers exactly these trades
+  // (a competition plus a driver has no summary of its own).
+  const s = set.summary || {};
+  const ci = s.roi_ci95 && s.settled === m.n && Math.abs((s.profit ?? 0) - m.profit) < 0.005
+    ? `<p class="note">95% range on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Won ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
   const curve = settledCurve(trades);
   const chart = curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
   const open = trades.filter((t) => t.status === "open");
@@ -2676,6 +2684,7 @@ function liveStrategyHtml(cur, x, lg) {
     ${banner}
     ${tiles}
     ${caveat}
+    ${ci}
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card">${chart}</div>
