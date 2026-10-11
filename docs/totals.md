@@ -1157,3 +1157,49 @@ live and a corners paper portfolio, in all six live leagues:
   2027; no live code computes the pre-registered metrics (gain over the league average,
   slopes). The live test reports paper P/L and CLV only. SP1, D1 and E1 have no finalist,
   so their paper trades run model (f) where development found it over-confident.
+
+## Historical corner prices probe (owner-approved 50-credit cap, 11 Oct; probe only, no backtest)
+
+The question: do The Odds API's historical endpoints carry Pinnacle's team-corner prices
+(`alternate_team_totals_corners`, the market logged live since round 14)? If they do, a
+priced corners backtest of model (f) follows in the three leagues where it passed bake-off
+2 (E0, I1, F1). That backtest is a later step with its own decision; this probe only
+answers availability and prices the backtest.
+
+- **Code:** `edge/corner_history.py`, CLI `soccer-stats corner-history-probe --cap N`,
+  `odds-check.yml` `task=corner-history` with `cap` (0 = dry run: no calls at all; the key
+  is passed to this task only to make the paid calls; the task never pushes).
+- **Probe points** (one match each): E0 2025/26 (first Saturday kickoff in February 2026),
+  E0 2023/24 (March 2024: how far back the market goes; historical additional markets
+  start around May 2023), I1 2025/26 (February 2026), F1 2024/25 (March 2025). The
+  Saturday kickoff comes from the cached football-data file (a fixed fallback date
+  without one).
+- **Calls per point:** one historical events call (`/historical/sports/{sport}/events`,
+  1 credit) 24 hours before that kickoff; one historical event-odds call for the listed
+  match nearest the kickoff, at its kickoff minus 24 hours, `markets=
+  alternate_team_totals_corners`, `bookmakers=pinnacle`, `regions=eu` (10 credits for one
+  market and one book; an empty snapshot costs less). Then, only if the cap still allows,
+  one more odds call on the E0 2025/26 match 15 minutes before kickoff (does a close
+  exist?). With every point priced, the four points cost 44 and the close (10) doesn't fit
+  under 50; it runs only if some snapshot came back empty or cheaper.
+- **Guards:** `player_goal_odds.CappedBudget` (no call whose maximum cost would pass the
+  cap or leave under 3,000 credits on the shared key; cost counted from
+  `x-requests-last`). Bodies cached in `data/raw/corner_history/` (and copied into the
+  job's 7-day artifact), so a rerun costs nothing. The key reaches no log line, body or
+  file: failures log the exception type, API messages are redacted.
+- **Report:** per point the event found, the snapshot timestamp returned, whether
+  Pinnacle's team-corner quotes came back, lines per team, both sides present, margin
+  (1/over + 1/under − 1) and credits counted; the projected backtest cost; a verdict
+  (available / partly available, naming the seasons / not available). One
+  `CORNER_HISTORY_JSON` line holds everything.
+- **Projected backtest cost** (per league E0, I1, F1 and season 2023/24–2025/26): matches
+  from the cached football-data files (else 380, or 306 for Ligue 1) × the measured cost
+  per odds call, for (a) one look snapshot about 24 h before kickoff and (b) look plus
+  close (15 min before), plus one events call (1 credit) per distinct kickoff date and
+  snapshot. At the nominal 10 credits a call, with the standard counts: about 3,900 a
+  league-season for the look (E0, I1) and 3,150 (F1); all nine league-seasons about
+  32,900 for the look and 65,900 for look plus close, against about 22,000 credits on the
+  shared key. The backtest would have to be cut down (one league, or one season, or the
+  look only) to fit; that is the next decision, not this one. The historical bulk odds
+  endpoint takes featured markets only, so team corners need one event-odds call a match
+  and snapshot.
