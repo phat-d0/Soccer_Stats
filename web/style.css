@@ -655,8 +655,8 @@ table.mkts .lean-cell { font-weight: 700; }
 .lean-explain { margin-bottom: 8px; }
 
 /* ---------- Blend Lean: what carried a pick (market or model), and its backtest ---------- */
-.drv { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: 1px; background: var(--track); color: var(--text-secondary); }
-.drv-model { background: var(--good-bg); color: var(--good-text); }
+.drv { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: 1px; background: var(--track); color: var(--text-secondary); border: 1px solid var(--border); }
+/* Market and Model chips look the same on purpose: neither driver is the better one. */
 table.mkts td .zm { display: block; white-space: nowrap; font-size: 10.5px; font-weight: 400; color: var(--text-muted); }
 table.drv-table th:not(:first-child), table.drv-table td:not(:first-child) { text-align: right; }
 .drv-seg { margin: 12px 0 4px; }
