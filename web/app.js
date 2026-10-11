@@ -2371,7 +2371,7 @@ function sigmaList(by) {
   const items = Object.entries(by || {}).filter(([, v]) => v != null).map(([c, v]) => `${esc(leagueName(c))} ${ptsText(v)}`);
   return items.length ? ` (${items.join(", ")})` : "";
 }
-function viewPortfolio() {
+function pfClassic(topIn) {
   const pf = state.data.portfolio || {};
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
   const all = portfolios();
@@ -2414,7 +2414,7 @@ function viewPortfolio() {
   const leanLive = state.pfView === "live" && strat?.key === "lean";
   const drv = leanLive ? state.pfDriver : "";
   const set = drv && lgSet ? driverSet(lgSet, strat, drv, lg) : lgSet;
-  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
+  const top = topIn ?? `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
   if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
   if (leanBt) return `${top}${leanBacktestHtml(state.data.portfolio?.strategy_backtests?.lean, lg)}${retiredLinks}`;
   const isMoneyline = cur.id === "moneyline";
@@ -2466,6 +2466,256 @@ function viewPortfolio() {
     ${state.pfView === "backtest" ? edgeBucketsHtml(cur.id, lg) + pfBacktestExtras(set) : ""}
     ${retiredLinks}
     ${foot}`;
+}
+
+
+// ---------- Portfolio, laid out like the baseball app's (owner, 11 Oct) ----------
+// Switcher, then "Paper strategies": one row per strategy in the portfolio (Moneyline:
+// Blend Lean then Model 12%; others: one row), the selected one marked; then that
+// strategy's tiles, the caveat, profit over time, open and settled trades, the folded
+// extras and the rule note. Backtest keeps its own views under the same list.
+function pfStrategies(cur) {
+  const st = cur.id === "moneyline" ? cur.live?.strategies || [] : [];
+  if (st.length) return st.map((x) => ({ key: x.key, label: x.label, st: x, rule: x.rule }));
+  const label = cur.id === "corners" ? "Model (f) 12% vs Pinnacle" : cur.name;
+  return [{ key: cur.id, label, st: null, rule: cur.live?.rule || (cur.id === "moneyline" ? state.data.portfolio?.rule : null) }];
+}
+const pfSelected = (strats) => strats.find((x) => x.key === state.pfStrat) || strats[0];
+// One strategy's live trades, narrowed to a competition (and Lean's driver filter).
+function strategyLiveSet(cur, x, lg, drv = "") {
+  let set = x.st ? stratSet(cur.live || {}, x.st) : { ...(cur.live || {}), trades: cur.live?.trades || [] };
+  if (lg) set = leagueSet(set, lg);
+  if (drv && x.st) set = driverSet(set, x.st, drv, lg);
+  return set;
+}
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const meanOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+// Record, money and averages straight from the trades (so every filter agrees).
+function tradeStats(trades) {
+  const by = (st) => trades.filter((t) => t.status === st);
+  const won = by("won"), lost = by("lost"), voids = by("void"), open = by("open");
+  const settled = [...won, ...lost];
+  const profit = [...settled, ...voids].reduce((a, t) => a + (t.profit || 0), 0);
+  const staked = settled.reduce((a, t) => a + (t.stake || 0), 0);
+  return {
+    won: won.length, lost: lost.length, void: voids.length, open: open.length, n: settled.length,
+    profit, staked, roi: staked ? profit / staked : null,
+    atRisk: open.reduce((a, t) => a + (t.stake || 0), 0),
+    clv: meanOf(settled.map(tradeClv).filter(isNum)),
+    avgEdge: meanOf(trades.map((t) => t.edge).filter(isNum)),
+    avgZ: meanOf(trades.map((t) => t.z).filter(isNum)),
+    since: trades.map((t) => t.opened_at).filter(Boolean).sort()[0] || null,
+  };
+}
+const monthDay = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const signCls = (v) => (v > 0.005 ? "pos-text" : v < -0.005 ? "neg-text" : "");
+function ruleText(x) {
+  if (x.key === "lean") return `${x.rule?.min_z ?? 1}σ+`;
+  return x.rule?.threshold != null ? `${pct(x.rule.threshold)}+` : "";
+}
+// Backtest headline for a strategy row: bets and return (units), or "research only".
+function backtestHeadline(cur, x) {
+  if (x.key === "lean") {
+    const m = state.data.portfolio?.strategy_backtests?.lean?.all?.lean;
+    return m ? { v: signedPct(m.roi), cls: signCls(m.roi), sub: `${m.bets.toLocaleString()} bets · at Pinnacle` } : null;
+  }
+  const bt = cur.backtest;
+  if (bt?.kind === "research") return { v: "–", cls: "muted", sub: "research only" };
+  const sm = bt?.summary;
+  return sm ? { v: signedPct(sm.roi), cls: signCls(sm.roi), sub: `${(sm.trades || 0).toLocaleString()} bets · DraftKings` } : null;
+}
+function strategyList(cur, strats, sel, lg, backtest) {
+  const rows = strats.map((x) => {
+    const on = x.key === sel.key;
+    const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
+    const status = cur.status === "retired" ? "Retired · keeps its record"
+      : cur.status === "testing" && !m.open && !m.n ? "In testing"
+      : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`;
+    const rule = ruleText(x);
+    let right;
+    if (backtest) {
+      const h = backtestHeadline(cur, x);
+      right = h ? `<b class="${h.cls}">${h.v}</b><small>${esc(h.sub)}</small>` : `<b class="muted">–</b><small>no backtest</small>`;
+    } else {
+      right = m.n
+        ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
+        : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
+    }
+    const attrs = strats.length > 1 ? ` data-pfstrat="${esc(x.key)}" aria-pressed="${on}"` : ` aria-current="true"`;
+    return `
+      <button class="row-btn strat${on ? " on" : ""}${cur.status === "retired" ? " retired" : ""}"${attrs}>
+        <span class="who"><b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span></span>
+        <span class="vals">${right}</span>
+      </button>`;
+  }).join("");
+  return `<div class="card list">${rows}</div>`;
+}
+// The bet in words: "Barcelona to win", "Draw", "Valencia over 4.5 corners".
+function betName(t) {
+  if (isCorner(t) || isPlayer(t)) return tradeLabel(t);
+  if (t.market === "home") return `${t.home} to win`;
+  if (t.market === "away") return `${t.away} to win`;
+  return PICK_LABEL[t.market] || t.market;
+}
+const rowKickoff = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+function pfTradeRow(t) {
+  const open = t.status === "open";
+  const dec = Number(t.odds);
+  const clv = tradeClv(t);
+  const how = isLean(t) && t.z != null ? sigmaText(t.z) : t.edge != null ? `edge ${signedPct(t.edge)}` : "";
+  let extra = "";
+  if (open) { const { cur, live } = currentPrice(t); extra = cur && cur !== t.odds && live ? ` · now ${american(cur)}` : ""; }
+  else extra = `${t.score ? ` · ${esc(t.score)}` : ""}${clv != null ? ` · CLV ${signedPct(clv)}` : ""}`;
+  const right = open
+    ? `<b>$${Number(t.stake).toFixed(0)}</b><small>to win $${(t.stake * (dec - 1)).toFixed(2)}</small>`
+    : t.status === "void"
+      ? `<b>${t.push ? "Push" : "Void"}</b><small>stake back</small>`
+      : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(t.profit, 2)}</b><small>${t.status}</small>`;
+  return `
+    <button class="row-btn trade-row" data-trade="${esc(t.id)}">
+      <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}
+        <span class="meta">${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
+        <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span></span>
+      <span class="vals">${right}</span>
+    </button>`;
+}
+// Settled profit by day (settled date, else kickoff), cumulative from $0.
+function settledCurve(trades) {
+  const days = new Map();
+  for (const t of trades) {
+    if (!["won", "lost", "void"].includes(t.status) || t.profit == null) continue;
+    const d = String(t.settled_at || t.kickoff).slice(0, 10);
+    const g = days.get(d) || { date: d, profit: 0, n: 0 };
+    g.profit += t.profit; g.n += 1;
+    days.set(d, g);
+  }
+  let cum = 0;
+  return [...days.values()].sort((a, b) => a.date.localeCompare(b.date)).map((g) => ({ ...g, cum: (cum += g.profit) }));
+}
+let curveData = null;
+const curveReadout = (c) => `<b>${esc(new Date(`${c.date}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }))}</b>: ${c.n} trade${c.n > 1 ? "s" : ""} settled, ${usd(c.profit, 2)} that day · running total ${usd(c.cum, 2)}`;
+// The baseball app's profit chart: $0 line, the end label, each settled day a tappable
+// point whose numbers go in the readout line under the chart (no hover tooltips).
+function curveChart(curve) {
+  curveData = curve;
+  if (!curve.length) return "";
+  const pts = [{ cum: 0 }, ...curve];
+  const W = 320, H = 170, L = 44, R = 52, T = 12, B = 22;
+  const ys = pts.map((c) => c.cum);
+  const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+  const span = hi - lo || 1;
+  const sx = (i) => L + (i / (pts.length - 1)) * (W - L - R);
+  const sy = (v) => T + (1 - (v - lo) / span) * (H - T - B);
+  const ticks = [lo, hi].filter((v) => Math.abs(v) > span * 0.12);
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${usd(v)}</text>`).join("");
+  const path = pts.map((c, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ");
+  const last = pts.length - 1, end = pts[last].cum;
+  const neg = end < 0 ? " neg" : "";
+  const dots = curve.map((c, i) => `<circle class="pt${neg}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="3"/><circle class="hit" data-cv="${i}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="13" fill="transparent"/>`).join("");
+  return `
+    <div class="chart curve">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${usd(end, 2)} so far">
+        <g class="grid">${grid}</g>
+        <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
+        <text class="xlab" x="${L - 4}" y="${sy(0) + 3}" text-anchor="end">$0</text>
+        <path class="line${neg}" d="${path}"/>
+        ${dots}
+        <circle class="dot${neg}" cx="${sx(last)}" cy="${sy(end)}" r="4.5"/>
+        <text class="end ${end > 0 ? "pos" : end < 0 ? "neg" : ""}" x="${sx(last) + 8}" y="${sy(end) + 4}">${usd(end, Math.abs(end) < 10 ? 2 : 0)}</text>
+        <text class="xlab" x="${L}" y="${H - 6}">start</text>
+        <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${curve[curve.length - 1].date}T12:00:00Z`))}</text>
+      </svg>
+      <div class="eb-readout" id="cv-readout" aria-live="polite">${curveReadout(curve[curve.length - 1])}</div>
+    </div>`;
+}
+function liveRuleNote(cur, x) {
+  const rule = state.data.portfolio?.rule || {};
+  if (cur.id === "corners") return `<b>Live test: fixed ${pct(x.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${x.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(x.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back. Prices: Pinnacle's team corners, logged about a day before kickoff and again just before it.`;
+  if (x.key === "lean") return `<b>Blend Lean (1σ+).</b> A $${x.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(x.rule?.sigma)}. Be warned: most Lean picks come from the part of the blend that sharpens DraftKings' own price (it makes favourites a little likelier and long shots less likely, a pattern fitted on Pinnacle's prices), not from the model, which gets little weight. With that sharpening switched off, only 2 of the 12 matches that reached 1σ from 1 to 10 Oct would still have qualified. Lean hasn't proven itself, and neither has the baseball app's Lean tier it comes from. Expect few picks, mostly outside the Premier League, and judge it on closing line value rather than a few dozen results.`;
+  if (cur.id === "moneyline" && fixedRule()) return `<b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.`;
+  if (cur.id === "moneyline") return rule.threshold == null ? "No new paper trades: no minimum edge has beaten the market in past bets." : `A $${rule.stake ?? 10} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.`;
+  return esc(cur.note || "");
+}
+function liveStrategyHtml(cur, x, lg) {
+  const lean = x.key === "lean";
+  const drv = lean ? state.pfDriver : "";
+  const set = strategyLiveSet(cur, x, lg, drv);
+  const trades = set.trades || [];
+  const m = tradeStats(trades);
+  const book = cur.id === "corners" ? "Pinnacle's" : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
+  const banner = set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
+  const rules = `<div class="explain live-test rule-note">${liveRuleNote(cur, x)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
+  const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
+  const title = `<div class="section-title nocase">${esc(x.label)}${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>`;
+  if (!trades.length) {
+    const empty = drv ? `No ${DRIVER_NAME[drv].toLowerCase()} Lean trades yet.`
+      : lean ? `No Blend Lean trades yet. One opens when a side's blended chance beats DraftKings' break-even by 1σ.${x.rule?.source === "none" && x.rule?.note ? ` ${esc(x.rule.note)}` : ""}`
+      : cur.id === "corners" ? "No corner trades yet. One opens when a team's corner line shows a 12% edge against Pinnacle's price."
+      : cur.status === "testing" ? "No trades yet. They start once this strategy passes its tests."
+      : cur.status === "retired" ? "No live trades: this strategy was retired before any opened. Its testing history is under Backtest."
+      : "No paper trades yet.";
+    return `${title}${banner}${drvPanel}<div class="empty">${empty}</div>${rules}`;
+  }
+  const avg = lean && m.avgZ != null ? sigmaText(m.avgZ) : signedPct(m.avgEdge);
+  const tiles = `
+    <div class="tiles pf-tiles">
+      <div class="tile"><div class="label">Profit, settled</div><div class="value ${m.n ? signCls(m.profit) : ""}">${m.n ? usd(m.profit, 2) : "–"}</div><div class="sub">${m.n ? `on $${m.staked.toFixed(0)} staked · ${signedPct(m.roi)}` : "nothing settled yet"}</div></div>
+      <div class="tile"><div class="label">Record</div><div class="value">${m.won}–${m.lost}</div><div class="sub">${m.void} void${m.clv != null ? ` · CLV ${signedPct(m.clv)}` : ""}</div></div>
+      <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk</div></div>
+      <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${lean ? " (σ above break-even)" : ""}</div></div>
+    </div>`;
+  const caveat = m.n < 200 ? `<p class="note">${m.n ? `Only ${m.n} settled so far` : "Nothing settled yet"}; until a few hundred, results are mostly luck. Closing line value (CLV, against ${book} close) is the faster sign of an edge.</p>` : "";
+  const curve = settledCurve(trades);
+  const chart = curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
+  const open = trades.filter((t) => t.status === "open");
+  const done = trades.filter((t) => t.status !== "open");
+  const shown = done.slice(0, state.pfShown);
+  const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
+  return `
+    ${title}
+    ${banner}
+    ${tiles}
+    ${caveat}
+    ${drvPanel}
+    <div class="section-title">Profit over time</div>
+    <div class="card">${chart}</div>
+    <div class="section-title">Open · ${open.length}${open.length ? ` · $${m.atRisk.toFixed(0)} at risk` : ""}</div>
+    ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">No open trades.</span></div>`}
+    ${done.length ? `<div class="section-title">Settled · ${done.length} · <span class="${signCls(doneProfit)}">${usd(doneProfit, 2)}</span></div><div class="card list">${shown.map(pfTradeRow).join("")}</div>${done.length > shown.length ? `<button class="more" id="pf-more">Show more (${done.length - shown.length} left)</button>` : ""}` : ""}
+    ${impliedVsRealizedHtml(trades)}
+    ${pfBreakdowns(set.breakdowns || {})}
+    ${rules}`;
+}
+function viewPortfolio() {
+  const all = portfolios();
+  const cur = pfCurrent();
+  const active = all.filter((p) => p.status !== "retired");
+  const retired = all.filter((p) => p.status === "retired" && p.id !== cur.id);
+  const switcher = active.length > 1 || cur.status === "retired" ? `
+    <div class="segmented" role="group" aria-label="Portfolio">
+      ${active.map((p) => `<button data-pfid="${esc(p.id)}" class="${p.id === cur.id ? "on" : ""}" aria-pressed="${p.id === cur.id}">${esc(p.name)}</button>`).join("")}
+    </div>` : "";
+  const head = `
+    <div class="pf-head">
+      <span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>
+      <span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span>
+    </div>`;
+  const retiredLinks = retired.length ? `
+    <div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : "";
+  const toggle = `
+    <div class="segmented small-seg" role="group" aria-label="Which trades">
+      ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
+    </div>`;
+  const backtest = state.pfView === "backtest";
+  const strats = pfStrategies(cur);
+  const sel = pfSelected(strats);
+  const research = backtest && cur.backtest?.kind === "research";
+  const byComp = cur.id === "moneyline" || cur.id === "corners";
+  const lg = byComp && !research ? leagueOn() : "";
+  const list = `<div class="section-title">${backtest ? "Strategies, tested on past prices" : "Paper strategies"}</div>${strategyList(cur, strats, sel, lg, backtest)}`;
+  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${list}`;
+  if (!backtest) return `${top}${liveStrategyHtml(cur, sel, lg)}${retiredLinks}`;
+  return pfClassic(top);
 }
 
 // Who prices the player shot lines (FanDuel; match odds come from DraftKings).
@@ -2629,6 +2879,13 @@ function setUpdated() {
 
 // ---------- events ----------
 document.addEventListener("click", (ev) => {
+  const cv = ev.target.closest?.("[data-cv]");
+  if (cv && curveData) { // Portfolio profit chart: the tapped day's numbers in the readout line
+    const el = document.getElementById("cv-readout");
+    const c = curveData[Number(cv.dataset.cv)];
+    if (el && c) el.innerHTML = curveReadout(c);
+    return;
+  }
   const t = ev.target.closest("button, [data-close]");
   if (!t) return;
   if (t.dataset.tab) {

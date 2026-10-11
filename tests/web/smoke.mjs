@@ -292,8 +292,22 @@ const STEPS = [
     const on = await p.locator('button[data-pfstrat].on').innerText();
     if (!on.includes("Blend Lean")) throw new Error(`default strategy: ${on}`);
     const text = await p.textContent("#view");
-    for (const want of ["Blend Lean (1σ+), listed first", "baseball app's Lean tier", "not from the model", "Wolves v Everton"]) if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    for (const want of ["Paper strategies", "Model 12% (your live test)", "Profit, settled", "Record", "Avg edge", "Profit over time", "Open · ", "Settled · ", "Blend Lean (1σ+). A $10", "baseball app's Lean tier", "not from the model", "Wolves v Everton", "until a few hundred, results are mostly luck"]) {
+      if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    }
     if (text.includes("Nott'm Forest v Arsenal")) throw new Error("a 12% trade shows under Blend Lean");
+    // Every trade row under Lean is a Lean trade (its id ends "|lean").
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    if (!ids.length || ids.some((id) => !id.endsWith("|lean"))) throw new Error(`non-Lean rows under Lean: ${ids.join(", ")}`);
+    // The strategy list: Lean's row carries its own settled record, 12% its own.
+    const leanRow = await p.locator('button[data-pfstrat="lean"]').innerText();
+    if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow)) throw new Error(`Lean row: ${leanRow}`);
+    // Profit over time: three settled days for Lean; tapping the first fills the readout.
+    await p.locator(".chart.curve [data-cv='0']").dispatchEvent("click");
+    const readout = await p.textContent("#cv-readout");
+    if (!readout.includes("running total")) throw new Error(`curve readout: ${readout}`);
+    const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
+    if (!avg.endsWith("σ")) throw new Error(`Lean avg edge should be in σ: ${avg}`);
   }],
   ["portfolio-live-lean-trade", async (p) => {
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
@@ -307,6 +321,7 @@ const STEPS = [
     await p.click('.chip[data-league=""]');
     const text = await p.textContent("#view");
     for (const want of ["What carried each pick", "Market-driven", "Model-driven"]) if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    await p.click("details.drv-fold > summary");
     const chip = await p.locator('button[data-trade="E0|2627|Wolves|Everton|lean"] .drv').innerText();
     if (chip !== "Model") throw new Error(`Wolves chip: ${chip}`);
     await p.click('button[data-pfdriver="model"]');
@@ -319,9 +334,11 @@ const STEPS = [
   ["portfolio-live-lean-sp1-model", async (p) => {
     await p.click('.chip[data-league="SP1"]'); await p.click('button[data-pfdriver="model"]');
     const text = await p.textContent("#view");
-    if (!text.includes("Betis v Celta") || !text.includes("not kept per competition for this filter") || text.includes("nothing settled yet")) throw new Error("SP1 model-driven counts");
-    const roi = await p.locator(".tile", { hasText: "ROI" }).first().locator(".value").innerText();
-    if (roi !== "–") throw new Error(`SP1 driver ROI shown: ${roi}`);
+    // The tiles count straight from the trades, so a competition plus a driver still has a
+    // record: Betis v Celta won.
+    if (!text.includes("Betis v Celta") || text.includes("nothing settled yet")) throw new Error("SP1 model-driven trades");
+    const rec = await p.locator(".tile", { hasText: "Record" }).locator(".value").innerText();
+    if (rec !== "1–0") throw new Error(`SP1 model-driven record: ${rec}`);
   }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
@@ -349,6 +366,13 @@ const STEPS = [
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
     const text = await p.textContent("#view");
     if (!text.includes("Your live test: fixed 12%") || text.includes("Wolves v Everton")) throw new Error("12% strategy view");
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    if (!ids.length || ids.some((id) => id.endsWith("|lean"))) throw new Error(`a Lean trade shows under 12%: ${ids.join(", ")}`);
+    const on = await p.locator('button[data-pfstrat].on').innerText();
+    if (!on.includes("Model 12%") || !on.includes("12%+")) throw new Error(`12% row: ${on}`);
+    const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
+    if (!avg.endsWith("%")) throw new Error(`12% avg edge should be a %: ${avg}`);
+    if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
   }],
   ["portfolio-live-sp1", click('.chip[data-league="SP1"]')],
   ["portfolio-backtest-sp1", click('button[data-pf="backtest"]')],
@@ -370,7 +394,7 @@ const STEPS = [
   ["portfolio-corners", async (p) => {
     await closeSheet(p); await p.click('button[data-pfid="corners"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
-    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)"]) {
+    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Profit over time"]) {
       if (!text.includes(want)) throw new Error(`Team corners lacks "${want}"`);
     }
   }],
