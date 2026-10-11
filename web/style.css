@@ -660,3 +660,45 @@ table.mkts .lean-cell { font-weight: 700; }
 table.mkts td .zm { display: block; white-space: nowrap; font-size: 10.5px; font-weight: 400; color: var(--text-muted); }
 table.drv-table th:not(:first-child), table.drv-table td:not(:first-child) { text-align: right; }
 .drv-seg { margin: 12px 0 4px; }
+
+/* ---------- Portfolio laid out like the baseball app: strategy list, tiles, profit
+   over time, trade lists (owner, 11 Oct) ---------- */
+.pos-text { color: var(--pos); }
+.neg-text { color: var(--neg); }
+.nocase { text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--text-primary); }
+.card.list { padding: 2px 14px; overflow: hidden; }
+.row-btn {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px;
+  width: 100%; padding: 10px 0; border: 0; border-top: 0.5px solid var(--border);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.row-btn:first-child { border-top: 0; }
+.row-btn:active { transform: scale(0.99); }
+.row-btn .who { min-width: 0; }
+.row-btn .who b { font-weight: 600; }
+.row-btn .meta { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Trade rows wrap their meta lines so the score and CLV never get cut off at 390px. */
+.row-btn.trade-row .meta { white-space: normal; }
+.row-btn .vals { text-align: right; font-variant-numeric: tabular-nums; min-width: 64px; }
+.row-btn .vals b { font-size: 16px; font-weight: 600; }
+.row-btn .vals small { display: block; font-size: 11px; color: var(--text-muted); }
+.card.list .row-btn.strat.on {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  margin: 0 -14px; width: calc(100% + 28px); padding-left: 14px; padding-right: 14px;
+  box-shadow: inset 4px 0 0 var(--accent); border-top-color: transparent;
+}
+.card.list .row-btn.strat.on + .row-btn { border-top-color: transparent; }
+.row-btn.strat.retired:not(.on) .who b { color: var(--text-secondary); font-weight: 500; }
+.row-btn.strat[aria-current] { cursor: default; }
+@media (min-width: 700px) { .tiles.pf-tiles { grid-template-columns: repeat(4, 1fr); } }
+.chart.curve .line.neg { stroke: var(--neg); }
+.chart.curve .dot.neg, .chart.curve .pt.neg { fill: var(--neg); }
+.chart.curve .pt { fill: var(--accent); }
+.chart.curve .hit { cursor: pointer; }
+.chart.curve .end { font-size: 12px; font-weight: 600; fill: var(--text-primary); }
+.chart.curve .end.pos { fill: var(--pos); }
+.chart.curve .end.neg { fill: var(--neg); }
+.chart.curve .eb-readout { margin-top: 6px; }
+.rule-note { margin-top: 18px; }
+details.drv-fold { margin-top: 10px; }
+.chart.curve svg { max-width: 460px; margin: 0 auto; }
