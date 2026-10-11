@@ -1196,10 +1196,12 @@ answers availability and prices the backtest.
   from the cached football-data files (else 380, or 306 for Ligue 1) × the measured cost
   per odds call, for (a) one look snapshot about 24 h before kickoff and (b) look plus
   close (15 min before), plus one events call (1 credit) per distinct kickoff date and
-  snapshot. At the nominal 10 credits a call, with the standard counts: about 3,900 a
-  league-season for the look (E0, I1) and 3,150 (F1); all nine league-seasons about
-  32,900 for the look and 65,900 for look plus close, against about 22,000 credits on the
-  shared key. The backtest would have to be cut down (one league, or one season, or the
+  snapshot. Dry run (`odds-check.yml` run 38119430417, cap 0, no calls; matches from the
+  cached files except I1 and F1 2023/24, which use the standard counts), at the nominal 10
+  credits a call: about 3,910–3,935 a league-season for the look in E0 and I1 and
+  3,150–3,160 in F1 (look + close twice that); per season about 11,000 for the three
+  leagues; all nine league-seasons (3,198 matches) 32,994 for the look and 65,988 for look
+  plus close, against about 22,000 credits on the shared key. The backtest would have to be cut down (one league, or one season, or the
   look only) to fit; that is the next decision, not this one. The historical bulk odds
   endpoint takes featured markets only, so team corners need one event-odds call a match
   and snapshot.
