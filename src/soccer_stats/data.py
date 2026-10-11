@@ -26,6 +26,8 @@ RAW_DIR = Path(
 LEAGUES = {
     "E0": "England Premier League",
     "E1": "England Championship",
+    "E2": "England League One",
+    "E3": "England League Two",
     "SP1": "Spain La Liga",
     "D1": "Germany Bundesliga",
     "I1": "Italy Serie A",

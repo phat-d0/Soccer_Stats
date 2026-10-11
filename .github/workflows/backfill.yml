@@ -48,7 +48,7 @@ on:
         type: boolean
         default: false
       estimate_month:
-        description: "Only estimate Odds API credits per league (YYYY-MM, or YYYY-MM,YYYY-MM,... for the team-total and team-corner snapshots too; no key, no push)"
+        description: "Only estimate Odds API credits per league and month (YYYY-MM or YYYY-MM,YYYY-MM,...; plus team-total and team-corner snapshots; League One/Two priced apart; no key, no push)"
         default: ""
 
 permissions:
@@ -96,11 +96,13 @@ jobs:
         run: |
           uv sync --frozen
           months="${{ inputs.estimate_month }}"
-          uv run soccer-stats estimate-credits --month "${months%%,*}"
+          # Every registry league per month listed, League One and League Two (off) included.
+          for m in ${months//,/ }; do uv run soccer-stats estimate-credits --month "$m"; done
           # Team-total snapshots (docs/totals.md): an estimate only, no key, no calls.
           uv run soccer-stats estimate-team-totals --months "$months"
-          # Pinnacle team-corner snapshots, six leagues (owner's live test, 10 Oct).
-          uv run soccer-stats estimate-corners --months "$months"
+          # Pinnacle team-corner snapshots, six leagues (owner's live test, 10 Oct), plus
+          # League One and League Two priced apart (owner's check, 11 Oct; not counted).
+          uv run soccer-stats estimate-corners --months "$months" --extra-leagues E2,E3
 
       - name: Match markets vs Pinnacle (research, print only)
         if: ${{ inputs.match_markets && inputs.estimate_month == '' }}

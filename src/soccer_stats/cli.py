@@ -142,34 +142,57 @@ def cmd_estimate_corners(args: argparse.Namespace) -> None:
     from soccer_stats.xg import load_schedule
 
     months = [pd.Timestamp(f"{m.strip()}-01", tz="UTC") for m in args.months.split(",")]
+    extra = [c.strip() for c in (args.extra_leagues or "").split(",") if c.strip()]
+    extra = [c for c in extra if c not in corners_live.LEAGUES]
     print("Team-corner snapshots at Pinnacle: credits per month (estimate; look + close,")
-    print("1 credit a call; the Championship uses its calendar a year earlier)")
-    grand = 0
+    print("1 credit a call; goals-only leagues use their calendar a year earlier)")
+
+    def month_estimate(code, start, end):
+        year = start.year if start.month >= 7 else start.year - 1
+        s, e = start, end
+        if LEAGUES[code].understat:
+            ks = list(load_schedule(code, year, include_played=True)["kickoff"])
+        else:  # football-data has played matches only: the month a year earlier
+            s = start - pd.DateOffset(years=1)
+            e = s + pd.offsets.MonthBegin(1)
+            ks = list(season_kickoffs(code, year - 1))
+        return corners_live.estimate({code: ks}, s, e)[code]
+
+    grand, grand_extra = 0, dict.fromkeys(extra, 0)
     for start in months:
         end = start + pd.offsets.MonthBegin(1)
-        year = start.year if start.month >= 7 else start.year - 1
         total, parts = 0, []
         for code in corners_live.LEAGUES:
-            s, e = start, end
             try:
-                if LEAGUES[code].understat:
-                    ks = list(load_schedule(code, year, include_played=True)["kickoff"])
-                else:  # football-data has played matches only: the month a year earlier
-                    s = start - pd.DateOffset(years=1)
-                    e = s + pd.offsets.MonthBegin(1)
-                    ks = list(season_kickoffs(code, year - 1))
+                est = month_estimate(code, start, end)
             except Exception as exc:  # no schedule: say so rather than guess
                 parts.append(f"{code} unavailable ({type(exc).__name__})")
                 continue
-            est = corners_live.estimate({code: ks}, s, e)[code]
             total += est["credits"]
             parts.append(f"{code} {est['matches']} matches {est['credits']}")
         grand += total
         print(f"  {start:%b %Y}: {total} credits ({'; '.join(parts)})")
+        for code in extra:  # leagues not in the live corner test (priced only, not counted)
+            try:
+                est = month_estimate(code, start, end)
+            except Exception as exc:  # noqa: BLE001
+                print(f"    not live, {code}: unavailable ({type(exc).__name__})")
+                continue
+            grand_extra[code] += est["credits"]
+            print(
+                f"    not live, {code}: {est['matches']} matches {est['calls']} calls "
+                f"{est['credits']} credits"
+            )
+    n = max(len(months), 1)
     print(
-        f"Average a month over {len(months)} month(s): {grand / max(len(months), 1):.0f} "
+        f"Average a month over {len(months)} month(s): {grand / n:.0f} "
         f"(cap {corners_live.CORNERS_MONTHLY_CAP})"
     )
+    if extra:
+        print(
+            "Not live, average a month (would add): "
+            + ", ".join(f"{c} {v / n:.0f}" for c, v in grand_extra.items())
+        )
     # A check of the live model (f) on whatever football-data files are cached (no calls).
     now = pd.Timestamp.now(tz="UTC")
     for code in corners_live.LEAGUES:
@@ -243,7 +266,7 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
 
     month_start = pd.Timestamp(f"{args.month}-01", tz="UTC")
     year = month_start.year if month_start.month >= 7 else month_start.year - 1
-    total = 0
+    total, off = 0, {}
     print(f"Odds API credits for {args.month} (refresh rules only; an upper bound):")
     for code, lg in LEAGUES.items():
         start, note = month_start, ""
@@ -261,6 +284,8 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
         e = estimate_credits(code, kickoffs, start, end)
         if lg.live:
             total += e["credits"]
+        else:  # registered off (League One, League Two): priced, never counted as live
+            off[code] = e["credits"]
         month = [k for k in kickoffs if start <= k < end]
         times = len({(k.hour, k.minute) for k in month})
         print(
@@ -269,6 +294,12 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
             f"{times} distinct kickoff times{note})"
         )
     print(f"Live leagues now: {total} credits")
+    if off:
+        print(
+            "Not live (switching each on would add): "
+            + ", ".join(f"{c} {n}" for c, n in off.items())
+            + f"; together {sum(off.values())} credits"
+        )
 
 
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
@@ -1819,6 +1850,9 @@ def main(argv: list[str] | None = None) -> None:
 
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
+    eco.add_argument(
+        "--extra-leagues", default="", help="leagues outside the live test to price, e.g. E2,E3"
+    )
     eco.set_defaults(func=cmd_estimate_corners)
 
     ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")

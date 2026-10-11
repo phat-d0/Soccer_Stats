@@ -19,8 +19,8 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 # ---------- the registry ----------
 
 
-def test_registry_matches_the_loaders_and_every_league_is_live():
-    assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1", "E1"}
+def test_registry_matches_the_loaders_and_six_leagues_are_live():
+    assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"}
     assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1"]  # primary first
     for code, lg in lgs.LEAGUES.items():
         assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
@@ -31,6 +31,94 @@ def test_registry_matches_the_loaders_and_every_league_is_live():
     assert lgs.get("E1").understat is None and feed.SPORTS["E1"] == "soccer_efl_champ"
     assert feed.SPORTS["E0"] == "soccer_epl"  # the live path is unchanged
     assert lgs.name("XX") == "XX"
+
+
+# ---------- League One and League Two: registered off (owner's check, 11 Oct) ----------
+
+OFF = ("E2", "E3")
+
+
+def test_league_one_and_two_are_registered_off_and_goals_only():
+    assert feed.SPORTS["E2"] == "soccer_england_league1"
+    assert feed.SPORTS["E3"] == "soccer_england_league2"
+    for code in OFF:
+        lg = lgs.get(code)
+        assert not lg.live and lg.understat is None and lg.odds_policy == "matchday"
+        assert code not in lgs.live_codes()
+    assert lgs.name("E2") == "League One" and lgs.name("E3") == "League Two"
+
+
+def test_an_off_league_is_never_fetched_even_near_a_match(tmp_path, monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
+    near = [T + pd.Timedelta(hours=2)]
+    for code in OFF:
+        events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
+        assert events is None and "not live" in status.error
+    assert list(tmp_path.iterdir()) == []  # no cache file, no meta: nothing downloaded
+
+
+def test_off_leagues_stay_out_of_every_live_list_and_data_json():
+    from soccer_stats import corners_live, espn_news, team_totals
+    from soccer_stats.publish import league_list
+
+    for code in OFF:
+        assert code not in corners_live.LEAGUES and code not in feed.TEAM_TOTAL_LEAGUES
+        assert code not in team_totals.TEAM_TOTAL_LEAGUES and code not in espn_news.SLUGS
+    fixtures = [{"league": "E0"}, {"league": "SP1"}]
+    rows = league_list(fixtures, {})
+    # Every live league is listed as before (fixtures or not); the off ones are left out,
+    # so data.json, the app's chips and paper.leagues_in_play are unchanged.
+    assert [r["code"] for r in rows] == lgs.live_codes()
+    assert {r["code"]: r["fixtures"] for r in rows}["D1"] == 0
+    assert paper.leagues_in_play({"leagues": rows, "fixtures": fixtures}) == ["E0", "SP1"]
+    # Only fixtures could bring one in (none are built while it is off).
+    assert "E2" in [r["code"] for r in league_list([{"league": "E2"}], {})]
+
+
+def test_estimate_credits_prices_off_leagues_under_the_matchday_rule():
+    start, end = T.normalize(), T.normalize() + pd.Timedelta(days=7)
+    assert feed.estimate_credits("E2", [], start, end)["credits"] == 0
+    k = [start + pd.Timedelta(days=3, hours=15)]
+    e2 = feed.estimate_credits("E2", k, start, end)
+    assert e2["calls"] == feed.estimate_credits("E1", k, start, end)["calls"] > 0
+    assert e2["credits"] == e2["calls"]  # 1 credit a refresh (h2h only)
+
+
+def test_estimate_cli_lists_off_leagues_apart(monkeypatch, capsys):
+    import argparse
+
+    from soccer_stats import cli
+
+    def kickoffs(code, year, raw_dir=None):  # one 15:00 Saturday a week, Oct 2025
+        return pd.Series(pd.date_range("2025-10-04 14:00", periods=4, freq="7D", tz="UTC"))
+
+    def schedule(code, year, raw_dir=None, include_played=False):
+        ks = pd.date_range("2026-10-03 14:00", periods=4, freq="7D", tz="UTC")
+        return pd.DataFrame({"kickoff": ks})
+
+    monkeypatch.setattr(fd, "season_kickoffs", kickoffs)
+    monkeypatch.setattr(xg, "load_schedule", schedule)
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("no network"))
+    cli.cmd_estimate_credits(argparse.Namespace(month="2026-10"))
+    out = capsys.readouterr().out
+    assert "League One" in out and "League Two" in out and "off" in out
+    live = int(out.split("Live leagues now: ")[1].split()[0])
+    e2 = int(out.split("Not live (switching each on would add): E2 ")[1].split(",")[0])
+    assert e2 > 0 and live > 0
+    # The off leagues aren't in the live total: six live leagues' credits only.
+    rows = [ln.split() for ln in out.splitlines() if " calls " in ln]
+    credits = [(r[r.index("credits") - 1], r) for r in rows]
+    assert len(rows) == 8
+    assert sum(int(c) for c, r in credits if "live" in r) == live
+    assert sum(int(c) for c, r in credits if "off" in r) == e2 + int(
+        out.split(", E3 ")[1].split(";")[0]
+    )
+
+    cli.cmd_estimate_corners(argparse.Namespace(months="2026-10", extra_leagues="E2,E3"))
+    out = capsys.readouterr().out
+    assert "not live, E2: 4 matches" in out and "not live, E3: 4 matches" in out
+    assert "Not live, average a month (would add): E2 8, E3 8" in out
+    assert "E2" not in out.split("Oct 2026:")[1].split("\n")[0]  # not in the live total
 
 
 # ---------- refresh policy ----------
