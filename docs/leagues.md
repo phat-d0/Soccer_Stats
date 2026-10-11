@@ -190,5 +190,25 @@ Results:
   (HC/AC) 100%, Pinnacle early and close 1X2 30% (E2 29.9%, E3 30.3%: Pinnacle prices
   stop part-way through the season, as in E1 and the top flights); 2026/27 so far E2 90
   and E3 102 matches, corners 100%, Pinnacle 0%.
-- Paid probe: _run id_, _ credits. DraftKings h2h: _. Pinnacle team corners: _.
-  FanDuel: _. Verdict: _ (the lead fills this in).
+- Paid probe (`odds-check.yml` run 38179178621, 11 Oct 22:08 UTC, `task=markets`,
+  `leagues=E2,E3`, `cap=10`): **6 credits** (22,037 → 22,031; per league 1 discovery + 2
+  for the odds call, h2h and totals). One match each, 4–6 days before kickoff (E2
+  Mansfield Town v Oxford United, E3 Shrewsbury Town v Bristol Rovers).
+  - **DraftKings h2h: listed in both**, all three sides; margin 7.7% (E2) and 8.5% (E3)
+    on that match, against about 4–5% in the top flights.
+  - **Pinnacle: h2h and totals only, no team corners.** `alternate_team_totals_corners`
+    is not in either league's discovery list (Pinnacle lists h2h, spreads, totals and
+    their alternates and halves). Pinnacle h2h margin 5.6% (E2) and 6.3% (E3); totals
+    4.6% (E2, line 2.75) and 5.8% (E3, line 2.25). A corner listing nearer kickoff wasn't
+    checked; in the six live leagues Pinnacle's corners showed in the 9 Oct discovery.
+  - **FanDuel: not listed** in either league, so no team-goal prices.
+  - 40+ books list h2h in each league; the cheapest two-sided h2h after Pinnacle was
+    Coolbet (7.1% / 6.8%).
+- **Verdict.** Only the two match strategies could run in League One and League Two:
+  Blend Lean and the fixed 12% test on DraftKings' h2h (a per-league blend can be fitted
+  on football-data's Pinnacle closes from 2022/23; 2025/26 has them for only 30% of
+  matches). No team-corner test (no Pinnacle corner prices) and no team-goal test (no
+  FanDuel). Live odds would cost about 364 credits a month for both (estimate above);
+  the corner cap needs no change. Earlier research (round 5, bake-off 2) found no model
+  edge in either league against Pinnacle. The owner decides whether to switch them on
+  (`live=True` in `leagues.py` plus a `fit-match-blends` refit).
