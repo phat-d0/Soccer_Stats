@@ -1428,6 +1428,13 @@ def _goal_predictions(league: str, holdout_reason: str):
     return apps, gp
 
 
+def cmd_corner_history_probe(args: argparse.Namespace) -> None:
+    """Does The Odds API's history carry Pinnacle's team corners? Never past --cap."""
+    from soccer_stats.edge import corner_history
+
+    corner_history.cli(args.cap, args.json)
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -1966,6 +1973,14 @@ def main(argv: list[str] | None = None) -> None:
     )
     gl_.add_argument("--json", help="write the results as JSON")
     gl_.set_defaults(func=cmd_goal_lab)
+
+    chp = sub.add_parser(
+        "corner-history-probe",
+        help="historical Pinnacle team-corner prices: probe and backtest cost (capped)",
+    )
+    chp.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
+    chp.add_argument("--json", help="write the results as JSON")
+    chp.set_defaults(func=cmd_corner_history_probe)
 
     gp_ = sub.add_parser(
         "goalscorer-pilot", help="anytime goalscorer odds: live probe + 5-match pilot (capped)"
