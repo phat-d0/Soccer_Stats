@@ -393,6 +393,23 @@ def test_lab_levels_fill_in_for_leagues_without_a_backtest(tmp_path, monkeypatch
     assert paper.load_ledger(log, "SP1")  # the SP1 trade (20% edge) opened at 7%
 
 
+def test_championship_long_names_map_to_football_data():
+    """Publish 38097356619 left "Queens Park Rangers v Derby" unmatched: football-data
+    writes QPR. Long forms map with or without the season's team list."""
+    known = {"QPR", "Derby", "Sheffield Weds", "Sheffield United", "Preston", "West Brom"}
+    for dk, name in {
+        "Queens Park Rangers": "QPR",
+        "Sheffield Wednesday": "Sheffield Weds",
+        "Derby County": "Derby",
+        "Preston North End": "Preston",
+        "West Bromwich Albion": "West Brom",
+    }.items():
+        assert feed._team(dk, known) == name
+        assert feed._team(dk) == name
+    assert feed._team("Queens Park Rangers", known) in known
+    assert feed._team("Sheffield United", known) == "Sheffield United"
+
+
 def test_draftkings_names_map_to_football_data_in_new_leagues():
     """DraftKings spellings from the first six-league publish land on football-data names,
     so a priced match joins its scheduled fixture instead of being added a second time."""
