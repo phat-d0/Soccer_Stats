@@ -2047,7 +2047,7 @@ function pfTiles(s, trades = []) {
   const openTiles = o.n ? `
       <div class="tile"><div class="label">Open bets, if cashed out</div><div class="value ${plClass(o.pl)}">${usd(o.pl, 2)}</div><div class="sub">$${o.atRisk} at risk on ${o.n} bet${o.n > 1 ? "s" : ""}</div></div>
       <div class="tile"><div class="label">Total gain/loss</div><div class="value ${plClass(total)}">${usd(total, 2)}</div><div class="sub">settled + open</div></div>` : "";
-  const profit = `<div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : "nothing settled yet"}</div></div>`;
+  const profit = `<div class="tile"><div class="label">Settled profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">${s.staked ? `on $${s.staked.toLocaleString()} staked` : s.counts_only && s.settled ? "not kept per competition for this filter" : "nothing settled yet"}</div></div>`;
   const roi = `<div class="tile"><div class="label">ROI</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${se ? `standard error${se}` : "per dollar staked"}</div></div>`;
   const corners = trades.length > 0 && trades.every(isCorner);
   const book = corners ? "Pinnacle's" : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
@@ -2335,7 +2335,7 @@ function lbLeagueDetails(l) {
 // split by league).
 function driverSet(set, st, drv, lg) {
   const trades = (set.trades || []).filter((t) => (driverOf(t) || "unknown") === drv);
-  const summary = !lg && st.by_driver?.[drv] ? st.by_driver[drv] : { trades: trades.length, open: trades.filter((t) => t.status === "open").length, settled: trades.filter((t) => t.status === "won" || t.status === "lost").length };
+  const summary = !lg && st.by_driver?.[drv] ? st.by_driver[drv] : { trades: trades.length, open: trades.filter((t) => t.status === "open").length, settled: trades.filter((t) => t.status === "won" || t.status === "lost").length, void: trades.filter((t) => t.status === "void").length, counts_only: true };
   return { ...set, trades, summary, breakdowns: {}, by_league: null };
 }
 // Live: market-driven vs model-driven, side by side, with a filter for the rest of the view.

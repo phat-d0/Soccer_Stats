@@ -314,9 +314,18 @@ const STEPS = [
     if (!only.includes("Wolves v Everton") || only.includes("Spurs v Brentford")) throw new Error("model-driven filter");
   }],
   ["portfolio-live-lean-market", click('button[data-pfdriver="market"]')],
+  // With a competition chosen the driver filter shows counts only (by_driver isn't kept
+  // per league): no profit or ROI for the group, and never "nothing settled yet".
+  ["portfolio-live-lean-sp1-model", async (p) => {
+    await p.click('.chip[data-league="SP1"]'); await p.click('button[data-pfdriver="model"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("Betis v Celta") || !text.includes("not kept per competition for this filter") || text.includes("nothing settled yet")) throw new Error("SP1 model-driven counts");
+    const roi = await p.locator(".tile", { hasText: "ROI" }).first().locator(".value").innerText();
+    if (roi !== "–") throw new Error(`SP1 driver ROI shown: ${roi}`);
+  }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
-    await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
     const text = await p.textContent("#view");
     for (const want of ["In the replay at Pinnacle's prices Lean", "Return by league", "Lean and Strong", "Market-driven and model-driven", "Bets, newest first", "units"]) {
       if (!text.includes(want)) throw new Error(`Lean backtest lacks "${want}"`);
