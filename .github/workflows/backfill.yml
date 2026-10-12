@@ -7,6 +7,8 @@
 # match_blends: fits each live league's h2h blend and sigma (Blend Lean) on football-data
 # and Understat (no key, no credits); pushes backtest/match_blends.json to data-log only
 # from the default branch.
+# estimate_month (+ cups): credit estimates only, no key, no push; `cups` adds the UEFA
+# cups' cost on ESPN's calendar (cups.py).
 # lean_backtest: replays Blend Lean walk-forward on Pinnacle's early prices per league
 # (no key, no credits); pushes backtest/lean_backtest.json to data-log only from the
 # default branch.
@@ -50,6 +52,10 @@ on:
       estimate_month:
         description: "Only estimate Odds API credits per league and month (YYYY-MM or YYYY-MM,YYYY-MM,...; plus team-total and team-corner snapshots; League One/Two priced apart; no key, no push)"
         default: ""
+      cups:
+        description: "With estimate_month: also cost the UEFA cups on ESPN's 2024/25-2025/26 calendar (no key, no push; log + 7-day artifact)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # writes the backtest summary to the data-log branch
@@ -103,6 +109,24 @@ jobs:
           # Pinnacle team-corner snapshots, six leagues (owner's live test, 10 Oct), plus
           # League One and League Two priced apart (owner's check, 11 Oct; not counted).
           uv run soccer-stats estimate-corners --months "$months" --extra-leagues E2,E3
+
+      # The UEFA cups (owner's request, 12 Oct; docs/leagues.md "European cups"): ESPN's
+      # free calendar replayed under the matchday rule, snapshot and historical costs, and
+      # football-data team coverage. No key, no credits, no push.
+      - name: European cups cost estimate (print only)
+        if: ${{ inputs.estimate_month != '' && inputs.cups }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          uv run soccer-stats estimate-cups --json out/cups.json
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.estimate_month != '' && inputs.cups && always() }}
+        with:
+          name: cups-estimate
+          path: out/cups.json
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Match markets vs Pinnacle (research, print only)
         if: ${{ inputs.match_markets && inputs.estimate_month == '' }}

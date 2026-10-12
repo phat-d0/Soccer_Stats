@@ -8,7 +8,8 @@ switches:
 
 * `live`: publish builds the league's fixtures and fetches its DraftKings odds. Six are
   live (owner, 8 Oct 2026); League One and League Two (E2, E3) are registered off, for the
-  credit estimate and the market probe only (owner's check, 11 Oct 2026). The Odds API
+  credit estimate and the market probe only (owner's check, 11 Oct 2026), and so are the
+  three UEFA cups (UCL, UEL, UECL; cost estimate, 12 Oct 2026). The Odds API
   key is shared with the baseball app, so each league costs credits; the Premier League
   budgets first, and the others pause below odds_feed.MATCHDAY_RESERVE_CREDITS
   (docs/leagues.md).
@@ -38,6 +39,7 @@ class League:
     odds_sport: str  # The Odds API sport key
     live: bool = False
     odds_policy: str = "matchday"  # "always" or "matchday"
+    cup: bool = False  # a UEFA cup: no football-data calendar (cups.py reads ESPN's)
 
 
 LEAGUES: dict[str, League] = {
@@ -54,6 +56,12 @@ LEAGUES: dict[str, League] = {
         # never fetched, built, logged or listed in data.json (publish.league_list).
         League("E2", "League One", None, "soccer_england_league1"),
         League("E3", "League Two", None, "soccer_england_league2"),
+        # The three UEFA cups: off, a cost estimate only (owner's request, 12 Oct;
+        # docs/leagues.md "European cups"). football-data has no cup files, so their
+        # calendar comes from ESPN (cups.py); estimate-credits leaves them to estimate-cups.
+        League("UCL", "Champions League", None, "soccer_uefa_champs_league", cup=True),
+        League("UEL", "Europa League", None, "soccer_uefa_europa_league", cup=True),
+        League("UECL", "Conference League", None, "soccer_uefa_europa_conference_league", cup=True),
     )
 }
 PRIMARY = "E0"  # the league whose fields fill data.json's top level (params, teams, ...)

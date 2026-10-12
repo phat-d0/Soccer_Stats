@@ -286,6 +286,8 @@ def run(
             key=lambda e: e["commence_time"],
         )
         r["events"], r["upcoming"] = len(evs or []), len(upcoming)
+        if is_check(lg):  # free: every listed kickoff (the cups' cost estimate reads them)
+            r["kickoffs"] = [e["commence_time"] for e in upcoming]
         if not upcoming:
             r["note"] = "no upcoming events"
             continue
@@ -358,6 +360,9 @@ def football_data_coverage(leagues, seasons=(2025, 2026), raw_dir=None, download
     download = download or fd.download
     out: dict = {}
     for lg in leagues:
+        if lg not in fd.LEAGUES:  # a UEFA cup: football-data has no file for it
+            out[lg] = {"error": "not on football-data"}
+            continue
         for year in seasons:
             key = f"{lg} {fd.season_code(year)}"
             try:
@@ -392,6 +397,9 @@ def report(res: dict) -> str:
         lines.append(f"{lg} ({r.get('event', '-')}, {r.get('kickoff', '-')}): {r.get('note', '')}")
         if "events" in r:
             lines.append(f"  events listed: {r['events']} ({r['upcoming']} upcoming)")
+        if r.get("kickoffs"):
+            days = sorted({k[:10] for k in r["kickoffs"]})
+            lines.append(f"  upcoming kickoff days: {', '.join(days)}")
         if "market_keys" in r:
             lines.append(f"  market keys found: {', '.join(r['market_keys']) or 'none'}")
             lines.append(f"  requested: {r.get('requested')}")

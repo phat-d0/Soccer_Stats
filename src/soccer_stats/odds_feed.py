@@ -469,13 +469,15 @@ def estimate_credits(
     start: pd.Timestamp,
     end: pd.Timestamp,
     cost: int = DEFAULT_COST,
+    call_times: list | None = None,
 ) -> dict:
     """Odds API calls and credits one league would use between start and end.
 
     Replays the scheduled publish runs against the league's refresh policy
     (policy_floor) with an unlimited budget, so it is what the rules alone would spend:
     each refresh is one call for h2h from one bookmaker (`cost` credits).
-    The `live` flag is ignored: this prices switching a league on.
+    The `live` flag is ignored: this prices switching a league on. Pass a list as
+    `call_times` to get each refresh's run time appended (the cup estimate's weekday split).
     """
     ks = sorted(pd.Timestamp(k).tz_convert("UTC") for k in kickoffs)
     last = None
@@ -487,6 +489,8 @@ def estimate_credits(
         if last is None or (t - last) >= pd.Timedelta(hours=floor):
             calls += 1
             last = t
+            if call_times is not None:
+                call_times.append(t)
     return {
         "league": league,
         "matches": sum(start <= k < end for k in ks),
