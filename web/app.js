@@ -1820,6 +1820,28 @@ const DK_NOTE = {
 // Backtest seasons as start years ("2025", "2023-2025") to "2025/26", "2023/24–2025/26".
 const startYears = (v) => String(v).split(/[-,]/).map((y) => y.trim()).filter(Boolean)
   .map((y) => `${y}/${String((Number(y) + 1) % 100).padStart(2, "0")}`).filter((_, i, a) => i === 0 || i === a.length - 1).join("–");
+// Record → Match bets → Blend: the blend trades through Blend Lean now, so its tiles are
+// Blend Lean's Premier League backtest (portfolio.strategy_backtests.lean, leagues.E0),
+// in the same four tiles as Model alone, at $10 a bet (the file is per $1).
+const leanDkOn = () => !!state.data.portfolio?.strategy_backtests?.lean;
+function leanDkTiles() {
+  const lb = state.data.portfolio?.strategy_backtests?.lean;
+  if (!lb) return "";
+  if (lb.available === false) return `<div class="explain"><b>Blend Lean backtest:</b> ${esc(lb.note || "not available yet.")}</div>`;
+  const e = lb.leagues?.E0;
+  const l = e?.lean;
+  if (!l?.bets) return `<div class="explain"><b>Blend Lean backtest:</b> ${esc(e?.error || "no Premier League bets in the file yet.")}</div>`;
+  const seasons = e.seasons_included || [];
+  const span = seasons.length ? ` ${esc(seasons[0])}${seasons.length > 1 ? `–${esc(seasons[seasons.length - 1])}` : ""}` : "";
+  return `
+    <p class="note lean-dk-label"><b>Blend Lean (1σ+), the rule the blend trades on now.</b> Premier League, Pinnacle's early prices${span}, $10 a bet. At the old ${pct(PAPER_EDGE)} edge the blend made no bets against DraftKings, as the table below shows.</p>
+    <div class="tiles lean-dk" style="margin-top:8px">
+      <div class="tile"><div class="label">Profit</div><div class="value ${plClass(l.profit)}">${usd(l.profit * 10)}</div><div class="sub">from ${l.bets} bets at 1σ+</div></div>
+      <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(l.roi)}</div><div class="sub">${l.roi_ci95 ? `95%: ${signedPct(l.roi_ci95[0], 0)} to ${signedPct(l.roi_ci95[1], 0)}` : "ROI"}</div></div>
+      <div class="tile"><div class="label">Won</div><div class="value">${pct(l.win_rate, 1)}</div><div class="sub">${pct(l.breakeven, 1)} needed to break even</div></div>
+      <div class="tile"><div class="label">Beat the close</div><div class="value">${l.beat_close != null ? pct(l.beat_close) : "–"}</div><div class="sub">avg price move ${l.clv != null ? signedPct(l.clv) : "–"} vs Pinnacle's close</div></div>
+    </div>`;
+}
 function recordDkHtml() {
   const bt = pfById("moneyline")?.backtest;
   const strategies = bt?.strategies;
@@ -1860,7 +1882,8 @@ function recordDkHtml() {
       ${strats.map((k) => `<button data-recdk="${esc(k)}" class="${k === cur ? "on" : ""}" aria-pressed="${k === cur}">${esc(short(k))}</button>`).join("")}
     </div>
     <p class="note"><b>${esc(DK_LABEL[cur] || strategies[cur].label || cur)}.</b> ${esc(DK_NOTE[cur] || "")}</p>
-    ${noBets ? `<div class="explain"><b>No bets at a ${pct(th)} edge.</b> ${cur === "blend" ? "The blend stays so close to DraftKings' own chance that it never clears their margin, so it doesn't bet. That is the result: the model adds little that DraftKings' price doesn't already know." : "Nothing reached the threshold."}</div>` : `
+    ${cur === "blend" ? leanDkTiles() : ""}
+    ${noBets && cur === "blend" && leanDkOn() ? `<div class="explain"><b>No bets at a ${pct(th)} edge</b> against DraftKings: the blend stays too close to DraftKings' own chance to clear their margin.</div>` : noBets ? `<div class="explain"><b>No bets at a ${pct(th)} edge.</b> ${cur === "blend" ? "The blend stays so close to DraftKings' own chance that it never clears their margin, so it doesn't bet. That is the result: the model adds little that DraftKings' price doesn't already know." : "Nothing reached the threshold."}</div>` : `
     <div class="tiles" style="margin-top:12px">
       <div class="tile"><div class="label">Profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">from ${s.trades} bets at ${pct(th)}+ edge</div></div>
       <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${s.roi_ci95 ? `95%: ${signedPct(s.roi_ci95[0], 0)} to ${signedPct(s.roi_ci95[1], 0)}` : "ROI"}</div></div>
