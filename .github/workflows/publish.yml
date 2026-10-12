@@ -20,9 +20,12 @@ permissions:
   pages: write
   id-token: write
 
+# A new run waits for the one in progress instead of cancelling it: a cancelled run could
+# lose the record of calls it already paid for, and closes.yml dispatches runs close to
+# kickoff that must not cut a running publish short (GitHub keeps one pending run).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

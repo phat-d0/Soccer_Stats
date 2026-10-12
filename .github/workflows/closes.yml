@@ -1,0 +1,71 @@
+# Starts publish.yml shortly before each cluster of kickoffs, so the team-total and corner
+# close snapshots (and the match trades' last DraftKings price) are taken inside their
+# 30-minute window. GitHub throttles scheduled runs (10-12 Oct 2026: 18 scheduled publish
+# runs in two days, gaps up to 6.5 h), but a workflow_dispatch starts within a minute or two.
+# The dispatched publish is an ordinary run: no extra calls per snapshot, every cap,
+# reserve and call record unchanged (src/soccer_stats/close_runs.py).
+name: Close snapshots
+
+on:
+  schedule:
+    # A safety net: a planner run hands over to the next one itself while kickoffs are
+    # due (see the last step), so these only restart it after a quiet spell.
+    - cron: "41 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write # dispatch publish.yml and the next planner run
+  contents: read
+
+# One planner at a time. A new run waits for the sleeping one rather than cancelling it.
+concurrency:
+  group: closes
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350 # GitHub stops any job at 6 h; the plan covers 5.5 h
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Read the coming kickoffs (data-log)
+        run: |
+          mkdir -p "$RUNNER_TEMP/odds_log"
+          git fetch --depth=1 origin data-log || { echo "no data-log yet"; exit 0; }
+          this=$(date -u +%Y-%m)
+          next=$(date -u -d "$(date -u +%Y-%m-01) +1 month" +%Y-%m)
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E "_(${this}|${next})\.jsonl$"); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/odds_log/$(basename "$f")"
+          done
+          ls "$RUNNER_TEMP/odds_log" | wc -l
+
+      - name: Plan the close runs
+        run: |
+          uv sync --frozen
+          uv run soccer-stats close-plan --log-dir "$RUNNER_TEMP/odds_log" --out "$RUNNER_TEMP/plan.json"
+
+      # Only the default branch dispatches (a manual run elsewhere just prints the plan).
+      - name: Dispatch publish at each planned time
+        if: github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+        run: |
+          plan="$RUNNER_TEMP/plan.json"
+          for at in $(jq -r '.dispatch[].epoch' "$plan"); do
+            wait=$(( at - $(date +%s) ))
+            if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+            if gh workflow run publish.yml --ref "$REF"; then
+              echo "Dispatched publish at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            else
+              echo "Dispatch failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            fi
+          done
+          if [ "$(jq -r '.continue' "$plan")" = "true" ]; then
+            wait=$(( $(jq -r '.horizon_end.epoch' "$plan") - $(date +%s) ))
+            if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+            gh workflow run closes.yml --ref "$REF" && echo "Next planner run requested"
+          fi
