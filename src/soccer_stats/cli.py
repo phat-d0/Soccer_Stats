@@ -324,6 +324,21 @@ def cmd_estimate_cups(args: argparse.Namespace) -> None:
     print("CUPS_JSON " + json.dumps(cups.summary(res), default=str))
 
 
+def cmd_close_plan(args: argparse.Namespace) -> None:
+    """When closes.yml should dispatch publish.yml so close snapshots land in their window
+    (reads data-log's odds_log files only: no key, no calls)."""
+    import json
+
+    from soccer_stats import close_runs
+
+    now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
+    p = close_runs.plan(close_runs.kickoffs(args.log_dir), now, args.horizon_hours)
+    print(close_runs.describe(p))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(close_runs.to_json(p)))
+
+
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
     """Credits to log team-total prices per match under each snapshot plan (estimate only:
     no key, no calls). Replays each league's real fixture calendar (Understat)."""
@@ -1907,6 +1922,13 @@ def main(argv: list[str] | None = None) -> None:
     ett.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
     ett.add_argument("--since", default="2026-10-09", help="start for the 4/8-week counts")
     ett.set_defaults(func=cmd_estimate_team_totals)
+
+    cp = sub.add_parser("close-plan", help="when to dispatch publish for close snapshots")
+    cp.add_argument("--log-dir", required=True, help="folder of data-log odds_log files")
+    cp.add_argument("--out", help="write the plan as JSON (closes.yml reads it)")
+    cp.add_argument("--now", help="plan from this time (default: now)")
+    cp.add_argument("--horizon-hours", type=float, default=5.5)
+    cp.set_defaults(func=cmd_close_plan)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")
