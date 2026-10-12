@@ -314,6 +314,18 @@ def test_match_team_uses_aliases_words_and_spelling_but_not_lookalikes():
     assert m("Slavia Prague") is None and m("Pafos") is None  # no football-data file
 
 
+def test_denied_lookalikes_and_near_names_for_the_log():
+    fd = {"G1": {"AEK", "Aris"}, "B1": {"Genk"}, "DNK": {"FC Copenhagen"}}
+    assert cups.match_team("AEK Athens", fd)["name"] == "AEK"  # by words
+    assert cups.match_team("AEK Larnaca", fd) is None  # Cyprus: denied
+    assert cups.match_team("Racing Genk", fd)["league"] == "B1"
+    assert cups.match_team("F.C. København", fd)["league"] == "DNK"
+    assert cups.near_names("Aris Limassol", fd) == []  # "aris" is under five letters
+    assert cups.near_names("Copenhagen Select Allstars", fd) == ["DNK FC Copenhagen"]
+    cov = cups.team_coverage({"UECL": ["AEK Larnaca", "Copenhagen Select Allstars"]}, fd)
+    assert cov["all"]["near"] == {"Copenhagen Select Allstars": ["DNK FC Copenhagen"]}
+
+
 def test_team_coverage_splits_fitted_main_and_extra():
     teams = {"UCL": ["Arsenal", "PSV Eindhoven", "Bodo/Glimt", "Slavia Prague"]}
     cov = cups.team_coverage(teams, FD)

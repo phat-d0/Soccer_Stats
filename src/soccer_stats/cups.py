@@ -162,16 +162,20 @@ STOP = {
     "1",
 }
 # ESPN spellings -> football-data's, where neither the name nor the fuzzy match finds it.
-# Each entry was checked against the football-data file named in the comment.
+# Targets seen in football-data's files in backfill.yml run 38192326466 (the six
+# leagues' spellings come from espn_news.ESPN_NAMES and odds_feed.TEAM_NAMES as well).
 ALIASES: dict[str, str] = {
     "Internazionale": "Inter",  # I1
     "Paris Saint-Germain": "Paris SG",  # F1
+    "AS Monaco": "Monaco",  # F1
     "Sporting CP": "Sp Lisbon",  # P1
     "SC Braga": "Sp Braga",  # P1
     "Olympiacos": "Olympiakos",  # G1
-    "PAOK Salonika": "PAOK",  # G1
     "Union St.-Gilloise": "St. Gilloise",  # B1
-    "Royale Union Saint-Gilloise": "St. Gilloise",  # B1
+    "Racing Genk": "Genk",  # B1
+    "F.C. København": "FC Copenhagen",  # DNK
+    "Brøndby IF": "Brondby",  # DNK
+    "Feyenoord Rotterdam": "Feyenoord",  # N1
     "Bayer Leverkusen": "Leverkusen",  # D1
     "Eintracht Frankfurt": "Ein Frankfurt",  # D1
     "VfB Stuttgart": "Stuttgart",  # D1
@@ -181,27 +185,20 @@ ALIASES: dict[str, str] = {
     "Celta Vigo": "Celta",  # SP1
     "Real Betis": "Betis",  # SP1
     "Nottingham Forest": "Nott'm Forest",  # E0
-    "Brighton & Hove Albion": "Brighton",  # E0
-    "Lyon": "Lyon",  # F1
-    "Olympique Lyonnais": "Lyon",  # F1
-    "Olympique de Marseille": "Marseille",  # F1
-    "AS Monaco": "Monaco",  # F1
-    "Lille": "Lille",  # F1
-    "Feyenoord Rotterdam": "Feyenoord",  # N1
-    "AZ Alkmaar": "AZ Alkmaar",  # N1
-    "Go Ahead Eagles": "Go Ahead Eagles",  # N1
-    "Bodo/Glimt": "Bodo/Glimt",  # NOR
-    "FC Copenhagen": "FC Copenhagen",  # DNK
-    "Red Bull Salzburg": "Salzburg",  # AUT
-    "Sturm Graz": "Sturm Graz",  # AUT
-    "Young Boys": "Young Boys",  # SWZ
     "FC Basel": "Basel",  # SWZ
-    "Fenerbahce": "Fenerbahce",  # T1
-    "Rapid Vienna": "Rapid Vienna",  # AUT
 }
-# Fuzzy matches seen to be wrong (a different club with a similar name).
+# Matches by words or spelling seen to be wrong in run 38192326466: a different club, most
+# from a country football-data doesn't cover (Cyprus, Malta, Belarus, San Marino,
+# Luxembourg, Serbia).
 DENY: set[tuple[str, str]] = {
-    ("Red Star Belgrade", "Red Star"),  # F2's Red Star (Paris), not Crvena zvezda
+    ("Red Star Belgrade", "Red Star"),  # F2's Red Star (Paris)
+    ("AEK Larnaca", "AEK"),  # Cyprus, not AEK Athens (G1)
+    ("Aris Limassol", "Aris"),  # Cyprus, not Aris (G1)
+    ("Hamrun Spartans", "Spartans"),  # Malta, not SC3's Spartans
+    ("Hibernians", "Hibernian"),  # Malta, not Hibernian (SC0)
+    ("Dinamo Brest", "Brest"),  # Belarus, not Brest (F1)
+    ("AC Virtus", "Virtus Entella"),  # San Marino, not I2
+    ("Racing Luxembourg", "Racing Club"),  # Luxembourg, not ARG
 }
 
 
@@ -607,6 +604,19 @@ def match_team(name: str, teams: dict[str, set]) -> dict | None:
     return None
 
 
+def near_names(name: str, teams: dict[str, set], limit: int = 4) -> list[str]:
+    """football-data clubs sharing a word of five letters or more with `name` (an aid to
+    checking an unmatched team by eye; never used to match)."""
+    words = {w for w in norm(name).split() if len(w) >= 5}
+    hits = sorted(
+        f"{code} {n}"
+        for code, names in teams.items()
+        for n in names
+        if words & set(norm(n).split())
+    )
+    return hits[:limit]
+
+
 def cup_teams(events: list[dict]) -> list[str]:
     """Distinct team names in a calendar (by ESPN id when present)."""
     seen: dict[str, str] = {}
@@ -630,6 +640,7 @@ def team_coverage(teams_by_cup: dict[str, list[str]], fd: dict[str, set]) -> dic
         everyone.update(rows)
         out["cups"][cup] = _coverage(rows, tier)
     out["all"] = _coverage(everyone, tier)
+    out["all"]["near"] = {n: near for n in out["all"]["unmatched"] if (near := near_names(n, fd))}
     return out
 
 
@@ -862,6 +873,8 @@ def report(res: dict) -> str:
             )
             if cup == "all":
                 lines.append(f"    unmatched: {v['unmatched']}")
+                if v.get("near"):
+                    lines.append(f"    near names (not matched): {v['near']}")
                 lines.append(
                     "    matched: "
                     + "; ".join(
