@@ -327,8 +327,10 @@ def season_calendar(
     """Every ESPN event for `slug` kicking off in [start, end), deduplicated by id.
 
     Seeds one call on the 1st of each month, then asks each day ESPN's calendar lists
-    within the window; with `every_day` (or when no response carries a calendar) it asks
-    every day instead. Returns {slug, events, requests, failures, mode, days}."""
+    within the window. With `every_day`, or when no answer's calendar lists a day in the
+    window (ESPN can return another season's calendar), it asks every day instead; a slug
+    that never answers stops after its seeds. Returns {slug, events, requests, failures,
+    mode, days, calendar_sample}."""
     today = today or pd.Timestamp.now(tz="UTC")
     stats: dict = {}
     window = set(_all_days(start, end))
@@ -340,6 +342,7 @@ def season_calendar(
     done: set[str] = set()
     events: dict[str, dict] = {}
     listed = answered = False
+    sample: list = []
     while todo:
         day = todo.pop(0)
         if day in done:
@@ -351,13 +354,20 @@ def season_calendar(
             events[e["id"]] = e
         if mode == "calendar":
             cal = [d for d in calendar_days(body) if d in window]
-            listed = listed or has_calendar(body)
+            listed = listed or bool(cal)
+            if not sample and has_calendar(body):  # what ESPN sent, for the log
+                raw = body["leagues"][0]["calendar"]
+                sample = [
+                    len(raw),
+                    *[str(x)[:40] for x in raw[:2]],
+                    *[str(x)[:40] for x in raw[-1:]],
+                ]
             todo = sorted((set(todo) | set(cal)) - done)
         if not todo and mode == "calendar" and not listed:
             if not answered:  # an unknown slug (every seed 4xx or failed): nothing to ask
                 mode = "no response"
                 break
-            mode = "every day (no calendar)"  # answers but no calendar: ask every day
+            mode = "every day (no calendar in window)"  # answers but no usable calendar
             todo = sorted(window - done)
     inside = [e for e in events.values() if start <= e["kickoff"] < end]
     return {
@@ -367,12 +377,19 @@ def season_calendar(
         "failures": stats.get("failures", 0),
         "mode": mode,
         "days": len(done),
+        "calendar_sample": sample,
     }
 
 
 def season_window(year: int) -> tuple[pd.Timestamp, pd.Timestamp]:
-    """1 July of the start year to 1 July of the next (UTC)."""
-    return pd.Timestamp(f"{year}-07-01", tz="UTC"), pd.Timestamp(f"{year + 1}-07-01", tz="UTC")
+    """The main competition's window: 1 August of the start year to 1 July of the next
+    (UTC; the league phase starts in September, the finals are in late May)."""
+    return pd.Timestamp(f"{year}-08-01", tz="UTC"), pd.Timestamp(f"{year + 1}-07-01", tz="UTC")
+
+
+def qual_window(year: int) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """The qualifying rounds' window: 15 June to 1 September of the start year."""
+    return pd.Timestamp(f"{year}-06-15", tz="UTC"), pd.Timestamp(f"{year}-09-01", tz="UTC")
 
 
 # ---------- estimates (pure: calendars in, numbers out) ----------
@@ -687,10 +704,13 @@ def run(
             cal = season_calendar(slug, start, end, raw_dir, get, every_day, today)
             ks = [e["kickoff"] for e in cal["events"]]
             hist[y] = ks
-            q = season_calendar(QUAL[code], start, end, raw_dir, get, every_day, today)
+            qs, qe = qual_window(y)
+            q = season_calendar(QUAL[code], qs, qe, raw_dir, get, every_day, today)
             qks = [e["kickoff"] for e in q["events"]]
             cup["seasons"][str(y)] = {
-                "calendar": {k: cal[k] for k in ("requests", "failures", "mode", "days")},
+                "calendar": {
+                    k: cal[k] for k in ("requests", "failures", "mode", "days", "calendar_sample")
+                },
                 "matches": len(ks),
                 "midweek_matches": sum(k.weekday() in MIDWEEK for k in ks),
                 "kickoff_days": dict(Counter(f"{k:%a}" for k in ks)),
@@ -703,7 +723,8 @@ def run(
                     "slug": QUAL[code],
                     "matches": len(qks),
                     "slots": kickoff_slots(qks),
-                    "live": live_estimate(code, qks, start, end)["season"],
+                    "calendar": {k: q[k] for k in ("requests", "mode", "days")},
+                    "live": live_estimate(code, qks, qs, qe)["season"],
                 },
             }
             if y == latest:
@@ -772,7 +793,8 @@ def report(res: dict) -> str:
                 f"  {y}/{int(y) % 100 + 1:02d}: {s['matches']} matches ({s['first']} to "
                 f"{s['last']}), Tue-Thu {s['midweek_matches']}, kickoff days "
                 f"{s['kickoff_days']}, slots {s['slots']}; ESPN {cal['requests']} requests, "
-                f"{cal['failures']} failed, {cal['days']} days ({cal['mode']})"
+                f"{cal['failures']} failed, {cal['days']} days ({cal['mode']}; calendar "
+                f"{cal.get('calendar_sample')})"
             )
             lines.append(
                 f"    live h2h: season {live['season']['credits']} credits, typical month "
@@ -794,7 +816,7 @@ def report(res: dict) -> str:
             q = s["qualifying"]
             lines.append(
                 f"    qualifying ({q['slug']}): {q['matches']} matches, slots {q['slots']}, live "
-                f"{q['live']['credits']} credits"
+                f"{q['live']['credits']} credits; ESPN {q['calendar']}"
             )
         h = c["historical"]
         for label, k in (("1 season", "one_season"), ("2 seasons", "all_seasons")):

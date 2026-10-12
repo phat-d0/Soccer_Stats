@@ -144,9 +144,9 @@ def test_season_calendar_follows_espns_calendar_and_caches_final_days(tmp_path):
     assert cal["mode"] == "calendar"
     assert [e["id"] for e in cal["events"]] == ["1", "2", "3", "4", "5"]
     assert cal["events"][0]["home"] == "Athletic Club" and cal["events"][0]["completed"]
-    # 12 monthly seeds plus the two listed days, one date per call, never a range.
+    # 11 monthly seeds (Aug-Jun) plus the two listed days, one date per call, never a range.
     days = [p["dates"] for _, p in log]
-    assert len(days) == len(set(days)) == 12 + 2
+    assert len(days) == len(set(days)) == 11 + 2
     assert all(len(d) == 8 and d.isdigit() for d in days)
     # Past days are cached: a second pass asks nothing.
     again = []
@@ -174,19 +174,23 @@ def test_an_unknown_slug_stops_after_its_seeds(tmp_path):
 
     start, end = cups.season_window(2025)
     cal = cups.season_calendar("uefa.nothing", start, end, tmp_path, missing, today=TODAY)
-    assert cal["mode"] == "no response" and cal["events"] == [] and len(log) == 12
+    assert cal["mode"] == "no response" and cal["events"] == [] and len(log) == 11
 
 
-def test_an_empty_calendar_is_trusted(tmp_path):
+def test_another_seasons_calendar_falls_back_to_every_day(tmp_path):
+    # ESPN may answer with the current season's calendar for a past date: no day in the
+    # window, so every day is asked rather than trusting it.
     log = []
 
-    def empty(url, params=None, timeout=None):
+    def other(url, params=None, timeout=None):
         log.append(params["dates"])
-        return Resp({"events": [], "leagues": [{"calendar": []}]})
+        return Resp({"events": [], "leagues": [{"calendar": ["2026-09-16T07:00Z"]}]})
 
-    start, end = cups.season_window(2025)
-    cal = cups.season_calendar("uefa.champions_qual", start, end, tmp_path, empty, today=TODAY)
-    assert cal["mode"] == "calendar" and len(log) == 12  # no every-day fallback
+    start = pd.Timestamp("2025-09-01", tz="UTC")
+    end = pd.Timestamp("2025-11-01", tz="UTC")
+    cal = cups.season_calendar("uefa.champions", start, end, tmp_path, other, today=TODAY)
+    assert cal["mode"].startswith("every day") and len(log) == 61
+    assert cal["calendar_sample"][0] == 1
 
 
 def test_recent_days_are_never_cached(tmp_path):
