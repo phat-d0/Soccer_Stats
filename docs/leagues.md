@@ -420,3 +420,28 @@ all.
   3. the cross-league model, tested walk-forward against Pinnacle;
   4. live odds (`live=True`) only if step 3 earns it, or as a paper test the owner
      chooses.
+
+### European cups: market probe, step 1 (12 Oct; owner-approved ≤10 credits)
+
+`odds-check.yml` run 38198048534 (`task=markets`, `leagues=UCL,UEL,UECL`, `cap=10`,
+03:00 UTC): **10 credits** (22,018 → 22,008). One match per cup (1 discovery credit, then
+one odds call at up to ten books; the cap's even share left room for three markets in the
+Champions League and two in the others, so totals were dropped first where short).
+
+| Cup (match, kickoff) | DraftKings h2h | Pinnacle h2h / totals | Pinnacle team corners | FanDuel |
+| --- | --- | --- | --- | --- |
+| UCL (RC Lens v Sporting Lisbon, Tue 13 Oct, about 38 h out) | all three sides, 4.8% | 3.4% / 2.8% (line 3.0) | **listed, two-sided, 6.9%** (4.5 and 5.5 per team) | h2h 4.8%; team corners 7.1%; team totals listed; match total one-sided |
+| UEL (Salzburg v AC Milan, Thu 15 Oct, about 3.5 days out) | all three sides, 5.6% | 5.4% / 4.1% (line 3.0) | not listed | h2h 7.8%; team totals listed (not asked); match total one-sided |
+| UECL (Gent v AGF Aarhus, Thu 15 Oct, about 3.5 days out) | all three sides, 5.5% | 6.0% / 4.8% (line 2.5) | not listed | h2h 7.0% only |
+
+- All 18 events of each cup's next round are listed.
+- **DraftKings prices all three cups' match odds**, at margins close to its top-flight ones
+  (4.8–5.6%, against 7.7–8.5% in League One and League Two).
+- **Pinnacle's team corners showed only for the Champions League match**, the one closest
+  to kickoff. The Europa and Conference League matches were about 3.5 days out, so corners may
+  simply not be posted yet; League One and League Two (11 Oct) were checked 4–6 days out too.
+  A re-check nearer kickoff would settle it (1–2 credits a league).
+- DraftKings also lists player props in the Champions League (anytime scorer, shots,
+  cards), and FanDuel lists team totals in the Champions and Europa League.
+- Nothing switched on. Next steps stay separate owner decisions: Pinnacle Champions League
+  closes for a backtest (590 credits a season), the cross-league model, then live odds.
