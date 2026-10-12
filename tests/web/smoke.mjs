@@ -280,7 +280,20 @@ const STEPS = [
   ["players-e0-sheet", async (p) => { await p.click('.chip[data-league="E0"]'); await p.click('button[data-plmode="stats"]'); await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
   ["record-match-bucket", click('.eb-row[data-ebrow="0"]')],
-  ["record-match-raw", click('button[data-recdk="raw"]')],
+  // Blend trades through Blend Lean now: its tiles are Lean's Premier League backtest.
+  ["record-match-blend-lean", async (p) => {
+    await p.click('button[data-recdk="blend"]');
+    const tiles = await p.locator(".tiles.lean-dk .tile").count();
+    if (tiles !== 4) throw new Error(`Blend shows ${tiles} Lean tiles, not 4`);
+    const text = await p.textContent("#view");
+    for (const want of ["Blend Lean (1σ+), the rule the blend trades on now", "Premier League, Pinnacle's early prices 2019/20–2024/25", "from 351 bets at 1σ+", "−4.2%", "needed to break even", "vs Pinnacle's close", "No bets at a 12% edge"]) {
+      if (!text.includes(want)) throw new Error(`Blend tab lacks "${want}"`);
+    }
+  }],
+  ["record-match-raw", async (p) => {
+    await p.click('button[data-recdk="raw"]');
+    if (await p.locator(".tiles.lean-dk").count()) throw new Error("Lean tiles on Model alone");
+  }],
   ["record-match-sp1", click('.chip[data-league="SP1"]')],
   ["record-match-all", click('.chip[data-league=""]')],
   ["record-player", click('button[data-recbet="player"]')],
