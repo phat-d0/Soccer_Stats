@@ -175,6 +175,7 @@ ALIASES: dict[str, str] = {
     "Racing Genk": "Genk",  # B1
     "F.C. København": "FC Copenhagen",  # DNK
     "Brøndby IF": "Brondby",  # DNK
+    "CSU Craiova": "Univ. Craiova",  # ROU (run 38192948263's near names; not U Craiova 1948)
     "Feyenoord Rotterdam": "Feyenoord",  # N1
     "Bayer Leverkusen": "Leverkusen",  # D1
     "Eintracht Frankfurt": "Ein Frankfurt",  # D1

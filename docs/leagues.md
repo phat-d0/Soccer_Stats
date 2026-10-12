@@ -212,3 +212,211 @@ Results:
   the corner cap needs no change. Earlier research (round 5, bake-off 2) found no model
   edge in either league against Pinnacle. The owner decides whether to switch them on
   (`live=True` in `leagues.py` plus a `fit-match-blends` refit).
+
+## European cups: cost estimate (12 Oct)
+
+Owner's request (12 Oct, lead session): cost out the Champions League (UCL), Europa League
+(UEL) and Conference League (UECL), the midweek cups. **An estimate only: 0 credits spent,
+nothing switched on.**
+
+What is built (branch `lead/cups-cost`):
+- **Registry.** `UCL`, `UEL`, `UECL` in `leagues.py` with `live=False`, `cup=True`,
+  `understat=None`, the "matchday" policy and sport keys `soccer_uefa_champs_league`,
+  `soccer_uefa_europa_league`, `soccer_uefa_europa_conference_league`. Like League One
+  and Two they are never fetched, built, logged or listed in `data.json`
+  (`publish.league_list`). `estimate-credits` skips them (football-data has no cup files)
+  and points to `estimate-cups`. Tests: `tests/test_cups.py`, `tests/test_leagues.py`.
+- **Calendar** (`cups.py`, free, no key): ESPN's site API scoreboard, one date per call,
+  slugs `uefa.champions`, `uefa.europa`, `uefa.europa.conf` (main competition, 1 Aug to
+  1 Jul) and their `_qual` slugs (qualifying, 15 Jun to 1 Sep). ESPN's
+  `leagues[0].calendar` turned out to describe another season, so the run asks every day
+  (334 + 78 requests per cup-season, none failed). Past days are cached in
+  `data/raw/cups/`.
+- **Estimates.** Live refreshes come from `odds_feed.estimate_credits` (matchday rule, 1
+  credit a refresh, with each refresh's weekday). Snapshots use the team-total and corner
+  estimator (a look 24 h out plus the close, 1 credit per market per snapshot). Historical
+  bulk h2h costs 10 credits per region per market per snapshot, one snapshot per distinct
+  kickoff time.
+- **Team coverage.** Each cup team's ESPN name is matched to football-data's 2024/25 and
+  2025/26 files (22 main divisions and 16 "extra leagues"). `cups.py` holds the aliases
+  and a deny list for lookalikes (AEK Larnaca is not AEK Athens). The log prints every
+  match, plus near names for the teams left unmatched.
+- **How to run.** Dispatch `backfill.yml` with `estimate_month` set (any month) and `cups`
+  ticked. It needs no key and pushes nothing; it takes about 7 minutes and leaves the
+  log plus the 7-day artifact `cups-estimate` (full calendars). The market dry run is
+  `odds-check.yml` with `task=markets`, `leagues=UCL,UEL,UECL`, `cap=0`.
+
+Runs (branch `lead/cups-cost`, 0 credits each):
+- Calendar and estimates: `backfill.yml` run 38192326466. Run 38192948263 repeated it with
+  identical figures and the final team match.
+- Market dry run: `odds-check.yml` run 38191998708 (balance 22,019 before and after).
+
+**Calendar, 2025/26** (main competition):
+
+| Cup | Matches | Tue | Wed | Thu | Other | Kickoff slots |
+| --- | --- | --- | --- | --- | --- | --- |
+| Champions League | 189 | 82 | 100 | 6 | 1 (Sat final) | 59 |
+| Europa League | 189 | 0 | 12 | 177 | 0 | 34 |
+| Conference League | 153 | 0 | 1 | 151 | 1 (Fri) | 27 |
+
+- 189 = 144 league-phase matches + 16 play-off + 16 + 8 + 4 + 1. The Conference League
+  has 108 league-phase matches.
+- 529 of the 531 matches (99.6%) are on Tuesday to Thursday.
+- 2024/25 has the same match counts, with 57, 37 and 33 kickoff slots.
+
+**1. Live DraftKings h2h, credits a month** (matchday rule, 1 credit a refresh). These are
+upper bounds, since GitHub throttles scheduled runs.
+
+| Month (2025/26) | UCL | UEL | UECL | All three |
+| --- | --- | --- | --- | --- |
+| Sep | 87 | 46 | 3 | 136 |
+| Oct | 59 | 50 | 62 | 171 |
+| Nov | 86 | 52 | 52 | 190 |
+| Dec | 47 | 26 | 48 | 121 |
+| Jan | 69 | 50 | 0 | 119 |
+| Feb | 87 | 52 | 52 | 191 |
+| Mar | 86 | 66 | 52 | 204 |
+| Apr | 105 | 84 | 74 | 263 |
+| May | 57 | 44 | 44 | 145 |
+| **Typical month** (median of months with matches) | **86** | **50** | **52** | **171** |
+| **Season** (Sep–May) | **683** | **470** | **387** | **1,540** |
+| 2024/25 season, same method | 676 | 511 | 424 | 1,611 |
+
+- Tuesday to Thursday:
+  - 74% of the Champions League's refreshes (507 of 683). The 48-hour window opens on
+    Sunday and Monday before a Tuesday round.
+  - 98% of the Europa League's and 97% of the Conference League's.
+  - 1,340 of 1,540 (87%) for all three.
+- Knockout months cost the most per match (April: 30 matches, 263 credits). The two legs
+  of each tie are spread over Tuesday to Thursday, and every kickoff day gets its own
+  48-hour run of refreshes.
+- The six live leagues spend about 2,024 a month on DraftKings, about 3,200 with team
+  totals and corners. All three cups would add about 5% (171 a month); the Champions
+  League alone about 86.
+- Qualifying rounds are not in the table. They run in July and August (ESPN's `_qual`
+  slugs), outside the main sport keys; The Odds API would need its own qualification
+  keys (not checked). In 2025: UCL 92 matches and 337 credits, UEL 82 and 284, UECL 256
+  and 381, about 1,000 in all. Most of those teams can't be rated (below), so leave them
+  out.
+
+**2. Snapshot costs if the cups' team corners (Pinnacle) or team totals were logged.**
+Base plan: a look 24 h out plus the close, 1 credit per market per snapshot, the same
+estimator the live logs use.
+
+| Per market | UCL | UEL | UECL | All three |
+| --- | --- | --- | --- | --- |
+| Season 2025/26 | 378 | 378 | 306 | 1,062 |
+| Typical month (median) | 36 | 36 | 32 | 96 (average 118; 18 in May to 216 in Nov) |
+
+- Team corners (one market, its own call) cost the row above: about 1,060 a season and
+  up to 216 a month. That would not fit under today's 550 corner cap beside the six
+  leagues (about 471).
+- Team totals alone cost the same. With the match total in the same call (2 markets, as
+  the live team-total log does) it is twice that, about 2,120 a season.
+- Nobody knows yet whether Pinnacle quotes cup team corners, or FanDuel cup team totals.
+  The probe in 5 below would check.
+
+**3. Historical prices for a backtest.** The Odds API's historical bulk odds cost 10
+credits per region per market per snapshot. One snapshot covers every listed match at
+that moment, so a close costs one snapshot per distinct kickoff time. Prices are h2h only.
+
+| | Slots | (a) Pinnacle close (eu) | (b) DraftKings close (us) | (c) Both, close + 24 h look |
+| --- | --- | --- | --- | --- |
+| UCL, 1 season (2025/26) | 59 | 590 | 590 | 2,360 |
+| UCL, 2 seasons (+2024/25) | 116 | 1,160 | 1,160 | 4,640 |
+| UEL, 1 season | 34 | 340 | 340 | 1,360 |
+| UEL, 2 seasons | 71 | 710 | 710 | 2,840 |
+| UECL, 1 season | 27 | 270 | 270 | 1,080 |
+| UECL, 2 seasons | 60 | 600 | 600 | 2,400 |
+| **All three, 1 season** | 120 | **1,200** | **1,200** | **4,800** |
+| **All three, 2 seasons** | 247 | **2,470** | **2,470** | **9,880** |
+
+- (c) = (slots + look times) × 10 × 2 regions; there are as many look times as slots.
+  Adding the totals market doubles any option.
+- A cheaper variant, not costed in the table: take one close snapshot per kickoff day, a
+  few minutes before its first kickoff. That covers the 19:00 UTC matches about 2 h 15
+  min early and cuts (a) and (b) by about half.
+- The Odds API's historical data starts around mid-2020 for featured markets (h2h and
+  totals). Earlier seasons (old format) are possible at the same cost per slot.
+- Historical team corners aren't available (11 Oct corner-history probe: none at
+  Pinnacle in any league), so a cup corner backtest can't be bought.
+
+**4. The build needed** (effort in plain terms):
+
+| Piece | Effort | Data, and is it free? |
+| --- | --- | --- |
+| Fixtures and results for settlement | Small to medium: an ESPN schedule loader (the parsing exists in `cups.py`), scores for settlement, and team-name maps between The Odds API, ESPN and football-data (about 100 clubs a season, most outside our maps) | ESPN, free. ESPN's cup summaries carry corner counts (`wonCorners` per team; checked on 9 completed 2025/26 matches, 3 per cup) |
+| Cross-league team-strength model | Large: the core of the work | See below |
+| Blend Lean for cups | Medium once the data exists (`match_calibration.league_fit` on cup matches) | Needs past Pinnacle closes for cup matches, which are not free: option (a) |
+| The live pipeline | Medium: `publish` builds a league from football-data or Understat and its own fit, so a cup needs its own path (ESPN schedule, cross-league ratings). Paper trades and the odds log already work per league code | Free |
+| The app | Small to medium (ui-designer): the competition filter and cards come from `data.leagues`; the Teams tab has no table for a cup and would show cross-league ratings | Free |
+
+Cross-league team strength:
+- **Coverage.** Of 2025/26's 108 league-phase teams, football-data's domestic files rate
+  **82 (76%)**:
+  - 38 (35%) are in our six fitted leagues.
+  - 23 are in its other main divisions (Netherlands 6, Portugal 4, Greece 4, Belgium 3,
+    Turkey 3, Scotland 3), with full columns and Pinnacle prices.
+  - 21 are in its extra leagues (Poland 4, Switzerland 3, Austria 3, Norway 2, Denmark 2,
+    Sweden 2, Ireland 2, Romania 2, Finland 1), with results and closing 1X2 only, no
+    shots or corners.
+  - Per cup: **Champions League 32 of 36 (89%)**, Europa League 30 of 36 (83%),
+    Conference League 20 of 36 (56%).
+  - Run 38192948263 counted 81. Its near-name list showed that CSU Craiova is
+    football-data's "Univ. Craiova", which has been added since.
+- **Not covered (26).** These teams would need domestic results from elsewhere (ESPN
+  lists many of these leagues; not checked) or ratings from cup matches alone:
+  - Czechia: Slavia Prague, Sparta Prague, Viktoria Plzen, Sigma Olomouc.
+  - Croatia: Dinamo Zagreb, Rijeka.
+  - Cyprus: Pafos, Omonia, AEK Larnaca.
+  - Ukraine: Dynamo Kyiv, Shakhtar.
+  - Serbia (Red Star), Hungary (Ferencvaros), Bulgaria (Ludogorets), Israel (Maccabi
+    Tel-Aviv), Slovakia (Slovan Bratislava), Slovenia (Celje), Bosnia (Zrinjski).
+  - Azerbaijan (Qarabag), Kazakhstan (Kairat), Armenia (Noah), Kosovo (Drita), North
+    Macedonia (Shkendija), Iceland (Breidablik), Malta (Hamrun Spartans), Gibraltar
+    (Lincoln Red Imps).
+  - The Champions League's 4 are Slavia Prague, Qarabag, Kairat and Pafos.
+  - Of the teams seen only in qualifying, 42 of 166 (25%) can be rated.
+- **League offsets, walk-forward.**
+  - Fit each domestic league's goals-only Dixon-Coles as now; its ratings are relative
+    to that league's average.
+  - A cup match then adds a strength offset per league (home attack = domestic attack +
+    the league's offset, and so on), with one cup home advantage.
+  - Fit the offsets on cup matches before the match date only, shrunk toward 0 (or
+    toward a prior from UEFA's country coefficients), and refit every 28 days like
+    `walk_forward`.
+  - The training data is ESPN's past cup results (free). Seasons before 2024/25 use the
+    old 32-team format but feature the same clubs, and the qualifiers link the small
+    leagues.
+  - The test: walk-forward log loss on 2024/25 and 2025/26 cup matches against
+    Pinnacle's close, which needs option (a).
+
+**5. Market availability** (free events lists only; `odds-check.yml` run 38191998708, cap
+0, no discovery or odds calls). Each cup lists 18 events, the next round only:
+- UCL: Tue 13 and Wed 14 Oct, at 16:45 and 19:00 UTC (first RC Lens v Sporting Lisbon).
+- UEL and UECL: Thu 15 Oct (first Salzburg v AC Milan and Gent v AGF Aarhus).
+
+A later probe at ≤10 credits (`cap=10`, the League One/Two check's code: 1 discovery
+credit per cup, then an odds call for the keys found) would check, per cup: DraftKings
+h2h (listed? margin), Pinnacle h2h, totals and team corners
+(`alternate_team_totals_corners`), and FanDuel team totals. About 3 credits a cup, 9 in
+all.
+
+**Recommendation.** Credits are not the obstacle; the model is.
+- **Champions League only, as a first step:**
+  - about **86 credits a month** in season (683 a season) for live DraftKings odds;
+  - plus **590** one-off for Pinnacle's 2025/26 closes (**1,160** for two seasons), to fit
+    a cup blend and test a cross-league model against the close before anything trades.
+  - Its teams are the best covered: 89% rated, 61% in our own six fits.
+- **All three cups:** about 171 a month (1,540 a season) live, and 1,200 (one season) or
+  2,470 (two) one-off for Pinnacle closes. The Conference League adds the teams we can
+  rate least (56%).
+- Earlier research found no model edge against Pinnacle in any domestic league, so
+  expect the same here. Only Blend Lean and the 12% test could run, and Blend Lean needs
+  option (a).
+- Suggested order, each step a separate owner decision:
+  1. the ≤10-credit live probe;
+  2. option (a) for the Champions League, two seasons (1,160);
+  3. the cross-league model, tested walk-forward against Pinnacle;
+  4. live odds (`live=True`) only if step 3 earns it, or as a paper test the owner
+     chooses.
