@@ -20,11 +20,14 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 
 
 def test_registry_matches_the_loaders_and_six_leagues_are_live():
-    assert set(lgs.LEAGUES) == {"E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"}
+    assert set(lgs.LEAGUES) == {
+        *("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"),
+        *("UCL", "UEL", "UECL"),
+    }
     assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1"]  # primary first
     for code, lg in lgs.LEAGUES.items():
         assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
-        assert code in fd.LEAGUES  # football-data knows the division
+        assert (code in fd.LEAGUES) != lg.cup  # football-data knows every division, no cup
         assert feed.SPORTS[code] == lg.odds_sport
     assert lgs.get("E0").odds_policy == "always"
     assert {lgs.get(c).odds_policy for c in ("SP1", "D1", "I1", "F1", "E1")} == {"matchday"}

@@ -268,7 +268,10 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
     year = month_start.year if month_start.month >= 7 else month_start.year - 1
     total, off = 0, {}
     print(f"Odds API credits for {args.month} (refresh rules only; an upper bound):")
+    cups = [lg.name for lg in LEAGUES.values() if lg.cup]
     for code, lg in LEAGUES.items():
+        if lg.cup:  # no football-data calendar: priced by estimate-cups on ESPN's
+            continue
         start, note = month_start, ""
         try:
             if lg.understat:  # Understat lists the whole season, kickoff times included
@@ -300,6 +303,25 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
             + ", ".join(f"{c} {n}" for c, n in off.items())
             + f"; together {sum(off.values())} credits"
         )
+    if cups:
+        print(f"UEFA cups ({', '.join(cups)}): off; priced by estimate-cups (ESPN calendar)")
+
+
+def cmd_estimate_cups(args: argparse.Namespace) -> None:
+    """The UEFA cups' cost (docs/leagues.md "European cups"): ESPN's calendar replayed
+    under the matchday rule, snapshot and historical costs, football-data team coverage.
+    No Odds API key and no credits."""
+    import json
+
+    from soccer_stats import cups
+
+    seasons = [int(s) for s in args.seasons.split(",") if s.strip()]
+    res = cups.run(seasons, every_day=args.every_day, teams=not args.no_teams)
+    print(cups.report(res))
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(res, default=str))
+    print("CUPS_JSON " + json.dumps(cups.summary(res), default=str))
 
 
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
@@ -1854,6 +1876,15 @@ def main(argv: list[str] | None = None) -> None:
         "--extra-leagues", default="", help="leagues outside the live test to price, e.g. E2,E3"
     )
     eco.set_defaults(func=cmd_estimate_corners)
+
+    ecu = sub.add_parser(
+        "estimate-cups", help="cost of the UEFA cups on ESPN's calendar (no key, 0 credits)"
+    )
+    ecu.add_argument("--seasons", default="2024,2025", help="start years, e.g. 2024,2025")
+    ecu.add_argument("--every-day", action="store_true", help="ask ESPN for every day")
+    ecu.add_argument("--no-teams", action="store_true", help="skip football-data coverage")
+    ecu.add_argument("--json", help="write the full result (calendars included) here")
+    ecu.set_defaults(func=cmd_estimate_cups)
 
     ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")
     ttr.add_argument("--log-dir", required=True, help="data-log checkout")

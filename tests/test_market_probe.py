@@ -379,3 +379,22 @@ def test_football_data_coverage_counts_corners_and_pinnacle(tmp_path):
     res = {"cap": 0, "spent": 0, "left_before": None, "left": None, "leagues": {}, "log": []}
     text = mp.report({**res, "coverage": cov})
     assert "football-data E2 2526: 3 matches, corners (HC/AC) 67%" in text
+
+
+def test_cup_dry_run_lists_kickoffs_for_free_and_skips_football_data():
+    # The UEFA cups (cost estimate, 12 Oct): cap 0 asks only the free events lists, keeps
+    # every upcoming kickoff, and never looks for a football-data cup file.
+    calls = []
+    res = mp.run(0, leagues=("UCL", "UEL", "UECL"), api_key="k", now=NOW, get=check_api(calls))
+    assert res["spent"] == 0 and [c[0].rsplit("/", 1)[-1] for c in calls] == ["events"] * 3
+    assert "soccer_uefa_champs_league/events" in calls[0][0]
+    assert res["leagues"]["UCL"]["kickoffs"] == ["2026-10-11T14:00:00Z"]
+    assert "upcoming kickoff days: 2026-10-11" in mp.report(res)
+    assert mp.parse_leagues("ucl,uel,uecl") == ("UCL", "UEL", "UECL")
+
+    def download(lg, year, **kw):
+        raise AssertionError("no football-data download for a cup")
+
+    assert mp.football_data_coverage(["UCL"], download=download) == {
+        "UCL": {"error": "not on football-data"}
+    }
