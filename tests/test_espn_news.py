@@ -97,6 +97,8 @@ def test_slugs_and_name_mapping():
         "I1": "ita.1",
         "F1": "fra.1",
         "E1": "eng.2",
+        "E2": "eng.3",
+        "E3": "eng.4",
     }
     known = {"Man City", "Bournemouth", "Ath Madrid", "Inter", "Wolves"}
     assert en.team_name("Manchester City", known) == "Man City"  # shared Odds API map

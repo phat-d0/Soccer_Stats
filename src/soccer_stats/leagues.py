@@ -3,13 +3,16 @@
 One entry per league: its football-data code (the key everywhere: file names, trade ids,
 the odds log, `<code>_dk.json`), display name, Understat league name (xG; None for a
 league Understat doesn't cover, such as the Championship, which then runs the goals-only
-model and takes its schedule from football-data), The Odds API sport key, and two
+model and takes its schedule from football-data; League One and League Two likewise),
+The Odds API sport key, and two
 switches:
 
-* `live`: publish builds the league's fixtures and fetches its DraftKings odds. Six are
-  live (owner, 8 Oct 2026); League One and League Two (E2, E3) are registered off, for the
-  credit estimate and the market probe only (owner's check, 11 Oct 2026), and so are the
-  three UEFA cups (UCL, UEL, UECL; cost estimate, 12 Oct 2026). The Odds API
+* `live`: publish builds the league's fixtures and fetches its DraftKings odds. Eight
+  are live: the Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and the
+  Championship (owner, 8 Oct 2026), plus League One and League Two (E2, E3; owner, 13 Oct
+  2026, after the 11 Oct check: DraftKings h2h only, no team corners or team totals
+  there). The three UEFA cups (UCL, UEL, UECL; cost estimate, 12 Oct 2026) are
+  registered off: priced and probed only, never fetched or built. The Odds API
   key is shared with the baseball app, so each league costs credits; the Premier League
   budgets first, and the others pause below odds_feed.MATCHDAY_RESERVE_CREDITS
   (docs/leagues.md).
@@ -19,10 +22,11 @@ switches:
   away from kickoff (odds_feed.policy_floor).
 
 Live paper trades follow trades.PAPER_RULE. Under "fixed_raw" (owner's live test, 10 Oct
-2026) every live league trades at 12% on the model's own chance. Under "learned", a
+2026) every live league trades at 12% on the model's own chance, and Blend Lean trades
+wherever backtest/match_blends.json has the league's fit. Under "learned", a
 league trades only with a learned minimum edge: its own backtest
 (`backtest/<code>_dk.json` -> edge_threshold), else the research lab's
-`lab/min_edge.json`. Without one, or with a null level (all five non-E0 leagues today), a
+`lab/min_edge.json`. Without one, or with a null level (every non-E0 league today), a
 non-E0 league opens no paper trades (trades.paper_threshold).
 """
 
@@ -51,14 +55,17 @@ LEAGUES: dict[str, League] = {
         League("I1", "Serie A", "Serie_A", "soccer_italy_serie_a", live=True),
         League("F1", "Ligue 1", "Ligue_1", "soccer_france_ligue_one", live=True),
         League("E1", "Championship", None, "soccer_efl_champ", live=True),
-        # League One and League Two: off, priced and probed only (owner's check, 11 Oct;
-        # docs/leagues.md). Goals-only like the Championship. A league that isn't live is
-        # never fetched, built, logged or listed in data.json (publish.league_list).
-        League("E2", "League One", None, "soccer_england_league1"),
-        League("E3", "League Two", None, "soccer_england_league2"),
+        # League One and League Two: live from 13 Oct (owner; docs/leagues.md "League One
+        # and League Two live"). Goals-only like the Championship (no Understat), schedule
+        # from football-data, matchday odds policy. DraftKings h2h only: no team corners
+        # (corners_live.LEAGUES) or team totals (odds_feed.TEAM_TOTAL_LEAGUES) there.
+        League("E2", "League One", None, "soccer_england_league1", live=True),
+        League("E3", "League Two", None, "soccer_england_league2", live=True),
         # The three UEFA cups: off, a cost estimate only (owner's request, 12 Oct;
         # docs/leagues.md "European cups"). football-data has no cup files, so their
         # calendar comes from ESPN (cups.py); estimate-credits leaves them to estimate-cups.
+        # A league that isn't live is never fetched, built, logged or listed in data.json
+        # (publish.league_list).
         League("UCL", "Champions League", None, "soccer_uefa_champs_league", cup=True),
         League("UEL", "Europa League", None, "soccer_uefa_europa_league", cup=True),
         League("UECL", "Conference League", None, "soccer_uefa_europa_conference_league", cup=True),

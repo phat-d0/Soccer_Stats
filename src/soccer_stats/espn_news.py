@@ -34,7 +34,16 @@ from soccer_stats.data import RAW_DIR
 from soccer_stats.odds_feed import _team
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}"
-SLUGS = {"E0": "eng.1", "SP1": "esp.1", "D1": "ger.1", "I1": "ita.1", "F1": "fra.1", "E1": "eng.2"}
+SLUGS = {
+    "E0": "eng.1",
+    "SP1": "esp.1",
+    "D1": "ger.1",
+    "I1": "ita.1",
+    "F1": "fra.1",
+    "E1": "eng.2",
+    "E2": "eng.3",  # League One and League Two: live from 13 Oct (owner)
+    "E3": "eng.4",
+}
 # ESPN spellings the shared map (odds_feed.TEAM_NAMES) and its fuzzy match don't cover.
 ESPN_NAMES: dict[str, str] = {
     # Spellings seen in the probe (run 37964999592) that neither the shared map nor its
@@ -447,12 +456,24 @@ def log(root: Path, rows: list[dict]) -> int:
 # ---------- probe (no key; run in Actions) ----------
 
 
-def probe(get: Callable = requests.get, back: int = 7, ahead: int = 2) -> dict:
+def probe(
+    get: Callable = requests.get,
+    back: int = 7,
+    ahead: int = 2,
+    leagues=None,
+    known: dict[str, set[str]] | None = None,
+) -> dict:
     """Per league: which days' scoreboards answer, ESPN team names, and the shape of one
-    finished and one upcoming match's summary (lineups, injuries, update time)."""
+    finished and one upcoming match's summary (lineups, injuries, update time). With
+    `known` (football-data's clubs per league), also how ESPN's names map onto them
+    (`names`, odds_feed.name_check through `team_name`)."""
+    from soccer_stats.odds_feed import name_check
+
     now = pd.Timestamp.now(tz="UTC")
     out = {}
     for league, slug in SLUGS.items():
+        if leagues and league not in leagues:
+            continue
         stats: dict = {}
         events, statuses = [], {}
         for day in _days(now - pd.Timedelta(days=back), now + pd.Timedelta(days=ahead)):
@@ -461,6 +482,9 @@ def probe(get: Callable = requests.get, back: int = 7, ahead: int = 2) -> dict:
             events += parse_scoreboard(body, set())
         info = {"slug": slug, "statuses": statuses, "events": len(events)}
         info["teams"] = sorted({e["espn_home"] for e in events} | {e["espn_away"] for e in events})
+        if known and known.get(league):
+            ks = known[league]
+            info["names"] = name_check(info["teams"], ks, mapper=lambda n, ks=ks: team_name(n, ks))
         past = [e for e in events if e["kickoff"] < now - pd.Timedelta(hours=3)]
         future = [e for e in events if e["kickoff"] > now]
         for label, pick in (("finished", past[-1:]), ("upcoming", future[:1])):

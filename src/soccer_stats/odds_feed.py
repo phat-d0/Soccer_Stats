@@ -171,6 +171,24 @@ def _team(name: str, known: set[str] | None = None) -> str:
     return name
 
 
+def name_check(names, known: set[str], mapper=None) -> dict:
+    """How a feed's team names land on football-data's (`known`): `mapped` {feed name:
+    our name}, `unmatched` (names whose mapped form isn't in `known`: a card would
+    duplicate), `clashes` (two feed names onto one of ours) and `unseen` (our teams no feed
+    name reached). The free name checks (market probe, ESPN probe) print it."""
+    mapper = mapper or (lambda n: _team(n, known))
+    mapped = {n: mapper(n) for n in sorted(set(names))}
+    by_target: dict[str, list[str]] = {}
+    for n, t in mapped.items():
+        by_target.setdefault(t, []).append(n)
+    return {
+        "mapped": mapped,
+        "unmatched": sorted(n for n, t in mapped.items() if t not in known),
+        "clashes": {t: ns for t, ns in sorted(by_target.items()) if len(ns) > 1},
+        "unseen": sorted(set(known) - set(mapped.values())),
+    }
+
+
 def next_reset(now: pd.Timestamp, reset_day: int = 1) -> pd.Timestamp:
     """Next time the monthly allowance resets (midnight UTC on `reset_day`)."""
     this = now.normalize().replace(day=min(reset_day, 28))

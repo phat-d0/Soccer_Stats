@@ -92,7 +92,7 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       leagues:
-        description: "markets: comma-separated leagues to probe, e.g. E2,E3 (blank = the six live leagues)"
+        description: "markets / espn: comma-separated leagues, e.g. E2,E3 (blank = the six; markets also prints team names vs football-data's clubs, espn reads 21 days)"
         default: ""
 
 permissions:
@@ -207,7 +207,7 @@ jobs:
             markets)  # blank leagues = the six (unchanged); E2,E3 = the L1/L2 check + coverage
               if [ -n "$LEAGUES" ]; then
                 uv run python -m soccer_stats.edge.market_probe --cap "$CAP" --leagues "$LEAGUES" \
-                  --coverage --json out/markets.json --bodies out/market_bodies
+                  --coverage --names --json out/markets.json --bodies out/market_bodies
               else
                 uv run python -m soccer_stats.edge.market_probe --cap "$CAP" \
                   --json out/markets.json --bodies out/market_bodies
@@ -242,7 +242,12 @@ jobs:
               rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
-            espn) uv run soccer-stats espn-probe ;;  # no key: ESPN slugs, names, summary shape
+            espn)  # no key: ESPN slugs, names (vs football-data's clubs), summary shape
+              if [ -n "$LEAGUES" ]; then
+                uv run soccer-stats espn-probe --leagues "$LEAGUES" --back 21
+              else
+                uv run soccer-stats espn-probe
+              fi ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log

@@ -241,8 +241,24 @@ def cmd_espn_probe(args: argparse.Namespace) -> None:
     import json
 
     from soccer_stats import espn_news
+    from soccer_stats.edge.market_probe import football_data_teams
 
-    print(json.dumps(espn_news.probe(), indent=1, ensure_ascii=False, default=str))
+    leagues = [c.strip() for c in (args.leagues or "").split(",") if c.strip()] or None
+    known = {}
+    for code in leagues or espn_news.SLUGS:  # football-data's clubs, for the name check
+        try:
+            known[code] = football_data_teams(code, current_season())
+        except Exception as exc:  # noqa: BLE001  file not posted yet: names unchecked
+            print(f"{code}: football-data clubs unavailable ({type(exc).__name__})")
+    res = espn_news.probe(back=args.back, leagues=leagues, known=known)
+    print(json.dumps(res, indent=1, ensure_ascii=False, default=str))
+    for code, info in res.items():
+        c = info.get("names")
+        if c:
+            print(
+                f"NAMES {code}: ESPN {len(info['teams'])} teams, unmatched {c['unmatched']}, "
+                f"clashes {c['clashes']}, no ESPN event for {c['unseen']}"
+            )
 
 
 def cmd_log_team_news(args: argparse.Namespace) -> None:
@@ -1868,6 +1884,8 @@ def main(argv: list[str] | None = None) -> None:
     lo.set_defaults(func=cmd_log_odds)
 
     ep = sub.add_parser("espn-probe", help="ESPN league slugs, team names and summary shape")
+    ep.add_argument("--leagues", default="", help="comma-separated codes (blank = every slug)")
+    ep.add_argument("--back", type=int, default=7, help="days of past scoreboards to read")
     ep.set_defaults(func=cmd_espn_probe)
 
     ltn = sub.add_parser("log-team-news", help="append the build's ESPN team news to team_news/")
