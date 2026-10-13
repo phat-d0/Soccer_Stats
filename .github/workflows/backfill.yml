@@ -12,6 +12,13 @@
 # lean_backtest: replays Blend Lean walk-forward on Pinnacle's early prices per league
 # (no key, no credits); pushes backtest/lean_backtest.json to data-log only from the
 # default branch.
+# cup_odds: the Champions League's historical closes (owner decision, 13 Oct; lead cap
+# 1,200 credits): Pinnacle and DraftKings h2h, one bulk snapshot per kickoff slot of
+# ESPN's 2024/25-2025/26 calendar (`soccer-stats backfill-cup-odds`). The cap is
+# max_credits; dry_run (the default) or max_credits 0 = plan only, and a dry run gets no
+# key. Bodies go to the cup-odds-history-* cache; the parsed closes and call record are
+# appended to data-log's odds_history/ only from the default branch and only when not a
+# dry run (elsewhere: log + 7-day artifact). None of the DraftKings steps run with it.
 name: Backfill DraftKings odds
 
 on:
@@ -56,6 +63,13 @@ on:
         description: "With estimate_month: also cost the UEFA cups on ESPN's 2024/25-2025/26 calendar (no key, no push; log + 7-day artifact)"
         type: boolean
         default: false
+      cup_odds:
+        description: "Champions League historical closes (Pinnacle + DraftKings h2h; cap = max_credits; dry_run or 0 = plan only, no key; saved to data-log from the default branch only)"
+        type: boolean
+        default: false
+      cup_seasons:
+        description: "cup_odds: seasons (start years, comma-separated)"
+        default: "2024,2025"
 
 permissions:
   contents: write # writes the backtest summary to the data-log branch
@@ -75,7 +89,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -91,11 +105,88 @@ jobs:
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
+
+      # Champions League historical closes (owner decision, 13 Oct; docs/leagues.md
+      # "Champions League: historical closes download"). Bodies and ESPN's calendar days
+      # live in their own cache, restored here and saved even when a later step fails, so
+      # a paid body is never lost before its rows reach data-log.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.cup_odds }}
+        with:
+          path: |
+            data/raw/cup_odds
+            data/raw/cups/espn
+          key: cup-odds-history-${{ github.run_id }}
+          restore-keys: cup-odds-history-
+
+      # The durable copy: slots already held on data-log are never bought again, even if
+      # the cache above was evicted. Fails the job, before any call, if data-log can't be read.
+      - name: Read the cup closes already held on data-log
+        if: ${{ inputs.cup_odds }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/cup_state"
+          git fetch --depth=1 origin data-log
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_history/ | grep -E '_close(s|_calls)\.jsonl$'); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/cup_state/$(basename "$f")"
+          done
+          ls -l "$RUNNER_TEMP/cup_state"
+
+      - name: Download the Champions League closes (capped)
+        if: ${{ inputs.cup_odds }}
+        env:
+          # The key only for a paid run; a dry run has none, so it can't spend.
+          ODDS_API_KEY: ${{ (inputs.cup_odds && !inputs.dry_run) && secrets.ODDS_API_KEY || '' }}
+        run: |
+          uv sync --frozen
+          mkdir -p out data/raw/cup_odds data/raw/cups/espn
+          cap="${{ inputs.max_credits }}"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then cap=0; fi
+          uv run soccer-stats backfill-cup-odds --cup UCL --seasons "${{ inputs.cup_seasons }}" \
+            --cap "$cap" --state "$RUNNER_TEMP/cup_state" --pending out/cup_odds \
+            --json out/cup_odds.json
+
+      - uses: actions/cache/save@v4
+        if: ${{ inputs.cup_odds && always() }}
+        with:
+          path: |
+            data/raw/cup_odds
+            data/raw/cups/espn
+          key: cup-odds-history-${{ github.run_id }}
+
+      - name: Save the cup closes to data-log (default branch only)
+        if: ${{ inputs.cup_odds && !inputs.dry_run }}
+        run: |
+          if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Not the default branch: printed only, nothing pushed to data-log."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            uv run soccer-stats log-cup-odds --cup UCL --pending out/cup_odds --log-dir ../log
+            git -C ../log add odds_history
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Champions League historical closes"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.cup_odds && always() }}
+        with:
+          name: cup-odds
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Credit estimate per league (print only)
         if: ${{ inputs.estimate_month != '' }}
@@ -225,13 +316,13 @@ jobs:
           if-no-files-found: ignore
 
       - name: Backtest from cached odds (print only)
-        if: ${{ inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -241,7 +332,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

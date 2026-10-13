@@ -519,3 +519,77 @@ Champions League and two in the others, so totals were dropped first where short
   cards), and FanDuel lists team totals in the Champions and Europa League.
 - Nothing switched on. Next steps stay separate owner decisions: Pinnacle Champions League
   closes for a backtest (590 credits a season), the cross-league model, then live odds.
+
+### Champions League: historical closes download (13 Oct, owner-approved ≤1,200 credits)
+
+Owner decision (13 Oct): switch the Champions League on with Blend Lean, and first buy two
+seasons of Pinnacle's past Champions League closing prices (option (a) above, about 1,160
+credits once). The lead set the cap at 1,200 credits, with the shared 3,000-credit reserve
+kept. This step is only the download and its storage; the cross-league model and the
+live switch-on come later.
+
+What it buys (`cup_odds.py`, `soccer-stats backfill-cup-odds`):
+- The Odds API's historical bulk odds for `soccer_uefa_champs_league` (league phase and
+  knockouts; never the qualifying rounds), `markets=h2h`,
+  `bookmakers=pinnacle,draftkings`, decimal prices.
+- One snapshot per kickoff slot of ESPN's calendar (`cups.season_calendar` on
+  `uefa.champions`), at the kickoff minus 5 minutes, floored to the API's 5-minute
+  steps. One snapshot prices every match listed at that moment, so a slot costs about 10
+  credits (one market; up to ten named books count as one region).
+- Seasons 2024/25 and 2025/26 (the 36-team format): 57 + 59 = **116 snapshots, about
+  1,160 credits** on the 12 Oct calendar (the dry run prints the exact plan).
+
+Spend control:
+- Every call goes through `player_goal_odds.CappedBudget`: it is skipped when its largest
+  possible cost would pass the cap or leave under 3,000 credits on the shared key (the
+  balance is read first from The Odds API's free sports list). The cost counted is
+  `x-requests-last` on every call.
+- The first call is budgeted at 20 credits (one region per book, the worst case). If it
+  really costs 20, adding DraftKings doubled the price: DraftKings is dropped for the rest
+  of the run and the log says so (two seasons would then cost about 1,170).
+- If a slot's snapshot leaves any match without a Pinnacle price, the snapshot 5 minutes
+  earlier (`previous_timestamp`) is asked once, but only after every slot's first snapshot
+  and only while the cap allows (at most about 4 at a 1,200 cap).
+- An HTTP error or a network failure stops all further calls.
+- `--cap 0` (or no key) is a dry run: no Odds API call at all; it lists the snapshots, the
+  matches in each and the cost estimate.
+- The key travels only inside the request. It is redacted from every message, the report,
+  the JSON, the cached bodies and the data-log rows.
+
+Never paying twice:
+- Every body is cached under `data/raw/cup_odds/soccer_uefa_champs_league_<time>.json`
+  (kept in the Actions cache `cup-odds-history-*`, saved even when a later step fails;
+  never delete it) and reused before any call.
+- The durable copy is on data-log, because GitHub drops a cache unused for 7 days:
+  - `odds_history/UCL_closes.jsonl`: one row per match and book (`cup`, `season`,
+    `stage`, `date`, `kickoff` and `espn_id` from ESPN, ESPN's `home`/`away`, The Odds
+    API's `odds_home`/`odds_away`, `event_id`, `commence_time`, `book`,
+    `price_home`/`price_draw`/`price_away` in decimal, `snapshot` (the API's time),
+    `requested`, `minutes_before` kickoff, the book's `last_update`, `kind` close or retry,
+    how the names matched and whether home and away were swapped);
+  - `odds_history/UCL_close_calls.jsonl`: one row per snapshot call (slot, requested,
+    snapshot times, books, status, cost from `x-requests-last`, events, matches paired,
+    rows per book).
+- The job reads both first. A slot whose call is recorded with status 200, or whose
+  matches all hold a Pinnacle row, is never asked again; a slot retried once is never
+  retried again.
+- Team names: The Odds API's names are paired with ESPN's within each slot (an alias
+  table, accent-free names, shared words, close spellings; one team matching is enough
+  when its partner kicks off at the same time). The log prints every pairing, the Odds
+  API events near a slot that matched nothing, and the ESPN matches left without a
+  Pinnacle close.
+
+How to run (Actions, `backfill.yml`, on `claude/soccer-stats-scaffold`):
+1. **Dry run** (no key, 0 credits): `cup_odds` ticked, `dry_run` ticked (the default),
+   `max_credits` 0, `cup_seasons` 2024,2025, everything else as default. It prints the
+   plan, `Cup odds: 0 snapshots, 0 credits, ...` and a `CUP_ODDS_JSON` line, and uploads
+   the 7-day artifact `cup-odds`.
+2. **Paid run** (lead dispatch only, after review): the same with `dry_run` unticked and
+   `max_credits` 1200. From the default branch it appends the closes and the call record to
+   data-log; from any other branch it only prints and uploads the artifact (the bodies stay
+   in the cache, and a later default-branch run with `max_credits` 0 and `dry_run`
+   unticked writes them to data-log for free).
+3. Read the summary line `Cup odds: N snapshots, C credits, M matches with Pinnacle, D with
+   DraftKings, credits left X` and `CUP_ODDS_JSON` (per season: matches on the calendar,
+   snapshots held, cached, bought, planned and skipped, matches priced per book). A rerun
+   costs nothing for slots already held.
