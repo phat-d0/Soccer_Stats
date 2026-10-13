@@ -488,7 +488,7 @@ function goalsSection(fx) {
       <table class="mkts goals"><thead><tr><th>Over/under</th><th>Over</th><th>Under</th>${fd ? "<th>FD over</th>" : ""}</tr></thead><tbody>${rows}</tbody></table></div>`;
   };
   const when = fd && tt.fetched_at ? new Date(tt.fetched_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
-  const e1Note = e1 ? " These are less reliable in the Championship: it runs on goals only, and in testing its goal chances were too confident." : "";
+  const e1Note = e1 ? " These are less reliable in the Championship: it runs on goals only, and in testing its goal chances were too confident." : ["E2", "E3"].includes(lg) ? ` ${esc(leagueName(lg))} wasn't part of that test; it runs on goals only, like the Championship, where the goal chances were too confident.` : "";
   return `
     <div class="section-title">Goals</div>
     <div class="card" style="padding:8px 14px">

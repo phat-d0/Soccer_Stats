@@ -135,7 +135,7 @@ def cmd_log_corners(args: argparse.Namespace) -> None:
 
 def cmd_estimate_corners(args: argparse.Namespace) -> None:
     """Credits to log Pinnacle's team corners, a look (24 h) and a close per match, one
-    credit a call, in the six live leagues (estimate only: no key, no calls)."""
+    credit a call, in the six leagues of the live corner test (estimate only: no key, no calls)."""
     from soccer_stats import corners_live
     from soccer_stats.data import season_kickoffs
     from soccer_stats.leagues import LEAGUES
@@ -176,12 +176,12 @@ def cmd_estimate_corners(args: argparse.Namespace) -> None:
             try:
                 est = month_estimate(code, start, end)
             except Exception as exc:  # noqa: BLE001
-                print(f"    not live, {code}: unavailable ({type(exc).__name__})")
+                print(f"    not in the corner test, {code}: unavailable ({type(exc).__name__})")
                 continue
             grand_extra[code] += est["credits"]
             print(
-                f"    not live, {code}: {est['matches']} matches {est['calls']} calls "
-                f"{est['credits']} credits"
+                f"    not in the corner test, {code}: {est['matches']} matches "
+                f"{est['calls']} calls {est['credits']} credits"
             )
     n = max(len(months), 1)
     print(
@@ -190,7 +190,7 @@ def cmd_estimate_corners(args: argparse.Namespace) -> None:
     )
     if extra:
         print(
-            "Not live, average a month (would add): "
+            "Not in the corner test, average a month (would add): "
             + ", ".join(f"{c} {v / n:.0f}" for c, v in grand_extra.items())
         )
     # A check of the live model (f) on whatever football-data files are cached (no calls).
@@ -241,8 +241,24 @@ def cmd_espn_probe(args: argparse.Namespace) -> None:
     import json
 
     from soccer_stats import espn_news
+    from soccer_stats.edge.market_probe import football_data_teams
 
-    print(json.dumps(espn_news.probe(), indent=1, ensure_ascii=False, default=str))
+    leagues = [c.strip() for c in (args.leagues or "").split(",") if c.strip()] or None
+    known = {}
+    for code in leagues or espn_news.SLUGS:  # football-data's clubs, for the name check
+        try:
+            known[code] = football_data_teams(code, current_season())
+        except Exception as exc:  # noqa: BLE001  file not posted yet: names unchecked
+            print(f"{code}: football-data clubs unavailable ({type(exc).__name__})")
+    res = espn_news.probe(back=args.back, leagues=leagues, known=known)
+    print(json.dumps(res, indent=1, ensure_ascii=False, default=str))
+    for code, info in res.items():
+        c = info.get("names")
+        if c:
+            print(
+                f"NAMES {code}: ESPN {len(info['teams'])} teams, unmatched {c['unmatched']}, "
+                f"clashes {c['clashes']}, no ESPN event for {c['unseen']}"
+            )
 
 
 def cmd_log_team_news(args: argparse.Namespace) -> None:
@@ -287,7 +303,7 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
         e = estimate_credits(code, kickoffs, start, end)
         if lg.live:
             total += e["credits"]
-        else:  # registered off (League One, League Two): priced, never counted as live
+        else:  # registered off (none of football-data's today): priced, not counted
             off[code] = e["credits"]
         month = [k for k in kickoffs if start <= k < end]
         times = len({(k.hour, k.minute) for k in month})
@@ -1868,6 +1884,8 @@ def main(argv: list[str] | None = None) -> None:
     lo.set_defaults(func=cmd_log_odds)
 
     ep = sub.add_parser("espn-probe", help="ESPN league slugs, team names and summary shape")
+    ep.add_argument("--leagues", default="", help="comma-separated codes (blank = every slug)")
+    ep.add_argument("--back", type=int, default=7, help="days of past scoreboards to read")
     ep.set_defaults(func=cmd_espn_probe)
 
     ltn = sub.add_parser("log-team-news", help="append the build's ESPN team news to team_news/")
@@ -1888,7 +1906,9 @@ def main(argv: list[str] | None = None) -> None:
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
     eco.add_argument(
-        "--extra-leagues", default="", help="leagues outside the live test to price, e.g. E2,E3"
+        "--extra-leagues",
+        default="",
+        help="leagues outside the live corner test to price, e.g. E2,E3",
     )
     eco.set_defaults(func=cmd_estimate_corners)
 

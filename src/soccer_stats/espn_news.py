@@ -1,6 +1,7 @@
 """Team news from ESPN's free soccer endpoints: injuries and confirmed lineups.
 
-Owner-approved on 9 Oct for all six leagues. Data and display only: nothing here changes
+Owner-approved on 9 Oct for all six leagues, and League One and League Two (eng.3, eng.4)
+since they went live on 13 Oct. Data and display only: nothing here changes
 how bets are judged, and it costs no Odds API credits. ESPN's site API is unofficial, so
 every call is defensive (short timeouts, a small retry, any failure = no news this run).
 
@@ -34,7 +35,16 @@ from soccer_stats.data import RAW_DIR
 from soccer_stats.odds_feed import _team
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}"
-SLUGS = {"E0": "eng.1", "SP1": "esp.1", "D1": "ger.1", "I1": "ita.1", "F1": "fra.1", "E1": "eng.2"}
+SLUGS = {
+    "E0": "eng.1",
+    "SP1": "esp.1",
+    "D1": "ger.1",
+    "I1": "ita.1",
+    "F1": "fra.1",
+    "E1": "eng.2",
+    "E2": "eng.3",  # League One and League Two: live from 13 Oct (owner)
+    "E3": "eng.4",
+}
 # ESPN spellings the shared map (odds_feed.TEAM_NAMES) and its fuzzy match don't cover.
 ESPN_NAMES: dict[str, str] = {
     # Spellings seen in the probe (run 37964999592) that neither the shared map nor its
@@ -60,7 +70,13 @@ KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 TIMEOUT = 15
 RETRIES = 2
 PAUSE = 0.2
-MAX_SUMMARIES = 60  # per run, across leagues: keeps a busy weekend's request count modest
+# Per run, across leagues: keeps a busy weekend's request count modest. 90 since League One
+# and League Two went live (13 Oct): a Saturday's 15:00 UK slot alone then has about 35-40
+# matches (the Championship, League One and League Two play ~11-12 each) that ask for a
+# summary on every run in their last 90 minutes, beside the 3-hourly refresh of the next
+# day's matches. At 60, the leagues processed last (League Two) could miss their lineups.
+# RUN_SECONDS still bounds the run (90 x ~0.5 s is well inside 120 s).
+MAX_SUMMARIES = 90
 # Wall-clock budget for one run's ESPN calls. Without it a hanging ESPN could take
 # 60 summaries x 3 attempts x TIMEOUT (~45 min) and, with publish's cancel-in-progress
 # concurrency, cancel runs before their data-log writes (ledger, odds log, team totals).
@@ -447,12 +463,24 @@ def log(root: Path, rows: list[dict]) -> int:
 # ---------- probe (no key; run in Actions) ----------
 
 
-def probe(get: Callable = requests.get, back: int = 7, ahead: int = 2) -> dict:
+def probe(
+    get: Callable = requests.get,
+    back: int = 7,
+    ahead: int = 2,
+    leagues=None,
+    known: dict[str, set[str]] | None = None,
+) -> dict:
     """Per league: which days' scoreboards answer, ESPN team names, and the shape of one
-    finished and one upcoming match's summary (lineups, injuries, update time)."""
+    finished and one upcoming match's summary (lineups, injuries, update time). With
+    `known` (football-data's clubs per league), also how ESPN's names map onto them
+    (`names`, odds_feed.name_check through `team_name`)."""
+    from soccer_stats.odds_feed import name_check
+
     now = pd.Timestamp.now(tz="UTC")
     out = {}
     for league, slug in SLUGS.items():
+        if leagues and league not in leagues:
+            continue
         stats: dict = {}
         events, statuses = [], {}
         for day in _days(now - pd.Timedelta(days=back), now + pd.Timedelta(days=ahead)):
@@ -461,6 +489,9 @@ def probe(get: Callable = requests.get, back: int = 7, ahead: int = 2) -> dict:
             events += parse_scoreboard(body, set())
         info = {"slug": slug, "statuses": statuses, "events": len(events)}
         info["teams"] = sorted({e["espn_home"] for e in events} | {e["espn_away"] for e in events})
+        if known and known.get(league):
+            ks = known[league]
+            info["names"] = name_check(info["teams"], ks, mapper=lambda n, ks=ks: team_name(n, ks))
         past = [e for e in events if e["kickoff"] < now - pd.Timedelta(hours=3)]
         future = [e for e in events if e["kickoff"] > now]
         for label, pick in (("finished", past[-1:]), ("upcoming", future[:1])):

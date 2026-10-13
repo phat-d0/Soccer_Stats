@@ -97,6 +97,8 @@ def test_slugs_and_name_mapping():
         "I1": "ita.1",
         "F1": "fra.1",
         "E1": "eng.2",
+        "E2": "eng.3",
+        "E3": "eng.4",
     }
     known = {"Man City", "Bournemouth", "Ath Madrid", "Inter", "Wolves"}
     assert en.team_name("Manchester City", known) == "Man City"  # shared Odds API map
@@ -305,3 +307,37 @@ def test_a_failing_or_slow_espn_stops_the_run_early(tmp_path, monkeypatch):
     s = en.add([card()], tmp_path / "b", NOW, fake(calls))
     assert calls == [] and s["requests"] == 0
     assert any("stopped early" in e for e in s["errors"])
+
+
+def test_probe_names_check_against_football_data_clubs():
+    board = scoreboard(
+        ("1", "Peterborough United", "AFC Wimbledon", NOW - pd.Timedelta(days=2)),
+        ("2", "Stockport County", "Bradford City", NOW + pd.Timedelta(hours=5)),
+    )
+    known = {"Peterboro", "AFC Wimbledon", "Stockport", "Bradford"}
+    res = en.probe(get=fake([], board=board), back=1, ahead=0, leagues=["E2"], known={"E2": known})
+    assert list(res) == ["E2"] and res["E2"]["slug"] == "eng.3"
+    c = res["E2"]["names"]
+    assert c["unmatched"] == [] and c["clashes"] == {} and c["unseen"] == []
+    assert c["mapped"]["Peterborough United"] == "Peterboro"
+    res = en.probe(get=fake([], board=board), back=0, ahead=0, leagues=["E3"])
+    assert "names" not in res["E3"]  # no football-data clubs given: names unchecked
+
+
+def test_feed_name_check_flags_unmatched_clashes_and_unseen():
+    from soccer_stats.odds_feed import name_check
+
+    c = name_check(["Wimbledon", "AFC Wimbledon", "Bolton"], {"AFC Wimbledon", "York"})
+    assert c["unmatched"] == ["Bolton"] and c["unseen"] == ["York"]
+    assert c["clashes"] == {"AFC Wimbledon": ["AFC Wimbledon", "Wimbledon"]}
+
+
+def test_a_saturday_with_eight_leagues_fits_in_one_run(tmp_path):
+    """70 matches due a summary across the three EFL divisions all get one in one run."""
+    events = [(str(i), f"H{i}", f"A{i}", K) for i in range(70)]
+    cards = [card(f"H{i}", f"A{i}", league=("E1", "E2", "E3")[i % 3]) for i in range(70)]
+    calls = []
+    s = en.add(cards, tmp_path, NOW, fake(calls, board=scoreboard(*events)))
+    assert en.MAX_SUMMARIES >= 70 and en.RUN_SECONDS == 120 and en.MAX_FAILURES == 3
+    assert s["matches"] == 70 and calls.count("summary") == 70
+    assert all(c.get("team_news") for c in cards)

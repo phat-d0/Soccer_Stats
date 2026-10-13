@@ -98,6 +98,38 @@ TEAM_NAMES = {
     "Plymouth Argyle": "Plymouth",
     "Huddersfield Town": "Huddersfield",
     "Rotherham United": "Rotherham",
+    # League One and League Two (live from 13 Oct 2026). Every 2026/27 club's spelling on
+    # The Odds API's free events list (odds-check run 38447588309) and ESPN's eng.3/eng.4
+    # scoreboards (run 38447592742), checked against football-data's 2026/27 E2/E3 files.
+    # Peterborough, Wimbledon and Bristol Rovers can't be found by the word match in
+    # `_team`; the rest are listed so they map even when a team isn't in `known`.
+    "Peterborough United": "Peterboro",
+    "Wimbledon": "AFC Wimbledon",
+    "Bristol Rovers": "Bristol Rvs",
+    "Bradford City": "Bradford",
+    "Bromley FC": "Bromley",
+    "Burton Albion": "Burton",
+    "Cambridge United": "Cambridge",
+    "Doncaster Rovers": "Doncaster",
+    "Mansfield Town": "Mansfield",
+    "Stockport County": "Stockport",
+    "Stockport County FC": "Stockport",
+    "Wigan Athletic": "Wigan",
+    "Wycombe Wanderers": "Wycombe",
+    "Accrington Stanley": "Accrington",
+    "Cheltenham Town": "Cheltenham",
+    "Chesterfield FC": "Chesterfield",
+    "Colchester United": "Colchester",
+    "Crewe Alexandra": "Crewe",
+    "Exeter City": "Exeter",
+    "Grimsby Town": "Grimsby",
+    "Northampton Town": "Northampton",
+    "Oldham Athletic": "Oldham",
+    "Salford City": "Salford",
+    "Shrewsbury Town": "Shrewsbury",
+    "Swindon Town": "Swindon",
+    "Tranmere Rovers": "Tranmere",
+    "York City": "York",
     # Spain (DraftKings spellings seen on the first six-league publish, 8 Oct 2026)
     "Athletic Bilbao": "Ath Bilbao",
     "Atlético Madrid": "Ath Madrid",
@@ -169,6 +201,24 @@ def _team(name: str, known: set[str] | None = None) -> str:
         if len(hits) == 1:
             return hits[0]
     return name
+
+
+def name_check(names, known: set[str], mapper=None) -> dict:
+    """How a feed's team names land on football-data's (`known`): `mapped` {feed name:
+    our name}, `unmatched` (names whose mapped form isn't in `known`: a card would
+    duplicate), `clashes` (two feed names onto one of ours) and `unseen` (our teams no feed
+    name reached). The free name checks (market probe, ESPN probe) print it."""
+    mapper = mapper or (lambda n: _team(n, known))
+    mapped = {n: mapper(n) for n in sorted(set(names))}
+    by_target: dict[str, list[str]] = {}
+    for n, t in mapped.items():
+        by_target.setdefault(t, []).append(n)
+    return {
+        "mapped": mapped,
+        "unmatched": sorted(n for n, t in mapped.items() if t not in known),
+        "clashes": {t: ns for t, ns in sorted(by_target.items()) if len(ns) > 1},
+        "unseen": sorted(set(known) - set(mapped.values())),
+    }
 
 
 def next_reset(now: pd.Timestamp, reset_day: int = 1) -> pd.Timestamp:
