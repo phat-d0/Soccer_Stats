@@ -324,6 +324,31 @@ def cmd_estimate_cups(args: argparse.Namespace) -> None:
     print("CUPS_JSON " + json.dumps(cups.summary(res), default=str))
 
 
+def cmd_backfill_cup_odds(args: argparse.Namespace) -> None:
+    """A UEFA cup's historical closes (Pinnacle and DraftKings h2h) on ESPN's calendar, one
+    bulk snapshot per kickoff slot, never past --cap (0 = dry run: no Odds API calls)."""
+    from soccer_stats import cup_odds
+
+    seasons = [int(s) for s in args.seasons.split(",") if s.strip()]
+    cup_odds.cli(
+        args.cup,
+        seasons,
+        args.cap,
+        state=args.state,
+        pending=args.pending,
+        json_path=args.json,
+        retry=not args.no_retry,
+    )
+
+
+def cmd_log_cup_odds(args: argparse.Namespace) -> None:
+    """Append a cup-odds run's rows and calls to data-log's odds_history/ (deduplicated)."""
+    from soccer_stats import cup_odds
+
+    rows, calls = cup_odds.log(Path(args.pending), Path(args.log_dir), args.cup)
+    print(f"Cup odds log: {rows} new rows, {calls} new calls")
+
+
 def cmd_close_plan(args: argparse.Namespace) -> None:
     """When closes.yml should dispatch publish.yml so close snapshots land in their window
     (reads data-log's odds_log files only: no key, no calls)."""
@@ -1900,6 +1925,25 @@ def main(argv: list[str] | None = None) -> None:
     ecu.add_argument("--no-teams", action="store_true", help="skip football-data coverage")
     ecu.add_argument("--json", help="write the full result (calendars included) here")
     ecu.set_defaults(func=cmd_estimate_cups)
+
+    bco = sub.add_parser(
+        "backfill-cup-odds",
+        help="a UEFA cup's historical Pinnacle/DraftKings closes (capped; --cap 0 = dry run)",
+    )
+    bco.add_argument("--cup", default="UCL", choices=["UCL", "UEL", "UECL"])
+    bco.add_argument("--seasons", default="2024,2025", help="start years, e.g. 2024,2025")
+    bco.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
+    bco.add_argument("--state", help="folder with data-log's closes and call record (skip held)")
+    bco.add_argument("--pending", help="write this run's new rows and calls here")
+    bco.add_argument("--json", help="write the full result here")
+    bco.add_argument("--no-retry", action="store_true", help="never ask a previous snapshot")
+    bco.set_defaults(func=cmd_backfill_cup_odds)
+
+    lcu = sub.add_parser("log-cup-odds", help="append cup closes and calls to odds_history/")
+    lcu.add_argument("--cup", default="UCL", choices=["UCL", "UEL", "UECL"])
+    lcu.add_argument("--pending", required=True, help="a backfill-cup-odds --pending folder")
+    lcu.add_argument("--log-dir", required=True, help="data-log checkout")
+    lcu.set_defaults(func=cmd_log_cup_odds)
 
     ttr = sub.add_parser("team-totals-report", help="team-total CLV vs FanDuel's close (no key)")
     ttr.add_argument("--log-dir", required=True, help="data-log checkout")
