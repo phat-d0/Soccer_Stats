@@ -446,6 +446,36 @@ def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
         )
 
 
+def cup_and_league_results(codes: list[str], season: int, cup_results=None) -> pd.DataFrame:
+    """Results for paper settlement: football-data's files for the domestic leagues, and
+    ESPN's scoreboard for a UEFA cup (cup_model.cup_results: 90-minute scores, ESPN's names
+    as on the cards). One source failing never costs the other: its trades stay open until
+    a later build."""
+    from soccer_stats import cup_model
+    from soccer_stats.leagues import LEAGUES
+
+    cup_results = cup_results or cup_model.cup_results
+    domestic = [c for c in codes if not (LEAGUES.get(c) and LEAGUES[c].cup)]
+    frames = []
+    try:  # every league with fixtures or trades this build (leagues.py), primary first
+        frames.append(load_matches(domestic, [season - 1, season]))
+    except Exception as exc:  # no results: trades stay open until the next build
+        print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
+    for code in codes:
+        if code in domestic:
+            continue
+        try:
+            budget = cup_model.Budget(seconds=60)
+            got = [cup_results(y, get=budget, stats=budget.stats) for y in (season - 1, season)]
+            frames += [g.assign(league=code) for g in got]
+        except Exception as exc:  # noqa: BLE001
+            print(f"{code} results unavailable ({type(exc).__name__}); its trades settle later")
+    frames = [f for f in frames if len(f)]
+    if not frames:
+        return pd.DataFrame(columns=["league", "home", "away", "season"])
+    return pd.concat(frames, ignore_index=True)
+
+
 def cmd_paper(args: argparse.Namespace) -> None:
     import json
 
@@ -456,11 +486,7 @@ def cmd_paper(args: argparse.Namespace) -> None:
     site = Path(args.site)
     data = json.loads((site / "data.json").read_text())
     season = current_season()
-    try:  # every league with fixtures or trades this build (leagues.py), primary first
-        results = load_matches(paper.leagues_in_play(data, args.league), [season - 1, season])
-    except Exception as exc:  # no results: trades stay open until the next build
-        print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
-        results = pd.DataFrame(columns=["home", "away", "season"])
+    results = cup_and_league_results(paper.leagues_in_play(data, args.league), season)
     apps = None
     if args.league == "E0":
         try:
@@ -785,6 +811,35 @@ def cmd_fit_match_blends(args: argparse.Namespace) -> None:
         "leagues": {},
     }
     for code in codes:
+        if lgs.LEAGUES[code].cup:  # the cross-league model beside the bought closes
+            from soccer_stats import cup_model
+
+            try:
+                entry = cup_model.blend_entry(args.cup_closes, fit_date)
+            except Exception as exc:  # noqa: BLE001
+                entry = {"coef": None, "sigma": None, "error": f"{type(exc).__name__}: {exc}"}
+            out["leagues"][code] = entry
+            wf = entry.get("walk_forward") or {}
+            print(
+                f"{lgs.name(code)}: "
+                + (
+                    entry["error"]
+                    if entry.get("error")
+                    else f"coef {entry['coef']}, sigma {entry['sigma']}, {entry['matches']} "
+                    f"matches {entry['fit_from']} to {entry['fit_to']} (fit date "
+                    f"{entry['fit_date']}; {entry.get('fit_rows')} fit rows, minimum "
+                    f"{entry.get('min_rows')})"
+                )
+            )
+            for line in cup_model.blend_report(entry):
+                print(line)
+            if wf:
+                print(
+                    f"  Blend walk-forward log loss on {wf['matches']} matches ({wf['refits']} "
+                    f"refits): model {wf['model']:.4f}, blend {wf['blend']:.4f}, Pinnacle "
+                    f"{wf['pinnacle']:.4f}"
+                )
+            continue
         try:
             matches = load_matches([code], years)
             matches, err = with_xg(matches)
@@ -889,7 +944,9 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
     from soccer_stats.data import pinnacle_prices
     from soccer_stats.publish import XG_WEIGHT, _clean
 
-    codes = args.leagues or lgs.live_codes()
+    # The Champions League is left out: its bought prices are closes only, and Lean is
+    # replayed on Pinnacle's early price with CLV against the close (docs/leagues.md).
+    codes = args.leagues or [c for c in lgs.live_codes() if not lgs.LEAGUES[c].cup]
     last = current_season()
     years = range(args.from_season - args.burn_in, last + 1)
     reports: dict[str, dict] = {}
@@ -2052,6 +2109,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     mb.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
     mb.add_argument("--fit-date", help="fit on matches before this date (default: today)")
+    mb.add_argument(
+        "--cup-closes",
+        help="the Champions League's bought closes (data-log odds_history/UCL_closes.jsonl)",
+    )
     mb.add_argument("--json", help="path for the fits")
     mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
     mb.set_defaults(func=cmd_fit_match_blends)

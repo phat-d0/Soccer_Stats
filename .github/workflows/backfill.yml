@@ -68,7 +68,7 @@ on:
         type: boolean
         default: false
       cup_seasons:
-        description: "cup_odds: seasons (start years, comma-separated)"
+        description: "cup_odds, and estimate_month + cups: seasons (start years, comma-separated)"
         default: "2024,2025"
 
 permissions:
@@ -210,7 +210,9 @@ jobs:
         run: |
           uv sync --frozen
           mkdir -p out
-          uv run soccer-stats estimate-cups --json out/cups.json
+          # cup_seasons picks the calendars (default 2024,2025; 2026 = this season's, e.g.
+          # the Champions League's live cost for Oct-Dec 2026).
+          uv run soccer-stats estimate-cups --seasons "${{ inputs.cup_seasons }}" --json out/cups.json
 
       - uses: actions/upload-artifact@v4
         if: ${{ inputs.estimate_month != '' && inputs.cups && always() }}
@@ -236,16 +238,41 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # The Champions League's blend (owner, 13 Oct) needs every European result since
+      # 2022 from ESPN's free scoreboards: the days the closes download cached, then this
+      # step's own cache (saved below; publish.yml restores it, so the live model starts warm).
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
+        with:
+          path: |
+            data/raw/cup_odds
+            data/raw/cups/espn
+          key: cup-odds-history-${{ github.run_id }}
+          restore-keys: cup-odds-history-
+
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-${{ github.run_id }}
+          restore-keys: cup-espn-
+
       # Blend Lean (owner, 10 Oct): each live league's h2h blend of the model and Pinnacle's
       # margin-free close, with sigma, from football-data and Understat only (no key, no
-      # credits). Saved to data-log (backtest/match_blends.json) only from the default
-      # branch; elsewhere it prints and uploads a 7-day artifact.
+      # credits); the Champions League's from the cross-league model beside data-log's
+      # bought closes (odds_history/UCL_closes.jsonl). Saved to data-log
+      # (backtest/match_blends.json) only from the default branch; elsewhere it prints and
+      # uploads a 7-day artifact.
       - name: Fit the per-league match blends
         if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
-          mkdir -p out
-          uv run soccer-stats fit-match-blends --json out/match_blends.json
+          mkdir -p out data/raw/cups/espn
+          git fetch --depth=1 origin data-log
+          git show FETCH_HEAD:odds_history/UCL_closes.jsonl > out/UCL_closes.jsonl 2>/dev/null ||
+            { rm -f out/UCL_closes.jsonl; echo "No Champions League closes on data-log"; }
+          uv run soccer-stats fit-match-blends --cup-closes out/UCL_closes.jsonl \
+            --json out/match_blends.json
           if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
             echo "Not the default branch: printed only, nothing pushed to data-log."
             exit 0
@@ -265,6 +292,12 @@ jobs:
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
+
+      - uses: actions/cache/save@v4
+        if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' && always() }}
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ inputs.match_blends && always() }}

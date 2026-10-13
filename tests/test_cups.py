@@ -82,22 +82,23 @@ def fake_espn(calendar=True, log=None):
 # ---------- the registry: three cups, off ----------
 
 
-def test_cups_are_registered_off_with_their_odds_api_keys():
+def test_cups_are_registered_with_their_odds_api_keys_and_only_ucl_is_live():
     assert feed.SPORTS["UCL"] == "soccer_uefa_champs_league"
     assert feed.SPORTS["UEL"] == "soccer_uefa_europa_league"
     assert feed.SPORTS["UECL"] == "soccer_uefa_europa_conference_league"
     for code in ("UCL", "UEL", "UECL"):
         lg = lgs.get(code)
-        assert lg.cup and not lg.live and lg.understat is None and lg.odds_policy == "matchday"
-        assert code not in lgs.live_codes()
-    assert not any(lgs.get(c).cup for c in lgs.live_codes())
+        assert lg.cup and lg.understat is None and lg.odds_policy == "matchday"
+        assert lg.live == (code == "UCL")  # the Champions League live from 13 Oct (owner)
+        assert (code in lgs.live_codes()) == (code == "UCL")
+    assert [c for c in lgs.live_codes() if lgs.get(c).cup] == ["UCL"]
     assert set(cups.CUPS) == {c for c, lg in lgs.LEAGUES.items() if lg.cup}
 
 
 def test_an_off_cup_is_never_fetched_or_listed(tmp_path, monkeypatch):
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
     near = [TODAY + pd.Timedelta(hours=2)]
-    for code in cups.CUPS:
+    for code in ("UEL", "UECL"):  # the cups still off
         events, status = feed.fetch_odds(
             code, raw_dir=tmp_path, api_key="k", now=TODAY, kickoffs=near
         )

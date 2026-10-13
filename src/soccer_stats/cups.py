@@ -278,8 +278,42 @@ def calendar_days(body: dict | None) -> list[str]:
     return out
 
 
+def _goals(value) -> int | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(v) if v >= 0 and v == int(v) else None
+
+
+def _extra_time(e: dict) -> bool:
+    """True when ESPN's status says the match went past 90 minutes (extra time, or
+    penalties): a period after the second half, or AET / pens in the status name."""
+    st = e.get("status") or {}
+    typ = st.get("type") or {}
+    text = " ".join(str(typ.get(k) or "") for k in ("name", "detail", "shortDetail")).upper()
+    try:
+        period = int(st.get("period") or 0)
+    except (TypeError, ValueError):
+        period = 0
+    return period > 2 or "AET" in text or "PEN" in text or "EXTRA" in text
+
+
+def _first_two_halves(c: dict) -> int | None:
+    """Goals in the first two linescores (the 90 minutes), when ESPN lists them."""
+    ls = c.get("linescores")
+    if not isinstance(ls, list) or len(ls) < 2:
+        return None
+    vals = [_goals(x.get("value") if isinstance(x, dict) else None) for x in ls[:2]]
+    return None if None in vals else sum(vals)
+
+
 def parse_events(body: dict | None) -> list[dict]:
-    """{id, kickoff, home, away, home_id, away_id, completed, stage} per event."""
+    """{id, kickoff, home, away, home_id, away_id, completed, stage} per event, plus the
+    result fields the cup model and settlement read: `home_score`/`away_score` (ESPN's
+    final score, extra time included; None before kickoff), `neutral` (ESPN's
+    neutralSite), `extra_time` and `score90` ([home, away] after 90 minutes: the final
+    score without extra time, from the first two linescores after extra time, else None)."""
     out = []
     events = (body or {}).get("events") if isinstance(body, dict) else None
     for e in events if isinstance(events, list) else []:
@@ -292,6 +326,16 @@ def parse_events(body: dict | None) -> list[dict]:
         if not (e.get("id") and e.get("date") and h.get("displayName") and a.get("displayName")):
             continue
         status = ((e.get("status") or {}).get("type") or {}).get("completed")
+        hs = _goals(sides.get("home", {}).get("score"))
+        as_ = _goals(sides.get("away", {}).get("score"))
+        extra = bool(status) and _extra_time(e)
+        if not status or hs is None or as_ is None:
+            score90 = None
+        elif not extra:
+            score90 = [hs, as_]
+        else:
+            h90, a90 = (_first_two_halves(sides.get(s, {})) for s in ("home", "away"))
+            score90 = None if h90 is None or a90 is None else [h90, a90]
         out.append(
             {
                 "id": str(e["id"]),
@@ -302,6 +346,11 @@ def parse_events(body: dict | None) -> list[dict]:
                 "away_id": str(a.get("id", "")),
                 "completed": bool(status),
                 "stage": (e.get("season") or {}).get("slug"),
+                "home_score": hs if status else None,
+                "away_score": as_ if status else None,
+                "neutral": bool(comp.get("neutralSite")),
+                "extra_time": extra,
+                "score90": score90,
             }
         )
     return out
@@ -321,8 +370,13 @@ def season_calendar(
     get: Callable = requests.get,
     every_day: bool = False,
     today: pd.Timestamp | None = None,
+    stats: dict | None = None,
 ) -> dict:
     """Every ESPN event for `slug` kicking off in [start, end), deduplicated by id.
+
+    `stats` (optional) is shared between calls, so a caller can bound a whole run: once
+    stats["failures"] reaches MAX_FAILURES no further request is made (cached days still
+    read). The `requests`/`failures` returned are then the shared totals.
 
     Seeds one call on the 1st of each month, then asks each day ESPN's calendar lists
     within the window. With `every_day`, or when no answer's calendar lists a day in the
@@ -330,7 +384,7 @@ def season_calendar(
     that never answers stops after its seeds. Returns {slug, events, requests, failures,
     mode, days, calendar_sample}."""
     today = today or pd.Timestamp.now(tz="UTC")
-    stats: dict = {}
+    stats = {} if stats is None else stats
     window = set(_all_days(start, end))
     if every_day:
         todo, mode = sorted(window), "every day"
