@@ -398,3 +398,28 @@ def test_cup_dry_run_lists_kickoffs_for_free_and_skips_football_data():
     assert mp.football_data_coverage(["UCL"], download=download) == {
         "UCL": {"error": "not on football-data"}
     }
+
+
+def test_names_check_maps_the_events_list_onto_football_data_clubs(tmp_path):
+    # League One and League Two go live (13 Oct): --names prints every events-list team
+    # against football-data's clubs this season, for free (dry run: events lists only).
+    res = mp.run(0, leagues=("E2",), api_key="k", now=NOW, get=check_api([]))
+    assert res["leagues"]["E2"]["teams"] == ["Bolton", "Wigan"]
+    csv = tmp_path / "E2.csv"
+    csv.write_text("Div,Date,HomeTeam,AwayTeam\nE2,01/08/2026,Wigan,Peterboro\n")
+    names = mp.name_checks(res, 2026, download=lambda lg, year, **kw: csv)
+    c = names["E2"]
+    assert c["football_data"] == ["Peterboro", "Wigan"]
+    assert c["unmatched"] == ["Bolton"] and c["unseen"] == ["Peterboro"]
+    text = mp.report({**res, "names": names})
+    assert "NAMES E2: football-data clubs (2): Peterboro, Wigan" in text
+    assert "odds api 'Bolton' -> 'Bolton'  <- NOT A FOOTBALL-DATA CLUB" in text
+    assert "odds api 'Wigan' -> 'Wigan'\n" in text
+
+    def missing(lg, year, **kw):
+        raise OSError("not posted")
+
+    assert mp.name_checks(res, 2026, download=missing) == {"E2": {"error": "OSError"}}
+    # The six-league default run never records teams, so --names adds nothing there.
+    six = mp.run(0, leagues=("E0",), api_key="k", now=NOW, get=fake_api([]))
+    assert mp.name_checks(six, 2026, download=missing) == {}

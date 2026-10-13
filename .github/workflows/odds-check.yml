@@ -28,7 +28,11 @@
 #            all six leagues, never past `cap` credits (0 = dry run: free events list only).
 #            `leagues` (e.g. E2,E3) probes only those: League One / League Two check
 #            (docs/leagues.md): h2h, team corners and totals at DraftKings, Pinnacle and
-#            FanDuel, a verdict per league, and football-data's HC/AC and Pinnacle coverage.
+#            FanDuel, a verdict per league, and football-data's HC/AC and Pinnacle coverage,
+#            plus every events-list team name against football-data's clubs this season
+#            (`--names`, free; the 13 Oct name check, run 38447588309).
+#   espn: ESPN slugs, team names and summary shape (no key); with `leagues` (e.g. E2,E3)
+#            only those, 21 days of scoreboards, names checked against football-data's clubs.
 #   corner-history: historical Pinnacle team-corner prices (alternate_team_totals_corners;
 #            docs/totals.md, "Historical corner prices probe"): four probe points, one events
 #            and one odds call each, never past `cap` credits (0 = dry run: no calls), plus
@@ -204,7 +208,7 @@ jobs:
             lab-holdout) uv run python -m soccer_stats.lab.run --league "$LEAGUE" $HS --open-holdout \
                      --reason "$REASON" --finalists "$FINALISTS" --stack-base "$STACK_BASE" \
                      --json out/lab_holdout.json ;;
-            markets)  # blank leagues = the six (unchanged); E2,E3 = the L1/L2 check + coverage
+            markets)  # blank leagues = the six (unchanged); E2,E3 = the L1/L2 check + coverage + names
               if [ -n "$LEAGUES" ]; then
                 uv run python -m soccer_stats.edge.market_probe --cap "$CAP" --leagues "$LEAGUES" \
                   --coverage --names --json out/markets.json --bodies out/market_bodies

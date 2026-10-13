@@ -2,7 +2,8 @@
 
 The owner turned on live odds for every league on 8 Oct 2026: La Liga (SP1), Bundesliga
 (D1), Serie A (I1), Ligue 1 (F1) and the EFL Championship (E1) now fetch DraftKings odds
-beside the Premier League (E0), whose behaviour hasn't changed. Historical DraftKings odds
+beside the Premier League (E0), whose behaviour hasn't changed. League One (E2) and League
+Two (E3) followed on 13 Oct ("League One and League Two live" below). Historical DraftKings odds
 for the new leagues are not approved (cap 0), so they have no DraftKings backtest. This
 page shows what each league costs. **No credits were spent to work this out.**
 
@@ -11,7 +12,8 @@ The Odds API key is shared with the baseball app. The balance was about 22,600 o
 ## How a league is switched on (or off)
 
 1. Set `live=True` (or `False`) for the league in `src/soccer_stats/leagues.py` (the
-   `LEAGUES` registry) and merge. All six are `True` now.
+   `LEAGUES` registry) and merge. All eight football-data leagues are `True` now; the
+   three UEFA cups are registered `False` (priced only).
 2. Each publish run then builds that league's fixtures with its own match model, fetches
    its DraftKings odds by the refresh rule below, and logs them to
    `odds_log/<code>_<YYYY-MM>.jsonl`. The app gets every fixture tagged with its league.
@@ -36,7 +38,7 @@ was; the leagues still never refresh more often than the floors below.
 | League | Rule |
 | --- | --- |
 | Premier League (live) | Unchanged: every hour, around the clock, and every 30 minutes within 2 hours of a kickoff (budget permitting). |
-| SP1, D1, I1, F1, E1 | Nothing unless the league has a match within 48 hours. Then every 3 hours, hourly from 6 hours before kickoff, and every 30 minutes in the last 2 hours. |
+| SP1, D1, I1, F1, E1, E2, E3 | Nothing unless the league has a match within 48 hours. Then every 3 hours, hourly from 6 hours before kickoff, and every 30 minutes in the last 2 hours. |
 
 ### Who gets the budget when credits run low
 
@@ -45,7 +47,8 @@ was; the leagues still never refresh more often than the floors below.
   per league for the month, far more than the hourly floor needs, so every league sits at
   its floor. It matters only when credits run low: at 3,000 credits an even six-way split
   would stretch E0 from hourly to about every 2 hours. Priority keeps it hourly.
-- **The other leagues split the balance six ways and keep 3,000 credits in reserve**
+- **The other leagues split the balance eight ways (six until 13 Oct) and keep 3,000
+  credits in reserve**
   (`odds_feed.MATCHDAY_RESERVE_CREDITS`, the same reserve the player-odds fetches keep).
   Below that they stop fetching and keep their cached odds. They read the freshest balance
   any league has seen (the key is shared, and E0 refreshes most often), so they pause
@@ -132,12 +135,83 @@ Ways to spend less, if needed (none are built yet):
   model (the research lab's round-5 bake-off also used goals only for E1). Its upcoming
   fixtures come from football-data's fixtures file, which covers about the next week.
 
+## League One and League Two live (13 Oct, owner)
+
+Owner's decision (13 Oct, lead session), after the check below: "Switch them on please."
+League One (E2) and League Two (E3) are `live=True` in `leagues.py`: goals-only (no
+Understat, `understat=None`), the football-data schedule, the "matchday" refresh policy.
+
+What runs there:
+- **Live DraftKings h2h odds** under the matchday rule: nothing without a kickoff within
+  48 hours, then every 3 hours, hourly from 6 hours out, every 30 minutes in the last 2
+  hours. 1 credit a refresh. Both pause below the shared 3,000-credit matchday reserve, on
+  the freshest balance any league has seen. Logged to `odds_log/E2_<YYYY-MM>.jsonl` and
+  `odds_log/E3_<YYYY-MM>.jsonl` on data-log.
+- **Cost:** about 364 credits a month for both (Oct 211 + 167, Nov 183 + 145, Dec 210 +
+  176; `backfill.yml` run 38447622203 on the switched-on registry, identical to the 11 Oct
+  estimate, run 38178582402). All eight leagues' DraftKings refreshes: Oct 2,402, Nov
+  1,569, Dec 1,662 (November and December use placeholder kickoff times in the top
+  flights, so October is the realistic month). All live spend, about 3,540 a month:
+  DraftKings about 2,390 (2,024 for the six plus 364), team totals about 682, corners
+  about 471.
+- **Both match strategies**, $10 paper trades, each league's own ledger
+  (`paper_trades/E2_<season>.jsonl`, `paper_trades/E3_<season>.jsonl`):
+  - the fixed 12% test (`trades.PAPER_RULE = "fixed_raw"`) on the raw model's chance
+    against DraftKings' quoted price, from the first publish with E2/E3 odds;
+  - Blend Lean (1σ+) once `backtest/match_blends.json` has their fits. Until the refit
+    runs from the default branch, `publish.add_lean` finds no E2/E3 entry, their cards get
+    no `z` or `lean_pick`, and no Lean trades open there (the rule's σ is null).
+- **ESPN team news** (free): slugs `eng.3` and `eng.4`, under the same 120-second and
+  3-failure run budget. `MAX_SUMMARIES` goes from 60 to 90: a Saturday's 15:00 UK slot
+  alone now has about 35–40 matches (Championship, League One and League Two) asking for a
+  summary on every run in their last 90 minutes, beside the 3-hourly refresh of the next
+  day's matches; at 60 the league processed last (League Two) could miss its lineups.
+- **Not there:** no team corners (Pinnacle lists none; `corners_live.LEAGUES` stays the
+  six) and no team totals (FanDuel doesn't list either league;
+  `odds_feed.TEAM_TOTAL_LEAGUES` stays the five). The app's Teams tab shows ratings from
+  goals (no xG, no player stats), and the match sheet's goals note says these leagues
+  weren't in the total-goals test.
+
+Team names (checked before the first publish, free):
+- `odds-check.yml` run 38447588309 (`task=markets`, `leagues=E2,E3`, `cap=0`, new
+  `--names`): The Odds API's free events list had 12 upcoming events in each league,
+  which named all 24 clubs in each. Against football-data's 2026/27 E2/E3 files, three
+  spellings didn't land: "Peterborough United" (football-data "Peterboro"), "Wimbledon"
+  ("AFC Wimbledon") and "Bristol Rovers" ("Bristol Rvs").
+- `odds-check.yml` run 38447592742 (`task=espn`, `leagues=E2,E3`, 21 days of
+  scoreboards): ESPN named all 24 clubs in each league; "Peterborough United" and
+  "Bristol Rovers" didn't land.
+- `odds_feed.TEAM_NAMES` now maps those three and every other long form (e.g. "Wycombe
+  Wanderers" → "Wycombe", "Stockport County FC" → "Stockport", "Accrington Stanley" →
+  "Accrington"), so all 48 clubs map with or without the season's team list.
+  `tests/test_leagues.py` lists every 2026/27 club with both feeds' spellings and checks
+  no unmatched name, no two names on one club, and no duplicate card.
+
+Blend fits (`backfill.yml` run 38447596291, `match_blends` from the branch, printed
+only; Pinnacle's own close from 2022/23, 2025/26 only partly priced, 2026/27 none):
+
+| League | σ | Matches | coef [a_draw, a_away, b, c] | Walk-forward log loss: model / blend / Pinnacle |
+| --- | --- | --- | --- | --- |
+| League One | 0.0161 | 1,691 (2022-07-30 to 2025-11-25) | [−0.048, 0.063, 0.957, 0.082] | 1.0301 / 1.0188 / 1.0173 (1,380 matches) |
+| League Two | 0.0170 | 1,711 (2022-07-30 to 2025-10-25) | [−0.084, −0.043, 0.996, −0.192] | 1.0806 / 1.0546 / 1.0532 (1,404 matches) |
+
+The other six leagues' fits in that run are identical to the live file's. In both new
+leagues b is about 1 (the blend doesn't sharpen Pinnacle's price, unlike the top
+flights), and the blend trails Pinnacle's close out of sample, as everywhere but Serie A.
+
+After the merge: dispatch `backfill.yml` on `claude/soccer-stats-scaffold` with
+`match_blends` ticked (writes `backtest/match_blends.json` with E2/E3 to data-log), then
+`publish.yml`. Check the publish log for "League One: N fixtures, odds DraftKings",
+"Duplicate fixtures: 0", no "odds events unmatched" line for League One or Two, the
+"Match blends" line naming both, and "Team news (ESPN)" counts.
+
 ## League One and League Two check (11 Oct)
 
 Owner's request (11 Oct, lead session): more midweek fixtures. Among our six leagues only
 the Championship plays midweek, so League One (E2) and League Two (E3) are candidates.
 Owner-approved at **10 credits at most** for the paid part. Nothing goes live from this
-check; switching either on is a separate owner decision.
+check; switching either on is a separate owner decision (taken on 13 Oct: both are
+live, see the section above).
 
 What is built:
 - **Registry.** E2 and E3 are in `leagues.py` with `live=False`, Odds API sport keys

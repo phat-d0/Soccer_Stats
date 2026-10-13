@@ -64,7 +64,7 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Markets | Home, draw, away, over 2.5, under 2.5 |
 | Probability for the edge | app value pick: the blend (model + DraftKings' margin-free price, below) when a fit is saved, else the model's own. Live paper trades: the model's own chance (`p`) while `trades.PAPER_RULE = "fixed_raw"` (owner's live test, 10 Oct 2026); the blend under `"learned"` |
 | Edge | that probability × DraftKings decimal odds − 1 |
-| Paper-trade threshold | `trades.PAPER_RULE`. Now `"fixed_raw"`: 12% (`PAPER_EDGE`) in every live league (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Championship), whatever the learned levels say; backtests of this rule lost money, and this tests it live. `"learned"` (one line to revert): the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`, `lab/min_edge.json` for other leagues), none learned = no new match paper trades. Each new trade records `threshold`, `rule` and `p_source` |
+| Paper-trade threshold | `trades.PAPER_RULE`. Now `"fixed_raw"`: 12% (`PAPER_EDGE`) in every live league (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Championship, and League One and League Two since 13 Oct), whatever the learned levels say; backtests of this rule lost money, and this tests it live. `"learned"` (one line to revert): the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`, `lab/min_edge.json` for other leagues), none learned = no new match paper trades. Each new trade records `threshold`, `rule` and `p_source` |
 | App minimum edge | learned from past bets (`edge_threshold` in each backtest); none when no level beat the market; 2/5/8/12% under "Explore other edges" |
 | Trades per match | one, the market with the highest edge |
 | Odds cap | none (the backtest also reports a 6.0 cap) |
@@ -101,7 +101,7 @@ field existed read as `edge12`). The app lists Lean first (`portfolio.strategy_o
 
 The fits come from `soccer-stats fit-match-blends` (football-data and Understat only, no
 key, 0 credits): for each live league, the model's walk-forward chances from 2022/23
-(weekly refits on earlier matches only, goals-only for the Championship) beside
+(weekly refits on earlier matches only, goals-only for the Championship, League One and League Two) beside
 Pinnacle's own close (rows without a Pinnacle price are left out, not filled from the
 market average), one fit on every match before the fit date, plus a walk-forward check
 (log loss of model, blend and Pinnacle). Run it from the Actions tab: *Backfill DraftKings
@@ -125,7 +125,7 @@ scored (2025/26's football-data prices stop in January, so it is left out). This
 tougher test than the live one (Pinnacle is sharper than DraftKings) and not the live book.
 
 **Team corners (owner's live test, 10 Oct 2026).** A second paper portfolio, *Team
-corners* (`trades.PORTFOLIOS` id `corners`, status testing), in all six live leagues:
+corners* (`trades.PORTFOLIOS` id `corners`, status testing), in six live leagues (not League One or League Two: Pinnacle quotes no team corners there):
 
 | Rule | Value |
 | --- | --- |
@@ -385,4 +385,4 @@ notebooks/              exploration
 - Non-penalty xG, and separate weights for attack vs defence
 - Over/under and Asian handicap: tested in round 2 against Pinnacle; no edge (`docs/edge.md`)
 - Market-blending: model probability shrunk toward the market, bet only on large disagreements
-- Lower leagues, where bookmaker prices are less efficient
+- Lower leagues, where bookmaker prices are less efficient (League One and League Two live from 13 Oct 2026: both match strategies on DraftKings h2h; `docs/leagues.md`)

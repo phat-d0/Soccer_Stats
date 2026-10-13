@@ -1,6 +1,7 @@
 """Team news from ESPN's free soccer endpoints: injuries and confirmed lineups.
 
-Owner-approved on 9 Oct for all six leagues. Data and display only: nothing here changes
+Owner-approved on 9 Oct for all six leagues, and League One and League Two (eng.3, eng.4)
+since they went live on 13 Oct. Data and display only: nothing here changes
 how bets are judged, and it costs no Odds API credits. ESPN's site API is unofficial, so
 every call is defensive (short timeouts, a small retry, any failure = no news this run).
 
@@ -69,7 +70,13 @@ KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 TIMEOUT = 15
 RETRIES = 2
 PAUSE = 0.2
-MAX_SUMMARIES = 60  # per run, across leagues: keeps a busy weekend's request count modest
+# Per run, across leagues: keeps a busy weekend's request count modest. 90 since League One
+# and League Two went live (13 Oct): a Saturday's 15:00 UK slot alone then has about 35-40
+# matches (the Championship, League One and League Two play ~11-12 each) that ask for a
+# summary on every run in their last 90 minutes, beside the 3-hourly refresh of the next
+# day's matches. At 60, the leagues processed last (League Two) could miss their lineups.
+# RUN_SECONDS still bounds the run (90 x ~0.5 s is well inside 120 s).
+MAX_SUMMARIES = 90
 # Wall-clock budget for one run's ESPN calls. Without it a hanging ESPN could take
 # 60 summaries x 3 attempts x TIMEOUT (~45 min) and, with publish's cancel-in-progress
 # concurrency, cancel runs before their data-log writes (ledger, odds log, team totals).
