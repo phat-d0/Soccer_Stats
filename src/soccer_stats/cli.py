@@ -284,7 +284,7 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
     year = month_start.year if month_start.month >= 7 else month_start.year - 1
     total, off = 0, {}
     print(f"Odds API credits for {args.month} (refresh rules only; an upper bound):")
-    cups = [lg.name for lg in LEAGUES.values() if lg.cup]
+    cups = [f"{lg.name}{' (live)' if lg.live else ''}" for lg in LEAGUES.values() if lg.cup]
     for code, lg in LEAGUES.items():
         if lg.cup:  # no football-data calendar: priced by estimate-cups on ESPN's
             continue
@@ -320,7 +320,10 @@ def cmd_estimate_credits(args: argparse.Namespace) -> None:
             + f"; together {sum(off.values())} credits"
         )
     if cups:
-        print(f"UEFA cups ({', '.join(cups)}): off; priced by estimate-cups (ESPN calendar)")
+        print(
+            f"UEFA cups ({', '.join(cups)}): not counted above; priced by estimate-cups "
+            "(ESPN calendar)"
+        )
 
 
 def cmd_estimate_cups(args: argparse.Namespace) -> None:

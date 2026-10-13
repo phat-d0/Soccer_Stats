@@ -64,7 +64,7 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Markets | Home, draw, away, over 2.5, under 2.5 |
 | Probability for the edge | app value pick: the blend (model + DraftKings' margin-free price, below) when a fit is saved, else the model's own. Live paper trades: the model's own chance (`p`) while `trades.PAPER_RULE = "fixed_raw"` (owner's live test, 10 Oct 2026); the blend under `"learned"` |
 | Edge | that probability × DraftKings decimal odds − 1 |
-| Paper-trade threshold | `trades.PAPER_RULE`. Now `"fixed_raw"`: 12% (`PAPER_EDGE`) in every live league (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Championship, and League One and League Two since 13 Oct), whatever the learned levels say; backtests of this rule lost money, and this tests it live. `"learned"` (one line to revert): the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`, `lab/min_edge.json` for other leagues), none learned = no new match paper trades. Each new trade records `threshold`, `rule` and `p_source` |
+| Paper-trade threshold | `trades.PAPER_RULE`. Now `"fixed_raw"`: 12% (`PAPER_EDGE`) in every live league (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Championship, and League One, League Two and the Champions League since 13 Oct), whatever the learned levels say; backtests of this rule lost money, and this tests it live. `"learned"` (one line to revert): the minimum edge learned from past bets (`E0_dk.json` → `edge_threshold.min_edge`, `lab/min_edge.json` for other leagues), none learned = no new match paper trades. Each new trade records `threshold`, `rule` and `p_source` |
 | App minimum edge | learned from past bets (`edge_threshold` in each backtest); none when no level beat the market; 2/5/8/12% under "Explore other edges" |
 | Trades per match | one, the market with the highest edge |
 | Odds cap | none (the backtest also reports a 6.0 cap) |
@@ -74,7 +74,8 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Live entry | first build where the pick qualifies, odds under 3 hours old, before kickoff |
 | Backtest entry | first qualifying look, 48 and 3 hours before kickoff |
 | Close | last DraftKings price before kickoff in the odds log (for closing line value); its minutes before kickoff are stored, since scheduled builds can be late |
-| Settlement | 90-minute result from football-data; void if kickoff moves 48h+ or no result in 14 days |
+| Settlement | 90-minute result from football-data (the Champions League: ESPN's scoreboard; an extra-time match without a 90-minute score waits and voids); void if kickoff moves 48h+ or no result in 14 days |
+| Champions League | fixtures from ESPN, chances from one goals-only fit across Europe's leagues tied together by European results (`cup_model.py`); a club no football-data league covers gets no model chance, so its matches show odds only and never trade |
 
 **Live paper trades** (`paper.py`): after each build, `soccer-stats paper` updates an
 append-only ledger at `paper_trades/<league>_<season>.jsonl` on the `data-log` branch (one file per league), and its log names the rule in force ("Paper rule: fixed_raw (12% on the model's own chance, all leagues)"). A trade's
@@ -102,7 +103,7 @@ field existed read as `edge12`). The app lists Lean first (`portfolio.strategy_o
 The fits come from `soccer-stats fit-match-blends` (football-data and Understat only, no
 key, 0 credits): for each live league, the model's walk-forward chances from 2022/23
 (weekly refits on earlier matches only, goals-only for the Championship, League One and League Two) beside
-Pinnacle's own close (rows without a Pinnacle price are left out, not filled from the
+Pinnacle's own close (the Champions League: the cross-league model beside the Pinnacle closes bought on 13 Oct, `odds_history/UCL_closes.jsonl`) (rows without a Pinnacle price are left out, not filled from the
 market average), one fit on every match before the fit date, plus a walk-forward check
 (log loss of model, blend and Pinnacle). Run it from the Actions tab: *Backfill DraftKings
 odds* with `match_blends` ticked; only the default branch saves the file to `data-log`.

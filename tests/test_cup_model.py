@@ -173,6 +173,31 @@ def test_parse_events_reads_scores_neutral_and_the_90_minute_score():
     assert [e["id"] for e in cm.results(list(ev.values()))] == ["1", "2"]
 
 
+def goal(team, clock, **kw):
+    return {"scoringPlay": True, "team": {"id": f"id-{team}"}, "clock": {"displayValue": clock},
+            **kw}  # fmt: skip
+
+
+def test_extra_time_90_minute_score_from_goal_events_only_when_they_add_up():
+    def aet(details, score=(2, 1)):
+        e = espn_event(7, "2025-04-30T19:00Z", "Barcelona", "Internazionale", score, period=4,
+                       status="STATUS_FINAL_AET")  # fmt: skip
+        e["competitions"][0]["details"] = details
+        return cups.parse_events({"events": [e]})[0]
+
+    # 1-1 after 90 (stoppage time counts), Barcelona's 105th-minute goal is extra time;
+    # shootout kicks never count.
+    full = [goal("Barcelona", "12'"), goal("Internazionale", "90'+3'"),
+            goal("Barcelona", "105'"), goal("Barcelona", "", shootout=True)]  # fmt: skip
+    assert aet(full)["score90"] == [1, 1]
+    assert aet(full[:2])["score90"] is None  # the events miss a goal: not trusted
+    assert (
+        aet([goal("Barcelona", "12'"), goal("Nobody", "50'"), goal("Barcelona", "99'")])["score90"]
+        is None
+    )  # a team it can't place
+    assert aet(None)["score90"] is None
+
+
 # ---------- the Dixon-Coles options: unchanged by default ----------
 
 

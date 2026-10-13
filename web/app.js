@@ -237,7 +237,7 @@ function compareTable(fx, pick) {
   return `
     <div class="cmp num" role="table" aria-label="Win, draw and loss chances: model and bookmaker">
       <span></span><span class="h">Home</span><span class="h">Draw</span><span class="h">Away</span>
-      <span class="lbl">Model</span>${keys.map((k) => cell(k, fx.p[k], true)).join("")}
+      <span class="lbl">Model</span>${fx.no_model ? '<span class="none">No model chance</span>' : keys.map((k) => cell(k, fx.p[k], true)).join("")}
       <span class="lbl">${bookName()}</span>${
         imp.home != null ? keys.map((k) => cell(k, imp[k], false)).join("") : '<span class="none">Odds not out yet</span>'
       }
@@ -386,7 +386,30 @@ function blendWhyText(margin) {
   return `Tested on ${n ? `${n.toLocaleString()} ` : ""}past matches, the price already held what the model knows: the best mix gives the model ${weight}, so the blend sits right next to ${bookPoss()} chance. A bet only shows when the blend beats the price by more than ${bookPoss()} margin${margin ? ` (${pct(margin, 1)} here)` : ""}, which is rare. Few or no picks is the honest answer, not a fault.`;
 }
 
+// The match sheet for a card without a model chance: DraftKings' odds and the reason.
+function noModelHtml(fx) {
+  const { home, away, kickoff, odds: o } = fx;
+  const imp = o ? impliedFor(fx) : {};
+  const rows = [["home", `${esc(home)} win`], ["draw", "Draw"], ["away", `${esc(away)} win`]]
+    .map(([k, name]) => `<tr><td>${name}</td><td>${pct(imp[k])}</td><td>${price(o?.[k])}</td></tr>`).join("");
+  const when = new Date(kickoff).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const dk = isDK() ? "DK" : "Book";
+  return `
+    <div class="detail">
+      <p class="muted" style="margin:0;font-size:13px">${esc(when)} · ${esc(leagueName(fxLeague(fx)))}</p>
+      <h2 id="sheet-title">${esc(home)} v ${esc(away)}</h2>
+      <div class="explain">${esc(fx.no_model_reason || "No model chance for this match.")} No paper trade opens on it.</div>
+      ${teamNewsSection(fx)}
+      <div class="section-title">Markets</div>
+      <div class="card" style="padding:8px 14px">
+        <table class="mkts"><thead><tr><th></th><th>${dk}</th><th>Odds</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>
+      <p class="note">${dk} = ${bookPoss()} odds as a chance, margin removed.${o?.home == null ? ` No ${bookName()} odds yet: they're fetched from 48 hours before kickoff.` : ""}</p>
+    </div>`;
+}
+
 function detailHtml(fx) {
+  if (fx.no_model) return noModelHtml(fx);
   const { home, away, kickoff, xg, p, odds: o, top, matrix, lowData } = fx;
   const imp = o ? impliedFor(fx) : {};
   const hasOdds = o && Object.values(o).some((v) => v != null);
@@ -614,16 +637,19 @@ function closeSheet() {
 }
 
 // ---------- competitions (football-data league codes) ----------
-const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"]];
+const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"], ["UCL", "Champions League", "Champions Lg"]];
 const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
 // "the Premier League", "the Championship", "the Bundesliga", but "La Liga", "Serie A", "Ligue 1".
-const theLeague = (c) => (["E0", "E1", "E2", "E3", "D1"].includes(c) ? `the ${leagueName(c)}` : leagueName(c));
+const theLeague = (c) => (["E0", "E1", "E2", "E3", "D1", "UCL"].includes(c) ? `the ${leagueName(c)}` : leagueName(c));
 const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
 const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
 // Understat's xG covers these; elsewhere (the Championship) the model runs on goals only,
 // so a card's expected goals aren't labelled "xG".
 const XG_LEAGUES = new Set(["E0", "SP1", "D1", "I1", "F1"]);
 const xgLabel = (fx) => (XG_LEAGUES.has(fxLeague(fx)) ? "xG" : "exp. goals");
+// A card without a model chance (a Champions League club no football-data league covers,
+// or the cup's results still loading: publish's `no_model`) shows DraftKings' odds only.
+const xgText = (fx, i) => (fx.no_model || fx.xg?.[i] == null ? "" : `${fx.xg[i].toFixed(1)} ${xgLabel(fx)}`);
 const tLeague = (t) => t.league || "E0";
 // Competitions in the data: fixtures plus Moneyline's trades, in LEAGUES order.
 function leaguesPresent() {
@@ -949,8 +975,8 @@ function viewMatches() {
         <button class="card match" data-fixture="${idx}">
           <div class="match-head"><span>${esc(time)}${!lg && multiLeague() ? ` · ${esc(leagueName(fxLeague(fx)))}` : ""}</span><span>Details ›</span></div>
           <div class="teams">
-            <span>${esc(fx.home)}</span><span class="xg num">${fx.xg[0].toFixed(1)} ${xgLabel(fx)}</span>
-            <span>${esc(fx.away)}</span><span class="xg num">${fx.xg[1].toFixed(1)} ${xgLabel(fx)}</span>
+            <span>${esc(fx.home)}</span><span class="xg num">${xgText(fx, 0)}</span>
+            <span>${esc(fx.away)}</span><span class="xg num">${xgText(fx, 1)}</span>
           </div>
           ${compareTable(fx, pick)}
           ${newsLine(fx)}
@@ -958,7 +984,7 @@ function viewMatches() {
           ${lean ? leanBadges(fx, openTrades.get(tradeKey(fx.home, fx.away, "lean"))) : ""}
           ${pick ? `<span class="badge${lean ? " second" : ""}">${CHECK}${pickBadge(pick, openTrades.get(tradeKey(fx.home, fx.away, "edge12")))}: ${esc(PICK_LABEL[pick.market])} @ ${price(pick.odds)} <span class="num">(${signedPct(pick.edge)})</span></span>` : ""}
           ${!lean && openTrades.has(tradeKey(fx.home, fx.away, "edge12")) ? openBadge(openTrades.get(tradeKey(fx.home, fx.away, "edge12"))) : ""}
-          ${fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
+          ${fx.no_model ? '<div class="warn">No model chance: odds only</div>' : fx.low_data ? '<div class="warn">⚠ Few matches for one team</div>' : ""}
         </button>`;
     }
   }
@@ -1392,7 +1418,8 @@ function viewRatings() {
   if (state.teamsView === "players") return viewPlayers();
   const lg = teamsLeague();
   const block = teamsBlock(lg);
-  if (!block?.ratings?.length) return `${teamsToggle()}${teamsLeagueChips()}<div class="empty">No ratings for ${esc(theLeague(lg))} yet.</div>`;
+  const cupNote = state.league === "UCL" ? `<p class="note">The Champions League has no ratings table of its own: its clubs come from many leagues. This shows ${esc(theLeague(lg))}; pick a club's league to see its rating.</p>` : "";
+  if (!block?.ratings?.length) return `${teamsToggle()}${teamsLeagueChips()}${cupNote}<div class="empty">No ratings for ${esc(theLeague(lg))} yet.</div>`;
   const r = block.ratings;
   const maxNet = Math.max(...r.map((t) => Math.abs(t.goal_diff)), 0.01);
   const hasXg = r.some((t) => t.xg_for != null);
@@ -1409,7 +1436,7 @@ function viewRatings() {
   }).join("");
   return `
     ${teamsToggle()}
-    ${teamsLeagueChips()}
+    ${teamsLeagueChips()}${cupNote}
     <p class="note">Goals each team would score and concede per game against an average ${esc(leagueName(lg))} side on a neutral pitch. Recent matches count more.${hasXg ? " The xG line is this season's raw average." : XG_LEAGUES.has(lg) ? "" : ` ${esc(theLeague(lg).replace(/^the/, "The"))} has no xG data (Understat doesn't cover it), so these come from goals only.`}</p>
     <div class="card" style="margin-top:12px">
       <div class="rating-row head"><span></span><span>Team</span><span class="r">For</span><span class="r">Agst</span><span class="r">Net</span></div>

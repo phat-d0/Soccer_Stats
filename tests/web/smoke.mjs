@@ -108,6 +108,28 @@ const STEPS = [
     if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
     if (!text.includes("No Pinnacle price for this match yet") || !text.includes("fits less well in La Liga")) throw new Error("SP1 corners should be model only, with the weaker-fit note");
   }, true],
+  // The Champions League (owner, 13 Oct): goals-only model chances ("exp. goals"), and an
+  // odds-only card for a club no football-data league covers.
+  ["matches-league-ucl", async (p) => {
+    await closeSheet(p); await p.click('.chip[data-league="UCL"]');
+    const cards = await p.locator("button.match").allInnerTexts();
+    if (cards.length !== 2) throw new Error(`expected 2 Champions League cards, got ${cards.length}`);
+    if (!cards[0].includes("exp. goals") || cards[0].includes("xG")) throw new Error(`UCL model card: ${cards[0]}`);
+    if (!cards[1].includes("No model chance") || cards[1].includes("exp. goals")) throw new Error(`UCL odds-only card: ${cards[1]}`);
+  }],
+  ["match-sheet-ucl", async (p) => {
+    await p.click("button.match >> nth=0"); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    if (!text.includes("Arsenal v FC Porto") || !text.includes("Scorelines")) throw new Error("UCL model sheet");
+  }, true],
+  ["match-sheet-ucl-odds-only", async (p) => {
+    await closeSheet(p); await p.click("button.match >> nth=1"); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["FK Qarabag v Chelsea", "No model chance", "No paper trade opens", "Champions League"]) {
+      if (!text.includes(want)) throw new Error(`UCL odds-only sheet lacks "${want}"`);
+    }
+    if (text.includes("Scorelines")) throw new Error("UCL odds-only sheet shows model sections");
+  }, true],
   ["matches-league-all", async (p) => { await closeSheet(p); await p.click('.chip[data-league=""]'); }],
   // With Blend Lean on (portfolio.strategy_order has "lean"), Matches shows Lean only (owner,
   // 11 Oct): Lean picks and Lean paper trades; the 12% test's picks and trades are under

@@ -129,7 +129,9 @@ def test_estimate_credits_cli_leaves_the_cups_to_estimate_cups(monkeypatch, caps
     cli.cmd_estimate_credits(argparse.Namespace(month="2026-10"))
     out = capsys.readouterr().out
     assert not set(asked) & set(cups.CUPS)  # never looked for a football-data cup file
-    assert "UEFA cups (Champions League, Europa League, Conference League): off" in out
+    assert (
+        "UEFA cups (Champions League (live), Europa League, Conference League): not counted" in out
+    )
     assert "Champions League " not in out.split("UEFA cups")[0]
 
 

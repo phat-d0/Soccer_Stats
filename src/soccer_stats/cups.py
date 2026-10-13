@@ -308,12 +308,43 @@ def _first_two_halves(c: dict) -> int | None:
     return None if None in vals else sum(vals)
 
 
+def _minute(display) -> int | None:
+    """The match minute of a clock like "31'", "45'+2'", "90'+4'" or "105'"."""
+    m = re.match(r"\s*(\d+)", str(display or ""))
+    return int(m.group(1)) if m else None
+
+
+def _details_90(comp: dict, ids: tuple[str, str], final: tuple[int, int]) -> list[int] | None:
+    """[home, away] goals in the 90 minutes from the scoreboard's goal events
+    (`competitions[0].details`, scoringPlay, not the shootout): a goal at minute 90 or
+    earlier, stoppage time included ("90'+4'"), counts. Trusted only when every goal event
+    has a minute and a team, and all of them together give the final score exactly; None
+    otherwise (own goals, missing events or a changed shape can't then mislead)."""
+    details = comp.get("details")
+    if not isinstance(details, list):
+        return None
+    full, ninety = [0, 0], [0, 0]
+    for d in details:
+        if not isinstance(d, dict) or not d.get("scoringPlay") or d.get("shootout"):
+            continue
+        team = str((d.get("team") or {}).get("id", ""))
+        minute = _minute((d.get("clock") or {}).get("displayValue"))
+        if team not in ids or minute is None:
+            return None
+        side = ids.index(team)
+        full[side] += 1
+        if minute <= 90:
+            ninety[side] += 1
+    return ninety if tuple(full) == tuple(final) else None
+
+
 def parse_events(body: dict | None) -> list[dict]:
     """{id, kickoff, home, away, home_id, away_id, completed, stage} per event, plus the
     result fields the cup model and settlement read: `home_score`/`away_score` (ESPN's
     final score, extra time included; None before kickoff), `neutral` (ESPN's
     neutralSite), `extra_time` and `score90` ([home, away] after 90 minutes: the final
-    score without extra time, from the first two linescores after extra time, else None)."""
+    score without extra time, from the first two linescores after extra time, else from the
+    goal events when they add up to the final score (_details_90), else None)."""
     out = []
     events = (body or {}).get("events") if isinstance(body, dict) else None
     for e in events if isinstance(events, list) else []:
@@ -336,6 +367,9 @@ def parse_events(body: dict | None) -> list[dict]:
         else:
             h90, a90 = (_first_two_halves(sides.get(s, {})) for s in ("home", "away"))
             score90 = None if h90 is None or a90 is None else [h90, a90]
+            if score90 is None:  # no linescores: count the goal events instead
+                ids = (str(h.get("id", "")), str(a.get("id", "")))
+                score90 = _details_90(comp, ids, (hs, as_)) if all(ids) else None
         out.append(
             {
                 "id": str(e["id"]),

@@ -461,7 +461,7 @@ def evaluate(
     preds: pd.DataFrame,
     pinnacle: pd.DataFrame,
     draftkings: pd.DataFrame | None = None,
-    research_rows: int = 150,
+    research_rows: int = 100,
 ) -> dict:
     """The out-of-sample check, all on matches before each fit:
 
@@ -626,6 +626,15 @@ def blend_entry(
     uncovered = sorted(
         {e[s] for e in targets for s in ("home", "away") if mapping.get(e[s]) is None}
     )
+    # Finished matches left out because their 90-minute score is unknown (extra time).
+    unknown90 = [
+        f"{e['home']} v {e['away']} ({_naive(e['kickoff']):%Y-%m-%d})"
+        for e in euro
+        if e.get("slug") == SLUG
+        and season_of(e["kickoff"]) in set(seasons)
+        and e.get("completed")
+        and not e.get("score90")
+    ]
     clubs = sorted({e[s] for e in cur["events"] for s in ("home", "away")})
     out.update(
         {
@@ -634,6 +643,7 @@ def blend_entry(
             "min_rows": mc.MIN_ROWS,
             "coverage": cov,
             "no_model": uncovered,
+            "no_90_minute_score": unknown90,
             "evaluation": evaluate(preds, pin, dk),
             "current_clubs": {
                 "season": season_code(now_season),
@@ -670,6 +680,8 @@ def blend_report(entry: dict) -> list[str]:
         )
     if entry.get("no_model"):
         lines.append(f"  No model chance (not on football-data): {entry['no_model']}")
+    if entry.get("no_90_minute_score"):
+        lines.append(f"  Left out, no 90-minute score (extra time): {entry['no_90_minute_score']}")
     ev = entry.get("evaluation") or {}
     mp = ev.get("model_vs_pinnacle")
     if mp:
