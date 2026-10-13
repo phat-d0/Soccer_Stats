@@ -7,6 +7,7 @@ import requests
 from test_paper import KICKOFF, NOW, card, src
 
 from soccer_stats import data as fd
+from soccer_stats import espn_news as en
 from soccer_stats import leagues as lgs
 from soccer_stats import odds_feed as feed
 from soccer_stats import odds_log as ol
@@ -19,66 +20,280 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 # ---------- the registry ----------
 
 
-def test_registry_matches_the_loaders_and_six_leagues_are_live():
+def test_registry_matches_the_loaders_and_eight_leagues_are_live():
     assert set(lgs.LEAGUES) == {
         *("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"),
         *("UCL", "UEL", "UECL"),
     }
-    assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1"]  # primary first
+    # primary first; League One and League Two live from 13 Oct (owner)
+    assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"]
     for code, lg in lgs.LEAGUES.items():
         assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
         assert (code in fd.LEAGUES) != lg.cup  # football-data knows every division, no cup
         assert feed.SPORTS[code] == lg.odds_sport
     assert lgs.get("E0").odds_policy == "always"
-    assert {lgs.get(c).odds_policy for c in ("SP1", "D1", "I1", "F1", "E1")} == {"matchday"}
+    matchday = ("SP1", "D1", "I1", "F1", "E1", "E2", "E3")
+    assert {lgs.get(c).odds_policy for c in matchday} == {"matchday"}
     assert lgs.get("E1").understat is None and feed.SPORTS["E1"] == "soccer_efl_champ"
     assert feed.SPORTS["E0"] == "soccer_epl"  # the live path is unchanged
     assert lgs.name("XX") == "XX"
 
 
-# ---------- League One and League Two: registered off (owner's check, 11 Oct) ----------
+# ---------- League One and League Two: live from 13 Oct (owner) ----------
 
-OFF = ("E2", "E3")
+L12 = ("E2", "E3")
+CUPS = ("UCL", "UEL", "UECL")
+
+# Every 2026/27 club, as football-data's E2/E3 files spell them (odds-check run
+# 38447588309, `--names`), with The Odds API's events-list spelling (the same run; what
+# DraftKings' bulk odds use) and ESPN's eng.3/eng.4 spelling (run 38447592742).
+L12_CLUBS = {
+    "E2": {
+        "AFC Wimbledon": ("Wimbledon", "AFC Wimbledon"),
+        "Barnsley": ("Barnsley", "Barnsley"),
+        "Blackpool": ("Blackpool", "Blackpool"),
+        "Bradford": ("Bradford City", "Bradford City"),
+        "Bromley": ("Bromley FC", "Bromley"),
+        "Burton": ("Burton Albion", "Burton Albion"),
+        "Cambridge": ("Cambridge United", "Cambridge United"),
+        "Doncaster": ("Doncaster Rovers", "Doncaster Rovers"),
+        "Huddersfield": ("Huddersfield Town", "Huddersfield Town"),
+        "Leicester": ("Leicester City", "Leicester City"),
+        "Leyton Orient": ("Leyton Orient", "Leyton Orient"),
+        "Luton": ("Luton", "Luton Town"),
+        "Mansfield": ("Mansfield Town", "Mansfield Town"),
+        "Milton Keynes Dons": ("Milton Keynes Dons", "Milton Keynes Dons"),
+        "Notts County": ("Notts County", "Notts County"),
+        "Oxford": ("Oxford United", "Oxford United"),
+        "Peterboro": ("Peterborough United", "Peterborough United"),
+        "Plymouth": ("Plymouth Argyle", "Plymouth Argyle"),
+        "Reading": ("Reading", "Reading"),
+        "Sheffield Weds": ("Sheffield Wednesday", "Sheffield Wednesday"),
+        "Stevenage": ("Stevenage", "Stevenage"),
+        "Stockport": ("Stockport County FC", "Stockport County"),
+        "Wigan": ("Wigan Athletic", "Wigan Athletic"),
+        "Wycombe": ("Wycombe Wanderers", "Wycombe Wanderers"),
+    },
+    "E3": {
+        "Accrington": ("Accrington Stanley", "Accrington Stanley"),
+        "Barnet": ("Barnet", "Barnet"),
+        "Bristol Rvs": ("Bristol Rovers", "Bristol Rovers"),
+        "Cheltenham": ("Cheltenham Town", "Cheltenham Town"),
+        "Chesterfield": ("Chesterfield FC", "Chesterfield"),
+        "Colchester": ("Colchester United", "Colchester United"),
+        "Crawley Town": ("Crawley Town", "Crawley Town"),
+        "Crewe": ("Crewe Alexandra", "Crewe Alexandra"),
+        "Exeter": ("Exeter City", "Exeter City"),
+        "Fleetwood Town": ("Fleetwood Town", "Fleetwood Town"),
+        "Gillingham": ("Gillingham", "Gillingham"),
+        "Grimsby": ("Grimsby Town", "Grimsby Town"),
+        "Newport County": ("Newport County", "Newport County"),
+        "Northampton": ("Northampton Town", "Northampton Town"),
+        "Oldham": ("Oldham Athletic", "Oldham Athletic"),
+        "Port Vale": ("Port Vale", "Port Vale"),
+        "Rochdale": ("Rochdale", "Rochdale"),
+        "Rotherham": ("Rotherham United", "Rotherham United"),
+        "Salford": ("Salford City", "Salford City"),
+        "Shrewsbury": ("Shrewsbury Town", "Shrewsbury Town"),
+        "Swindon": ("Swindon Town", "Swindon Town"),
+        "Tranmere": ("Tranmere Rovers", "Tranmere Rovers"),
+        "Walsall": ("Walsall", "Walsall"),
+        "York": ("York City", "York City"),
+    },
+}
 
 
-def test_league_one_and_two_are_registered_off_and_goals_only():
+def test_league_one_and_two_are_live_goals_only_matchday_leagues():
     assert feed.SPORTS["E2"] == "soccer_england_league1"
     assert feed.SPORTS["E3"] == "soccer_england_league2"
-    for code in OFF:
+    for code in L12:
         lg = lgs.get(code)
-        assert not lg.live and lg.understat is None and lg.odds_policy == "matchday"
-        assert code not in lgs.live_codes()
+        assert lg.live and lg.understat is None and lg.odds_policy == "matchday"
+        assert code in lgs.live_codes() and code not in xg.LEAGUES  # goals-only fit
     assert lgs.name("E2") == "League One" and lgs.name("E3") == "League Two"
 
 
-def test_an_off_league_is_never_fetched_even_near_a_match(tmp_path, monkeypatch):
-    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
-    near = [T + pd.Timedelta(hours=2)]
-    for code in OFF:
+def test_league_one_and_two_fetch_only_near_a_match_into_their_own_cache(tmp_path, monkeypatch):
+    calls = []
+
+    class Resp:
+        ok, status_code, text = True, 200, "[]"
+        headers = {"x-requests-remaining": "20000", "x-requests-last": "1"}
+
+    monkeypatch.setattr(requests, "get", lambda url, **k: calls.append((url, k)) or Resp())
+    far = [T + pd.Timedelta(days=4)]
+    near = [T + pd.Timedelta(hours=30)]
+    for code, sport in (("E2", "soccer_england_league1"), ("E3", "soccer_england_league2")):
+        events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=far)
+        assert events is None and "48 hours" in status.error  # matchday rule: no call
+        n = len(calls)
         events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
-        assert events is None and "not live" in status.error
-    assert list(tmp_path.iterdir()) == []  # no cache file, no meta: nothing downloaded
+        assert len(calls) == n + 1 and sport in calls[-1][0] and events == []
+        assert calls[-1][1]["params"]["markets"] == "h2h"  # 1 credit, DraftKings only
+        assert calls[-1][1]["params"]["bookmakers"] == feed.BOOKMAKER
+        assert (tmp_path / f"odds_api_{code}_draftkings.json").exists()
 
 
-def test_off_leagues_stay_out_of_every_live_list_and_data_json():
+def test_league_one_and_two_keep_the_matchday_reserve(tmp_path, monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
+    _meta(tmp_path, "E0", T - pd.Timedelta(hours=1), 2_500)  # the shared key, nearly spent
+    near = [T + pd.Timedelta(hours=30)]
+    for code in L12:  # each last saw 20,000 a day ago; E0's balance is the freshest
+        _meta(tmp_path, code, T - pd.Timedelta(days=1), 20_000)
+        _, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
+        assert status.refresh_hours is None and "keeping 3000" in status.error
+
+
+def test_league_one_and_two_log_odds_to_their_own_files(tmp_path):
+    e2 = card(home="Peterboro", away="AFC Wimbledon")
+    e2["league"] = "E2"
+    e3 = card(home="Bristol Rvs", away="Walsall")
+    e3["league"] = "E3"
+    d = {
+        "fixtures": [e2, e3],
+        "odds_source": src(),
+        "odds_sources": {"E2": {"league": "E2", **src()}, "E3": {"league": "E3", **src()}},
+    }
+    rows = ol.rows_from_data(d, NOW)
+    assert {r["league"] for r in rows} == {"E2", "E3"}
+    ol.append(tmp_path, rows)
+    names = sorted(p.name for p in (tmp_path / "odds_log").iterdir())
+    assert names == ["E2_2026-10.jsonl", "E3_2026-10.jsonl"]
+    assert set(ol.load(tmp_path, "E2")["home"]) == {"Peterboro"}
+
+
+def test_league_one_and_two_make_no_corner_or_team_total_calls(tmp_path):
+    from soccer_stats import corners_live, team_totals
+
+    for code in L12:  # Pinnacle quotes no team corners there; FanDuel isn't listed
+        assert code not in corners_live.LEAGUES and code not in feed.TEAM_TOTAL_LEAGUES
+        assert code not in team_totals.TEAM_TOTAL_LEAGUES
+    kick = T + pd.Timedelta(hours=24)  # inside the 18-30 h look window
+    cards = []
+    for code, (h, a) in (("E2", ("Peterboro", "Wycombe")), ("E3", ("York", "Barnet"))):
+        c = card(home=h, away=a, kickoff=kick)
+        c["league"] = code
+        cards.append(c)
+    fail = lambda *a, **k: pytest.fail("no call for League One or Two")  # noqa: E731
+    s = team_totals.run(cards, tmp_path / "tt", raw_dir=tmp_path, api_key="k", now=T, get=fail)
+    assert s["calls"] == 0 and s["due"] == 0
+    s = corners_live.run(cards, tmp_path / "c", raw_dir=tmp_path, api_key="k", now=T, get=fail)
+    assert s["calls"] == 0
+
+
+def test_league_one_and_two_open_paper_trades_under_the_fixed_rule(tmp_path, monkeypatch):
+    monkeypatch.setattr(tr, "PAPER_RULE", "fixed_raw")
+    e2 = card(home="Peterboro", away="AFC Wimbledon")  # draw 0.24 x 5.0 = 20% edge
+    e2["league"] = "E2"
+    e3 = card(home="Bristol Rvs", away="Walsall")
+    e3["league"] = "E3"
+    d = {
+        "fixtures": [e2, e3],
+        "odds_source": src(),
+        "odds_sources": {"E0": src(), "E2": src(), "E3": src()},
+        "leagues": [{"code": c, "fixtures": int(c in L12)} for c in lgs.live_codes()],
+        "portfolio": {},
+    }
+    assert paper.leagues_in_play(d) == ["E0", "E2", "E3"]
+    assert paper.run(d, tmp_path, None, now=NOW) == 2
+    t2 = paper.load_ledger(tmp_path, "E2")["E2|2627|Peterboro|AFC Wimbledon"]
+    t3 = paper.load_ledger(tmp_path, "E3")["E3|2627|Bristol Rvs|Walsall"]
+    for t in (t2, t3):
+        assert t["market"] == "draw" and t["threshold"] == tr.PAPER_EDGE
+        assert t["rule"] == "fixed_raw" and t["p_source"] == "model"
+    assert (tmp_path / "paper_trades" / "E2_2627.jsonl").exists()
+    assert (tmp_path / "paper_trades" / "E3_2627.jsonl").exists()
+    rules = d["portfolio"]["rules"]
+    # No match_blends fit for them yet: no Lean sigma, so no Lean trades.
+    assert rules["E2"]["threshold"] == tr.PAPER_EDGE and rules["E2"]["sigma"] is None
+
+
+def test_every_league_one_and_two_club_maps_to_football_data_without_duplicates():
+    for clubs in L12_CLUBS.values():
+        known = set(clubs)
+        assert len(known) == 24
+        odds = [o for o, _ in clubs.values()]
+        espn = [e for _, e in clubs.values()]
+        for ours, (o, e) in clubs.items():
+            assert feed._team(o, known) == ours  # with the season's list (publish)
+            assert feed._team(o) == ours  # and from the map alone
+            assert en.team_name(e, known) == ours
+        espn_map = lambda n, known=known: en.team_name(n, known)  # noqa: E731
+        for names, mapper in ((odds, None), (espn, espn_map)):
+            c = feed.name_check(names, known, mapper)
+            assert c["unmatched"] == [] and c["clashes"] == {} and c["unseen"] == []
+
+
+def test_a_league_one_draftkings_match_joins_its_scheduled_card(monkeypatch):
+    """The three spellings `_team`'s word match can't find (Peterborough United,
+    Wimbledon, Bristol Rovers) still land on the schedule's card: no duplicate."""
+    from soccer_stats import publish
+
+    kick = T + pd.Timedelta(hours=30)
+
+    def event(home, away):
+        return {
+            "home_team": home,
+            "away_team": away,
+            "commence_time": kick.isoformat().replace("+00:00", "Z"),
+            "bookmakers": [
+                {
+                    "key": feed.BOOKMAKER,
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": home, "price": 2.2},
+                                {"name": "Draw", "price": 3.3},
+                                {"name": away, "price": 3.4},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    events = [event("Peterborough United", "Wimbledon"), event("Bristol Rovers", "York City")]
+    monkeypatch.setattr(publish, "fetch_odds", lambda *a, **k: (events, feed.OddsStatus()))
+    fixtures = pd.DataFrame(
+        {
+            "kickoff": [kick, kick],
+            "home": ["Peterboro", "Bristol Rvs"],
+            "away": ["AFC Wimbledon", "York"],
+        }
+    )
+    known = {"Peterboro", "AFC Wimbledon", "Bristol Rvs", "York"}
+    out, source = publish.with_draftkings(fixtures, "E2", known, now=T)
+    assert len(out) == 2 and source["unmatched"] == []
+    assert list(out["odds_home"]) == [2.2, 2.2]
+    cards = [{"league": "E2", **r} for r in out[["home", "away", "kickoff"]].to_dict("records")]
+    assert publish.duplicate_fixtures(cards) == []
+
+
+def test_off_leagues_stay_out_of_every_live_list_and_data_json(tmp_path, monkeypatch):
+    """Only the UEFA cups are registered off now: never fetched, built or listed."""
     from soccer_stats import corners_live, espn_news, team_totals
     from soccer_stats.publish import league_list
 
-    for code in OFF:
-        assert code not in corners_live.LEAGUES and code not in feed.TEAM_TOTAL_LEAGUES
+    assert [c for c, lg in lgs.LEAGUES.items() if not lg.live] == list(CUPS)
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
+    near = [T + pd.Timedelta(hours=2)]
+    for code in CUPS:
+        assert code not in lgs.live_codes() and code not in corners_live.LEAGUES
         assert code not in team_totals.TEAM_TOTAL_LEAGUES and code not in espn_news.SLUGS
+        events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
+        assert events is None and "not live" in status.error
+    assert list(tmp_path.iterdir()) == []  # no cache file, no meta: nothing downloaded
     fixtures = [{"league": "E0"}, {"league": "SP1"}]
     rows = league_list(fixtures, {})
-    # Every live league is listed as before (fixtures or not); the off ones are left out,
-    # so data.json, the app's chips and paper.leagues_in_play are unchanged.
+    # Every live league is listed (fixtures or not); the cups are left out.
     assert [r["code"] for r in rows] == lgs.live_codes()
-    assert {r["code"]: r["fixtures"] for r in rows}["D1"] == 0
+    assert {r["code"]: r for r in rows}["E2"]["name"] == "League One"
+    assert {r["code"]: r for r in rows}["E3"]["name"] == "League Two"
     assert paper.leagues_in_play({"leagues": rows, "fixtures": fixtures}) == ["E0", "SP1"]
-    # Only fixtures could bring one in (none are built while it is off).
-    assert "E2" in [r["code"] for r in league_list([{"league": "E2"}], {})]
 
 
-def test_estimate_credits_prices_off_leagues_under_the_matchday_rule():
+def test_estimate_credits_prices_league_one_under_the_matchday_rule():
     start, end = T.normalize(), T.normalize() + pd.Timedelta(days=7)
     assert feed.estimate_credits("E2", [], start, end)["credits"] == 0
     k = [start + pd.Timedelta(days=3, hours=15)]
@@ -87,7 +302,7 @@ def test_estimate_credits_prices_off_leagues_under_the_matchday_rule():
     assert e2["credits"] == e2["calls"]  # 1 credit a refresh (h2h only)
 
 
-def test_estimate_cli_lists_off_leagues_apart(monkeypatch, capsys):
+def test_estimate_cli_counts_league_one_and_two_as_live(monkeypatch, capsys):
     import argparse
 
     from soccer_stats import cli
@@ -104,23 +319,22 @@ def test_estimate_cli_lists_off_leagues_apart(monkeypatch, capsys):
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("no network"))
     cli.cmd_estimate_credits(argparse.Namespace(month="2026-10"))
     out = capsys.readouterr().out
-    assert "League One" in out and "League Two" in out and "off" in out
+    assert "League One" in out and "League Two" in out
     live = int(out.split("Live leagues now: ")[1].split()[0])
-    e2 = int(out.split("Not live (switching each on would add): E2 ")[1].split(",")[0])
-    assert e2 > 0 and live > 0
-    # The off leagues aren't in the live total: six live leagues' credits only.
+    # Every football-data league is live now: eight rows, all in the live total.
     rows = [ln.split() for ln in out.splitlines() if " calls " in ln]
     credits = [(r[r.index("credits") - 1], r) for r in rows]
-    assert len(rows) == 8
-    assert sum(int(c) for c, r in credits if "live" in r) == live
-    assert sum(int(c) for c, r in credits if "off" in r) == e2 + int(
-        out.split(", E3 ")[1].split(";")[0]
-    )
+    assert len(rows) == 8 and all("live" in r for _, r in credits)
+    assert sum(int(c) for c, _ in credits) == live > 0
+    assert "Not live" not in out
+    e2 = next(int(c) for c, r in credits if "One" in r)
+    assert e2 > 0
 
     cli.cmd_estimate_corners(argparse.Namespace(months="2026-10", extra_leagues="E2,E3"))
     out = capsys.readouterr().out
-    assert "not live, E2: 4 matches" in out and "not live, E3: 4 matches" in out
-    assert "Not live, average a month (would add): E2 8, E3 8" in out
+    assert "not in the corner test, E2: 4 matches" in out
+    assert "not in the corner test, E3: 4 matches" in out
+    assert "Not in the corner test, average a month (would add): E2 8, E3 8" in out
     assert "E2" not in out.split("Oct 2026:")[1].split("\n")[0]  # not in the live total
 
 

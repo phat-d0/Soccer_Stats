@@ -288,6 +288,10 @@ def run(
         r["events"], r["upcoming"] = len(evs or []), len(upcoming)
         if is_check(lg):  # free: every listed kickoff (the cups' cost estimate reads them)
             r["kickoffs"] = [e["commence_time"] for e in upcoming]
+            # ...and every team name, as DraftKings' bulk odds will spell it (--names).
+            r["teams"] = sorted(
+                {e.get("home_team") for e in evs or []} | {e.get("away_team") for e in evs or []}
+            )
         if not upcoming:
             r["note"] = "no upcoming events"
             continue
@@ -388,6 +392,36 @@ def football_data_coverage(leagues, seasons=(2025, 2026), raw_dir=None, download
     return out
 
 
+def football_data_teams(league: str, year: int, raw_dir=None, download=None) -> set[str]:
+    """Every club in football-data's file for a league and season (home or away): the
+    names publish's `_season_teams` knows a league by."""
+    from soccer_stats import data as fd
+
+    download = download or fd.download
+    kw = {"raw_dir": raw_dir} if raw_dir is not None else {}
+    raw = pd.read_csv(download(league, year, **kw), encoding="latin-1")
+    return {str(t).strip() for t in pd.concat([raw["HomeTeam"], raw["AwayTeam"]]).dropna()}
+
+
+def name_checks(res: dict, year: int, raw_dir=None, download=None) -> dict:
+    """Per probed league: the events list's team names against football-data's clubs for
+    `year` (odds_feed.name_check): which map, which would duplicate a card, which of our
+    clubs no listed event reached (free; no extra API calls)."""
+    from soccer_stats.odds_feed import name_check
+
+    out: dict = {}
+    for lg, r in res.get("leagues", {}).items():
+        if "teams" not in r:
+            continue
+        try:
+            known = football_data_teams(lg, year, raw_dir=raw_dir, download=download)
+        except Exception as exc:  # noqa: BLE001  not posted yet, or unreachable
+            out[lg] = {"error": type(exc).__name__}
+            continue
+        out[lg] = {"football_data": sorted(known), **name_check(r["teams"], known)}
+    return out
+
+
 def report(res: dict) -> str:
     lines = [
         f"== Live market probe: cap {res['cap']}, spent {res['spent']}, credits before "
@@ -427,6 +461,21 @@ def report(res: dict) -> str:
                 f"early {c['pinnacle_early']:.0%}, close {c['pinnacle_close']:.0%}"
             )
         )
+    for lg, c in (res.get("names") or {}).items():
+        if "error" in c:
+            lines.append(f"NAMES {lg}: football-data file unavailable ({c['error']})")
+            continue
+        lines.append(
+            f"NAMES {lg}: football-data clubs ({len(c['football_data'])}): "
+            + ", ".join(c["football_data"])
+        )
+        for n, t in c["mapped"].items():
+            flag = "  <- NOT A FOOTBALL-DATA CLUB" if n in c["unmatched"] else ""
+            lines.append(f"  odds api {n!r} -> {t!r}{flag}")
+        lines.append(
+            f"  unmatched {len(c['unmatched'])}: {c['unmatched']}; clashes {c['clashes']}; "
+            f"no event listed for {c['unseen']}"
+        )
     lines += ["Log:", *[f"  {x}" for x in res["log"]]]
     return "\n".join(lines)
 
@@ -456,11 +505,20 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument(
         "--coverage", action="store_true", help="football-data HC/AC and Pinnacle coverage"
     )
+    ap.add_argument(
+        "--names",
+        action="store_true",
+        help="events' team names vs football-data's clubs this season (free)",
+    )
     args = ap.parse_args(argv)
     leagues = parse_leagues(args.leagues)
     res = run(args.cap, leagues=leagues, out_dir=Path(args.bodies) if args.cap > 0 else None)
     if args.coverage:
         res["coverage"] = football_data_coverage(leagues)
+    if args.names:
+        from soccer_stats.data import current_season
+
+        res["names"] = name_checks(res, current_season())
     print(report(res))
     text = json.dumps(res, default=str)
     if args.json:

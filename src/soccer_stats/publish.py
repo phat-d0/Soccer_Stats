@@ -953,7 +953,7 @@ def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
 def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
     """The registry's live leagues (plus any league with fixtures in this build) for
     data.json: code, name, live flag, fixtures, odds source. A league registered off and
-    without fixtures (League One and League Two, priced only: docs/leagues.md) is left
+    without fixtures (the UEFA cups, priced only: docs/leagues.md) is left
     out, so registering one changes nothing in the build or the app."""
     rows = []
     for code, lg in lgs.LEAGUES.items():
