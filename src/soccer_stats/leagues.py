@@ -11,8 +11,10 @@ switches:
   are live: the Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and the
   Championship (owner, 8 Oct 2026), plus League One and League Two (E2, E3; owner, 13 Oct
   2026, after the 11 Oct check: DraftKings h2h only, no team corners or team totals
-  there). The three UEFA cups (UCL, UEL, UECL; cost estimate, 12 Oct 2026) are
-  registered off: priced and probed only, never fetched or built. The Odds API
+  there), and the Champions League (UCL; owner, 13 Oct 2026: fixtures and results from
+  ESPN, model chances from the cross-league fit in cup_model.py). The Europa League and
+  Conference League (UEL, UECL; cost estimate, 12 Oct 2026) are registered off: priced
+  and probed only, never fetched or built. The Odds API
   key is shared with the baseball app, so each league costs credits; the Premier League
   budgets first, and the others pause below odds_feed.MATCHDAY_RESERVE_CREDITS
   (docs/leagues.md).
@@ -61,12 +63,16 @@ LEAGUES: dict[str, League] = {
         # (corners_live.LEAGUES) or team totals (odds_feed.TEAM_TOTAL_LEAGUES) there.
         League("E2", "League One", None, "soccer_england_league1", live=True),
         League("E3", "League Two", None, "soccer_england_league2", live=True),
-        # The three UEFA cups: off, a cost estimate only (owner's request, 12 Oct;
-        # docs/leagues.md "European cups"). football-data has no cup files, so their
-        # calendar comes from ESPN (cups.py); estimate-credits leaves them to estimate-cups.
-        # A league that isn't live is never fetched, built, logged or listed in data.json
-        # (publish.league_list).
-        League("UCL", "Champions League", None, "soccer_uefa_champs_league", cup=True),
+        # The Champions League: live from 13 Oct (owner; docs/leagues.md "Champions League
+        # live"). football-data has no cup files: fixtures and results come from ESPN's
+        # uefa.champions scoreboard, model chances from the cross-league fit (cup_model.py),
+        # DraftKings h2h on the main key (league phase and knockouts), matchday odds policy.
+        # No team corners or team totals.
+        League("UCL", "Champions League", None, "soccer_uefa_champs_league", live=True, cup=True),
+        # The Europa League and Conference League: off, a cost estimate only (owner's
+        # request, 12 Oct; docs/leagues.md "European cups"); estimate-credits leaves the
+        # cups to estimate-cups. A league that isn't live is never fetched, built, logged
+        # or listed in data.json (publish.league_list).
         League("UEL", "Europa League", None, "soccer_uefa_europa_league", cup=True),
         League("UECL", "Conference League", None, "soccer_uefa_europa_conference_league", cup=True),
     )

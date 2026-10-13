@@ -238,21 +238,37 @@ def _cache_path(raw_dir: Path, slug: str, day: str) -> Path:
 
 
 def scoreboard_day(
-    slug: str, day: str, raw_dir: Path, get: Callable, stats: dict, today: pd.Timestamp
+    slug: str,
+    day: str,
+    raw_dir: Path,
+    get: Callable,
+    stats: dict,
+    today: pd.Timestamp,
+    ttl_minutes: float = 0,
 ) -> dict | None:
     """ESPN's scoreboard for one date (YYYYMMDD). Days at least two days past are final
-    and cached for good; nearer days are always asked again."""
+    and cached for good; nearer days are asked again, or with `ttl_minutes` reused from a
+    short-lived copy (`<slug>_<day>.recent.json`) that young (the live cup's publish runs:
+    kickoff times and results can wait that long)."""
     path = _cache_path(raw_dir, slug, day)
     final = pd.Timestamp(day, tz="UTC") < today.normalize() - pd.Timedelta(days=1)
+    recent = path.with_suffix(".recent.json")
     if final and path.exists():
         try:
             return json.loads(path.read_text())
         except (OSError, ValueError):
             pass
+    if not final and ttl_minutes > 0 and recent.exists():
+        try:
+            if time.time() - recent.stat().st_mtime < ttl_minutes * 60:
+                return json.loads(recent.read_text())
+        except (OSError, ValueError):
+            pass
     body = _get_json(ESPN.format(slug=slug) + "/scoreboard", {"dates": day}, get, stats)
-    if body is not None and final:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(body))
+    if body is not None and (final or ttl_minutes > 0):
+        target = path if final else recent
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(body))
     return body
 
 
@@ -278,8 +294,73 @@ def calendar_days(body: dict | None) -> list[str]:
     return out
 
 
+def _goals(value) -> int | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(v) if v >= 0 and v == int(v) else None
+
+
+def _extra_time(e: dict) -> bool:
+    """True when ESPN's status says the match went past 90 minutes (extra time, or
+    penalties): a period after the second half, or AET / pens in the status name."""
+    st = e.get("status") or {}
+    typ = st.get("type") or {}
+    text = " ".join(str(typ.get(k) or "") for k in ("name", "detail", "shortDetail")).upper()
+    try:
+        period = int(st.get("period") or 0)
+    except (TypeError, ValueError):
+        period = 0
+    return period > 2 or "AET" in text or "PEN" in text or "EXTRA" in text
+
+
+def _first_two_halves(c: dict) -> int | None:
+    """Goals in the first two linescores (the 90 minutes), when ESPN lists them."""
+    ls = c.get("linescores")
+    if not isinstance(ls, list) or len(ls) < 2:
+        return None
+    vals = [_goals(x.get("value") if isinstance(x, dict) else None) for x in ls[:2]]
+    return None if None in vals else sum(vals)
+
+
+def _minute(display) -> int | None:
+    """The match minute of a clock like "31'", "45'+2'", "90'+4'" or "105'"."""
+    m = re.match(r"\s*(\d+)", str(display or ""))
+    return int(m.group(1)) if m else None
+
+
+def _details_90(comp: dict, ids: tuple[str, str], final: tuple[int, int]) -> list[int] | None:
+    """[home, away] goals in the 90 minutes from the scoreboard's goal events
+    (`competitions[0].details`, scoringPlay, not the shootout): a goal at minute 90 or
+    earlier, stoppage time included ("90'+4'"), counts. Trusted only when every goal event
+    has a minute and a team, and all of them together give the final score exactly; None
+    otherwise (own goals, missing events or a changed shape can't then mislead)."""
+    details = comp.get("details")
+    if not isinstance(details, list):
+        return None
+    full, ninety = [0, 0], [0, 0]
+    for d in details:
+        if not isinstance(d, dict) or not d.get("scoringPlay") or d.get("shootout"):
+            continue
+        team = str((d.get("team") or {}).get("id", ""))
+        minute = _minute((d.get("clock") or {}).get("displayValue"))
+        if team not in ids or minute is None:
+            return None
+        side = ids.index(team)
+        full[side] += 1
+        if minute <= 90:
+            ninety[side] += 1
+    return ninety if tuple(full) == tuple(final) else None
+
+
 def parse_events(body: dict | None) -> list[dict]:
-    """{id, kickoff, home, away, home_id, away_id, completed, stage} per event."""
+    """{id, kickoff, home, away, home_id, away_id, completed, stage} per event, plus the
+    result fields the cup model and settlement read: `home_score`/`away_score` (ESPN's
+    final score, extra time included; None before kickoff), `neutral` (ESPN's
+    neutralSite), `extra_time` and `score90` ([home, away] after 90 minutes: the final
+    score without extra time, from the first two linescores after extra time, else from the
+    goal events when they add up to the final score (_details_90), else None)."""
     out = []
     events = (body or {}).get("events") if isinstance(body, dict) else None
     for e in events if isinstance(events, list) else []:
@@ -292,6 +373,19 @@ def parse_events(body: dict | None) -> list[dict]:
         if not (e.get("id") and e.get("date") and h.get("displayName") and a.get("displayName")):
             continue
         status = ((e.get("status") or {}).get("type") or {}).get("completed")
+        hs = _goals(sides.get("home", {}).get("score"))
+        as_ = _goals(sides.get("away", {}).get("score"))
+        extra = bool(status) and _extra_time(e)
+        if not status or hs is None or as_ is None:
+            score90 = None
+        elif not extra:
+            score90 = [hs, as_]
+        else:
+            h90, a90 = (_first_two_halves(sides.get(s, {})) for s in ("home", "away"))
+            score90 = None if h90 is None or a90 is None else [h90, a90]
+            if score90 is None:  # no linescores: count the goal events instead
+                ids = (str(h.get("id", "")), str(a.get("id", "")))
+                score90 = _details_90(comp, ids, (hs, as_)) if all(ids) else None
         out.append(
             {
                 "id": str(e["id"]),
@@ -302,6 +396,11 @@ def parse_events(body: dict | None) -> list[dict]:
                 "away_id": str(a.get("id", "")),
                 "completed": bool(status),
                 "stage": (e.get("season") or {}).get("slug"),
+                "home_score": hs if status else None,
+                "away_score": as_ if status else None,
+                "neutral": bool(comp.get("neutralSite")),
+                "extra_time": extra,
+                "score90": score90,
             }
         )
     return out
@@ -321,8 +420,15 @@ def season_calendar(
     get: Callable = requests.get,
     every_day: bool = False,
     today: pd.Timestamp | None = None,
+    stats: dict | None = None,
+    ttl_minutes: float = 0,
 ) -> dict:
     """Every ESPN event for `slug` kicking off in [start, end), deduplicated by id.
+    `ttl_minutes` lets days not yet final come from a copy that young (scoreboard_day).
+
+    `stats` (optional) is shared between calls, so a caller can bound a whole run: once
+    stats["failures"] reaches MAX_FAILURES no further request is made (cached days still
+    read). The `requests`/`failures` returned are then the shared totals.
 
     Seeds one call on the 1st of each month, then asks each day ESPN's calendar lists
     within the window. With `every_day`, or when no answer's calendar lists a day in the
@@ -330,7 +436,7 @@ def season_calendar(
     that never answers stops after its seeds. Returns {slug, events, requests, failures,
     mode, days, calendar_sample}."""
     today = today or pd.Timestamp.now(tz="UTC")
-    stats: dict = {}
+    stats = {} if stats is None else stats
     window = set(_all_days(start, end))
     if every_day:
         todo, mode = sorted(window), "every day"
@@ -346,7 +452,7 @@ def season_calendar(
         if day in done:
             continue
         done.add(day)
-        body = scoreboard_day(slug, day, raw_dir, get, stats, today)
+        body = scoreboard_day(slug, day, raw_dir, get, stats, today, ttl_minutes)
         answered = answered or body is not None
         for e in parse_events(body):
             events[e["id"]] = e

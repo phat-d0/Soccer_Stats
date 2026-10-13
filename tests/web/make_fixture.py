@@ -341,6 +341,7 @@ def build(src: Path, out: Path) -> dict:
     add_markets_research(data)
     add_corners(data)
     add_lean_strategy(data)
+    add_champions_league(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
     lb = (data["portfolio"].get("strategy_backtests") or {}).get("lean") or {}
@@ -1159,6 +1160,64 @@ def add_second_league(data: dict) -> None:
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     data["portfolio"]["portfolios"] = paper.portfolios_section(
         live, live_trades, backtests, ml["live"].get("rule")
+    )
+
+
+# The Champions League (owner, 13 Oct): one card with a model chance from the real
+# cross-league fit (cup_model, on a small synthetic Europe through publish.fixture_cards)
+# and one odds-only card for a club no football-data league covers (cup_model.no_model_card).
+UCL_CLUBS = {"E0": ["Arsenal", "Chelsea", "Leeds", "Burnley"],
+             "P1": ["Benfica", "Porto", "Braga", "Arouca"]}  # fmt: skip
+
+
+def add_champions_league(data: dict) -> None:
+    from soccer_stats import cup_model as cm
+    from soccer_stats.publish import fixture_cards, implied_probs
+
+    rng = np.random.default_rng(13)
+    rows = []
+    for d in pd.date_range("2025-08-02", "2026-10-04", freq="7D"):
+        for code, clubs in UCL_CLUBS.items():
+            perm = rng.permutation(clubs)
+            for h, a in ((perm[0], perm[1]), (perm[2], perm[3])):
+                rows.append({"league": code, "date": d, "home": h, "away": a,
+                             "home_goals": int(rng.poisson(1.5)),
+                             "away_goals": int(rng.poisson(1.1))})  # fmt: skip
+    dom = pd.DataFrame(rows)
+    euro = [
+        {"id": str(i), "kickoff": pd.Timestamp(d, tz="UTC"), "home": h, "away": a,
+         "home_id": h, "away_id": a, "completed": True, "score90": [2, 1], "cup": "UCL"}
+        for i, (d, h, a) in enumerate([("2025-10-21 19:00", "Arsenal", "Benfica"),
+                                       ("2025-11-05 20:00", "FC Porto", "Chelsea"),
+                                       ("2026-02-18 20:00", "Benfica", "Leeds United")])
+    ]  # fmt: skip
+    mapping = cm.team_map([e[s] for e in euro for s in ("home", "away")] + ["FC Porto"],
+                          cm.teams_by_league(dom))  # fmt: skip
+    model = cm.fit(cm.fit_matches(dom, euro, mapping), NOW)
+    k = pd.Timestamp("2026-10-21T16:45:00Z")  # after every other card: indexes unchanged
+    keys = {"Arsenal": mapping["Arsenal"], "FC Porto": mapping["FC Porto"]}
+    row = {"kickoff": k, "home": "Arsenal", "away": "FC Porto", "odds_home": 1.53,
+           "odds_draw": 4.3, "odds_away": 6.2, "odds_over25": np.nan, "odds_under25": np.nan,
+           "odds_updated": (NOW - pd.Timedelta(minutes=30)).isoformat()}  # fmt: skip
+    card = fixture_cards(cm.Named(model, keys), pd.DataFrame([row]),
+                         pd.Series({"Arsenal": 60, "FC Porto": 58}), league="UCL")[0]  # fmt: skip
+    plain = {"id": "u2", "kickoff": k + pd.Timedelta(hours=2, minutes=15), "home": "FK Qarabag",
+             "away": "Chelsea"}  # fmt: skip
+    odds = {"odds_home": 6.0, "odds_draw": 4.4, "odds_away": 1.5}
+    why = ("No model chance: FK Qarabag is not in the football-data leagues the model rates, "
+           "so this match shows DraftKings' odds only.")  # fmt: skip
+    extra = {"players": [], "team_totals": None, "team_news": None, "p_bet": None, "z": None,
+             "z_market": None, "lean_pick": None}  # fmt: skip
+    cards = [{**card, **extra}, {**cm.no_model_card(plain, odds, why, implied_probs), **extra}]
+    data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])
+    data["leagues"].append(
+        {
+            "code": "UCL",
+            "name": "Champions League",
+            "live": True,
+            "fixtures": 2,
+            "odds": "DraftKings",
+        }  # fmt: skip
     )
 
 

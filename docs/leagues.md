@@ -135,6 +135,162 @@ Ways to spend less, if needed (none are built yet):
   model (the research lab's round-5 bake-off also used goals only for E1). Its upcoming
   fixtures come from football-data's fixtures file, which covers about the next week.
 
+## Champions League live (13 Oct, owner)
+
+Owner's decision (13 Oct): switch the Champions League on, with both match paper
+strategies (Blend Lean and the Model 12% test). The Europa League and Conference League
+stay off. `leagues.py`: `UCL` is `live=True`, `cup=True`, "matchday" odds policy,
+DraftKings h2h on The Odds API's main key `soccer_uefa_champs_league` (league phase and
+knockouts; the qualifying rounds are another key and aren't fetched).
+
+### The model: one fit across Europe's leagues
+
+The domestic fits rate clubs only against their own league, so they can't price Arsenal
+against Benfica. `cup_model.py` fits one goals-only Dixon-Coles model (the same model as
+the domestic leagues, with time decay) over:
+
+- the domestic matches of the leagues Champions League clubs come from: football-data's
+  top divisions (England, Spain, Germany, Italy, France, Scotland, the Netherlands,
+  Belgium, Portugal, Turkey, Greece) and its European "extra leagues" (Austria,
+  Switzerland, Denmark, Norway, Sweden, Poland, Romania, Finland, Ireland). Every club's
+  name carries its league code ("P1:Benfica"), so two clubs with the same name in
+  different countries never merge;
+- every finished match of the three UEFA cups, qualifying rounds included, from ESPN's
+  free scoreboards. A club football-data doesn't cover keeps its own name (by ESPN id), so
+  its matches still link the leagues it plays.
+
+Within a league, clubs are tied together by their domestic matches; how strong one
+league is against another is set only by its clubs' European results. Only the 730 days
+before the prediction time are used, older matches count less (the domestic decay), a
+small ridge keeps a club with a handful of matches finite, and the final (a neutral venue)
+gets no home advantage. Extra-time matches count with their 90-minute score: from ESPN's
+linescores, else from its goal events, trusted only when every goal has a minute and a
+team and they add up to the final score (all seven extra-time knockout matches of 2024/25
+and 2025/26 were recovered this way). One fit takes about 1.5 s on about 23,000 domestic
+and 4,000 European matches.
+
+**No look-ahead.** Every fit uses matches played before its own time only (domestic by
+date, European by kickoff). The evaluation refits every Monday 00:00 UTC and predicts
+that week's matches; tests check that the fit's last match is before its time and that
+rewriting later results changes no prediction.
+
+**Clubs without a model chance.** A club no football-data league covers gets no model
+chance: its cards show DraftKings' odds only (`no_model`, `low_data`, so no paper trade of
+either strategy opens), the match sheet says why, and the publish log lists the clubs.
+2026/27 league phase (ESPN's calendar, run 38457777910): 32 of 36 clubs covered; no model
+chance for Sabah (Azerbaijan), Shakhtar Donetsk (Ukraine), Slavia Prague (Czechia) and
+Slovan Bratislava (Slovakia). In 2024/25 and 2025/26 the uncovered clubs were Dinamo
+Zagreb, FK Qarabag, Kairat Almaty, Pafos, Red Star Belgrade, Shakhtar Donetsk, Slavia
+Prague, Slovan Bratislava and Sparta Prague.
+
+### Evaluation (walk-forward, against the bought closes)
+
+`backfill.yml` run 38457777910 (`match_blends`, from the PR branch, printed only, no key,
+0 credits). Every 2024/25 and 2025/26 Champions League match (378), the model's chance from
+the Monday fit before it, beside Pinnacle's close bought on 13 Oct
+(`odds_history/UCL_closes.jsonl`, run 38452265319). 307 matches have a model chance, 372 a
+Pinnacle close, 302 both. Log loss (lower is better):
+
+| Matches | Model | Pinnacle close | DraftKings close |
+| --- | --- | --- | --- |
+| All, 302 | 0.9537 | 0.9449 | |
+| 2024/25, 145 | 0.9680 | 0.9524 | |
+| 2025/26, 157 | 0.9404 | 0.9381 | |
+| With DraftKings' close too, 290 | 0.9606 | 0.9528 | 0.9509 |
+
+The model trails Pinnacle's close, as it does in every domestic league (by 0.009 here;
+0.013 to 0.027 in the domestic fits). It is closer in 2025/26, when it had a full season
+of the new format behind it. DraftKings' close is as sharp as Pinnacle's on these matches.
+
+**Blend check, evaluation only (not used live):** a blend fitted on 2024/25's 145 rows and
+scored on 2025/26's 157: model 0.9404, blend 0.9337, Pinnacle 0.9381. One season of 157
+matches is far too few to call that a gain.
+
+### The Blend Lean fit
+
+`fit-match-blends` gains a Champions League entry: `match_calibration.league_fit` on the
+model's walk-forward chances beside Pinnacle's bought close, its 300-match minimum
+unchanged. **302 fit rows** (145 + 157), just over the minimum. The first run had 295,
+because the seven extra-time matches had no 90-minute score; recovering their scores from
+ESPN's goal events (not lowering the guard) brought it to 302. Fit (run 38457777910, fit
+date 13 Oct): coef [a_draw −0.516, a_away −0.065, b 0.745, c 0.093], σ 0.0475, matches
+18 Sep 2024 to 30 May 2026.
+
+Read it with care:
+- **b = 0.745 is below 1**: the blend pulls Pinnacle's price toward even (long shots up,
+  favourites down), the opposite of La Liga, the Bundesliga, Serie A and Ligue 1
+  (b 1.07–1.52). The model's weight c is small (0.09).
+- **σ is 4.75 points**, 1.6 to 7.5 times the domestic leagues' (0.6–3.1), so a Lean pick
+  needs the blend 4.75 points above DraftKings' break-even. Expect few Lean picks, mostly
+  on outsiders.
+- `league_fit`'s own walk-forward check covers **1 match** (the rows reach 300 only before
+  the final), so it says nothing. The season split above is the only out-of-sample look.
+- The rows won't grow by themselves: live runs log DraftKings, not Pinnacle. A refit
+  each month changes nothing until more Pinnacle closes are bought.
+- If the lead or owner prefers not to trade on a 302-row fit, the lowest sound option is
+  to leave the UCL entry out of `match_blends.json` (no Lean picks, the 12% test runs);
+  lowering the 300-row guard is not proposed.
+
+**Lean backtest: left out.** `backtest-lean` replays Lean on Pinnacle's early price and
+scores CLV against the close. The bought prices are closes only, so a replay could only
+bet at the close and its CLV would be zero by construction. `backtest-lean` skips the
+cup (its default leagues are the live non-cup ones).
+
+### What runs live
+
+- **Fixtures** from ESPN's `uefa.champions` scoreboard for the next 14 days (football-data
+  has no cup files), placeholder knockout ties ("TBD", "Winner ...") skipped. Cards carry
+  ESPN's team names.
+- **DraftKings h2h** under the matchday rule (nothing without a kickoff within 48 hours,
+  then every 3 hours, hourly from 6 hours out, every 30 minutes in the last 2 hours; pause
+  below the shared 3,000-credit reserve). The Odds API's names pair with ESPN's by kickoff
+  (within 3 hours) and names (`cup_odds.pair_events` and its aliases, seven added from the
+  bought closes, and Qarabag's corrected to ESPN's "FK Qarabag"). An event that pairs with
+  no fixture is listed in the log ("odds events unmatched").
+- **Model chances** from one fit at publish time. The fit needs every European result in
+  its window: ESPN days at least two days old are cached for good, nearer ones for 30
+  minutes, and one run's cup requests stop after 90 seconds or 3 failed requests
+  (`cup_model.Budget`). Until the history is complete, every card shows odds only and says
+  the results are still loading. `backfill.yml` `match_blends` saves the ESPN days to the
+  `cup-espn-*` cache and `publish.yml` restores it, so the first live runs start warm.
+- **Both paper strategies** under the existing rules: the Model 12% test on the raw
+  model's chance (`trades.PAPER_RULE = "fixed_raw"`), and Blend Lean once
+  `backtest/match_blends.json` has the UCL entry. Ledger `paper_trades/UCL_<season>.jsonl`,
+  odds log `odds_log/UCL_<YYYY-MM>.jsonl` (so `closes.yml` sees the kickoffs).
+- **Settlement** on ESPN's 90-minute score (`cup_model.cup_results`; `soccer-stats paper`
+  never asks football-data for the cup). An extra-time match without a 90-minute score
+  waits and voids after 14 days, as any match without a result.
+- **ESPN team news** (free): slug `uefa.champions`; the cards' names are ESPN's own, so
+  they match as they are.
+- **Not there:** no team corners (`corners_live.LEAGUES`) and no team totals
+  (`TEAM_TOTAL_LEAGUES`) for the Champions League (test). No Teams tab block (its clubs
+  come from many leagues; the tab says so). The Europa League and Conference League stay
+  off.
+
+### Cost
+
+`backfill.yml` run 38455236172 (`estimate_month` 2026-10,2026-11,2026-12 with `cups`,
+`cup_seasons` 2026; no key): ESPN's 2026/27 Champions League calendar under the matchday
+rule at 1 credit a refresh: **Oct 86, Nov 86, Dec 43 credits** (Sep 60, Jan 65; league
+phase 144 matches, 340 credits; the knockouts aren't on the calendar yet, so a full season
+is about 680, as the 12 Oct estimate said). The other eight leagues' DraftKings refreshes in
+the same run: Oct 2,402, Nov 1,569, Dec 1,662. All live spend goes from about 3,540 to about
+3,630 a month. The fit and ESPN cost nothing.
+
+### Checks after the merge
+
+1. Dispatch `backfill.yml` on `claude/soccer-stats-scaffold` with `match_blends` ticked
+   (other inputs default; no key, 0 credits, about 4 minutes). From the default branch it
+   writes `backtest/match_blends.json` with the UCL entry to data-log and saves the ESPN
+   days to the `cup-espn-*` cache.
+2. Then dispatch `publish.yml`. Its log should show "Champions League: European results
+   ... matches (N ESPN requests); M of K fixtures with a model chance; no model chance for
+   ..." (no "incomplete"), "Match blends: ... Champions League sigma 0.0475 (302 matches)",
+   and, once a kickoff is within 48 hours, "Champions League: K fixtures, odds DraftKings".
+3. On a matchday: the first `UCL|2627|...` trades in `paper_trades/UCL_2627.jsonl`, rows in
+   `odds_log/UCL_2026-10.jsonl`, no "odds events unmatched" for the Champions League, and
+   settlement after the matches.
+
 ## League One and League Two live (13 Oct, owner)
 
 Owner's decision (13 Oct, lead session), after the check below: "Switch them on please."

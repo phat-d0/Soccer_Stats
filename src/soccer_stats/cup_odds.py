@@ -95,8 +95,19 @@ ODDS_TO_ESPN: dict[str, str] = {
     "Ajax": "Ajax Amsterdam",
     "Bodø/Glimt": "Bodo/Glimt",
     "Bodo Glimt": "Bodo/Glimt",
-    "Qarabağ FK": "Qarabag",
-    "Qarabag FK": "Qarabag",
+    # ESPN's 2025/26 spelling is "FK Qarabag" (backfill.yml run 38452265319 paired it on
+    # its opponent only, because this alias still said "Qarabag").
+    "Qarabağ FK": "FK Qarabag",
+    "Qarabag FK": "FK Qarabag",
+    # Seen in run 38452265319 (the bought closes): pairs that only matched on the opponent
+    # or a close spelling; the live Champions League cards pair on these too.
+    "Bayern München": "Bayern Munich",
+    "Internazionale Milano": "Internazionale",
+    "Slavia Praha": "Slavia Prague",
+    "Salzburg": "RB Salzburg",
+    "FC Kairat": "Kairat Almaty",
+    "LOSC Lille": "Lille",
+    "Atalanta BC": "Atalanta",
     "GNK Dinamo Zagreb": "Dinamo Zagreb",
     "SK Slavia Praha": "Slavia Prague",
     "AC Sparta Praha": "Sparta Prague",

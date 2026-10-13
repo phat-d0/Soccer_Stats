@@ -42,6 +42,14 @@ jobs:
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
+      # The Champions League model's European results (ESPN days, final ones cached for
+      # good), warmed by backfill.yml's match_blends run; saved again with data/raw above.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-${{ github.run_id }}
+          restore-keys: cup-espn-
+
       # Player odds and trades stay off until the player model beats its baseline
       # (backtest-players writes that result to the data-log branch).
       - name: Read the player-model gate

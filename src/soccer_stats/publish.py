@@ -885,6 +885,9 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
     no team news: those exist for E0 only. Never raises: a league that fails to load
     returns no cards, no block, and says why.
     """
+    lg = lgs.LEAGUES.get(league)
+    if lg is not None and lg.cup:  # a UEFA cup: ESPN's fixtures and the cross-league model
+        return cup_league_fixtures(league, share, now)
     season = current_season()
     try:
         matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
@@ -905,6 +908,126 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         print(f"{lgs.name(league)}: Teams block unavailable ({type(exc).__name__}: {exc})")
         block = None
     return cards, source, block
+
+
+def cup_league_fixtures(
+    league: str,
+    share: int = 1,
+    now: pd.Timestamp | None = None,
+    raw_dir: Path = RAW_DIR,
+    get=None,
+) -> tuple:
+    """Champions League cards (owner, 13 Oct 2026): ESPN's fixtures for the next
+    FIXTURE_DAYS, DraftKings' h2h paired to them by kickoff and names (cup_model.pair_odds),
+    and model chances from the cross-league fit (cup_model) at `now` on earlier matches.
+
+    The fit needs every European result in its window (ESPN, cached for good once final;
+    one run's requests are bounded by cup_model.Budget). Until they are all in, and for
+    any club no football-data file covers, a card shows DraftKings' odds only (`no_model`,
+    `low_data`: no paper trade opens) and says why. No Teams block. Never raises."""
+    import requests
+
+    from soccer_stats import cup_model as cm
+
+    now = now or pd.Timestamp.now(tz="UTC")
+    name = lgs.name(league)
+    budget = cm.Budget(get or requests.get)
+    stats = budget.stats
+    try:
+        fixtures = cm.upcoming(now, raw_dir, budget, stats)
+        kickoffs = [e["kickoff"] for e in fixtures]
+        events, status = fetch_odds(
+            league, raw_dir=raw_dir, kickoffs=kickoffs, share=share, now=now
+        )
+        source = {
+            "league": league,
+            "name": "none",
+            "format": "decimal",
+            "fetched_at": status.fetched_at,
+            "credits_left": status.credits_left,
+            "last_cost": status.last_cost,
+            "refresh_hours": status.refresh_hours,
+            "error": status.error,
+        }
+        odds, unmatched = cm.pair_odds(fixtures, events)
+        if events is not None:
+            source.update(name=BOOKMAKER_NAME, format="american", unmatched=unmatched)
+        start = now - pd.Timedelta(days=cm.WINDOW_DAYS)
+        euro, rep = cm.european_events(
+            cm.years_between(start, now),
+            raw_dir,
+            budget,
+            today=now,
+            until=now,
+            stats=stats,
+            ttl_minutes=cm.LIVE_TTL_MINUTES,
+        )
+    except Exception as exc:  # noqa: BLE001  a cup failing never stops the site
+        return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}, None
+    head = (
+        f"{name}: European results {len(cm.results(euro))} matches "
+        f"({rep['requests']} ESPN requests"
+        + ("" if rep["complete"] else f", incomplete: {rep['why'] or 'failed requests'}")
+        + ")"
+    )
+    if not fixtures:
+        print(head)
+        return [], source, None
+    cards, missing = [], {}
+    try:
+        reason = None
+        if not rep["complete"]:
+            reason = (
+                "No model chance yet: the European results the model needs are still loading "
+                "(they come in over the next few updates), so this match shows DraftKings' "
+                "odds only."
+            )
+        else:
+            domestic, errors = cm.load_domestic(start, now, raw_dir)
+            if errors:
+                print(f"{name}: football-data files unavailable: {errors}")
+            names = [e[s] for e in euro + fixtures for s in ("home", "away")]
+            mapping = cm.team_map(names, cm.teams_by_league(domestic))
+            matches = cm.fit_matches(domestic, euro, mapping)
+            model = cm.fit(matches, now)
+            counts = cm.match_counts(cm.window(matches, now))
+        for e in fixtures:
+            o = odds.get(str(e["id"]))
+            why = reason
+            if why is None:
+                gone = [e[s] for s in ("home", "away") if mapping.get(e[s]) not in model.attack]
+                for t in gone:
+                    missing[t] = "not covered" if mapping.get(t) is None else "no recent matches"
+                if gone:
+                    why = (
+                        f"No model chance: {' and '.join(gone)} "
+                        f"{'is' if len(gone) == 1 else 'are'} not in the football-data leagues "
+                        "the model rates, so this match shows DraftKings' odds only."
+                    )
+            if why:
+                cards.append(cm.no_model_card(e, o, why, implied_probs))
+                continue
+            keys = {e["home"]: mapping[e["home"]], e["away"]: mapping[e["away"]]}
+            named = cm.Named(model, keys, [(e["home"], e["away"])] if e.get("neutral") else [])
+            row = {"kickoff": e["kickoff"], "home": e["home"], "away": e["away"]}
+            row.update({c: (o or {}).get(c, np.nan) for c in ODDS_COLS})
+            row["odds_updated"] = (o or {}).get("odds_updated")
+            cnt = pd.Series({t: int(counts.get(k, 0)) for t, k in keys.items()})
+            cards += fixture_cards(named, pd.DataFrame([row]), cnt, league=league)
+    except Exception as exc:  # noqa: BLE001
+        print(f"{name}: model failed ({type(exc).__name__}: {exc}); odds only")
+        why = "No model chance: the Champions League model couldn't be fitted this update."
+        cards = [cm.no_model_card(e, odds.get(str(e["id"])), why, implied_probs) for e in fixtures]
+    with_model = sum(not c.get("no_model") for c in cards)
+    print(
+        f"{head}; {with_model} of {len(cards)} fixtures with a model chance"
+        + (
+            "; no model chance for " + ", ".join(f"{t} ({w})" for t, w in sorted(missing.items()))
+            if missing
+            else ""
+        )
+    )
+    return cards, source, None
 
 
 def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:

@@ -12,6 +12,11 @@ With `xg_weight` > 0, team ratings are fit to a blend of expected goals and real
 goals: target = xg_weight * xG + (1 - xg_weight) * goals (goals alone where a match
 has no xG). Poisson likelihood still works for non-integer targets (it becomes a
 quasi-likelihood); the low-score correction keeps using the real scoreline.
+
+Two options for the cross-league cup model (cup_model.py), both off by default so every
+domestic fit is unchanged: `ridge` > 0 adds ridge * sum(attack^2 + defence^2) to the loss
+(keeps a club with a handful of matches finite), and a `neutral` column (1 = neutral
+venue, e.g. a cup final) drops the home advantage for that match.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ class DixonColes:
     xi: float = 0.0019  # time decay per day (~1 year half-life ≈ 0.0019)
     xg_weight: float = 0.0  # 0 = goals only, 1 = xG only
     max_goals: int = 10
+    ridge: float = 0.0  # ridge on team ratings (0 = none, the domestic default)
     teams: list[str] = field(default_factory=list)
     params: dict[str, float] = field(default_factory=dict)
     attack: dict[str, float] = field(default_factory=dict)
@@ -61,13 +67,16 @@ class DixonColes:
         as_of = as_of or matches["date"].max()
         age = (as_of - matches["date"]).dt.days.to_numpy()
         w = np.exp(-self.xi * age)
+        home = None
+        if "neutral" in matches.columns:
+            home = 1.0 - matches["neutral"].fillna(0).to_numpy(dtype=float)
 
         x0 = np.concatenate([np.zeros(2 * n), [0.2, 0.3, -0.05]])  # att, def, intercept, home, rho
         bounds = [(None, None)] * (2 * n + 2) + [(-0.3, 0.3)]
         res = minimize(
             _neg_loglik,
             x0,
-            args=(hi, ai, x, y, w, n, tx, ty),
+            args=(hi, ai, x, y, w, n, tx, ty, home, self.ridge),
             jac=True,
             method="L-BFGS-B",
             bounds=bounds,
@@ -87,12 +96,12 @@ class DixonColes:
 
     # ---------- prediction ----------
 
-    def expected_goals(self, home: str, away: str) -> tuple[float, float]:
+    def expected_goals(self, home: str, away: str, neutral: bool = False) -> tuple[float, float]:
         # Teams unseen in training (e.g. promoted sides) get league-average ratings.
         p = self.params
         lam = np.exp(
             p["intercept"]
-            + p["home_adv"]
+            + (0.0 if neutral else p["home_adv"])
             + self.attack.get(home, 0.0)
             + self.defence.get(away, 0.0)
         )
@@ -100,13 +109,19 @@ class DixonColes:
         return float(lam), float(mu)
 
     def score_matrix(
-        self, home: str, away: str, home_mult: float = 1.0, away_mult: float = 1.0
+        self,
+        home: str,
+        away: str,
+        home_mult: float = 1.0,
+        away_mult: float = 1.0,
+        neutral: bool = False,
     ) -> np.ndarray:
         """P(home scores i, away scores j) for i, j in 0..max_goals.
 
-        `home_mult` / `away_mult` scale each side's expected goals, e.g. for team news.
+        `home_mult` / `away_mult` scale each side's expected goals, e.g. for team news;
+        `neutral` drops the home advantage (a cup final).
         """
-        lam, mu = self.expected_goals(home, away)
+        lam, mu = self.expected_goals(home, away, neutral)
         lam, mu = lam * home_mult, mu * away_mult
         goals = np.arange(self.max_goals + 1)
         m = np.outer(poisson.pmf(goals, lam), poisson.pmf(goals, mu))
@@ -118,18 +133,21 @@ class DixonColes:
         return m / m.sum()
 
 
-def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None):
+def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None, home=None, ridge=0.0):
     """Weighted negative log-likelihood and gradient.
 
     x, y are real goals (they select the low-score correction); tx, ty are the
-    Poisson targets (goals, or a goals/xG blend). Defaults to tx, ty = x, y.
+    Poisson targets (goals, or a goals/xG blend). Defaults to tx, ty = x, y. `home`
+    (optional, per match) scales the home advantage: 0 at a neutral venue, else 1.
+    `ridge` adds ridge * sum(attack^2 + defence^2).
     """
     tx = x if tx is None else tx
     ty = y if ty is None else ty
     att, dfn = theta[:n], theta[n : 2 * n]
     c, h, rho = theta[2 * n], theta[2 * n + 1], theta[2 * n + 2]
+    hm = 1.0 if home is None else home
 
-    eta_h = c + h + att[hi] + dfn[ai]
+    eta_h = c + h * hm + att[hi] + dfn[ai]
     eta_a = c + att[ai] + dfn[hi]
     lam, mu = np.exp(eta_h), np.exp(eta_a)
 
@@ -167,7 +185,7 @@ def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None):
     grad[:n] = np.bincount(hi, g_h, n) + np.bincount(ai, g_a, n)
     grad[n : 2 * n] = np.bincount(ai, g_h, n) + np.bincount(hi, g_a, n)
     grad[2 * n] = g_h.sum() + g_a.sum()
-    grad[2 * n + 1] = g_h.sum()
+    grad[2 * n + 1] = (g_h * hm).sum()
     grad[2 * n + 2] = (w * dt_r).sum()
 
     sa, sd = att.sum(), dfn.sum()
@@ -175,4 +193,8 @@ def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None):
     grad = -grad
     grad[:n] += 2 * _ID_PENALTY * sa
     grad[n : 2 * n] += 2 * _ID_PENALTY * sd
+    if ridge:
+        obj += ridge * (att @ att + dfn @ dfn)
+        grad[:n] += 2 * ridge * att
+        grad[n : 2 * n] += 2 * ridge * dfn
     return obj, grad

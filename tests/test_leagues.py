@@ -20,19 +20,19 @@ T = pd.Timestamp("2026-11-06 12:00", tz="UTC")  # a Friday
 # ---------- the registry ----------
 
 
-def test_registry_matches_the_loaders_and_eight_leagues_are_live():
+def test_registry_matches_the_loaders_and_nine_leagues_are_live():
     assert set(lgs.LEAGUES) == {
         *("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"),
         *("UCL", "UEL", "UECL"),
     }
-    # primary first; League One and League Two live from 13 Oct (owner)
-    assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3"]
+    # primary first; League One, League Two and the Champions League live from 13 Oct (owner)
+    assert lgs.live_codes() == ["E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3", "UCL"]
     for code, lg in lgs.LEAGUES.items():
         assert xg.LEAGUES.get(code) == lg.understat  # Understat names stay in step
         assert (code in fd.LEAGUES) != lg.cup  # football-data knows every division, no cup
         assert feed.SPORTS[code] == lg.odds_sport
     assert lgs.get("E0").odds_policy == "always"
-    matchday = ("SP1", "D1", "I1", "F1", "E1", "E2", "E3")
+    matchday = ("SP1", "D1", "I1", "F1", "E1", "E2", "E3", "UCL")
     assert {lgs.get(c).odds_policy for c in matchday} == {"matchday"}
     assert lgs.get("E1").understat is None and feed.SPORTS["E1"] == "soccer_efl_champ"
     assert feed.SPORTS["E0"] == "soccer_epl"  # the live path is unchanged
@@ -271,14 +271,16 @@ def test_a_league_one_draftkings_match_joins_its_scheduled_card(monkeypatch):
 
 
 def test_off_leagues_stay_out_of_every_live_list_and_data_json(tmp_path, monkeypatch):
-    """Only the UEFA cups are registered off now: never fetched, built or listed."""
+    """Only the Europa League and Conference League are registered off now: never
+    fetched, built or listed."""
     from soccer_stats import corners_live, espn_news, team_totals
     from soccer_stats.publish import league_list
 
-    assert [c for c, lg in lgs.LEAGUES.items() if not lg.live] == list(CUPS)
+    off = ("UEL", "UECL")
+    assert [c for c, lg in lgs.LEAGUES.items() if not lg.live] == list(off)
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("should not call"))
     near = [T + pd.Timedelta(hours=2)]
-    for code in CUPS:
+    for code in off:
         assert code not in lgs.live_codes() and code not in corners_live.LEAGUES
         assert code not in team_totals.TEAM_TOTAL_LEAGUES and code not in espn_news.SLUGS
         events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
@@ -286,7 +288,7 @@ def test_off_leagues_stay_out_of_every_live_list_and_data_json(tmp_path, monkeyp
     assert list(tmp_path.iterdir()) == []  # no cache file, no meta: nothing downloaded
     fixtures = [{"league": "E0"}, {"league": "SP1"}]
     rows = league_list(fixtures, {})
-    # Every live league is listed (fixtures or not); the cups are left out.
+    # Every live league is listed (fixtures or not); the cups still off are left out.
     assert [r["code"] for r in rows] == lgs.live_codes()
     assert {r["code"]: r for r in rows}["E2"]["name"] == "League One"
     assert {r["code"]: r for r in rows}["E3"]["name"] == "League Two"

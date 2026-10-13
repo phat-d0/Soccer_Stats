@@ -44,6 +44,9 @@ SLUGS = {
     "E1": "eng.2",
     "E2": "eng.3",  # League One and League Two: live from 13 Oct (owner)
     "E3": "eng.4",
+    # The Champions League: live from 13 Oct (owner). Its cards already carry ESPN's own
+    # team names (fixtures come from this scoreboard), so they match as they are.
+    "UCL": "uefa.champions",
 }
 # ESPN spellings the shared map (odds_feed.TEAM_NAMES) and its fuzzy match don't cover.
 ESPN_NAMES: dict[str, str] = {
@@ -140,6 +143,10 @@ def _get(d, *keys):
 
 
 def team_name(name: str, known: set[str]) -> str:
+    """Our name for an ESPN club: itself when the cards already use it (Champions League
+    cards carry ESPN's names), else football-data's spelling."""
+    if name in known:
+        return name
     return _team(ESPN_NAMES.get(name, name), known)
 
 
