@@ -238,21 +238,37 @@ def _cache_path(raw_dir: Path, slug: str, day: str) -> Path:
 
 
 def scoreboard_day(
-    slug: str, day: str, raw_dir: Path, get: Callable, stats: dict, today: pd.Timestamp
+    slug: str,
+    day: str,
+    raw_dir: Path,
+    get: Callable,
+    stats: dict,
+    today: pd.Timestamp,
+    ttl_minutes: float = 0,
 ) -> dict | None:
     """ESPN's scoreboard for one date (YYYYMMDD). Days at least two days past are final
-    and cached for good; nearer days are always asked again."""
+    and cached for good; nearer days are asked again, or with `ttl_minutes` reused from a
+    short-lived copy (`<slug>_<day>.recent.json`) that young (the live cup's publish runs:
+    kickoff times and results can wait that long)."""
     path = _cache_path(raw_dir, slug, day)
     final = pd.Timestamp(day, tz="UTC") < today.normalize() - pd.Timedelta(days=1)
+    recent = path.with_suffix(".recent.json")
     if final and path.exists():
         try:
             return json.loads(path.read_text())
         except (OSError, ValueError):
             pass
+    if not final and ttl_minutes > 0 and recent.exists():
+        try:
+            if time.time() - recent.stat().st_mtime < ttl_minutes * 60:
+                return json.loads(recent.read_text())
+        except (OSError, ValueError):
+            pass
     body = _get_json(ESPN.format(slug=slug) + "/scoreboard", {"dates": day}, get, stats)
-    if body is not None and final:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(body))
+    if body is not None and (final or ttl_minutes > 0):
+        target = path if final else recent
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(body))
     return body
 
 
@@ -405,8 +421,10 @@ def season_calendar(
     every_day: bool = False,
     today: pd.Timestamp | None = None,
     stats: dict | None = None,
+    ttl_minutes: float = 0,
 ) -> dict:
     """Every ESPN event for `slug` kicking off in [start, end), deduplicated by id.
+    `ttl_minutes` lets days not yet final come from a copy that young (scoreboard_day).
 
     `stats` (optional) is shared between calls, so a caller can bound a whole run: once
     stats["failures"] reaches MAX_FAILURES no further request is made (cached days still
@@ -434,7 +452,7 @@ def season_calendar(
         if day in done:
             continue
         done.add(day)
-        body = scoreboard_day(slug, day, raw_dir, get, stats, today)
+        body = scoreboard_day(slug, day, raw_dir, get, stats, today, ttl_minutes)
         answered = answered or body is not None
         for e in parse_events(body):
             events[e["id"]] = e

@@ -954,7 +954,13 @@ def cup_league_fixtures(
             source.update(name=BOOKMAKER_NAME, format="american", unmatched=unmatched)
         start = now - pd.Timedelta(days=cm.WINDOW_DAYS)
         euro, rep = cm.european_events(
-            cm.years_between(start, now), raw_dir, budget, today=now, until=now, stats=stats
+            cm.years_between(start, now),
+            raw_dir,
+            budget,
+            today=now,
+            until=now,
+            stats=stats,
+            ttl_minutes=cm.LIVE_TTL_MINUTES,
         )
     except Exception as exc:  # noqa: BLE001  a cup failing never stops the site
         return [], {"league": league, "name": None, "error": f"{type(exc).__name__}: {exc}"}, None

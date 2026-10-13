@@ -629,6 +629,21 @@ def test_no_model_card_has_the_card_shape():
     assert cm.no_model_card(e[0], None, "w", implied_probs)["implied"]["home"] is None
 
 
+def test_days_not_yet_final_are_reused_for_a_short_while_on_live_runs(tmp_path):
+    log = []
+    k = NOW + pd.Timedelta(days=2)
+    get = fake_espn(
+        {"uefa.champions": {f"{k:%Y%m%d}": [espn_event(1, k, "A", "B", completed=False)]}}, log
+    )
+    day = f"{k:%Y%m%d}"
+    for _ in range(3):
+        cups.scoreboard_day("uefa.champions", day, tmp_path, get, {}, NOW, ttl_minutes=30)
+    assert len(log) == 1  # reused from the short-lived copy
+    cups.scoreboard_day("uefa.champions", day, tmp_path, get, {}, NOW)
+    assert len(log) == 2  # without a TTL a day not yet final is always asked again
+    assert not cups._cache_path(tmp_path, "uefa.champions", day).exists()  # never "final"
+
+
 def test_upcoming_skips_placeholder_knockout_ties(tmp_path):
     k = NOW + pd.Timedelta(days=2)
     sched = {
@@ -878,3 +893,72 @@ def test_backtest_lean_leaves_the_cup_out(monkeypatch):
     )
     cli.cmd_backtest_lean(args)
     assert "UCL" not in seen and "E0" in seen
+
+
+# ---------- names: the real 2026/27 league phase and the bought closes ----------
+
+# ESPN's 2026/27 Champions League league phase and football-data's clubs, as backfill.yml
+# run 38457777910 (fit-match-blends, no key) mapped them; four clubs no football-data
+# league covers get no model chance.
+UCL_2627 = {
+    "AEK Athens": "G1:AEK", "AS Roma": "I1:Roma", "Arsenal": "E0:Arsenal",
+    "Aston Villa": "E0:Aston Villa", "Atlético Madrid": "SP1:Ath Madrid",
+    "Barcelona": "SP1:Barcelona", "Bayern Munich": "D1:Bayern Munich",
+    "Bodo/Glimt": "NOR:Bodo/Glimt", "Borussia Dortmund": "D1:Dortmund",
+    "Club Brugge": "B1:Club Brugge", "Como": "I1:Como", "FC Porto": "P1:Porto",
+    "Fenerbahce": "T1:Fenerbahce", "Feyenoord Rotterdam": "N1:Feyenoord",
+    "Galatasaray": "T1:Galatasaray", "Internazionale": "I1:Inter", "LASK Linz": "AUT:LASK",
+    "Lens": "F1:Lens", "Lille": "F1:Lille", "Liverpool": "E0:Liverpool",
+    "Manchester City": "E0:Man City", "Manchester United": "E0:Man United",
+    "Napoli": "I1:Napoli", "PSV Eindhoven": "N1:PSV Eindhoven",
+    "Paris Saint-Germain": "F1:Paris SG", "RB Leipzig": "D1:RB Leipzig",
+    "Real Betis": "SP1:Betis", "Real Madrid": "SP1:Real Madrid", "Sabah FK": None,
+    "Shakhtar Donetsk": None, "Slavia Prague": None, "Slovan Bratislava": None,
+    "Sporting CP": "P1:Sp Lisbon", "VfB Stuttgart": "D1:Stuttgart", "Viking FK": "NOR:Viking",
+    "Villarreal": "SP1:Villarreal",
+}  # fmt: skip
+# Their leagues' other clubs that could be confused with them.
+DECOYS = {
+    "E0": ["Man City", "Man United", "Liverpool", "Arsenal", "Aston Villa", "Chelsea"],
+    "SP1": ["Real Madrid", "Barcelona", "Ath Madrid", "Ath Bilbao", "Betis", "Sevilla",
+            "Villarreal", "Sociedad"],
+    "D1": ["Bayern Munich", "Dortmund", "RB Leipzig", "Stuttgart", "Leverkusen",
+           "M'gladbach"],
+    "I1": ["Inter", "Milan", "Roma", "Lazio", "Napoli", "Como"],
+    "F1": ["Paris SG", "Lens", "Lille", "Lyon", "Marseille"],
+    "P1": ["Porto", "Benfica", "Sp Lisbon", "Sp Braga"],
+    "N1": ["PSV Eindhoven", "Feyenoord", "Ajax"],
+    "T1": ["Galatasaray", "Fenerbahce", "Besiktas"],
+    "G1": ["AEK", "Olympiakos", "PAOK"],
+    "B1": ["Club Brugge", "Anderlecht", "Genk"],
+    "NOR": ["Bodo/Glimt", "Viking", "Molde", "Rosenborg"],
+    "AUT": ["LASK", "Salzburg", "Sturm Graz"],
+}  # fmt: skip
+
+
+def test_every_2026_27_league_phase_club_maps_to_its_football_data_club():
+    teams = {code: set(names) for code, names in DECOYS.items()}
+    assert cm.team_map(list(UCL_2627), teams) == UCL_2627
+
+
+# Every Odds API spelling that differed from ESPN's in the bought closes
+# (odds_history/UCL_closes.jsonl, run 38452265319): the live cards pair on them.
+ODDS_PAIRS = {
+    "Sporting Lisbon": "Sporting CP", "LOSC Lille": "Lille", "Bayern München": "Bayern Munich",
+    "Salzburg": "RB Salzburg", "Paris Saint Germain": "Paris Saint-Germain",
+    "Internazionale Milano": "Internazionale", "ŠK Slovan Bratislava": "Slovan Bratislava",
+    "Feyenoord": "Feyenoord Rotterdam", "Monaco": "AS Monaco",
+    "Athletic Bilbao": "Athletic Club", "Union Saint-Gilloise": "Union St.-Gilloise",
+    "Qarabağ FK": "FK Qarabag", "Olympiakos Piraeus": "Olympiacos", "Pafos FC": "Pafos",
+    "Slavia Praha": "Slavia Prague", "Bodø/Glimt": "Bodo/Glimt", "Atalanta BC": "Atalanta",
+    "Ajax": "Ajax Amsterdam", "Inter Milan": "Internazionale",
+    "FC Copenhagen": "F.C. København", "FC Kairat": "Kairat Almaty",
+}  # fmt: skip
+
+
+def test_the_odds_api_names_from_the_bought_closes_pair_strongly_with_espns():
+    from soccer_stats import cup_odds
+
+    for odds_name, espn_name in ODDS_PAIRS.items():
+        assert cup_odds.same_team(odds_name, espn_name) in cup_odds.STRONG, odds_name
+    assert cup_odds.same_team("Inter Milan", "AC Milan") is None

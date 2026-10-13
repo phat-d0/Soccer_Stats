@@ -64,6 +64,9 @@ FIXTURE_DAYS = 14
 # One publish run's ESPN budget for the cup (the domestic team-news feed has its own).
 RUN_SECONDS = 90
 RUN_FAILURES = 3
+# A day not yet final is reused from a copy this young on live runs (publish runs every
+# 15 minutes; kickoff times and results can wait).
+LIVE_TTL_MINUTES = 30
 REFIT_WEEKDAY = 0  # the walk-forward refits every Monday 00:00 UTC
 
 
@@ -215,6 +218,7 @@ def european_events(
     until: pd.Timestamp | None = None,
     stats: dict | None = None,
     cups_map: dict | None = None,
+    ttl_minutes: float = 0,
 ) -> tuple[list[dict], dict]:
     """Every ESPN event of the three UEFA cups (main and qualifying slugs) kicking off
     before `until` in the seasons given, each with `cup` and `slug`. The report says how
@@ -235,7 +239,14 @@ def european_events(
                 if ws >= until:
                     continue
                 cal = cups.season_calendar(
-                    s, ws, min(we, until), raw_dir, get, today=today, stats=stats
+                    s,
+                    ws,
+                    min(we, until),
+                    raw_dir,
+                    get,
+                    today=today,
+                    stats=stats,
+                    ttl_minutes=ttl_minutes,
                 )
                 calendars.append(
                     {"slug": s, "season": y, "mode": cal["mode"], "events": len(cal["events"])}
@@ -731,7 +742,14 @@ def upcoming(
     `days` ahead, not yet finished."""
     start = (now - pd.Timedelta(hours=2)).normalize()
     cal = cups.season_calendar(
-        SLUG, start, now + pd.Timedelta(days=days), raw_dir, get, today=now, stats=stats
+        SLUG,
+        start,
+        now + pd.Timedelta(days=days),
+        raw_dir,
+        get,
+        today=now,
+        stats=stats,
+        ttl_minutes=LIVE_TTL_MINUTES,
     )
     return [
         e
@@ -838,7 +856,14 @@ def cup_results(
     now = now or pd.Timestamp.now(tz="UTC")
     start, end = cups.season_window(season)
     cal = cups.season_calendar(
-        SLUG, start, min(end, now + pd.Timedelta(days=1)), raw_dir, get, today=now, stats=stats
+        SLUG,
+        start,
+        min(end, now + pd.Timedelta(days=1)),
+        raw_dir,
+        get,
+        today=now,
+        stats=stats,
+        ttl_minutes=LIVE_TTL_MINUTES,
     )
     rows = [
         {
