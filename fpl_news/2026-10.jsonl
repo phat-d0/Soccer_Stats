@@ -412,3 +412,8 @@
 {"at": "2026-10-13T15:52+00:00", "team": "Man United", "name": "De Ligt", "status": "d", "chance": 75, "news": "Back injury - 75% chance of playing"}
 {"at": "2026-10-13T17:38+00:00", "team": "Aston Villa", "name": "Ruggeri", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
 {"at": "2026-10-13T18:30+00:00", "team": "Man United", "name": "De Ligt", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-14T13:37+00:00", "team": "Aston Villa", "name": "Madjo", "status": "d", "chance": 50, "news": "Unspecified injury - 50% chance of playing"}
+{"at": "2026-10-14T13:37+00:00", "team": "Aston Villa", "name": "Goretzka", "status": "d", "chance": 75, "news": "Knee injury - 75% chance of playing"}
+{"at": "2026-10-14T13:37+00:00", "team": "Bournemouth", "name": "Kluivert", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-10-14T13:37+00:00", "team": "Bournemouth", "name": "Adli", "status": "d", "chance": 75, "news": "Calf injury - 75% chance of playing"}
+{"at": "2026-10-14T13:37+00:00", "team": "Brighton", "name": "Struijk", "status": "a", "chance": 100, "news": ""}
