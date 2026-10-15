@@ -676,6 +676,23 @@ Champions League and two in the others, so totals were dropped first where short
 - Nothing switched on. Next steps stay separate owner decisions: Pinnacle Champions League
   closes for a backtest (590 credits a season), the cross-league model, then live odds.
 
+**Re-check near kickoff (15 Oct; owner-approved, "Yes to the europa league and conference
+league matches"):** `odds-check.yml` run 38747744922 (`task=markets`, `leagues=UEL,UECL`,
+`cap=4`, 14:01 UTC, about 2 h 45 min before the first kickoffs): **4 credits** (20,619 →
+20,615); one discovery call and one h2h call per cup, so the corner answer comes from the
+discovery list (`books_markets.pinnacle`), not from prices.
+
+| Cup (match, kickoff) | Pinnacle team corners | DraftKings h2h | Pinnacle h2h | FanDuel |
+| --- | --- | --- | --- | --- |
+| UEL (Salzburg v AC Milan, 16:45 UTC) | **listed** (`alternate_team_totals_corners`; not priced in this run) | 4.7% | 3.6% | h2h 8.0%; team corners and team totals listed |
+| UECL (Gent v AGF Aarhus, 16:45 UTC) | **not listed** (Pinnacle lists only h2h, spreads and totals) | 4.4% | 4.4% | h2h 7.9% only |
+
+- So Pinnacle posts Europa League team corners close to kickoff (absent 3.5 days out),
+  as it did for the Champions League 38 h out; the Conference League match had none even
+  under 3 hours out. DraftKings itself lists team corners in the Europa League match.
+- Nothing switched on: the Europa and Conference League stay registered off. Team corners in
+  any cup would also need a corner model for clubs across leagues (model (f) is per league).
+
 ### Champions League: historical closes download (13 Oct, owner-approved ≤1,200 credits)
 
 Owner decision (13 Oct): switch the Champions League on with Blend Lean, and first buy two
