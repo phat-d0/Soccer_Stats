@@ -426,3 +426,10 @@
 {"at": "2026-10-15T18:45+00:00", "team": "Bournemouth", "name": "Adli", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-10-15T18:45+00:00", "team": "Brighton", "name": "Hinshelwood", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-10-15T22:08+00:00", "team": "Crystal Palace", "name": "Chilwell", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-10-16T12:17+00:00", "team": "Chelsea", "name": "James", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-10-16T12:17+00:00", "team": "Coventry", "name": "Kesler-Hayden", "status": "d", "chance": 75, "news": "Hamstring injury - 75% chance of playing"}
+{"at": "2026-10-16T12:17+00:00", "team": "Coventry", "name": "Eccles", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-10-16T12:17+00:00", "team": "Liverpool", "name": "Gakpo", "status": "d", "chance": 25, "news": "Ankle injury - 25% chance of playing"}
+{"at": "2026-10-16T12:17+00:00", "team": "Liverpool", "name": "Szoboszlai", "status": "d", "chance": 25, "news": "Hamstring injury - 25% chance of playing"}
+{"at": "2026-10-16T12:17+00:00", "team": "Liverpool", "name": "Isak", "status": "d", "chance": 25, "news": "Thigh injury - 25% chance of playing"}
+{"at": "2026-10-16T12:17+00:00", "team": "Newcastle", "name": "Elanga", "status": "i", "chance": 0, "news": "Unspecified injury - Expected back 25 Oct"}
