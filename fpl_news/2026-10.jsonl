@@ -466,3 +466,6 @@
 {"at": "2026-10-17T15:00+00:00", "team": "Brentford", "name": "Yarmoliuk", "status": "s", "chance": 0, "news": "Suspended until 8 Nov"}
 {"at": "2026-10-17T15:00+00:00", "team": "Liverpool", "name": "Szoboszlai", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
 {"at": "2026-10-17T15:45+00:00", "team": "Liverpool", "name": "Frimpong", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-10-17T16:15+00:00", "team": "Aston Villa", "name": "Barkley", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-17T16:15+00:00", "team": "Aston Villa", "name": "Madjo", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-17T16:15+00:00", "team": "Newcastle", "name": "Tour\u00e9", "status": "a", "chance": 100, "news": ""}
