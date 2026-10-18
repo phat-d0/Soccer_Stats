@@ -135,6 +135,58 @@ Ways to spend less, if needed (none are built yet):
   model (the research lab's round-5 bake-off also used goals only for E1). Its upcoming
   fixtures come from football-data's fixtures file, which covers about the next week.
 
+## Fast settlement from ESPN (18 Oct, lead; 0 credits)
+
+The owner saw many paper trades still open after their matches ended. Domestic match and
+corner trades settled only once football-data posted results: data-log's ledgers showed a
+median of 41 h after kickoff for match trades (13–67 h) and 37 h for corner trades
+(12–39 h), against about 3 h for the Champions League, which already settled from ESPN.
+
+What changed (`espn_results.py`, `paper.awaiting_results`, `cli.espn_settlement`):
+
+- Each paper step lists the live match and corner trades open past kickoff (within 14
+  days) that football-data can't settle yet, and asks ESPN's free scoreboard only for those
+  leagues (all eight domestic slugs in `espn_news.SLUGS`) and kickoff days, from 1 h 45 min
+  after kickoff. A match counts as final when ESPN marks it completed, its status isn't
+  postponed, abandoned, cancelled, suspended, forfeited or delayed, and the 90-minute score
+  is known (`cups.parse_events`).
+- Names are mapped to the trades' football-data names with `espn_news.team_name` against
+  the league's clubs (football-data's results plus the trades' names). An event settles a
+  trade only if both names map exactly, home and away the right way round, the kickoff is
+  within 3 h, and no other event that day fits or lands on the same club. Otherwise the
+  trade stays open and the log lists it ("no ESPN match", "ambiguous ESPN match").
+- Corner trades read the final match summary's `wonCorners` per team (by ESPN team id,
+  then name, then home/away). No counts: corners wait for football-data's HC/AC.
+- Settlement order: football-data first when it already has the result (it also carries
+  Pinnacle's close for `clv_pinnacle`), else ESPN. Every settle event records
+  `result_source` (`"football-data"` or `"espn"`; the Champions League `"espn"`).
+- **Later check (rule):** when football-data's result arrives for a trade ESPN settled, one
+  update event adds `result_check` (`"ok"` or `"mismatch"`), football-data's `check_score`
+  and, for match trades, Pinnacle's CLV. ESPN's settlement stands; a mismatch prints a
+  "Result check" or "Corner check" line in the publish log. Corner counts can differ
+  between data providers by a corner now and then, so watch the corner mismatch rate in the
+  first weeks; if it is material, the lead can switch corner settlement back to
+  football-data only.
+- Budget per run: 60 s, 3 failed requests (after one retry each) or 80 requests, 10 s
+  timeout. Scoreboard days with every match final, or two days past, and summaries with
+  both counts are cached for good in `data/raw/espn_results/` (the `raw-data-*` cache).
+  Any failure only means those trades wait for football-data; the ledger write never
+  depends on ESPN. Log line: "ESPN results: N of M matches final (C with corner counts),
+  R requests (F failed)".
+- **Settlement runs:** publish runs hourly and every 15 minutes from 10:00 to 21:59 UTC,
+  but GitHub throttles scheduled runs (gaps up to 6.5 h on 10–12 Oct). `close_runs.plan`
+  therefore adds one publish dispatch 2 h 15 min after the last kickoff of each cluster
+  (kickoffs up to 12 min apart), skipped when a close run starts within 20 min after that
+  time, and the planner hands over to a new planner run while a settlement is still due.
+  A dispatched publish spends Odds API credits only where a refresh is due anyway:
+  DraftKings refreshes follow each league's refresh floor and budget
+  (`odds_feed.fetch_odds` downloads only when the interval has passed), team-total and
+  corner snapshots are recorded per event and snapshot, so they are never bought twice,
+  and player lines keep their own per-event refresh interval. The credit estimates already
+  assume every scheduled run happens, so these runs stay inside them; against today's
+  throttled schedule a settlement run can at most take a refresh that was due (about 1
+  credit per league with a kickoff in the next 48 h, and only if its floor has passed).
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

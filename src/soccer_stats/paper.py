@@ -10,9 +10,13 @@ Every scheduled build calls update_ledger, which:
    in the odds log (odds_log.py; without a log, the last price seen by a build before
    kickoff), with closing line value against it and how many minutes before kickoff
    that price was quoted (GitHub throttles scheduled runs, so it can be hours);
-3. settles trades once football-data has the result, adding closing line value against
-   Pinnacle's close; voids a trade if kickoff moves by more than VOID_MOVED_HOURS or no
-   result arrives within VOID_AFTER_DAYS.
+3. settles trades on football-data's result when it has one (adding closing line value
+   against Pinnacle's close), else on ESPN's 90-minute score as soon as ESPN calls the
+   match final (espn_results.py, 18 Oct; the Champions League's results come from ESPN
+   too), recording `result_source`; when football-data's result later arrives for a
+   trade ESPN settled, it adds Pinnacle's CLV and `result_check` ("ok"/"mismatch",
+   with football-data's `check_score`) and never re-settles; voids a trade if kickoff
+   moves by more than VOID_MOVED_HOURS or no result arrives within VOID_AFTER_DAYS.
 
 The ledger is append-only JSON lines in paper_trades/<league>_<season>.jsonl on the
 data-log branch. An "open" line holds the entry, which is never edited; later lines
@@ -55,7 +59,13 @@ UPDATE_FIELDS = {
     "z_market",
     "driver",
     "driver_from",
+    # Fast settlement (18 Oct): which source settled the trade, and football-data's later
+    # check of an ESPN settlement.
+    "result_source",
+    "result_check",
+    "check_score",
 }
+FOOTBALL_DATA = "football-data"
 
 
 def ledger_dir(log_dir: Path) -> Path:
@@ -120,7 +130,8 @@ def _update(trade: dict, now: pd.Timestamp, **fields) -> dict:
 
 
 def _result(results: pd.DataFrame, trade: dict) -> dict | None:
-    """The football-data result for a trade's match in its season, if played."""
+    """The result for a trade's match in its season, if played (football-data's files,
+    or for a cup ESPN's scoreboard: `result_source` says which)."""
     if results is None or results.empty:
         return None
     r = results[
@@ -129,6 +140,58 @@ def _result(results: pd.DataFrame, trade: dict) -> dict | None:
         & (results["season"].astype(str) == trade["season"])
     ]
     return r.iloc[0].to_dict() if not r.empty else None
+
+
+def _source(res: dict) -> str:
+    s = res.get("result_source")
+    return s if isinstance(s, str) and s else FOOTBALL_DATA
+
+
+def _espn_result(espn: pd.DataFrame | None, trade: dict) -> dict | None:
+    """ESPN's row for the trade's match (espn_results.fetch): same league, names and
+    season, kickoff within KICKOFF_TOLERANCE; exactly one, else None."""
+    if espn is None or espn.empty:
+        return None
+    r = espn[
+        (espn["home"] == trade["home"])
+        & (espn["away"] == trade["away"])
+        & (espn["season"].astype(str) == trade["season"])
+    ]
+    if "league" in r and trade.get("league"):
+        r = r[r["league"] == trade["league"]]
+    k = _utc(trade["kickoff"])
+    r = r[[abs(_utc(x) - k) <= KICKOFF_TOLERANCE for x in r["kickoff"]]]
+    return r.iloc[0].to_dict() if len(r) == 1 else None
+
+
+def _utc(x) -> pd.Timestamp:
+    t = pd.Timestamp(x)
+    return t.tz_localize("UTC") if t.tz is None else t.tz_convert("UTC")
+
+
+def _fd_check(t: dict, results: pd.DataFrame | None, now: pd.Timestamp) -> dict | None:
+    """Once football-data has the result of a match trade ESPN settled: one update with
+    Pinnacle's CLV and `result_check` ("ok" or "mismatch", plus football-data's
+    `check_score`). ESPN's settlement stands either way (docs/leagues.md)."""
+    if t.get("result_source") != "espn" or t.get("result_check") or not t.get("score"):
+        return None
+    res = _result(results, t)
+    if res is None or _source(res) != FOOTBALL_DATA:
+        return None
+    if pd.isna(res.get("home_goals")) or pd.isna(res.get("away_goals")):
+        return None
+    fd = f"{int(res['home_goals'])}-{int(res['away_goals'])}"
+    check = "ok" if fd == t["score"] else "mismatch"
+    if check == "mismatch":
+        print(
+            f"Result check: {t['id']} settled on ESPN's {t['score']}, football-data says {fd}; "
+            "ESPN's settlement stands"
+        )
+    extra = {}
+    if t.get("clv_pinnacle") is None:
+        pin = {m: res.get(f"close_{m}") for m in tr.MARKETS}
+        extra["clv_pinnacle"] = tr.clv(t["odds"], t["market"], pin)
+    return _update(t, now, result_check=check, check_score=fd, **extra)
 
 
 def _minutes_before(kickoff, quoted) -> float | None:
@@ -179,6 +242,7 @@ def update_ledger(
     threshold: float | None = tr.PAPER_EDGE,
     rule: dict | None = None,
     lean: dict | None = None,
+    espn: pd.DataFrame | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -199,6 +263,11 @@ def update_ledger(
     blended `p_bet` at the rule's sigma, $10, one Lean trade per match (id "...|lean"),
     recording z, tier, sigma, p_bet and the raw model chance. Without a sigma, no Lean
     trades. Closes, CLV and settlement are the same for both.
+
+    Settlement takes `results` (football-data; ESPN for a cup) first, else `espn`
+    (espn_results.fetch: ESPN's final 90-minute scores, matched to the trade's names and
+    kickoff), and records `result_source`. A trade ESPN settled gets football-data's
+    check once its result arrives (_fd_check).
     """
     rule = rule or {}
     raw = rule.get("p_source") == "model"
@@ -290,6 +359,10 @@ def update_ledger(
 
     # 2. Track the close and catch moved fixtures; 3. settle.
     for t in ledger.values():
+        if t["status"] != "open" and t["source"] == "live" and t.get("bet_type") != "player":
+            ev = _fd_check(t, results, now)  # football-data's check of an ESPN settlement
+            if ev:
+                events.append(ev)
         if t["status"] != "open" or t["source"] != "live":
             continue
         kickoff = pd.Timestamp(t["kickoff"])
@@ -317,6 +390,8 @@ def update_ledger(
                     events.append(_update(t, now, **_close_fields(t, group, quoted, kickoff)))
             continue
         res = _result(results, t)
+        if res is None:
+            res = _espn_result(espn, t)
         if res is not None:
             moved = (
                 abs((pd.Timestamp(res["date"]) - kickoff.tz_convert(None).normalize()).days)
@@ -330,6 +405,7 @@ def update_ledger(
                     **tr.settle(t, res["home_goals"], res["away_goals"], void=moved),
                     clv_pinnacle=None if moved else tr.clv(t["odds"], t["market"], pin),
                     settled_at=now.isoformat(timespec="seconds"),
+                    result_source=_source(res),
                 )
             )
         elif now - kickoff > pd.Timedelta(days=VOID_AFTER_DAYS):
@@ -583,6 +659,9 @@ CORNER_UPDATE_FIELDS = {
     "score",
     "profit",
     "settled_at",
+    "result_source",
+    "result_check",
+    "check_score",
 }
 KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 
@@ -656,6 +735,35 @@ def _corner_result(results: pd.DataFrame | None, t: dict) -> dict | None:
     return r.iloc[0].to_dict() if not r.empty else None
 
 
+def _has_corners(res: dict | None) -> bool:
+    return res is not None and not (
+        pd.isna(res.get("home_corners")) or pd.isna(res.get("away_corners"))
+    )
+
+
+def _corner_score(res: dict) -> str:
+    return f"{int(res['home_corners'])}-{int(res['away_corners'])} corners"
+
+
+def _corner_check(t: dict, results: pd.DataFrame | None, now: pd.Timestamp) -> dict | None:
+    """Once football-data's HC/AC arrive for a corner trade ESPN settled: one update with
+    `result_check` ("ok" when both teams' counts agree, else "mismatch") and
+    football-data's `check_score`. ESPN's settlement stands (docs/leagues.md)."""
+    if t.get("result_source") != "espn" or t.get("result_check") or not t.get("score"):
+        return None
+    res = _corner_result(results, t)
+    if not _has_corners(res):
+        return None
+    fd = _corner_score(res)
+    check = "ok" if fd == t["score"] else "mismatch"
+    if check == "mismatch":
+        print(
+            f"Corner check: {t['id']} settled on ESPN's {t['score']}, football-data says {fd}; "
+            "ESPN's settlement stands"
+        )
+    return _update(t, now, result_check=check, check_score=fd)
+
+
 def update_corner_ledger(
     ledger: dict[str, dict],
     cards: list[dict],
@@ -664,6 +772,7 @@ def update_corner_ledger(
     now: pd.Timestamp,
     league: str,
     ref: dict | None = None,
+    espn: pd.DataFrame | None = None,
 ) -> list[dict]:
     """Open, close and settle corner paper trades in one league. Mutates `ledger`.
 
@@ -675,8 +784,11 @@ def update_corner_ledger(
        line, ever.
     2. Close: the newest quote at the trade's team line before kickoff (the close
        snapshot when it was taken), with CLV vs Pinnacle's de-margined close.
-    3. Settle on football-data's corner counts (HC/AC); a whole line that lands exactly is
-       a push (void, stake back); a moved match or no result after VOID_AFTER_DAYS: void.
+    3. Settle on football-data's corner counts (HC/AC) when it has them, else on ESPN's
+       (`espn`: espn_results.fetch, the final match summary's wonCorners), recording
+       `result_source`; a whole line that lands exactly is a push (void, stake back); a
+       moved match or no result after VOID_AFTER_DAYS: void. A trade ESPN settled gets
+       football-data's check once HC/AC arrive (_corner_check), never a re-settlement.
     P/L and CLV only: nothing here scores the model against the league average.
     """
     from soccer_stats import corners_live as cl
@@ -723,6 +835,10 @@ def update_corner_ledger(
 
     # 2. Close, and 3. settle.
     for t in ledger.values():
+        if t.get("source") == "live" and t.get("status") != "open":
+            ev = _corner_check(t, results, now)  # pushes (void) included
+            if ev:
+                events.append(ev)
         if t.get("source") != "live" or t.get("status") == "void":
             continue
         k = cl._ts(t["kickoff"])
@@ -741,9 +857,9 @@ def update_corner_ledger(
         if t["status"] != "open" or k > now:
             continue
         res = _corner_result(results, t)
-        if res is not None and not (
-            pd.isna(res.get("home_corners")) or pd.isna(res.get("away_corners"))
-        ):
+        if not _has_corners(res):
+            res = _espn_result(espn, t)
+        if _has_corners(res):
             moved = (
                 abs((pd.Timestamp(res["date"]) - k.tz_convert(None).normalize()).days)
                 > VOID_MOVED_HOURS / 24
@@ -755,8 +871,9 @@ def update_corner_ledger(
                     t,
                     now,
                     **fields,
-                    score=f"{int(res['home_corners'])}-{int(res['away_corners'])} corners",
+                    score=_corner_score(res),
                     settled_at=now.isoformat(timespec="seconds"),
+                    result_source=_source(res),
                 )
             )
         elif now - k > pd.Timedelta(days=VOID_AFTER_DAYS):
@@ -1013,8 +1130,12 @@ def run(
     now: pd.Timestamp | None = None,
     apps: pd.DataFrame | None = None,
     corner_results: pd.DataFrame | None = None,
+    espn_results: pd.DataFrame | None = None,
 ) -> int:
     """Update the ledger in `log_dir` and fill data["portfolio"]; returns events written.
+
+    `espn_results` (espn_results.fetch) settles match and corner trades football-data
+    has no result for yet.
 
     Fails safe: if the ledger can't be read, nothing is opened and the tab says why.
     The corners portfolio runs on its own ledger files, the logged Pinnacle team-corner
@@ -1075,6 +1196,7 @@ def run(
                 if res is not None and "league" in res and not res.empty:
                     res = res[res["league"] == lg]
                 log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
+                esp = _league_rows(espn_results, lg)
                 ev, n = update_ledger(
                     sub,
                     cards,
@@ -1089,6 +1211,7 @@ def run(
                     threshold=rules[lg]["threshold"],
                     rule=rules[lg],
                     lean=leans[lg],
+                    espn=esp,
                 )
                 ledger.update(sub)
                 events += ev
@@ -1098,7 +1221,9 @@ def run(
             live_trades = list(ledger.values())
             live.update(portfolio_section(live_trades), note=note)
             try:  # the corners portfolio: its own ledger, rows and results
-                n, corner_trades = _run_corners(data, log_dir, codes, league, now, corner_results)
+                n, corner_trades = _run_corners(
+                    data, log_dir, codes, league, now, corner_results, espn_results
+                )
                 written += n
             except Exception as exc:  # noqa: BLE001  never costs the match ledger
                 corner_section["error"] = (
@@ -1149,7 +1274,53 @@ def run(
     return written
 
 
-def _run_corners(data, log_dir, codes, primary, now, results) -> tuple[int, list[dict]]:
+def _league_rows(df: pd.DataFrame | None, league: str) -> pd.DataFrame | None:
+    if df is None or df.empty or "league" not in df:
+        return df
+    return df[df["league"] == league]
+
+
+def awaiting_results(
+    log_dir: Path,
+    codes: list[str],
+    now: pd.Timestamp,
+    results: pd.DataFrame | None = None,
+    corner_results: pd.DataFrame | None = None,
+) -> list[dict]:
+    """The live match and corner trades still open after kickoff that football-data can't
+    settle yet (no result, or no HC/AC for a corner trade), kicked off within
+    VOID_AFTER_DAYS: {kind ("match"/"corners"), league, season, home, away, kickoff}. The
+    paper step asks ESPN about these only (espn_results.fetch)."""
+    out = []
+    for lg in codes:
+        books = (("match", load_ledger(log_dir, lg)), ("corners", load_corner_ledger(log_dir, lg)))
+        for kind, ledger in books:
+            for t in ledger.values():
+                if t.get("status") != "open" or t.get("source") != "live":
+                    continue
+                if t.get("bet_type") == "player":
+                    continue
+                k = _utc(t["kickoff"])
+                if k > now or now - k > pd.Timedelta(days=VOID_AFTER_DAYS):
+                    continue
+                if kind == "match" and _result(_league_rows(results, lg), t) is not None:
+                    continue
+                if kind == "corners" and _has_corners(_corner_result(corner_results, t)):
+                    continue
+                out.append(
+                    {
+                        "kind": kind,
+                        "league": lg,
+                        "season": t["season"],
+                        "home": t["home"],
+                        "away": t["away"],
+                        "kickoff": t["kickoff"],
+                    }
+                )
+    return out
+
+
+def _run_corners(data, log_dir, codes, primary, now, results, espn=None) -> tuple[int, list[dict]]:
     """Update the corners ledger in every corner league in play; returns (events written,
     every corner trade)."""
     from soccer_stats import corners_live as cl
@@ -1165,6 +1336,8 @@ def _run_corners(data, log_dir, codes, primary, now, results) -> tuple[int, list
         if res is not None and "league" in res and not res.empty:
             res = res[res["league"] == lg]
         lrows = [r for r in rows if r.get("league") == lg]
-        events += update_corner_ledger(ledger, cards, lrows, res, now, lg, ref)
+        events += update_corner_ledger(
+            ledger, cards, lrows, res, now, lg, ref, espn=_league_rows(espn, lg)
+        )
         trades += list(ledger.values())
     return append_corner_events(log_dir, events), trades

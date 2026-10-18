@@ -74,7 +74,8 @@ the app's value pick (`bestPick` in `web/app.js`):
 | Live entry | first build where the pick qualifies, odds under 3 hours old, before kickoff |
 | Backtest entry | first qualifying look, 48 and 3 hours before kickoff |
 | Close | last DraftKings price before kickoff in the odds log (for closing line value); its minutes before kickoff are stored, since scheduled builds can be late |
-| Settlement | 90-minute result from football-data (the Champions League: ESPN's scoreboard; an extra-time match without a 90-minute score waits and voids); void if kickoff moves 48h+ or no result in 14 days |
+| Settlement | 90-minute result from football-data when it has it, else ESPN's scoreboard as soon as ESPN calls the match final (since 18 Oct; football-data posts results a day or two late); the Champions League always from ESPN (an extra-time match without a 90-minute score waits and voids). Each settle event records `result_source` (`"football-data"` / `"espn"`). When football-data's result later arrives for an ESPN-settled trade, one update adds Pinnacle's CLV and `result_check` (`"ok"` / `"mismatch"` with `check_score`); ESPN's settlement stands. Void if kickoff moves 48h+ or no result in 14 days |
+| Corner settlement | football-data's HC/AC when present, else the final ESPN match summary's `wonCorners`; same push and void rules, the same `result_source` and later `result_check` |
 | Champions League | fixtures from ESPN, chances from one goals-only fit across Europe's leagues tied together by European results (`cup_model.py`); a club no football-data league covers gets no model chance, so its matches show odds only and never trade |
 
 **Live paper trades** (`paper.py`): after each build, `soccer-stats paper` updates an
@@ -82,6 +83,11 @@ append-only ledger at `paper_trades/<league>_<season>.jsonl` on the `data-log` b
 entry (time, price, probability, edge) is written once and never edited; later lines only
 add the closing price and the settlement. Rebuilding adds nothing new. If the ledger or
 the odds are unavailable, the site still publishes, opens nothing, and the tab says why.
+Before settling, the paper step asks ESPN (free, no key) only about leagues and days with a
+trade still open past kickoff that football-data can't settle yet (`espn_results.py`,
+at most 60 s, 3 failed requests or 80 requests a run; final days and summaries cached for
+good; any failure leaves those trades for football-data). `closes.yml` also dispatches a
+publish 2 h 15 min after each cluster of kickoffs, so trades settle soon after full time.
 
 **Blend Lean (owner's second live test, 10 Oct 2026).** A second match strategy runs
 beside the fixed 12% test in Moneyline, ported from the owner's baseball app (confidence
