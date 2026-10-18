@@ -208,6 +208,35 @@ def test_league_one_and_two_open_paper_trades_under_the_fixed_rule(tmp_path, mon
     assert rules["E2"]["threshold"] == tr.PAPER_EDGE and rules["E2"]["sigma"] is None
 
 
+def test_a_league_without_fixtures_this_build_keeps_its_trades(tmp_path, monkeypatch):
+    """Between matchdays a league has no fixtures, but its open trades must still close,
+    settle and show: leagues_in_play adds every league with a ledger file."""
+    monkeypatch.setattr(tr, "PAPER_RULE", "fixed_raw")
+    e2 = card(home="Peterboro", away="AFC Wimbledon")
+    e2["league"] = "E2"
+    d = {
+        "fixtures": [e2],
+        "odds_source": src(),
+        "odds_sources": {"E0": src(), "E2": src()},
+        "leagues": [{"code": c, "fixtures": int(c == "E2")} for c in lgs.live_codes()],
+        "portfolio": {},
+    }
+    assert paper.run(d, tmp_path, None, now=NOW) == 1
+    later = {
+        "fixtures": [],
+        "odds_source": src(),
+        "odds_sources": {"E0": src()},
+        "leagues": [{"code": c, "fixtures": 0} for c in lgs.live_codes()],
+        "portfolio": {},
+    }
+    assert paper.leagues_in_play(later) == ["E0"]
+    assert paper.leagues_in_play(later, log_dir=tmp_path) == ["E0", "E2"]
+    paper.run(later, tmp_path, None, now=NOW)
+    ids = {t["id"] for t in later["portfolio"]["portfolios"][0]["live"]["trades"]}
+    assert "E2|2627|Peterboro|AFC Wimbledon" in ids
+    assert paper.ledger_leagues(None) == [] and paper.ledger_leagues(tmp_path / "none") == []
+
+
 def test_every_league_one_and_two_club_maps_to_football_data_without_duplicates():
     for clubs in L12_CLUBS.values():
         known = set(clubs)
@@ -616,9 +645,13 @@ def test_moneyline_backtest_carries_each_leagues_level(tmp_path):
         assert "this league" in by["SP1"]["note"]
     assert ml["backtest"]["edge_threshold"]["min_edge"] == 0.08  # top level unchanged
 
-    # One league only: no by_league (the app falls back to the top level).
+    # One league only (a fresh ledger: SP1's trades above would keep it in play): no
+    # by_league (the app falls back to the top level).
+    solo = tmp_path / "solo"
+    (solo / "backtest").mkdir(parents=True)
+    (solo / "backtest" / "E0_dk.json").write_text(json.dumps(e0))
     d = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
-    paper.run(d, tmp_path, None, now=NOW)
+    paper.run(d, solo, None, now=NOW)
     ml = next(p for p in d["portfolio"]["portfolios"] if p["id"] == "moneyline")
     assert "by_league" not in ml["backtest"]["edge_threshold"]
 

@@ -529,7 +529,9 @@ def cmd_paper(args: argparse.Namespace) -> None:
     site = Path(args.site)
     data = json.loads((site / "data.json").read_text())
     season = current_season()
-    results = cup_and_league_results(paper.leagues_in_play(data, args.league), season)
+    log_dir = Path(args.log_dir) if args.log_dir else None
+    in_play = paper.leagues_in_play(data, args.league, log_dir)
+    results = cup_and_league_results(in_play, season)
     apps = None
     if args.league == "E0":
         try:
@@ -538,19 +540,18 @@ def cmd_paper(args: argparse.Namespace) -> None:
             apps, _ = load_appearances(args.league, [season], max_new=20)
         except Exception as exc:  # player trades settle on a later build
             print(f"Player data unavailable ({type(exc).__name__})")
-    log_dir = Path(args.log_dir) if args.log_dir else None
     from soccer_stats.trades import paper_rule_line
 
     print(paper_rule_line())
     try:  # corner counts (HC/AC) from the cached football-data files, for corner settlement
         from soccer_stats import corners_live
 
-        codes = [c for c in paper.leagues_in_play(data, args.league) if c in corners_live.LEAGUES]
+        codes = [c for c in in_play if c in corners_live.LEAGUES]
         corner_res = corners_live.corner_results(codes, seasons=[season - 1, season])
     except Exception as exc:  # corner trades settle on a later build
         print(f"Corner results unavailable ({type(exc).__name__})")
         corner_res = None
-    codes = paper.leagues_in_play(data, args.league)
+    codes = in_play
     now = pd.Timestamp.now(tz="UTC")
     espn = espn_settlement(log_dir, codes, results, corner_res, now)
     n = paper.run(
