@@ -1090,13 +1090,30 @@ def _add_league_levels(bt: dict | None, codes: list[str], rules: dict, log_dir, 
     bt["edge_threshold"] = {**et, "by_league": by}
 
 
-def leagues_in_play(data: dict, primary: str = "E0") -> list[str]:
+def ledger_leagues(log_dir: Path | None) -> list[str]:
+    """Registry leagues with a paper ledger file (match or corners) in `log_dir`, sorted."""
+    from soccer_stats.leagues import LEAGUES
+
+    if log_dir is None or not ledger_dir(log_dir).is_dir():
+        return []
+    found = set()
+    for path in ledger_dir(log_dir).glob("*.jsonl"):
+        code = path.name.split("_", 1)[0]
+        if code in LEAGUES:
+            found.add(code)
+    return sorted(found)
+
+
+def leagues_in_play(data: dict, primary: str = "E0", log_dir: Path | None = None) -> list[str]:
     """The primary league plus every league with fixtures in this build (data.json
-    `leagues`, or the fixtures' own `league`), primary first."""
+    `leagues`, or the fixtures' own `league`), then every league with a ledger file in
+    `log_dir`, primary first. The ledger leagues matter between matchdays: a league with
+    no fixtures this build (the Championship after its weekend, the Champions League
+    between rounds) still has open trades that must close, settle and show."""
     codes = [primary]
     listed = [lg["code"] for lg in data.get("leagues") or [] if lg.get("fixtures")]
     tagged = [f.get("league") for f in data.get("fixtures") or [] if f.get("league")]
-    for c in listed + tagged:
+    for c in listed + tagged + ledger_leagues(log_dir):
         if c not in codes:
             codes.append(c)
     return codes
@@ -1150,7 +1167,7 @@ def run(
     corner_trades: list[dict] = []
     corner_section: dict = {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
     backtests: dict[str, dict | None] = {"corners": corners_research()}
-    codes = leagues_in_play(data, league)
+    codes = leagues_in_play(data, league, log_dir)
     files = {lg: league_backtest(log_dir, lg) if log_dir is not None else None for lg in codes}
     rules = {lg: tr.paper_threshold(files[lg], lg) for lg in codes}
     # The app's flags (edge_threshold.by_league) keep showing the learned levels and their
