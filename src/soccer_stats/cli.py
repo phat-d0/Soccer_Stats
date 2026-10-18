@@ -453,7 +453,8 @@ def cup_and_league_results(codes: list[str], season: int, cup_results=None) -> p
     """Results for paper settlement: football-data's files for the domestic leagues, and
     ESPN's scoreboard for a UEFA cup (cup_model.cup_results: 90-minute scores, ESPN's names
     as on the cards). One source failing never costs the other: its trades stay open until
-    a later build."""
+    a later build. `result_source` says which ("football-data" / "espn"); domestic trades
+    football-data can't settle yet are asked of ESPN separately (espn_settlement)."""
     from soccer_stats import cup_model
     from soccer_stats.leagues import LEAGUES
 
@@ -461,7 +462,9 @@ def cup_and_league_results(codes: list[str], season: int, cup_results=None) -> p
     domestic = [c for c in codes if not (LEAGUES.get(c) and LEAGUES[c].cup)]
     frames = []
     try:  # every league with fixtures or trades this build (leagues.py), primary first
-        frames.append(load_matches(domestic, [season - 1, season]))
+        frames.append(
+            load_matches(domestic, [season - 1, season]).assign(result_source="football-data")
+        )
     except Exception as exc:  # no results: trades stay open until the next build
         print(f"Results unavailable ({type(exc).__name__}); nothing settled this time")
     for code in codes:
@@ -470,13 +473,50 @@ def cup_and_league_results(codes: list[str], season: int, cup_results=None) -> p
         try:
             budget = cup_model.Budget(seconds=60)
             got = [cup_results(y, get=budget, stats=budget.stats) for y in (season - 1, season)]
-            frames += [g.assign(league=code) for g in got]
+            frames += [g.assign(league=code, result_source="espn") for g in got]
         except Exception as exc:  # noqa: BLE001
             print(f"{code} results unavailable ({type(exc).__name__}); its trades settle later")
     frames = [f for f in frames if len(f)]
     if not frames:
         return pd.DataFrame(columns=["league", "home", "away", "season"])
     return pd.concat(frames, ignore_index=True)
+
+
+def espn_settlement(
+    log_dir: Path | None,
+    codes: list[str],
+    results: pd.DataFrame | None,
+    corner_results: pd.DataFrame | None,
+    now: pd.Timestamp,
+    fetch=None,
+) -> pd.DataFrame | None:
+    """ESPN's final scores and corner counts for the live trades open past kickoff that
+    football-data can't settle yet (paper.awaiting_results; espn_results.fetch, bounded
+    by its run budget). Any failure prints one line and returns None: those trades wait
+    for football-data, the ledger write never depends on ESPN."""
+    from soccer_stats import espn_results, paper
+
+    if log_dir is None or not Path(log_dir).is_dir():
+        return None
+    try:
+        todo = paper.awaiting_results(log_dir, codes, now, results, corner_results)
+        todo = [t for t in todo if t["league"] in espn_results.DOMESTIC]
+        if not todo:
+            print("ESPN results: no open trade past kickoff waits for a result")
+            return None
+        known: dict[str, set[str]] = {}
+        for df in (results, corner_results):
+            if df is None or df.empty or "league" not in df:
+                continue
+            for lg, g in df.groupby("league"):
+                known.setdefault(str(lg), set()).update(g["home"].dropna(), g["away"].dropna())
+        rows, report = (fetch or espn_results.fetch)(todo, known, now)
+        for line in espn_results.describe(report):
+            print(line)
+        return rows
+    except Exception as exc:  # noqa: BLE001  ESPN never costs the ledger
+        print(f"ESPN results unavailable ({type(exc).__name__}); football-data settles later")
+        return None
 
 
 def cmd_paper(args: argparse.Namespace) -> None:
@@ -510,7 +550,19 @@ def cmd_paper(args: argparse.Namespace) -> None:
     except Exception as exc:  # corner trades settle on a later build
         print(f"Corner results unavailable ({type(exc).__name__})")
         corner_res = None
-    n = paper.run(data, log_dir, results, league=args.league, apps=apps, corner_results=corner_res)
+    codes = paper.leagues_in_play(data, args.league)
+    now = pd.Timestamp.now(tz="UTC")
+    espn = espn_settlement(log_dir, codes, results, corner_res, now)
+    n = paper.run(
+        data,
+        log_dir,
+        results,
+        league=args.league,
+        now=now,
+        apps=apps,
+        corner_results=corner_res,
+        espn_results=espn,
+    )
     detail = log_dir / "backtest" / f"{args.league}_players_detail.json" if log_dir else None
     if detail and detail.exists():  # the Players view loads this on demand
         shutil.copy(detail, site / "players_backtest.json")

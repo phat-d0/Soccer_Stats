@@ -37,6 +37,14 @@ CONTINUE_HOURS = 30.0
 
 assert LEAD_MINUTES + SPAN_MINUTES < CLOSE_MINUTES
 
+# Settlement runs (18 Oct): one more dispatch SETTLE_AFTER after the last kickoff of each
+# cluster, when every match in it should be final (90 minutes, half time and stoppages
+# take about 1 h 55 min), so the paper step settles its trades from ESPN at once instead
+# of waiting for a throttled scheduled run. Kickoffs within SPAN_MINUTES share one, and a
+# planned close run starting within SETTLE_MERGE after that time does the job instead.
+SETTLE_AFTER = pd.Timedelta(hours=2, minutes=15)
+SETTLE_MERGE = pd.Timedelta(minutes=20)
+
 
 def kickoffs(log_dir) -> list[pd.Timestamp]:
     """Every distinct kickoff in data-log's odds_log files (the DraftKings log lists each
@@ -76,14 +84,29 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
     while i < len(due):
         first = due[i]
         covered = [k for k in due[i:] if k <= first + span]
-        dispatch.append({"at": max(first - lead, now), "kickoffs": covered})
+        dispatch.append({"at": max(first - lead, now), "kickoffs": covered, "kind": "close"})
         i += len(covered)
+    # Settlement runs: kickoffs whose settle time falls in this window.
+    settle = [k for k in ks if now <= k + SETTLE_AFTER < end]
+    i = 0
+    while i < len(settle):
+        first = settle[i]
+        covered = [k for k in settle[i:] if k <= first + span]
+        at = covered[-1] + SETTLE_AFTER
+        i += len(covered)
+        if any(at <= d["at"] <= at + SETTLE_MERGE for d in dispatch if d["kind"] == "close"):
+            continue
+        dispatch.append({"at": at, "kickoffs": covered, "kind": "settle"})
+    dispatch.sort(key=lambda d: d["at"])
     later = [k for k in ks if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
+    # A cluster whose settlement falls after this window hands over to the next planner too.
+    unsettled = [k for k in ks if end <= k + SETTLE_AFTER and k - lead < end]
     return {
         "now": now,
         "horizon_end": end,
         "dispatch": dispatch,
-        "continue": bool(later),
+        "continue": bool(later or unsettled),
+        "settle_pending": bool(unsettled),
         "next_kickoff": later[0] if later else None,
     }
 
@@ -104,7 +127,11 @@ def to_json(p: dict) -> dict:
         "continue": p["continue"],
         "next_kickoff": t(p["next_kickoff"]),
         "dispatch": [
-            {**t(d["at"]), "kickoffs": [k.isoformat(timespec="minutes") for k in d["kickoffs"]]}
+            {
+                **t(d["at"]),
+                "kind": d.get("kind", "close"),
+                "kickoffs": [k.isoformat(timespec="minutes") for k in d["kickoffs"]],
+            }
             for d in p["dispatch"]
         ],
     }
@@ -114,13 +141,16 @@ def describe(p: dict) -> str:
     lines = [f"Close runs planned from {p['now']:%Y-%m-%d %H:%M} to {p['horizon_end']:%H:%M} UTC:"]
     for d in p["dispatch"]:
         ks = ", ".join(f"{k:%H:%M}" for k in d["kickoffs"])
-        lines.append(f"  publish at {d['at']:%Y-%m-%d %H:%M} UTC for kickoffs {ks}")
+        why = "settle kickoffs" if d.get("kind") == "settle" else "for kickoffs"
+        lines.append(f"  publish at {d['at']:%Y-%m-%d %H:%M} UTC {why} {ks}")
     if not p["dispatch"]:
         lines.append("  none (no kickoff in this window)")
-    if p["continue"]:
+    if p["continue"] and p["next_kickoff"] is not None:
         lines.append(
             f"Next kickoff {p['next_kickoff']:%Y-%m-%d %H:%M} UTC: a new planner run follows"
         )
+    elif p["continue"]:
+        lines.append("A settlement run falls after this window: a new planner run follows")
     else:
         lines.append(
             f"No kickoff within {CONTINUE_HOURS:g} h after this window: "

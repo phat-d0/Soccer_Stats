@@ -4,6 +4,9 @@
 # runs in two days, gaps up to 6.5 h), but a workflow_dispatch starts within a minute or two.
 # The dispatched publish is an ordinary run: no extra calls per snapshot, every cap,
 # reserve and call record unchanged (src/soccer_stats/close_runs.py).
+# Since 18 Oct it also dispatches one publish 2 h 15 min after each cluster of kickoffs,
+# so the paper step settles those trades from ESPN's final scores (free) right after full
+# time; DraftKings refreshes in that run still follow the per-league refresh floors.
 name: Close snapshots
 
 on:

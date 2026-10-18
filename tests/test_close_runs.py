@@ -10,6 +10,10 @@ def T(s):
     return pd.Timestamp(s, tz="UTC")
 
 
+def closes(p):
+    return [d for d in p["dispatch"] if d["kind"] == "close"]
+
+
 def test_one_run_per_cluster_of_kickoffs():
     now = T("2026-10-17 10:00")
     ks = [
@@ -48,9 +52,9 @@ def test_every_covered_kickoff_gets_a_close_from_the_dispatched_run():
 def test_late_planner_dispatches_now_or_skips():
     k = T("2026-10-17 15:00")
     p = cr.plan([k], T("2026-10-17 14:52"))  # 8 minutes left: still worth a run
-    assert [d["at"] for d in p["dispatch"]] == [T("2026-10-17 14:52")]
-    assert cr.plan([k], T("2026-10-17 14:56"))["dispatch"] == []  # too close
-    assert cr.plan([k], T("2026-10-17 15:30"))["dispatch"] == []  # already kicked off
+    assert [d["at"] for d in closes(p)] == [T("2026-10-17 14:52")]
+    assert closes(cr.plan([k], T("2026-10-17 14:56"))) == []  # too close
+    assert closes(cr.plan([k], T("2026-10-17 15:30"))) == []  # already kicked off
 
 
 def test_horizon_and_handover():
@@ -93,8 +97,40 @@ def test_plan_json_for_the_workflow():
     assert j["dispatch"][0]["epoch"] == int(T("2026-10-17 13:45").timestamp())
     assert j["dispatch"][0]["kickoffs"] == ["2026-10-17T14:00+00:00"]
     assert j["horizon_end"]["epoch"] == int(T("2026-10-17 15:30").timestamp())
-    assert j["continue"] is False and j["next_kickoff"] is None
-    assert "13:45" in cr.describe(p)
+    assert j["dispatch"][0]["kind"] == "close"
+    # Its settlement run (16:15) falls after the window: the next planner dispatches it.
+    assert j["continue"] is True and j["next_kickoff"] is None
+    assert "13:45" in cr.describe(p) and "settlement run" in cr.describe(p)
+
+
+def test_a_settlement_run_after_each_cluster_of_kickoffs():
+    now = T("2026-10-17 12:00")  # window to 17:30
+    ks = [T("2026-10-17 11:00"), T("2026-10-17 14:00"), T("2026-10-17 14:05")]
+    p = cr.plan(ks, now)
+    settles = [d for d in p["dispatch"] if d["kind"] == "settle"]
+    # 11:00 kicked off before the planner started: still settled at 13:15; the 14:00 and
+    # 14:05 kickoffs share one run 2 h 15 min after the later one.
+    assert [d["at"] for d in settles] == [T("2026-10-17 13:15"), T("2026-10-17 16:20")]
+    assert settles[1]["kickoffs"] == [T("2026-10-17 14:00"), T("2026-10-17 14:05")]
+    assert [d["at"] for d in p["dispatch"]] == sorted(d["at"] for d in p["dispatch"])
+    assert p["continue"] is False  # nothing left for a later planner
+    j = cr.to_json(p)
+    assert [d["kind"] for d in j["dispatch"]] == ["settle", "close", "settle"]
+    assert "settle kickoffs 14:00, 14:05" in cr.describe(p)
+    # A settlement already past is skipped (the scheduled runs have it).
+    late = cr.plan([T("2026-10-17 09:00")], now)
+    assert late["dispatch"] == [] and late["continue"] is False
+
+
+def test_a_close_run_just_after_full_time_does_the_settling():
+    now = T("2026-10-17 12:00")
+    # 13:00 settles at 15:15; the 15:30 kickoff's close run at 15:15 covers it.
+    p = cr.plan([T("2026-10-17 13:00"), T("2026-10-17 15:30")], now)
+    assert [(d["at"], d["kind"]) for d in p["dispatch"]] == [
+        (T("2026-10-17 12:45"), "close"),
+        (T("2026-10-17 15:15"), "close"),
+    ]
+    assert p["continue"] is True  # 15:30's own settlement (17:45) is after the window
 
 
 def test_cli_writes_the_plan(tmp_path, capsys):
