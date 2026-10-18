@@ -217,7 +217,12 @@ and ROI on a small sample is mostly noise. Trust closing line value over ROI: be
 the close on average (especially Pinnacle's) is the best sign of a real edge. If ROI
 falls as the sweep's threshold rises, big claimed edges are mostly the model's mistakes,
 and the next step is blending with the market, not more bets. Tap any trade for every
-stored field.
+stored field. Unsettled trades are split by kickoff: *Open* lists upcoming matches (latest
+odds, CLV so far) and matches *In play* (kicked off under about 2 h 15 min ago; prices after
+kickoff aren't logged, so the row shows the close and its final CLV); a finished match whose
+result hasn't reached the ledger yet sits under *Awaiting result* until it settles on its
+own, usually within a few hours of full time. Match cards say the same ("In play",
+"Finished", "Awaiting result").
 
 ## Player bets: shots and shots on target
 
