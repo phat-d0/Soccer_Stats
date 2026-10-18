@@ -383,6 +383,44 @@ const STEPS = [
     const text = await p.textContent("#sheet-body");
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
   }, true],
+  // Trade states (owner, 18 Oct): kicked off under ~2 h 15 min ago = "In play"; a finished
+  // match still open waits in its own "Awaiting result" group, between Open and Settled.
+  ["portfolio-live-states", async (p) => {
+    await closeSheet(p);
+    const text = await p.textContent("#view");
+    for (const want of ["Awaiting result · 1", "These matches have finished. Results usually come in within a few hours of full time, and each trade then settles automatically.", "Their close and CLV are final", "finished, awaiting result (not in profit yet)"]) {
+      if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
+    }
+    // Open = upcoming + in play only (Arsenal v Leeds upcoming, Aston Villa v Brentford in play).
+    const openHead = await p.locator(".section-title", { hasText: "Open · " }).innerText();
+    if (!/Open · 2 · \$20 at risk/i.test(openHead)) throw new Error(`open header: ${openHead}`);
+    const inplay = await p.locator('button[data-trade="E0|2627|Aston Villa|Brentford|lean"]').innerText();
+    if (!inplay.includes("In play") || !inplay.includes("Close") || inplay.includes("now ")) throw new Error(`in-play row: ${inplay}`);
+    const waiting = await p.locator('button[data-trade="SP1|2627|Sevilla|Valencia|lean"]').innerText();
+    if (!waiting.includes("Finished · awaiting result") || !waiting.includes("CLV")) throw new Error(`awaiting row: ${waiting}`);
+    // The awaiting trade sits after the Awaiting result title and before Settled.
+    const order = await p.evaluate(() => {
+      const els = [...document.querySelectorAll("#view .section-title, #view button[data-trade]")];
+      return els.map((e) => (e.dataset.trade ? `T:${e.dataset.trade}` : `H:${e.textContent.split(" · ")[0]}`));
+    });
+    const iA = order.indexOf("H:Awaiting result"), iS = order.indexOf("H:Settled"), iW = order.indexOf("T:SP1|2627|Sevilla|Valencia|lean");
+    if (!(iA >= 0 && iA < iW && (iS < 0 || iW < iS))) throw new Error(`group order: ${order.join(", ")}`);
+  }],
+  ["portfolio-live-awaiting-sheet", async (p) => {
+    await p.click('button[data-trade="SP1|2627|Sevilla|Valencia|lean"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["Finished · awaiting result", "Kicked off 5.0 h ago", "settles automatically", "Closing odds", "Close taken", "CLV vs DraftKings", "Open · Finished · awaiting result"]) {
+      if (!text.includes(want)) throw new Error(`awaiting trade sheet lacks "${want}"`);
+    }
+    if (text.includes("Latest odds") || text.includes("CLV so far")) throw new Error("awaiting trade sheet still reads like an upcoming trade");
+  }, true],
+  ["portfolio-live-inplay-sheet", async (p) => {
+    await closeSheet(p); await p.click('button[data-trade="E0|2627|Aston Villa|Brentford|lean"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["In play", "Kicked off 50 min ago", "Prices after kickoff aren't logged", "Closing odds"]) {
+      if (!text.includes(want)) throw new Error(`in-play trade sheet lacks "${want}"`);
+    }
+  }, true],
   ["portfolio-live-lean-sp1", async (p) => { await closeSheet(p); await p.click('.chip[data-league="SP1"]'); if (!(await p.textContent("#view")).includes("Betis v Celta")) throw new Error("SP1 Lean trade"); }],
   // Blend Lean live split by driver: the side-by-side table, a chip on each Lean trade and
   // a filter (Wolves v Everton is model-driven, Spurs v Brentford market-driven).
@@ -446,6 +484,14 @@ const STEPS = [
     if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
     if (!text.includes("95% range on ROI")) throw new Error("12% live lacks paper.py's ROI range");
   }],
+  ["portfolio-live-edge12-states", async (p) => {
+    const text = await p.textContent("#view");
+    if (!text.includes("Awaiting result · 1")) throw new Error("12% awaiting group");
+    const waiting = await p.locator('button[data-trade="E0|2627|Bournemouth|Wolves"]').innerText();
+    if (!waiting.includes("Finished · awaiting result")) throw new Error(`12% awaiting row: ${waiting}`);
+    const inplay = await p.locator('button[data-trade="E0|2627|Brighton|Everton"]').innerText();
+    if (!inplay.includes("In play") || !inplay.includes("No close logged")) throw new Error(`12% in-play row: ${inplay}`);
+  }],
   ["portfolio-live-sp1", click('.chip[data-league="SP1"]')],
   ["portfolio-backtest-sp1", click('button[data-pf="backtest"]')],
   ["portfolio-live-all", async (p) => { await p.click('button[data-pf="live"]'); await p.click('.chip[data-league=""]'); }],
@@ -470,6 +516,12 @@ const STEPS = [
       if (!text.includes(want)) throw new Error(`Team corners lacks "${want}"`);
     }
   }],
+  ["portfolio-corners-awaiting", async (p) => {
+    const text = await p.textContent("#view");
+    if (!text.includes("Awaiting result · 1")) throw new Error("corners awaiting group");
+    const row = await p.locator('button[data-trade="E0|2627|Crystal Palace|Brentford|corners|away|4.5"]').innerText();
+    if (!row.includes("Finished · awaiting result") || !row.includes("Pinnacle's close")) throw new Error(`corner awaiting row: ${row}`);
+  }],
   ["portfolio-corners-sp1", click('.chip[data-league="SP1"]')],
   ["portfolio-corners-push", async (p) => {
     await p.click('.chip[data-league=""]');
@@ -491,6 +543,31 @@ const STEPS = [
     if (!(await p.textContent("#view")).includes("Team corners")) throw new Error("corners link didn't open the portfolio");
   }],
   ["portfolio-moneyline", async (p) => { await p.click('button[data-pfid="moneyline"]'); }],
+  // Matches after kickoff (the clock moved past Arsenal v Leeds, 10 Oct 11:30 UTC): the
+  // card says "In play", then "Finished"; its open trades read "In play" / "Awaiting
+  // result" with the close, and no new pick shows.
+  ["matches-in-play", async (p) => {
+    await p.clock.setFixedTime(new Date("2026-10-10T12:10:00Z")); await tab("matches")(p);
+    const card = p.locator("button.match", { hasText: "Leeds" }).filter({ hasText: "Arsenal" }).first();
+    const text = await card.innerText();
+    if (!text.includes("In play") || !text.includes("In play (Lean): Away")) throw new Error(`in-play card: ${text}`);
+    if (await card.locator(".badge.lean").count()) throw new Error("a Lean pick shows on a match that has kicked off");
+  }],
+  ["matches-awaiting", async (p) => {
+    await p.clock.setFixedTime(new Date("2026-10-10T15:00:00Z")); await tab("portfolio")(p); await tab("matches")(p);
+    const card = p.locator("button.match", { hasText: "Leeds" }).filter({ hasText: "Arsenal" }).first();
+    const text = await card.innerText();
+    if (!text.includes("Finished") || !text.includes("Awaiting result (Lean): Away") || text.includes("Paper trade open")) throw new Error(`finished card: ${text}`);
+  }],
+  ["match-sheet-awaiting", async (p) => {
+    await p.locator("button.match", { hasText: "Leeds" }).filter({ hasText: "Arsenal" }).first().click(); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["Blend Lean: match finished, paper trade awaiting result", "settles automatically", "Awaiting result: Arsenal over 4.5"]) {
+      if (!text.includes(want)) throw new Error(`finished match sheet lacks "${want}"`);
+    }
+    if (text.includes("A $10 paper trade opens") || text.includes("nothing new opens here")) throw new Error("finished match sheet reads like an upcoming one");
+  }, true],
+  ["matches-reset-clock", async (p) => { await closeSheet(p); await p.clock.setFixedTime(NOW); await tab("portfolio")(p); await tab("matches")(p); }],
   ["explore", tab("explore")],
 ];
 const MODES = [

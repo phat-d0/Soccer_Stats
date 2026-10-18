@@ -129,7 +129,8 @@ const stratOf = (t) => t.strategy || "edge12";
 const leanOn = () => (state.data?.portfolio?.strategy_order || []).includes("lean");
 const leanRule = (lg) => leagueRule(lg)?.lean || null;
 const leanSigma = (lg) => state.data?.match_blends?.leagues?.[lg || "E0"]?.sigma ?? leanRule(lg)?.sigma ?? null;
-const leanPick = (fx) => (leanOn() && !fx.low_data ? fx.lean_pick || null : null);
+// No pick once the match has kicked off: paper trades only open before kickoff.
+const leanPick = (fx) => (leanOn() && !fx.low_data && kickoffPhase(fx.kickoff) === "upcoming" ? fx.lean_pick || null : null);
 const sigmaText = (z) => (z == null ? "–" : `${z < 0 ? "−" : z > 0 ? "+" : ""}${Math.abs(z).toFixed(1)}σ`);
 const ptsText = (x) => `${(x * 100).toFixed(1)} points`;
 const tierName = (pick) => (pick.tier === "strong" ? "Strong" : "Lean");
@@ -186,6 +187,37 @@ const tradeTitle = (t) => (isCorner(t) ? esc(cornerLabel(t)) : t.bet_type === "p
 // Closing line value: against Pinnacle's close for corners, DraftKings' for match bets.
 const tradeClv = (t) => (isCorner(t) ? t.clv_pinnacle : t.clv_dk);
 const tradeBeat = (t) => (isCorner(t) ? t.beat_close_pinnacle : t.beat_close_dk);
+// Where an unsettled trade stands, from its kickoff and the clock: "upcoming" (kickoff
+// ahead), "inplay" (kicked off under IN_PLAY_MIN ago) or "awaiting" (the match is over and
+// the result hasn't reached the ledger yet; results land some hours after full time).
+// Settled trades are "settled". Prices after kickoff aren't logged, so once a match starts
+// the trade's last logged price is its close and its CLV is final.
+const IN_PLAY_MIN = 135; // about 2 h 15 min: 90 minutes, half-time and stoppage time
+const minsSinceKickoff = (iso) => { const k = Date.parse(iso); return Number.isFinite(k) ? (Date.now() - k) / 60000 : null; };
+function kickoffPhase(iso) {
+  const m = minsSinceKickoff(iso);
+  return m == null || m < 0 ? "upcoming" : m < IN_PLAY_MIN ? "inplay" : "finished";
+}
+function tradePhase(t) {
+  if (t.status !== "open") return "settled";
+  const k = kickoffPhase(t.kickoff);
+  return k === "finished" ? "awaiting" : k;
+}
+const PHASE_LABEL = { upcoming: "Upcoming", inplay: "In play", awaiting: "Finished · awaiting result" };
+const KICKED_OFF_TEXT = "This match has kicked off, and paper trades only open before kickoff.";
+const startedTradeHead = (t) => (tradePhase(t) === "inplay" ? "paper trade in play" : "match finished, paper trade awaiting result");
+const startedTradeNote = (t) => (tradePhase(t) === "inplay"
+  ? "Prices after kickoff aren't logged, so the close and its CLV are final; the trade settles after full time."
+  : AWAIT_NOTE);
+const AWAIT_NOTE = "Results usually come in within a few hours of full time, and each trade then settles automatically.";
+// "Close +140 (2.40) · CLV +3.1%" for a trade whose match has started ("no close logged" without one).
+function startedCloseText(t, html = true) {
+  const clv = tradeClv(t);
+  const who = isCorner(t) ? "Pinnacle's close" : "Close";
+  if (t.close_odds == null) return `No close logged${clv != null ? ` · CLV ${signedPct(clv)}` : ""}`;
+  const c = html ? `<span class="nowrap">CLV <span class="${plClass(clv)}">${signedPct(clv)}</span></span>` : `CLV ${signedPct(clv)}`;
+  return `${who} ${american(t.close_odds)} (${Number(t.close_odds).toFixed(2)})${clv != null ? ` · ${c}` : ""}`;
+}
 
 // Which bookmaker the upcoming-match odds come from (DraftKings when configured).
 const isDK = () => state.data?.odds_source?.name === "DraftKings";
@@ -546,6 +578,7 @@ function cornersSection(fx) {
   const pin = co.pinnacle;
   const rule = pfById("corners")?.live?.rule;
   const level = rule?.threshold ?? PAPER_EDGE;
+  const started = kickoffPhase(fx.kickoff) !== "upcoming";
   const picks = [];
   const team = (side) => {
     const m = co[side];
@@ -563,15 +596,16 @@ function cornersSection(fx) {
       // One trade per team line, ever: an open trade is marked by its own side and entry
       // price (the pick may have moved or lapsed since); otherwise the pick as it stands.
       const trade = cornerTrade(fx, side, q.line);
-      if (trade || q.pick) picks.push({ side, q, trade });
-      return `<tr class="${q.pick || trade ? "pick" : ""}"><td>${Number(q.line)}</td><td>${pct(q.p_over)}</td><td>${pct(q.fair_over)}</td><td>${american(q.over)}</td><td>${american(q.under)}</td><td class="${q.pick ? "edge-pos" : ""}">${best ? `${signedPct(best[1], 0)}<span class="mk-range">${best[0]}</span>` : "–"}</td></tr>`;
+      const pick = started ? null : q.pick; // nothing new opens after kickoff
+      if (trade || pick) picks.push({ side, q: { ...q, pick }, trade });
+      return `<tr class="${pick || trade ? "pick" : ""}"><td>${Number(q.line)}</td><td>${pct(q.p_over)}</td><td>${pct(q.fair_over)}</td><td>${american(q.over)}</td><td>${american(q.under)}</td><td class="${pick ? "edge-pos" : ""}">${best ? `${signedPct(best[1], 0)}<span class="mk-range">${best[0]}</span>` : "–"}</td></tr>`;
     }).join("");
     return `<div class="goals-team"><b>${name}</b> <span class="muted small">model expects ${Number(m.mean).toFixed(1)}</span>
       <table class="mkts corners-t"><thead><tr><th>Line</th><th>Model</th><th>PIN</th><th>Over</th><th>Under</th><th>Edge</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   };
   const body = team("home") + team("away");
   const pickHtml = picks.map(({ side, q, trade }) => (trade
-    ? `<span class="badge paper">${CHECK}Paper trade open: ${esc(fx[side])} ${trade.side} ${Number(q.line)} @ ${american(trade.odds)} <span class="num">(${signedPct(trade.edge)} at entry)</span></span>`
+    ? `<span class="badge paper">${CHECK}${({ inplay: "In play", awaiting: "Awaiting result" })[tradePhase(trade)] || "Paper trade open"}: ${esc(fx[side])} ${trade.side} ${Number(q.line)} @ ${american(trade.odds)} <span class="num">(${signedPct(trade.edge)} at entry)</span>${tradePhase(trade) === "upcoming" ? "" : ` · ${startedCloseText(trade)}`}</span>`
     : `<span class="badge">${CHECK}Live-test pick: ${esc(fx[side])} ${q.pick.side} ${Number(q.line)} @ ${american(q.pick.odds)} <span class="num">(${signedPct(q.pick.edge)})</span></span>`)).join("");
   const when = pin?.fetched_at ? espnTime(pin.fetched_at) : null;
   const weak = WEAK_CORNER_FIT.has(lg) ? ` Model (f) fits less well in ${esc(theLeague(lg))}: in testing its chances there were too spread out, so this league isn't in the February test and its live record is the only check.` : "";
@@ -810,7 +844,12 @@ function leanPickText(fx) {
     return `${esc(PICK_LABEL[m])} at ${price(fx.odds[m])}: the blend gives ${pct(fx.p_bet[m], 1)} against the ${pct(be, 1)} this price needs to break even, ${sigmaText(z[m])}`;
   };
   let head;
-  if (t) {
+  const started = kickoffPhase(fx.kickoff) !== "upcoming";
+  if (t && started) {
+    head = `<b>Blend Lean: ${startedTradeHead(t)}:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened${driverOf(t) ? `, ${DRIVER_NAME[driverOf(t)].toLowerCase()}` : ""})` : ""}. ${startedCloseText(t)}. ${startedTradeNote(t)}`;
+  } else if (started) {
+    head = `<b>Blend Lean: no pick.</b> ${KICKED_OFF_TEXT}`;
+  } else if (t) {
     const same = lp && PICK_LABEL[lp.market] === PICK_LABEL[t.market];
     head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened${driverOf(t) ? `, ${DRIVER_NAME[driverOf(t)].toLowerCase()}` : ""})` : ""}. ${driverText(t)}One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."} ${LEAN_CAVEAT}`;
   } else if (lp) {
@@ -827,6 +866,9 @@ function fixedPickText(fx, pick) {
   const t = openTradeFor(fx, "edge12"); // the 12% test's own trade, never the Lean one
   const now = pick ? `${esc(PICK_LABEL[pick.market] || pick.market)} at ${price(pick.odds)}, ${signedPct(pick.edge)} edge on the model alone` : "";
   const l = leanOn();
+  const started = kickoffPhase(fx.kickoff) !== "upcoming";
+  if (t && started) return `<b>${l ? "Model 12%: " : ""}${startedTradeHead(t)}:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}. ${startedCloseText(t)}. ${startedTradeNote(t)}`;
+  if (started) return `<b>${l ? "Model 12%: no pick" : "No pick here"}.</b> ${KICKED_OFF_TEXT}`;
   if (t) {
     const same = pick && PICK_LABEL[pick.market] === PICK_LABEL[t.market];
     return `<b>${l ? "Model 12%: paper trade already open" : "Paper trade already open"}:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}. Only one ${l ? "12% " : ""}trade per match, so nothing new opens here.${same ? ` It is still the ${l ? "12%" : "live-test"} pick at today's price: ${now}.` : pick ? ` At today's price the ${l ? "12% rule" : "live test"} would pick ${now}.` : !pick ? ` At today's price no outcome reaches the ${l ? "12% rule's" : "live test's"} edge any more; the trade stays open until it settles.` : ""}`;
@@ -969,11 +1011,14 @@ function viewMatches() {
   for (const [day, items] of byDay) {
     html += `<div class="section-title">${esc(day)}</div>`;
     for (const [fx, idx] of items) {
-      const pick = lean ? null : bestPick(fx, fxEdge(fx)); // with Lean on, Matches shows Lean only
+      const phase = kickoffPhase(fx.kickoff);
+      // With Lean on, Matches shows Lean only; once a match kicks off nothing new opens.
+      const pick = lean || phase !== "upcoming" ? null : bestPick(fx, fxEdge(fx));
       const time = new Date(fx.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      const phaseTag = phase === "inplay" ? ' · <b class="phase-tag">In play</b>' : phase === "finished" ? ' · <b class="phase-tag">Finished</b>' : "";
       html += `
         <button class="card match" data-fixture="${idx}">
-          <div class="match-head"><span>${esc(time)}${!lg && multiLeague() ? ` · ${esc(leagueName(fxLeague(fx)))}` : ""}</span><span>Details ›</span></div>
+          <div class="match-head"><span>${esc(time)}${phaseTag}${!lg && multiLeague() ? ` · ${esc(leagueName(fxLeague(fx)))}` : ""}</span><span>Details ›</span></div>
           <div class="teams">
             <span>${esc(fx.home)}</span><span class="xg num">${xgText(fx, 0)}</span>
             <span>${esc(fx.away)}</span><span class="xg num">${xgText(fx, 1)}</span>
@@ -2144,7 +2189,7 @@ function pfOpen(trades) {
     const move = cur < t.odds ? "shortened" : cur > t.odds ? "drifted" : "unchanged";
     return `
       <button class="bet-row trade" data-trade="${esc(t.id)}">
-        <span>${tradeTitle(t)}${isLean(t) ? driverChip(t) : ""}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curZ != null ? ` · now ${sigmaText(curZ)}` : curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}</div></span>
+        <span>${tradeTitle(t)}${isLean(t) ? driverChip(t) : ""}<div class="meta">${esc(kickoffText(t.kickoff))} · ${t.bet_type === "player" || isCorner(t) ? `${esc(t.home)} v ${esc(t.away)}` : esc(tradeLabel(t))} · $${t.stake} @ ${american(t.odds)}</div><div class="meta">${tradePhase(t) !== "upcoming" ? `<b class="phase-tag ${tradePhase(t)}">${PHASE_LABEL[tradePhase(t)]}</b> · ${startedCloseText(t)}` : `Now ${american(cur)} (${move}${live ? "" : ", last seen"})${curZ != null ? ` · now ${sigmaText(curZ)}` : curEdge != null ? ` · edge now ${signedPct(curEdge)}` : ""}`}</div></span>
         <span class="pl ${plClass(mtm)}">${usd(mtm, 2)}<div class="meta">if cashed out</div></span>
       </button>`;
   }).join("");
@@ -2244,10 +2289,15 @@ const pickBadge = (pick, t) => {
   return moved ? "Would pick now" : "Live-test pick";
 };
 // An open match trade on a card: its bet, entry price, today's price and value if cashed out.
+// Once the match has started there is no "now" price: "In play" or "Awaiting result" with the close.
 function openBadge(t) {
+  const tag = leanOn() ? (stratOf(t) === "lean" ? " (Lean)" : " (12%)") : "";
+  const ph = tradePhase(t);
+  if (ph === "inplay" || ph === "awaiting") {
+    return `<span class="badge paper ${ph}">${ph === "inplay" ? "In play" : "Awaiting result"}${tag}: ${esc(tradeLabel(t))} @ ${american(t.odds)} · ${startedCloseText(t)}</span>`;
+  }
   const { cur } = currentPrice(t);
   const m = markToMarket(t, cur);
-  const tag = leanOn() ? (stratOf(t) === "lean" ? " (Lean)" : " (12%)") : "";
   return `<span class="badge paper">Paper trade open${tag}: ${esc(tradeLabel(t))} @ ${american(t.odds)} · now ${american(cur)} <b class="${plClass(m)}">${usd(m, 2)}</b></span>`;
 }
 // The headline Blend Lean badge ("Lean · 1.3σ" or "Strong · 2.4σ"), then its open trade.
@@ -2613,8 +2663,10 @@ function pfTradeRow(t) {
   const dec = Number(t.odds);
   const clv = tradeClv(t);
   const how = isLean(t) && t.z != null ? sigmaText(t.z) : t.edge != null ? `edge ${signedPct(t.edge)}` : "";
+  const ph = tradePhase(t);
   let extra = "";
-  if (open) { const { cur, live } = currentPrice(t); extra = cur && cur !== t.odds && live ? ` · now ${american(cur)}` : ""; }
+  if (ph === "upcoming") { const { cur, live } = currentPrice(t); extra = cur && cur !== t.odds && live ? ` · now ${american(cur)}` : ""; }
+  else if (open) extra = ` · ${startedCloseText(t)}`; // kicked off: no "now" price, the close is final
   else extra = `${t.score ? ` · ${esc(t.score)}` : ""}${clv != null ? ` · <span class="nowrap">CLV ${signedPct(clv)}</span>` : ""}`;
   const right = open
     ? `<b>$${Number(t.stake).toFixed(0)}</b><small>to win $${(t.stake * (dec - 1)).toFixed(2)}</small>`
@@ -2624,7 +2676,7 @@ function pfTradeRow(t) {
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
       <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}
-        <span class="meta">${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
+        <span class="meta">${open && ph !== "upcoming" ? `<b class="phase-tag ${ph}">${PHASE_LABEL[ph]}</b> · ` : ""}${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
         <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span></span>
       <span class="vals">${right}</span>
     </button>`;
@@ -2707,11 +2759,16 @@ function liveStrategyHtml(cur, x, lg) {
     return `${title}${banner}${drvPanel}<div class="empty">${empty}</div>${rules}`;
   }
   const avg = lean && m.avgZ != null ? sigmaText(m.avgZ) : signedPct(m.avgEdge);
+  // Unsettled trades split by kickoff: upcoming and in play stay "Open"; a finished match
+  // waits for its result in its own group until the ledger settles it.
+  const open = trades.filter((t) => t.status === "open" && tradePhase(t) !== "awaiting");
+  const awaiting = trades.filter((t) => tradePhase(t) === "awaiting");
+  const openRisk = open.reduce((a, t) => a + (t.stake || 0), 0);
   const tiles = `
     <div class="tiles pf-tiles">
       <div class="tile"><div class="label">Profit, settled</div><div class="value ${m.n ? signCls(m.profit) : ""}">${m.n ? usd(m.profit, 2) : "–"}</div><div class="sub">${m.n ? `on $${m.staked.toFixed(0)} staked · ${signedPct(m.roi)}` : "nothing settled yet"}</div></div>
       <div class="tile"><div class="label">Record</div><div class="value">${m.won}–${m.lost}</div><div class="sub">${m.void} void${m.clv != null ? ` · CLV ${signedPct(m.clv)}` : ""}</div></div>
-      <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk</div></div>
+      <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk${awaiting.length ? ` · ${awaiting.length} finished, awaiting result (not in profit yet)` : ""}</div></div>
       <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${lean ? " (σ above break-even)" : ""}</div></div>
     </div>`;
   // Closes taken over an hour before kickoff (throttled scheduled builds): approximate CLV.
@@ -2725,7 +2782,6 @@ function liveStrategyHtml(cur, x, lg) {
     ? `<p class="note">95% range on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Won ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
   const curve = settledCurve(trades);
   const chart = curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
-  const open = trades.filter((t) => t.status === "open");
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
   const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
@@ -2738,8 +2794,9 @@ function liveStrategyHtml(cur, x, lg) {
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card">${chart}</div>
-    <div class="section-title">Open · ${open.length}${open.length ? ` · $${m.atRisk.toFixed(0)} at risk` : ""}</div>
-    ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">No open trades.</span></div>`}
+    <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk` : ""}</div>
+    ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
+    ${awaiting.length ? `<div class="section-title">Awaiting result · ${awaiting.length}</div><p class="note await-note">These matches have finished. ${AWAIT_NOTE} Their close and CLV are final.</p><div class="card list">${awaiting.map(pfTradeRow).join("")}</div>` : ""}
     ${done.length ? `<div class="section-title">Settled · ${done.length} · <span class="${signCls(doneProfit)}">${usd(doneProfit, 2)}</span></div><div class="card list">${shown.map(pfTradeRow).join("")}</div>${done.length > shown.length ? `<button class="more" id="pf-more">Show more (${done.length - shown.length} left)</button>` : ""}` : ""}
     ${impliedVsRealizedHtml(trades)}
     ${pfBreakdowns(set.breakdowns || {})}
@@ -2870,14 +2927,14 @@ const TRADE_FIELDS = [
   ["Threshold", (t) => (isLean(t) ? `+${Number(t.threshold).toFixed(0)}σ` : pct(t.threshold))],
   ["Rule", (t) => (isCorner(t) ? "Fixed edge, model (f) vs Pinnacle (live test)" : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : t.rule === "lean_1sigma" ? "Blend 1σ+ above the price's break-even" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
-  [(t) => (t.status === "open" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
-  [(t) => (t.status === "open" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
+  [(t) => (tradePhase(t) === "upcoming" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
+  [(t) => (tradePhase(t) === "upcoming" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
   ["Bookmaker", (t) => ({ pinnacle: "Pinnacle", draftkings: "DraftKings", fanduel: "FanDuel" })[t.bookmaker] || t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings")],
   ["Book implied chance", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
-  [(t) => (isPlayer(t) ? "Price move to close" : t.status === "open" ? "CLV so far" : isCorner(t) ? "CLV vs Pinnacle's close" : "CLV vs DraftKings"), (t) => signedPct(tradeClv(t))],
-  ["Beat the close", (t) => { const b = tradeBeat(t), c = tradeClv(t); return b == null ? (c == null || t.status === "open" ? "–" : c > 0 ? "Yes" : "No") : b ? "Yes" : "No"; }, (t) => !isPlayer(t)],
+  [(t) => (isPlayer(t) ? "Price move to close" : tradePhase(t) === "upcoming" ? "CLV so far" : isCorner(t) ? "CLV vs Pinnacle's close" : "CLV vs DraftKings"), (t) => signedPct(tradeClv(t))],
+  ["Beat the close", (t) => { const b = tradeBeat(t), c = tradeClv(t); return b == null ? (c == null || tradePhase(t) === "upcoming" ? "–" : c > 0 ? "Yes" : "No") : b ? "Yes" : "No"; }, (t) => !isPlayer(t)],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle), "match"],
-  ["Status", (t) => t.status[0].toUpperCase() + t.status.slice(1)],
+  ["Status", (t) => (t.status === "open" ? `Open · ${PHASE_LABEL[tradePhase(t)]}` : t.status[0].toUpperCase() + t.status.slice(1))],
   ["Score", (t) => t.score || "–", (t) => !isPlayer(t)],
   ["Profit", (t) => (t.profit == null ? "–" : usd(t.profit, 2))],
   ["Season", (t) => seasonName(t.season)],
@@ -2885,6 +2942,20 @@ const TRADE_FIELDS = [
   ["Model", (t) => [t.model_ref?.commit, t.model_ref?.xg_weight != null ? `xG weight ${t.model_ref.xg_weight}` : null, t.model_ref?.matches_fit ? `${t.model_ref.matches_fit} matches` : null].filter(Boolean).join(" · ") || "–"],
   ["Trade id", (t) => t.id],
 ];
+
+// The trade sheet's state line for a live trade: upcoming, in play, awaiting its result, or settled.
+function tradeStateLine(t) {
+  if (t.source !== "live") return "";
+  const ph = tradePhase(t);
+  const m = minsSinceKickoff(t.kickoff);
+  let text;
+  if (ph === "upcoming") text = m == null ? "" : `Kicks off in ${hoursText(-m / 60)}. Prices are still moving: the odds and CLV below are the latest logged.`;
+  else if (ph === "inplay") text = `Kicked off ${hoursText(m / 60)} ago. Prices after kickoff aren't logged, so the close and CLV below are final. It settles after full time.`;
+  else if (ph === "awaiting") text = `Kicked off ${hoursText(m / 60)} ago. ${AWAIT_NOTE} The close and CLV below are final.`;
+  else text = t.status === "void" ? (t.push ? "A push: stake back." : "Void: stake back.") : `${t.status === "won" ? "Won" : "Lost"}${t.profit != null ? ` ${usd(t.profit, 2)}` : ""}.`;
+  const label = ph === "settled" ? "Settled" : PHASE_LABEL[ph];
+  return `<p class="trade-state"><b class="phase-tag ${ph}">${label}</b>${text ? ` ${esc(text)}` : ""}</p>`;
+}
 
 function tradeHtml(t) {
   const kind = isPlayer(t) ? "player" : isCorner(t) ? "corners" : "match";
@@ -2894,6 +2965,7 @@ function tradeHtml(t) {
     <div class="detail">
       <p class="muted" style="margin:0;font-size:13px">${t.source === "live" ? "Live paper trade" : "Backtest trade"}${isPlayer(t) || isCorner(t) ? ` · ${esc(t.home)} v ${esc(t.away)}` : ""}</p>
       <h2 id="sheet-title">${tradeTitle(t)}</h2>
+      ${tradeStateLine(t)}
       <div class="card" style="padding:8px 14px;margin-top:10px">
         <table class="kv"><tbody>${rows}</tbody></table>
       </div>

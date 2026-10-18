@@ -962,7 +962,21 @@ def add_corners(data: dict) -> None:
         t |= tr.settle_corner(t, count) | {"score": f"{hc}-{ac} corners"}
         t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
         settled.append(t)
-    corner_trades = [open_t, *settled]
+    # A finished match whose corner count hasn't arrived yet (open, awaiting its result).
+    kick = NOW - pd.Timedelta(hours=6)
+    c = {"league": "E0", "home": "Crystal Palace", "away": "Brentford", "kickoff": kick}
+    pk = {"side": "over", "odds": 1.95, "model_p": 0.6, "p_push": 0.0, "edge": 0.17}
+    waiting = trade(c, "away", 4.5, pk, kick - pd.Timedelta(hours=25))
+    waiting |= {
+        "model_mean": 5.3,
+        "close_odds": 1.85,
+        "close_prices": {"over": 1.85, "under": 1.97},
+    }
+    waiting |= {"close_fetched_at": (kick - pd.Timedelta(minutes=15)).isoformat()}
+    waiting |= {"close_minutes_before": 15.0, "close_snapshot": "close"}
+    clv = tr.corner_clv(1.95, "over", 1.85, 1.97)
+    waiting |= {"clv_pinnacle": clv, "beat_close_pinnacle": clv > 0}
+    corner_trades = [open_t, waiting, *settled]
     pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
     live_trades = [
         t for p in pfs.values() for t in p["live"]["trades"] if tr.portfolio_of(t) != "corners"
@@ -1018,6 +1032,16 @@ LEAN_SETTLED = [
     ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 3.1, 2.15, 0.4, 3.2, "1-1", False),
     ("SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 1.72, 1.04, 0.71, 1.70, "2-0", True),
 ]
+# Open trades whose matches have started, relative to NOW (the app's trade states, 18 Oct):
+# in play (kicked off under ~2 h 15 min ago) and finished, awaiting the result. Prices
+# after kickoff aren't logged, so each carries its close (or none) and that CLV is final.
+# strategy, league, home, away, minutes since kickoff, market, odds, z (Lean), close odds
+STARTED_OPEN = [
+    ("lean", "E0", "Aston Villa", "Brentford", 50, "home", 2.1, 1.18, 2.0),
+    ("lean", "SP1", "Sevilla", "Valencia", 300, "away", 3.4, 1.07, 3.6),
+    ("edge12", "E0", "Bournemouth", "Wolves", 240, "draw", 3.7, None, 3.5),
+    ("edge12", "E0", "Brighton", "Everton", 30, "away", 4.2, None, None),
+]
 
 
 def add_lean_strategy(data: dict) -> None:
@@ -1070,6 +1094,30 @@ def add_lean_strategy(data: dict) -> None:
         t |= {"profit": round(10 * (odds - 1), 2) if won else -10.0}
         t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
         lean.append(t)
+    for strat, lg, home, away, mins, market, odds, z, close in STARTED_OPEN:
+        kick = NOW - pd.Timedelta(minutes=mins)
+        opened = kick - pd.Timedelta(hours=20)
+        if strat == "lean":
+            sigma = SYNTHETIC_BLENDS["leagues"][lg]["sigma"]
+            p = 1 / odds + z * sigma
+            pick = {"market": market, "odds": odds, "p_bet": p, "model_p": p, "edge": p * odds - 1}
+            pick |= {"z": z, "tier": "lean", "sigma": sigma, "z_market": 0.6, "driver": "model"}
+            t = lean_trade(lg, home, away, kick, pick, opened)
+        else:
+            p = 1.16 / odds
+            pick = {"market": market, "odds": odds, "model_p": p, "edge": p * odds - 1}
+            t = tr.new_trade(
+                pick, source="live", league=lg, home=home, away=away, kickoff=kick,
+                opened_at=opened, odds_fetched_at=(opened - pd.Timedelta(minutes=20)).isoformat(),
+                threshold=0.12, model_p_base=p, model_ref=ref | {"probs": "raw"},
+                rule="fixed_raw", p_source="model", strategy="edge12",
+            )  # fmt: skip
+        if close:
+            clv = odds / close - 1
+            t |= {"close_odds": close, "close_minutes_before": 12, "clv_dk": round(clv, 4)}
+            t |= {"close_fetched_at": (kick - pd.Timedelta(minutes=12)).isoformat()}
+            t |= {"beat_close_dk": clv > 0}
+        (lean if strat == "lean" else trades).append(t)
     ml = pfs["moneyline"]
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     rule = data["portfolio"]["rules"]["E0"]  # paper.run: rules[league], sigma and lean added
