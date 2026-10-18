@@ -702,3 +702,21 @@ table.drv-table th:not(:first-child), table.drv-table td:not(:first-child) { tex
 .rule-note { margin-top: 18px; }
 details.drv-fold { margin-top: 10px; }
 .chart.curve svg { max-width: 460px; margin: 0 auto; }
+
+/* ---------- trade state: upcoming, in play, finished and awaiting its result ---------- */
+.phase-tag { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.phase-tag.inplay { color: var(--accent); }
+.phase-tag.inplay::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+.badge.paper.inplay { color: var(--accent); }
+.badge.paper.awaiting { color: var(--text-primary); }
+.trade-state { margin: 6px 0 0; font-size: 14px; color: var(--text-secondary); }
+.await-note { margin-top: 0; }
