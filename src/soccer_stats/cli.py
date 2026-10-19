@@ -1062,6 +1062,134 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
         print(f"Lean backtest written to {path}")
 
 
+def _print_filter_block(label: str, m: dict, clv_key: str = "") -> None:
+    if not m.get("bets"):
+        print(f"  {label}: 0 bets")
+        return
+    blk = m.get(clv_key) if clv_key else m
+    clv = "n/a" if blk.get("clv") is None else f"{blk['clv']:+.1%}"
+    beat = "n/a" if blk.get("beat_close") is None else f"{blk['beat_close']:.0%}"
+    print(
+        f"  {label}: {m['bets']} bets, won {m['win_rate']:.1%} vs model {m['model_p']:.1%} "
+        f"vs implied {m['implied']:.1%}, ROI {m['roi']:+.1%} ({_fmt_range(m.get('roi_ci95'))}), "
+        f"CLV {clv} (95% {_fmt_range(blk.get('clv_ci95'))}; 97.5% "
+        f"{_fmt_range(blk.get('clv_ci975'))}; {blk['clv_bets']} with a close), "
+        f"beat close {beat}, avg odds {m['avg_odds']:.2f}"
+    )
+
+
+def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
+    """The live Model 12% rule and two filters (A: model favourites only, B: price 3.00 or
+    shorter) on Pinnacle's early prices, plus a descriptive E0 DraftKings check
+    (lab/edge12_filters.py; pre-registered in docs/lab.md). Football-data, Understat and
+    the cached DraftKings snapshots only: no Odds API key, no credits."""
+    import json
+
+    from soccer_stats import leagues as lgs
+    from soccer_stats.data import pinnacle_prices
+    from soccer_stats.lab import edge12_filters as ef
+    from soccer_stats.publish import XG_WEIGHT, _clean
+
+    codes = args.leagues or list(ef.LEAGUES)
+    last = int("20" + ef.LAST_SEASON[:2])
+    years = range(args.from_season - args.burn_in, last + 1)
+    infos: dict[str, dict] = {}
+    rule_bets: dict[str, dict] = {}
+    for code in codes:
+        try:
+            matches = load_matches([code], years)
+            matches, err = with_xg(matches)
+            if err and lgs.LEAGUES[code].understat:
+                print(f"{lgs.name(code)}: {err}")
+            weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+            factory = functools.partial(DixonColes, xg_weight=weight)
+            preds = backtest.walk_forward(
+                matches, start=f"{args.from_season}-07-01", model_factory=factory
+            )
+            pins = pinnacle_prices(code, range(args.from_season, last + 1))
+            info, rb = ef.league_bets(preds, pins, code)
+            info["xg_weight"] = weight
+        except Exception as exc:  # one league failing never costs the others
+            info, rb = {"error": f"{type(exc).__name__}: {exc}"}, {}
+        infos[code] = info
+        rule_bets[code] = rb
+        print(f"\n=== Model 12% filters on Pinnacle early: {lgs.name(code)} ===")
+        if info.get("error"):
+            print(f"  {info['error']}")
+            continue
+        print(
+            f"  xG weight {info['xg_weight']}; seasons scored: "
+            f"{', '.join(info['seasons_scored']) or 'none'}; left out: "
+            f"{', '.join(info['seasons_left_out']) or 'none'}; {info['candidates']} matches"
+        )
+        for rule in ef.RULES:
+            _print_filter_block(rule, ef.metrics(rb[rule]))
+
+    dk = None
+    if not args.no_dk:
+        try:
+            dk = _edge12_dk_check(ef)
+        except Exception as exc:
+            dk = {"error": f"{type(exc).__name__}: {exc}"}
+    out = ef.build(infos, rule_bets, names={c: lgs.name(c) for c in codes}, dk=dk)
+    print("\n=== Model 12% filters, all leagues pooled ===")
+    for rule in ef.RULES:
+        _print_filter_block(rule, out["pooled"][rule])
+    for rule in ef.RULES:
+        print(f"\n--- {rule} by season (pooled, descriptive) ---")
+        for s in out["by_season"][rule]:
+            _print_filter_block(s["label"], s)
+    if dk:
+        print(f"\n=== {dk.get('label', 'DraftKings check')} ===")
+        if dk.get("error"):
+            print(f"  {dk['error']}")
+        else:
+            print(f"  {dk['matches']} matches with DraftKings candidates")
+            for rule in ef.RULES:
+                _print_filter_block(f"{rule} vs DraftKings' close", dk[rule])
+                if dk[rule].get("bets"):
+                    _print_filter_block(f"{rule} vs Pinnacle's close", dk[rule], "clv_pinnacle")
+    dec = out["decision"]
+    print("\n=== Decision (pre-registered) ===")
+    for f, c in dec["checks"].items():
+        print(
+            f"  {f}: {c['bets']} bets, CLV 97.5% range {_fmt_range(c['clv_ci975'])}, "
+            f"passes {c['passes']}"
+        )
+    print("  " + dec["verdict"])
+    print(
+        "EDGE12_FILTERS_JSON "
+        + json.dumps(_clean({"pooled": out["pooled"], "decision": dec}), separators=(",", ":"))
+    )
+    if args.json:
+        path = Path(args.json)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"Results written to {path}")
+
+
+def _edge12_dk_check(ef) -> dict:
+    """E0's DraftKings 2025/26 candidates as backtest-dk builds them (looks 48 h and 3 h,
+    xG weight 0.7, burn-in 2), from the cached snapshots only."""
+    from soccer_stats.odds_history import load_history
+    from soccer_stats.publish import XG_WEIGHT
+
+    year = 2025
+    matches = load_matches(["E0"], range(year - 2, year + 1))
+    matches, err = with_xg(matches)
+    if err:
+        print(f"DraftKings check: {err}")
+    history = load_history("E0", set(matches["home"]))
+    if history.empty:
+        return {"error": "no cached DraftKings snapshots"}
+    weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+    factory = functools.partial(DixonColes, xg_weight=weight)
+    cands = backtest.dk_candidates(
+        matches, history, start=f"{year}-07-01", looks_hours=(48.0, 3.0), model_factory=factory
+    )
+    return ef.dk_check(cands, season=f"{year % 100:02d}{(year + 1) % 100:02d}")
+
+
 def _print_goals(goals: dict) -> None:
     print("\n=== Anytime goalscorer (stage 1: no odds), P(scores | plays) ===")
     for view in ("before_lineups", "lineup_known"):
@@ -2189,6 +2317,17 @@ def main(argv: list[str] | None = None) -> None:
     lbk.add_argument("--json", help="path for the results")
     lbk.add_argument("--log-dir", help="data-log checkout: writes backtest/lean_backtest.json")
     lbk.set_defaults(func=cmd_backtest_lean)
+
+    e12 = sub.add_parser(
+        "backtest-edge12-filters",
+        help="the live 12% rule and two filters on Pinnacle's early prices (no key)",
+    )
+    e12.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
+    e12.add_argument("--from-season", type=int, default=2019, help="first season of bets")
+    e12.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    e12.add_argument("--no-dk", action="store_true", help="skip the DraftKings E0 check")
+    e12.add_argument("--json", help="path for the results")
+    e12.set_defaults(func=cmd_backtest_edge12_filters)
 
     bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
     bp.add_argument("--league", default="E0")
