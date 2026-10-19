@@ -923,3 +923,80 @@ fewer, shorter-priced bets, and I expect their CLV to be closer to 0 but not abo
 **How it runs:** `soccer-stats backtest-edge12-filters` (`edge12_filters.py`),
 `backfill.yml` input `edge12_filters` (no key, 0 credits, prints and uploads a 7-day
 artifact, never pushes to data-log), dispatched once on the research branch.
+
+### Results (2026-10-19; print-only `backfill.yml` run 39291797948, 0 credits, no key)
+
+Order: pre-registration committed 268baf7 at 16:55:55 UTC; code c15748b at 17:01:57;
+first run 39290653007 dispatched 17:02:08. That run lost Ligue 1, the Championship and
+League Two to football-data read timeouts (the other five leagues' numbers were printed
+and seen). The fix (e9d4f46, 17:09) only adds download retries, and refuses to run an
+Understat league goals-only. Nothing in the rules, data or metrics changed. The complete
+run 39291797948 (dispatched 17:10:03) is the result. Its five shared leagues match the
+first run exactly. Every league scored all six seasons 2019/20–2024/25: Pinnacle's
+early and close prices cover at least 90% everywhere. xG was attached to 100% of matches
+in the five Understat leagues and 0% in E1–E3, as registered.
+
+Won = win rate; model = the model's average chance on the picked side; implied =
+1/decimal (margin kept). ROI per $1 and CLV with 95% ranges (2,000 match resamples);
+pooled CLV also at 97.5%.
+
+**Pooled, eight leagues**
+
+| Rule | Bets | Won / model / implied | ROI (95%) | CLV (95%) | CLV 97.5% | Beat close | Avg odds |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Baseline | 8,911 | 26.6% / 35.7% / 28.4% | −5.6% (−9.7% to −1.8%) | −4.6% (−4.8% to −4.4%) | −4.9% to −4.4% | 30% | 4.52 |
+| A, model > 50% | 1,560 | 44.8% / 58.7% / 47.2% | −5.7% (−11.1% to −0.5%) | −2.7% (−3.1% to −2.3%) | −3.1% to −2.3% | 32% | 2.17 |
+| B, price ≤ 3.00 | 2,925 | 40.8% / 52.1% / 42.7% | −4.8% (−9.1% to −0.6%) | −3.1% (−3.4% to −2.9%) | −3.5% to −2.8% | 31% | 2.40 |
+
+**Per league (descriptive)**: bets; won / model / implied; ROI (95%); CLV (95%)
+
+| League | Baseline | A, model > 50% | B, price ≤ 3.00 |
+| --- | --- | --- | --- |
+| E0 | 1,140; 24.6 / 31.7 / 24.9%; +4.4% (−8.2 to +18.5); −4.2% (−4.9 to −3.5) | 148; 47.3 / 59.0 / 48.2%; −2.3% (−19.1 to +14.5); −2.5% (−3.7 to −1.3) | 286; 42.3 / 52.1 / 43.1%; −2.0% (−15.3 to +11.7); −3.1% (−4.0 to −2.2) |
+| SP1 | 930; 24.2 / 31.4 / 25.2%; −5.7% (−19.0 to +6.9); −4.7% (−5.5 to −3.9) | 107; 48.6 / 57.0 / 46.9%; +2.3% (−17.5 to +22.3); −1.4% (−2.8 to +0.2) | 225; 43.1 / 50.2 / 41.8%; +2.0% (−13.3 to +17.9); −2.2% (−3.2 to −1.2) |
+| D1 | 628; 23.7 / 29.1 / 23.7%; +3.7% (−13.9 to +22.6); −4.4% (−5.3 to −3.4) | 66; 45.5 / 58.4 / 48.1%; −6.0% (−30.7 to +19.4); −1.7% (−3.5 to +0.1) | 132; 42.4 / 51.7 / 43.1%; −0.8% (−20.6 to +19.6); −2.2% (−3.4 to −1.0) |
+| I1 | 856; 19.3 / 30.2 / 24.4%; −23.4% (−35.9 to −10.4); −4.8% (−5.6 to −3.9) | 88; 43.2 / 57.6 / 47.4%; −11.5% (−33.3 to +9.2); −0.9% (−2.6 to +0.8) | 190; 37.9 / 50.6 / 42.3%; −11.2% (−27.5 to +4.6); −1.8% (−3.0 to −0.6) |
+| F1 | 851; 22.2 / 30.9 / 24.6%; −4.2% (−19.1 to +10.9); −4.4% (−5.3 to −3.6) | 90; 41.1 / 58.0 / 46.7%; −12.2% (−35.2 to +10.9); −1.8% (−3.4 to −0.1) | 185; 36.2 / 51.0 / 42.0%; −13.5% (−30.5 to +3.2); −2.1% (−3.3 to −1.0) |
+| E1 | 1,666; 31.1 / 40.7 / 32.2%; −4.3% (−11.5 to +3.5); −4.5% (−4.9 to −4.1) | 407; 48.2 / 59.5 / 47.9%; +0.8% (−9.0 to +10.8); −2.9% (−3.6 to −2.2) | 723; 43.2 / 53.0 / 43.5%; −0.7% (−9.2 to +7.6); −3.4% (−3.9 to −2.9) |
+| E2 | 1,441; 30.1 / 40.9 / 32.4%; −9.2% (−17.4 to −1.5); −4.4% (−4.9 to −4.0) | 401; 43.4 / 59.6 / 47.3%; −9.0% (−19.0 to +1.4); −3.0% (−3.7 to −2.3) | 641; 42.3 / 53.9 / 43.7%; −2.6% (−11.6 to +5.9); −3.3% (−3.9 to −2.8) |
+| E3 | 1,399; 29.2 / 39.5 / 31.3%; −5.9% (−14.1 to +2.2); −5.3% (−5.8 to −4.9) | 253; 40.3 / 57.5 / 45.6%; −12.1% (−25.0 to +1.8); −3.8% (−4.7 to −3.0) | 543; 36.1 / 50.5 / 41.2%; −12.7% (−22.6 to −2.6); −4.0% (−4.6 to −3.4) |
+
+By season (pooled, descriptive): every season's CLV range is below 0 for all three
+rules. Baseline −3.6% to −5.8%, A −1.9% to −3.6%, B −2.8% to −3.5%.
+
+**Decision (pre-registered rule):** A has 1,560 bets with a pooled CLV range at 97.5% of
+−3.1% to −2.3%. B has 2,925 bets with −3.5% to −2.8%. Neither range lies above 0, so
+**neither filter passes. No live change.** (Per league, A's 95% CLV range touches 0
+only in La Liga, the Bundesliga and Serie A, with 66–107 bets each. Per-league numbers
+are descriptive, not judged.)
+
+**DraftKings E0 2025/26 check (descriptive): not run as registered.** The job found no
+`odds-history-*` cache (the cached DraftKings snapshots `backtest-dk` reads), neither on
+this branch nor on the default branch it can restore from. GitHub likely evicted it
+after 7 days without use; the last run that read it was 10 Oct. Without the
+snapshots, A and B can't be replayed on DraftKings, since both need every side's price
+at each look. What can be shown, from data-log's `backtest/E0_dk.json` (generated 10
+Oct, the baseline's 173 settled trades), is the baseline and the baseline's own picks
+that already pass each filter. These subsets are *not* rules A and B: A or B could
+also bet a different side, or at the other look, in matches the baseline bet on a long
+shot.
+
+| DraftKings E0 2025/26 | Bets | Won / model / implied | ROI (95%) | CLV vs DraftKings (95%) | CLV vs Pinnacle (95%) |
+| --- | --- | --- | --- | --- | --- |
+| Baseline (as `E0_dk.json`) | 173 | 23.7% / 31.4% / 25.1% | −13.4% (−38.3% to +14.1%) | −6.2% (−7.3% to −4.9%) | −6.3% (−7.6% to −4.9%) |
+| Baseline picks with model > 50% | 13 | 53.8% / 57.1% / 48.7% | +7.8% (−53.1% to +59.0%) | −3.8% (−6.7% to −0.6%) | −3.6% (−6.6% to −0.1%) |
+| Baseline picks priced ≤ 3.00 | 34 | 41.2% / 48.8% / 41.5% | −3.6% (−40.9% to +39.7%) | −4.5% (−6.4% to −2.6%) | −4.6% (−6.5% to −2.7%) |
+
+## Verdict (Model 12% filters)
+
+**Neither filter is worth keeping.** Both filters do what the owner hoped in one way:
+they drop the long shots where the model overrates its chances most. Bets fall from
+about 8,900 to 1,560 (A) or 2,925 (B), average odds from 4.5 to about 2.2–2.4, and the
+average loss against Pinnacle's close shrinks from 4.6% to 2.7% (A) or 3.1% (B).
+But the model still overrates its picks by a wide margin. Model favourites it gives
+58.7% win 44.8% of the time, against 47.2% implied by the price. The filtered bets
+still lose to the closing price in every league and every season, and lose money
+overall. A smaller loss is still a loss, and the pre-registered bar (CLV range above 0)
+isn't close: both upper ends are about −2.3% or lower. The live Model 12% test can stay
+as the owner's paper test or be stopped. Adding either filter would only make it lose
+more slowly. No handover.
