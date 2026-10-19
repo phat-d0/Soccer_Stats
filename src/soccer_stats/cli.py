@@ -1097,11 +1097,15 @@ def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
     rule_bets: dict[str, dict] = {}
     for code in codes:
         try:
+            _prefetch_seasons(code, years)
             matches = load_matches([code], years)
             matches, err = with_xg(matches)
             if err and lgs.LEAGUES[code].understat:
                 print(f"{lgs.name(code)}: {err}")
             weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+            if lgs.LEAGUES[code].understat and not weight:
+                # Pre-registered: xG weight 0.7 here; never fall back to goals only.
+                raise RuntimeError(f"no Understat xG attached ({err})")
             factory = functools.partial(DixonColes, xg_weight=weight)
             preds = backtest.walk_forward(
                 matches, start=f"{args.from_season}-07-01", model_factory=factory
@@ -1109,6 +1113,7 @@ def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
             pins = pinnacle_prices(code, range(args.from_season, last + 1))
             info, rb = ef.league_bets(preds, pins, code)
             info["xg_weight"] = weight
+            info["xg_share"] = round(float(matches["home_xg"].notna().mean()), 4)
         except Exception as exc:  # one league failing never costs the others
             info, rb = {"error": f"{type(exc).__name__}: {exc}"}, {}
         infos[code] = info
@@ -1118,7 +1123,8 @@ def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
             print(f"  {info['error']}")
             continue
         print(
-            f"  xG weight {info['xg_weight']}; seasons scored: "
+            f"  xG weight {info['xg_weight']} (xG on {info['xg_share']:.0%} of matches); "
+            "seasons scored: "
             f"{', '.join(info['seasons_scored']) or 'none'}; left out: "
             f"{', '.join(info['seasons_left_out']) or 'none'}; {info['candidates']} matches"
         )
@@ -1166,6 +1172,27 @@ def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(_clean(out), separators=(",", ":")))
         print(f"Results written to {path}")
+
+
+def _prefetch_seasons(code: str, years, tries: int = 4, wait: float = 20.0) -> None:
+    """Download each past season's football-data file into the raw cache, retrying network
+    errors (football-data sometimes times out; a past season is then cached for good)."""
+    import time
+
+    import requests
+
+    from soccer_stats.data import download
+
+    for year in years:
+        for attempt in range(1, tries + 1):
+            try:
+                download(code, year)
+                break
+            except requests.RequestException as exc:
+                if attempt == tries:
+                    raise
+                print(f"{code} {year}: {type(exc).__name__}, retry {attempt} of {tries - 1}")
+                time.sleep(wait * attempt)
 
 
 def _edge12_dk_check(ef) -> dict:

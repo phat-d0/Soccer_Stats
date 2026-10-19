@@ -267,3 +267,27 @@ def test_dk_skips_voids_thin_teams_and_other_seasons():
     assert ef.dk_bets(pd.DataFrame([_cand("3h", PROBS, ODDS, home_n=5)]), "A").empty
     assert ef.dk_bets(pd.DataFrame([_cand("3h", PROBS, ODDS, season="2425")]), "A").empty
     assert ef.dk_bets(pd.DataFrame(), "A").empty
+
+
+def test_prefetch_retries_network_errors_then_gives_up(monkeypatch):
+    import requests
+
+    from soccer_stats import cli, data
+
+    calls = []
+
+    def flaky(code, year):
+        calls.append(year)
+        if len(calls) < 3:
+            raise requests.ReadTimeout("slow")
+
+    monkeypatch.setattr(data, "download", flaky)
+    cli._prefetch_seasons("F1", [2019], tries=4, wait=0)
+    assert calls == [2019, 2019, 2019]
+
+    def down(code, year):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(data, "download", down)
+    with pytest.raises(requests.ConnectionError):
+        cli._prefetch_seasons("F1", [2019], tries=2, wait=0)
