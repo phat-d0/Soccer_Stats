@@ -843,3 +843,83 @@ What this means for the work plan:
   how fast DraftKings reacts. It isn't for any model edge, since nothing beats Pinnacle's
   close here or in bake-offs 1–3.
 - No handover and no live change.
+
+## Model 12% filters (owner, 19 Oct; pre-registered 2026-10-19, before any code or run)
+
+**Owner's request.** The live Model 12% test loses because its edges sit on long shots
+the model over-rates: on 86 settled live trades the model said 37%, the price implied
+31%, and 29% won; at prices of 5.00 and up (15 bets) the model said 19%, the price 15%,
+and 7% won, −$85 of the −$109. Test on history which of two filters, if either, is worth
+keeping. Those live numbers are why the filters were chosen, so they are not evidence
+for them; the test below uses history only.
+
+**The three rules (fixed now).** Each is applied once per match to the model's own raw
+chances (p_home, p_draw, p_away) and the quoted decimal prices; edge = p × decimal − 1.
+- **Baseline:** the live rule as it is: the side with the highest edge among those with
+  edge ≥ 12% (and > 0), one pick per match, `trades.best_pick`'s order and ties (home,
+  draw, away; a later side replaces an earlier one only with a strictly higher edge;
+  12% minus `EPS` 1e-9), $1 a bet.
+- **A, model favourites only:** the same, but only sides whose model chance is above
+  50% (strictly) can be picked.
+- **B, no long shots:** the same, but only sides whose decimal price is 3.00 or shorter
+  (≤ 3.00) can be picked.
+- **How a filter applies (the choice, kept):** the filter is applied *before* the pick,
+  not to the pick the baseline would make. Each rule chooses the best edge ≥ 12% among
+  the sides that pass its filter. So a match whose baseline pick is a long shot can
+  still be bet under B on another side with edge ≥ 12% and price ≤ 3.00. Under A at most
+  one side can pass (two sides can't both be above 50%).
+
+**Data.**
+- Model chances: `backtest.walk_forward` exactly as `lean_backtest` builds them
+  (`soccer-stats backtest-lean`): Dixon-Coles refitted every 7 days on the 730 days
+  before each window, predictions from 2019-07-01, training data from 2017/18 (burn-in
+  2 seasons), xG weight 0.7 in the Understat leagues (E0, SP1, D1, I1, F1) and goals
+  only (weight 0) in E1, E2 and E3, as live. Matches with a team that has fewer than 6
+  matches in the training window get no chance (the walk-forward's skip, the same 6 as
+  the live `low_data` rule), so they are never bet. Every chance comes from matches
+  played before its window: no look-ahead.
+- Prices: Pinnacle's own early 1X2 from football-data (PSH/PSD/PSA, never the
+  average/Bet365 fallback; `data.pinnacle_prices`), bet at the quoted price (margin
+  kept). CLV = entry odds × Pinnacle's Shin-fair close (PSCH/PSCD/PSCA) − 1
+  (`trades.clv`); a bet without a full close counts for ROI but not CLV.
+- Seasons: 2019/20–2024/25 only, and in each league only the seasons where Pinnacle's
+  early and close prices both cover at least 90% of played matches (`lean_backtest`'s
+  coverage rule). 2025/26 (about half priced) and 2026/27 are dropped before any bet is
+  made, whatever their coverage.
+- Leagues: E0, SP1, D1, I1, F1, E1, E2, E3.
+
+**Metrics, per rule, pooled across leagues and per league** (per season pooled as a
+descriptive extra): bets; win rate beside the model's average chance and the average
+implied chance (1/decimal, margin kept); ROI per $1 with a 95% range; CLV with a 95%
+range; beat-the-close share (CLV > 0); average odds. Ranges are percentile bootstraps
+(2,000 draws, fixed seed) resampling matches; each rule has at most one bet per match,
+so resampling bets is resampling matches. Pooled CLV also gets the 97.5% range used by
+the decision.
+
+**Decision rule (written before any result).**
+- A filter is **worth keeping** if, pooled across the eight leagues, its CLV range at
+  97.5% (Bonferroni for two filters: 2 tests at 95% family-wise) lies above 0 **and** it
+  has at least 300 bets.
+- If both pass, keep the one with the higher pooled CLV. If neither passes, say so
+  plainly and recommend no live change.
+- ROI is reported, not judged (too noisy). The baseline is the reference and is not
+  judged. Per-league and per-season numbers are descriptive. Variants counted: 2 (A and
+  B); nothing else will be tried under this registration.
+
+**Secondary, descriptive check (not judged):** the same three rules on E0's DraftKings
+2025/26 backtest (`backtest.dk_candidates` on the cached DraftKings snapshots, as
+`backtest-dk` builds them for `E0_dk.json`: looks 48 h and 3 h before kickoff, a match
+trades at its first qualifying look under each rule, xG weight 0.7, burn-in 2, teams
+with fewer than 6 matches in the training window skipped). Home/draw/away only, as the
+live DraftKings call asks for h2h only. Reported: bets, win rate vs model vs implied,
+ROI with a 95% range, CLV against DraftKings' close and against Pinnacle's close.
+
+**What I already know (disclosed):** the baseline at Pinnacle's early price has been
+seen before in E0 (round 2: CLV −4.2% on 1,419 1X2 bets; `edge_threshold_pinnacle`)
+and in the bake-offs (CLV −3% to −5% in every league). No filtered result has been
+computed. Expectation: the baseline's CLV is below 0 in every league; A and B make
+fewer, shorter-priced bets, and I expect their CLV to be closer to 0 but not above it.
+
+**How it runs:** `soccer-stats backtest-edge12-filters` (`edge12_filters.py`),
+`backfill.yml` input `edge12_filters` (no key, 0 credits, prints and uploads a 7-day
+artifact, never pushes to data-log), dispatched once on the research branch.
