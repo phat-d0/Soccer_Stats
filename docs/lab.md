@@ -1000,3 +1000,127 @@ overall. A smaller loss is still a loss, and the pre-registered bar (CLV range a
 isn't close: both upper ends are about −2.3% or lower. The live Model 12% test can stay
 as the owner's paper test or be stopped. Adding either filter would only make it lose
 more slowly. No handover.
+
+## Price-band edge rule (owner, 20 Oct; pre-registered 2026-10-20, before any code or run)
+
+**Owner's request.** The match rule bets the side with an edge, but in a three-way market
+an edge often sits on a side that isn't the favourite, and the model's underdog edges look
+like its mistakes. Dig into how often the underdog wins when the model disagrees with the
+price, and test a stricter edge on underdogs and a looser one on favourites, so fewer,
+better bets might win. The live numbers that prompted this (Model 12% trades and E0's
+DraftKings backtest: in the 3.50–6.00 band the model said about 28%, the price 22%, and
+15–18% won) are why the bands were chosen, so they are not evidence for the rule.
+
+**What is already known (disclosed).** The Model 12% filters test above used the same
+data: baseline CLV −4.6% (8,911 bets), A (model above 50%) −2.7%, B (price 3.00 or
+shorter) −3.1%, every season below 0. So I expect every band's CLV to be below 0 at every
+threshold, the favourite bands least so. This test differs in two ways: each band gets its
+own minimum edge, chosen on early seasons only, and favourites may qualify below 12%.
+
+**Data (identical to the Model 12% filters test).** The model's walk-forward chances
+(`backtest.walk_forward`, Dixon-Coles refitted every 7 days on the 730 days before each
+window, from 2019-07-01, burn-in 2 seasons, xG weight 0.7 in E0, SP1, D1, I1, F1 and
+goals only in E1, E2, E3; no look-ahead); Pinnacle's own early 1X2 from football-data
+(PSH/PSD/PSA, quoted, margin kept); CLV = entry odds × Pinnacle's Shin-fair close − 1.
+Leagues E0, SP1, D1, I1, F1, E1, E2, E3; only seasons where Pinnacle's early and close
+prices both cover 90% of played matches. Edge = model chance × quoted decimal − 1.
+
+**Split (fixed now).** Development 2019/20–2022/23. Check 2023/24–2024/25, used only once,
+after the rule below is frozen by the code from development alone. 2025/26 and later are
+dropped before anything is computed.
+
+**Bands (by the side's Pinnacle early quoted decimal price o).**
+- `fav`: home or away, o < 2.00
+- `mid`: home or away, 2.00 ≤ o ≤ 3.50
+- `dog`: home or away, 3.50 < o ≤ 6.00
+- `long`: home or away, o > 6.00
+- `draw`: the draw, at any price
+
+**Step 1, descriptive (development only).** Every side with edge > 0, per band × claimed
+edge bucket (0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+): sides, the model's average
+chance, the implied chance (1/o), the win rate, ROI per $1 and CLV, each with a 95% range.
+This answers "how often does the underdog win when the model disagrees".
+
+**Step 2, the rule, chosen on development only.** For each band and each threshold t in
+{2%, 5%, 8%, 12%, 15%, 20%, 25%, 30%}: the band's sides with edge ≥ t, each scored on its
+own (a match can give a home and a draw side). The band's threshold is the t with the
+highest mean CLV among the t with at least 200 development sides (ties: the higher t). A
+band is switched **off** when that best mean CLV is 0 or below.
+
+**Step 3, the frozen rule R.** Per match, among the sides that clear their band's
+threshold (bands that are off can't), bet the one with the highest edge (ties: home,
+draw, away), $1, one bet per match. If every band is off, R makes no bets and the result
+is "no rule survives development".
+
+**Step 4, the check (2023/24–2024/25, once).** R's pooled bets across the eight leagues:
+bets, win rate vs model vs implied, ROI (95% range), CLV (95% range), beat-the-close.
+**Decision:** R is worth a live paper test if its pooled CLV 95% range lies above 0 with at
+least 300 bets (one test, so 95%). ROI is reported, not judged.
+
+**Descriptive alongside (not judged).** On the same check seasons: the baseline (12% on
+every side, the live rule), filters A and B, and R* = the same selection without
+switching any band off (each band at its best development t whatever its sign), so the
+owner can see whether band thresholds beat one flat 12% out of sample. R per band and
+per league. Ranges are percentile bootstraps (2,000 draws, fixed seeds) resampling
+matches.
+
+**How it runs.** `soccer-stats backtest-band-edges` (`lab/band_edges.py`), `odds-check.yml`
+`task=band-edges`: no key, 0 credits, never pushes; log and a 7-day artifact. One run.
+
+### Results (2026-10-20; `odds-check.yml` run 39388494286, 0 credits, no key)
+
+**Order.** Pre-registration c6b8aff (07:34:45 UTC), code a43f8cf, then the one run
+39388494286 (dispatched 07:44:15 UTC on a43f8cf). Nothing was run before the
+pre-registration and nothing has been run since.
+
+**Data.** Eight leagues, 2019/20–2024/25 all scored (Pinnacle early and close coverage
+≥ 90% in every season; 2025/26 dropped first): E0 2,215 matches, SP1 2,212, D1 1,782,
+I1 2,185, F1 1,971, E1 3,184, E2 2,984, E3 3,020. Development 13,007 matches, check 6,546.
+
+**Step 1: how often the side the model likes wins (development, every side with edge > 0).**
+"Model" is the model's average chance, "implied" 1/price at Pinnacle early (margin
+included), ROI per $1 and CLV vs Pinnacle's fair close with 95% ranges (matches resampled).
+
+| Band | Sides | Model | Won | Implied | ROI | CLV |
+| --- | --- | --- | --- | --- | --- | --- |
+| Favourite (< 2.00) | 1,420 | 63.1% | 57.1% | 58.7% | −2.8% (−7.2% to +1.8%) | −2.4% (−2.7% to −2.1%) |
+| Middle (2.00–3.50) | 5,620 | 43.2% | 36.0% | 38.1% | −5.6% (−8.7% to −2.2%) | −3.4% (−3.6% to −3.2%) |
+| Underdog (3.50–6.00) | 3,124 | 27.7% | 21.3% | 23.0% | −6.6% (−13.1% to −0.2%) | −5.0% (−5.4% to −4.7%) |
+| Long shot (> 6.00) | 1,570 | 15.5% | 11.6% | 11.9% | +7.2% (−7.9% to +23.5%) | −6.1% (−6.9% to −5.4%) |
+| Draw | 4,018 | 26.3% | 23.6% | 24.3% | −3.4% (−9.3% to +2.3%) | −3.1% (−3.4% to −2.9%) |
+
+In every band the side the model likes wins a little *less* often than the price says,
+not more, and a bigger claimed edge doesn't help: favourites at a 20%+ edge won 50.5%
+(model 70.3%, implied 55.7%, 91 sides); underdogs at 15–20% won 17.0% (model 27.0%,
+implied 23.0%). The long-shot ROI is one season's luck: its CLV is the worst of all.
+
+**Step 2: thresholds (development).** Best mean CLV per band among thresholds with ≥ 200
+sides: favourite 2% (−2.3%, 1,139 sides), middle 30% (−2.8%, 537), underdog 30% (−4.3%,
+766), long shot 30% (−5.6%, 686), draw 2% (−3.4%, 3,215). Every best CLV is below 0, so
+**every band is switched off**.
+
+**Step 3–4: the frozen rule and the check.** R makes no bets, so there is nothing to
+check: **no rule survives development; no live change.**
+
+**Descriptive on the check seasons (2023/24–2024/25, 6,546 matches, not judged).**
+
+| Rule | Bets | Won | Model | Implied | ROI | CLV |
+| --- | --- | --- | --- | --- | --- | --- |
+| R* (each band at its best t, none off) | 2,336 | 30.1% | 38.6% | 32.6% | −10.7% (−17.3% to −4.3%) | −4.4% (−4.7% to −4.0%) |
+| Baseline 12% (the live rule) | 2,761 | 26.1% | 35.9% | 28.6% | −13.1% (−18.6% to −6.6%) | −5.4% (−5.8% to −5.0%) |
+| A, model > 50% | 489 | 46.2% | 58.9% | 47.3% | −2.3% (−11.4% to +6.9%) | −3.1% (−3.7% to −2.4%) |
+| B, price ≤ 3.00 | 900 | 40.4% | 52.3% | 42.9% | −6.0% (−13.6% to +1.7%) | −3.3% (−3.8% to −2.8%) |
+
+R* by band on the check: favourite 608 bets, won 54.9% vs 58.5% implied, CLV −2.6%;
+middle 249, won 38.6% vs 36.1%, ROI +7.8% (−8.9% to +25.3%) but CLV −4.0%; underdog
+375, won 17.1% vs 22.2% (model 32.5%), ROI −23.5%, CLV −5.6%; long shot 223, won 6.7%
+vs 12.4% (model 18.9%), ROI −45.0%, CLV −11.0%; draw 881, won 21.9% vs 23.2%, CLV −3.5%.
+The baseline's CLV range is below 0 in every one of the eight leagues (−4.6% to −6.3%).
+
+**Verdict.** The owner's idea is right about direction: the further the side is from
+favourite, the worse the model's picks do (CLV −2.4% on favourites to −6.1% on long
+shots in development, −2.6% to −11.0% on the check), so being stricter on underdogs and
+looser on favourites loses *less* than the flat 12% (R* −10.7% vs −13.1% ROI, CLV −4.4%
+vs −5.4%). But no band at any threshold beats Pinnacle's close: even the model's
+favourites win less often than the price implies. Taking fewer bets trims the losses;
+it doesn't find a winning subset. No live change; the paper tests run as they are.
