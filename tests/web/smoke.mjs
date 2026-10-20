@@ -89,6 +89,26 @@ const STEPS = [
       if (!text.includes(want)) throw new Error(`Corners section lacks "${want}"`);
     }
     await p.locator("table.corners-t").first().scrollIntoViewIfNeeded();
+    // Pinnacle's open trade (home 4.5) marks Pinnacle's row only, never DraftKings' row at
+    // the same line; the away 3.5 DraftKings line is one-sided ("–" for the under).
+    const home = p.locator("#sheet-body table.corners-t").first();
+    if (!(await home.locator('tr.pick[data-book="pinnacle"][data-line="4.5"]').count())) throw new Error("Pinnacle's open trade isn't marked on its line");
+    if (await home.locator('tr.pick[data-book="draftkings"][data-line="4.5"]').count()) throw new Error("Pinnacle's trade marks DraftKings' line");
+    if (!(await p.locator('#sheet-body .badge.paper[data-book="pinnacle"]').count()) || (await p.locator('#sheet-body .badge.paper[data-book="draftkings"]').count())) throw new Error("open-trade badges on the wrong book");
+    const one = await p.locator('#sheet-body table.corners-t >> nth=1').locator('tr[data-book="draftkings"][data-line="3.5"]').innerText();
+    if (!one.includes("DK") || !one.includes("–")) throw new Error(`one-sided DraftKings line: ${one}`);
+    if (!text.includes("DK = DraftKings") || !text.includes("prices only one side")) throw new Error("corners note lacks the DraftKings key");
+  }, true],
+  // The other direction: a DraftKings trade (Ipswich v Fulham, home 4.5) marks DraftKings'
+  // row and badge only, never Pinnacle's line at the same team line.
+  ["match-sheet-corners-dk", async (p) => {
+    await closeSheet(p); await p.locator("button.match", { hasText: "Ipswich" }).first().click(); await sheet(p);
+    const home = p.locator("#sheet-body table.corners-t").first();
+    if (!(await home.locator('tr.pick[data-book="draftkings"][data-line="4.5"]').count())) throw new Error("DraftKings' open trade isn't marked on its line");
+    if (await home.locator('tr.pick[data-book="pinnacle"][data-line="4.5"]').count()) throw new Error("DraftKings' trade marks Pinnacle's line");
+    const badges = await p.locator("#sheet-body .badge.paper").allInnerTexts();
+    if (badges.length !== 1 || !badges[0].includes("(DraftKings)")) throw new Error(`open-trade badges: ${badges.join(" | ")}`);
+    await home.scrollIntoViewIfNeeded();
   }, true],
   // The recommended minimum edge, then exploring another one (folded under "Explore other edges").
   ["match-sheet-no-lineups", async (p) => {
@@ -106,7 +126,7 @@ const STEPS = [
     await p.click("button.match >> nth=0"); await sheet(p); await p.click("details.goals-fold > summary");
     const text = await p.textContent("#sheet-body");
     if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
-    if (!text.includes("No Pinnacle price for this match yet") || !text.includes("fits less well in La Liga")) throw new Error("SP1 corners should be model only, with the weaker-fit note");
+    if (!text.includes("No Pinnacle or DraftKings price for this match yet") || !text.includes("fits less well in La Liga")) throw new Error("SP1 corners should be model only, with the weaker-fit note");
   }, true],
   // The Champions League (owner, 13 Oct): goals-only model chances ("exp. goals"), and an
   // odds-only card for a club no football-data league covers.
@@ -512,10 +532,32 @@ const STEPS = [
   ["portfolio-corners", async (p) => {
     await closeSheet(p); await p.click('button[data-pfid="corners"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
-    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Profit over time"]) {
+    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Profit over time"]) {
       if (!text.includes(want)) throw new Error(`Team corners lacks "${want}"`);
     }
+    if (await p.locator('#view button[data-trade$="|dk"]').count()) throw new Error("a DraftKings trade shows under the Pinnacle track");
   }],
+  // The DraftKings track: its own trades, CLV vs DraftKings' close with Pinnacle's as a
+  // second line, a one-sided close without DraftKings CLV; Moneyline's selection untouched.
+  ["portfolio-corners-dk", async (p) => {
+    const before = await p.evaluate(() => localStorage.getItem("pfStrat"));
+    await p.click('button[data-pfstrat="draftkings"]');
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    if (ids.length !== 3 || ids.some((id) => !id.endsWith("|dk"))) throw new Error(`DraftKings track lists: ${ids.join(", ")}`);
+    const text = await p.textContent("#view");
+    for (const want of ["on model (f) against DraftKings", "vs DraftKings' close", "vs Pinnacle's close", "one-sided close", "Brighton over 5.5 corners"]) {
+      if (!text.includes(want)) throw new Error(`DraftKings corners lacks "${want}"`);
+    }
+    if ((await p.evaluate(() => localStorage.getItem("pfStrat"))) !== before) throw new Error("the corner switch changed Moneyline's strategy");
+  }],
+  ["portfolio-corners-dk-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Aston Villa|Fulham|corners|away|4.5|dk"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    for (const want of ["DraftKings", "Fixed edge, model (f) vs DraftKings", "– (one-sided close)", "CLV vs Pinnacle's close", "Pinnacle's close, over / under"]) {
+      if (!text.includes(want)) throw new Error(`DraftKings corner trade sheet lacks "${want}"`);
+    }
+  }, true],
+  ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await p.click('button[data-pfstrat="pinnacle"]'); }],
   ["portfolio-corners-awaiting", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("corners awaiting group");
@@ -562,7 +604,7 @@ const STEPS = [
   ["match-sheet-awaiting", async (p) => {
     await p.locator("button.match", { hasText: "Leeds" }).filter({ hasText: "Arsenal" }).first().click(); await sheet(p);
     const text = await p.textContent("#sheet-body");
-    for (const want of ["Blend Lean: match finished, paper trade awaiting result", "settles automatically", "Awaiting result: Arsenal over 4.5"]) {
+    for (const want of ["Blend Lean: match finished, paper trade awaiting result", "settles automatically", "Awaiting result (Pinnacle): Arsenal over 4.5"]) {
       if (!text.includes(want)) throw new Error(`finished match sheet lacks "${want}"`);
     }
     if (text.includes("A $10 paper trade opens") || text.includes("nothing new opens here")) throw new Error("finished match sheet reads like an upcoming one");

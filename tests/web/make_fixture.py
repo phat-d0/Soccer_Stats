@@ -88,6 +88,7 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
+PLAYER_BT_TRADES = 100  # Player shots (retired) backtest trades kept, newest first
 LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
 SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
 
@@ -331,6 +332,13 @@ def build(src: Path, out: Path) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         log = Path(tmp) / "log"
         shutil.copytree(src, log)
+        # Player shots is retired and its backtest view pages trades by 15: keep the newest
+        # PLAYER_BT_TRADES of E0_players.json's trades (keeps the fixtures under 1 MB).
+        pj = log / "backtest" / "E0_players.json"
+        if pj.exists():
+            pd_ = json.loads(pj.read_text())
+            pd_["trades"] = (pd_.get("trades") or [])[-PLAYER_BT_TRADES:]
+            pj.write_text(json.dumps(pd_))
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
@@ -862,13 +870,40 @@ def add_corners(data: dict) -> None:
             | {"margin": round(1 / over + 1 / under - 1, 6), "fetched_at": at}
             | {"time_source": "download", "downloaded_at": at, "minutes_before": 5000.0}
         )
+    # DraftKings beside Pinnacle (owner, 20 Oct): the same file, book "draftkings".
+    # (card, side, line, shift, sides): card 0 home 4.5 is near the model at DraftKings
+    # (no pick there, though Pinnacle's trade is open on that line); card 1 home 4.5 is a
+    # DraftKings pick with its own open trade (Pinnacle's line has none); card 0 away 3.5
+    # is one-sided (over only); card 2 away 4.5 is quoted at DraftKings only.
+    dk_plan = [(0, "home", 4.5, 0.01, "both"), (0, "away", 3.5, 0.02, "over")]
+    dk_plan += [(1, "home", 4.5, -0.17, "both"), (2, "away", 4.5, 0.0, "both")]
+    for i, side, line, shift, sides in dk_plan:
+        c = e0[i]
+        probs = corners_live.side_probs(c["corners"][side]["cdf"], line)
+        q = min(0.9, max(0.1, probs["over"] / max(1e-9, 1 - probs["push"]) + shift))
+        over, under = round(1 / (q * 1.04), 2), round(1 / ((1 - q) * 1.04), 2)
+        if sides == "over":
+            under = None
+        fair = 1 / over / (1 / over + 1 / under) if under else None
+        rows.append(
+            {"market": corners_live.ROW_MARKET, "league": "E0", "home": c["home"]}
+            | {"away": c["away"], "kickoff": pd.Timestamp(c["kickoff"]).isoformat()}
+            | {"event_id": f"fx{i}", "snapshot": "look", "book": "draftkings", "side": side}
+            | {"team": c[side], "line": line, "over": over, "under": under}
+            | {"fair_over": round(fair, 6) if fair else None}
+            | {"fair_under": round(1 - fair, 6) if fair else None}
+            | {"margin": round(1 / over + 1 / under - 1, 6) if under else None}
+            | {"fetched_at": at, "time_source": "download", "downloaded_at": at}
+            | {"minutes_before": 5000.0}
+        )
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "E0_corners_2026-10.jsonl").write_text(
             "\n".join(json.dumps(r) for r in rows) + "\n"
         )
         corners_live.add_quotes(cards, [tmp])
+        corners_live.add_quotes(cards, [tmp], book=corners_live.DK)
 
-    def trade(c, side, line, pick, at, snapshot="look"):
+    def trade(c, side, line, pick, at, snapshot="look", book="pinnacle"):
         return tr.new_corner_trade(
             pick,
             league=c["league"],
@@ -880,6 +915,7 @@ def add_corners(data: dict) -> None:
             opened_at=pd.Timestamp(at),
             odds_fetched_at=pd.Timestamp(at).isoformat(),
             snapshot=snapshot,
+            book=book,
         ) | {"model_mean": c.get("corners", {}).get(side, {}).get("mean")}
 
     first = e0[0]
@@ -976,7 +1012,7 @@ def add_corners(data: dict) -> None:
     waiting |= {"close_minutes_before": 15.0, "close_snapshot": "close"}
     clv = tr.corner_clv(1.95, "over", 1.85, 1.97)
     waiting |= {"clv_pinnacle": clv, "beat_close_pinnacle": clv > 0}
-    corner_trades = [open_t, waiting, *settled]
+    corner_trades = [open_t, waiting, *settled, *dk_corner_trades(e0, trade, at)]
     pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
     live_trades = [
         t for p in pfs.values() for t in p["live"]["trades"] if tr.portfolio_of(t) != "corners"
@@ -991,8 +1027,51 @@ def add_corners(data: dict) -> None:
         live_trades + corner_trades,
         backtests,
         ml["live"].get("rule"),
-        {"corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}},
+        {
+            "corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
+            | {"strategies": paper.corner_strategies(corner_trades)}
+        },
     )
+
+
+def dk_corner_trades(e0, trade, at) -> list[dict]:
+    """DraftKings corner trades through paper's own close code: one open (card 1 home
+    4.5, DraftKings' pick; Pinnacle's quote at that line is its second yardstick), one
+    settled with a two-sided close and one settled with a one-sided close (no DraftKings
+    CLV, Pinnacle's CLV only)."""
+    out = []
+    c = e0[1]
+    ln = next(x for x in c["corners"]["draftkings"]["home"] if x["pick"])
+    t = trade(c, "home", ln["line"], ln["pick"], at, book="draftkings")
+    q = {"over": ln["over"], "under": ln["under"], "downloaded_at": ln["downloaded_at"]}
+    t |= paper._dk_close(t, q | {"snapshot": "look"}) or {}
+    pin = next(x for x in c["corners"]["pinnacle"]["home"] if x["line"] == ln["line"])
+    t |= paper._pinnacle_ref(t, {**pin, "downloaded_at": pin["downloaded_at"]})
+    out.append(t)
+    # league, home, away, kickoff, side, line, pick side, odds, model_p, count, DK close
+    # over/under (under None = one-sided), Pinnacle close over/under.
+    past = [
+        ("E0", "Brighton", "Wolves", "2026-09-27T14:00:00Z", "home", 5.5, "over")
+        + (2.2, 0.55, 7, 1.95, 1.80, 1.90, 1.95),
+        ("E0", "Aston Villa", "Fulham", "2026-10-04T16:30:00Z", "away", 4.5, "under")
+        + (1.9, 0.62, 6, None, 1.75, 2.02, 1.84),
+    ]
+    for lg, h, a, ko, side, line, ps, odds, mp, count, dko, dku, po, pu in past:
+        c = {"league": lg, "home": h, "away": a, "kickoff": ko}
+        pk = {"side": ps, "odds": odds, "model_p": mp, "p_push": 0.0}
+        pk["edge"] = round(mp * odds - 1, 4)
+        kick = pd.Timestamp(ko)
+        t = trade(c, side, line, pk, kick - pd.Timedelta(hours=26), book="draftkings")
+        t |= {"model_mean": round(line + (0.9 if ps == "over" else -0.8), 2)}
+        got = (kick - pd.Timedelta(minutes=20)).isoformat()
+        t |= paper._dk_close(t, {"over": dko, "under": dku, "downloaded_at": got}) or {}
+        t |= {"close_snapshot": "close"}
+        t |= paper._pinnacle_ref(t, {"over": po, "under": pu, "downloaded_at": got})
+        hc, ac = (count, 5) if side == "home" else (3, count)
+        t |= tr.settle_corner(t, count) | {"score": f"{hc}-{ac} corners"}
+        t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+        out.append(t)
+    return out
 
 
 # Blend Lean (round 14), the second Moneyline strategy, until data-log has
@@ -1126,7 +1205,10 @@ def add_lean_strategy(data: dict) -> None:
         trades + lean,
         {pid: p["backtest"] for pid, p in pfs.items()},
         rule,
-        {"corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}},
+        {
+            "corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
+            | {"strategies": paper.corner_strategies(pfs["corners"]["live"]["trades"])}
+        },
         paper.match_strategies(leans, rule),
     )
 
