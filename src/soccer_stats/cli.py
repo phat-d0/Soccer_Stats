@@ -1174,6 +1174,131 @@ def cmd_backtest_edge12_filters(args: argparse.Namespace) -> None:
         print(f"Results written to {path}")
 
 
+def _print_side_block(label: str, m: dict) -> None:
+    if not m.get("sides"):
+        print(f"  {label}: 0 sides")
+        return
+    clv = "n/a" if m.get("clv") is None else f"{m['clv']:+.1%}"
+    print(
+        f"  {label}: {m['sides']} sides, won {m['win_rate']:.1%} vs model {m['model_p']:.1%} "
+        f"vs implied {m['implied']:.1%}, ROI {m['roi']:+.1%} ({_fmt_range(m.get('roi_ci95'))}), "
+        f"CLV {clv} ({_fmt_range(m.get('clv_ci95'))}), avg odds {m['avg_odds']:.2f}"
+    )
+
+
+def cmd_backtest_band_edges(args: argparse.Namespace) -> None:
+    """A minimum edge per price band for the match rule, chosen on 2019/20-2022/23 and
+    checked once on 2023/24-2024/25 at Pinnacle's early prices (lab/band_edges.py;
+    pre-registered in docs/lab.md). Football-data and Understat only: no key, no credits."""
+    import json
+
+    from soccer_stats import leagues as lgs
+    from soccer_stats.data import pinnacle_prices
+    from soccer_stats.lab import band_edges as be
+    from soccer_stats.publish import XG_WEIGHT, _clean
+
+    codes = args.leagues or list(be.LEAGUES)
+    last = int("20" + be.CHECK_SEASONS[-1][:2])
+    years = range(args.from_season - args.burn_in, last + 1)
+    targets: dict[str, pd.DataFrame] = {}
+    infos: dict[str, dict] = {}
+    for code in codes:
+        try:
+            _prefetch_seasons(code, years)
+            matches = load_matches([code], years)
+            matches, err = with_xg(matches)
+            if err and lgs.LEAGUES[code].understat:
+                print(f"{lgs.name(code)}: {err}")
+            weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+            if lgs.LEAGUES[code].understat and not weight:
+                # Pre-registered: xG weight 0.7 here; never fall back to goals only.
+                raise RuntimeError(f"no Understat xG attached ({err})")
+            factory = functools.partial(DixonColes, xg_weight=weight)
+            preds = backtest.walk_forward(
+                matches, start=f"{args.from_season}-07-01", model_factory=factory
+            )
+            pins = pinnacle_prices(code, range(args.from_season, last + 1))
+            info, target = be.league_target(preds, pins)
+            info["xg_weight"] = weight
+            info["xg_share"] = round(float(matches["home_xg"].notna().mean()), 4)
+            targets[code] = target
+        except Exception as exc:  # one league failing never costs the others
+            info = {"error": f"{type(exc).__name__}: {exc}"}
+        infos[code] = info
+        print(f"\n=== Price bands: {lgs.name(code)} ===")
+        if info.get("error"):
+            print(f"  {info['error']}")
+            continue
+        print(
+            f"  xG weight {info['xg_weight']} (xG on {info['xg_share']:.0%} of matches); "
+            f"seasons scored: {', '.join(info['seasons_scored']) or 'none'}; left out: "
+            f"{', '.join(info['seasons_left_out']) or 'none'}; {info['candidates']} matches"
+        )
+
+    out = be.run(targets, infos, names={c: lgs.name(c) for c in codes})
+    dev = out["development"]
+    print(f"\n=== Development {out['settings']['development']}: {dev['matches']} matches ===")
+    for b in be.BANDS:
+        print(f"\n--- {be.BAND_LABELS[b]} ---")
+        _print_side_block("all edges", dev["by_band"][b])
+        for r in dev["buckets"][b]:
+            hi = "up" if r["edge_hi"] is None else f"{r['edge_hi']:.0%}"
+            _print_side_block(f"edge {r['edge_lo']:.0%} to {hi}", r)
+        for r in dev["scan"][b]:
+            _print_side_block(f"edge >= {r['t']:.0%}", r)
+        c = dev["chosen"][b]
+        t = "none" if c["t"] is None else f"{c['t']:.0%}"
+        print(f"  chosen threshold {t}: {c['why']}")
+    print("\n=== Frozen rule (from development only) ===")
+    for b in be.BANDS:
+        r, rs = out["rule"][b], out["rule_star"][b]
+        print(
+            f"  {b}: R {'off' if r is None else f'{r:.0%}'}; "
+            f"R* {'none' if rs is None else f'{rs:.0%}'}"
+        )
+    chk = out["check"]
+    print(f"\n=== Check {out['settings']['check']}: {chk['matches']} matches, pooled ===")
+    for name, label in (
+        ("R", "R (the band rule)"),
+        ("R_star", "R* (no band off, descriptive)"),
+        ("baseline", "Baseline 12% (descriptive)"),
+        ("A", "A, model > 50% (descriptive)"),
+        ("B", "B, price <= 3.00 (descriptive)"),
+    ):
+        _print_filter_block(label, chk["pooled"][name])
+    for name in ("R", "R_star"):
+        print(f"\n--- {name} by band (check, descriptive) ---")
+        for b in be.BANDS:
+            _print_filter_block(b, chk["by_band"][name][b])
+    print("\n--- R and baseline by league (check, descriptive) ---")
+    for code, lg in out["leagues"].items():
+        _print_filter_block(f"{code} R", lg.get("R") or {})
+        _print_filter_block(f"{code} baseline", lg.get("baseline") or {})
+    dec = out["decision"]
+    print("\n=== Decision (pre-registered) ===")
+    print("  " + dec["verdict"])
+    print(
+        "BAND_EDGES_JSON "
+        + json.dumps(
+            _clean(
+                {
+                    "rule": out["rule"],
+                    "rule_star": out["rule_star"],
+                    "chosen": dev["chosen"],
+                    "check": chk["pooled"],
+                    "decision": dec,
+                }
+            ),
+            separators=(",", ":"),
+        )
+    )
+    if args.json:
+        path = Path(args.json)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"Results written to {path}")
+
+
 def _prefetch_seasons(code: str, years, tries: int = 4, wait: float = 20.0) -> None:
     """Download each past season's football-data file into the raw cache, retrying network
     errors (football-data sometimes times out; a past season is then cached for good)."""
@@ -2355,6 +2480,16 @@ def main(argv: list[str] | None = None) -> None:
     e12.add_argument("--no-dk", action="store_true", help="skip the DraftKings E0 check")
     e12.add_argument("--json", help="path for the results")
     e12.set_defaults(func=cmd_backtest_edge12_filters)
+
+    bnd = sub.add_parser(
+        "backtest-band-edges",
+        help="research: a minimum edge per price band on Pinnacle early (pre-registered)",
+    )
+    bnd.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
+    bnd.add_argument("--from-season", type=int, default=2019, help="first season of bets")
+    bnd.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    bnd.add_argument("--json", help="path for the results")
+    bnd.set_defaults(func=cmd_backtest_band_edges)
 
     bp = sub.add_parser("backtest-players", help="walk-forward test of the player shot model")
     bp.add_argument("--league", default="E0")

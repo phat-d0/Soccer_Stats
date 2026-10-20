@@ -55,6 +55,9 @@
 #             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
 #             move and as blend inputs (no credits).
+#   band-edges: a minimum edge per price band for the match rule (docs/lab.md, "Price-band
+#            edge rule", owner 20 Oct): chosen on 2019/20-2022/23, checked once on
+#            2023/24-2024/25 at Pinnacle's early prices, eight leagues. No key, no credits.
 #   team-totals: data-log's FanDuel team-total log, scored once enough matches settle; also
 #             the round-13 test against DraftKings' main market (docs/totals.md): counts only
 #             below its gate; `finalists` ("fanduel_anchor:0.05") + `after` score a frozen rule.
@@ -64,9 +67,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
@@ -252,6 +255,7 @@ jobs:
               else
                 uv run soccer-stats espn-probe
               fi ;;
+            band-edges) uv run soccer-stats backtest-band-edges --json out/band_edges.json ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log
