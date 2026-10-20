@@ -19,3 +19,12 @@
 {"type":"update","id":"E0|2627|Tottenham|Coventry|corners|home|6.5","at":"2026-10-19T18:32:54+00:00","close_odds":1.93,"close_prices":{"over":1.86,"under":1.93},"close_fetched_at":"2026-10-19T18:32:42+00:00","close_minutes_before":27.3,"close_snapshot":"close","clv_pinnacle":-0.09303721655802388,"beat_close_pinnacle":false}
 {"type":"update","id":"E0|2627|Tottenham|Coventry|corners|away|3.5","at":"2026-10-19T21:00:53+00:00","status":"won","actual":4,"push":false,"profit":9.2,"score":"4-4 corners","settled_at":"2026-10-19T21:00:53+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Tottenham|Coventry|corners|home|6.5","at":"2026-10-19T21:00:53+00:00","status":"won","actual":4,"push":false,"profit":8.5,"score":"4-4 corners","settled_at":"2026-10-19T21:00:53+00:00","result_source":"espn"}
+{"type":"update","id":"E0|2627|Brighton|Crystal Palace|corners|home|6.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"8-5 corners"}
+{"type":"update","id":"E0|2627|Everton|Chelsea|corners|away|4.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"5-7 corners"}
+{"type":"update","id":"E0|2627|Everton|Chelsea|corners|home|4.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"5-7 corners"}
+{"type":"update","id":"E0|2627|Brentford|Liverpool|corners|away|5.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"3-9 corners"}
+{"type":"update","id":"E0|2627|Brentford|Liverpool|corners|home|4.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"3-9 corners"}
+{"type":"update","id":"E0|2627|Fulham|Hull|corners|away|3.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"10-2 corners"}
+{"type":"update","id":"E0|2627|Fulham|Hull|corners|home|6.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"10-2 corners"}
+{"type":"update","id":"E0|2627|Tottenham|Coventry|corners|away|3.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E0|2627|Tottenham|Coventry|corners|home|6.5","at":"2026-10-20T18:30:52+00:00","result_check":"ok","check_score":"4-4 corners"}
