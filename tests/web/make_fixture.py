@@ -88,6 +88,7 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
+PLAYER_BT_TRADES = 100  # Player shots (retired) backtest trades kept, newest first
 LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
 SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
 
@@ -331,6 +332,13 @@ def build(src: Path, out: Path) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         log = Path(tmp) / "log"
         shutil.copytree(src, log)
+        # Player shots is retired and its backtest view pages trades by 15: keep the newest
+        # PLAYER_BT_TRADES of E0_players.json's trades (keeps the fixtures under 1 MB).
+        pj = log / "backtest" / "E0_players.json"
+        if pj.exists():
+            pd_ = json.loads(pj.read_text())
+            pd_["trades"] = (pd_.get("trades") or [])[-PLAYER_BT_TRADES:]
+            pj.write_text(json.dumps(pd_))
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
