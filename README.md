@@ -145,8 +145,23 @@ corners* (`trades.PORTFOLIOS` id `corners`, status testing), in six live leagues
 | Close | the newest quote at the trade's line before kickoff (the close snapshot), CLV against Pinnacle's de-margined close (`clv_pinnacle`) |
 | Settlement | football-data's corner counts: over wins at count > line; a whole line that lands exactly is a push (void, stake back); void if the match moves 48h+ or no result in 14 days |
 
+**DraftKings track (owner, 20 Oct).** The same rule runs a second time against
+DraftKings' team-corner prices, as its own strategy (`strategy: "draftkings"`, trade ids
+ending `|dk`; Pinnacle's trades and ids are unchanged, and a corner trade without
+`strategy` is Pinnacle's):
+
+| Rule | DraftKings track |
+| --- | --- |
+| Market | DraftKings' `alternate_team_totals_corners` (listed in E0, SP1, D1, I1 and F1; not in the Championship) |
+| Probability, edge, stake | as above: model (f), P(win) × DraftKings' decimal odds + P(push) − 1 ≥ 12%, $10 |
+| Trades | at most one per match, team, line and book; a one-sided DraftKings line can trade on its priced side |
+| Entry | the newest logged DraftKings quote, downloaded within 3 hours, kickoff still ahead |
+| Close | DraftKings' newest quote at the line before kickoff: CLV against its de-margined close (`clv_dk`, two-sided only), and against Pinnacle's newest quote at the same team line when Pinnacle has it (`clv_pinnacle`) |
+| Settlement | the same as the Pinnacle track |
+
 Prices come from `corners_live.run` inside `publish` (default branch only): one
-1-credit `/events/{id}/odds` call per match and snapshot, its own 550-credit monthly cap
+1-credit `/events/{id}/odds` call per match and snapshot for both books
+(`bookmakers=pinnacle,draftkings`: up to ten books bill as one region), its own 550-credit monthly cap
 and the shared 3,000-credit reserve, logged to `odds_log/<code>_corners_<YYYY-MM>.jsonl`
 by `soccer-stats log-corners`. Trades go to `paper_trades/<code>_corners_<season>.jsonl`.
 There are no historical corner prices, so the portfolio's backtest is the research record

@@ -653,6 +653,12 @@ CORNER_UPDATE_FIELDS = {
     "close_snapshot",
     "clv_pinnacle",
     "beat_close_pinnacle",
+    # DraftKings corner trades (20 Oct): CLV vs DraftKings' own close, and Pinnacle's
+    # quote at the same team line as the second yardstick (clv_pinnacle above).
+    "clv_dk",
+    "beat_close_dk",
+    "pinnacle_close_prices",
+    "pinnacle_close_fetched_at",
     "actual",
     "push",
     "status",
@@ -764,6 +770,59 @@ def _corner_check(t: dict, results: pd.DataFrame | None, now: pd.Timestamp) -> d
     return _update(t, now, result_check=check, check_score=fd)
 
 
+def _dk_close(t: dict, q: dict) -> dict | None:
+    """Close fields for a DraftKings corner trade from DraftKings' own quote at its line:
+    the price of its side, both prices (one may be None), when we downloaded it, and CLV
+    vs DraftKings' de-margined close (`clv_dk`, `beat_close_dk`; None unless two-sided).
+    None when the quote doesn't price the trade's side."""
+    if q.get(t["side"]) is None:
+        return None
+    clv = tr.corner_clv(t["odds"], t["side"], q.get("over"), q.get("under"))
+    got = q["downloaded_at"]
+    return {
+        "close_odds": q[t["side"]],
+        "close_prices": {"over": q.get("over"), "under": q.get("under")},
+        "close_fetched_at": got,
+        "close_minutes_before": _minutes_before(t["kickoff"], got),
+        "close_snapshot": q.get("snapshot"),
+        "clv_dk": clv,
+        "beat_close_dk": None if clv is None else bool(clv > 0),
+    }
+
+
+def _pinnacle_ref(t: dict, q: dict) -> dict:
+    """A DraftKings corner trade's second yardstick: Pinnacle's quote at the same team line
+    (`pinnacle_close_prices`, `pinnacle_close_fetched_at`) and CLV vs its de-margined
+    price (`clv_pinnacle`, `beat_close_pinnacle`)."""
+    clv = tr.corner_clv(t["odds"], t["side"], q.get("over"), q.get("under"))
+    return {
+        "pinnacle_close_prices": {"over": q.get("over"), "under": q.get("under")},
+        "pinnacle_close_fetched_at": q["downloaded_at"],
+        "clv_pinnacle": clv,
+        "beat_close_pinnacle": None if clv is None else bool(clv > 0),
+    }
+
+
+def _quote_at(quotes: dict, t: dict) -> dict | None:
+    """The newest quote at a trade's team line (kickoff within KICKOFF_TOLERANCE)."""
+    from soccer_stats import corners_live as cl
+
+    k = cl._ts(t["kickoff"])
+    q = None
+    for (_, h, a, kq, side, line), r in quotes.items():
+        if (h, a, side, line) == (t["home"], t["away"], t["team_side"], float(t["line"])):
+            if abs(kq - k) <= KICKOFF_TOLERANCE:
+                if q is None or cl._ts(r["downloaded_at"]) > cl._ts(q["downloaded_at"]):
+                    q = r
+    return q
+
+
+def _newer(got, have) -> bool:
+    from soccer_stats import corners_live as cl
+
+    return not have or cl._ts(got) > cl._ts(have)
+
+
 def update_corner_ledger(
     ledger: dict[str, dict],
     cards: list[dict],
@@ -776,14 +835,18 @@ def update_corner_ledger(
 ) -> list[dict]:
     """Open, close and settle corner paper trades in one league. Mutates `ledger`.
 
-    `rows` are the logged Pinnacle team-corner rows (corners_live.load_rows); `cards`
-    the build's fixture cards with the model (f) (`corners.home/away.cdf`).
-    1. Open: for each team line's newest quote downloaded before kickoff, within
-       FRESH_HOURS of now, on a card whose kickoff is still ahead: the better of over and
-       under (corners_live.pick at trades.CORNERS_EDGE), one trade per match, team and
-       line, ever.
-    2. Close: the newest quote at the trade's team line before kickoff (the close
-       snapshot when it was taken), with CLV vs Pinnacle's de-margined close.
+    `rows` are the logged team-corner rows (corners_live.load_rows; Pinnacle's and, from
+    20 Oct, DraftKings'); `cards` the build's fixture cards with the model (f)
+    (`corners.home/away.cdf`). Each book is its own strategy (tr.CORNER_STRATEGY_ORDER):
+    1. Open: for each team line's newest quote at the book downloaded before kickoff,
+       within FRESH_HOURS of now, on a card whose kickoff is still ahead: the better of
+       over and under (corners_live.pick at trades.CORNERS_EDGE), one trade per match,
+       team, line and book, ever (DraftKings' ids end "|dk").
+    2. Close: the newest quote at the trade's team line at its own book before kickoff
+       (the close snapshot when it was taken). Pinnacle trades: CLV vs Pinnacle's
+       de-margined close (`clv_pinnacle`), unchanged. DraftKings trades: CLV vs
+       DraftKings' de-margined close (`clv_dk`, two-sided only), plus `clv_pinnacle` vs
+       Pinnacle's newest quote at the same team line when Pinnacle has it.
     3. Settle on football-data's corner counts (HC/AC) when it has them, else on ESPN's
        (`espn`: espn_results.fetch, the final match summary's wonCorners), recording
        `result_source`; a whole line that lands exactly is a push (void, stake back); a
@@ -793,45 +856,55 @@ def update_corner_ledger(
     """
     from soccer_stats import corners_live as cl
 
-    rule = tr.corners_rule()
     events: list[dict] = []
-    quotes = cl.newest_quotes([r for r in rows if (r.get("league") or league) == league])
+    mine = [r for r in rows if (r.get("league") or league) == league]
+    quotes = {b: cl.newest_quotes(mine, book=b) for b in cl.BOOKS}
     cards_by = {(c["home"], c["away"]): c for c in cards if c.get("kickoff")}
 
-    # 1. Open.
-    for (_, h, a, k, side, line), q in sorted(quotes.items(), key=lambda kv: str(kv[0])):
-        c = cards_by.get((h, a))
-        if c is None:
-            continue
-        kickoff = cl._ts(c["kickoff"])
-        if abs(kickoff - k) > KICKOFF_TOLERANCE or kickoff <= now:
-            continue
-        got = cl._ts(q["downloaded_at"])
-        if got > now or now - got > pd.Timedelta(hours=FRESH_HOURS):
-            continue
-        model = (c.get("corners") or {}).get(side) or {}
-        p = cl.pick(model.get("cdf"), line, q["over"], q["under"], rule["threshold"])
-        if not p:
-            continue
-        t = tr.new_corner_trade(
-            p,
-            league=league,
-            home=h,
-            away=a,
-            team_side=side,
-            line=line,
-            kickoff=kickoff,
-            opened_at=now,
-            odds_fetched_at=q["downloaded_at"],
-            snapshot=q.get("snapshot"),
-            ref=ref,
-        )
-        if t["id"] in ledger:
-            continue
-        t["model_mean"] = model.get("mean")
-        t.update(_corner_close(t, q))  # until a later quote, the entry price is the close
-        ledger[t["id"]] = t
-        events.append({"type": "open", **t})
+    # 1. Open, Pinnacle first (its trades exactly as before), then DraftKings.
+    for book in cl.BOOKS:
+        rule = tr.corners_rule(book)
+        for (_, h, a, k, side, line), q in sorted(quotes[book].items(), key=lambda kv: str(kv[0])):
+            c = cards_by.get((h, a))
+            if c is None:
+                continue
+            kickoff = cl._ts(c["kickoff"])
+            if abs(kickoff - k) > KICKOFF_TOLERANCE or kickoff <= now:
+                continue
+            got = cl._ts(q["downloaded_at"])
+            if got > now or now - got > pd.Timedelta(hours=FRESH_HOURS):
+                continue
+            model = (c.get("corners") or {}).get(side) or {}
+            p = cl.pick(model.get("cdf"), line, q.get("over"), q.get("under"), rule["threshold"])
+            if not p:
+                continue
+            t = tr.new_corner_trade(
+                p,
+                league=league,
+                home=h,
+                away=a,
+                team_side=side,
+                line=line,
+                kickoff=kickoff,
+                opened_at=now,
+                odds_fetched_at=q["downloaded_at"],
+                snapshot=q.get("snapshot"),
+                ref=ref,
+                book=book,
+            )
+            if t["id"] in ledger:
+                continue
+            t["model_mean"] = model.get("mean")
+            # Until a later quote, the entry price is the close.
+            if book == cl.BOOK:
+                t.update(_corner_close(t, q))
+            else:
+                t.update(_dk_close(t, q) or {})
+                pq = _quote_at(quotes[cl.BOOK], t)
+                if pq is not None and cl._ts(pq["downloaded_at"]) < kickoff:
+                    t.update(_pinnacle_ref(t, pq))
+            ledger[t["id"]] = t
+            events.append({"type": "open", **t})
 
     # 2. Close, and 3. settle.
     for t in ledger.values():
@@ -842,18 +915,23 @@ def update_corner_ledger(
         if t.get("source") != "live" or t.get("status") == "void":
             continue
         k = cl._ts(t["kickoff"])
-        q = None
-        for (_, h, a, kq, side, line), r in quotes.items():
-            if (h, a, side, line) == (t["home"], t["away"], t["team_side"], float(t["line"])):
-                if abs(kq - k) <= KICKOFF_TOLERANCE:
-                    if q is None or cl._ts(r["downloaded_at"]) > cl._ts(q["downloaded_at"]):
-                        q = r
-        if q is not None and cl._ts(q["downloaded_at"]) < k:
-            newer = not t.get("close_fetched_at") or cl._ts(q["downloaded_at"]) > cl._ts(
-                t["close_fetched_at"]
-            )
-            if newer:
-                events.append(_update(t, now, **_corner_close(t, q)))
+        if tr.corner_strategy_of(t) == "draftkings":
+            fields: dict = {}
+            q = _quote_at(quotes[cl.DK], t)
+            if q is not None and cl._ts(q["downloaded_at"]) < k:
+                if _newer(q["downloaded_at"], t.get("close_fetched_at")):
+                    fields.update(_dk_close(t, q) or {})
+            pq = _quote_at(quotes[cl.BOOK], t)
+            if pq is not None and cl._ts(pq["downloaded_at"]) < k:
+                if _newer(pq["downloaded_at"], t.get("pinnacle_close_fetched_at")):
+                    fields.update(_pinnacle_ref(t, pq))
+            if fields:
+                events.append(_update(t, now, **fields))
+        else:
+            q = _quote_at(quotes[cl.BOOK], t)
+            if q is not None and cl._ts(q["downloaded_at"]) < k:
+                if _newer(q["downloaded_at"], t.get("close_fetched_at")):
+                    events.append(_update(t, now, **_corner_close(t, q)))
         if t["status"] != "open" or k > now:
             continue
         res = _corner_result(results, t)
@@ -949,11 +1027,13 @@ def by_league(trades: list[dict]) -> dict | None:
     return out
 
 
-def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None) -> dict:
-    """One match strategy's live record (Moneyline -> live -> strategies): its rule, summary,
-    breakdowns, per-league view and its trades' ids, newest first (the trades themselves
-    are in the section's combined `trades`, so data.json carries each trade once)."""
-    mine = [t for t in trades if tr.strategy_of(t) == key]
+def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None, of=None) -> dict:
+    """One strategy's live record (Moneyline -> live -> strategies, and Team corners ->
+    live -> strategies with `of` = tr.corner_strategy_of): its rule, summary, breakdowns,
+    per-league view and its trades' ids, newest first (the trades themselves are in the
+    section's combined `trades`, so data.json carries each trade once)."""
+    of = of or tr.strategy_of
+    mine = [t for t in trades if of(t) == key]
     sec = portfolio_section(mine)
     out = {
         "key": key,
@@ -1007,6 +1087,22 @@ def match_strategies(leans: dict[str, dict], rule: dict) -> list[dict]:
     rules = {"lean": lean_overview(leans), "edge12": rule}
     labels = {**tr.STRATEGY_LABELS, "edge12": edge_label}
     return [{"key": k, "label": labels[k], "rule": rules[k]} for k in tr.STRATEGY_ORDER]
+
+
+def corner_strategies(trades: list[dict]) -> list[dict]:
+    """Team corners -> live -> strategies: one strategy_section per book in
+    tr.CORNER_STRATEGY_ORDER (Pinnacle first), each with its own rule
+    (tr.corners_rule(book)). A trade without `strategy` is Pinnacle's."""
+    return [
+        strategy_section(
+            trades,
+            k,
+            tr.CORNER_STRATEGY_LABELS[k],
+            tr.corners_rule(k),
+            of=tr.corner_strategy_of,
+        )
+        for k in tr.CORNER_STRATEGY_ORDER
+    ]
 
 
 def portfolios_section(
@@ -1155,9 +1251,10 @@ def run(
     has no result for yet.
 
     Fails safe: if the ledger can't be read, nothing is opened and the tab says why.
-    The corners portfolio runs on its own ledger files, the logged Pinnacle team-corner
-    rows in `log_dir`/odds_log and `corner_results` (corners_live.corner_results); a
-    failure there costs only the corners section.
+    The corners portfolio runs on its own ledger files, the logged Pinnacle and
+    DraftKings team-corner rows in `log_dir`/odds_log and `corner_results`
+    (corners_live.corner_results); a failure there costs only the corners section. Its
+    live section gets `strategies`, one per book (corner_strategies).
     """
     now = now or pd.Timestamp.now(tz="UTC")
     portfolio = data.setdefault("portfolio", {})
@@ -1280,6 +1377,7 @@ def run(
     # above stay for one release.
     if live.get("error") and not corner_section["error"]:
         corner_section["error"] = live["error"]
+    corner_section["strategies"] = corner_strategies(corner_trades)
     portfolio["portfolios"] = portfolios_section(
         live,
         live_trades + corner_trades,

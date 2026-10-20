@@ -343,6 +343,14 @@ def cmd_estimate_cups(args: argparse.Namespace) -> None:
     print("CUPS_JSON " + json.dumps(cups.summary(res), default=str))
 
 
+def cmd_cup_corners(args: argparse.Namespace) -> None:
+    """The cup corners model (docs/totals.md "Cup corners model"): the coverage count, or
+    the pre-registered walk-forward evaluation. ESPN and football-data only."""
+    from soccer_stats import cup_corners
+
+    cup_corners.cli(args.coverage_only, args.workers, args.json)
+
+
 def cmd_backfill_cup_odds(args: argparse.Namespace) -> None:
     """A UEFA cup's historical closes (Pinnacle and DraftKings h2h) on ESPN's calendar, one
     bulk snapshot per kickoff slot, never past --cap (0 = dry run: no Odds API calls)."""
@@ -600,8 +608,14 @@ def cmd_paper(args: argparse.Namespace) -> None:
             pc["live"].get("error")
             or f"Corner paper trades: {cs.get('trades', 0)} trades, {cs.get('open', 0)} open, "
             f"{cs.get('settled', 0)} settled (rule: {pc['live']['rule']['threshold']:.0%} on "
-            "model (f) vs Pinnacle)"
+            "model (f) vs Pinnacle and DraftKings)"
         )
+        for st in pc["live"].get("strategies") or []:
+            ss = st.get("summary") or {}
+            print(
+                f"Corner strategy {st['label']}: {ss.get('trades', 0)} trades, "
+                f"{ss.get('open', 0)} open, {ss.get('settled', 0)} settled"
+            )
 
 
 def _plan(league: str, seasons: list[int], looks: list[float]):
@@ -2338,6 +2352,18 @@ def main(argv: list[str] | None = None) -> None:
     ecu.add_argument("--no-teams", action="store_true", help="skip football-data coverage")
     ecu.add_argument("--json", help="write the full result (calendars included) here")
     ecu.set_defaults(func=cmd_estimate_cups)
+
+    ccn = sub.add_parser(
+        "cup-corners",
+        help="cross-league team-corner model for the UEFA cups: coverage, walk-forward "
+        "evaluation and cost (no key, 0 credits, prints only)",
+    )
+    ccn.add_argument(
+        "--coverage-only", action="store_true", help="counts and the cost estimate only"
+    )
+    ccn.add_argument("--workers", type=int, default=6, help="parallel ESPN summary requests")
+    ccn.add_argument("--json", help="write the result here")
+    ccn.set_defaults(func=cmd_cup_corners)
 
     bco = sub.add_parser(
         "backfill-cup-odds",

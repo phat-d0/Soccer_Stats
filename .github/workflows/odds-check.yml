@@ -22,6 +22,13 @@
 #            2017/18-2023/24; `reason` + `finalists` (the league's finalist, f/g/h) + `cap`
 #            (leagues judged) open the 2026/27 test (to 31 Jan 2027) once, not before 3 Feb 2027.
 #   corner-coverage: 2025/26 corner-count coverage in all six leagues (counts only).
+#   cup-corner-coverage: the cup corners model's coverage count (docs/totals.md "Cup corners
+#            model"): football-data HC/AC per file, ESPN cup summaries with corner counts,
+#            cup clubs with domestic corner data, plus the live corner-snapshot cost on ESPN's
+#            2026/27 calendar. No fit, no score; ESPN and football-data only, no key.
+#   cup-corners: the cup corners model's pre-registered walk-forward on 2024/25-2025/26 (all
+#            three cups, qualifying included) and the 2026/27 clubs with a chance. No key.
+#            Both cup tasks keep ESPN's corner counts in the cup-corners-* cache.
 #   corner-recal: team-corner recalibration for `league` (docs/totals.md, round 12):
 #            development view with 2025/26 dropped first; `reason` opens 2025/26 once.
 #   markets: live market probe (team totals, alternate totals, corners; docs/totals.md),
@@ -67,9 +74,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
@@ -156,6 +163,22 @@ jobs:
           path: data/raw
           key: understat-F1-none
           restore-keys: understat-F1-
+      # The cup corners model: ESPN's cup scoreboards (warmed by backfill.yml's match_blends
+      # and the closes download), then this task's own cache of corner counts (saved below).
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'cup-corner-coverage' || inputs.task == 'cup-corners' }}
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-none
+          restore-keys: cup-espn-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'cup-corner-coverage' || inputs.task == 'cup-corners' }}
+        with:
+          path: |
+            data/raw/cups/corners
+            data/raw/cups/espn
+          key: cup-corners-none
+          restore-keys: cup-corners-
       - name: Run
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history') && secrets.ODDS_API_KEY || '' }}
@@ -204,6 +227,9 @@ jobs:
               uv run python -m soccer_stats.edge.corners2 --league "$LEAGUE" --reason "$REASON" \
                 --finalist "$FINALISTS" --tests "$T" --json out/corners2.json ;;
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
+            cup-corner-coverage) uv run soccer-stats cup-corners --coverage-only \
+                     --json out/cup_corner_coverage.json ;;
+            cup-corners) uv run soccer-stats cup-corners --json out/cup_corners.json ;;
             corner-recal) uv run python -m soccer_stats.edge.corner_recal --league "$LEAGUE" \
                      --reason "$REASON" --json out/corner_recal.json ;;
             lab-coverage) uv run python -m soccer_stats.lab.run --league "$LEAGUE" \
@@ -268,6 +294,14 @@ jobs:
               cat out/team_totals.json
               rm -rf out/log ;;
           esac
+      # The cup corner counts (final matches, a few bytes each) under their own prefix.
+      - uses: actions/cache/save@v4
+        if: ${{ always() && (inputs.task == 'cup-corner-coverage' || inputs.task == 'cup-corners') }}
+        with:
+          path: |
+            data/raw/cups/corners
+            data/raw/cups/espn
+          key: cup-corners-${{ github.run_id }}
       # Only goal-league saves a cache, under its own league's prefix (never raw-data-).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'goal-league' && inputs.league != 'E0' }}
