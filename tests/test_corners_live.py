@@ -219,7 +219,7 @@ def test_run_fetches_each_snapshot_once_in_every_league(tmp_path):
     s = cl.run(cards, out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
     assert s["calls"] == 2 and s["credits"] == 2 and s["stop"] is None
     url, params = calls[0]
-    assert "/events/ev1/odds" in url and params["bookmakers"] == "pinnacle"
+    assert "/events/ev1/odds" in url and params["bookmakers"] == "pinnacle,draftkings"
     assert params["markets"] == "alternate_team_totals_corners"
     assert "/soccer_efl_champ/events/ev9/odds" in calls[1][0]  # E1: its own call
     rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
@@ -612,10 +612,10 @@ def test_publish_corners_never_stop_the_build(tmp_path, monkeypatch, capsys):
     publish.add_corners(data)  # no exception
     out = capsys.readouterr().out
     assert "Corners model (f): failed (RuntimeError)" in out and data["corners_model"] is None
-    assert "Corners shown: none (RuntimeError)" in out and "Corners (Pinnacle)" not in out
+    assert "Corners shown: none (RuntimeError)" in out and "Corners (Pinnacle" not in out
     monkeypatch.setenv("CORNERS_DIR", str(tmp_path / "pending"))
     publish.add_corners(data)
-    assert "Corners (Pinnacle): failed (RuntimeError)" in capsys.readouterr().out
+    assert "Corners (Pinnacle, DraftKings): failed (RuntimeError)" in capsys.readouterr().out
 
 
 def test_publish_log_names_each_fit_window(monkeypatch, capsys):
@@ -623,7 +623,7 @@ def test_publish_log_names_each_fit_window(monkeypatch, capsys):
     fit = {"matches": 770, "window_from": "2024-10-06", "window_to": "2026-10-05", "cards": 1}
     monkeypatch.delenv("CORNERS_DIR", raising=False)
     monkeypatch.setattr(cl, "add_model", lambda cards, now=None: {"E0": fit, "E1": {"error": "x"}})
-    monkeypatch.setattr(cl, "add_quotes", lambda cards, dirs: 0)
+    monkeypatch.setattr(cl, "add_quotes", lambda cards, dirs, **kw: 0)
     publish.add_corners({"fixtures": [card(model=False)]})
     out = capsys.readouterr().out
     assert "Premier League 770 matches 2024-10-06 to 2026-10-05" in out

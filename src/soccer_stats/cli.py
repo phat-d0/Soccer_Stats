@@ -600,8 +600,14 @@ def cmd_paper(args: argparse.Namespace) -> None:
             pc["live"].get("error")
             or f"Corner paper trades: {cs.get('trades', 0)} trades, {cs.get('open', 0)} open, "
             f"{cs.get('settled', 0)} settled (rule: {pc['live']['rule']['threshold']:.0%} on "
-            "model (f) vs Pinnacle)"
+            "model (f) vs Pinnacle and DraftKings)"
         )
+        for st in pc["live"].get("strategies") or []:
+            ss = st.get("summary") or {}
+            print(
+                f"Corner strategy {st['label']}: {ss.get('trades', 0)} trades, "
+                f"{ss.get('open', 0)} open, {ss.get('settled', 0)} settled"
+            )
 
 
 def _plan(league: str, seasons: list[int], looks: list[float]):
