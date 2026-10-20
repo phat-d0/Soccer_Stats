@@ -308,7 +308,8 @@ def test_club_map_keys_by_country_and_keeps_namesakes_apart():
         "AUT": {"Sturm Graz"},
     }
     names = ["Arsenal", "SL Benfica", "Sturm Graz", "Qarabag FK", "Heart of Midlothian"]
-    m = cc.club_map(names, teams)
+    m = cc.club_map([*names, "Arsenal Tivat"], teams)
+    assert m["Arsenal Tivat"] is None  # CORNER_DENY: Montenegro's Arsenal
     assert m["Heart of Midlothian"]["key"] == "Scotland:Hearts"  # CORNER_ALIASES
     assert m["Arsenal"]["key"] == "England:Arsenal"
     assert m["SL Benfica"]["key"] == "Portugal:Benfica"

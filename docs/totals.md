@@ -1370,3 +1370,68 @@ shape `corners = {model, home: {mean, cdf}, away: {mean, cdf}}`, the walk-forwar
 report); CLI `soccer-stats cup-corners` (`--coverage-only`); `odds-check.yml`
 `task=cup-corner-coverage` and `task=cup-corners` (no key, never pushes, cache
 `cup-corners-*` for the ESPN corner counts).
+
+### Cup corners: coverage check (counts only; recorded before the scoring run)
+
+Runs: `odds-check.yml` `task=cup-corner-coverage` from `lead/cup-corners`, no key, 0
+credits: **39387711656** (07:37 UTC, commit 7c628bc; 4,046 ESPN summaries fetched, none
+failed, all cached for good in `cup-corners-*`) and **39388646723** (07:46 UTC, commit
+b4747c4; every summary from the cache, plus the club-name check). Neither run fits or
+scores anything.
+
+**football-data corner counts.** Every main division carries HC/AC for 2022/23–2026/27
+(99–100% of played matches; Turkey 2022/23 313 of 342) except the National League (EC),
+which has them only from 2026/27. **None of the nine European extra files** (Austria,
+Switzerland, Denmark, Norway, Sweden, Poland, Romania, Finland, Ireland) has HC/AC, as
+expected. So 22 leagues can rate clubs domestically: B1, D1, D2, E0–E3, EC, F1, F2, G1,
+I1, I2, N1, P1, SC0–SC3, SP1, SP2, T1.
+
+**ESPN corner counts (both teams' `wonCorners`), finished matches, main + qualifying:**
+
+| Cup | 2022/23 | 2023/24 | 2024/25 (scored) | 2025/26 (scored) | 2026/27 (not scored) |
+| --- | --- | --- | --- | --- | --- |
+| UCL | 146 of 213 | 175 of 214 | 216 of 280 | 207 of 281 | 126 of 126 |
+| UEL | 147 of 175 | 151 of 175 | 218 of 269 | 189 of 271 | 116 of 116 |
+| UECL | 140 of 414 | 142 of 418 | 153 of 409 | 409 of 409 | 276 of 276 |
+
+ESPN's older summaries miss corner counts mostly in the qualifying rounds (the Conference
+League's 2022/23–2024/25 qualifiers almost entirely; its main competition is complete).
+Those matches are dropped, as pre-registered.
+
+**Clubs.** Per season, of the clubs in each cup (main + qualifying), those in a corner
+league / in a file without corners / on no football-data file: UCL 32–36 / 11–12 / 34–36
+of 78–82; UEL 27–28 / 9–19 / 20–33 of 57–77; UECL 15–26 / 27–32 / 118–123 of 164–179. So
+(i) and (j) can only cover matches between clubs from the 22 corner leagues; everything
+else rests on (k) or gets no chance.
+
+**2026/27 league phase, clubs with domestic corner data:** UCL **29 of 36** (no corners:
+Bodo/Glimt, LASK, Viking; not on football-data: Sabah, Shakhtar, Slavia Prague, Slovan
+Bratislava); UEL **21 of 36**; UECL **13 of 36**.
+
+**Name check (before scoring).** The first run left Heart of Midlothian (SC0 "Hearts") and
+Sint-Truidense (B1 "St Truiden") unmapped; the second run's list of unmapped clubs with a
+near name in a corner league held only genuinely different clubs (Sparta Prague, Lincoln
+Red Imps, Inter d'Escaldes, Santa Coloma, ...), and of the eleven loose matches one was
+wrong: Arsenal Tivat (Montenegro) had matched Arsenal. Fixed in `cup_corners.CORNER_ALIASES`
+and `CORNER_DENY` (local: `cups.ALIASES`, which the live Champions League model reads, is
+unchanged). These are data fixes made from names only, before any score.
+
+**One clarification of the scored window (before scoring).** The pre-registration says
+"2024/25 and 2025/26 (qualifying included)" and "kickoffs from 1 June 2024 to 30 June
+2026". Qualifying for the next season starts in late June, so late-June 2026 matches are
+2026/27 qualifiers, which the same text says are never scored. The scoring run therefore
+takes kickoffs in that window **and** in seasons 2024/25 or 2025/26 (a season starts in
+June, `cup_corners.season_of`); June 2024's preliminary round counts as 2024/25.
+
+**Cost of the live follow-up (estimate, 0 credits; ESPN's 2026/27 calendar, main
+competition from August; qualifying is over).** Corner snapshots, a look 18–30 h and a close
+≤30 min before kickoff, one `/events/{id}/odds` call each (`bookmakers=pinnacle,draftkings`,
+one market = 1 credit):
+- UCL 288 a season (Sep 36, Oct 72, Nov 72, Dec 36, Jan 72; the knockouts' fixtures aren't
+  on ESPN yet, so the season figure is the league phase), UEL 288 (same months), UECL 216
+  (Oct, Nov, Dec 72 each). **About 216 a month for all three in October and November.**
+- Event ids: today's corner fetch reads them from each league's cached DraftKings body.
+  The Champions League already has its DraftKings fetch. The Europa and Conference League
+  would need either their DraftKings h2h (matchday rule, 1 credit a refresh: UEL 221 a
+  season, about 48–52 a month; UECL 164, about 56 a month; this run's estimate) or the
+  free `/events` list.

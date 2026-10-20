@@ -202,6 +202,10 @@ CORNER_ALIASES: dict[str, str] = {
     "Heart of Midlothian": "Hearts",  # SC0
     "Sint-Truidense": "St Truiden",  # B1
 }
+# Loose matches seen to be wrong in the second coverage run (39388646723).
+CORNER_DENY: set[tuple[str, str]] = {
+    ("Arsenal Tivat", "Arsenal"),  # Montenegro, not Arsenal (E0)
+}
 
 
 def club_map(names, teams: dict[str, set]) -> dict[str, dict | None]:
@@ -209,6 +213,8 @@ def club_map(names, teams: dict[str, set]) -> dict[str, dict | None]:
     out = {}
     for n in sorted(set(names)):
         m = cups.match_team(CORNER_ALIASES.get(n, n), teams)
+        if m and (n, m["name"]) in CORNER_DENY:
+            m = None
         if m:
             country = COUNTRY.get(m["league"], m["league"])
             out[n] = {**m, "key": f"{country}:{m['name']}", "country": country}
