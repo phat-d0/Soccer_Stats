@@ -768,3 +768,14 @@
 {"type":"update","id":"SP1|2627|Levante|Ath Madrid","at":"2026-10-20T18:30:52+00:00","close_odds":5.0,"close_prices":{"home":5.0,"draw":4.5,"away":1.53},"close_fetched_at":"2026-10-20T18:29:50+00:00","close_minutes_before":15510.2,"clv_dk":-0.022877598214591455,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Barcelona|Alaves","at":"2026-10-20T18:30:52+00:00","close_odds":17.0,"close_prices":{"home":1.14,"draw":7.0,"away":17.0},"close_fetched_at":"2026-10-20T18:29:50+00:00","close_minutes_before":15930.2,"clv_dk":-0.25202485052264734,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Betis|Malaga|lean","at":"2026-10-20T18:30:52+00:00","close_odds":1.4,"close_prices":{"home":1.4,"draw":5.0,"away":6.5},"close_fetched_at":"2026-10-20T18:29:50+00:00","close_minutes_before":15780.2,"clv_dk":-0.040047759699456065,"beat_close_dk":false}
+{"type":"update","id":"SP1|2627|La Coruna|Levante","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.11067092861597894}
+{"type":"update","id":"SP1|2627|Espanol|Ath Madrid","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"0-1","clv_pinnacle":-0.21756439990054588}
+{"type":"update","id":"SP1|2627|Betis|Barcelona","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-5","clv_pinnacle":-0.11688251384890203}
+{"type":"update","id":"SP1|2627|Valencia|Ath Bilbao","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"0-0","clv_pinnacle":0.07411173275937366}
+{"type":"update","id":"SP1|2627|Villarreal|Elche|lean","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"0-0","clv_pinnacle":-0.0010212474844611963}
+{"type":"update","id":"SP1|2627|Betis|Barcelona|lean","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-5","clv_pinnacle":-0.030791065461359235}
+{"type":"update","id":"SP1|2627|Espanol|Ath Madrid|lean","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"0-1","clv_pinnacle":-0.009366666790616818}
+{"type":"update","id":"SP1|2627|Real Madrid|Sevilla|lean","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"4-1","clv_pinnacle":-0.015970523650853607}
+{"type":"update","id":"SP1|2627|Osasuna|Santander","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-0","clv_pinnacle":-0.03062944924581379}
+{"type":"update","id":"SP1|2627|Malaga|Sociedad","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-5","clv_pinnacle":0.025770566260586936}
+{"type":"update","id":"SP1|2627|Real Madrid|Sevilla","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"4-1","clv_pinnacle":0.030834155381479045}

@@ -14,3 +14,7 @@
 {"type":"update","id":"I1|2627|Milan|Atalanta|corners|home|5.5","at":"2026-10-18T18:27:22+00:00","status":"won","actual":2,"push":false,"profit":6.8,"score":"2-2 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Bologna|Inter|corners|away|5.5","at":"2026-10-18T18:27:22+00:00","status":"lost","actual":7,"push":false,"profit":-10.0,"score":"2-7 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Fiorentina|Como|corners|away|5.5","at":"2026-10-18T18:27:22+00:00","status":"won","actual":5,"push":false,"profit":6.7,"score":"11-5 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
+{"type":"update","id":"I1|2627|Fiorentina|Como|corners|away|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"11-5 corners"}
+{"type":"update","id":"I1|2627|Milan|Atalanta|corners|home|5.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-2 corners"}
+{"type":"update","id":"I1|2627|Bologna|Inter|corners|away|5.5","at":"2026-10-20T21:01:02+00:00","result_check":"mismatch","check_score":"2-6 corners"}
+{"type":"update","id":"I1|2627|Fiorentina|Como|corners|away|5.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"11-5 corners"}

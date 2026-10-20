@@ -29,3 +29,8 @@
 {"type":"update","id":"E1|2627|Millwall|Lincoln|corners|home|6.5","at":"2026-10-18T18:44:58+00:00","status":"won","actual":12,"push":false,"profit":11.7,"score":"12-2 corners","settled_at":"2026-10-18T18:44:58+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Watford|Charlton|corners|away|4.5","at":"2026-10-18T18:44:58+00:00","status":"won","actual":3,"push":false,"profit":6.8,"score":"4-3 corners","settled_at":"2026-10-18T18:44:58+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Birmingham|QPR|corners|away|4.5","at":"2026-10-18T18:44:58+00:00","status":"won","actual":4,"push":false,"profit":6.8,"score":"0-4 corners","settled_at":"2026-10-18T18:44:58+00:00","result_source":"espn"}
+{"type":"update","id":"E1|2627|Burnley|Wolves|corners|away|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-6 corners"}
+{"type":"update","id":"E1|2627|Burnley|Wolves|corners|home|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-6 corners"}
+{"type":"update","id":"E1|2627|Millwall|Lincoln|corners|home|6.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"12-2 corners"}
+{"type":"update","id":"E1|2627|Watford|Charlton|corners|away|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"4-3 corners"}
+{"type":"update","id":"E1|2627|Birmingham|QPR|corners|away|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"0-4 corners"}

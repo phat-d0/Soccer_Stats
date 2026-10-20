@@ -525,3 +525,7 @@
 {"at": "2026-10-20T14:57+00:00", "team": "Aston Villa", "name": "Wan-Bissaka", "status": "i", "chance": 0, "news": "Hamstring injury - Expected back 21 Nov"}
 {"at": "2026-10-20T19:00+00:00", "team": "Liverpool", "name": "Munoz", "status": "d", "chance": 75, "news": "Knee injury - 75% chance of playing"}
 {"at": "2026-10-20T19:00+00:00", "team": "Man City", "name": "Haaland", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-10-20T21:00+00:00", "team": "Man United", "name": "Heaven", "status": "d", "chance": 75, "news": "Illness - 75% chance of playing"}
+{"at": "2026-10-20T21:00+00:00", "team": "Man United", "name": "Shaw", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-10-20T21:00+00:00", "team": "Man United", "name": "Rashford", "status": "d", "chance": 75, "news": "Hip injury - 75% chance of playing"}
+{"at": "2026-10-20T21:00+00:00", "team": "Man United", "name": "Mainoo", "status": "i", "chance": 0, "news": "Unspecified injury - Expected back 8 Nov"}

@@ -16,3 +16,10 @@
 {"type":"update","id":"F1|2627|Troyes|Lens|corners|away|5.5","at":"2026-10-18T18:27:22+00:00","status":"won","actual":4,"push":false,"profit":7.0,"score":"6-4 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Troyes|Lens|corners|home|4.5","at":"2026-10-18T18:27:22+00:00","status":"won","actual":6,"push":false,"profit":11.9,"score":"6-4 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Lorient|Monaco|corners|home|3.5","at":"2026-10-18T18:27:22+00:00","status":"won","actual":3,"push":false,"profit":12.2,"score":"3-4 corners","settled_at":"2026-10-18T18:27:22+00:00","result_source":"espn"}
+{"type":"update","id":"F1|2627|Angers|Marseille|corners|home|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"2-5 corners"}
+{"type":"update","id":"F1|2627|Lorient|Monaco|corners|home|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-4 corners"}
+{"type":"update","id":"F1|2627|Paris FC|Rennes|corners|home|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-4 corners"}
+{"type":"update","id":"F1|2627|Strasbourg|Paris SG|corners|away|5.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-6 corners"}
+{"type":"update","id":"F1|2627|Troyes|Lens|corners|away|5.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"6-4 corners"}
+{"type":"update","id":"F1|2627|Troyes|Lens|corners|home|4.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"6-4 corners"}
+{"type":"update","id":"F1|2627|Lorient|Monaco|corners|home|3.5","at":"2026-10-20T21:01:02+00:00","result_check":"ok","check_score":"3-4 corners"}
