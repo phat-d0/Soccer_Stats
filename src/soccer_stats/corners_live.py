@@ -24,7 +24,20 @@ Owner-approved on 10 Oct (docs/totals.md, "Live corner prices and paper trades")
   730 days before the last earlier match (the bake-off's window), earlier matches only.
   File reads and the fit only: no API calls.
 
-The corners paper portfolio (paper.update_corner_ledger) trades on these rows and cards.
+* **DraftKings beside Pinnacle (owner, 20 Oct).** The same call asks for
+  `bookmakers=pinnacle,draftkings`: up to ten books count as one region and the API bills
+  per market per region, so it stays 1 credit (the market probe, run 37889595473, billed
+  each odds call exactly its market count with ten books from three regions). Pinnacle's
+  rows are exactly as before (two-sided lines only). DraftKings' rows have the same schema
+  with `book: "draftkings"`; a one-sided DraftKings line is kept with the missing side
+  None and no fair price or margin. The probe's discovery lists the market at DraftKings
+  in E0, SP1, D1, I1 and F1 (one line per team, two-sided, median margin 7.5-8.2%), not
+  in the Championship, where those calls return Pinnacle only. The pre-call budget check
+  uses the dearest call this month at these books (at least COST_PER_CALL), so the cap and
+  the reserve still hold if the real cost ever rises.
+
+The corners paper portfolio (paper.update_corner_ledger) trades on these rows and cards:
+one strategy per book (Pinnacle, and DraftKings from 20 Oct).
 """
 
 from __future__ import annotations
@@ -45,9 +58,12 @@ from soccer_stats.odds_feed import MATCHDAY_RESERVE_CREDITS, SPORTS, _team
 MARKET = "alternate_team_totals_corners"  # The Odds API key (market probe, run 37889595473)
 ROW_MARKET = "team_corners"  # `market` on a logged row (team totals: "team_totals")
 GROUP = "team_corners"  # the call record's market group
-BOOK = "pinnacle"
+BOOK = "pinnacle"  # the original track: its rows and trades are unchanged
+DK = "draftkings"
+BOOKS = (BOOK, DK)  # one call, both books (one region of up to ten books: 1 credit)
+BOOKS_PARAM = ",".join(BOOKS)
 LEAGUES = ("E0", "SP1", "D1", "I1", "F1", "E1")
-COST_PER_CALL = 1  # one market, one book: 1 credit
+COST_PER_CALL = 1  # one market, up to ten books (one region): 1 credit
 CORNERS_MONTHLY_CAP = 550  # credits a calendar month (UTC), corner calls; 500 until 10 Oct
 LOCAL_CALLS = "corners_calls.jsonl"  # local copy of the call record (raw-data cache)
 TRAIN_DAYS = 730  # corners2's window
@@ -290,12 +306,27 @@ def _call_key(c: dict) -> tuple:
 def rows_from_body(
     body: dict | None, card: dict, event_id: str, snapshot: str, downloaded: pd.Timestamp
 ) -> list[dict]:
-    """One row per team and line with both sides priced at Pinnacle."""
+    """One row per book, team and line: Pinnacle's with both sides priced (unchanged),
+    then DraftKings' with at least one side priced (a one-sided line has the other side,
+    the fair prices and the margin None)."""
+    rows = _book_rows(body, card, event_id, snapshot, downloaded, BOOK, two_sided=True)
+    return rows + _book_rows(body, card, event_id, snapshot, downloaded, DK, two_sided=False)
+
+
+def _book_rows(
+    body: dict | None,
+    card: dict,
+    event_id: str,
+    snapshot: str,
+    downloaded: pd.Timestamp,
+    book: str,
+    two_sided: bool,
+) -> list[dict]:
     k = _ts(card["kickoff"])
     known = {card["home"], card["away"]}
     pairs: dict[tuple, dict] = {}
     for b in (body or {}).get("bookmakers", []) or []:
-        if b.get("key") != BOOK:
+        if b.get("key") != book:
             continue
         for m in b.get("markets", []) or []:
             if m.get("key") != MARKET:
@@ -312,9 +343,17 @@ def rows_from_body(
                 pairs.setdefault(key, {"last_update": updated})[side] = float(o["price"])
     rows = []
     for (team, line), q in sorted(pairs.items()):
-        if "over" not in q or "under" not in q or min(q["over"], q["under"]) <= 1:
-            continue
-        fair = devig_shin(np.array([q["over"], q["under"]]))
+        if two_sided:
+            if "over" not in q or "under" not in q or min(q["over"], q["under"]) <= 1:
+                continue
+        else:
+            for s_ in ("over", "under"):
+                if s_ in q and not q[s_] > 1:
+                    del q[s_]
+            if "over" not in q and "under" not in q:
+                continue
+        both = "over" in q and "under" in q
+        fair = devig_shin(np.array([q["over"], q["under"]])) if both else (None, None)
         quoted = _ts(q["last_update"]) if q.get("last_update") else downloaded
         side = "home" if team == card["home"] else "away"
         rows.append(
@@ -326,15 +365,15 @@ def rows_from_body(
                 "kickoff": _iso(k),
                 "event_id": event_id,
                 "snapshot": snapshot,
-                "book": BOOK,
+                "book": book,
                 "team": team,
                 "side": side,
                 "line": line,
-                "over": q["over"],
-                "under": q["under"],
-                "fair_over": round(float(fair[0]), 6),
-                "fair_under": round(float(fair[1]), 6),
-                "margin": round(1 / q["over"] + 1 / q["under"] - 1, 6),
+                "over": q.get("over"),
+                "under": q.get("under"),
+                "fair_over": round(float(fair[0]), 6) if both else None,
+                "fair_under": round(float(fair[1]), 6) if both else None,
+                "margin": round(1 / q["over"] + 1 / q["under"] - 1, 6) if both else None,
                 "fetched_at": _iso(quoted),
                 "time_source": "last_update" if q.get("last_update") else "download",
                 "downloaded_at": _iso(downloaded),
@@ -369,12 +408,21 @@ def run(
     calls = load_calls(*state_dirs, raw_dir)
     done = {_call_key(c) for c in calls}
     spent = tt.month_spend(calls, now)
+    expected = expected_cost(calls, now)
     try:
         others = tt.load_calls(*balance_dirs, raw_dir)
     except Exception:  # noqa: BLE001  the balance falls back to the DraftKings meta
         others = []
     credits = tt.freshest_credits(raw_dir, calls + others)
-    summary = {"calls": 0, "credits": 0, "rows": 0, "due": 0, "month_spent": spent, "stop": None}
+    summary = {
+        "calls": 0,
+        "credits": 0,
+        "rows": 0,
+        "rows_by_book": {},
+        "due": 0,
+        "month_spent": spent,
+        "stop": None,
+    }
     if not api_key:
         summary["stop"] = "no ODDS_API_KEY"
         return summary
@@ -397,12 +445,12 @@ def run(
                 if eid is None or (eid, snap, GROUP) in done:
                     continue
                 summary["due"] += 1
-                if credits is not None and credits - COST_PER_CALL < MATCHDAY_RESERVE_CREDITS:
+                if credits is not None and credits - expected < MATCHDAY_RESERVE_CREDITS:
                     summary["stop"] = (
                         f"reserve: {credits} credits left (keeping {MATCHDAY_RESERVE_CREDITS})"
                     )
                     break
-                if spent + COST_PER_CALL > CORNERS_MONTHLY_CAP:
+                if spent + expected > CORNERS_MONTHLY_CAP:
                     summary["stop"] = (
                         f"monthly cap: {spent} of {CORNERS_MONTHLY_CAP} corner credits used"
                     )
@@ -412,7 +460,7 @@ def run(
                         tt.URL.format(sport=SPORTS[league], event_id=eid),
                         params={
                             "apiKey": api_key,
-                            "bookmakers": BOOK,
+                            "bookmakers": BOOKS_PARAM,
                             "markets": MARKET,
                             "oddsFormat": "decimal",
                             "dateFormat": "iso",
@@ -425,10 +473,11 @@ def run(
                 cost = tt._header_int(resp, "x-requests-last")
                 left = tt._header_int(resp, "x-requests-remaining")
                 if cost is None:  # unknown: count the worst case of a successful call
-                    cost = COST_PER_CALL if resp.ok else 0
+                    cost = expected if resp.ok else 0
                 if left is not None:
                     credits = left
                 spent += cost
+                expected = max(expected, cost)  # a dearer call than thought: budget for it
                 rows = []
                 if resp.ok:
                     try:
@@ -447,7 +496,7 @@ def run(
                     "status": resp.status_code,
                     "cost": cost,
                     "credits_left": credits,
-                    "books": BOOK,
+                    "books": BOOKS_PARAM,
                     "markets": MARKET,
                     "rows": len(rows),
                 }
@@ -462,6 +511,7 @@ def run(
         calls=len(new_calls),
         credits=sum(c["cost"] for c in new_calls),
         rows=len(new_rows),
+        rows_by_book={b: sum(r["book"] == b for r in new_rows) for b in BOOKS},
         month_spent=spent,
         credits_left=credits,
     )
@@ -475,11 +525,29 @@ def run(
     return summary
 
 
+def expected_cost(calls: list[dict], now) -> int:
+    """What the next call is budgeted at: COST_PER_CALL, or the dearest recorded call this
+    month (UTC) that asked for these books, if dearer. The cost always comes from
+    `x-requests-last`; this only keeps the cap and the reserve checks honest if billing
+    for the two-book call is ever more than 1 credit."""
+    month = _ts(now).strftime("%Y-%m")
+    seen = [
+        int(c.get("cost") or 0)
+        for c in calls
+        if c.get("books") == BOOKS_PARAM
+        and c.get("fetched_at")
+        and _ts(c["fetched_at"]).strftime("%Y-%m") == month
+    ]
+    return max([COST_PER_CALL, *seen])
+
+
 def summary_line(s: dict) -> str:
+    by = s.get("rows_by_book") or {}
     return (
-        f"Corners (Pinnacle): {s.get('calls', 0)} calls, {s.get('credits', 0)} credits, "
-        f"{s.get('rows', 0)} rows; month {s.get('month_spent', 0)} of {CORNERS_MONTHLY_CAP} "
-        "corner credits"
+        f"Corners (Pinnacle, DraftKings): {s.get('calls', 0)} calls, "
+        f"{s.get('credits', 0)} credits, {s.get('rows', 0)} rows "
+        f"({by.get(BOOK, 0)} Pinnacle, {by.get(DK, 0)} DraftKings); "
+        f"month {s.get('month_spent', 0)} of {CORNERS_MONTHLY_CAP} corner credits"
         + (f", credits left {s['credits_left']}" if s.get("credits_left") is not None else "")
         + (f" (stopped: {s['stop']})" if s.get("stop") else "")
     )
@@ -566,11 +634,15 @@ def load_rows(*dirs) -> list[dict]:
     return out
 
 
-def newest_quotes(rows: list[dict], before_kickoff: bool = True) -> dict[tuple, dict]:
-    """The newest quote per (league, home, away, kickoff, side, line), downloaded before
-    kickoff."""
+def newest_quotes(
+    rows: list[dict], before_kickoff: bool = True, book: str = BOOK
+) -> dict[tuple, dict]:
+    """The newest quote at one book (rows without `book` are Pinnacle's) per (league,
+    home, away, kickoff, side, line), downloaded before kickoff."""
     latest: dict[tuple, dict] = {}
     for r in rows:
+        if (r.get("book") or BOOK) != book:
+            continue
         try:
             k = _ts(r["kickoff"])
             key = (r.get("league"), r["home"], r["away"], k, r["side"], float(r["line"]))
@@ -584,16 +656,20 @@ def newest_quotes(rows: list[dict], before_kickoff: bool = True) -> dict[tuple, 
     return latest
 
 
-def add_quotes(cards: list[dict], dirs, threshold: float | None = None) -> int:
-    """Each card's newest Pinnacle team-corner quote per side and line before kickoff
+def add_quotes(
+    cards: list[dict], dirs, threshold: float | None = None, book: str = BOOK, rows=None
+) -> int:
+    """Each card's newest team-corner quote at `book` per side and line before kickoff
     (data-log's price files in the state folder plus this run's rows.jsonl), with the
-    model's chances now and the live-test pick (`pick`, or None): `corners.pinnacle =
-    {book, fetched_at, home: [...], away: [...]}`. Display only; no API calls. Returns the
-    number of cards given prices."""
+    model's chances now and the live-test pick (`pick`, or None): `corners.<book> =
+    {book, fetched_at, home: [...], away: [...]}` (`corners.pinnacle`,
+    `corners.draftkings`). A one-sided DraftKings line has the missing side and
+    `fair_over`/`margin` None. Display only; no API calls. Returns the number of cards
+    given prices."""
     from soccer_stats.trades import CORNERS_EDGE
 
     threshold = CORNERS_EDGE if threshold is None else threshold
-    latest = newest_quotes(load_rows(*dirs))
+    latest = newest_quotes(load_rows(*dirs) if rows is None else rows, book=book)
     n = 0
     for c in cards:
         try:
@@ -611,24 +687,24 @@ def add_quotes(cards: list[dict], dirs, threshold: float | None = None) -> int:
             out[side].append(
                 {
                     "line": line,
-                    "over": r["over"],
-                    "under": r["under"],
-                    "fair_over": r["fair_over"],
+                    "over": r.get("over"),
+                    "under": r.get("under"),
+                    "fair_over": r.get("fair_over"),
                     "margin": r.get("margin"),
                     "snapshot": r.get("snapshot"),
                     "downloaded_at": r["downloaded_at"],
                     "p_over": round(probs["over"], 4) if probs else None,
                     "p_under": round(probs["under"], 4) if probs else None,
                     "p_push": round(probs["push"], 4) if probs else None,
-                    "pick": pick(cdf, line, r["over"], r["under"], threshold),
+                    "pick": pick(cdf, line, r.get("over"), r.get("under"), threshold),
                 }
             )
             stamps.append(r.get("fetched_at") or r["downloaded_at"])
         if stamps:
             for side in ("home", "away"):
                 out[side].sort(key=lambda x: x["line"])
-            c.setdefault("corners", {})["pinnacle"] = {
-                "book": BOOK,
+            c.setdefault("corners", {})[book] = {
+                "book": book,
                 "fetched_at": max(stamps),
                 **out,
             }

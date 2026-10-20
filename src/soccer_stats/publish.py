@@ -1033,9 +1033,10 @@ def cup_league_fixtures(
 def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
     """Team corners on every card (owner's live test, 10 Oct): the corners model (f) fitted
     per league on cached football-data files (`corners = {model, home: {mean, cdf}, away}`,
-    `data.corners_model`), then Pinnacle's team-corner snapshots (fetched only on the
-    default branch, CORNERS_DIR; a separate monthly cap) and the newest logged quote per
-    team line (`corners.pinnacle`). Each step is wrapped: corners never stop the build."""
+    `data.corners_model`), then the team-corner snapshots at Pinnacle and DraftKings (one
+    call for both; fetched only on the default branch, CORNERS_DIR; a separate monthly
+    cap) and the newest logged quote per book and team line (`corners.pinnacle`,
+    `corners.draftkings`). Each step is wrapped: corners never stop the build."""
     cards = data.get("fixtures") or []
     try:
         fits = corners_live.add_model(cards, now=now)
@@ -1065,10 +1066,20 @@ def add_corners(data: dict, now: pd.Timestamp | None = None) -> None:
             )
             print(corners_live.summary_line(s))
         except Exception as exc:  # noqa: BLE001
-            print(f"Corners (Pinnacle): failed ({type(exc).__name__}); nothing fetched after it")
-    try:  # the newest logged Pinnacle quote per team line, with the live-test pick (no calls)
-        n = corners_live.add_quotes(cards, [c_state, c_dir])
-        print(f"Corners shown: {n} fixtures with Pinnacle team-corner prices")
+            print(
+                f"Corners (Pinnacle, DraftKings): failed ({type(exc).__name__}); "
+                "nothing fetched after it"
+            )
+    try:  # the newest logged quote per book and team line, with the live-test pick (no calls)
+        rows = corners_live.load_rows(c_state, c_dir)
+        n = {
+            b: corners_live.add_quotes(cards, [c_state, c_dir], book=b, rows=rows)
+            for b in corners_live.BOOKS
+        }
+        print(
+            f"Corners shown: {n[corners_live.BOOK]} fixtures with Pinnacle team-corner prices, "
+            f"{n[corners_live.DK]} with DraftKings'"
+        )
     except Exception as exc:  # noqa: BLE001
         print(f"Corners shown: none ({type(exc).__name__})")
 

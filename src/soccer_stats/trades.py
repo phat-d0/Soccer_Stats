@@ -382,7 +382,8 @@ PORTFOLIOS = [
         "name": "Team corners",
         "status": "testing",
         "note": "Owner's live test (10 Oct): each team's corners, model (f) at a 12% edge "
-        "against Pinnacle's team-corner prices in six leagues, $10 a trade. In development the "
+        "against Pinnacle's team-corner prices in six leagues, $10 a trade; since 20 Oct the "
+        "same rule also runs against DraftKings' prices as a second track. In development the "
         "model beat the league average in all six leagues, but its chances were well "
         "calibrated only in the Premier League, Serie A and Ligue 1; the locked February test "
         "decides it. There are no historical corner prices, so its backtest is the research "
@@ -621,12 +622,36 @@ CORNERS_NOTE = (
     "against Pinnacle's team-corner prices, all six leagues. The February test is unchanged."
 )
 
+CORNERS_DK_NOTE = (
+    "Owner's second corner track (20 Oct): the same model (f) and fixed 12% edge on its own "
+    "chance, against DraftKings' team-corner prices (Premier League, La Liga, Bundesliga, "
+    "Serie A, Ligue 1; DraftKings lists no team corners in the Championship). CLV against "
+    "DraftKings' own close, and against Pinnacle's close where Pinnacle has the same line."
+)
+
 CORNER_ENTRY_FIELDS = (*ENTRY_FIELDS, "team_side", "p_push", "bookmaker")
 
+# Corner strategies, one per book, in the order the app lists them. A corner trade without
+# a `strategy` field (all of them before 20 Oct) is the Pinnacle track.
+CORNER_STRATEGY_ORDER = ["pinnacle", "draftkings"]
+CORNER_STRATEGY_LABELS = {
+    "pinnacle": "Model (f) 12% vs Pinnacle",
+    "draftkings": "Model (f) 12% vs DraftKings",
+}
+CORNER_ID_SUFFIX = {"pinnacle": (), "draftkings": ("dk",)}  # Pinnacle's ids are unchanged
 
-def corners_rule() -> dict:
-    """The corners paper rule, as paper_threshold's dict (the app reads the same shape)."""
-    return {
+
+def corner_strategy_of(trade: dict) -> str:
+    """A corner trade's strategy: its own `strategy`, else its `bookmaker`, else
+    "pinnacle" (every corner trade opened before 20 Oct)."""
+    s = trade.get("strategy") or trade.get("bookmaker")
+    return s if s in CORNER_STRATEGY_ORDER else "pinnacle"
+
+
+def corners_rule(book: str = "pinnacle") -> dict:
+    """The corners paper rule at a book, as paper_threshold's dict (the app reads the same
+    shape). The default is the Pinnacle track's rule, unchanged."""
+    out = {
         "threshold": CORNERS_EDGE,
         "source": "owner_fixed",
         "note": CORNERS_NOTE,
@@ -635,6 +660,9 @@ def corners_rule() -> dict:
         "book": "pinnacle",
         "stake": STAKE,
     }
+    if book == "draftkings":
+        out.update(note=CORNERS_DK_NOTE, book="draftkings")
+    return out
 
 
 def new_corner_trade(
@@ -650,10 +678,13 @@ def new_corner_trade(
     odds_fetched_at: str | None,
     snapshot: str | None,
     ref: dict | None = None,
+    book: str = "pinnacle",
 ) -> dict:
     """A corners paper trade: new_trade's shape plus the team line. `pick` is
     corners_live.pick's {side, odds, model_p, p_push, edge}. The id adds the team side and
-    line, so a match can hold one trade per team line."""
+    line, so a match can hold one trade per team line; a DraftKings trade's id also ends
+    "|dk" (Pinnacle's ids are unchanged), so each book holds its own. `strategy` and
+    `bookmaker` name the book ("pinnacle" or "draftkings")."""
     t = new_trade(
         {
             "market": CORNERS_MARKET,
@@ -675,15 +706,25 @@ def new_corner_trade(
         look=snapshot,
         rule="fixed_raw",
         p_source="model_f",
+        strategy=book,
     )
     t.update(
-        id=trade_id(league, t["season"], home, away, "corners", team_side, f"{float(line):g}"),
+        id=trade_id(
+            league,
+            t["season"],
+            home,
+            away,
+            "corners",
+            team_side,
+            f"{float(line):g}",
+            *CORNER_ID_SUFFIX[book],
+        ),
         bet_type="corners",
         portfolio="corners",
         team=home if team_side == "home" else away,
         team_side=team_side,
         p_push=pick.get("p_push", 0.0),
-        bookmaker="pinnacle",
+        bookmaker=book,
     )
     return t
 
@@ -707,7 +748,8 @@ def settle_corner(trade: dict, count: int | None) -> dict:
 
 
 def corner_clv(entry_odds: float, side: str, over: float | None, under: float | None):
-    """Entry odds x Pinnacle's margin-free closing chance of the side - 1 (Shin)."""
+    """Entry odds x a book's margin-free closing chance of the side - 1 (Shin); None
+    unless both sides of the close are priced."""
     fair = devig_pair(over, under)
     if fair is None:
         return None

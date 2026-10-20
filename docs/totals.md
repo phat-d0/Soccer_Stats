@@ -1158,6 +1158,35 @@ live and a corners paper portfolio, in all six live leagues:
   slopes). The live test reports paper P/L and CLV only. SP1, D1 and E1 have no finalist,
   so their paper trades run model (f) where development found it over-confident.
 
+**DraftKings beside Pinnacle (owner, 20 Oct: "Let's add DraftKings odds for the corner
+bets, we'll still keep the Pinnacle track live too").**
+- **Prices, same call, same cost.** Each snapshot call now asks
+  `bookmakers=pinnacle,draftkings` for the one market. The Odds API bills per market per
+  region and counts up to ten named books as one region, so the call stays 1 credit. The
+  evidence is our own: the market probe's odds calls (run 37889595473) named ten books from
+  the us, eu and au regions and each cost exactly its market count (6, 6, 6, 6, 5, 4). The
+  cost is still read from `x-requests-last`, and the cap (550) and the 3,000 reserve are
+  checked at `expected_cost` (the dearest two-book call this month, at least 1), so a dearer
+  call than expected stops the next one rather than overshooting. Empty calls used to cost
+  0 (41 of October's first 165 corner calls); one where only DraftKings answers now costs 1,
+  so October's spend moves toward the 1-a-call estimate (~471 a month), not past it.
+- **Where DraftKings quotes them.** The same probe's discovery lists
+  `alternate_team_totals_corners` at DraftKings in E0, SP1, D1, I1 and F1, priced there at
+  one line per team, two-sided, median margin 7.5–8.2% (Pinnacle 6.6–7.0% at the same
+  lines in SP1, D1, I1 and F1; Pinnacle wasn't asked in E0). The Championship lists only
+  h2h at DraftKings, so its calls return Pinnacle only. DraftKings also listed it in the
+  Europa League match on 15 Oct (run 38747744922), which is off.
+- **Rows.** Same file and schema, `book: "draftkings"`. Pinnacle's rows are unchanged
+  (two-sided only). DraftKings' keep every line it quotes; a one-sided line is stored with
+  the missing side, the fair prices and the margin null.
+- **Paper strategy "Model (f) 12% vs DraftKings".** The same model, rule, stake and
+  freshness as the Pinnacle track, on DraftKings' quoted price; one trade per match, team,
+  line and book (ids end `|dk`). Close: DraftKings' own newest quote at the line before
+  kickoff, CLV vs its Shin-fair close (`clv_dk`, two-sided closes only), and CLV vs
+  Pinnacle's newest quote at the same team line when Pinnacle has it (`clv_pinnacle`).
+  Settled exactly like the Pinnacle trades. The portfolio's live section lists both
+  strategies (`strategies`, Pinnacle first). The February test is unchanged.
+
 ## Historical corner prices probe (owner-approved 50-credit cap, 11 Oct; probe only, no backtest)
 
 The question: do The Odds API's historical endpoints carry Pinnacle's team-corner prices
