@@ -195,11 +195,20 @@ def load_domestic(
 # ---------- club names ----------
 
 
+# ESPN names cups.match_team misses for clubs in a football-data file with corner counts
+# (from the coverage run's lists, before any scoring run). Kept here, not in cups.ALIASES,
+# so the live Champions League match model's club map is unchanged.
+CORNER_ALIASES: dict[str, str] = {
+    "Heart of Midlothian": "Hearts",  # SC0
+    "Sint-Truidense": "St Truiden",  # B1
+}
+
+
 def club_map(names, teams: dict[str, set]) -> dict[str, dict | None]:
     """ESPN name -> {key: "<country>:<football-data name>", league, name, how} or None."""
     out = {}
     for n in sorted(set(names)):
-        m = cups.match_team(n, teams)
+        m = cups.match_team(CORNER_ALIASES.get(n, n), teams)
         if m:
             country = COUNTRY.get(m["league"], m["league"])
             out[n] = {**m, "key": f"{country}:{m['name']}", "country": country}
@@ -960,7 +969,24 @@ def coverage(data: dict) -> dict:
         "cups": per_cup,
         "clubs": clubs,
         "league_phase_2026": phase,
+        "names": name_check(data, corner_leagues),
     }
+
+
+def name_check(data: dict, corner_leagues: set) -> dict:
+    """For checking the club map by eye: every cup club (any season) left unmapped that
+    shares a long word with a club in a corner league, and every club matched into a
+    corner league by words or a close spelling rather than its name or an alias."""
+    teams = {k: v for k, v in data["domestic"]["teams"].items() if k in corner_leagues}
+    unmapped, loose = {}, {}
+    for name, m in sorted(data["mapping"].items()):
+        if m is None:
+            near = cups.near_names(name, teams)
+            if near:
+                unmapped[name] = near
+        elif m["league"] in corner_leagues and m["how"] in ("words", "spelling"):
+            loose[name] = f"{m['league']} {m['name']} ({m['how']})"
+    return {"unmapped_near": unmapped, "loose_matches": loose}
 
 
 def current_clubs(data: dict) -> dict:
@@ -1067,6 +1093,11 @@ def coverage_report(cov: dict) -> str:
         out.append(
             f"  {k}: {v['clubs']} clubs: {v['corners']} / {v['no_corners']} / {v['unmapped']}"
         )
+    names = cov.get("names") or {}
+    out.append(
+        f"Unmapped cup clubs with near names in corner leagues: {names.get('unmapped_near')}"
+    )
+    out.append(f"Matched into corner leagues by words or spelling: {names.get('loose_matches')}")
     out.append("2026/27 league phase, clubs with domestic corner data:")
     for code, v in cov["league_phase_2026"].items():
         out.append(

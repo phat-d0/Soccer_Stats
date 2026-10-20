@@ -301,8 +301,15 @@ def test_load_domestic_counts_corner_coverage_and_reads_extra_names(tmp_path):
 
 
 def test_club_map_keys_by_country_and_keeps_namesakes_apart():
-    teams = {"E0": {"Arsenal", "Sporting"}, "P1": {"Sp Lisbon", "Benfica"}, "AUT": {"Sturm Graz"}}
-    m = cc.club_map(["Arsenal", "SL Benfica", "Sturm Graz", "Qarabag FK"], teams)
+    teams = {
+        "E0": {"Arsenal", "Sporting"},
+        "P1": {"Sp Lisbon", "Benfica"},
+        "SC0": {"Hearts", "Celtic"},
+        "AUT": {"Sturm Graz"},
+    }
+    names = ["Arsenal", "SL Benfica", "Sturm Graz", "Qarabag FK", "Heart of Midlothian"]
+    m = cc.club_map(names, teams)
+    assert m["Heart of Midlothian"]["key"] == "Scotland:Hearts"  # CORNER_ALIASES
     assert m["Arsenal"]["key"] == "England:Arsenal"
     assert m["SL Benfica"]["key"] == "Portugal:Benfica"
     assert m["Sturm Graz"]["key"] == "Austria:Sturm Graz"
@@ -533,6 +540,7 @@ def test_the_whole_run_offline(tmp_path, monkeypatch):
     assert data["mapping"]["Qarabag"] is None
     cov = cc.coverage(data)
     assert cov["corner_leagues"] == ["E0"]
+    assert set(cov["names"]) == {"unmapped_near", "loose_matches"}
     assert all(r["with_corners"] == r["finished"] for r in cov["cups"])
     assert set(cov["league_phase_2026"]) == {"UCL", "UEL", "UECL"}
     assert "== Cup corners: coverage" in cc.coverage_report(cov)
