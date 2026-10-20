@@ -1000,3 +1000,69 @@ overall. A smaller loss is still a loss, and the pre-registered bar (CLV range a
 isn't close: both upper ends are about −2.3% or lower. The live Model 12% test can stay
 as the owner's paper test or be stopped. Adding either filter would only make it lose
 more slowly. No handover.
+
+## Price-band edge rule (owner, 20 Oct; pre-registered 2026-10-20, before any code or run)
+
+**Owner's request.** The match rule bets the side with an edge, but in a three-way market
+an edge often sits on a side that isn't the favourite, and the model's underdog edges look
+like its mistakes. Dig into how often the underdog wins when the model disagrees with the
+price, and test a stricter edge on underdogs and a looser one on favourites, so fewer,
+better bets might win. The live numbers that prompted this (Model 12% trades and E0's
+DraftKings backtest: in the 3.50–6.00 band the model said about 28%, the price 22%, and
+15–18% won) are why the bands were chosen, so they are not evidence for the rule.
+
+**What is already known (disclosed).** The Model 12% filters test above used the same
+data: baseline CLV −4.6% (8,911 bets), A (model above 50%) −2.7%, B (price 3.00 or
+shorter) −3.1%, every season below 0. So I expect every band's CLV to be below 0 at every
+threshold, the favourite bands least so. This test differs in two ways: each band gets its
+own minimum edge, chosen on early seasons only, and favourites may qualify below 12%.
+
+**Data (identical to the Model 12% filters test).** The model's walk-forward chances
+(`backtest.walk_forward`, Dixon-Coles refitted every 7 days on the 730 days before each
+window, from 2019-07-01, burn-in 2 seasons, xG weight 0.7 in E0, SP1, D1, I1, F1 and
+goals only in E1, E2, E3; no look-ahead); Pinnacle's own early 1X2 from football-data
+(PSH/PSD/PSA, quoted, margin kept); CLV = entry odds × Pinnacle's Shin-fair close − 1.
+Leagues E0, SP1, D1, I1, F1, E1, E2, E3; only seasons where Pinnacle's early and close
+prices both cover 90% of played matches. Edge = model chance × quoted decimal − 1.
+
+**Split (fixed now).** Development 2019/20–2022/23. Check 2023/24–2024/25, used only once,
+after the rule below is frozen by the code from development alone. 2025/26 and later are
+dropped before anything is computed.
+
+**Bands (by the side's Pinnacle early quoted decimal price o).**
+- `fav`: home or away, o < 2.00
+- `mid`: home or away, 2.00 ≤ o ≤ 3.50
+- `dog`: home or away, 3.50 < o ≤ 6.00
+- `long`: home or away, o > 6.00
+- `draw`: the draw, at any price
+
+**Step 1, descriptive (development only).** Every side with edge > 0, per band × claimed
+edge bucket (0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+): sides, the model's average
+chance, the implied chance (1/o), the win rate, ROI per $1 and CLV, each with a 95% range.
+This answers "how often does the underdog win when the model disagrees".
+
+**Step 2, the rule, chosen on development only.** For each band and each threshold t in
+{2%, 5%, 8%, 12%, 15%, 20%, 25%, 30%}: the band's sides with edge ≥ t, each scored on its
+own (a match can give a home and a draw side). The band's threshold is the t with the
+highest mean CLV among the t with at least 200 development sides (ties: the higher t). A
+band is switched **off** when that best mean CLV is 0 or below.
+
+**Step 3, the frozen rule R.** Per match, among the sides that clear their band's
+threshold (bands that are off can't), bet the one with the highest edge (ties: home,
+draw, away), $1, one bet per match. If every band is off, R makes no bets and the result
+is "no rule survives development".
+
+**Step 4, the check (2023/24–2024/25, once).** R's pooled bets across the eight leagues:
+bets, win rate vs model vs implied, ROI (95% range), CLV (95% range), beat-the-close.
+**Decision:** R is worth a live paper test if its pooled CLV 95% range lies above 0 with at
+least 300 bets (one test, so 95%). ROI is reported, not judged.
+
+**Descriptive alongside (not judged).** On the same check seasons: the baseline (12% on
+every side, the live rule), filters A and B, and R* = the same selection without
+switching any band off (each band at its best development t whatever its sign), so the
+owner can see whether band thresholds beat one flat 12% out of sample. R per band and
+per league. Ranges are percentile bootstraps (2,000 draws, fixed seeds) resampling
+matches.
+
+**How it runs.** `soccer-stats backtest-band-edges` (`lab/band_edges.py`), `odds-check.yml`
+`task=band-edges`: no key, 0 credits, never pushes; log and a 7-day artifact. One run.
