@@ -1435,3 +1435,70 @@ one market = 1 credit):
   would need either their DraftKings h2h (matchday rule, 1 credit a refresh: UEL 221 a
   season, about 48–52 a month; UECL 164, about 56 a month; this run's estimate) or the
   free `/events` list.
+
+### Cup corners: results and verdict (the one scoring run, 20 Oct)
+
+Run: `odds-check.yml` `task=cup-corners`, **39389328073** (07:51 UTC, commit 642be3e, after
+the coverage record above), no key, **0 credits**. Weekly walk-forward on 2024/25 and
+2025/26 (qualifying included), every fit on earlier matches only. 1,392 matches with both
+corner counts: 486 in set D (both clubs rated domestically), 593 in set X (at least one
+club rated from cup matches only), 313 with no chance (a club with neither, mostly
+Conference League qualifiers). Gain = per-match mean log-loss gain over the cup average
+across the six team lines; ranges at 99.583% (12 tests); slope band 0.80–1.25; at least
+120 matches to be judged.
+
+| Candidate (set) | Group | Matches | Gain (99.583% range) | Slopes | Pass |
+| --- | --- | --- | --- | --- | --- |
+| (i) cross-league (f), no offsets (D) | UCL | 280 | −0.0116 (−0.0372 to +0.0127) | 0.02–0.46 | no |
+| | UEL | 170 | −0.0431 (−0.0809 to −0.0077) | −0.49–0.12 | no |
+| | UECL | 36 | +0.0238 (−0.0961 to +0.1508) | −0.40–0.84 | not judged |
+| | all | 486 | −0.0200 (−0.0416 to +0.0010) | −0.10–0.34 | no |
+| (j) (i) + league offsets (D) | UCL | 280 | +0.0190 (−0.0083 to +0.0460) | 0.45–1.18 | no |
+| | UEL | 170 | −0.0026 (−0.0389 to +0.0335) | 0.15–0.77 | no |
+| | UECL | 36 | +0.0320 (−0.1005 to +0.1592) | −0.25–1.15 | not judged |
+| | all | 486 | +0.0124 (−0.0105 to +0.0347) | 0.44–0.94 | no |
+| (k) (j) + cup-only ratings (X) | UCL | 133 | +0.1023 (+0.0547 to +0.1529) | 1.11–1.96 | no (slopes) |
+| | UEL | 212 | +0.0258 (−0.0080 to +0.0598) | 0.56–1.14 | no |
+| | UECL | 248 | +0.0268 (−0.0302 to +0.0782) | 0.27–0.60 | no |
+| | all | 593 | +0.0434 (+0.0143 to +0.0711) | 0.56–0.82 | no (slopes) |
+
+**What it means, in plain English.**
+- **Domestic corner ratings don't carry into Europe on their own.** (i), which takes each
+  club's league corner ratios at face value, is worse than simply guessing the cup average
+  (pooled −0.020; the Europa League's range is below 0), and its chances barely track what
+  happens (slopes near 0): a club that wins many corners against its own league's weaker
+  sides doesn't win as many against European opposition.
+- **Adjusting for league strength helps but isn't enough.** (j)'s league offsets turn the
+  loss into a small gain (pooled +0.012), but the range includes 0 in every cup and pooled,
+  and pooled its chances are too spread out on four of the six lines (home 4.5 and 5.5,
+  away 3.5 and 4.5: slopes 0.44–0.60).
+- **Rating clubs from their own cup matches carries some information** (pooled (k) +0.043,
+  range above 0; Champions League +0.102), but the chances are mis-scaled: too timid in the
+  Champions League (slopes 1.1–2.0) and too bold in the Conference League (0.27–0.60). It
+  fails the slope band everywhere.
+
+**Verdict, per cup (the pre-registered reading):**
+- **Champions League: no corner model.** Neither (i) nor (j) passes (judged on 280 matches);
+  (k) fails on calibration.
+- **Europa League: no corner model.** Neither passes on 170 matches; (j) is no better than
+  the cup average.
+- **Conference League: no corner model.** Only 36 matches have two domestically rated clubs,
+  so it follows the pooled result, which fails.
+- **Pooled: nothing passes.** So no cup club gets a corner model chance under the rule as
+  written, cup-only clubs stay unrated, and no corner trades follow.
+
+**2026/27 league-phase clubs that a fit at 20 Oct would rate** (descriptive, since nothing
+passed): UCL 29 of 36 domestically plus 7 from cup matches only (Bodo/Glimt, LASK, Sabah,
+Shakhtar, Slavia Prague, Slovan Bratislava, Viking), none unrated; UEL 21 plus 14, one
+unrated (Torreense); UECL 13 plus 23, none unrated. With no candidate passing, **none of
+them gets a model chance** today.
+
+**What this changes.** Nothing live: the cups' cards carry no `corners` block and no corner
+trades open there. A live Pinnacle cup-corner paper test (about 216 credits a month for the
+three cups in October and November, plus 48–56 a month each for the Europa and Conference
+League's DraftKings h2h or the free events list for event ids) would have no model to trade
+on; it could only log prices. The closest candidate is (j) pooled, which is over-confident
+in the middle of the range; a per-cup recalibration (as round 12 tried domestically) or
+fewer, larger-sample offsets would be a new pre-registered idea, judged on a 2026/27
+forward window (cup corner counts from July 2026 were not scored here), and is for the
+lead and owner to decide.
