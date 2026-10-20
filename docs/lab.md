@@ -1066,3 +1066,61 @@ matches.
 
 **How it runs.** `soccer-stats backtest-band-edges` (`lab/band_edges.py`), `odds-check.yml`
 `task=band-edges`: no key, 0 credits, never pushes; log and a 7-day artifact. One run.
+
+### Results (2026-10-20; `odds-check.yml` run 39388494286, 0 credits, no key)
+
+**Order.** Pre-registration c6b8aff (07:34:45 UTC), code a43f8cf, then the one run
+39388494286 (dispatched 07:44:15 UTC on a43f8cf). Nothing was run before the
+pre-registration and nothing has been run since.
+
+**Data.** Eight leagues, 2019/20–2024/25 all scored (Pinnacle early and close coverage
+≥ 90% in every season; 2025/26 dropped first): E0 2,215 matches, SP1 2,212, D1 1,782,
+I1 2,185, F1 1,971, E1 3,184, E2 2,984, E3 3,020. Development 13,007 matches, check 6,546.
+
+**Step 1: how often the side the model likes wins (development, every side with edge > 0).**
+"Model" is the model's average chance, "implied" 1/price at Pinnacle early (margin
+included), ROI per $1 and CLV vs Pinnacle's fair close with 95% ranges (matches resampled).
+
+| Band | Sides | Model | Won | Implied | ROI | CLV |
+| --- | --- | --- | --- | --- | --- | --- |
+| Favourite (< 2.00) | 1,420 | 63.1% | 57.1% | 58.7% | −2.8% (−7.2% to +1.8%) | −2.4% (−2.7% to −2.1%) |
+| Middle (2.00–3.50) | 5,620 | 43.2% | 36.0% | 38.1% | −5.6% (−8.7% to −2.2%) | −3.4% (−3.6% to −3.2%) |
+| Underdog (3.50–6.00) | 3,124 | 27.7% | 21.3% | 23.0% | −6.6% (−13.1% to −0.2%) | −5.0% (−5.4% to −4.7%) |
+| Long shot (> 6.00) | 1,570 | 15.5% | 11.6% | 11.9% | +7.2% (−7.9% to +23.5%) | −6.1% (−6.9% to −5.4%) |
+| Draw | 4,018 | 26.3% | 23.6% | 24.3% | −3.4% (−9.3% to +2.3%) | −3.1% (−3.4% to −2.9%) |
+
+In every band the side the model likes wins a little *less* often than the price says,
+not more, and a bigger claimed edge doesn't help: favourites at a 20%+ edge won 50.5%
+(model 70.3%, implied 55.7%, 91 sides); underdogs at 15–20% won 17.0% (model 27.0%,
+implied 23.0%). The long-shot ROI is one season's luck: its CLV is the worst of all.
+
+**Step 2: thresholds (development).** Best mean CLV per band among thresholds with ≥ 200
+sides: favourite 2% (−2.3%, 1,139 sides), middle 30% (−2.8%, 537), underdog 30% (−4.3%,
+766), long shot 30% (−5.6%, 686), draw 2% (−3.4%, 3,215). Every best CLV is below 0, so
+**every band is switched off**.
+
+**Step 3–4: the frozen rule and the check.** R makes no bets, so there is nothing to
+check: **no rule survives development; no live change.**
+
+**Descriptive on the check seasons (2023/24–2024/25, 6,546 matches, not judged).**
+
+| Rule | Bets | Won | Model | Implied | ROI | CLV |
+| --- | --- | --- | --- | --- | --- | --- |
+| R* (each band at its best t, none off) | 2,336 | 30.1% | 38.6% | 32.6% | −10.7% (−17.3% to −4.3%) | −4.4% (−4.7% to −4.0%) |
+| Baseline 12% (the live rule) | 2,761 | 26.1% | 35.9% | 28.6% | −13.1% (−18.6% to −6.6%) | −5.4% (−5.8% to −5.0%) |
+| A, model > 50% | 489 | 46.2% | 58.9% | 47.3% | −2.3% (−11.4% to +6.9%) | −3.1% (−3.7% to −2.4%) |
+| B, price ≤ 3.00 | 900 | 40.4% | 52.3% | 42.9% | −6.0% (−13.6% to +1.7%) | −3.3% (−3.8% to −2.8%) |
+
+R* by band on the check: favourite 608 bets, won 54.9% vs 58.5% implied, CLV −2.6%;
+middle 249, won 38.6% vs 36.1%, ROI +7.8% (−8.9% to +25.3%) but CLV −4.0%; underdog
+375, won 17.1% vs 22.2% (model 32.5%), ROI −23.5%, CLV −5.6%; long shot 223, won 6.7%
+vs 12.4% (model 18.9%), ROI −45.0%, CLV −11.0%; draw 881, won 21.9% vs 23.2%, CLV −3.5%.
+The baseline's CLV range is below 0 in every one of the eight leagues (−4.6% to −6.3%).
+
+**Verdict.** The owner's idea is right about direction: the further the side is from
+favourite, the worse the model's picks do (CLV −2.4% on favourites to −6.1% on long
+shots in development, −2.6% to −11.0% on the check), so being stricter on underdogs and
+looser on favourites loses *less* than the flat 12% (R* −10.7% vs −13.1% ROI, CLV −4.4%
+vs −5.4%). But no band at any threshold beats Pinnacle's close: even the model's
+favourites win less often than the price implies. Taking fewer bets trims the losses;
+it doesn't find a winning subset. No live change; the paper tests run as they are.
