@@ -1267,3 +1267,267 @@ answers availability and prices the backtest.
   with 95% ranges per league, credit use against the 550 cap, settlement working. The
   February test (3 Feb 2027, model accuracy on 2026/27 kickoffs to 31 Jan) stays locked and
   separate.
+
+## Cup corners model (owner, 20 Oct; pre-registered 2026-10-20, before any code or run)
+
+**Why.** The owner (20 Oct): "build cross league models for corners so we can track UCL,
+UEL, and Conference League." Model (f) (`corners_live.TeamCornersF`) rates each club only
+against its own league, so it can't price a cup match between clubs from two leagues. This
+section fixes the candidates, data, scoring and pass rule before any code is written or
+any cup corner count is read. 0 credits, no key: football-data and ESPN are free, and
+everything runs in GitHub Actions from branch `lead/cup-corners`, printing only (log and a
+7-day artifact; nothing is pushed to data-log; no live change).
+
+**Scope.** Each team's corners in a cup match, home and away, over 3.5 / 4.5 / 5.5: the six
+team lines of bake-off 2. All three cups: Champions League (UCL), Europa League (UEL),
+Conference League (UECL), each with its qualifying rounds (ESPN's `*_qual` slugs) counted
+under that cup. No match totals, no prices (The Odds API's history has no team-corner
+prices: the 11 Oct probe above), so this tests the model's chances only; a live paper test
+would be the priced test, in a follow-up.
+
+**Data.**
+- *Domestic corners:* football-data's main-division season files (`cups.FD_MAIN`: E0–E3,
+  EC, SC0–SC3, SP1–SP2, D1–D2, I1–I2, F1–F2, N1, B1, P1, T1, G1), HC/AC, seasons
+  2022/23–2025/26 for the evaluation. The extra all-season files (`AUT`, `SWZ`, `DNK`,
+  `NOR`, `SWE`, `POL`, `ROU`, `FIN`, `IRL`) are expected to carry no HC/AC; the coverage
+  check below says. Their club names are still loaded, so that a club from Austria maps to
+  Austria (no corner data) instead of a near spelling elsewhere.
+- *Cup matches and corners:* ESPN's scoreboards (`cups.season_calendar` through
+  `cup_model.european_events`, main and qualifying slugs of all three cups) and each finished
+  match's summary (`wonCorners` per team, read with `espn_results.summary_corners`). Seasons
+  2022/23 and 2023/24 are history only (they feed the windows); **2024/25 and 2025/26
+  (qualifying included) are scored**: kickoffs from 1 June 2024 to 30 June 2026.
+  **2026/27 cup corner counts are never scored here** (they stay free for a later forward
+  check); 2026/27 summaries are read only to count which current clubs would get a
+  chance (below). Each summary's corner counts are cached for good once the match is final
+  (`data/raw/cups/corners/`, a few bytes per match).
+- *Club mapping:* ESPN names to football-data clubs with `cups.match_team` (aliases, exact
+  normalized names, word containment, close spellings; `DENY`), the cup model's matcher,
+  against every main and extra file's clubs. A club is keyed by country and football-data
+  name, so a promoted or relegated club keeps one identity; at each fit its domestic league
+  is the league of its latest domestic match with corner counts before the fit time.
+
+**Fitting (every candidate): walk-forward, weekly.** A fit at every Monday 00:00 UTC with
+a cup match that week (as `cup_model.walk_forward`), on matches before that Monday only:
+domestic matches dated before it, cup matches kicked off before it, each league's window
+the 730 days before its last earlier match (model (f)'s window, at least 300 matches with
+corner counts, else that league's clubs are unrated), the cup window the 730 days before
+the fit. No tuning on outcomes; every constant below is fixed here.
+
+**Baseline (a): the cup average.** Each cup's mean home and away corners over its earlier
+matches with corner counts in the window (qualifying included); NB2 dispersion
+moment-matched per side (`corners.mom_alpha`) on those rows. A cup with fewer than 50
+earlier rows uses the three cups pooled. Neutral venue (ESPN's `neutralSite`, the finals):
+both sides get the average of the home and away means.
+
+**Candidates (the family).**
+- **(i) Cross-league (f), no league offsets.** Each club's for/against corner ratios from
+  model (f) fitted on its own domestic league at the fit time (`TeamCornersF`, unchanged:
+  ratios to the league's home/away means, empirical-Bayes shrinkage estimated on the
+  window). A cup match: mean home corners = s(cup, home) × F(home club) × A(away club),
+  mean away corners = s(cup, away) × F(away) × A(home), where s(cup, venue) = Σ corners /
+  Σ F×A over that cup's earlier rows with both clubs rated (one Poisson scale per cup and
+  side; under 50 rows, the three cups pooled). NB2 dispersion per side moment-matched on
+  those rows. Neutral venue: both sides use the average of the two scales.
+- **(j) (i) plus league offsets.** As (i), plus a corners-for offset o(L) and a
+  corners-against offset d(L) per domestic league, so that a club's ratios count less when
+  its league is weak: log mean = log s(cup, side) + log F + log A + o(L of the club taking
+  the corners) + d(L of the club conceding them). The offsets have a Normal(0, 0.2²)
+  prior on the log scale and are fitted (with the six cup scales, unpenalized) by
+  maximum a posteriori on the earlier cup rows with both clubs rated: the cup matches tie
+  the leagues together. Fewer than 200 such rows: (j) gives (i)'s chances. Dispersion as
+  in (i), on (j)'s means.
+- **(k) Coverage extension: (j) plus cup-only ratings.** A club with no domestic corner
+  data at the fit time (its league has no HC/AC, e.g. Austria, Czechia, Croatia, Cyprus)
+  gets ratios from its own earlier cup matches with corner counts in the window: per match,
+  r_for = its corners / (s(cup, side) × the opponent's against term from (j)), r_against =
+  corners conceded / (s(cup, other side) × the opponent's for term), where an opponent
+  without a domestic rating counts as 1; its ratio = (Σ r + k) / (n + k), with k from
+  `corners2.eb_shrink` over all such clubs' rows in the window (for and against apart), and
+  no league offset. It needs at least 4 such matches, else it is unrated. Domestically rated
+  clubs use (j)'s terms unchanged.
+
+**No rating, no chance (the fallback, live and here).** A match where either club is
+unrated (no domestic corner data and, under (k), fewer than 4 earlier cup matches with
+corner counts) gets no model chance. In the live follow-up such a card would carry no
+`corners` block, so no corner paper trade could open on it, as the match model's odds-only
+cards (`no_model`) do.
+
+**Scoring.**
+- *Sets.* (i) and (j) are scored on set D: matches where both clubs have a domestic rating
+  at the fit time. (k) is scored on set X: matches it rates where at least one club is
+  rated only from cup matches (on set D, (k) = (j) by construction). The baseline is
+  scored on the same matches as each candidate. Matches with a missing corner count are
+  dropped before anything (counted).
+- *Per line* (bake-off 2's `corner_recal.score`, unchanged): log-loss gain over (a), and
+  the recalibration slope (logistic fit of the outcome on logit(p)).
+- *Groups:* UCL, UEL, UECL (each with its qualifying rounds) and the three pooled.
+- *Family:* 3 candidates × 4 groups = **12 tests, gain ranges at 99.583%** (Bonferroni),
+  whole-match bootstrap of the per-match mean gain across the six lines.
+- *Pass, per candidate and group:* the gain range is above 0 **and** every one of the six
+  lines' slopes is within 0.80–1.25. A group with fewer than 120 scored matches is
+  reported, not judged (bake-off 2's minimum).
+
+**Reading the result.**
+- A cup gets a corner model if (i) or (j) passes in that cup: its finalist is the passing
+  one with the larger gain (ties: (i), the simpler). A cup that isn't judged (under 120
+  matches) follows the pooled result. A cup where neither passes gets no corner model, and
+  no corner trades follow.
+- Clubs without domestic corner data get chances only where (k) passes in that cup (or
+  pooled, if the cup isn't judged); otherwise they stay unrated.
+- Whatever passes is model accuracy only, against a simple average, never against a price:
+  a pass makes a live paper test (Pinnacle's cup team corners, where listed) worth putting
+  to the lead and owner, nothing more.
+
+**Coverage check first (counts only; recorded below before the scoring run).** One run
+(`odds-check.yml` `task=cup-corner-coverage`) prints, without fitting or scoring anything:
+football-data's HC/AC coverage per main and extra file and season; per cup and season,
+the finished matches and how many summaries carry both corner counts; the cup clubs mapped
+to a corner league, to a file without corners, or to nothing; and, per cup, how many
+2026/27 league-phase clubs have domestic corner data. The scoring run (`task=cup-corners`)
+comes after that count is written here.
+
+**Also printed (estimate, 0 credits):** the live corner-snapshot cost per month for each
+cup on ESPN's 2026/27 calendar (a look 18–30 h and a close ≤30 min before kickoff, one
+`/events/{id}/odds` call each with `bookmakers=pinnacle,draftkings` and one market: 1
+credit; `corners_live.estimate`), and the DraftKings h2h cost for the Europa and Conference
+League (`cups.live_estimate`), since today's corner fetch takes event ids from each
+league's cached DraftKings body.
+
+**Code.** `src/soccer_stats/cup_corners.py` (the model with `corners_live.add_model`'s card
+shape `corners = {model, home: {mean, cdf}, away: {mean, cdf}}`, the walk-forward and the
+report); CLI `soccer-stats cup-corners` (`--coverage-only`); `odds-check.yml`
+`task=cup-corner-coverage` and `task=cup-corners` (no key, never pushes, cache
+`cup-corners-*` for the ESPN corner counts).
+
+### Cup corners: coverage check (counts only; recorded before the scoring run)
+
+Runs: `odds-check.yml` `task=cup-corner-coverage` from `lead/cup-corners`, no key, 0
+credits: **39387711656** (07:37 UTC, commit 7c628bc; 4,046 ESPN summaries fetched, none
+failed, all cached for good in `cup-corners-*`) and **39388646723** (07:46 UTC, commit
+b4747c4; every summary from the cache, plus the club-name check). Neither run fits or
+scores anything.
+
+**football-data corner counts.** Every main division carries HC/AC for 2022/23–2026/27
+(99–100% of played matches; Turkey 2022/23 313 of 342) except the National League (EC),
+which has them only from 2026/27. **None of the nine European extra files** (Austria,
+Switzerland, Denmark, Norway, Sweden, Poland, Romania, Finland, Ireland) has HC/AC, as
+expected. So 22 leagues can rate clubs domestically: B1, D1, D2, E0–E3, EC, F1, F2, G1,
+I1, I2, N1, P1, SC0–SC3, SP1, SP2, T1.
+
+**ESPN corner counts (both teams' `wonCorners`), finished matches, main + qualifying:**
+
+| Cup | 2022/23 | 2023/24 | 2024/25 (scored) | 2025/26 (scored) | 2026/27 (not scored) |
+| --- | --- | --- | --- | --- | --- |
+| UCL | 146 of 213 | 175 of 214 | 216 of 280 | 207 of 281 | 126 of 126 |
+| UEL | 147 of 175 | 151 of 175 | 218 of 269 | 189 of 271 | 116 of 116 |
+| UECL | 140 of 414 | 142 of 418 | 153 of 409 | 409 of 409 | 276 of 276 |
+
+ESPN's older summaries miss corner counts mostly in the qualifying rounds (the Conference
+League's 2022/23–2024/25 qualifiers almost entirely; its main competition is complete).
+Those matches are dropped, as pre-registered.
+
+**Clubs.** Per season, of the clubs in each cup (main + qualifying), those in a corner
+league / in a file without corners / on no football-data file: UCL 32–36 / 11–12 / 34–36
+of 78–82; UEL 27–28 / 9–19 / 20–33 of 57–77; UECL 15–26 / 27–32 / 118–123 of 164–179. So
+(i) and (j) can only cover matches between clubs from the 22 corner leagues; everything
+else rests on (k) or gets no chance.
+
+**2026/27 league phase, clubs with domestic corner data:** UCL **29 of 36** (no corners:
+Bodo/Glimt, LASK, Viking; not on football-data: Sabah, Shakhtar, Slavia Prague, Slovan
+Bratislava); UEL **21 of 36**; UECL **13 of 36**.
+
+**Name check (before scoring).** The first run left Heart of Midlothian (SC0 "Hearts") and
+Sint-Truidense (B1 "St Truiden") unmapped; the second run's list of unmapped clubs with a
+near name in a corner league held only genuinely different clubs (Sparta Prague, Lincoln
+Red Imps, Inter d'Escaldes, Santa Coloma, ...), and of the eleven loose matches one was
+wrong: Arsenal Tivat (Montenegro) had matched Arsenal. Fixed in `cup_corners.CORNER_ALIASES`
+and `CORNER_DENY` (local: `cups.ALIASES`, which the live Champions League model reads, is
+unchanged). These are data fixes made from names only, before any score.
+
+**One clarification of the scored window (before scoring).** The pre-registration says
+"2024/25 and 2025/26 (qualifying included)" and "kickoffs from 1 June 2024 to 30 June
+2026". Qualifying for the next season starts in late June, so late-June 2026 matches are
+2026/27 qualifiers, which the same text says are never scored. The scoring run therefore
+takes kickoffs in that window **and** in seasons 2024/25 or 2025/26 (a season starts in
+June, `cup_corners.season_of`); June 2024's preliminary round counts as 2024/25.
+
+**Cost of the live follow-up (estimate, 0 credits; ESPN's 2026/27 calendar, main
+competition from August; qualifying is over).** Corner snapshots, a look 18–30 h and a close
+≤30 min before kickoff, one `/events/{id}/odds` call each (`bookmakers=pinnacle,draftkings`,
+one market = 1 credit):
+- UCL 288 a season (Sep 36, Oct 72, Nov 72, Dec 36, Jan 72; the knockouts' fixtures aren't
+  on ESPN yet, so the season figure is the league phase), UEL 288 (same months), UECL 216
+  (Oct, Nov, Dec 72 each). **About 216 a month for all three in October and November.**
+- Event ids: today's corner fetch reads them from each league's cached DraftKings body.
+  The Champions League already has its DraftKings fetch. The Europa and Conference League
+  would need either their DraftKings h2h (matchday rule, 1 credit a refresh: UEL 221 a
+  season, about 48–52 a month; UECL 164, about 56 a month; this run's estimate) or the
+  free `/events` list.
+
+### Cup corners: results and verdict (the one scoring run, 20 Oct)
+
+Run: `odds-check.yml` `task=cup-corners`, **39389328073** (07:51 UTC, commit 642be3e, after
+the coverage record above), no key, **0 credits**. Weekly walk-forward on 2024/25 and
+2025/26 (qualifying included), every fit on earlier matches only. 1,392 matches with both
+corner counts: 486 in set D (both clubs rated domestically), 593 in set X (at least one
+club rated from cup matches only), 313 with no chance (a club with neither, mostly
+Conference League qualifiers). Gain = per-match mean log-loss gain over the cup average
+across the six team lines; ranges at 99.583% (12 tests); slope band 0.80–1.25; at least
+120 matches to be judged.
+
+| Candidate (set) | Group | Matches | Gain (99.583% range) | Slopes | Pass |
+| --- | --- | --- | --- | --- | --- |
+| (i) cross-league (f), no offsets (D) | UCL | 280 | −0.0116 (−0.0372 to +0.0127) | 0.02–0.46 | no |
+| | UEL | 170 | −0.0431 (−0.0809 to −0.0077) | −0.49–0.12 | no |
+| | UECL | 36 | +0.0238 (−0.0961 to +0.1508) | −0.40–0.84 | not judged |
+| | all | 486 | −0.0200 (−0.0416 to +0.0010) | −0.10–0.34 | no |
+| (j) (i) + league offsets (D) | UCL | 280 | +0.0190 (−0.0083 to +0.0460) | 0.45–1.18 | no |
+| | UEL | 170 | −0.0026 (−0.0389 to +0.0335) | 0.15–0.77 | no |
+| | UECL | 36 | +0.0320 (−0.1005 to +0.1592) | −0.25–1.15 | not judged |
+| | all | 486 | +0.0124 (−0.0105 to +0.0347) | 0.44–0.94 | no |
+| (k) (j) + cup-only ratings (X) | UCL | 133 | +0.1023 (+0.0547 to +0.1529) | 1.11–1.96 | no (slopes) |
+| | UEL | 212 | +0.0258 (−0.0080 to +0.0598) | 0.56–1.14 | no |
+| | UECL | 248 | +0.0268 (−0.0302 to +0.0782) | 0.27–0.60 | no |
+| | all | 593 | +0.0434 (+0.0143 to +0.0711) | 0.56–0.82 | no (slopes) |
+
+**What it means, in plain English.**
+- **Domestic corner ratings don't carry into Europe on their own.** (i), which takes each
+  club's league corner ratios at face value, is worse than simply guessing the cup average
+  (pooled −0.020; the Europa League's range is below 0), and its chances barely track what
+  happens (slopes near 0): a club that wins many corners against its own league's weaker
+  sides doesn't win as many against European opposition.
+- **Adjusting for league strength helps but isn't enough.** (j)'s league offsets turn the
+  loss into a small gain (pooled +0.012), but the range includes 0 in every cup and pooled,
+  and pooled its chances are too spread out on four of the six lines (home 4.5 and 5.5,
+  away 3.5 and 4.5: slopes 0.44–0.60).
+- **Rating clubs from their own cup matches carries some information** (pooled (k) +0.043,
+  range above 0; Champions League +0.102), but the chances are mis-scaled: too timid in the
+  Champions League (slopes 1.1–2.0) and too bold in the Conference League (0.27–0.60). It
+  fails the slope band everywhere.
+
+**Verdict, per cup (the pre-registered reading):**
+- **Champions League: no corner model.** Neither (i) nor (j) passes (judged on 280 matches);
+  (k) fails on calibration.
+- **Europa League: no corner model.** Neither passes on 170 matches; (j) is no better than
+  the cup average.
+- **Conference League: no corner model.** Only 36 matches have two domestically rated clubs,
+  so it follows the pooled result, which fails.
+- **Pooled: nothing passes.** So no cup club gets a corner model chance under the rule as
+  written, cup-only clubs stay unrated, and no corner trades follow.
+
+**2026/27 league-phase clubs that a fit at 20 Oct would rate** (descriptive, since nothing
+passed): UCL 29 of 36 domestically plus 7 from cup matches only (Bodo/Glimt, LASK, Sabah,
+Shakhtar, Slavia Prague, Slovan Bratislava, Viking), none unrated; UEL 21 plus 14, one
+unrated (Torreense); UECL 13 plus 23, none unrated. With no candidate passing, **none of
+them gets a model chance** today.
+
+**What this changes.** Nothing live: the cups' cards carry no `corners` block and no corner
+trades open there. A live Pinnacle cup-corner paper test (about 216 credits a month for the
+three cups in October and November, plus 48–56 a month each for the Europa and Conference
+League's DraftKings h2h or the free events list for event ids) would have no model to trade
+on; it could only log prices. The closest candidate is (j) pooled, which is over-confident
+in the middle of the range; a per-cup recalibration (as round 12 tried domestically) or
+fewer, larger-sample offsets would be a new pre-registered idea, judged on a 2026/27
+forward window (cup corner counts from July 2026 were not scored here), and is for the
+lead and owner to decide.
