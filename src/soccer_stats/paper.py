@@ -32,12 +32,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from soccer_stats import edge12_backtest as e12b
 from soccer_stats import lean_backtest as lb
 from soccer_stats import odds_log as ol
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
 LEAN_BACKTEST = "lean_backtest.json"  # on data-log under backtest/ (soccer-stats backtest-lean)
+EDGE12_BACKTEST = "edge12_backtest.json"  # on data-log under backtest/ (backtest-edge12)
 FRESH_HOURS = 3.0  # only open on odds fetched this recently
 VOID_MOVED_HOURS = 48.0
 VOID_AFTER_DAYS = 14
@@ -1368,10 +1370,14 @@ def run(
                 combined = (b.get("trades") or []) + ptrades
                 merged = portfolio_section(combined)
                 portfolio["backtest"] = {**b, **merged}
-    # Blend Lean's own backtest (backtest-lean on Pinnacle's early prices), trimmed for
-    # data.json; no file = {available: False, note}.
-    found = _read_json(Path(log_dir) / "backtest" / LEAN_BACKTEST) if log_dir else None
-    portfolio["strategy_backtests"] = {"lean": lb.app_section(found)}
+    # Each match strategy's own backtest on Pinnacle's early prices (backtest-lean and
+    # backtest-edge12; the Champions League at the close), trimmed for data.json; no file
+    # = {available: False, note}. E0_dk.json stays Moneyline's `backtest`.
+    bdir = Path(log_dir) / "backtest" if log_dir else None
+    portfolio["strategy_backtests"] = {
+        "lean": lb.app_section(_read_json(bdir / LEAN_BACKTEST) if bdir else None),
+        "edge12": e12b.app_section(_read_json(bdir / EDGE12_BACKTEST) if bdir else None),
+    }
     portfolio["live"] = live
     # One portfolio per strategy (the app reads these); live, backtest and player_model
     # above stay for one release.

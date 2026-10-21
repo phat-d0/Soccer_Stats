@@ -974,12 +974,25 @@ def _print_lean_block(label: str, m: dict) -> None:
     )
 
 
+def _print_cup_coverage(rep: dict) -> None:
+    for c in rep.get("coverage") or []:
+        print(
+            f"  {c['label']}: {c['matches']} finished matches, {c['model']} with a model chance "
+            f"(not low-data), {c['draftkings']} with DraftKings' close, {c['pinnacle']} with "
+            f"Pinnacle's, {c['candidates']} candidates"
+        )
+
+
 def _print_lean(name: str, rep: dict) -> None:
     print(f"\n=== Blend Lean on Pinnacle early: {name} ===")
+    if rep.get("kind") == "close":
+        print("  Priced at DraftKings' close (no early cup prices); CLV vs Pinnacle's close")
     if rep.get("error"):
         print(f"  {rep['error']}")
         return
-    if rep.get("coverage"):
+    if rep.get("kind") == "close":
+        _print_cup_coverage(rep)
+    elif rep.get("coverage"):
         print(
             "  Pinnacle early/close coverage: "
             + ", ".join(
@@ -995,6 +1008,11 @@ def _print_lean(name: str, rep: dict) -> None:
             + (f"{sig['min']:.4f}-{sig['max']:.4f}" if sig else "n/a")
             + f", {rep.get('candidates', 0)} matches scored"
         )
+    if rep.get("kind") == "close":
+        print(
+            f"  {rep.get('training_matches')} blend rows in all (minimum {rep.get('min_rows')}); "
+            f"{rep.get('scored', 0)} of {rep.get('candidates', 0)} candidates after a fit"
+        )
     for tier in ("lean", "strong"):
         m = rep.get(tier) or {}
         _print_lean_block(tier.capitalize(), m)
@@ -1004,56 +1022,136 @@ def _print_lean(name: str, rep: dict) -> None:
         _print_lean_block(f"{s['label']}", s)
 
 
-def cmd_backtest_lean(args: argparse.Namespace) -> None:
-    """Blend Lean replayed walk-forward on Pinnacle's early prices, per league
-    (lean_backtest.py). Football-data and Understat only: no Odds API key, no credits."""
-    import json
-
+def _cup_close_reports(codes, closes_path, which: tuple[str, ...]) -> dict[str, dict]:
+    """The Champions League replayed at DraftKings' bought close (cup_backtest.py) for each
+    rule in `which` ("lean", "edge12"): {code: {rule: (report, bets)}}. Only UCL has bought
+    closes; another cup, a missing closes file or incomplete European results give
+    {error} reports. Nothing here buys prices."""
+    from soccer_stats import cup_backtest as cb
+    from soccer_stats import cup_model
+    from soccer_stats import edge12_backtest as e12b
     from soccer_stats import leagues as lgs
     from soccer_stats import lean_backtest as lb
-    from soccer_stats.data import pinnacle_prices
-    from soccer_stats.publish import XG_WEIGHT, _clean
 
-    # The Champions League is left out: its bought prices are closes only, and Lean is
-    # replayed on Pinnacle's early price with CLV against the close (docs/leagues.md).
-    codes = args.leagues or [c for c in lgs.live_codes() if not lgs.LEAGUES[c].cup]
+    empty = {"lean": lambda c: lb.bets(pd.DataFrame(), c), "edge12": e12b.empty_bets}
+    out: dict[str, dict] = {}
+    cups_ = [c for c in codes if lgs.LEAGUES[c].cup]
+    if not cups_:
+        return out
+
+    def fail(code, error):
+        return {r: (cb.error_report(error), empty[r](code)) for r in which}
+
+    loaded = cb.load(closes_path)
+    hist = None
+    for code in cups_:
+        if code != cup_model.CUP:
+            out[code] = fail(code, "No bought closes for this cup")
+            continue
+        if loaded is None:
+            out[code] = fail(code, cb.NO_FILE)
+            continue
+        try:
+            hist = hist or cup_model.history()
+        except Exception as exc:  # noqa: BLE001  the cup failing never costs the leagues
+            out[code] = fail(code, f"{type(exc).__name__}: {exc}")
+            continue
+        if hist.get("error"):
+            out[code] = fail(code, hist["error"])
+            continue
+        pin, dk = loaded
+        reports = {}
+        for r in which:
+            try:
+                rep, b = (cb.lean_report if r == "lean" else e12b.cup_report)(
+                    hist["preds"], pin, dk
+                )
+            except Exception as exc:  # noqa: BLE001
+                rep, b = cb.error_report(f"{type(exc).__name__}: {exc}"), empty[r](code)
+            reports[r] = (rep, b)
+        out[code] = reports
+    return out
+
+
+def _early_preds(code: str, from_season: int, burn_in: int):
+    """One domestic league's walk-forward model chances from `from_season` (xG weight 0.7
+    where Understat has xG, else goals only) and Pinnacle's own prices for those seasons."""
+    from soccer_stats import leagues as lgs
+    from soccer_stats.data import pinnacle_prices
+    from soccer_stats.publish import XG_WEIGHT
+
     last = current_season()
-    years = range(args.from_season - args.burn_in, last + 1)
+    matches = load_matches([code], range(from_season - burn_in, last + 1))
+    matches, err = with_xg(matches)
+    if err and lgs.LEAGUES[code].understat:
+        print(f"{lgs.name(code)}: {err}")
+    weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
+    factory = functools.partial(DixonColes, xg_weight=weight)
+    preds = backtest.walk_forward(matches, start=f"{from_season}-07-01", model_factory=factory)
+    return preds, pinnacle_prices(code, range(from_season, last + 1)), weight
+
+
+def _read_dk(path) -> dict | None:
+    import json
+
+    if not path or not Path(path).exists():
+        return None
+    try:
+        return json.loads(Path(path).read_text())
+    except ValueError:
+        return None
+
+
+def _write_backtest(out: dict, args, name: str, label: str) -> None:
+    import json
+
+    from soccer_stats.publish import _clean
+
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = Path(args.log_dir) / "backtest" / name
+    else:
+        path = None
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
+        print(f"{label} written to {path}")
+
+
+def cmd_backtest_lean(args: argparse.Namespace) -> None:
+    """Blend Lean replayed walk-forward on Pinnacle's early prices, per league
+    (lean_backtest.py), plus the Champions League at DraftKings' bought close
+    (cup_backtest.py). Football-data, Understat, ESPN and data-log's closes only: no Odds
+    API key, no credits."""
+    from soccer_stats import leagues as lgs
+    from soccer_stats import lean_backtest as lb
+
+    codes = args.leagues or lgs.live_codes()
+    cup = _cup_close_reports(codes, getattr(args, "cup_closes", None), ("lean",))
     reports: dict[str, dict] = {}
     all_bets: list[pd.DataFrame] = []
     for code in codes:
-        try:
-            matches = load_matches([code], years)
-            matches, err = with_xg(matches)
-            if err and lgs.LEAGUES[code].understat:
-                print(f"{lgs.name(code)}: {err}")
-            weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
-            factory = functools.partial(DixonColes, xg_weight=weight)
-            preds = backtest.walk_forward(
-                matches, start=f"{args.from_season}-07-01", model_factory=factory
-            )
-            pins = pinnacle_prices(code, range(args.from_season, last + 1))
-            rep, b = lb.league_report(code, preds, pins)
-            rep["xg_weight"] = weight
-        except Exception as exc:  # one league failing never costs the others
-            rep, b = {"error": f"{type(exc).__name__}: {exc}"}, lb.bets(pd.DataFrame(), code)
+        if code in cup:
+            rep, b = cup[code]["lean"]
+        else:
+            try:
+                preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+                rep, b = lb.league_report(code, preds, pins)
+                rep["xg_weight"] = weight
+            except Exception as exc:  # one league failing never costs the others
+                rep, b = {"error": f"{type(exc).__name__}: {exc}"}, lb.bets(pd.DataFrame(), code)
         reports[code] = rep
         all_bets.append(b)
         _print_lean(lgs.name(code), rep)
-    dk = None
-    if args.dk_file and Path(args.dk_file).exists():
-        try:
-            dk = json.loads(Path(args.dk_file).read_text())
-        except ValueError:
-            dk = None
     out = lb.build(
         reports,
         all_bets,
         from_season=args.from_season,
-        dk=dk,
+        dk=_read_dk(args.dk_file),
         names={c: lgs.name(c) for c in codes},
     )
-    _print_lean("all leagues pooled", out["all"])
+    _print_lean("early-price leagues pooled", out["all"])
     for code, m in out["all"]["by_league"].items():
         _print_lean_block(code, m)
     rep = out["draftkings_replay"]
@@ -1064,16 +1162,110 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
             roi = "n/a" if m.get("roi") is None else f"{m['roi']:+.1%}"
             print(f"  {tier.capitalize()}: {m.get('bets', 0)} bets, ROI {roi}")
     print(f"\n{out['bets_total']} bets in all ({len(out['bets'])} rows kept)")
-    if args.json:
-        path = Path(args.json)
-    elif args.log_dir:
-        path = Path(args.log_dir) / "backtest" / "lean_backtest.json"
-    else:
-        path = None
-    if path:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(_clean(out), separators=(",", ":")))
-        print(f"Lean backtest written to {path}")
+    _write_backtest(out, args, "lean_backtest.json", "Lean backtest")
+
+
+def _print_edge12_block(label: str, m: dict) -> None:
+    if not m.get("bets"):
+        print(f"  {label}: 0 bets")
+        return
+    clv = "n/a" if m.get("clv") is None else f"{m['clv']:+.1%}"
+    print(
+        f"  {label}: {m['bets']} bets, won {m['win_rate']:.1%} vs break-even "
+        f"{m['breakeven']:.1%} (model {m['model_p']:.1%}), ROI {m['roi']:+.1%} "
+        f"({_fmt_range(m.get('roi_ci95'))}), CLV {clv} ({_fmt_range(m.get('clv_ci95'))}, "
+        f"{m['clv_bets']} with a close), avg odds {m['avg_odds']:.2f}"
+    )
+
+
+def _print_edge12(name: str, rep: dict) -> None:
+    print(f"\n=== Model 12% on Pinnacle early: {name} ===")
+    if rep.get("kind") == "close":
+        print("  Priced at DraftKings' close (no early cup prices); CLV vs Pinnacle's close")
+    if rep.get("error"):
+        print(f"  {rep['error']}")
+        return
+    if rep.get("kind") == "close":
+        _print_cup_coverage(rep)
+    elif rep.get("coverage"):
+        print(
+            "  Pinnacle early/close coverage: "
+            + ", ".join(
+                f"{c['label']} {c['early_share']:.0%}/{c['close_share']:.0%}"
+                + ("" if c["included"] else " (left out)")
+                for c in rep["coverage"]
+            )
+        )
+    if "candidates" in rep:
+        print(f"  {rep['candidates']} matches scored")
+    _print_edge12_block("Model 12%", rep.get("edge12") or {})
+    for s in rep.get("by_season") or []:
+        _print_edge12_block(s["label"], s)
+
+
+def cmd_backtest_edge12(args: argparse.Namespace) -> None:
+    """Model 12% replayed per league on Pinnacle's early prices (edge12_backtest.py), plus
+    the Champions League at DraftKings' bought close (cup_backtest.py). Football-data,
+    Understat, ESPN and data-log's closes only: no Odds API key, no credits."""
+    from soccer_stats import edge12_backtest as e12b
+    from soccer_stats import leagues as lgs
+
+    codes = args.leagues or lgs.live_codes()
+    cup = _cup_close_reports(codes, args.cup_closes, ("edge12",))
+    reports: dict[str, dict] = {}
+    league_bets: dict[str, pd.DataFrame] = {}
+    for code in codes:
+        if code in cup:
+            rep, b = cup[code]["edge12"]
+        else:
+            try:
+                preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+                rep, b = e12b.league_report(code, preds, pins)
+                rep["xg_weight"] = weight
+            except Exception as exc:  # one league failing never costs the others
+                rep, b = {"error": f"{type(exc).__name__}: {exc}"}, e12b.empty_bets(code)
+        reports[code] = rep
+        league_bets[code] = b
+        _print_edge12(lgs.name(code), rep)
+    out = e12b.build(
+        reports,
+        league_bets,
+        from_season=args.from_season,
+        dk=_read_dk(args.dk_file),
+        names={c: lgs.name(c) for c in codes},
+    )
+    _print_edge12("early-price leagues pooled", out["all"])
+    for code, m in out["all"]["by_league"].items():
+        _print_edge12_block(code, m)
+    dk = out["draftkings_replay"]
+    if dk:
+        sm = dk["summary"]
+        roi = "n/a" if sm.get("roi") is None else f"{sm['roi']:+.1%}"
+        print(f"\n=== {dk['label']} (separate file) ===")
+        print(f"  {sm.get('trades', 0)} trades, ROI {roi}")
+    print(f"\n{out['bets_total']} bets in all ({len(out['bets'])} rows kept)")
+    brief = {
+        c: {k: r.get(k) for k in ("kind", "error", "candidates")} | _brief(r.get("edge12") or {})
+        for c, r in out["leagues"].items()
+    }
+    print(
+        "EDGE12_BACKTEST_JSON "
+        + json_dumps({"leagues": brief, "all": _brief(out["all"]["edge12"])})
+    )
+    _write_backtest(out, args, "edge12_backtest.json", "Model 12% backtest")
+
+
+def _brief(m: dict) -> dict:
+    keys = ("bets", "win_rate", "breakeven", "roi", "roi_ci95", "clv", "clv_ci95", "avg_odds")
+    return {k: m.get(k) for k in keys if k in m}
+
+
+def json_dumps(obj) -> str:
+    import json
+
+    from soccer_stats.publish import _clean
+
+    return json.dumps(_clean(obj), separators=(",", ":"))
 
 
 def _print_filter_block(label: str, m: dict, clv_key: str = "") -> None:
@@ -2492,9 +2684,29 @@ def main(argv: list[str] | None = None) -> None:
     )
     lbk.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
     lbk.add_argument("--dk-file", help="E0_dk.json, for the DraftKings tiers beside the replay")
+    lbk.add_argument(
+        "--cup-closes",
+        help="the Champions League's bought closes (data-log odds_history/UCL_closes.jsonl)",
+    )
     lbk.add_argument("--json", help="path for the results")
     lbk.add_argument("--log-dir", help="data-log checkout: writes backtest/lean_backtest.json")
     lbk.set_defaults(func=cmd_backtest_lean)
+
+    e12b = sub.add_parser(
+        "backtest-edge12",
+        help="replay Model 12% on Pinnacle's early prices per league (no key)",
+    )
+    e12b.add_argument("--leagues", nargs="+", help="football-data codes (default: every live one)")
+    e12b.add_argument("--from-season", type=int, default=2019, help="first season of bets")
+    e12b.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    e12b.add_argument("--dk-file", help="E0_dk.json, named beside the replay")
+    e12b.add_argument(
+        "--cup-closes",
+        help="the Champions League's bought closes (data-log odds_history/UCL_closes.jsonl)",
+    )
+    e12b.add_argument("--json", help="path for the results")
+    e12b.add_argument("--log-dir", help="data-log checkout: writes backtest/edge12_backtest.json")
+    e12b.set_defaults(func=cmd_backtest_edge12)
 
     e12 = sub.add_parser(
         "backtest-edge12-filters",
