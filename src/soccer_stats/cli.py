@@ -984,9 +984,10 @@ def _print_cup_coverage(rep: dict) -> None:
 
 
 def _print_lean(name: str, rep: dict) -> None:
-    print(f"\n=== Blend Lean on Pinnacle early: {name} ===")
+    where = "at DraftKings' close" if rep.get("kind") == "close" else "on Pinnacle early"
+    print(f"\n=== Blend Lean {where}: {name} ===")
     if rep.get("kind") == "close":
-        print("  Priced at DraftKings' close (no early cup prices); CLV vs Pinnacle's close")
+        print("  No early cup prices: priced at DraftKings' close; CLV vs Pinnacle's close")
     if rep.get("error"):
         print(f"  {rep['error']}")
         return
@@ -1179,9 +1180,10 @@ def _print_edge12_block(label: str, m: dict) -> None:
 
 
 def _print_edge12(name: str, rep: dict) -> None:
-    print(f"\n=== Model 12% on Pinnacle early: {name} ===")
+    where = "at DraftKings' close" if rep.get("kind") == "close" else "on Pinnacle early"
+    print(f"\n=== Model 12% {where}: {name} ===")
     if rep.get("kind") == "close":
-        print("  Priced at DraftKings' close (no early cup prices); CLV vs Pinnacle's close")
+        print("  No early cup prices: priced at DraftKings' close; CLV vs Pinnacle's close")
     if rep.get("error"):
         print(f"  {rep['error']}")
         return
