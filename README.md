@@ -116,7 +116,7 @@ odds* with `match_blends` ticked; only the default branch saves the file to `dat
 Expect few Lean picks: the blend gives the model almost no weight, so σ is small and the
 blend rarely clears DraftKings' margin. In La Liga, the Bundesliga, Serie A and Ligue 1 the fits' price
 weight b is above 1 (1.07–1.52), so the blend sharpens the price itself; most Lean picks so far come from that
-(favourites), not from the model (see CLAUDE.md, Blend Lean). `backtest-dk` also replays both tiers on the
+(favourites), not from the model (see `docs/history.md`, round 14 "Blend Lean beside the 12% test"). `backtest-dk` also replays both tiers on the
 DraftKings backtest (`E0_dk.json` → `tiers`; research, not a gate).
 
 `soccer-stats backtest-lean` (*Backfill DraftKings odds* with `lean_backtest` ticked; no
