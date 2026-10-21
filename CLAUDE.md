@@ -372,7 +372,7 @@ the owner's baseball app, so the balance can drop without any run here.
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
 
-**Player bets** (Premier League; details and results in `docs/player_props.md`)
+**Player bets** (shots and the live player lines: Premier League; goalscorer research: five leagues, E0, SP1, D1, I1, F1; details and results in `docs/player_props.md`)
 - `player_data.py` (Understat shots, name matching, season stats, FPL active players), `factors.py`
   (features from earlier matches), `models/player_counts.py` (NB2 shots/on target, start/sub
   mixture, `prob_over`).

@@ -48,7 +48,7 @@ Don't edit live model code owned by moneyline or player-props. Hand a winner ove
 - ROI last, and always with bootstrap ranges that resample whole matches.
 
 **Pass rule**
-- The candidate earns blend weight with a range above 0, and shows positive CLV at the early price with a range above 0.
+- The candidate earns blend weight with a range above 0, and shows positive CLV at the early price with a range above 0, unless the test's pre-registration in `docs/` sets its own rule (for example the corner tests: gain range above 0 and every line's slope within 0.80–1.25; round 13's team totals: CLV range above 0 with at least 30 bets).
 - Backtest profit alone never passes.
 
 **Uses of each method**
