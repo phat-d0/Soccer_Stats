@@ -490,6 +490,27 @@ const STEPS = [
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
     if (!(await p.textContent("#view")).includes("matches to fit on")) throw new Error("SP1 fits");
   }],
+  // The strategy rows' backtest headlines follow the competition chip (owner, 21 Oct).
+  ["portfolio-backtest-headlines", async (p) => {
+    const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .vals`).innerText()).replace(/\s+/g, " ");
+    const seen = {};
+    for (const lg of ["", "E0", "SP1"]) {
+      await p.click(`.chip[data-league="${lg}"]`);
+      seen[lg] = await row("lean");
+      const e12 = await row("edge12");
+      if (lg === "SP1" ? !e12.includes("no backtest for this competition yet") : !e12.includes("Premier League · DraftKings")) throw new Error(`12% row under "${lg}": ${e12}`);
+    }
+    if (new Set(Object.values(seen)).size !== 3) throw new Error(`Lean headline doesn't follow the chip: ${JSON.stringify(seen)}`);
+    if (!seen.SP1.includes("La Liga at Pinnacle") || !seen[""].includes("bets · at Pinnacle")) throw new Error(`Lean subs: ${JSON.stringify(seen)}`);
+    // The Champions League isn't in the Lean backtest.
+    await p.click('.chip[data-league="UCL"]');
+    if (!(await row("lean")).includes("no backtest for this competition")) throw new Error(`UCL Lean row: ${await row("lean")}`);
+    // Model 12% under La Liga: a plain note, never the Premier League's numbers.
+    await p.click('.chip[data-league="SP1"]'); await p.click('button[data-pfstrat="edge12"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("No Model 12% backtest for La Liga yet") || (await p.locator("#view .tiles").count())) throw new Error("12% SP1 backtest body");
+    await p.click('button[data-pfstrat="lean"]');
+  }],
   ["portfolio-live-edge12", async (p) => {
     await p.click('button[data-pf="live"]');
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
