@@ -76,7 +76,8 @@ settlement runs after them.
   bets, ROI −2.2% (−7.5% to +2.9%), CLV −3.1% (−3.4% to −2.8%); the branch run in
   `docs/leagues.md` had 2,629 bets, ROI −2.3%. UCL Lean: 0 bets (only one block reaches the
   300-row minimum).
-- The model overrates underdogs and long shots: in every price band the side it likes wins a
+- The model overrates the side it likes in every price band, favourites included (favourites:
+  model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
   (`docs/lab.md` "Price-band edge rule", step 1, and the "Model 12% filters" verdict).
 
@@ -84,7 +85,7 @@ settlement runs after them.
 the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
 
 **Credits:** about 19,800 left on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
-~2,390 (with League One/Two and UCL), team totals ~682, corners ~471. The key is shared with
+~2,476 (with League One/Two and UCL ~86), team totals ~682, corners ~471. The key is shared with
 the owner's baseball app, so the balance can drop without any run here.
 
 **Scheduled checks** (send_later into the lead session; trigger ids):
@@ -372,7 +373,7 @@ the owner's baseball app, so the balance can drop without any run here.
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
 
-**Player bets** (Premier League; details and results in `docs/player_props.md`)
+**Player bets** (shots and the live player lines: Premier League; goalscorer research: five leagues, E0, SP1, D1, I1, F1; details and results in `docs/player_props.md`)
 - `player_data.py` (Understat shots, name matching, season stats, FPL active players), `factors.py`
   (features from earlier matches), `models/player_counts.py` (NB2 shots/on target, start/sub
   mixture, `prob_over`).
