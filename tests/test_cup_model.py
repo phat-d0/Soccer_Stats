@@ -876,7 +876,7 @@ def test_odds_log_and_close_planner_see_ucl_kickoffs(tmp_path):
     assert close_runs.kickoffs(tmp_path / "odds_log") == [k]
 
 
-def test_backtest_lean_leaves_the_cup_out(monkeypatch):
+def test_backtest_lean_never_loads_the_cup_from_football_data(monkeypatch):
     import argparse
 
     from soccer_stats import cli

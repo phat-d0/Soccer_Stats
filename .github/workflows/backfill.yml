@@ -9,9 +9,12 @@
 # from the default branch.
 # estimate_month (+ cups): credit estimates only, no key, no push; `cups` adds the UEFA
 # cups' cost on ESPN's calendar (cups.py).
-# lean_backtest: replays Blend Lean walk-forward on Pinnacle's early prices per league
-# (no key, no credits); pushes backtest/lean_backtest.json to data-log only from the
-# default branch.
+# lean_backtest: replays Blend Lean walk-forward on Pinnacle's early prices per league,
+# and the Champions League at DraftKings' bought close (data-log's UCL_closes.jsonl, never
+# bought here) (no key, no credits); pushes backtest/lean_backtest.json to data-log only
+# from the default branch.
+# edge12_backtest: the same for the live Model 12% rule (owner, 21 Oct); pushes
+# backtest/edge12_backtest.json to data-log only from the default branch.
 # edge12_filters: the live Model 12% rule and two filters (model favourites only; price
 # 3.00 or shorter) on Pinnacle's early prices, plus a descriptive E0 DraftKings check
 # (pre-registered in docs/lab.md, owner 19 Oct). No key, no credits, never pushes;
@@ -60,6 +63,10 @@ on:
         description: "Replay Blend Lean on Pinnacle's early prices per league (no key; saved to data-log from the default branch only)"
         type: boolean
         default: false
+      edge12_backtest:
+        description: "Replay Model 12% on Pinnacle's early prices per league, the Champions League at the close (no key; saved to data-log from the default branch only)"
+        type: boolean
+        default: false
       edge12_filters:
         description: "Research: the live 12% rule with two filters on Pinnacle's early prices + E0 DraftKings check (no key, no push)"
         type: boolean
@@ -97,7 +104,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -106,14 +113,14 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_filters || inputs.estimate_month != '' }}
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.estimate_month != '' }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -320,14 +327,27 @@ jobs:
       # (read from data-log, never written by this step). Football-data and Understat only:
       # no key, no credits. Saved to data-log (backtest/lean_backtest.json) only from the
       # default branch; elsewhere it prints and uploads a 7-day artifact.
+      # The Champions League's replay at the close (owner, 21 Oct) needs ESPN's European
+      # results, from the cache fit-match-blends saves (restored only), and data-log's
+      # bought closes (read only; nothing is ever bought here).
+      - uses: actions/cache/restore@v4
+        if: ${{ (inputs.lean_backtest || inputs.edge12_backtest) && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-${{ github.run_id }}
+          restore-keys: cup-espn-
+
       - name: Blend Lean backtest on Pinnacle's early prices
         if: ${{ inputs.lean_backtest && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
-          mkdir -p out
+          mkdir -p out data/raw/cups/espn
           git fetch --depth=1 origin data-log
           git show FETCH_HEAD:backtest/E0_dk.json > out/E0_dk.json 2>/dev/null || rm -f out/E0_dk.json
-          uv run soccer-stats backtest-lean --dk-file out/E0_dk.json --json out/lean_backtest.json
+          git show FETCH_HEAD:odds_history/UCL_closes.jsonl > out/UCL_closes.jsonl 2>/dev/null ||
+            { rm -f out/UCL_closes.jsonl; echo "No Champions League closes on data-log"; }
+          uv run soccer-stats backtest-lean --dk-file out/E0_dk.json \
+            --cup-closes out/UCL_closes.jsonl --json out/lean_backtest.json
           if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
             echo "Not the default branch: printed only, nothing pushed to data-log."
             exit 0
@@ -356,6 +376,50 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # Model 12% backtest (owner, 21 Oct): the live 12% rule replayed per league on
+      # Pinnacle's early prices, the Champions League at DraftKings' bought close; E0_dk.json
+      # is read (named beside it), never written. No key, no credits. Saved to data-log
+      # (backtest/edge12_backtest.json) only from the default branch; elsewhere it prints and
+      # uploads a 7-day artifact.
+      - name: Model 12% backtest on Pinnacle's early prices
+        if: ${{ inputs.edge12_backtest && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
+        run: |
+          uv sync --frozen
+          mkdir -p out data/raw/cups/espn
+          git fetch --depth=1 origin data-log
+          git show FETCH_HEAD:backtest/E0_dk.json > out/E0_dk.json 2>/dev/null || rm -f out/E0_dk.json
+          git show FETCH_HEAD:odds_history/UCL_closes.jsonl > out/UCL_closes.jsonl 2>/dev/null ||
+            { rm -f out/UCL_closes.jsonl; echo "No Champions League closes on data-log"; }
+          uv run soccer-stats backtest-edge12 --dk-file out/E0_dk.json \
+            --cup-closes out/UCL_closes.jsonl --json out/edge12_backtest.json
+          if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Not the default branch: printed only, nothing pushed to data-log."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/backtest
+            cp out/edge12_backtest.json ../log/backtest/edge12_backtest.json
+            git -C ../log add backtest/edge12_backtest.json
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Model 12% backtest on Pinnacle early prices"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.edge12_backtest && always() }}
+        with:
+          name: edge12-backtest
+          path: out/edge12_backtest.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       # Model 12% filters (owner, 19 Oct; docs/lab.md): the cached DraftKings snapshots for the
       # descriptive E0 check are restored only (never saved or deleted), with no key.
       - uses: actions/cache/restore@v4
@@ -381,13 +445,13 @@ jobs:
           if-no-files-found: ignore
 
       - name: Backtest from cached odds (print only)
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -397,7 +461,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

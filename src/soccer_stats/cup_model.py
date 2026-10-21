@@ -555,33 +555,25 @@ def evaluate(
 EVAL_SEASONS = (2024, 2025)  # the seasons with bought closes (cup_odds)
 
 
-def blend_entry(
-    closes_path: Path | str | None,
-    fit_date,
+def history(
+    seasons=EVAL_SEASONS,
     raw_dir: Path = RAW_DIR,
     get: Callable = requests.get,
-    seasons=EVAL_SEASONS,
     today: pd.Timestamp | None = None,
     domestic_loader: Callable | None = None,
 ) -> dict:
-    """fit-match-blends' Champions League entry: the model's walk-forward chances for every
-    finished Champions League match of `seasons` (weekly refits on earlier matches only)
-    beside Pinnacle's bought close (data-log odds_history/UCL_closes.jsonl), fitted with
-    match_calibration.league_fit at `fit_date` (its MIN_ROWS guard unchanged), plus
-    `evaluation` (model / blend / Pinnacle log loss, DraftKings' close beside them),
-    `coverage` per season, the clubs without a model chance and this season's clubs'
-    coverage (`current_clubs`). The European results must be complete, or there is no fit
-    (an incomplete history would rate the leagues on part of the evidence)."""
-    from soccer_stats import match_calibration as mc
-
+    """The walk-forward behind blend_entry and the Champions League close backtests: every
+    finished Champions League match of `seasons`, predicted from a fit at the Monday before
+    its kickoff on matches played before then. Returns {info: {model, xg_weight, european,
+    domestic}, error (European results incomplete: nothing else), preds, mapping, euro,
+    targets, current (this season's calendar)}."""
     today = today or pd.Timestamp.now(tz="UTC")
-    fit_date = _naive(fit_date)
     first = min(seasons)
     start = cups.season_window(first)[0] - pd.Timedelta(days=WINDOW_DAYS)
     years = list(range(season_of(start), season_of(today) + 1))
     stats: dict = {}
     euro, rep = european_events(years, raw_dir, get, today=today, until=today, stats=stats)
-    out: dict = {
+    info: dict = {
         "model": "cross-league goals-only Dixon-Coles (cup_model.py)",
         "xg_weight": 0.0,
         "european": {
@@ -593,14 +585,12 @@ def blend_entry(
     }
     if not rep["complete"]:
         return {
-            **out,
-            "coef": None,
-            "sigma": None,
+            "info": info,
             "error": f"European results incomplete ({rep['why'] or 'failed requests'})",
         }
     loader = domestic_loader or (lambda a, b: load_domestic(a, b, raw_dir))
     domestic, errors = loader(start, today)
-    out["domestic"] = {
+    info["domestic"] = {
         "matches": int(len(domestic)),
         "errors": errors,
         "leagues": sorted(domestic["league"].unique().tolist()),
@@ -618,7 +608,45 @@ def blend_entry(
         for e in results(euro)
         if e.get("slug") == SLUG and season_of(e["kickoff"]) in set(seasons)
     ]
-    preds = walk_forward(targets, matches, mapping)
+    return {
+        "info": info,
+        "error": None,
+        "preds": walk_forward(targets, matches, mapping),
+        "mapping": mapping,
+        "euro": euro,
+        "targets": targets,
+        "current": cur,
+        "now_season": now_season,
+    }
+
+
+def blend_entry(
+    closes_path: Path | str | None,
+    fit_date,
+    raw_dir: Path = RAW_DIR,
+    get: Callable = requests.get,
+    seasons=EVAL_SEASONS,
+    today: pd.Timestamp | None = None,
+    domestic_loader: Callable | None = None,
+    hist: dict | None = None,
+) -> dict:
+    """fit-match-blends' Champions League entry: the model's walk-forward chances for every
+    finished Champions League match of `seasons` (weekly refits on earlier matches only;
+    history()) beside Pinnacle's bought close (data-log odds_history/UCL_closes.jsonl),
+    fitted with match_calibration.league_fit at `fit_date` (its MIN_ROWS guard unchanged),
+    plus `evaluation` (model / blend / Pinnacle log loss, DraftKings' close beside them),
+    `coverage` per season, the clubs without a model chance and this season's clubs'
+    coverage (`current_clubs`). The European results must be complete, or there is no fit
+    (an incomplete history would rate the leagues on part of the evidence). `hist` reuses
+    a history() already computed."""
+    from soccer_stats import match_calibration as mc
+
+    fit_date = _naive(fit_date)
+    h = hist or history(seasons, raw_dir, get, today, domestic_loader)
+    out = dict(h["info"])
+    if h.get("error"):
+        return {**out, "coef": None, "sigma": None, "error": h["error"]}
+    preds, mapping, euro, targets = h["preds"], h["mapping"], h["euro"], h["targets"]
     pin, dk = load_closes(closes_path, "pinnacle"), load_closes(closes_path, "draftkings")
     joined = blend_preds(preds, pin)
     rows = mc.training_rows(joined, "h2h")
@@ -646,7 +674,7 @@ def blend_entry(
         and e.get("completed")
         and not e.get("score90")
     ]
-    clubs = sorted({e[s] for e in cur["events"] for s in ("home", "away")})
+    clubs = sorted({e[s] for e in h["current"]["events"] for s in ("home", "away")})
     out.update(
         {
             **fit,
@@ -657,7 +685,7 @@ def blend_entry(
             "no_90_minute_score": unknown90,
             "evaluation": evaluate(preds, pin, dk),
             "current_clubs": {
-                "season": season_code(now_season),
+                "season": season_code(h["now_season"]),
                 "clubs": {c: mapping.get(c) for c in clubs if not PLACEHOLDER.match(c)},
             },
         }

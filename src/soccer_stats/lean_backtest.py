@@ -40,6 +40,7 @@ COVERAGE_MIN = 0.90
 STAKE = 1.0
 N_BOOT = 2000
 MAX_BETS = 6000  # compact rows kept in the file (newest first); aggregates use every bet
+CLOSE_KIND = "close"  # a league replayed at the close (cup_backtest), kept out of `all`
 DRIVERS = ("market", "model")
 BET_FIELDS = [
     "date",
@@ -65,7 +66,9 @@ NOTE = (
     "break-even, CLV against Pinnacle's margin-free close. Pinnacle is a sharper price than "
     "DraftKings, so this is a tougher test than the live one, and it isn't the live book: a "
     "blend fitted on Pinnacle and fed Pinnacle's own prices doesn't have the mismatch live "
-    "Lean has (fitted on Pinnacle, fed DraftKings' price, with b above 1 sharpening it)."
+    "Lean has (fitted on Pinnacle, fed DraftKings' price, with b above 1 sharpening it). The "
+    "Champions League has no early prices: it is replayed at DraftKings' close and kept out "
+    "of the pooled numbers."
 )
 DK_NOTE = (
     "The same Lean rule on DraftKings' own historical prices (Premier League only; the "
@@ -302,7 +305,7 @@ def metrics(df: pd.DataFrame) -> dict:
         "roi_ci95": _boot_mean(profit / STAKE),
         "profit": float(profit.sum()),
         "avg_odds": float(odds.mean()),
-        "avg_z": float(df["z"].astype(float).mean()),
+        **({"avg_z": float(df["z"].astype(float).mean())} if "z" in df else {}),
         "z_realized": float((won.mean() - be.mean()) / se) if se > 0 else None,
         "clv_bets": len(clv),
         "clv": float(clv.mean()) if len(clv) else None,
@@ -360,6 +363,7 @@ def league_report(
     b = bets(scored, league)
     sig = [f["sigma"] for f in fits]
     rep = {
+        "kind": "early",
         "coverage": cov,
         "seasons_included": [c["label"] for c in cov if c["included"]],
         "seasons_excluded": [c["label"] for c in cov if not c["included"]],
@@ -432,12 +436,20 @@ def build(
     now: pd.Timestamp | None = None,
 ) -> dict:
     """The saved file (backtest/lean_backtest.json): the rule, per-league reports, the
-    pooled view across leagues, the DraftKings replay and the compact bets."""
+    pooled view across the early-price leagues (a league priced at the close, the
+    Champions League's `kind: "close"`, is reported on its own), the DraftKings replay and
+    the compact bets (every league's)."""
     now = now or pd.Timestamp.now(tz="UTC")
-    frames = [b for b in all_bets if len(b)]
+    early = [
+        (code, b)
+        for (code, rep), b in zip(reports.items(), all_bets, strict=True)
+        if rep.get("kind") != CLOSE_KIND
+    ]
+    frames = [b for _, b in early if len(b)]
     pooled = pd.concat(frames, ignore_index=True) if frames else bets(pd.DataFrame(), "")
-    rows = compact(pooled)
-    by_league = {code: summary(b)["lean"] for code, b in zip(reports, all_bets, strict=True)}
+    every = [b for b in all_bets if len(b)]
+    rows = compact(pd.concat(every, ignore_index=True)) if every else []
+    by_league = {code: summary(b)["lean"] for code, b in early}
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "kind": "lean_backtest",
@@ -454,6 +466,8 @@ def build(
             "stake": STAKE,
             "coverage_min": COVERAGE_MIN,
             "clv": "entry odds x Pinnacle's margin-free (Shin) close - 1",
+            "cup": "Champions League at DraftKings' bought close (cup_backtest.py), CLV against "
+            "Pinnacle's close at the same moment; kept out of `all`",
             "driver": "market = still at least 1 sigma with the model's term taken out of "
             "the fitted blend (c = 0, a and b kept as fitted, no refit); model = only with it",
             "driver_note": tr.DRIVER_NOTE,
@@ -461,7 +475,13 @@ def build(
         "leagues": {
             code: {"name": (names or {}).get(code, code), **rep} for code, rep in reports.items()
         },
-        "all": {**summary(pooled), "by_league": by_league},
+        "all": {
+            **summary(pooled),
+            "leagues": [code for code, _ in early],
+            "by_league": by_league,
+            "note": "Early-price leagues only; the Champions League (priced at the close) is "
+            "reported on its own.",
+        },
         "draftkings_replay": dk_replay(dk),
         "bet_fields": BET_FIELDS,
         "bets_total": len(rows),

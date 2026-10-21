@@ -187,6 +187,77 @@ What changed (`espn_results.py`, `paper.awaiting_results`, `cli.espn_settlement`
   throttled schedule a settlement run can at most take a refresh that was due (about 1
   credit per league with a kickoff in the next 48 h, and only if its floor has passed).
 
+## Backtests in every live league (21 Oct, owner; 0 credits)
+
+The owner saw no backtest for League One, League Two or the Champions League, and Model
+12% had one only for the Premier League (`E0_dk.json`, DraftKings' own prices, 2025/26).
+Both live match strategies are now replayed in every live league (`edge12_backtest.py`,
+`lean_backtest.py`, `cup_backtest.py`; `backfill.yml` `edge12_backtest` and
+`lean_backtest`, no key). `E0_dk.json` stays as it is, named in each file's
+`draftkings_replay`.
+
+- **Domestic leagues** (`kind: "early"`): the model's walk-forward chances at Pinnacle's
+  early quoted price from football-data, $1 a bet, CLV against Pinnacle's margin-free close,
+  every season both prices cover 90% of the matches (2019/20–2024/25; 2025/26 is about half
+  priced and left out). Model 12% = the live rule on the model's own chance; Blend Lean as
+  before (`lean_backtest`). Pinnacle's early price is sharper than DraftKings', so this is a
+  tougher test than the live one.
+- **Champions League** (`kind: "close"`): no early cup prices exist, only the closes bought
+  on 13 Oct, so both rules bet DraftKings' close on the cross-league model's weekly
+  walk-forward chances (2024/25–2025/26; clubs the model doesn't cover and low-data matches
+  skipped, as live), CLV against Pinnacle's close at the same moment. That CLV shows how far
+  DraftKings' close sits from Pinnacle's, not price movement. Kept out of the pooled numbers.
+
+### Results (branch runs, printed only: `backfill.yml` 39627296311 Model 12%, 39627301375 Lean)
+
+Model 12%, $1 a bet, ROI and CLV with 95% ranges:
+
+| League | Bets | Won | Break-even | ROI | CLV |
+| --- | --- | --- | --- | --- | --- |
+| Premier League | 1,138 | 24.5% | 24.9% | +4.1% (−8.5% to +18.5%) | −4.2% (−4.9% to −3.5%) |
+| La Liga | 930 | 24.2% | 25.2% | −5.7% (−18.6% to +7.6%) | −4.7% (−5.6% to −4.0%) |
+| Bundesliga | 627 | 23.8% | 23.7% | +3.9% (−13.6% to +21.7%) | −4.4% (−5.3% to −3.5%) |
+| Serie A | 856 | 19.3% | 24.4% | −23.4% (−35.4% to −11.4%) | −4.8% (−5.6% to −3.9%) |
+| Ligue 1 | 851 | 22.2% | 24.6% | −4.2% (−18.0% to +11.4%) | −4.4% (−5.3% to −3.6%) |
+| Championship | 1,666 | 31.1% | 32.2% | −4.3% (−11.8% to +3.3%) | −4.5% (−5.0% to −4.1%) |
+| League One | 1,443 | 30.1% | 32.4% | −9.1% (−17.4% to −0.6%) | −4.4% (−4.9% to −4.0%) |
+| League Two | 1,399 | 29.2% | 31.3% | −5.9% (−13.7% to +2.5%) | −5.3% (−5.8% to −4.9%) |
+| **Pooled (early)** | **8,910** | 26.6% | 28.4% | **−5.7% (−9.7% to −1.6%)** | **−4.6% (−4.9% to −4.4%)** |
+| Champions League (at the close) | 163 | 20.9% | 23.0% | −2.9% (−34.3% to +30.8%) | −9.4% (−10.4% to −8.5%) |
+
+Every league's CLV range is below 0; the pooled ROI range is too. The 2019/20–2020/21 seasons
+were the kind ones (pooled ROI −1.5% and +4.8%); the last two seasons lost 13.7% and 12.1%.
+
+Blend Lean (1σ+), same layout (domestic leagues as the 10 Oct file, refreshed cache; League
+One and League Two new):
+
+| League | Bets | Won | Break-even | ROI | CLV |
+| --- | --- | --- | --- | --- | --- |
+| Premier League | 351 | 26.5% | 27.7% | −4.2% (−22.6% to +15.3%) | −3.1% (−4.0% to −2.1%) |
+| La Liga | 360 | 43.6% | 44.6% | −2.1% (−14.7% to +11.3%) | −0.8% (−1.3% to −0.3%) |
+| Bundesliga | 55 | 23.6% | 30.8% | −24.1% (−61.3% to +21.7%) | −1.8% (−4.8% to +1.5%) |
+| Serie A | 274 | 54.7% | 51.5% | +5.4% (−6.7% to +18.0%) | −3.6% (−4.6% to −2.6%) |
+| Ligue 1 | 431 | 43.4% | 44.3% | −2.5% (−14.2% to +8.8%) | −2.8% (−3.5% to −2.0%) |
+| Championship | 412 | 24.3% | 24.0% | +1.4% (−16.8% to +20.5%) | −4.0% (−5.1% to −3.0%) |
+| League One | 518 | 52.7% | 55.8% | −5.8% (−14.3% to +2.4%) | −3.8% (−4.4% to −3.3%) |
+| League Two | 228 | 42.1% | 41.0% | −1.5% (−17.6% to +14.5%) | −4.1% (−5.1% to −3.2%) |
+| **Pooled (early)** | **2,629** | 40.7% | 41.4% | **−2.3% (−7.6% to +3.1%)** | **−3.1% (−3.4% to −2.8%)** |
+| Champions League (at the close) | 0 | | | | |
+
+League One's Lean picks are mostly short-priced favourites (avg odds 1.88, 443 of 518
+market-driven); League Two's mostly model-driven (152 of 228). Pooled Strong (2σ+) 186 bets,
+ROI −8.8% (−24.1% to +7.2%).
+
+**Champions League Lean: 0 bets.** The blend needs 300 earlier matches with a model chance
+and Pinnacle's close before its first fit; there are 302 in the two bought seasons, so the
+first 28-day block with 300 behind it starts on 26 May 2026 (σ 0.0493) and holds 1 of the 295
+candidate matches, which doesn't reach 1σ. `MIN_ROWS` was not lowered. A Champions League Lean
+backtest needs more bought seasons (or must wait for 2026/27's live closes).
+
+Coverage, Champions League: 2024/25 189 finished matches, 150 with a model chance (not
+low-data), 180 with DraftKings' close, 183 with Pinnacle's, 143 candidates; 2025/26 189,
+157, 184, 189, 152.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper
