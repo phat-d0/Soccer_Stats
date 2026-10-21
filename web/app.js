@@ -2543,6 +2543,16 @@ function pfClassic(topIn) {
   const top = topIn ?? `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
   if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
   if (leanBt) return `${top}${leanBacktestHtml(state.data.portfolio?.strategy_backtests?.lean, lg)}${retiredLinks}`;
+  // Model 12% in a competition the DraftKings backtest doesn't cover: say so, never show
+  // Premier League numbers under it (a later strategy_backtests.edge12 fills these in).
+  if (state.pfView === "backtest" && cur.id === "moneyline" && strat?.key === "edge12" && lg && lg !== "E0") {
+    const e12 = state.data.portfolio?.strategy_backtests?.edge12;
+    const m = btPart(e12, "edge12", lg);
+    const body = m
+      ? `${lbTiles(m)}<p class="note">${esc(e12.note || "")}${e12.generated_at ? ` Run ${esc(shortDate(e12.generated_at))}.` : ""} Money is in units: $1 a bet.</p>`
+      : `<div class="empty">No Model 12% backtest for ${esc(leagueName(lg))} yet. Its backtest uses DraftKings' historical prices, which we have for the Premier League only. Choose Premier League or All to see it; the live paper trades in ${esc(leagueName(lg))} are under Live paper.</div>`;
+    return `${top}${body}${retiredLinks}`;
+  }
   const isMoneyline = cur.id === "moneyline";
   const ruleNote = cur.id === "corners" && state.pfView === "live"
     ? `<div class="explain live-test"><b>Live test: fixed ${pct(set?.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${set?.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(set?.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back.</div>`
@@ -2641,14 +2651,42 @@ function ruleText(x) {
   if (x.key === "lean") return `${x.rule?.min_z ?? 1}σ+`;
   return x.rule?.threshold != null ? `${pct(x.rule.threshold)}+` : "";
 }
-// Backtest headline for a strategy row: bets and return (units), or "research only".
-function backtestHeadline(cur, x) {
+// Backtest headline for a strategy row, for the chosen competition (lg "" = All): bets and
+// return (units), "–" with why when that competition has no backtest, or "research only".
+const NO_BT = (sub) => ({ v: "–", cls: "muted", sub });
+// A per-league backtest file (strategy_backtests.lean, a future .edge12): the part for lg, or
+// all leagues, and its metrics; null when that competition isn't in it or failed.
+function btPart(bt, key, lg) {
+  if (!bt?.available) return null;
+  const part = lg ? bt.leagues?.[lg] : bt.all;
+  if (!part || part.error) return null;
+  const m = part[key] || part.lean || part.metrics;
+  return m && m.bets != null ? m : null;
+}
+const btHead = (m, where) => ({ v: signedPct(m.roi), cls: signCls(m.roi), sub: `${m.bets.toLocaleString()} bets · ${where}` });
+function backtestHeadline(cur, x, lg = "") {
+  const sb = state.data.portfolio?.strategy_backtests || {};
   if (x.key === "lean") {
-    const m = state.data.portfolio?.strategy_backtests?.lean?.all?.lean;
-    return m ? { v: signedPct(m.roi), cls: signCls(m.roi), sub: `${m.bets.toLocaleString()} bets · at Pinnacle` } : null;
+    if (!sb.lean?.available) return null;
+    const m = btPart(sb.lean, "lean", lg);
+    return m ? btHead(m, `${lg ? `${leagueName(lg)} ` : ""}at Pinnacle`) : NO_BT("no backtest for this competition");
   }
   const bt = cur.backtest;
   if (bt?.kind === "research") return { v: "–", cls: "muted", sub: "research only" };
+  if (cur.id === "moneyline") {
+    // Model 12%: the DraftKings backtest is Premier League only (E0_dk.json). A later
+    // per-league file (strategy_backtests.edge12) covers the other leagues and All.
+    const e12 = sb.edge12;
+    if (lg !== "E0" && e12?.available) {
+      const m = btPart(e12, "edge12", lg);
+      const book = e12.book || (e12.kind === "close" ? "Pinnacle's close" : "Pinnacle");
+      if (m) return btHead(m, `${lg ? `${leagueName(lg)} ` : ""}at ${book}`);
+      if (lg) return NO_BT("no backtest for this competition yet");
+    }
+    if (lg && lg !== "E0") return NO_BT("no backtest for this competition yet");
+    const sm = bt?.by_league?.E0?.summary || bt?.summary;
+    return sm ? { v: signedPct(sm.roi), cls: signCls(sm.roi), sub: `${(sm.trades || 0).toLocaleString()} bets · Premier League · DraftKings` } : null;
+  }
   const sm = bt?.summary;
   return sm ? { v: signedPct(sm.roi), cls: signCls(sm.roi), sub: `${(sm.trades || 0).toLocaleString()} bets · DraftKings` } : null;
 }
@@ -2662,7 +2700,7 @@ function strategyList(cur, strats, sel, lg, backtest) {
     const rule = ruleText(x);
     let right;
     if (backtest) {
-      const h = backtestHeadline(cur, x);
+      const h = backtestHeadline(cur, x, lg);
       right = h ? `<b class="${h.cls}">${h.v}</b><small>${esc(h.sub)}</small>` : `<b class="muted">–</b><small>no backtest</small>`;
     } else {
       right = m.n
