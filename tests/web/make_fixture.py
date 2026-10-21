@@ -65,6 +65,7 @@ DATA_LOG_FILES = [
     "backtest/E0_players.json",
     "backtest/E0_players_detail.json",
     "backtest/lean_backtest.json",
+    "backtest/edge12_backtest.json",
 ]
 TEAMS = [
     "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", "Chelsea",
@@ -89,7 +90,9 @@ FALLBACK_MATCH_BLEND = {
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
 PLAYER_BT_TRADES = 100  # Player shots (retired) backtest trades kept, newest first
+DK_BT_TRADES = 120  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
 LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
+EDGE12_BETS = 45  # Model 12% backtest rows kept (newest first; every league, the cup too)
 SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
@@ -339,6 +342,13 @@ def build(src: Path, out: Path) -> dict:
             pd_ = json.loads(pj.read_text())
             pd_["trades"] = (pd_.get("trades") or [])[-PLAYER_BT_TRADES:]
             pj.write_text(json.dumps(pd_))
+        # The same for the DraftKings backtest's trade list (newest first in the file); its
+        # summary, sweep and breakdowns stay whole.
+        dj = log / "backtest" / "E0_dk.json"
+        if dj.exists():
+            dk_ = json.loads(dj.read_text())
+            dk_["trades"] = (dk_.get("trades") or [])[:DK_BT_TRADES]
+            dj.write_text(json.dumps(dk_))
         results = pd.DataFrame(columns=["home", "away", "season", "date", "home_goals"])
         paper.run(data, log, results, league="E0", now=NOW)
     add_settled_live_matches(data)
@@ -352,10 +362,21 @@ def build(src: Path, out: Path) -> dict:
     add_champions_league(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
-    lb = (data["portfolio"].get("strategy_backtests") or {}).get("lean") or {}
+    # The same for Model 12%'s per-league replay (edge12_backtest.json), keeping a few of
+    # each league's newest bets so every competition's list has rows.
+    sb = data["portfolio"].get("strategy_backtests") or {}
+    lb = sb.get("lean") or {}
     if lb.get("bets"):
         lb["bets"] = lb["bets"][:LEAN_BETS]
         lb["bets_shown"] = len(lb["bets"])
+    eb = sb.get("edge12") or {}
+    if eb.get("bets"):
+        li = eb["bet_fields"].index("league")
+        newest = eb["bets"][:EDGE12_BETS]
+        seen = {r[li] for r in newest}
+        extra = [r for r in eb["bets"][EDGE12_BETS:] if r[li] not in seen and not seen.add(r[li])]
+        eb["bets"] = newest + extra
+        eb["bets_shown"] = len(eb["bets"])
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (

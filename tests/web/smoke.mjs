@@ -490,26 +490,69 @@ const STEPS = [
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
     if (!(await p.textContent("#view")).includes("matches to fit on")) throw new Error("SP1 fits");
   }],
-  // The strategy rows' backtest headlines follow the competition chip (owner, 21 Oct).
+  // The strategy rows' backtest headlines follow the competition chip (owner, 21 Oct), and
+  // both strategies have a per-league backtest (Model 12%'s edge12_backtest.json).
   ["portfolio-backtest-headlines", async (p) => {
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .vals`).innerText()).replace(/\s+/g, " ");
+    const want = {
+      "": ["bets · at Pinnacle", "bets · at Pinnacle"],
+      E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
+      SP1: ["La Liga at Pinnacle", "La Liga at Pinnacle"],
+      E2: ["League One at Pinnacle", "League One at Pinnacle"],
+      E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
+      UCL: ["0 bets · Champions League at DraftKings' close", "Champions League at DraftKings' close"],
+    };
     const seen = {};
-    for (const lg of ["", "E0", "SP1"]) {
+    for (const [lg, [lean, e12]] of Object.entries(want)) {
       await p.click(`.chip[data-league="${lg}"]`);
       seen[lg] = await row("lean");
-      const e12 = await row("edge12");
-      if (lg === "SP1" ? !e12.includes("no backtest for this competition yet") : !e12.includes("Premier League · DraftKings")) throw new Error(`12% row under "${lg}": ${e12}`);
+      if (!seen[lg].includes(lean)) throw new Error(`Lean row under "${lg}": ${seen[lg]}`);
+      const r = await row("edge12");
+      if (!r.includes(e12)) throw new Error(`12% row under "${lg}": ${r}`);
     }
-    if (new Set(Object.values(seen)).size !== 3) throw new Error(`Lean headline doesn't follow the chip: ${JSON.stringify(seen)}`);
-    if (!seen.SP1.includes("La Liga at Pinnacle") || !seen[""].includes("bets · at Pinnacle")) throw new Error(`Lean subs: ${JSON.stringify(seen)}`);
-    // The Champions League isn't in the Lean backtest.
-    await p.click('.chip[data-league="UCL"]');
-    if (!(await row("lean")).includes("no backtest for this competition")) throw new Error(`UCL Lean row: ${await row("lean")}`);
-    // Model 12% under La Liga: a plain note, never the Premier League's numbers.
-    await p.click('.chip[data-league="SP1"]'); await p.click('button[data-pfstrat="edge12"]');
-    const text = await p.textContent("#view");
-    if (!text.includes("No Model 12% backtest for La Liga yet") || (await p.locator("#view .tiles").count())) throw new Error("12% SP1 backtest body");
+    if (new Set(["", "E0", "SP1"].map((k) => seen[k])).size !== 3) throw new Error(`Lean headline doesn't follow the chip: ${JSON.stringify(seen)}`);
+  }],
+  // The Champions League: Lean has no bets (the file's note says why), coverage by book.
+  ["portfolio-backtest-ucl-lean", async (p) => {
     await p.click('button[data-pfstrat="lean"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("300") || (await p.locator("#view .tiles").count())) throw new Error("UCL Lean should show the file's note, not tiles");
+    await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
+    const cov = await p.locator("details.mk-fold[open] table").innerText();
+    for (const w of ["DK", "PIN", "Bet on"]) if (!cov.includes(w)) throw new Error(`UCL coverage lacks ${w}`);
+  }],
+  ["portfolio-backtest-ucl-edge12", async (p) => {
+    await p.click('button[data-pfstrat="edge12"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("mostly measures the gap between the two books") || !(await p.locator("#view .tiles").count())) throw new Error("UCL Model 12% backtest");
+    await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
+  }],
+  ["portfolio-backtest-e2-edge12", async (p) => {
+    await p.click('.chip[data-league="E2"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("League One") || !(await p.locator("#view .bet-row").count())) throw new Error("League One Model 12% backtest");
+  }],
+  ["portfolio-backtest-e3-lean", async (p) => {
+    await p.click('.chip[data-league="E3"]'); await p.click('button[data-pfstrat="lean"]');
+    if (!(await p.locator("#view .tiles").count())) throw new Error("League Two Lean backtest tiles");
+  }],
+  // Model 12% under All: the per-league replay with its range plots and readout.
+  ["portfolio-backtest-edge12-all", async (p) => {
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
+    const text = await p.textContent("#view");
+    for (const w of ["In the replay at Pinnacle's prices Model 12%", "Return by league", "Bets, newest first", "Champions League is priced at DraftKings' close"]) {
+      if (!text.includes(w)) throw new Error(`12% All backtest lacks "${w}"`);
+    }
+    await p.click('.rc-row[data-rc="edge12roi"][data-rcrow="0"]');
+    if (!(await p.textContent("#rc-readout-edge12roi")).includes("bets")) throw new Error("12% ROI readout");
+  }],
+  // Under the Premier League: the DraftKings backtest, then the Pinnacle replay, both labelled.
+  ["portfolio-backtest-edge12-e0", async (p) => {
+    await p.click('.chip[data-league="E0"]');
+    const text = await p.textContent("#view");
+    for (const w of ["DraftKings backtest, Premier League", "Replay at Pinnacle's early prices, Premier League"]) {
+      if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
+    }
   }],
   ["portfolio-live-edge12", async (p) => {
     await p.click('button[data-pf="live"]');
@@ -539,7 +582,8 @@ const STEPS = [
   // A settled live match trade whose close was taken early (approximate CLV; fixture data).
   ["portfolio-live-close-sheet", async (p) => { await p.click('button[data-trade="E0|2627|Spurs|Brentford"]'); await sheet(p); }, true],
   ["portfolio-live-trade", async (p) => { await closeSheet(p); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click("details.fold > summary"); }],
+  // The DraftKings backtest's own trades: Model 12% under the Premier League.
+  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await p.click('button[data-pfstrat="edge12"]'); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   // An empty portfolio (in testing): its plain-English state, live and backtest.
   ["portfolio-goalscorer", async (p) => { await closeSheet(p); await p.click('button[data-pfid="goalscorer"]'); }],
