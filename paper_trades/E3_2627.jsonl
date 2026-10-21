@@ -162,3 +162,9 @@
 {"type":"update","id":"E3|2627|Exeter|Crewe","at":"2026-10-20T21:01:02+00:00","status":"lost","score":"2-0","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-10-20T21:01:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Northampton|Tranmere","at":"2026-10-20T21:01:02+00:00","status":"lost","score":"0-1","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-10-20T21:01:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Cheltenham|Fleetwood Town","at":"2026-10-20T21:01:02+00:00","status":"won","score":"4-2","profit":21.5,"clv_pinnacle":null,"settled_at":"2026-10-20T21:01:02+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Barnet|Swindon","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"1-3","clv_pinnacle":-0.18257146730115847}
+{"type":"update","id":"E3|2627|Chesterfield|Colchester","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.20789893913826818}
+{"type":"update","id":"E3|2627|Crawley Town|Shrewsbury","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"2-3","clv_pinnacle":0.0039597917114808645}
+{"type":"update","id":"E3|2627|Exeter|Crewe","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"2-0","clv_pinnacle":-0.0945520994097021}
+{"type":"update","id":"E3|2627|Northampton|Tranmere","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"0-1","clv_pinnacle":-0.07056142353867823}
+{"type":"update","id":"E3|2627|Cheltenham|Fleetwood Town","at":"2026-10-21T22:40:10+00:00","result_check":"ok","check_score":"4-2","clv_pinnacle":-0.07470336886071649}
