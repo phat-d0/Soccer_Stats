@@ -324,3 +324,13 @@ def test_outcome_rows_drop_matches_missing_any_series():
     long = cal.outcome_rows(df, {"model": "p", "blend": "pb"}, mc.H2H, key="E0")
     assert len(long) == 5 and long["won"].sum() == 2
     assert set(long["group"]) == {"E0|0", "E0|1"}
+
+
+def test_fit_info_failure_never_raises():
+    from soccer_stats import publish
+
+    class Broken:
+        params = {}
+
+    out = publish.safe_fit_info(Broken(), pd.DataFrame({"date": []}))
+    assert out["kind"] == "domestic" and "error" in out

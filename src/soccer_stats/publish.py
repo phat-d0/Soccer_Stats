@@ -87,6 +87,15 @@ def model_params(model: DixonColes) -> dict:
     }
 
 
+def safe_fit_info(model, rows: pd.DataFrame, kind: str = "domestic") -> dict:
+    """fit_info for display only: a failure returns {kind, error} and never costs a
+    league's cards or the build."""
+    try:
+        return fit_info(model, rows, kind)
+    except Exception as exc:  # noqa: BLE001
+        return {"kind": kind, "error": f"{type(exc).__name__}: {exc}"}
+
+
 def fit_info(model: DixonColes, rows: pd.DataFrame, kind: str = "domestic") -> dict:
     """One league's match-model fit for Portfolio's model view (paper.models_section):
     its home advantage, rho, intercept, the time weight xi (and its half-life), the xG
@@ -588,7 +597,7 @@ def build_data(
             "record_start": start,
             "teams": teams,
             "params": model_params(model),
-            "match_model": {league: fit_info(model, matches)},
+            "match_model": {league: safe_fit_info(model, matches)},
             "fixtures": fixture_cards(
                 model,
                 fixtures,
@@ -920,7 +929,7 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
         weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
         model = dashboard.fit_model(matches, xg_weight=weight)
-        source["model_fit"] = fit_info(model, matches)
+        source["model_fit"] = safe_fit_info(model, matches)
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
         counts = dashboard.match_counts(matches, teams or sorted(model.teams))
         cards = fixture_cards(model, fixtures, counts, league=league)
@@ -1015,7 +1024,7 @@ def cup_league_fixtures(
             matches = cm.fit_matches(domestic, euro, mapping)
             model = cm.fit(matches, now)
             counts = cm.match_counts(cm.window(matches, now))
-            source["model_fit"] = fit_info(model, cm.window(matches, now), "cross_league")
+            source["model_fit"] = safe_fit_info(model, cm.window(matches, now), "cross_league")
         for e in fixtures:
             o = odds.get(str(e["id"]))
             why = reason

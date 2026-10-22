@@ -1046,7 +1046,7 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
         "summary": sec["summary"],
         "breakdowns": sec["breakdowns"],
         "by_league": by_league(mine),
-        "calibration": trade_calibration(mine),
+        "calibration": _safe_calibration(mine),
         "trade_ids": [t["id"] for t in sec["trades"]],
     }
     if key == "lean":
@@ -1070,6 +1070,14 @@ def _trade_chance(t: dict) -> float | None:
         return None
     push = float(t.get("p_push") or 0.0) if t.get("market") == "team_corners" else 0.0
     return float(p) / (1 - push) if push < 1 else None
+
+
+def _safe_calibration(trades: list[dict]) -> dict:
+    """trade_calibration for display only: a failure costs this block, never the section."""
+    try:
+        return trade_calibration(trades)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__, "note": LIVE_CAL_NOTE}
 
 
 def trade_calibration(trades: list[dict]) -> dict:
