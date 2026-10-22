@@ -66,6 +66,7 @@ DATA_LOG_FILES = [
     "backtest/E0_players_detail.json",
     "backtest/lean_backtest.json",
     "backtest/edge12_backtest.json",
+    "backtest/match_blends.json",
 ]
 TEAMS = [
     "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", "Chelsea",
@@ -89,8 +90,8 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
-PLAYER_BT_TRADES = 100  # Player shots (retired) backtest trades kept, newest first
-DK_BT_TRADES = 120  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
+PLAYER_BT_TRADES = 40  # Player shots (retired) backtest trades kept, newest first
+DK_BT_TRADES = 30  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
 LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
 EDGE12_BETS = 45  # Model 12% backtest rows kept (newest first; every league, the cup too)
 SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
@@ -400,6 +401,7 @@ def build(src: Path, out: Path) -> dict:
     (out / "players_backtest.json").write_text(dump(sample))
     (out / "players_stats.json").write_text(dump(stats))
     sp1_stats = add_teams_by_league(data)
+    add_models(data, src)  # after every block, SP1's and E1's fits included
     (out / "players_stats_SP1.json").write_text(dump(sp1_stats))
     (out / "data.json").write_text(dump(data))  # again, with teams_by_league
     return data
@@ -420,9 +422,14 @@ SP1_PLAYERS = ["Lamine Yamal", "Vinicius Junior", "Kylian Mbappe", "Robert Lewan
                "Nico Williams", "Iago Aspas", "Ante Budimir", "Raphinha"]  # fmt: skip
 
 
+# Each synthetic league's match-model fit numbers (publish.safe_fit_info), for the
+# Portfolio model view (data.match_model).
+FIT_INFO: dict[str, dict] = {}
+
+
 def _fit_block(clubs: list[str], code: str, seed: int, with_xg: bool) -> dict:
     from soccer_stats import dashboard
-    from soccer_stats.publish import team_block
+    from soccer_stats.publish import safe_fit_info, team_block
 
     df, _ = simulate_league(n_teams=len(clubs), seasons=2, seed=seed)
     names = {f"T{i:02d}": t for i, t in enumerate(clubs)}
@@ -432,6 +439,7 @@ def _fit_block(clubs: list[str], code: str, seed: int, with_xg: bool) -> dict:
     df["home_xg"] = df["home_goals"] * 0.6 + rng.gamma(2, 0.3, len(df)) if with_xg else np.nan
     df["away_xg"] = df["away_goals"] * 0.6 + rng.gamma(2, 0.3, len(df)) if with_xg else np.nan
     model = dashboard.fit_model(df, xg_weight=0.7 if with_xg else 0.0)
+    FIT_INFO[code] = safe_fit_info(model, df)
     return team_block(model, df, pd.DataFrame(), code)
 
 
@@ -858,6 +866,7 @@ def add_corners(data: dict) -> None:
     data["corners_model"] = {
         "E0": {"model": "f", "matches": 731, "window_from": "2024-10-06", "window_to": "2026-10-05"}
         | {"k_for": 9.4, "k_against": 12.1, "mean_home": 5.62, "mean_away": 4.57}
+        | {"alpha_home": 0.061, "alpha_away": 0.074}
         | {"cards": sum(c["league"] == "E0" for c in cards)},
         "SP1": {
             "model": "f",
@@ -866,6 +875,7 @@ def add_corners(data: dict) -> None:
             "window_to": "2026-10-05",
         }
         | {"k_for": 7.8, "k_against": 10.5, "mean_home": 5.31, "mean_away": 4.12}
+        | {"alpha_home": 0.055, "alpha_away": 0.069}
         | {"cards": sum(c["league"] == "SP1" for c in cards)},
         "D1": {"error": "ValueError: 120 matches with corner counts in the window (need 300)"},
     }
@@ -1323,7 +1333,7 @@ UCL_CLUBS = {"E0": ["Arsenal", "Chelsea", "Leeds", "Burnley"],
 
 def add_champions_league(data: dict) -> None:
     from soccer_stats import cup_model as cm
-    from soccer_stats.publish import fixture_cards, implied_probs
+    from soccer_stats.publish import fixture_cards, implied_probs, safe_fit_info
 
     rng = np.random.default_rng(13)
     rows = []
@@ -1344,7 +1354,9 @@ def add_champions_league(data: dict) -> None:
     ]  # fmt: skip
     mapping = cm.team_map([e[s] for e in euro for s in ("home", "away")] + ["FC Porto"],
                           cm.teams_by_league(dom))  # fmt: skip
-    model = cm.fit(cm.fit_matches(dom, euro, mapping), NOW)
+    fitted = cm.fit_matches(dom, euro, mapping)
+    model = cm.fit(fitted, NOW)
+    FIT_INFO["UCL"] = safe_fit_info(model, fitted, "cross_league")
     k = pd.Timestamp("2026-10-21T16:45:00Z")  # after every other card: indexes unchanged
     keys = {"Arsenal": mapping["Arsenal"], "FC Porto": mapping["FC Porto"]}
     row = {"kickoff": k, "home": "Arsenal", "away": "FC Porto", "odds_home": 1.53,
@@ -1370,6 +1382,37 @@ def add_champions_league(data: dict) -> None:
             "odds": "DraftKings",
         }  # fmt: skip
     )
+
+
+def add_models(data: dict, src: Path) -> None:
+    """Portfolio's model view: every synthetic league's match fit (FIT_INFO), the equation
+    section rebuilt once every block is in, with data-log's real match_blends.json for the
+    blend's per-league numbers (the cards keep SYNTHETIC_BLENDS), and the corners live
+    section's quote calibration on synthetic half lines (the fixture logs no quotes)."""
+    from soccer_stats import calibration as cal
+    from soccer_stats import corners_live as cl
+    from soccer_stats import equations as eq
+
+    data.setdefault("match_model", {}).update(FIT_INFO)
+    mb = src / "backtest" / "match_blends.json"
+    blends = json.loads(mb.read_text()) if mb.exists() else data.get("match_blends")
+    data["portfolio"]["models"] = eq.section({**data, "match_blends": blends})
+    rng = np.random.default_rng(31)
+    qc = {"note": cl.QUOTE_CAL_NOTE}
+    for book, n, shift in (("pinnacle", 260, 0.0), ("draftkings", 140, 0.03)):
+        model = rng.uniform(0.25, 0.8, n)
+        price = np.clip(0.5 + 0.7 * (model - 0.5) + rng.normal(0, 0.04, n) - shift, 0.05, 0.95)
+        won = (rng.uniform(size=n) < price).astype(float).tolist()
+        group = [f"m{i // 2}" for i in range(n)]
+        qc[book] = {
+            "quotes": n + 12, "settled": n, "unsettled": 12, "whole_lines": 0, "pushes": 0,
+            "matches": len(set(group)),
+            "model": cal.reliability(model.tolist(), won, price.tolist(), groups=group),
+            "price": cal.reliability(price.tolist(), won, groups=group),
+        }  # fmt: skip
+    for p in data["portfolio"]["portfolios"]:
+        if p["id"] == "corners" and p.get("live"):
+            p["live"]["quote_calibration"] = qc
 
 
 def main(argv: list[str] | None = None) -> None:

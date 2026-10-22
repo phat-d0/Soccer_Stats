@@ -491,7 +491,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v46) on every web change, or phones
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v47) on every web change, or phones
   keep the old app.
 - Tabs: Matches; Teams (per league, with Players season stats); Record (Match bets, Goals &
   corners, Player shots); Portfolio; Explore.
@@ -527,7 +527,25 @@ the owner's baseball app, so the balance can drop without any run here.
   (`strategyBacktestHtml(bt, lg, key)` for `strategy_backtests.lean` and `.edge12`): verdict, units
   tiles, per-league ROI and CLV range plots, seasons, coverage and fits, bet list; UCL (`kind:
   "close"`) gets `closeVerdict`; Model 12% under the Premier League shows the DraftKings backtest
-  first. Corners' backtest is the research view (`researchBacktestHtml`).
+  first. Corners' backtest is the research view (`researchBacktestHtml`). Model (third view,
+  Moneyline and Team corners only; `modelViewHtml(cur, x, lg)`): equation cards from
+  `portfolio.models` (`MODEL_KEYS`: Lean → `blend` then `match`, Model 12% → `match`, corners →
+  `corners_f`; `equationCard`: equation lines, terms folded, the chosen competition's fitted
+  numbers in words via `modelNumbers`, or a per-league table under All via `modelTable`); for
+  Lean the blend's shape (`shapeChart`: p_bet's home chance against the market's fair one,
+  draw and away sharing the rest 45 : 55, the model equal / 10 points higher / lower, plus the
+  diagonal; under All the Premier League's fit); then "Lined up with results": (a) every
+  outcome (`reliabilityChart`, SVG, x predicted, y happened, model ring / blend dot / price
+  tick with Wilson ranges, from `strategy_backtests.<lean|edge12>` → `calibration.all_outcomes`,
+  `all` under All), (b) the strategy's own backtest bets and (c) live paper trades
+  (`binRowsChart` rows: said ring, break-even tick, won dot and range, blue when it won at least
+  as often as the price implied; `calibration.bets`, the live section's `calibration` and its
+  `by_league`), (d) corners: every logged half line per book (`quote_calibration[book].model`,
+  with the model's and the price's slopes). Slopes in words (`slopeWords`: 1 = right, below 1
+  over-confident). Taps fill a readout line (`data-rcpt` on SVG points, `data-rcrow` on rows;
+  `rcCharts`). Missing blocks or `error` give a plain note; the data files' own notes are
+  folded under "How this is measured". On Moneyline's Model view the chips list every league in
+  the backtest files, as on Backtest.
 - **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
   Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts
   and `rangeChart` per league, team-total progress), Player shots (strategy switch, threshold
@@ -549,8 +567,11 @@ the owner's baseball app, so the balance can drop without any run here.
 - Test data: `tests/fixtures/web/` (all JSON files together under 1 MB). Rebuild with
   `uv run python tests/web/make_fixture.py` (synthetic leagues through `publish.build_data`, the real
   ledger and backtests from `origin/data-log` through `paper.run`; fixed `NOW`, reproducible).
-  To stay under 1 MB it trims lists (`LEAN_BETS`, `EDGE12_BETS`, `DK_BT_TRADES`,
-  `PLAYER_BT_TRADES`, `SAMPLE_PLAYERS`); synthetic blocks (`add_lean_strategy`, `add_corners`,
+  To stay under 1 MB it trims lists (`LEAN_BETS`, `EDGE12_BETS`, `DK_BT_TRADES` 30,
+  `PLAYER_BT_TRADES` 40, `SAMPLE_PLAYERS`); `add_models` rebuilds `portfolio.models` once every
+  block is in (the synthetic leagues' fits via `publish.safe_fit_info`, data-log's real
+  `match_blends.json` for the blend's numbers) and gives the corners live section a synthetic
+  `quote_calibration` (the fixture logs no quotes); synthetic blocks (`add_lean_strategy`, `add_corners`,
   `add_champions_league`, `STARTED_OPEN`, `add_second_league`) cover states the real data lacks.
 - Smoke test: `node tests/web/smoke.mjs [--shots DIR]` visits every tab, view and sheet at 390px
   light and dark and at 1280px; fails on console errors, horizontal scroll, or "undefined", "NaN"
