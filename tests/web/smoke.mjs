@@ -554,6 +554,53 @@ const STEPS = [
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
   }],
+  // Model view (owner, 22 Oct): each strategy's equation, fitted numbers and calibration.
+  ["portfolio-model-lean", async (p) => {
+    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="lean"]');
+    const text = await p.textContent("#view");
+    for (const w of ["score_k", "Blend Lean (blend of price and model)", "Match model (Dixon-Coles)", "Fitted per competition", "The blend's shape, Premier League", "Lined up with results: every outcome", "Lined up with results: live paper trades"]) {
+      if (!text.includes(w)) throw new Error(`Lean model view lacks "${w}"`);
+    }
+    if ((await p.locator("#view .model-table").count()) < 2) throw new Error("per-league tables under All");
+    await p.click('[data-rc="shape-E0"][data-rcpt="2"]');
+    if (!(await p.textContent("#rc-readout-shape-E0")).includes("Market 50%")) throw new Error("shape readout");
+    await p.locator('[data-rc="rel-lean-all"][data-rcpt="0"]').dispatchEvent("click");
+    if (!(await p.textContent("#rc-readout-rel-lean-all")).includes("outcomes")) throw new Error("reliability readout");
+    if (!text.includes("slope")) throw new Error("slope in words");
+  }],
+  ["portfolio-model-lean-e0", async (p) => {
+    await p.click('.chip[data-league="E0"]');
+    const text = await p.textContent("#view");
+    for (const w of ["Fitted for Premier League", "Price weight b", "Home advantage", "Lined up with results: its own bets (backtest)"]) {
+      if (!text.includes(w)) throw new Error(`Lean E0 model view lacks "${w}"`);
+    }
+    await p.click('.rc-row[data-rc="bets-lean-E0"][data-rcrow="0"]');
+    if (!(await p.textContent("#rc-readout-bets-lean-E0")).includes("bets")) throw new Error("bets readout");
+  }],
+  ["portfolio-model-lean-e3", async (p) => {
+    await p.click('.chip[data-league="E3"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("Fitted for League Two") || !text.includes("Price weight b")) throw new Error("League Two blend numbers");
+    if (!text.includes("No Match model (Dixon-Coles) fit for League Two")) throw new Error("League Two missing match fit note");
+  }],
+  ["portfolio-model-lean-ucl", async (p) => {
+    await p.click('.chip[data-league="UCL"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("No Blend Lean bets in this backtest for Champions League") || !text.includes("DraftKings' close")) throw new Error("UCL Lean model view");
+  }],
+  ["portfolio-model-edge12-ucl", async (p) => {
+    await p.click('button[data-pfstrat="edge12"]');
+    const text = await p.textContent("#view");
+    if (!text.includes("Fitted for Champions League") || !text.includes("Ridge") || text.includes("The blend's shape")) throw new Error("UCL 12% model view");
+  }],
+  ["portfolio-model-edge12-e0", async (p) => {
+    await p.click('.chip[data-league="E0"]');
+    const text = await p.textContent("#view");
+    for (const w of ["Match model (Dixon-Coles)", "Home advantage", "Lined up with results: its own bets (backtest)"]) {
+      if (!text.includes(w)) throw new Error(`12% E0 model view lacks "${w}"`);
+    }
+    if (text.includes("Blend Lean (blend of price and model)")) throw new Error("12% shows the blend's equation");
+  }],
   ["portfolio-live-edge12", async (p) => {
     await p.click('button[data-pf="live"]');
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
@@ -643,6 +690,23 @@ const STEPS = [
     for (const want of ["No money tiles", "finalist", "February"]) if (!text.includes(want)) throw new Error(`research backtest lacks "${want}"`);
     if (await p.locator(".tiles").count()) throw new Error("research backtest shows money tiles");
     await p.click("details.mk-fold > summary");
+  }],
+  ["portfolio-corners-model", async (p) => {
+    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="pinnacle"]');
+    const text = await p.textContent("#view");
+    for (const w of ["Team corners model (f)", "Lined up with results: every logged line", "Pinnacle's fair price", "Lined up with results: live paper trades"]) {
+      if (!text.includes(w)) throw new Error(`corners model view lacks "${w}"`);
+    }
+    await p.click('.rc-row[data-rc="quotes-pinnacle"][data-rcrow="0"]');
+    if (!(await p.textContent("#rc-readout-quotes-pinnacle")).includes("lines")) throw new Error("quote readout");
+  }],
+  ["portfolio-corners-model-dk", async (p) => {
+    await p.click('button[data-pfstrat="draftkings"]'); await p.click('.chip[data-league="E0"]');
+    const text = await p.textContent("#view");
+    for (const w of ["DraftKings' fair price", "Fitted for Premier League", "Spread (NB2 α)"]) {
+      if (!text.includes(w)) throw new Error(`DraftKings corners model view lacks "${w}"`);
+    }
+    await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
   }],
   ["record-markets-corners-link", async (p) => {
     await tab("record")(p); await p.click('button[data-recbet="markets"]');

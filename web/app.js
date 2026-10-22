@@ -14,7 +14,7 @@ const state = {
   tab: "matches", // the app always opens on upcoming fixtures
   league: store.get("league", ""), // competition filter (football-data code), "" = all
   exploreEdge: null, // a step picked under "Explore other edges"; null = the recommended edge
-  pfView: "live", // Portfolio: "live" paper trades or "backtest"
+  pfView: "live", // Portfolio: "live" paper trades, "backtest" or "model"
   pfMarket: "",
   pfSeason: "",
   pfShown: 15,
@@ -715,10 +715,10 @@ const tLeague = (t) => t.league || "E0";
 function leaguesPresent() {
   const ml = pfById("moneyline");
   const co = pfById("corners");
-  // On Moneyline's Backtest, also every competition the per-league backtests cover (League
+  // On Moneyline's Backtest and Model, also every competition the per-league backtests cover (League
   // One between matchdays, the Champions League), so each can be chosen there.
   const sb = state.data.portfolio?.strategy_backtests || {};
-  const bt = state.tab === "portfolio" && state.pfView === "backtest" && pfCurrent()?.id === "moneyline"
+  const bt = state.tab === "portfolio" && (state.pfView === "backtest" || state.pfView === "model") && pfCurrent()?.id === "moneyline"
     ? [sb.lean, sb.edge12].flatMap((b) => (b?.available ? Object.keys(b.leagues || {}) : [])) : [];
   const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || []), ...(co?.live?.trades || [])].map(tLeague), ...bt]);
   const order = LEAGUES.map(([k]) => k);
@@ -2688,6 +2688,268 @@ function pfClassic(topIn) {
 }
 
 
+// ---------- Portfolio → Model: each strategy's equation and how it lined up with results ----------
+// (owner, 22 Oct). portfolio.models (equations.py) gives each model's equation, its terms
+// in plain English and the fitted numbers per league; the calibration blocks (calibration.py)
+// come from the backtest files (every outcome, and the strategy's own bets), each live
+// strategy section (settled paper trades) and, for corners, every logged quote.
+const MODEL_KEYS = { lean: ["blend", "match"], edge12: ["match"], pinnacle: ["corners_f"], draftkings: ["corners_f"] };
+const SERIES_NAME = { model: "Model", blend: "Blend", price: "Price" };
+const num2 = (v, d = 2) => (isNum(v) ? `${v < 0 ? "−" : ""}${Math.abs(v).toFixed(d)}` : "–");
+const sgn2 = (v, d = 2) => (isNum(v) ? `${v < 0 ? "−" : "+"}${Math.abs(v).toFixed(d)}` : "–");
+const pctRange = (lo, hi) => (isNum(lo) && isNum(hi) ? `${pct(lo)}–${pct(hi)}` : "");
+// The recalibration slope in words: 1 = right; below 1 the chances are too spread out.
+function slopeWords(c) {
+  if (!c || !isNum(c.slope)) return "too few results to fit a slope";
+  const s = c.slope, ci = c.slope_ci95;
+  const word = s < 0.9 ? "over-confident: its chances are too far from 50%" : s < 0.97 ? "a bit over-confident" : s <= 1.03 ? "about right" : s <= 1.1 ? "a bit timid" : "timid: its chances sit too close to 50%";
+  const range = ci && isNum(ci[0]) ? ` (range ${num2(ci[0])} to ${num2(ci[1])}${ci[0] <= 1 && ci[1] >= 1 ? ", which includes 1" : ""})` : "";
+  return `slope ${num2(s)}${range}: ${word}`;
+}
+function modelFor(key, lg) {
+  const m = state.data.portfolio?.models?.[key];
+  if (!m) return { m: null, part: null };
+  return { m, part: lg ? m.leagues?.[lg] || null : null };
+}
+// The fitted numbers of one league, each in words.
+function modelNumbers(key, f) {
+  if (!f) return [];
+  if (f.error) return [["Fit", esc(f.error)]];
+  if (key === "match") {
+    const ha = f.home_adv;
+    return [
+      ["Baseline", isNum(f.intercept) ? `${num2(Math.exp(f.intercept))} goals a game for an average away side (log ${num2(f.intercept, 3)})` : "–"],
+      ["Home advantage", isNum(ha) ? `${sgn2(ha)} on the log scale: about ${pct(Math.exp(ha) - 1)} more goals at home` : "–"],
+      ["ρ (low-score correction)", isNum(f.rho) ? `${num2(f.rho, 3)}${f.rho < 0 ? ": 0-0 and 1-1 a little likelier than plain Poisson" : f.rho > 0 ? ": 0-0 and 1-1 a little less likely" : ""}` : "–"],
+      ["Time weight", isNum(f.half_life_days) ? `a match counts half after ${f.half_life_days} days (ξ ${num2(f.xi, 4)} a day)` : "–"],
+      ["xG weight", isNum(f.xg_weight) ? (f.xg_weight ? `${pct(f.xg_weight)} of each match's goals come from xG` : "0: goals only (no xG for this competition)") : "–"],
+      ...(f.ridge ? [["Ridge", `${num2(f.ridge)}: ratings pulled toward 0 (the cross-league fit)`]] : []),
+      ["Fitted on", `${num(f.matches)} matches, ${num(f.teams)} teams${f.fit_from ? `, ${esc(shortDate(f.fit_from))} to ${esc(shortDate(f.fit_to))}` : ""}`],
+    ];
+  }
+  if (key === "blend") {
+    const c = f.coef || {};
+    return [
+      ["Price weight b", isNum(c.b) ? `${num2(c.b)}${c.b > 1.02 ? " (above 1: sharpens the price, favourites up, long shots down)" : c.b < 0.98 ? " (below 1: flattens the price)" : " (about 1: keeps the price as it is)"}` : "–"],
+      ["Model weight c", isNum(c.c) ? `${sgn2(c.c)}${Math.abs(c.c) < 0.05 ? " (almost no weight on the model)" : c.c < 0 ? " (leans against the model)" : " (some weight on the model)"}` : "–"],
+      ["Draw and away tilts", isNum(c.a_draw) ? `a_draw ${sgn2(c.a_draw, 3)}, a_away ${sgn2(c.a_away, 3)}` : "–"],
+      ["σ", isNum(f.sigma) ? `${ptsText(f.sigma)}: how far the blend usually strays from the price` : "–"],
+      ["Fitted on", `${num(f.matches)} matches${f.fit_from ? `, ${esc(shortDate(f.fit_from))} to ${esc(shortDate(f.fit_to))}` : ""}${f.fit_date ? ` (fit of ${esc(shortDate(f.fit_date))})` : ""}`],
+    ];
+  }
+  return [
+    ["League average", isNum(f.mean_home) ? `${num2(f.mean_home)} corners for the home side, ${num2(f.mean_away)} for the away side` : "–"],
+    ["Shrinkage", isNum(f.k_for) ? `k_for ${num2(f.k_for, 1)}, k_against ${num2(f.k_against, 1)} pseudo-matches toward the average` : "–"],
+    ["Spread (NB2 α)", isNum(f.alpha_home) ? `home ${num2(f.alpha_home, 3)}, away ${num2(f.alpha_away, 3)}${Math.max(f.alpha_home, f.alpha_away) < 0.05 ? ": close to Poisson" : ": a little wider than Poisson"}` : "not in this update"],
+    ["Fitted on", `${num(f.matches)} matches${f.window_from ? `, ${esc(shortDate(f.window_from))} to ${esc(shortDate(f.window_to))}` : ""}`],
+  ];
+}
+// Under All: one row per league with the numbers that matter most.
+function modelTable(key, m) {
+  const rows = Object.entries(m.leagues || {});
+  if (!rows.length) return `<p class="note">No fitted numbers for this model in this update.</p>`;
+  const cols = key === "match" ? ["Home adv.", "ρ", "xG wt", "Matches"] : key === "blend" ? ["b", "c", "σ", "Matches"] : ["Avg H / A", "k for / ag.", "α H / A", "Matches"];
+  const cells = (f) => {
+    if (f.error) return `<td colspan="4" class="muted">fit failed</td>`;
+    if (key === "match") return `<td>${sgn2(f.home_adv)}</td><td>${num2(f.rho, 3)}</td><td>${isNum(f.xg_weight) ? pct(f.xg_weight) : "–"}</td><td>${num(f.matches)}</td>`;
+    if (key === "blend") return `<td>${num2(f.coef?.b)}</td><td>${sgn2(f.coef?.c)}</td><td>${isNum(f.sigma) ? (f.sigma * 100).toFixed(1) : "–"}</td><td>${num(f.matches)}</td>`;
+    return `<td>${num2(f.mean_home, 1)} / ${num2(f.mean_away, 1)}</td><td>${num2(f.k_for, 1)} / ${num2(f.k_against, 1)}</td><td>${num2(f.alpha_home, 2)} / ${num2(f.alpha_away, 2)}</td><td>${num(f.matches)}</td>`;
+  };
+  return `<div class="card" style="padding:8px 14px"><table class="mkts mk-table model-table"><thead><tr><th></th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(([c, f]) => `<tr><td>${esc(leagueShort(c))}</td>${cells(f)}</tr>`).join("")}</tbody></table></div>
+    ${key === "blend" ? '<p class="note">σ in points (percentage points of chance).</p>' : ""}`;
+}
+function equationCard(key, lg) {
+  const { m, part } = modelFor(key, lg);
+  if (!m) return `<div class="explain">This model's equation isn't in this update.</div>`;
+  if (m.error) return `<div class="explain">The model view couldn't be built in this update (${esc(m.error)}).</div>`;
+  const terms = Object.entries(m.terms || {}).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+  const nums = lg
+    ? (part ? `<dl class="model-nums">${modelNumbers(key, part).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>` : `<p class="note">No ${esc(m.name || "model")} fit for ${esc(leagueName(lg))} in this update.</p>`)
+    : modelTable(key, m);
+  return `
+    <div class="section-title">${esc(m.name || key)}</div>
+    <div class="card model-card">
+      <div class="eqn">${(m.equation || []).map((l) => `<div>${esc(l)}</div>`).join("")}</div>
+      <details class="fold mk-fold"><summary>What each term means</summary><dl class="model-terms">${terms}</dl>${m.note ? `<p class="note">${esc(m.note)}</p>` : ""}</details>
+    </div>
+    <div class="section-title small-title">${lg ? `Fitted for ${esc(leagueName(lg))}` : "Fitted per competition"}</div>
+    ${nums}`;
+}
+// The blend's shape: p_bet(home) against the market's fair home chance, with the draw and
+// away sharing the rest in a fixed 45 : 55 ratio, for three model views of the home side.
+function blendHome(coef, p, dm) {
+  const share = [0.45, 0.55];
+  const price = [p, (1 - p) * share[0], (1 - p) * share[1]];
+  const mh = Math.min(0.97, Math.max(0.03, p + dm));
+  const model = [mh, (1 - mh) * share[0], (1 - mh) * share[1]];
+  const a = [0, coef.a_draw || 0, coef.a_away || 0];
+  const s = price.map((pk, k) => a[k] + coef.b * Math.log(pk) + coef.c * Math.log(model[k]));
+  const mx = Math.max(...s);
+  const e = s.map((v) => Math.exp(v - mx));
+  return e[0] / (e[0] + e[1] + e[2]);
+}
+function shapeChart(lg) {
+  const code = lg || "E0";
+  const f = state.data.portfolio?.models?.blend?.leagues?.[code];
+  const coef = f?.coef;
+  if (!coef || !isNum(coef.b)) return `<p class="note">No blend fit for ${esc(leagueName(code))}, so there is no shape to draw.</p>`;
+  const W = 320, H = 250, L = 38, R = 12, T = 10, B = 30;
+  const sx = (v) => L + v * (W - L - R), sy = (v) => T + (1 - v) * (H - T - B);
+  const xs = Array.from({ length: 37 }, (_, i) => 0.04 + i * 0.025);
+  const curve = (dm) => xs.map((p, i) => `${i ? "L" : "M"}${sx(p).toFixed(1)},${sy(blendHome(coef, p, dm)).toFixed(1)}`).join(" ");
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text><text x="${sx(v)}" y="${H - 14}" text-anchor="middle">${pct(v)}</text>`).join("");
+  const at = [0.2, 0.5, 0.8].map((p) => `${pct(p)} → ${pct(blendHome(coef, p, 0), 1)}`).join(", ");
+  rcCharts[`shape-${code}`] = [0.2, 0.35, 0.5, 0.65, 0.8].map((p) => ({
+    readout: `<b>Market ${pct(p)}</b>: blend ${pct(blendHome(coef, p, 0), 1)} with the model agreeing, ${pct(blendHome(coef, p, 0.1), 1)} with the model 10 points higher, ${pct(blendHome(coef, p, -0.1), 1)} with it 10 points lower.`,
+  }));
+  const hits = [0.2, 0.35, 0.5, 0.65, 0.8].map((p, i) => `<circle class="pt" cx="${sx(p)}" cy="${sy(blendHome(coef, p, 0))}" r="2.5"/><circle class="hit" data-rcpt="${i}" data-rc="shape-${code}" cx="${sx(p)}" cy="${sy(blendHome(coef, p, 0))}" r="12" fill="transparent"/>`).join("");
+  return `
+    <div class="section-title">The blend's shape${lg ? "" : ", Premier League"}</div>
+    <div class="chart curve shape-chart">
+      <div class="eb-legend"><span><i class="ln-key diag"></i>Blend = market</span><span><i class="ln-key same"></i>Model agrees</span><span><i class="ln-key up"></i>Model 10 pts higher</span><span><i class="ln-key down"></i>Model 10 pts lower</span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Blend's home chance against the market's: ${esc(at)}">
+        <g class="grid">${grid}</g>
+        <line class="diag" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(1)}" y2="${sy(1)}"/>
+        <path class="shape up" d="${curve(0.1)}"/>
+        <path class="shape down" d="${curve(-0.1)}"/>
+        <path class="shape same" d="${curve(0)}"/>
+        ${hits}
+        <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Market's fair home chance</text>
+      </svg>
+      <div class="eb-readout" id="rc-readout-shape-${code}" aria-live="polite">With the model agreeing with the market, ${at}.</div>
+    </div>
+    <p class="note">Drawn for the home side, with the draw and away sharing the rest of the chance 45 : 55 (the model's split too). Above the diagonal the blend rates the home side higher than the market. ${coef.b > 1.02 ? `With b = ${num2(coef.b)} above 1 the solid line bends away from the diagonal: favourites get a little likelier and long shots a little less likely, whatever the model says.` : `With b = ${num2(coef.b)} the solid line stays close to the diagonal.`} The gap between the dashed lines is all the model can move it${isNum(coef.c) ? ` (c = ${sgn2(coef.c)})` : ""}.${lg ? "" : " Choose a competition above to see its own fit."}</p>`;
+}
+// (a) Reliability over every outcome: x = the series' chance, y = how often it happened.
+function reliabilityChart(id, all) {
+  const series = ["model", "blend", "price"].filter((k) => all?.[k]?.bins?.length);
+  if (!series.length) return "";
+  const pts = series.flatMap((k) => all[k].bins.map((b) => ({ k, b })));
+  const top = Math.min(1, Math.max(0.4, Math.ceil((Math.max(...pts.flatMap(({ b }) => [b.predicted, b.realized_hi ?? b.realized])) + 0.02) * 10) / 10));
+  const W = 320, H = 260, L = 38, R = 12, T = 10, B = 30;
+  const sx = (v) => L + (v / top) * (W - L - R), sy = (v) => T + (1 - v / top) * (H - T - B);
+  const step = top <= 0.5 ? 0.1 : 0.2;
+  const ticks = [];
+  for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v);
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text><text x="${sx(v)}" y="${H - 14}" text-anchor="middle">${pct(v)}</text>`).join("");
+  rcCharts[id] = pts.map(({ k, b }) => ({
+    readout: `<b>${SERIES_NAME[k]}, chances ${pctRange(b.lo, b.hi)}</b>: ${num(b.n)} outcomes, it said ${pct(b.predicted, 1)} on average, they happened ${pct(b.realized, 1)} of the time${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 1)} to ${pct(b.realized_hi, 1)})` : ""}.`,
+  }));
+  const marks = pts.map(({ k, b }, i) => {
+    const x = sx(b.predicted), y = sy(b.realized);
+    const range = isNum(b.realized_lo) ? `<line class="rng ${k}" x1="${x}" x2="${x}" y1="${sy(b.realized_lo)}" y2="${sy(b.realized_hi)}"/>` : "";
+    const mark = k === "price" ? `<line class="mk price" x1="${x - 5}" x2="${x + 5}" y1="${y}" y2="${y}"/>` : `<circle class="mk ${k}" cx="${x}" cy="${y}" r="${k === "model" ? 4 : 3.5}"/>`;
+    return `${range}${mark}<circle class="hit" data-rcpt="${i}" data-rc="${id}" cx="${x}" cy="${y}" r="10" fill="transparent"/>`;
+  }).join("");
+  const s = all[series[0]];
+  return `
+    <div class="chart curve rel-chart">
+      <div class="eb-legend">${series.map((k) => `<span><i class="rel-key ${k}"></i>${SERIES_NAME[k]}</span>`).join("")}<span><i class="ln-key diag"></i>Perfect</span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Predicted chance against how often it happened">
+        <g class="grid">${grid}</g>
+        <line class="diag" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(top)}" y2="${sy(top)}"/>
+        ${marks}
+        <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Predicted chance</text>
+      </svg>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${num(s.n)} outcomes. Tap a point for its numbers.</div>
+    </div>
+    <ul class="slopes">${series.map((k) => `<li><b>${SERIES_NAME[k]}</b>: ${slopeWords(all[k])}. Brier ${num2(all[k].brier, 4)}, log loss ${num2(all[k].log_loss, 4)}.</li>`).join("")}</ul>`;
+}
+// (b)–(d) Per bin of the predicted chance: what it said (ring), the price's break-even
+// (tick) and how often it won (dot with its range; blue when it won at least as often as
+// the price implied, red when less).
+function binRowsChart(id, cal, what) {
+  const bins = (cal?.bins || []).filter((b) => b.n);
+  if (!bins.length) return "";
+  const vals = bins.flatMap((b) => [b.predicted, b.implied, b.realized_lo ?? b.realized, b.realized_hi ?? b.realized]).filter(isNum);
+  const hi = Math.min(1, Math.ceil((Math.max(...vals) + 0.02) * 10) / 10);
+  const lo = Math.max(0, Math.floor((Math.min(...vals) - 0.02) * 10) / 10);
+  const x = (v) => ((v - lo) / (hi - lo || 1)) * 100;
+  const step = hi - lo > 0.5 ? 0.2 : 0.1;
+  const ticks = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
+  rcCharts[id] = bins.map((b) => ({
+    readout: `<b>Said ${pctRange(b.lo, b.hi)}</b>, ${num(b.n)} ${what}: said ${pct(b.predicted, 1)} on average${isNum(b.implied) ? `, the price's break-even ${pct(b.implied, 1)}` : ""}, won ${pct(b.realized, 1)}${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 0)} to ${pct(b.realized_hi, 0)})` : ""}.`,
+  }));
+  const body = bins.map((b, i) => {
+    const beat = !isNum(b.implied) || b.realized >= b.implied;
+    const tone = isNum(b.implied) ? (beat ? "pos" : "neg") : "mid";
+    const range = isNum(b.realized_lo) ? `<span class="eb-range ${tone}" style="left:${x(b.realized_lo)}%;width:${Math.max(0.5, x(b.realized_hi) - x(b.realized_lo))}%"></span>` : "";
+    const dot = (v, cls) => (isNum(v) ? `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>` : "");
+    return `<button class="eb-row rc-row" data-rcrow="${i}" data-rc="${id}">
+      <span class="eb-label">${pctRange(b.lo, b.hi)}<span class="meta">${num(b.n)} ${what}</span></span>
+      <span class="eb-plot">${range}${dot(b.implied, "imp")}${dot(b.predicted, "mod")}${dot(b.realized, `real ${tone}`)}</span>
+    </button>`;
+  }).join("");
+  const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${pct(v)}</span>`).join("")}</span></div>`;
+  const sum = `All ${num(cal.n)} ${what}: said ${pct(cal.predicted, 1)}${isNum(cal.implied) ? `, the price's break-even ${pct(cal.implied, 1)}` : ""}, won ${pct(cal.realized, 1)}.`;
+  return `
+    <div class="card eb-card">
+      <div class="eb-legend">${bins.some((b) => isNum(b.implied)) ? '<span><i class="eb-key imp"></i>Price\'s break-even</span>' : ""}<span><i class="eb-key mod"></i>What it said</span><span><i class="eb-key real pos"></i>Won (range)</span></div>
+      ${body}
+      ${axis}
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${sum}</div>
+    </div>`;
+}
+function liveCalHtml(id, cal, lg, what) {
+  if (!cal) return `<p class="note">The live record's calibration isn't in this update.</p>`;
+  if (cal.error) return `<p class="note">The live calibration couldn't be worked out this time (${esc(cal.error)}).</p>`;
+  const c = lg ? cal.by_league?.[lg] : cal;
+  if (!c || !c.n) return `<p class="note">No settled ${what} ${lg ? `in ${esc(leagueName(lg))} ` : ""}yet.</p>`;
+  return `${binRowsChart(id, c, what)}
+    <p class="note">${num(c.n)} settled ${what}${cal.pushes ? `, ${cal.pushes} push${cal.pushes === 1 ? "" : "es"} left out` : ""}: a small sample, so the ranges are wide and one weekend can move every row.</p>${howFold(cal.note)}`;
+}
+const howFold = (note) => (note ? `<details class="fold mk-fold"><summary>How this is measured</summary><p class="note">${esc(note)}</p></details>` : "");
+const calBlock = (bt, lg) => (bt?.available ? (lg ? bt.leagues?.[lg] : bt.all) : null);
+function modelViewHtml(cur, x, lg) {
+  const sb = state.data.portfolio?.strategy_backtests || {};
+  const keys = MODEL_KEYS[x.key] || [];
+  if (!state.data.portfolio?.models) return `<div class="empty">The model view isn't in this update. It comes with the next site update.</div>`;
+  const cards = keys.map((k) => equationCard(k, lg)).join("");
+  const shape = x.key === "lean" ? shapeChart(lg) : "";
+  let results = "";
+  const name = x.key === "lean" ? "Blend Lean" : x.key === "edge12" ? "Model 12%" : x.label;
+  if (cur.id === "moneyline") {
+    const bt = sb[x.key];
+    const part = calBlock(bt, lg);
+    const cal = part?.calibration;
+    const close = isClose(part);
+    const where = close ? "DraftKings' close" : "Pinnacle's early price";
+    const a = !bt?.available ? `<p class="note">${esc(bt?.note || "The backtest isn't in this update.")}</p>`
+      : !part ? `<p class="note">No ${esc(name)} backtest for ${esc(leagueName(lg))}.</p>`
+      : part.error ? `<p class="note">${esc(part.error)}</p>`
+      : !cal ? `<p class="note">This backtest has no calibration yet; it comes with the next backtest run.</p>`
+      : `${reliabilityChart(`rel-${x.key}-${lg || "all"}`, cal.all_outcomes)}
+        <p class="note">Every home, draw and away chance in the replay${lg ? "" : " (all early-price leagues; the Champions League is shown on its own)"}, grouped by what was predicted, against how often it happened. Points on the diagonal are right. The price is ${where}, margin removed.</p>${howFold(cal.note)}`;
+    const b = cal?.bets?.n ? `${binRowsChart(`bets-${x.key}-${lg || "all"}`, cal.bets, "bets")}
+        <p class="note">${slopeWords(cal.bets)}. The ring is the chance the ${x.key === "lean" ? "blend" : "model"} gave its picks, the tick the price's break-even (1/odds, margin included), the dot how often they won.${cal.bets.predicted - (cal.bets.implied ?? cal.bets.predicted) > 0.03 ? ` On these bets it claimed ${((cal.bets.predicted - cal.bets.implied) * 100).toFixed(1)} points more than the price, and they won ${pct(cal.bets.realized, 1)} against ${pct(cal.bets.implied, 1)} break-even.` : ""}</p>`
+      : cal ? `<p class="note">No ${esc(name)} bets in this backtest${lg ? ` for ${esc(leagueName(lg))}` : ""}.</p>` : "";
+    results = `
+      <div class="section-title">Lined up with results: every outcome</div>${a}
+      ${cal ? `<div class="section-title">Lined up with results: its own bets (backtest)</div>${b}` : ""}
+      <div class="section-title">Lined up with results: live paper trades</div>
+      ${liveCalHtml(`live-${x.key}-${lg || "all"}`, x.st?.calibration, lg, "trades")}`;
+  } else if (cur.id === "corners") {
+    const qc = cur.live?.quote_calibration;
+    const q = qc?.[x.key];
+    const quotes = !qc ? `<p class="note">The corner quotes' calibration isn't in this update.</p>`
+      : qc.error ? `<p class="note">The corner quotes' calibration couldn't be worked out this time (${esc(qc.error)}).</p>`
+      : !q || !q.settled ? `<p class="note">No settled ${BOOK_POSS[x.key] || ""} corner lines yet.</p>`
+      : `${binRowsChart(`quotes-${x.key}`, q.model, "lines")}
+        <ul class="slopes"><li><b>Model (f)</b>: ${slopeWords(q.model)}. Brier ${num2(q.model?.brier, 4)}.</li><li><b>${esc(BOOK_POSS[x.key])} fair price</b>: ${slopeWords(q.price)}. Brier ${num2(q.price?.brier, 4)}.</li></ul>
+        <p class="note">Every half line ${esc(BOOK_NAME[x.key])} quoted before kickoff (its newest quote per team line), ${num(q.settled)} settled over ${num(q.matches)} matches${q.unsettled ? `, ${num(q.unsettled)} still waiting for a result` : ""}${q.whole_lines ? `; ${num(q.whole_lines)} whole lines left out (they can push)` : ""}. Ring = model (f)'s chance of the over, tick = ${esc(BOOK_POSS[x.key])} margin-free chance, dot = how often the over won. Every competition together.</p>${howFold(qc.note)}`;
+    results = `
+      <div class="section-title">Lined up with results: every logged line</div>${quotes}
+      <div class="section-title">Lined up with results: live paper trades</div>
+      ${liveCalHtml(`live-${x.key}-${lg || "all"}`, x.st?.calibration, lg, "trades")}`;
+  }
+  return `
+    <p class="note">${esc(name)}: the equation behind each chance, its fitted numbers, and how the chances lined up with what happened.</p>
+    ${cards}${shape}${results}`;
+}
+
 // ---------- Portfolio, laid out like the baseball app's (owner, 11 Oct) ----------
 // Switcher, then "Paper strategies": one row per strategy in the portfolio (Moneyline:
 // Blend Lean then Model 12%; others: one row), the selected one marked; then that
@@ -2973,11 +3235,15 @@ function viewPortfolio() {
     </div>`;
   const retiredLinks = retired.length ? `
     <div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : "";
+  // Moneyline and Team corners have a third view: each strategy's model and its calibration.
+  const hasModel = cur.id === "moneyline" || cur.id === "corners";
+  const views = [["live", "Live paper"], ["backtest", "Backtest"], ...(hasModel ? [["model", "Model"]] : [])];
+  const view = state.pfView === "model" && !hasModel ? "live" : state.pfView;
   const toggle = `
-    <div class="segmented small-seg" role="group" aria-label="Which trades">
-      ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
+    <div class="segmented small-seg" role="group" aria-label="Which view">
+      ${views.map(([k, l]) => `<button data-pf="${k}" class="${view === k ? "on" : ""}" aria-pressed="${view === k}">${l}</button>`).join("")}
     </div>`;
-  const backtest = state.pfView === "backtest";
+  const backtest = view === "backtest";
   const strats = pfStrategies(cur);
   const sel = pfSelected(strats, cur);
   const research = backtest && cur.backtest?.kind === "research";
@@ -2985,6 +3251,7 @@ function viewPortfolio() {
   const lg = byComp && !research ? leagueOn() : "";
   const list = `<div class="section-title">${backtest ? "Strategies, tested on past prices" : "Paper strategies"}</div>${strategyList(cur, strats, sel, lg, backtest)}`;
   const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${list}`;
+  if (view === "model") return `${top}${modelViewHtml(cur, sel, lg)}${retiredLinks}`;
   if (!backtest) return `${top}${liveStrategyHtml(cur, sel, lg)}${retiredLinks}`;
   return pfClassic(top);
 }
@@ -3173,6 +3440,13 @@ document.addEventListener("click", (ev) => {
     const el = document.getElementById("cv-readout");
     const c = curveData[Number(cv.dataset.cv)];
     if (el && c) el.innerHTML = curveReadout(c);
+    return;
+  }
+  const rp = ev.target.closest?.("[data-rcpt]");
+  if (rp) { // Model view charts: the tapped point's numbers in the readout line
+    const el = document.getElementById(`rc-readout-${rp.dataset.rc}`);
+    const r = rcCharts[rp.dataset.rc]?.[Number(rp.dataset.rcpt)];
+    if (el && r) el.innerHTML = r.readout;
     return;
   }
   const t = ev.target.closest("button, [data-close]");
