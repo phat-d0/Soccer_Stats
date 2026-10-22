@@ -32,7 +32,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from soccer_stats import calibration as cal
 from soccer_stats import edge12_backtest as e12b
+from soccer_stats import equations as eq
 from soccer_stats import lean_backtest as lb
 from soccer_stats import odds_log as ol
 from soccer_stats import trades as tr
@@ -1044,12 +1046,67 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
         "summary": sec["summary"],
         "breakdowns": sec["breakdowns"],
         "by_league": by_league(mine),
+        "calibration": _safe_calibration(mine),
         "trade_ids": [t["id"] for t in sec["trades"]],
     }
     if key == "lean":
         out["by_driver"] = by_driver(mine)
         out["driver_note"] = tr.DRIVER_NOTE
     return out
+
+
+LIVE_CAL_NOTE = (
+    "Settled paper trades only: the chance each trade was opened on (model_p: the raw "
+    "model for Model 12%, the blend for Blend Lean, model (f) for corners) against the "
+    "price's 1/odds and how often they won. Corner pushes are left out and counted; a "
+    "corner chance is taken given no push. Small samples: read the ranges. " + cal.NOTE
+)
+
+
+def _trade_chance(t: dict) -> float | None:
+    """The chance a settled trade was opened on, given no push for a corner line."""
+    p = t.get("model_p")
+    if p is None:
+        return None
+    push = float(t.get("p_push") or 0.0) if t.get("market") == "team_corners" else 0.0
+    return float(p) / (1 - push) if push < 1 else None
+
+
+def _safe_calibration(trades: list[dict]) -> dict:
+    """trade_calibration for display only: a failure costs this block, never the section."""
+    try:
+        return trade_calibration(trades)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__, "note": LIVE_CAL_NOTE}
+
+
+def trade_calibration(trades: list[dict]) -> dict:
+    """The live trades' calibration: settled won/lost trades (calibration.reliability of
+    model_p against 1/odds vs won), pushes and voids counted apart, plus by_league (each
+    league's own reliability, however small)."""
+    settled = [t for t in trades if t.get("status") in ("won", "lost")]
+    pushes = sum(1 for t in trades if t.get("status") == "void" and t.get("push"))
+    voids = sum(1 for t in trades if t.get("status") == "void") - pushes
+
+    def rel(group: list[dict]) -> dict:
+        rows = [(t, _trade_chance(t)) for t in group]
+        rows = [(t, p) for t, p in rows if p is not None and t.get("odds")]
+        return cal.reliability(
+            [p for _, p in rows],
+            [1.0 if t["status"] == "won" else 0.0 for t, _ in rows],
+            [1 / float(t["odds"]) for t, _ in rows],
+        )
+
+    leagues: dict[str, list[dict]] = {}
+    for t in settled:
+        leagues.setdefault(t.get("league") or "E0", []).append(t)
+    return {
+        **rel(settled),
+        "pushes": pushes,
+        "voids": voids,
+        "by_league": {lg: rel(g) for lg, g in sorted(leagues.items())},
+        "note": LIVE_CAL_NOTE,
+    }
 
 
 def by_driver(trades: list[dict]) -> dict:
@@ -1346,6 +1403,14 @@ def run(
                     f"The corners ledger couldn't be updated ({type(exc).__name__}), "
                     "so nothing was opened this update."
                 )
+            try:  # every logged corner line against its result (file reads only)
+                from soccer_stats import corners_live as cl
+
+                corner_section["quote_calibration"] = cl.quote_calibration(
+                    cl.load_rows(ol.log_dir(log_dir)), corner_results, espn_results
+                )
+            except Exception as exc:  # noqa: BLE001  costs only this block
+                corner_section["quote_calibration"] = {"error": type(exc).__name__}
         for p in tr.PORTFOLIOS:
             found = _read_json(Path(log_dir) / "backtest" / f"{league}_{p['backtest']}.json")
             if found is not None or p["id"] not in backtests:
@@ -1378,6 +1443,10 @@ def run(
         "lean": lb.app_section(_read_json(bdir / LEAN_BACKTEST) if bdir else None),
         "edge12": e12b.app_section(_read_json(bdir / EDGE12_BACKTEST) if bdir else None),
     }
+    try:  # each model's equation and fitted numbers per league (from data.json only)
+        portfolio["models"] = eq.section(data)
+    except Exception as exc:  # noqa: BLE001  never costs the portfolio
+        portfolio["models"] = {"error": type(exc).__name__}
     portfolio["live"] = live
     # One portfolio per strategy (the app reads these); live, backtest and player_model
     # above stay for one release.

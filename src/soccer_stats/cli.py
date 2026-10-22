@@ -961,6 +961,10 @@ def _fmt_range(r) -> str:
     return f"{r[0]:+.1%} to {r[1]:+.1%}" if r else "n/a"
 
 
+def _fmt_num_range(r) -> str:
+    return f"{r[0]:.3f} to {r[1]:.3f}" if r and None not in r else "n/a"
+
+
 def _print_lean_block(label: str, m: dict) -> None:
     if not m.get("bets"):
         print(f"  {label}: 0 bets")
@@ -1155,6 +1159,20 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
     _print_lean("early-price leagues pooled", out["all"])
     for code, m in out["all"]["by_league"].items():
         _print_lean_block(code, m)
+    for code, r in out["leagues"].items():
+        _print_calibration(code, r.get("calibration"))
+    _print_calibration("early-price leagues pooled", out["all"].get("calibration"))
+    print(
+        "LEAN_CALIBRATION_JSON "
+        + json_dumps(
+            {
+                "leagues": {
+                    c: _calibration_brief(r.get("calibration")) for c, r in out["leagues"].items()
+                },
+                "all": _calibration_brief(out["all"].get("calibration")),
+            }
+        )
+    )
     rep = out["draftkings_replay"]
     if rep:
         print(f"\n=== {rep['label']} ===")
@@ -1205,6 +1223,48 @@ def _print_edge12(name: str, rep: dict) -> None:
         _print_edge12_block(s["label"], s)
 
 
+def _print_calibration(label: str, calib: dict | None) -> None:
+    """One line per calibration series (n, slope with its range, Brier, log loss), then
+    the strategy's own bets per bin: predicted vs implied vs won."""
+    if not calib:
+        return
+    print(f"  Calibration, {label}:")
+    for name, r in (calib.get("all_outcomes") or {}).items():
+        if not r.get("n"):
+            print(f"    {name}: no rows")
+            continue
+        print(
+            f"    {name}: {r['n']} outcome rows, slope {r['slope']} "
+            f"({_fmt_num_range(r.get('slope_ci95'))}), intercept {r['intercept']}, "
+            f"Brier {r['brier']}, log loss {r['log_loss']}"
+        )
+    b = calib.get("bets") or {}
+    if not b.get("n"):
+        print("    bets: none")
+        return
+    print(
+        f"    bets ({b['predicted_from']}): {b['n']}, predicted {b['predicted']:.1%}, implied "
+        f"{b['implied']:.1%}, won {b['realized']:.1%}, slope {b['slope']} "
+        f"({_fmt_num_range(b.get('slope_ci95'))})"
+    )
+    for x in b.get("bins") or []:
+        print(
+            f"      {x['lo']:.0%}-{x['hi']:.0%}: {x['n']} bets, predicted {x['predicted']:.1%}, "
+            f"implied {x['implied']:.1%}, won {x['realized']:.1%} "
+            f"({x['realized_lo']:.1%} to {x['realized_hi']:.1%})"
+        )
+
+
+def _calibration_brief(calib: dict | None) -> dict:
+    """Slopes and ranges per series for the JSON line."""
+    out = {}
+    for name, r in ((calib or {}).get("all_outcomes") or {}).items():
+        out[name] = {k: r.get(k) for k in ("n", "slope", "slope_ci95", "brier", "log_loss")}
+    b = (calib or {}).get("bets") or {}
+    out["bets"] = {k: b.get(k) for k in ("n", "predicted", "implied", "realized", "slope")}
+    return out
+
+
 def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     """Model 12% replayed per league on Pinnacle's early prices (edge12_backtest.py), plus
     the Champions League at DraftKings' bought close (cup_backtest.py). Football-data,
@@ -1239,6 +1299,9 @@ def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     _print_edge12("early-price leagues pooled", out["all"])
     for code, m in out["all"]["by_league"].items():
         _print_edge12_block(code, m)
+    for code, r in out["leagues"].items():
+        _print_calibration(code, r.get("calibration"))
+    _print_calibration("early-price leagues pooled", out["all"].get("calibration"))
     dk = out["draftkings_replay"]
     if dk:
         sm = dk["summary"]
@@ -1253,6 +1316,17 @@ def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     print(
         "EDGE12_BACKTEST_JSON "
         + json_dumps({"leagues": brief, "all": _brief(out["all"]["edge12"])})
+    )
+    print(
+        "EDGE12_CALIBRATION_JSON "
+        + json_dumps(
+            {
+                "leagues": {
+                    c: _calibration_brief(r.get("calibration")) for c, r in out["leagues"].items()
+                },
+                "all": _calibration_brief(out["all"].get("calibration")),
+            }
+        )
     )
     _write_backtest(out, args, "edge12_backtest.json", "Model 12% backtest")
 

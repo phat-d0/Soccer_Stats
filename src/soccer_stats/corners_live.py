@@ -184,6 +184,8 @@ class TeamCornersF:
             "k_against": round(float(self.k_[1]), 2),
             "mean_home": round(float(self.mean_[0]), 3),
             "mean_away": round(float(self.mean_[1]), 3),
+            "alpha_home": round(float(self.alpha_[0]), 4),
+            "alpha_away": round(float(self.alpha_[1]), 4),
         }
 
 
@@ -724,6 +726,93 @@ def corner_results(leagues, raw_dir: Path = RAW_DIR, seasons=None) -> pd.DataFra
     if not frames:
         return corner_matches("", raw_dir, [])
     return pd.concat(frames, ignore_index=True)
+
+
+# ---------- calibration of every quoted line (owner, 22 Oct) ----------
+
+QUOTE_CAL_NOTE = (
+    "Every logged team-corner line, not only the trades: the newest quote per team and "
+    "line downloaded before kickoff, the model (f)'s chance of the over recorded with it "
+    "(p_model_over) and the book's margin-free over (fair_over; none on a one-sided "
+    "DraftKings line), against the team's corner count. Half lines only: a whole line can "
+    "push, and the logged rows carry no push chance, so whole lines are counted apart. "
+    "Matches without a corner count yet are counted as unsettled."
+)
+
+
+def _result_index(*frames) -> dict[tuple, list[tuple]]:
+    """(league, home, away) -> [(date, home corners, away corners)] from result frames
+    (corner_results, espn_results rows); rows without both counts are skipped."""
+    out: dict[tuple, list[tuple]] = {}
+    for df in frames:
+        if df is None or df.empty or "home_corners" not in df:
+            continue
+        for r in df.to_dict("records"):
+            hc, ac = r.get("home_corners"), r.get("away_corners")
+            if hc is None or ac is None or pd.isna(hc) or pd.isna(ac):
+                continue
+            d = pd.Timestamp(r.get("kickoff") or r.get("date"))
+            d = (d.tz_convert(None) if d.tzinfo else d).normalize()
+            out.setdefault((r.get("league"), r["home"], r["away"]), []).append(
+                (d, int(hc), int(ac))
+            )
+    return out
+
+
+def _count(index: dict, q: dict) -> int | None:
+    """The quoted team's corner count for the quote's match (result dated within a day of
+    the kickoff), else None."""
+    k = _ts(q["kickoff"]).tz_convert(None).normalize()
+    for d, hc, ac in index.get((q.get("league"), q["home"], q["away"]), []):
+        if abs((d - k).days) <= 1:
+            return hc if q["side"] == "home" else ac
+    return None
+
+
+def quote_calibration(rows: list[dict], *results, books=BOOKS) -> dict:
+    """Per book: {quotes, settled, unsettled, whole_lines, pushes, matches, model, price}
+    over each team line's newest pre-kickoff quote (newest_quotes): `model` =
+    calibration.reliability of p_model_over (implied: fair_over where the book has both
+    sides) and `price` = fair_over, both against over won (count > line). Clustered by
+    match. `results` are frames with league, home, away, date (or kickoff) and
+    home/away_corners (corner_results, ESPN rows)."""
+    from soccer_stats import calibration as cal
+
+    index = _result_index(*results)
+    out = {"note": QUOTE_CAL_NOTE}
+    for book in books:
+        quotes = list(newest_quotes(rows, book=book).values())
+        keep, unsettled, whole, pushes = [], 0, 0, 0
+        for q in quotes:
+            n = _count(index, q)
+            line = float(q["line"])
+            if n is None:
+                unsettled += 1
+            elif line == int(line):
+                whole += 1
+                pushes += int(n == line)
+            else:
+                keep.append((q, 1.0 if n > line else 0.0))
+
+        def f(q, k):
+            v = q.get(k)
+            return float(v) if v is not None else np.nan
+
+        group = [f"{q.get('league')}|{q['home']}|{q['away']}|{q['kickoff']}" for q, _ in keep]
+        won = [w for _, w in keep]
+        model = [f(q, "p_model_over") for q, _ in keep]
+        price = [f(q, "fair_over") for q, _ in keep]
+        out[book] = {
+            "quotes": len(quotes),
+            "settled": len(keep),
+            "unsettled": unsettled,
+            "whole_lines": whole,
+            "pushes": pushes,
+            "matches": len(set(group)),
+            "model": cal.reliability(model, won, price, groups=group),
+            "price": cal.reliability(price, won, groups=group),
+        }
+    return out
 
 
 # ---------- credit estimate ----------

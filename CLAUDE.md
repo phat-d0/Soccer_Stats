@@ -220,6 +220,33 @@ the owner's baseball app, so the balance can drop without any run here.
   12% on the raw model, $1); metrics add `model_p`, `avg_edge`. `edge12_backtest.json` has the
   same shape with `edge12` in place of `lean`/`strong` and `all.leagues`; `draftkings_replay`
   names `E0_dk.json`. Log line `EDGE12_BACKTEST_JSON`.
+- Calibration in both files (owner, 22 Oct): each league report and `all` carry `calibration =
+  {all_outcomes: {model, blend (Lean file only), price}, bets, note}`. `all_outcomes` scores every
+  outcome (home/draw/away) of every scored match (Lean: matches with a blend fit; Model 12%: every
+  candidate) on the same rows: the model's raw walk-forward chance, the blend `pb`, and the
+  margin-free price (Pinnacle's early; DraftKings' close for UCL), the price given as the others'
+  `implied`. `bets` = the strategy's own picks (`p_bet` for Lean, `model_p` for 12%, `predicted_from`
+  names it) vs 1/odds vs won. Each is a `calibration.reliability` dict. The outcome rows ride in
+  each report under `lb.OUTCOMES` for the pooled view and are never saved (`lb.saved`). Log lines
+  `LEAN_CALIBRATION_JSON` / `EDGE12_CALIBRATION_JSON` (n, slope and range, Brier, log loss per
+  series; the bets' predicted, implied, won).
+- `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None)` =
+  `{n, wins, predicted, implied?, realized, brier, log_loss, intercept, intercept_ci95, slope,
+  slope_ci95, bins: [{lo, hi, n, wins, predicted, implied?, realized, realized_lo, realized_hi}]}`.
+  Bins on the predicted chance at 0–10, …, 60–70, 70–100%; empty bins dropped, a bin under 20 rows
+  joins the next (the last joins the one before); Wilson 95% ranges. Recalibration logit(won) = a
+  + b·logit(pred) by Newton, 95% ranges from standard errors, cluster-robust over `groups` (one
+  id per match); slope < 1 = over-confident; None under 10 rows or one outcome. Binary log loss
+  per row (not the 1X2 one). `outcome_rows` (wide `<prefix>_<outcome>` → one row per outcome,
+  `group` = key|row) and `series_report`.
+- `equations.py`: `section(data)` → `portfolio.models` = `{order, match, blend, corners_f}`, each
+  `{key, name, equation (lines), terms, note, leagues: {code: {name, ...}}}` from data.json only:
+  `match_model` (publish.`fit_info`: `kind` domestic/cross_league, `intercept`, `home_adv`, `rho`,
+  `xi`, `half_life_days`, `xg_weight`, `ridge`, `matches`, `teams`, `fit_from`, `fit_to`; E0 from
+  `build_data`, the others from `league_fixtures`/`cup_league_fixtures` via the odds source's
+  `model_fit`, popped before `odds_sources`), `match_blends.leagues` (`coef` as {a_draw, a_away, b,
+  c}, `sigma`, `matches`, `fit_from`, `fit_to`, `fit_date`) and `corners_model` (now with
+  `alpha_home`/`alpha_away`).
 - `cup_backtest.py`: the Champions League in both files (`leagues.UCL`, `kind: "close"`, out of
   `all`): `cup_model.history()` chances bet at DraftKings' bought close, CLV vs Pinnacle's
   close at the same moment (it mostly measures the gap between the books). Lean needs 300
@@ -368,7 +395,15 @@ the owner's baseball app, so the balance can drop without any run here.
     `trades`/`summary`; Lean has `driver_note`. Corners `live.strategies` (`corner_strategies`),
     Pinnacle first. `by_league` per section when trades span 2+ leagues. Corners' backtest =
     `corners_research()` (`kind: "research"`, from `lab/markets_research.json`).
-    `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Legacy
+    `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Every
+    `strategy_section` (both Moneyline and both corner strategies) has `calibration` =
+    `trade_calibration`: settled won/lost trades' `model_p` (a corner's given no push, ÷ (1 −
+    `p_push`)) vs 1/odds vs won, `pushes`, `voids`, `by_league`, `note`. Corners' live section has
+    `quote_calibration` (`corners_live.quote_calibration`: per book the newest pre-kickoff quote
+    of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
+    counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,
+    `whole_lines`, `pushes`, `matches`, `model`, `price`; `{error}` on failure). `models` =
+    `equations.section(data)`. Legacy
     `portfolio.live`/`backtest`/`player_model` stay until Record stops reading `player_model`.
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
