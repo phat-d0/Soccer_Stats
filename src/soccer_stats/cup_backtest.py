@@ -180,6 +180,7 @@ def lean_report(
     scored, fits = lb.walk_forward(train, target, refit, min_rows)
     b = lb.bets(scored, "UCL")
     sig = [f["sigma"] for f in fits]
+    calib, _ = lb.calibration(scored, b, lb.SERIES, "p_bet", "UCL")
     out_of_sample = int(scored["sigma"].notna().sum()) if len(scored) else 0
     rep.update(
         {
@@ -190,6 +191,7 @@ def lean_report(
             "sigma": {"min": min(sig), "max": max(sig)} if sig else None,
             "scored": out_of_sample,
             **lb.summary(b),
+            "calibration": calib,
         }
     )
     rep["note"] = NOTE + " " + lean_note(len(train), len(target), out_of_sample, len(b), min_rows)

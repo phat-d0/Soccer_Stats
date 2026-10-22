@@ -87,6 +87,28 @@ def model_params(model: DixonColes) -> dict:
     }
 
 
+def fit_info(model: DixonColes, rows: pd.DataFrame, kind: str = "domestic") -> dict:
+    """One league's match-model fit for Portfolio's model view (paper.models_section):
+    its home advantage, rho, intercept, the time weight xi (and its half-life), the xG
+    weight, the ridge, and the matches it was fitted on (`rows`)."""
+    d = pd.to_datetime(rows["date"]) if len(rows) else pd.Series(dtype="datetime64[ns]")
+    p = model.params
+    return {
+        "kind": kind,
+        "intercept": round(float(p["intercept"]), 4),
+        "home_adv": round(float(p["home_adv"]), 4),
+        "rho": round(float(p["rho"]), 4),
+        "xi": model.xi,
+        "half_life_days": round(float(np.log(2) / model.xi)) if model.xi else None,
+        "xg_weight": model.xg_weight,
+        "ridge": model.ridge,
+        "matches": len(rows),
+        "teams": len(model.teams),
+        "fit_from": d.min().date().isoformat() if len(d) else None,
+        "fit_to": d.max().date().isoformat() if len(d) else None,
+    }
+
+
 def upcoming_fixtures(
     league: str = "E0", now: pd.Timestamp | None = None, raw_dir: Path = RAW_DIR
 ) -> pd.DataFrame:
@@ -566,6 +588,7 @@ def build_data(
             "record_start": start,
             "teams": teams,
             "params": model_params(model),
+            "match_model": {league: fit_info(model, matches)},
             "fixtures": fixture_cards(
                 model,
                 fixtures,
@@ -897,6 +920,7 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
         weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
         model = dashboard.fit_model(matches, xg_weight=weight)
+        source["model_fit"] = fit_info(model, matches)
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
         counts = dashboard.match_counts(matches, teams or sorted(model.teams))
         cards = fixture_cards(model, fixtures, counts, league=league)
@@ -991,6 +1015,7 @@ def cup_league_fixtures(
             matches = cm.fit_matches(domestic, euro, mapping)
             model = cm.fit(matches, now)
             counts = cm.match_counts(cm.window(matches, now))
+            source["model_fit"] = fit_info(model, cm.window(matches, now), "cross_league")
         for e in fixtures:
             o = odds.get(str(e["id"]))
             why = reason
@@ -1147,6 +1172,9 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         if code == league:
             continue
         cards, sources[code], block = league_fixtures(code, share)
+        fit = sources[code].pop("model_fit", None)
+        if fit is not None:  # Portfolio's model view (paper.models_section)
+            data.setdefault("match_model", {})[code] = fit
         if block is not None:
             teams_by_league[code] = _clean(block)
         data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])

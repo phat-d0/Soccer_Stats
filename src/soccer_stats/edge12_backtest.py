@@ -53,6 +53,9 @@ DK_NOTE = (
     "The same 12% rule on DraftKings' own historical prices, Premier League 2025/26 only "
     "(backtest/E0_dk.json, the DraftKings backtest): its first qualifying look per match."
 )
+# Calibration series: the model's raw walk-forward chance and the margin-free price
+# (Pinnacle's early; DraftKings' close for the cup) on every outcome of every candidate.
+SERIES = {"model": "p", "price": "mkt"}
 MISSING_NOTE = (
     "The Model 12% backtest hasn't been run yet (backtest/edge12_backtest.json is missing), "
     "so there is no history to show."
@@ -95,6 +98,7 @@ def league_report(
     if len(target):
         target = target[target["season"].astype(str).isin(included)]
     b = ef.bets(target, league, "baseline")
+    calib, long = lb.calibration(target, b, SERIES, "model_p", league)
     return {
         "kind": "early",
         "coverage": cov,
@@ -102,6 +106,8 @@ def league_report(
         "seasons_excluded": [c["label"] for c in cov if not c["included"]],
         "candidates": len(target),
         **summary(b),
+        "calibration": calib,
+        lb.OUTCOMES: long,
     }, b
 
 
@@ -112,7 +118,8 @@ def cup_report(
     cross-league model's walk-forward chances, CLV against Pinnacle's close."""
     rep, target = cb.base(preds, pin, dk)
     b = ef.bets(target, "UCL", "baseline")
-    return {**rep, **summary(b)}, b
+    calib, _ = lb.calibration(target, b, SERIES, "model_p", "UCL")
+    return {**rep, **summary(b), "calibration": calib}, b
 
 
 def dk_replay(dk: dict | None) -> dict | None:
@@ -194,6 +201,7 @@ def build(
     pooled = pd.concat(frames, ignore_index=True) if frames else empty_bets()
     every = [b for b in league_bets.values() if len(b)]
     rows = compact(pd.concat(every, ignore_index=True)) if every else []
+    calib = lb.pooled_calibration(reports, pooled, SERIES, "model_p", early)
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "kind": KIND,
@@ -211,10 +219,12 @@ def build(
             "cup": cb.PRICE + "; " + cb.CLV,
         },
         "leagues": {
-            code: {"name": (names or {}).get(code, code), **rep} for code, rep in reports.items()
+            code: {"name": (names or {}).get(code, code), **lb.saved(rep)}
+            for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
+            "calibration": calib,
             "leagues": early,
             "by_league": {c: metrics(league_bets[c]) for c in early},
             "note": "Early-price leagues only; the Champions League (priced at the close) is "

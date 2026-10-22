@@ -29,6 +29,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from soccer_stats import calibration as cal
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
 from soccer_stats.data import PIN_CLOSE, PIN_EARLY
@@ -42,6 +43,15 @@ N_BOOT = 2000
 MAX_BETS = 6000  # compact rows kept in the file (newest first); aggregates use every bet
 CLOSE_KIND = "close"  # a league replayed at the close (cup_backtest), kept out of `all`
 DRIVERS = ("market", "model")
+# Calibration series (calibration.py): the model's raw walk-forward chance, the blend and
+# Pinnacle's margin-free early price, on every outcome of every scored match.
+SERIES = {"model": "p", "blend": "pb", "price": "mkt"}
+OUTCOMES = "_outcomes"  # a report's outcome rows, for build()'s pooled view; never saved
+CAL_NOTE = (
+    "Every outcome (home, draw, away) of every scored match, not only the bets: the "
+    "model's raw walk-forward chance, the blend and the price (margin-free), each against "
+    "what happened; `bets` is the strategy's own picks (predicted vs 1/odds vs won). " + cal.NOTE
+)
 BET_FIELDS = [
     "date",
     "league",
@@ -342,6 +352,62 @@ def summary(df: pd.DataFrame) -> dict:
     return {"lean": _tier(df), "strong": _tier(strong), "by_season": seasons}
 
 
+def calibration(
+    scored: pd.DataFrame,
+    league_bets: pd.DataFrame,
+    series: dict[str, str],
+    bet_col: str,
+    key: str,
+) -> tuple[dict, pd.DataFrame]:
+    """{all_outcomes: {series: calibration.reliability}, bets: reliability of `bet_col`
+    against 1/odds, note} for one league, plus its outcome rows (for pooling). Every series
+    is scored on the same rows: matches where each has a chance."""
+    long = cal.outcome_rows(scored, series, H2H, key=key)
+    return {
+        "all_outcomes": cal.series_report(long, list(series), price="price"),
+        "bets": bet_calibration(league_bets, bet_col),
+        "note": CAL_NOTE,
+    }, long
+
+
+def bet_calibration(league_bets: pd.DataFrame, col: str) -> dict:
+    """The strategy's own bets: `col` (the chance it bet on) vs 1/odds vs won."""
+    if league_bets is None or not len(league_bets):
+        return {"n": 0, "predicted_from": col}
+    b = league_bets
+    return {
+        "predicted_from": col,
+        **cal.reliability(
+            b[col].astype(float),
+            b["won"].astype(float),
+            1 / b["odds"].astype(float),
+        ),
+    }
+
+
+def pooled_calibration(
+    reports: dict[str, dict], pooled_bets: pd.DataFrame, series, bet_col: str, codes
+) -> dict:
+    """The calibration block over the leagues `codes`, from their reports' outcome rows."""
+    frames = [reports[c].get(OUTCOMES) for c in codes]
+    frames = [f for f in frames if f is not None and len(f)]
+    long = (
+        pd.concat(frames, ignore_index=True)
+        if frames
+        else cal.outcome_rows(pd.DataFrame(), series, H2H)
+    )
+    return {
+        "all_outcomes": cal.series_report(long, list(series), price="price"),
+        "bets": bet_calibration(pooled_bets, bet_col),
+        "note": CAL_NOTE,
+    }
+
+
+def saved(rep: dict) -> dict:
+    """A report without its outcome rows (what the file keeps)."""
+    return {k: v for k, v in rep.items() if k != OUTCOMES}
+
+
 def league_report(
     league: str,
     preds: pd.DataFrame,
@@ -362,6 +428,7 @@ def league_report(
     scored = scored[scored["season"].astype(str).isin(included)] if len(scored) else scored
     b = bets(scored, league)
     sig = [f["sigma"] for f in fits]
+    calib, long = calibration(scored, b, SERIES, "p_bet", league)
     rep = {
         "kind": "early",
         "coverage": cov,
@@ -373,6 +440,8 @@ def league_report(
         "sigma": {"min": min(sig), "max": max(sig)} if sig else None,
         "candidates": int(scored["sigma"].notna().sum()) if len(scored) else 0,
         **summary(b),
+        "calibration": calib,
+        OUTCOMES: long,
     }
     return rep, b
 
@@ -450,6 +519,7 @@ def build(
     every = [b for b in all_bets if len(b)]
     rows = compact(pd.concat(every, ignore_index=True)) if every else []
     by_league = {code: summary(b)["lean"] for code, b in early}
+    calib = pooled_calibration(reports, pooled, SERIES, "p_bet", [c for c, _ in early])
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "kind": "lean_backtest",
@@ -473,10 +543,12 @@ def build(
             "driver_note": tr.DRIVER_NOTE,
         },
         "leagues": {
-            code: {"name": (names or {}).get(code, code), **rep} for code, rep in reports.items()
+            code: {"name": (names or {}).get(code, code), **saved(rep)}
+            for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
+            "calibration": calib,
             "leagues": [code for code, _ in early],
             "by_league": by_league,
             "note": "Early-price leagues only; the Champions League (priced at the close) is "
