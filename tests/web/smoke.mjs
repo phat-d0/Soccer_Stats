@@ -61,6 +61,46 @@ const closeSheet = async (p) => { await p.click(".sheet-close"); };
 // hover and a finger drag each land on the stop under the pointer, with the readout line
 // equal to the chart's own readout for that stop (and only that stop's marks highlighted);
 // Home then the right (or down) arrow step; the page still scrolls over the chart.
+// Backtest bands (owner via the Research lab, 23 Oct): for strategy `key` under competition
+// `lg` ("" = All), the odds-band and claimed-edge charts and the CLV fold are drawn from the
+// file's bands, each readout carries that band's own numbers, and every chart scrubs.
+async function bandsCheck(p, key, lg) {
+  const sfx = `${key}-${lg || "all"}`;
+  const bands = await p.evaluate(([key, lg]) => {
+    const bt = state.data.portfolio.strategy_backtests[key];
+    const part = lg ? bt.leagues[lg] : bt.all;
+    return { ob: part.by_odds_band, eb: part.by_edge_band, cb: part.by_clv_band };
+  }, [key, lg]);
+  const text = await p.textContent("#view");
+  for (const w of ["Where the bets sit on the odds", "Claimed edge vs what the price did", "Does beating the close predict profit?"]) if (!text.includes(w)) throw new Error(`${sfx} lacks "${w}"`);
+  // One row per odds band: its share, or "no bets".
+  const shares = await p.locator(`[data-scrub="ob-${sfx}"] .band-row[data-stop] .band-share`).allInnerTexts();
+  if (shares.length !== bands.ob.length) throw new Error(`${sfx}: ${shares.length} odds rows for ${bands.ob.length} bands`);
+  const wantShares = await p.evaluate((ob) => ob.map((b) => (b.bets ? pct(b.share, 0) : "no bets")), bands.ob);
+  if (shares.map((t) => t.trim()).join("|") !== wantShares.join("|")) throw new Error(`${sfx} shares ${shares} vs ${wantShares}`);
+  // Each readout holds its own band's numbers.
+  const bad = await p.evaluate(([sfx, b]) => {
+    const out = [];
+    const ob = scrubCharts[`ob-${sfx}`], ce = scrubCharts[`ce-${sfx}`];
+    b.ob.forEach((x, i) => { const r = plain(ob.readout(i)); if (x.bets ? !(r.includes(`${num(x.bets)} bets`) && r.includes(`CLV ${signedPct(x.clv)}`) && r.includes(`ROI ${signedPct(x.roi)}`)) : !r.includes("no bets")) out.push(`odds ${i}: ${r}`); });
+    const eb = b.eb.filter((x) => x.bets && x.claimed != null && x.clv != null);
+    eb.forEach((x, i) => { const r = plain(ce.readout(i)); if (!(r.includes(`Claimed ${signedPct(x.claimed)}`) && r.includes(`CLV ${signedPct(x.clv)}`) && r.includes(`${num(x.bets)} bets`))) out.push(`edge ${i}: ${r}`); });
+    if (ce.xs.length !== eb.length) out.push(`edge stops ${ce.xs.length} vs ${eb.length}`);
+    return out;
+  }, [sfx, bands]);
+  if (bad.length) throw new Error(`${sfx} readouts: ${bad.join(" | ")}`);
+  // The verdict follows the data: worse when CLV falls from the first band to the last.
+  const eb = bands.eb.filter((x) => x.bets);
+  const verdict = await p.locator(".verdict", { hasText: "edge it claimed" }).innerText();
+  const fell = eb[eb.length - 1].clv - eb[0].clv;
+  if (fell < -0.005 && !verdict.includes("worse") && !verdict.includes("barely")) throw new Error(`${sfx} verdict: ${verdict}`);
+  if (fell > 0.005 && !verdict.includes("better") && !verdict.includes("barely")) throw new Error(`${sfx} verdict: ${verdict}`);
+  if ((await p.locator(".band-table").count()) < 2) throw new Error(`${sfx}: band tables`);
+  await scrubCheck(p, `[data-scrub="ob-${sfx}"]`);
+  await scrubCheck(p, `[data-scrub="ce-${sfx}"]`);
+  await p.click(".band-fold > summary");
+  await scrubCheck(p, `[data-scrub="cb-${sfx}"]`);
+}
 async function scrubCheck(p, sel) {
   const wrap = p.locator(sel).first();
   await wrap.scrollIntoViewIfNeeded();
@@ -601,6 +641,7 @@ const STEPS = [
     await p.click('.rc-row[data-rc="lbroi"][data-rcrow="0"]');
     if (!(await p.textContent("#rc-readout-lbroi")).includes("bets")) throw new Error("ROI readout");
     await scrubCheck(p, "[data-scrub='lbroi']");
+    await bandsCheck(p, "lean", "");
   }],
   ["portfolio-lean-backtest-model", async (p) => {
     await p.click('button[data-pfdriver="model"]');
@@ -640,6 +681,7 @@ const STEPS = [
     await p.click('button[data-pfstrat="lean"]');
     const text = await p.textContent("#view");
     if (!text.includes("300") || (await p.locator("#view .tiles").count())) throw new Error("UCL Lean should show the file's note, not tiles");
+    if (text.includes("Where the bets sit on the odds") || (await p.locator("#view .band-row").count())) throw new Error("UCL Lean has no bets: no band charts");
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
     const cov = await p.locator("details.mk-fold[open] table").innerText();
     for (const w of ["DK", "PIN", "Bet on"]) if (!cov.includes(w)) throw new Error(`UCL coverage lacks ${w}`);
@@ -648,6 +690,8 @@ const STEPS = [
     await p.click('button[data-pfstrat="edge12"]');
     const text = await p.textContent("#view");
     if (!text.includes("mostly measures the gap between the two books") || !(await p.locator("#view .tiles").count())) throw new Error("UCL Model 12% backtest");
+    if (!text.includes("Pinnacle's close at the same moment")) throw new Error("UCL bands' close note");
+    await bandsCheck(p, "edge12", "UCL");
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
   }],
   ["portfolio-backtest-e2-edge12", async (p) => {
@@ -658,7 +702,9 @@ const STEPS = [
   ["portfolio-backtest-e3-lean", async (p) => {
     await p.click('.chip[data-league="E3"]'); await p.click('button[data-pfstrat="lean"]');
     if (!(await p.locator("#view .tiles").count())) throw new Error("League Two Lean backtest tiles");
+    await bandsCheck(p, "lean", "E3");
   }],
+  ["portfolio-backtest-e3-edge12", async (p) => { await p.click('button[data-pfstrat="edge12"]'); await bandsCheck(p, "edge12", "E3"); }],
   // Model 12% under All: the per-league replay with its range plots and readout.
   ["portfolio-backtest-edge12-all", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
@@ -668,6 +714,7 @@ const STEPS = [
     }
     await p.click('.rc-row[data-rc="edge12roi"][data-rcrow="0"]');
     if (!(await p.textContent("#rc-readout-edge12roi")).includes("bets")) throw new Error("12% ROI readout");
+    await bandsCheck(p, "edge12", "");
   }],
   // Under the Premier League: the DraftKings backtest, then the Pinnacle replay, both labelled.
   ["portfolio-backtest-edge12-e0", async (p) => {
@@ -676,7 +723,9 @@ const STEPS = [
     for (const w of ["DraftKings backtest, Premier League", "Replay at Pinnacle's early prices, Premier League"]) {
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
+    await bandsCheck(p, "edge12", "E0");
   }],
+  ["portfolio-backtest-e0-lean", async (p) => { await p.click('button[data-pfstrat="lean"]'); await bandsCheck(p, "lean", "E0"); }],
   // Model view (owner, 22 Oct): each strategy's equation, fitted numbers and calibration.
   ["portfolio-model-lean", async (p) => {
     await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="lean"]');

@@ -90,11 +90,11 @@ FALLBACK_MATCH_BLEND = {
     "totals": {"coef": [0.0, 1.0, 0.05], "matches": 2276},
     "generated_at": "2026-10-06T00:00:00+00:00",
 }
-PLAYER_BT_TRADES = 40  # Player shots (retired) backtest trades kept, newest first
-DK_BT_TRADES = 30  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
-LEAN_BETS = 45  # Lean backtest rows kept (the app pages them by 20)
-EDGE12_BETS = 45  # Model 12% backtest rows kept (newest first; every league, the cup too)
-SAMPLE_PLAYERS = 50  # players kept from the real detail file (keeps fixtures < 1 MB)
+PLAYER_BT_TRADES = 25  # Player shots (retired) backtest trades kept, newest first
+DK_BT_TRADES = 20  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
+LEAN_BETS = 30  # Lean backtest rows kept (the app pages them by 20)
+EDGE12_BETS = 30  # Model 12% backtest rows kept (newest first; every league, the cup too)
+SAMPLE_PLAYERS = 35  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
 def fetch_data_log(dest: Path) -> Path:

@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v52";
+const APP_VERSION = "v53";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2453,7 +2453,8 @@ function strategyBacktestHtml(bt, lg = "", key = "lean", opts = {}) {
     ${head}
     ${lbTiles(m)}
     ${close ? `<p class="note">${esc(part.note || "")}</p>` : ""}`;
-  if (opts.brief) return `${top}${lbSeasons(part.by_season, key)}${lg ? lbLeagueDetails(part) : ""}`;
+  const bands = backtestBandsHtml(bt, part, key, lg);
+  if (opts.brief) return `${top}${bands}${lbSeasons(part.by_season, key)}${lg ? lbLeagueDetails(part) : ""}`;
   const by = m.by_driver || {};
   const dnote = bt.rule?.driver_note || driverNote();
   const dk = bt.draftkings_replay;
@@ -2476,12 +2477,153 @@ function strategyBacktestHtml(bt, lg = "", key = "lean", opts = {}) {
     ${top}
     ${lg ? "" : lbLeagueCharts(bt, key)}
     ${leanParts}
+    ${bands}
     ${lbSeasons(part.by_season, key)}
     ${lg ? lbLeagueDetails(part) : ""}
     ${dkFold}
     ${drvSeg}
     ${lbBetList(bt, lg, key)}
     <p class="note">${esc(bt.note || "")}${bt.generated_at ? ` Run ${esc(shortDate(bt.generated_at))}.` : ""}</p>`;
+}
+// ---------- Backtest bands (owner via the Research lab, 23 Oct): by_odds_band, by_edge_band and
+// by_clv_band in each league and `all` of both backtest files; `bands` names the cuts. ----------
+const oddsWords = (d) => `${american(d)}`.replace(/^\+100$/, "even");
+function oddsBandLabel(b) {
+  if (b.lo == null) return `${oddsWords(b.hi)} or shorter (up to ${b.hi.toFixed(2)})`;
+  if (b.hi == null) return `longer than ${oddsWords(b.lo)} (over ${b.lo.toFixed(2)})`;
+  return `${oddsWords(b.lo)} to ${oddsWords(b.hi)} (${b.lo.toFixed(2)}–${b.hi.toFixed(2)})`;
+}
+const cutLabel = (b) => (b.lo == null ? `under ${signedPct(b.hi)}` : b.hi == null ? `${signedPct(b.lo)} and up` : `${signedPct(b.lo)} to ${signedPct(b.hi)}`);
+const rngText = (ci) => (ci && isNum(ci[0]) ? ` (range ${ciText(ci)})` : "");
+// A direction in words for y against the bands' order, from the bet-weighted slope and the
+// first and last bands together; "no clear pattern" when they disagree or barely move.
+function bandTrend(rows, xk, yk) {
+  const r = rows.filter((b) => b.bets && isNum(b[xk]) && isNum(b[yk]));
+  if (r.length < 2) return null;
+  const w = r.reduce((a, b) => a + b.bets, 0);
+  const mx = r.reduce((a, b) => a + b.bets * b[xk], 0) / w, my = r.reduce((a, b) => a + b.bets * b[yk], 0) / w;
+  const sxx = r.reduce((a, b) => a + b.bets * (b[xk] - mx) ** 2, 0);
+  const slope = sxx ? r.reduce((a, b) => a + b.bets * (b[xk] - mx) * (b[yk] - my), 0) / sxx : 0;
+  const first = r[0], last = r[r.length - 1], step = last[yk] - first[yk];
+  const dir = Math.abs(step) < 0.005 ? 0 : Math.sign(step) === Math.sign(slope) ? Math.sign(step) : 0;
+  return { dir, slope, first, last, r };
+}
+// 1. Where the bets sit on the odds: share of bets (bar) and CLV (dot, 95% range, 0 marked).
+function oddsBandChart(id, bands) {
+  const withClv = bands.filter((b) => b.bets && isNum(b.clv));
+  const vals = withClv.flatMap((b) => [b.clv_ci95?.[0] ?? b.clv, b.clv_ci95?.[1] ?? b.clv]).concat(0);
+  const span = Math.max(...vals) - Math.min(...vals) || 0.01;
+  const lo = Math.min(...vals) - span * 0.1, hi = Math.max(...vals) + span * 0.1;
+  const x = (v) => ((v - lo) / (hi - lo)) * 100;
+  const top = Math.max(...bands.map((b) => b.share || 0), 0.01);
+  const read = (b) => (b.bets
+    ? `<b>${esc(oddsBandLabel(b))}</b>: ${num(b.bets)} bets (${pct(b.share, 0)} of them); CLV ${signedPct(b.clv)}${rngText(b.clv_ci95)}; won ${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)} needed; ROI ${signedPct(b.roi)}${rngText(b.roi_ci95)}.`
+    : `<b>${esc(oddsBandLabel(b))}</b>: no bets.`);
+  scrubCharts[id] = { n: bands.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => read(bands[i]) };
+  const tone = (b) => (b.clv_ci95?.[0] > 0 ? "pos" : b.clv_ci95?.[1] < 0 ? "neg" : b.clv > 0 ? "pos" : "neg");
+  const rows = bands.map((b, i) => `
+    <div class="eb-row band-row" data-stop="${i}">
+      <span class="eb-label">${esc(oddsBandLabel(b))}</span>
+      <span class="band-share">${b.bets ? `<span class="share-bar" style="width:${((b.share || 0) / top) * 100}%"></span><span class="share-num">${pct(b.share, 0)}</span>` : '<span class="muted">no bets</span>'}</span>
+      <span class="eb-plot"><span class="rc-zero" style="left:${x(0)}%"></span>${b.bets && isNum(b.clv) ? `${b.clv_ci95 ? `<span class="eb-range ${tone(b)}" style="left:${x(b.clv_ci95[0])}%;width:${Math.max(0.5, x(b.clv_ci95[1]) - x(b.clv_ci95[0]))}%"></span>` : ""}<span class="eb-dot real ${tone(b)}" style="left:${x(b.clv)}%"></span>` : ""}</span>
+    </div>`).join("");
+  const ticks = [lo + (hi - lo) * 0.12, hi - (hi - lo) * 0.12].filter((v) => Math.abs(x(v) - x(0)) > 18);
+  const axis = `<div class="eb-axis band-row"><span></span><span class="band-share muted">Share</span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${signedPct(v, 1)}</span>`).join("")}<span style="left:${x(0)}%">0</span></span></div>`;
+  const busiest = bands.filter((b) => b.bets).sort((a, c) => c.share - a.share)[0];
+  return `<div class="card eb-card scrub-rows" ${scrubAttrs(id, bands.length, "Odds bands: point at or drag across the rows, or use the arrow keys")}>
+      <div class="eb-legend"><span><i class="eb-key share"></i>Share of bets</span><span><i class="eb-key real pos"></i>CLV (range)</span></div>
+      ${rows}${axis}
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${busiest ? read(busiest) : "No bets."}</div></div>`;
+}
+const rngCell = (v, ci) => `<td class="${plClass(v)}">${signedPct(v)}${ci && isNum(ci[0]) ? `<span class="meta">${signedPct(ci[0], 1)} to ${signedPct(ci[1], 1)}</span>` : ""}</td>`;
+const bandTable = (head, rows) => `<div class="card" style="padding:8px 14px"><table class="mkts mk-table band-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+// 2. Claimed edge (x, the band's mean) against CLV (y, with its range): the dashed line is
+// where the points would sit if the claimed edge were real; y = 0 is the close.
+function edgeClvChart(id, bands, lean) {
+  const r = bands.filter((b) => b.bets && isNum(b.claimed) && isNum(b.clv));
+  if (r.length < 2) return "";
+  const W = 320, H = 240, L = 44, R = 14, T = 12, B = 32;
+  const xmax = Math.max(...r.map((b) => b.claimed)) * 1.08, xmin = Math.min(0, ...r.map((b) => b.claimed));
+  const ys = r.flatMap((b) => [b.clv_ci95?.[0] ?? b.clv, b.clv_ci95?.[1] ?? b.clv]);
+  // The dashed line runs to 15% at most, so a big claim (Model 12%'s reach 50%) doesn't
+  // squash the CLV points flat; past that it leaves the top, marked with an arrow.
+  const ymin = Math.min(0, ...ys) - 0.01, ymax = Math.max(0.02, Math.min(xmax, 0.15), ...ys);
+  const sx = (v) => L + ((v - xmin) / (xmax - xmin || 1)) * (W - L - R), sy = (v) => T + (1 - (v - ymin) / (ymax - ymin || 1)) * (H - T - B);
+  const step = niceStep((ymax - ymin) / 4), xstep = niceStep((xmax - xmin) / 4);
+  let grid = "";
+  for (let v = Math.ceil(ymin / step) * step; v <= ymax + 1e-9; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${Math.abs(v) < 1e-9 ? "0%" : signedPct(v, 0)}</text>`;
+  for (let v = Math.ceil(xmin / xstep) * xstep; v <= xmax + 1e-9; v += xstep) grid += `<text x="${sx(v)}" y="${H - 16}" text-anchor="middle">${Math.abs(v) < 1e-9 ? "0%" : signedPct(v, 0)}</text>`;
+  const x1 = Math.max(xmin, ymin), x2 = Math.min(xmax, ymax);
+  const pts = r.map((b) => `${b.clv_ci95 ? `<line class="rng" x1="${sx(b.claimed)}" x2="${sx(b.claimed)}" y1="${sy(b.clv_ci95[0])}" y2="${sy(b.clv_ci95[1])}"/>` : ""}<circle class="mk ${b.clv >= 0 ? "pos" : "neg"}" cx="${sx(b.claimed)}" cy="${sy(b.clv)}" r="4"/>`).join("");
+  scrubCharts[id] = {
+    readoutId: `rc-readout-${id}`,
+    xs: r.map((b) => sx(b.claimed)),
+    points: (i) => [{ x: sx(r[i].claimed), y: sy(r[i].clv) }],
+    readout: (i) => { const b = r[i]; return `<b>Claimed ${signedPct(b.claimed)}</b> (edges ${esc(cutLabel(b))}${lean && isNum(b.z) ? `, average ${sigmaText(b.z)}` : ""}): CLV ${signedPct(b.clv)}${rngText(b.clv_ci95)}, ROI ${signedPct(b.roi)}${rngText(b.roi_ci95)}, ${num(b.bets)} bets.`; },
+  };
+  return `<div class="chart curve band-chart scrub" ${scrubAttrs(id, r.length, "Claimed edge against CLV: drag or use the arrow keys")}>
+      <div class="eb-legend"><span><i class="ln-key diag"></i>If the claim were right</span><span><i class="eb-key real neg"></i>CLV by band (range)</span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Claimed edge against closing line value by band">
+        <g class="grid">${grid}</g>
+        <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
+        <line class="diag" x1="${sx(x1)}" y1="${sy(x1)}" x2="${sx(x2)}" y2="${sy(x2)}"/>
+        ${xmax > ymax ? `<text class="xlab" x="${sx(x2) + 4}" y="${sy(x2) + 10}">claims up to ${signedPct(r[r.length - 1].claimed, 0)} ↑</text>` : ""}
+        ${pts}
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        <circle class="cdot" r="5.5" cx="0" cy="0" style="display:none"/>
+        ${scrubPad(W, H)}
+        <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Edge it claimed when it bet</text>
+      </svg>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">Point at or drag along the chart for each band's numbers.</div>
+    </div>`;
+}
+function edgeVerdict(bands) {
+  const t = bandTrend(bands, "claimed", "clv");
+  if (!t) return "";
+  const all = t.r.every((b) => b.clv < 0) ? " Every band got a worse price than the close." : t.r.every((b) => b.clv > 0) ? " Every band beat the close." : "";
+  const span = `from ${signedPct(t.first.clv)} at a claimed ${signedPct(t.first.claimed)} to ${signedPct(t.last.clv)} at ${signedPct(t.last.claimed)}`;
+  const lead = t.dir < 0 ? "The bigger the edge it claimed, the worse it did against the close"
+    : t.dir > 0 ? "The bigger the edge it claimed, the better it did against the close"
+      : "Its result against the close barely changed with the edge it claimed";
+  return `${lead} (${span}).${all}`;
+}
+function clvProfitFold(id, bands) {
+  const rows = bands.filter((b) => b.bets && isNum(b.roi)).map((b) => ({
+    label: `CLV ${cutLabel(b)}`, sub: `${num(b.bets)} bets`, v: b.roi, lo: b.roi_ci95?.[0], hi: b.roi_ci95?.[1],
+    readout: `<b>CLV ${esc(cutLabel(b))}</b> (average ${signedPct(b.clv)}): ${num(b.bets)} bets, ROI ${signedPct(b.roi)}${rngText(b.roi_ci95)}; won ${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)} needed.`,
+  }));
+  if (!rows.length) return "";
+  const t = bandTrend(bands, "clv", "roi");
+  const words = !t ? "" : t.dir > 0 ? `Yes: the better the price against the close, the better the return (ROI ${signedPct(t.first.roi)} in the worst CLV band, ${signedPct(t.last.roi)} in the best).`
+    : t.dir < 0 ? `Not here: the return fell as CLV rose (ROI ${signedPct(t.first.roi)} to ${signedPct(t.last.roi)}).`
+      : `No clear pattern: ROI ${signedPct(t.first.roi)} in the worst CLV band, ${signedPct(t.last.roi)} in the best.`;
+  return `<details class="fold mk-fold band-fold"><summary>Does beating the close predict profit?</summary>
+    <p class="note">${words} Each row groups the bets by their CLV; dot = the return, bar = its 95% range.</p>
+    ${rangeChart(id, rows, (v) => signedPct(v, 0))}</details>`;
+}
+// The three together for one strategy and competition (all = `all`).
+function backtestBandsHtml(bt, part, key, lg) {
+  const ob = part?.by_odds_band, eb = part?.by_edge_band, cb = part?.by_clv_band;
+  if (!ob?.length && !eb?.length) return "";
+  const lean = key === "lean", sfx = `${key}-${lg || "all"}`;
+  const close = isClose(part);
+  const oddsTable = bandTable(["Odds", "Bets", "Won vs needed", "ROI, 95% range"], ob.map((b) => `<tr><td>${esc(oddsBandLabel(b))}</td><td>${num(b.bets)}</td><td>${b.bets ? `${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)}` : "no bets"}</td>${b.bets ? rngCell(b.roi, b.roi_ci95) : "<td>–</td>"}</tr>`));
+  const edgeRows = (eb || []).filter((b) => b.bets);
+  const edgeTable = edgeRows.length ? bandTable(["Claimed", ...(lean ? ["σ"] : []), "CLV, 95% range", "ROI, 95% range", "Bets"], edgeRows.map((b) => `<tr><td>${signedPct(b.claimed)}<span class="meta">${esc(cutLabel(b))}</span></td>${lean ? `<td>${isNum(b.z) ? b.z.toFixed(2) : "–"}</td>` : ""}${rngCell(b.clv, b.clv_ci95)}${rngCell(b.roi, b.roi_ci95)}<td>${num(b.bets)}</td></tr>`)) : "";
+  const verdict = edgeVerdict(eb || []);
+  const cuts = bt.bands || {};
+  return `
+    <div class="section-title">Where the bets sit on the odds</div>
+    ${ob?.length ? oddsBandChart(`ob-${sfx}`, ob) : ""}
+    <p class="note">Bar = the share of ${lg ? "this competition's" : "all"} bets in each odds band; dot = their CLV against ${close ? "Pinnacle's close at the same moment" : "Pinnacle's close"}, bar = its 95% range, line = 0. The return's ranges are too wide to plot, so they sit in the table.</p>
+    ${ob?.length ? oddsTable : ""}
+    <div class="section-title">Claimed edge vs what the price did</div>
+    ${verdict ? `<div class="verdict ${/worse/.test(verdict) ? "neg" : "mid"}">${esc(verdict)}</div>` : ""}
+    ${edgeClvChart(`ce-${sfx}`, eb || [], lean)}
+    <p class="note">Each point is a fifth of the pooled bets, grouped by the edge ${lean ? "the blend" : "the model"} claimed when it bet${cuts.edge_from ? ` (worked out as ${esc(cuts.edge_from.replace(/\s*\(.*\)\s*$/, ""))})` : ""}. If the claim were right, the points would sit on the dashed line; a real edge would at least lift CLV as the claim grows.</p>
+    ${edgeTable}
+    ${cb?.length ? clvProfitFold(`cb-${sfx}`, cb) : ""}
+    ${cuts.note ? howFold(cuts.note) : ""}`;
 }
 const num = (v) => (isNum(v) ? v.toLocaleString() : "–");
 function lbLeagueDetails(l) {
