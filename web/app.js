@@ -3125,7 +3125,7 @@ function strategyList(cur, strats, sel, lg, backtest) {
       const h = backtestHeadline(cur, x, lg);
       right = h ? `<b class="${h.cls}">${h.v}</b><small>${esc(h.sub)}</small>` : `<b class="muted">–</b><small>no backtest</small>`;
     } else {
-      right = m.n
+      right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
         ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
         : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     }
@@ -3348,38 +3348,47 @@ function overlayReadout(series, rows, i) {
   });
   return `<b>${esc(dayName(rows[0][i].date))}</b> · ${parts.join(" · ")}`;
 }
-// A variant's own judgement: only trades opened after its filter was set count (the cut
-// was chosen after seeing the earlier ones). since_defined = {variant, parent, clv_diff,
-// clv_diff_ci95, n}; pooled over every competition.
+// A variant's own judgement (paper.variant_since): only trades opened at or after
+// defined_at count, since the cut was chosen after seeing the earlier ones. since_defined =
+// {defined_at, parent: {trades, summary}, variant: {trades, summary}, clv_diff: {clv_pinnacle,
+// clv_dk: {trades, kept, matches, mean_all, mean_kept, diff, ci95, draws}}}; clv_pinnacle is
+// the pre-registered measure. Pooled over every competition.
 const JUDGE_MIN = 30;
+const CLV_FIELD_NAME = { clv_pinnacle: "Pinnacle's close", clv_dk: "DraftKings' close" };
 function sinceDefinedHtml(cur, x, parent, lg) {
   const sd = x.st?.since_defined;
-  const at = x.st?.defined_at;
+  const at = sd?.defined_at || x.st?.defined_at;
   if (!sd || !at) return "";
   const name = variantShort(x, parent);
   const before = (strategyLiveSet(cur, parent, "").trades || []).filter((t) => t.opened_at && t.opened_at < at).length;
-  // The close the parent is judged on: Pinnacle's for Pinnacle corners, else DraftKings'.
   const clvKey = cur.id === "corners" && parent.key !== "draftkings" ? "clv_pinnacle" : "clv_dk";
-  const clvOf = (s) => s?.[clvKey];
-  const line = (label, s) => {
-    if (!s || !s.trades) return `<tr><th>${esc(label)}</th><td colspan="4" class="muted">no trades yet</td></tr>`;
-    const c = clvOf(s);
-    return `<tr><th>${esc(label)}</th><td>${s.settled ?? 0}</td><td class="${signCls(s.profit || 0)}">${usd(s.profit || 0, 2)}</td><td>${s.settled ? signedPct(s.roi) : "–"}</td><td>${isNum(c) ? signedPct(c) : "–"}</td></tr>`;
+  const line = (label, part) => {
+    const s = part?.summary;
+    if (!part?.trades || !s) return `<tr><th>${esc(label)}</th><td>0</td><td colspan="4" class="muted">none yet</td></tr>`;
+    const c = s[clvKey];
+    return `<tr><th>${esc(label)}</th><td>${part.trades}</td><td>${s.settled ?? 0}</td><td class="${signCls(s.profit || 0)}">${usd(s.profit || 0, 2)}</td><td>${s.settled ? signedPct(s.roi) : "–"}</td><td>${isNum(c) ? signedPct(c) : "–"}</td></tr>`;
   };
-  const n = sd.n ?? 0;
-  const diff = isNum(sd.clv_diff)
-    ? `CLV difference: <b class="${signCls(sd.clv_diff)}">${signedPct(sd.clv_diff)}</b>${sd.clv_diff_ci95 ? ` (95% range ${ciText(sd.clv_diff_ci95)})` : ""}, ${esc(name.toLowerCase())} minus all.`
-    : "No CLV difference yet: nothing has settled with a close since the filter was set.";
-  const enough = n < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${n} settled since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
-  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} trade${before === 1 ? "" : "s"}, so only trades opened after ${monthDay(at)} count when judging it.`;
+  const diffs = Object.entries(sd.clv_diff || {}).filter(([, d]) => d && d.trades);
+  const diffLine = ([f, d]) => {
+    const where = CLV_FIELD_NAME[f] || f;
+    const head = f === "clv_pinnacle" ? "<b>The judged measure</b>, CLV" : "CLV";
+    if (!isNum(d.diff)) return `<p class="note">${head} against ${where}: no ${esc(name.toLowerCase())} trade has a close yet (${d.trades} of all do).</p>`;
+    return `<p class="note">${head} against ${where}: ${esc(name.toLowerCase())} ${signedPct(d.mean_kept)} vs all ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : ""}, on ${d.kept} of ${d.trades} trades.</p>`;
+  };
+  const kept = sd.clv_diff?.clv_pinnacle?.kept ?? 0;
+  const none = !sd.parent?.trades;
+  const enough = none ? `<p class="note judge-few"><b>Nothing to judge yet:</b> no trade has opened since ${monthDay(at)}.</p>`
+    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} with a Pinnacle close since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
+  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
   return `
     <div class="card judged">
       <div class="judged-head">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
-      <table class="judged-tab"><thead><tr><th></th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
+      <table class="judged-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
         <tbody>${line(name, sd.variant)}${line("All", sd.parent)}</tbody></table>
-      <p class="note">${diff}</p>
+      ${diffs.map(diffLine).join("")}
       ${enough}
-      <p class="note">${why}${x.st?.filter?.note ? ` ${esc(x.st.filter.note)}` : ""}</p>
+      <p class="note">${why}</p>
+      ${x.st?.filter?.note ? `<details class="fold"><summary>How this filter works</summary><p class="note">${esc(x.st.filter.note)}</p></details>` : ""}
     </div>`;
 }
 function liveRuleNote(cur, x) {
@@ -3399,7 +3408,8 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const m = tradeStats(trades);
   const dkCorners = cur.id === "corners" && (x.variantOf || x.key) === "draftkings";
   const book = cur.id === "corners" ? BOOK_POSS[dkCorners ? "draftkings" : "pinnacle"] : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
-  const banner = set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
+  const banner = x.st?.error ? `<div class="banner">This filtered view could not be built this time (${esc(x.st.error)}); the full track's record is unaffected.</div>`
+    : set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   const rules = `<div class="explain live-test rule-note">${liveRuleNote(cur, x)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
   const title = `<div class="section-title nocase">${esc(x.label)}${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>`;

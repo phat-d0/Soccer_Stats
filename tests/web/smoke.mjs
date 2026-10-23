@@ -744,7 +744,7 @@ const STEPS = [
     const mine = await p.evaluate(() => pfById("corners").live.strategies.find((s) => s.key === "pinnacle_below60").trade_ids);
     if (!ids.length || ids.some((id) => !mine.includes(id))) throw new Error(`variant lists: ${ids.join(", ")}`);
     const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
-    for (const want of ["Judged from", "Below 60%", "All", "CLV difference", "95% range", "Not enough trades yet", "was picked after seeing the first", "only trades opened after"]) {
+    for (const want of ["Judged from", "Below 60%", "All", "The judged measure, CLV against Pinnacle's close", "a difference of", "95% range", "Not enough trades yet", "was picked after seeing the first", "only trades opened from"]) {
       if (!box.includes(want)) throw new Error(`Judged-from box lacks "${want}": ${box}`);
     }
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2) throw new Error("variant view lacks the overlay");

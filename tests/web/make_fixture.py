@@ -361,7 +361,6 @@ def build(src: Path, out: Path) -> dict:
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
-    add_corner_variants(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
     # The same for Model 12%'s per-league replay (edge12_backtest.json), keeping a few of
@@ -1068,7 +1067,7 @@ def add_corners(data: dict) -> None:
 
 
 # Six weeks of settled Pinnacle corner trades (seeded), so "Profit over time" has a real
-# shape and the below-60% variant (add_corner_variants) differs from its parent: model
+# shape and the below-60% variant differs from its parent: model
 # chances 48% to 70%, over or under, half lines, one a day or so from 1 Sep.
 CORNER_PAIRS = [
     ("Liverpool", "Wolves"), ("Spurs", "Burnley"), ("Newcastle", "Bournemouth"),
@@ -1098,77 +1097,14 @@ def corner_history() -> list[tuple]:
     return rows
 
 
-# Shadow-filter variants (owner, 23 Oct): the corners strategies' "below 60%" views. This
-# mirrors the contract Moneyline is building in paper (variant_of, filter, defined_at,
-# since_defined; trade_ids a subset of the parent's) until that lands.
-CORNER_VARIANT_MAX = 0.60
-CORNER_VARIANT_DEFINED = "2026-09-20T12:00:00+00:00"
-
-
-def add_corner_variants(data: dict) -> None:
-    pf = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")
-    live = pf["live"]
-    by_id = {t["id"]: t for t in live["trades"]}
-    out = []
-    for st in live["strategies"]:
-        out.append(st)
-        if st.get("variant_of"):
-            continue
-        mine = [by_id[i] for i in st["trade_ids"] if i in by_id]
-        keep = [t for t in mine if (paper._trade_chance(t) or 1) < CORNER_VARIANT_MAX]
-        sec = paper.strategy_section(
-            keep, st["key"], st["label"], st["rule"], of=lambda t, k=st["key"]: k
-        )
-        clv_key = "clv_dk" if st["key"] == "draftkings" else "clv_pinnacle"
-
-        def since(ts):
-            return [t for t in ts if t["opened_at"] >= CORNER_VARIANT_DEFINED]
-
-        def clvs(ts, clv_key=clv_key):
-            return [
-                t[clv_key]
-                for t in ts
-                if t["status"] in ("won", "lost") and t.get(clv_key) is not None
-            ]
-
-        vs, ps = since(keep), since(mine)
-        diff, ci = None, None
-        if clvs(vs) and clvs(ps):
-            diff = round(float(np.mean(clvs(vs)) - np.mean(clvs(ps))), 4)
-            rng = np.random.default_rng(5)
-            boots = []
-            for _ in range(400):
-                pick = [ps[j] for j in rng.integers(0, len(ps), len(ps))]
-                sub = [t for t in pick if t in vs]
-                if clvs(sub) and clvs(pick):
-                    boots.append(np.mean(clvs(sub)) - np.mean(clvs(pick)))
-            ci = [
-                round(float(np.percentile(boots, 2.5)), 4),
-                round(float(np.percentile(boots, 97.5)), 4),
-            ]
-        label = f"{st['label']}, below {round(CORNER_VARIANT_MAX * 100)}%"
-        out.append(
-            sec
-            | {"key": f"{st['key']}_below60", "label": label, "variant_of": st["key"]}
-            | {"defined_at": CORNER_VARIANT_DEFINED, "rule": st["rule"]}
-            | {
-                "filter": {
-                    "field": "model_p_no_push",
-                    "max": CORNER_VARIANT_MAX,
-                    "note": "Only trades whose model chance (given no push) is under 60%.",
-                }
-            }
-            | {
-                "since_defined": {
-                    "variant": paper.portfolio_section(vs)["summary"],
-                    "parent": paper.portfolio_section(ps)["summary"],
-                    "clv_diff": diff,
-                    "clv_diff_ci95": ci,
-                    "n": sum(t["status"] in ("won", "lost") for t in vs),
-                }
-            }
-        )
-    live["strategies"] = out
+# Shadow-filter variants (owner, 23 Oct): paper.corner_strategies adds each track's
+# below-60% variant (tr.CORNER_VARIANTS). Its real defined_at (23 Oct) is after this
+# fixture's NOW, so nothing would be judged; the fixture moves it to 20 Sep so the
+# "Judged from" box and the chart's marker have trades on both sides.
+FIXTURE_DEFINED_AT = "2026-09-20T12:00:00+00:00"
+tr.CORNER_VARIANTS = {
+    k: [v | {"defined_at": FIXTURE_DEFINED_AT} for v in vs] for k, vs in tr.CORNER_VARIANTS.items()
+}
 
 
 def dk_corner_trades(e0, trade, at) -> list[dict]:

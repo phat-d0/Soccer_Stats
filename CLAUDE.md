@@ -551,12 +551,14 @@ the owner's baseball app, so the balance can drop without any run here.
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60`): an
   indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
   Backtest and Model show the parent), its own trades and tiles via `trade_ids`, a "Judged
-  from <date>" box (`sinceDefinedHtml`: `since_defined` variant vs parent, CLV difference
-  and range, "Not enough trades yet" under `JUDGE_MIN` 30 settled, how many trades the cut
-  was picked after); with a parent or its variant selected, "Profit over time" is
+  from <date>" box (`sinceDefinedHtml`: `since_defined` variant vs parent, each
+  `clv_diff` field's difference and range with `clv_pinnacle` as the judged measure, "Not
+  enough trades yet" under `JUDGE_MIN` 30 kept trades, how many trades the cut was picked
+  after; an `error` variant shows a banner); with a parent or its variant selected, "Profit over time" is
   `overlayCurveChart` (parent solid, variants dashed, end labels, legend, a "filter set
   (judged from here)" marker at `defined_at`; readout "Sat 18 Oct · All +$23.40 · Below 60%
-  +$31.10 (difference +$7.70)"). The fixture's `add_corner_variants` mirrors the contract. Corner CLV is the trade's own book's (`tradeClv`). Backtest
+  +$31.10 (difference +$7.70)"). The fixture builds them through `paper.corner_strategies`, moving `defined_at` to 20 Sep
+  (`FIXTURE_DEFINED_AT`; the real 23 Oct is after its `NOW`). Corner CLV is the trade's own book's (`tradeClv`). Backtest
   (`strategyBacktestHtml(bt, lg, key)` for `strategy_backtests.lean` and `.edge12`): verdict, units
   tiles, per-league ROI and CLV range plots, seasons, coverage and fits, bet list; UCL (`kind:
   "close"`) gets `closeVerdict`; Model 12% under the Premier League shows the DraftKings backtest
