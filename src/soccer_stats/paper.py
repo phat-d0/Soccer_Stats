@@ -1246,22 +1246,29 @@ def _match_key(t: dict) -> str:
     return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away"))
 
 
+def _has_value(v) -> bool:
+    return v is not None and not (isinstance(v, float) and np.isnan(v))
+
+
 def clv_difference(
     parent: list[dict], kept_ids: set, field: str, n_boot: int = N_BOOT_VARIANT, seed: int = 0
 ) -> dict:
-    """Mean `field` of the kept trades minus that of all `parent` trades, over settled
-    trades with a value (their close is final), with a 95% percentile range from
-    resampling matches (each draw recomputes both means on the same trades; a draw with no
-    kept trade is skipped). `diff` and `ci95` are None when nothing is kept."""
+    """Mean `field` of the kept trades minus that of all `parent` trades, over the trades
+    the summaries' CLV uses (won or lost, with a value: tr.summarize), with a 95%
+    percentile range from resampling matches (each draw recomputes both means on the same
+    trades; a draw with no kept trade is skipped). Pushes and voids are left out and
+    counted (`left_out`; docs/totals.md "Shadow filter: below 60%", clarification of 23
+    Oct). `diff` and `ci95` are None when nothing is kept."""
     rows = [
         (_match_key(t), float(t[field]), t["id"] in kept_ids)
         for t in parent
-        if t.get("status") in ("won", "lost", "void") and t.get(field) is not None
+        if t.get("status") in ("won", "lost") and _has_value(t.get(field))
     ]
     kept = [c for _, c, k in rows if k]
     out = {
         "field": field,
         "trades": len(rows),
+        "left_out": sum(1 for t in parent if t.get("status") == "void"),
         "kept": len(kept),
         "matches": len({m for m, _, _ in rows}),
         "mean_all": float(np.mean([c for _, c, _ in rows])) if rows else None,
