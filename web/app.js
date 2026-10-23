@@ -3535,7 +3535,7 @@ function setUpdated() {
   const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
   // One league: its name; several: how many (the app covers more than the Premier League).
   const n = leaguesPresent().length;
-  $("#updated").textContent = `${n > 1 ? `${n} leagues ·` : d.league} ${d.season} · updated ${ago} · app ${APP_VERSION}`;
+  $("#updated").textContent = `${n > 1 ? `${n} leagues ·` : d.league} ${d.season} · updated ${ago} · App ${APP_VERSION}`;
   const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {

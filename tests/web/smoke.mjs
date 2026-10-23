@@ -871,7 +871,7 @@ try {
     // The header names the running app version, the same as sw.js's cache name.
     const swVersion = readFileSync(join(site, "sw.js"), "utf8").match(/soccer-model-(v\d+)/)[1];
     const sub = await page.textContent("#updated");
-    if (!sub.endsWith(`app ${swVersion}`)) failures.push(`${mode}/load: header "${sub}" should end "app ${swVersion}"`);
+    if (!sub.endsWith(`App ${swVersion}`)) failures.push(`${mode}/load: header "${sub}" should end "App ${swVersion}"`);
     for (const [name, run, isSheet] of STEPS) {
       step = name;
       try {
