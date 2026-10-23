@@ -762,3 +762,21 @@ details.drv-fold { margin-top: 10px; }
 .rel-key.blend { background: var(--accent); }
 .rel-key.price { width: 10px; height: 0; border-top: 2.5px solid var(--text-muted); border-radius: 0; }
 .shape-chart svg, .rel-chart svg { max-width: 420px; }
+
+/* ---------- Scrubbable charts: cursor line, snapped dots, focus ring ---------- */
+.chart.scrub { cursor: crosshair; outline: none; border-radius: 10px; }
+.chart.scrub:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.chart.scrub .cursor { stroke: var(--text-secondary); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.chart.scrub .cdot { fill: var(--accent); stroke: var(--surface-2); stroke-width: 2; pointer-events: none; }
+.chart.scrub .cdot.neg { fill: var(--neg); }
+.chart.scrub svg { user-select: none; -webkit-user-select: none; }
+.cshape .shape.l0 { stroke: var(--series-home); }
+.cshape .shape.l1 { stroke: var(--series-draw); }
+.cshape .shape.l2 { stroke: var(--series-away); }
+.cshape .shape { stroke-dasharray: none; stroke-width: 2; }
+.cshape .cdot.l0 { fill: var(--series-home); }
+.cshape .cdot.l1 { fill: var(--series-draw); }
+.cshape .cdot.l2 { fill: var(--series-away); }
+.ln-key.l35 { border-top: 2px solid var(--series-home); }
+.ln-key.l45 { border-top: 2px solid var(--series-draw); }
+.ln-key.l55 { border-top: 2px solid var(--series-away); }
