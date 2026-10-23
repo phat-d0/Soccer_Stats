@@ -36,6 +36,9 @@ const state = {
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
+// header and compared with the deployed sw.js on ↻.
+const APP_VERSION = "v49";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3532,7 +3535,7 @@ function setUpdated() {
   const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
   // One league: its name; several: how many (the app covers more than the Premier League).
   const n = leaguesPresent().length;
-  $("#updated").textContent = `${n > 1 ? `${n} leagues ·` : d.league} ${d.season} · updated ${ago}`;
+  $("#updated").textContent = `${n > 1 ? `${n} leagues ·` : d.league} ${d.season} · updated ${ago} · App ${APP_VERSION}`;
   const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {
@@ -3640,6 +3643,8 @@ document.addEventListener("click", (ev) => {
     closeSheet();
   } else if (t.id === "refresh") {
     load(true);
+    checkForUpdate();
+    newerAppDeployed().then((newer) => { if (newer) reloadOnce(); });
   }
 });
 document.addEventListener("change", (ev) => {
@@ -3688,8 +3693,39 @@ for (const k of ["anthropicKey", "chatConv", "chatModel"]) {
   try { localStorage.removeItem(k); } catch { /* storage blocked */ }
 }
 
+// ---------- app updates ----------
+// iOS keeps a home-screen app's page alive, so a new app.js only runs after a reload. sw.js
+// skips waiting and claims the page, so a new service worker taking over means a new app:
+// reload once. Check for one whenever the app comes back to the front and on ↻ (which also
+// compares the deployed sw.js's version with this one's, in case no worker is running).
+let swReg = null;
+function reloadOnce() {
+  try {
+    const last = Number(sessionStorage.getItem("appReloadAt") || 0);
+    if (Date.now() - last < 15000) return; // never loop
+    sessionStorage.setItem("appReloadAt", String(Date.now()));
+  } catch { /* storage blocked: the page-level flag below still guards */ }
+  if (reloadOnce.done) return;
+  reloadOnce.done = true;
+  location.reload();
+}
+function checkForUpdate() { if (swReg) swReg.update().catch(() => {}); }
+async function newerAppDeployed() {
+  try {
+    const res = await fetch("sw.js", { cache: "no-store" });
+    const m = (await res.text()).match(/soccer-model-(v\d+)/);
+    return Boolean(m && m[1] !== APP_VERSION);
+  } catch { return false; }
+}
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  // A change from no controller (the first install) has no older app to replace: no reload.
+  let controlled = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (controlled) reloadOnce();
+    controlled = true;
+  });
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").then((r) => { swReg = r; }).catch(() => {}));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
 }
 load();
 

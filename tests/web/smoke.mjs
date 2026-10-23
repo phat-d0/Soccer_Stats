@@ -10,7 +10,7 @@
 // Rebuild the fixture with: uv run python tests/web/make_fixture.py
 
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -806,6 +806,46 @@ const MODES = [
 
 const SHEET_SHOT_CSS = ".sheet{position:absolute;bottom:auto;min-height:100%} .sheet-panel{position:relative;max-height:none;margin-top:56px} body{overflow:visible!important}";
 const failures = [];
+// App updates (lead, 23 Oct): with the service worker allowed, the first install doesn't
+// reload; a new sw.js taking over reloads the page exactly once; ↻ reloads when the deployed
+// sw.js names another version.
+async function updateCheck() {
+  const swFile = join(site, "sw.js");
+  const original = readFileSync(swFile, "utf8");
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "allow" });
+  const page = await ctx.newPage();
+  let loads = 0;
+  page.on("load", () => { loads += 1; });
+  page.on("pageerror", (e) => failures.push(`update/page error: ${e.message}`));
+  try {
+    await page.goto(BASE);
+    await page.waitForSelector("button.match");
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null, null, { timeout: 15000 });
+    await page.waitForTimeout(800);
+    if (loads !== 1) failures.push(`update/first install: ${loads} loads (the first install must not reload)`);
+    // Deploy a "new" app: sw.js with another cache name, then the app's own update check.
+    writeFileSync(swFile, original.replace(/soccer-model-v\d+/, "soccer-model-v999"));
+    const reloaded = page.waitForEvent("load", { timeout: 15000 });
+    await page.evaluate(() => checkForUpdate());
+    await reloaded;
+    await page.waitForSelector("button.match");
+    await page.waitForTimeout(1500);
+    if (loads !== 2) failures.push(`update/new worker: ${loads} loads (expected exactly one reload)`);
+    // ↻ with the deployed sw.js on another version than this app.js: one reload.
+    await page.evaluate(() => sessionStorage.removeItem("appReloadAt"));
+    const again = page.waitForEvent("load", { timeout: 15000 });
+    await page.click("#refresh");
+    await again;
+    await page.waitForSelector("button.match");
+    await page.waitForTimeout(1000);
+    if (loads !== 3) failures.push(`update/refresh: ${loads} loads (expected one more reload)`);
+  } catch (err) {
+    failures.push(`update: ${String(err.message || err).split("\n")[0]}`);
+  } finally {
+    writeFileSync(swFile, original);
+    await ctx.close();
+  }
+}
 const browser = await pw.chromium.launch({ executablePath: CHROMIUM });
 try {
   if (shotsDir) mkdirSync(shotsDir, { recursive: true });
@@ -828,6 +868,10 @@ try {
     });
     await page.goto(BASE);
     await page.waitForSelector("button.match");
+    // The header names the running app version, the same as sw.js's cache name.
+    const swVersion = readFileSync(join(site, "sw.js"), "utf8").match(/soccer-model-(v\d+)/)[1];
+    const sub = await page.textContent("#updated");
+    if (!sub.endsWith(`App ${swVersion}`)) failures.push(`${mode}/load: header "${sub}" should end "App ${swVersion}"`);
     for (const [name, run, isSheet] of STEPS) {
       step = name;
       try {
@@ -859,6 +903,7 @@ try {
     }
     await ctx.close();
   }
+  await updateCheck();
 } finally {
   await browser.close();
   server.close();
