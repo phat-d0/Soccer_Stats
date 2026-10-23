@@ -665,6 +665,76 @@ def corners_rule(book: str = "pinnacle") -> dict:
     return out
 
 
+# ---------- shadow variants: a subset of a strategy's own trades (owner, 23 Oct) ----------
+
+# The below-60% filter's pre-registration commit (e0b0bcd, docs/totals.md "Shadow filter:
+# below 60%"): only trades opened at or after this time are judged.
+SHADOW_DEFINED_AT = "2026-10-23T08:39:09+00:00"
+BELOW60_MAX = 0.60
+BELOW60_NOTE = (
+    "A shadow of its track: the same trades, keeping only those where model (f) gave the "
+    "bet less than a 60% chance (given no push). No bets of its own. Judged only on trades "
+    "opened from 23 Oct 08:39 UTC, when the filter was pre-registered, on CLV against "
+    "Pinnacle's close; the cut-off was chosen after seeing the earlier trades, so those are "
+    "shown but not judged."
+)
+
+
+def chance_no_push(trade: dict) -> float | None:
+    """The chance a trade was opened on, given no push: model_p / (1 - p_push) for a
+    corner line (p_push missing = 0); model_p for anything else."""
+    p = trade.get("model_p")
+    if p is None:
+        return None
+    push = float(trade.get("p_push") or 0.0) if trade.get("market") == "team_corners" else 0.0
+    return float(p) / (1 - push) if push < 1 else None
+
+
+# Filter fields a variant can use: a name -> how to read it from a trade (anything else
+# is read as the trade's own field).
+FILTER_FIELDS = {"p_no_push": chance_no_push}
+
+
+def filter_value(trade: dict, field: str):
+    get = FILTER_FIELDS.get(field)
+    return get(trade) if get else trade.get(field)
+
+
+def passes_filter(trade: dict, flt: dict) -> bool:
+    """A variant's filter {field, min?, max?, note}: min <= value < max; a trade without
+    the value never passes."""
+    v = filter_value(trade, flt["field"])
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return False
+    if flt.get("min") is not None and v < flt["min"]:
+        return False
+    return not (flt.get("max") is not None and v >= flt["max"])
+
+
+def _below60(parent: str, label: str) -> dict:
+    return {
+        "key": f"{parent}_below60",
+        "label": f"{label}, below 60%",
+        "filter": {"field": "p_no_push", "max": BELOW60_MAX, "note": BELOW60_NOTE},
+        "defined_at": SHADOW_DEFINED_AT,
+    }
+
+
+# Shadow variants per corner strategy, shown right after their parent. Moneyline has none
+# yet; paper.with_variants takes the same shape for any strategy list.
+CORNER_VARIANTS = {k: [_below60(k, CORNER_STRATEGY_LABELS[k])] for k in CORNER_STRATEGY_ORDER}
+
+
+def variant_rule(rule: dict | None, spec: dict, parent: str) -> dict:
+    """A variant's rule: its parent's plus the filter."""
+    return {
+        **(rule or {}),
+        "variant_of": parent,
+        "filter": spec["filter"],
+        "defined_at": spec["defined_at"],
+    }
+
+
 def new_corner_trade(
     pick: dict,
     *,

@@ -30,6 +30,7 @@ import json
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from soccer_stats import calibration as cal
@@ -1065,11 +1066,7 @@ LIVE_CAL_NOTE = (
 
 def _trade_chance(t: dict) -> float | None:
     """The chance a settled trade was opened on, given no push for a corner line."""
-    p = t.get("model_p")
-    if p is None:
-        return None
-    push = float(t.get("p_push") or 0.0) if t.get("market") == "team_corners" else 0.0
-    return float(p) / (1 - push) if push < 1 else None
+    return tr.chance_no_push(t)
 
 
 def _safe_calibration(trades: list[dict]) -> dict:
@@ -1151,8 +1148,9 @@ def match_strategies(leans: dict[str, dict], rule: dict) -> list[dict]:
 def corner_strategies(trades: list[dict]) -> list[dict]:
     """Team corners -> live -> strategies: one strategy_section per book in
     tr.CORNER_STRATEGY_ORDER (Pinnacle first), each with its own rule
-    (tr.corners_rule(book)). A trade without `strategy` is Pinnacle's."""
-    return [
+    (tr.corners_rule(book)) and followed by its shadow variants (tr.CORNER_VARIANTS). A
+    trade without `strategy` is Pinnacle's."""
+    parents = [
         strategy_section(
             trades,
             k,
@@ -1162,6 +1160,139 @@ def corner_strategies(trades: list[dict]) -> list[dict]:
         )
         for k in tr.CORNER_STRATEGY_ORDER
     ]
+    return with_variants(parents, trades, tr.CORNER_VARIANTS, tr.corner_strategy_of)
+
+
+# ---------- shadow variants (owner, 23 Oct; docs/totals.md "Shadow filter: below 60%") ----------
+
+N_BOOT_VARIANT = 2000
+VARIANT_CLV = ("clv_pinnacle", "clv_dk")  # the first is the pre-registered primary
+
+
+def with_variants(
+    sections: list[dict], trades: list[dict], variants: dict[str, list[dict]], of
+) -> list[dict]:
+    """`sections` (strategy_section dicts) with each one's variants right after it. A
+    variant is computed from its parent's trades only (no ledger rows of its own); a
+    variant that fails costs only itself."""
+    out = []
+    for sec in sections:
+        out.append(sec)
+        for spec in variants.get(sec["key"]) or []:
+            try:
+                out.append(variant_section(trades, sec["key"], spec, sec.get("rule"), of))
+            except Exception as exc:  # noqa: BLE001  display only
+                out.append(
+                    {
+                        "key": spec["key"],
+                        "label": spec["label"],
+                        "variant_of": sec["key"],
+                        "filter": spec["filter"],
+                        "defined_at": spec["defined_at"],
+                        "error": type(exc).__name__,
+                    }
+                )
+    return out
+
+
+def variant_section(
+    trades: list[dict], parent: str, spec: dict, parent_rule: dict | None, of
+) -> dict:
+    """One shadow variant: strategy_section over the parent's trades that pass
+    spec["filter"] (tr.passes_filter), plus `variant_of`, `filter`, `defined_at` and
+    `since_defined` (variant_since)."""
+    mine_all = [t for t in trades if of(t) == parent]
+    kept = [t for t in mine_all if tr.passes_filter(t, spec["filter"])]
+    sec = strategy_section(
+        kept,
+        spec["key"],
+        spec["label"],
+        tr.variant_rule(parent_rule, spec, parent),
+        of=lambda _t: spec["key"],
+    )
+    sec.update(
+        variant_of=parent,
+        filter=spec["filter"],
+        defined_at=spec["defined_at"],
+        since_defined=variant_since(mine_all, kept, spec["defined_at"]),
+    )
+    return sec
+
+
+def _opened_since(t: dict, since: pd.Timestamp) -> bool:
+    try:
+        return _utc(t["opened_at"]) >= since
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def variant_since(parent: list[dict], kept: list[dict], defined_at: str) -> dict:
+    """The judged part: the parent's and the variant's trades opened at or after
+    `defined_at` (their summaries and counts), and per CLV field the matched difference
+    (clv_difference) on those trades."""
+    since = _utc(defined_at)
+    p = [t for t in parent if _opened_since(t, since)]
+    ids = {t["id"] for t in kept}
+    v = [t for t in p if t["id"] in ids]
+    return {
+        "defined_at": defined_at,
+        "parent": {"trades": len(p), "summary": portfolio_section(p)["summary"]},
+        "variant": {"trades": len(v), "summary": portfolio_section(v)["summary"]},
+        "clv_diff": {f: clv_difference(p, ids, f) for f in VARIANT_CLV},
+    }
+
+
+def _match_key(t: dict) -> str:
+    return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away"))
+
+
+def clv_difference(
+    parent: list[dict], kept_ids: set, field: str, n_boot: int = N_BOOT_VARIANT, seed: int = 0
+) -> dict:
+    """Mean `field` of the kept trades minus that of all `parent` trades, over settled
+    trades with a value (their close is final), with a 95% percentile range from
+    resampling matches (each draw recomputes both means on the same trades; a draw with no
+    kept trade is skipped). `diff` and `ci95` are None when nothing is kept."""
+    rows = [
+        (_match_key(t), float(t[field]), t["id"] in kept_ids)
+        for t in parent
+        if t.get("status") in ("won", "lost", "void") and t.get(field) is not None
+    ]
+    kept = [c for _, c, k in rows if k]
+    out = {
+        "field": field,
+        "trades": len(rows),
+        "kept": len(kept),
+        "matches": len({m for m, _, _ in rows}),
+        "mean_all": float(np.mean([c for _, c, _ in rows])) if rows else None,
+        "mean_kept": float(np.mean(kept)) if kept else None,
+        "diff": None,
+        "ci95": None,
+        "draws": 0,
+    }
+    if not kept:
+        return out
+    out["diff"] = out["mean_kept"] - out["mean_all"]
+    groups: dict[str, list[tuple[float, bool]]] = {}
+    for m, c, k in rows:
+        groups.setdefault(m, []).append((c, k))
+    keys = list(groups)
+    if len(keys) < 2:
+        return out
+    clv = [np.array([c for c, _ in groups[m]]) for m in keys]
+    kk = [np.array([k for _, k in groups[m]]) for m in keys]
+    rng = np.random.default_rng(seed)
+    diffs = []
+    for _ in range(n_boot):
+        pick = rng.integers(0, len(keys), len(keys))
+        c = np.concatenate([clv[i] for i in pick])
+        k = np.concatenate([kk[i] for i in pick])
+        if k.any():
+            diffs.append(c[k].mean() - c.mean())
+    if diffs:
+        out["ci95"] = [float(np.quantile(diffs, 0.025)), float(np.quantile(diffs, 0.975))]
+        out["draws"] = len(diffs)
+    return out
 
 
 def portfolios_section(
