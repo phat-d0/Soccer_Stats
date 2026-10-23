@@ -391,12 +391,60 @@ const STEPS = [
     // The strategy list: Lean's row carries its own settled record, 12% its own.
     const leanRow = await p.locator('button[data-pfstrat="lean"]').innerText();
     if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow)) throw new Error(`Lean row: ${leanRow}`);
-    // Profit over time: three settled days for Lean; tapping the first fills the readout.
-    await p.locator(".chart.curve [data-cv='0']").dispatchEvent("click");
+    // Profit over time: before any pointer, the readout is the latest settled day.
     const readout = await p.textContent("#cv-readout");
-    if (!readout.includes("running total")) throw new Error(`curve readout: ${readout}`);
+    const latest = await p.evaluate(() => plain(curveReadout(scrubCharts.cv.data.at(-1))));
+    if (readout !== latest || !readout.includes("to date")) throw new Error(`curve readout: ${readout}`);
     const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
     if (!avg.endsWith("σ")) throw new Error(`Lean avg edge should be in σ: ${avg}`);
+  }],
+  // The profit chart scrubs (owner, 23 Oct): point (laptop), press and drag, drag a finger
+  // (phone) or use the arrow keys; the readout shows that day's date, total and trades.
+  ["portfolio-live-scrub", async (p) => {
+    const svg = p.locator("[data-scrub='cv'] svg");
+    await svg.scrollIntoViewIfNeeded();
+    const box = await svg.boundingBox();
+    const y = box.y + box.height / 2;
+    const expected = () => p.evaluate(() => ({ at: scrubCharts.cv.at, text: plain(curveReadout(scrubCharts.cv.data[scrubCharts.cv.at])), cum: usd(scrubCharts.cv.data[scrubCharts.cv.at].cum, 2), n: scrubCharts.cv.data.length }));
+    const check = async (what) => {
+      const e = await expected();
+      const r = await p.textContent("#cv-readout");
+      if (r !== e.text || !r.includes(`${e.cum} to date`)) throw new Error(`${what}: readout "${r}" vs day ${e.at} "${e.text}"`);
+      if (await p.locator("[data-scrub='cv'] .cursor").evaluate((el) => el.style.display) === "none") throw new Error(`${what}: no cursor`);
+      return e;
+    };
+    // Pointing (no button) at the left edge snaps to the first settled day.
+    await p.mouse.move(box.x + 2, y);
+    await p.mouse.move(box.x + box.width * 0.2, y, { steps: 4 });
+    const a = await check("hover left");
+    if (a.at !== 0) throw new Error(`hover left should be day 0, got ${a.at}`);
+    // Press and drag to the right edge: the latest day; release keeps it.
+    await p.mouse.down();
+    await p.mouse.move(box.x + box.width - 2, y, { steps: 8 });
+    await p.mouse.up();
+    const b = await check("drag right");
+    if (b.at !== b.n - 1) throw new Error(`drag right should reach the last day, got ${b.at}`);
+    // A finger drag (touch pointer events) from the right back to the middle.
+    const sel = "[data-scrub='cv'] svg";
+    await p.locator(sel).dispatchEvent("pointerdown", { pointerType: "touch", pointerId: 7, clientX: box.x + box.width - 2, clientY: y, bubbles: true });
+    await p.locator(sel).dispatchEvent("pointermove", { pointerType: "touch", pointerId: 7, clientX: box.x + box.width * 0.5, clientY: y, bubbles: true });
+    const c = await check("touch drag");
+    await p.locator(sel).dispatchEvent("pointerup", { pointerType: "touch", pointerId: 7, bubbles: true });
+    if (c.at === b.at && c.n > 2) throw new Error("touch drag didn't move the cursor");
+    // A finger that isn't pressed doesn't scrub.
+    await p.locator(sel).dispatchEvent("pointermove", { pointerType: "touch", pointerId: 8, clientX: box.x + 2, clientY: y, bubbles: true });
+    if ((await expected()).at !== c.at) throw new Error("an unpressed finger moved the cursor");
+    // Keyboard: focus, then the left arrow steps one day back.
+    await p.locator("[data-scrub='cv']").focus();
+    await p.keyboard.press("ArrowLeft");
+    const d = await check("arrow left");
+    if (d.at !== Math.max(0, c.at - 1)) throw new Error(`arrow left: ${c.at} → ${d.at}`);
+    // Vertical page scroll isn't blocked over the chart.
+    if ((await svg.evaluate((el) => getComputedStyle(el).touchAction)) !== "pan-y") throw new Error("the chart must keep touch-action: pan-y");
+    const before = await p.evaluate(() => window.scrollY);
+    await p.mouse.move(box.x + box.width / 2, y);
+    await p.mouse.wheel(0, 400);
+    await p.waitForFunction((y0) => window.scrollY !== y0, before, { timeout: 3000 });
   }],
   ["portfolio-live-lean-trade", async (p) => {
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
@@ -697,8 +745,17 @@ const STEPS = [
     for (const w of ["Team corners model (f)", "Lined up with results: every logged line", "Pinnacle's fair price", "Lined up with results: live paper trades"]) {
       if (!text.includes(w)) throw new Error(`corners model view lacks "${w}"`);
     }
-    await p.click('.rc-row[data-rc="quotes-pinnacle"][data-rcrow="0"]');
-    if (!(await p.textContent("#rc-readout-quotes-pinnacle")).includes("lines")) throw new Error("quote readout");
+    for (const w of ["Model (f)'s shape, Premier League", "Over 4.5", "Model (f)"]) if (!text.includes(w)) throw new Error(`corners model view lacks "${w}"`);
+    if (!(await p.locator("#view .rel-chart").count())) throw new Error("corners diagonal reliability chart");
+    await p.locator('[data-rc="qrel-pinnacle"][data-rcpt="0"]').dispatchEvent("click");
+    if (!(await p.textContent("#rc-readout-qrel-pinnacle")).includes("lines")) throw new Error("quote readout");
+    // The shape chart scrubs too: pointing near the left edge reads about 2 expected corners.
+    const shape = p.locator("[data-scrub='cshape-E0'] svg");
+    await shape.scrollIntoViewIfNeeded();
+    const sb = await shape.boundingBox();
+    await p.mouse.move(sb.x + sb.width * 0.15, sb.y + sb.height / 2, { steps: 3 });
+    const sr = await p.textContent("#rc-readout-cshape-E0");
+    if (!/^Expected [0-9.]+ corners: over 3\.5 \d+%, over 4\.5 \d+%, over 5\.5 \d+%\.$/.test(sr)) throw new Error(`corner shape readout: ${sr}`);
   }],
   ["portfolio-corners-model-dk", async (p) => {
     await p.click('button[data-pfstrat="draftkings"]'); await p.click('.chip[data-league="E0"]');

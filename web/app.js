@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v48";
+const APP_VERSION = "v49";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2825,8 +2825,62 @@ function shapeChart(lg) {
     </div>
     <p class="note">Drawn for the home side, with the draw and away sharing the rest of the chance 45 : 55 (the model's split too). Above the diagonal the blend rates the home side higher than the market. ${coef.b > 1.02 ? `With b = ${num2(coef.b)} above 1 the solid line bends away from the diagonal: favourites get a little likelier and long shots a little less likely, whatever the model says.` : `With b = ${num2(coef.b)} the solid line stays close to the diagonal.`} The gap between the dashed lines is all the model can move it${isNum(coef.c) ? ` (c = ${sgn2(coef.c)})` : ""}.${lg ? "" : " Choose a competition above to see its own fit."}</p>`;
 }
+// Model (f)'s shape: the chance a team goes over 3.5, 4.5 and 5.5 corners against its
+// expected corners, from NB2 with the league's home dispersion (alpha_home). Scrubbable.
+function nbOver(mean, alpha, line) {
+  const k = Math.floor(line); // P(X > line) = 1 - P(X <= k)
+  let pmf, cdf = 0;
+  if (!(alpha > 1e-6)) {
+    pmf = Math.exp(-mean);
+    for (let j = 0; j <= k; j++) { cdf += pmf; pmf *= mean / (j + 1); }
+  } else {
+    const r = 1 / alpha, q = r / (r + mean);
+    pmf = Math.pow(q, r);
+    for (let j = 0; j <= k; j++) { cdf += pmf; pmf *= ((j + r) / (j + 1)) * (1 - q); }
+  }
+  return Math.max(0, Math.min(1, 1 - cdf));
+}
+const CORNER_LINES = [3.5, 4.5, 5.5];
+function cornerShapeChart(lg) {
+  const code = lg || "E0";
+  const f = state.data.portfolio?.models?.corners_f?.leagues?.[code];
+  if (!f || f.error) return `<p class="note">No model (f) fit for ${esc(leagueName(code))}, so there is no shape to draw.</p>`;
+  const alpha = isNum(f.alpha_home) ? f.alpha_home : 0;
+  const W = 320, H = 230, L = 38, R = 12, T = 10, B = 30, X0 = 2, X1 = 9;
+  const sx = (m) => L + ((m - X0) / (X1 - X0)) * (W - L - R), sy = (v) => T + (1 - v) * (H - T - B);
+  const ms = Array.from({ length: 57 }, (_, i) => X0 + i * 0.125);
+  const curve = (line) => ms.map((m, i) => `${i ? "L" : "M"}${sx(m).toFixed(1)},${sy(nbOver(m, alpha, line)).toFixed(1)}`).join(" ");
+  const yt = [0, 0.25, 0.5, 0.75, 1], xt = [2, 3, 4, 5, 6, 7, 8, 9];
+  const grid = yt.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text>`).join("")
+    + xt.map((m) => `<text x="${sx(m)}" y="${H - 14}" text-anchor="middle">${m}</text>`).join("");
+  const steps = Array.from({ length: 29 }, (_, i) => X0 + i * 0.25);
+  const id = `cshape-${code}`;
+  scrubCharts[id] = {
+    readoutId: `rc-readout-${id}`,
+    xs: steps.map(sx),
+    points: (i) => CORNER_LINES.map((line) => ({ x: sx(steps[i]), y: sy(nbOver(steps[i], alpha, line)) })),
+    readout: (i) => `<b>Expected ${steps[i].toFixed(2)} corners</b>: over 3.5 ${pct(nbOver(steps[i], alpha, 3.5))}, over 4.5 ${pct(nbOver(steps[i], alpha, 4.5))}, over 5.5 ${pct(nbOver(steps[i], alpha, 5.5))}.`,
+  };
+  const mid = isNum(f.mean_home) ? f.mean_home : 5;
+  const at = (line) => pct(nbOver(mid, alpha, line));
+  return `
+    <div class="section-title">Model (f)'s shape${lg ? "" : ", Premier League"}</div>
+    <div class="chart curve shape-chart cshape scrub" ${scrubAttrs(id, steps.length, "Model (f)'s shape: drag or use the arrow keys")}>
+      <div class="eb-legend"><span><i class="ln-key l35"></i>Over 3.5</span><span><i class="ln-key l45"></i>Over 4.5</span><span><i class="ln-key l55"></i>Over 5.5</span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance of over 3.5, 4.5 and 5.5 corners against expected corners">
+        <g class="grid">${grid}</g>
+        ${CORNER_LINES.map((line, k) => `<path class="shape l${k}" d="${curve(line)}"/>`).join("")}
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        ${CORNER_LINES.map((_, k) => `<circle class="cdot l${k}" r="4" cx="0" cy="0" style="display:none"/>`).join("")}
+        <rect class="scrub-pad" x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent"/>
+        <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Team's expected corners</text>
+      </svg>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">At the league's average for a home side (${num2(mid, 1)} corners): over 3.5 ${at(3.5)}, over 4.5 ${at(4.5)}, over 5.5 ${at(5.5)}. Drag along the chart for other teams.</div>
+    </div>
+    <p class="note">Each curve is the chance a team's corners go over that line, given how many it is expected to take (its for-ratio times the opponent's against-ratio times the league average). Drawn with the home side's spread (NB2 α ${num2(alpha, 3)}${isNum(f.alpha_away) ? `; away α ${num2(f.alpha_away, 3)}` : ""}): the bigger α, the flatter the curves, so the model is less sure either way. The curves are steepest where expected corners sit near the line, so a small change in a team's rating moves the chance most there.${lg ? "" : " Choose a competition above to see its own fit."}</p>`;
+}
 // (a) Reliability over every outcome: x = the series' chance, y = how often it happened.
-function reliabilityChart(id, all) {
+function reliabilityChart(id, all, names = SERIES_NAME, unit = "outcomes") {
   const series = ["model", "blend", "price"].filter((k) => all?.[k]?.bins?.length);
   if (!series.length) return "";
   const pts = series.flatMap((k) => all[k].bins.map((b) => ({ k, b })));
@@ -2838,7 +2892,7 @@ function reliabilityChart(id, all) {
   for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v);
   const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text><text x="${sx(v)}" y="${H - 14}" text-anchor="middle">${pct(v)}</text>`).join("");
   rcCharts[id] = pts.map(({ k, b }) => ({
-    readout: `<b>${SERIES_NAME[k]}, chances ${pctRange(b.lo, b.hi)}</b>: ${num(b.n)} outcomes, it said ${pct(b.predicted, 1)} on average, they happened ${pct(b.realized, 1)} of the time${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 1)} to ${pct(b.realized_hi, 1)})` : ""}.`,
+    readout: `<b>${names[k]}, chances ${pctRange(b.lo, b.hi)}</b>: ${num(b.n)} ${unit}, it said ${pct(b.predicted, 1)} on average, they happened ${pct(b.realized, 1)} of the time${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 1)} to ${pct(b.realized_hi, 1)})` : ""}.`,
   }));
   const marks = pts.map(({ k, b }, i) => {
     const x = sx(b.predicted), y = sy(b.realized);
@@ -2849,16 +2903,16 @@ function reliabilityChart(id, all) {
   const s = all[series[0]];
   return `
     <div class="chart curve rel-chart">
-      <div class="eb-legend">${series.map((k) => `<span><i class="rel-key ${k}"></i>${SERIES_NAME[k]}</span>`).join("")}<span><i class="ln-key diag"></i>Perfect</span></div>
+      <div class="eb-legend">${series.map((k) => `<span><i class="rel-key ${k}"></i>${names[k]}</span>`).join("")}<span><i class="ln-key diag"></i>Perfect</span></div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Predicted chance against how often it happened">
         <g class="grid">${grid}</g>
         <line class="diag" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(top)}" y2="${sy(top)}"/>
         ${marks}
         <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Predicted chance</text>
       </svg>
-      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${num(s.n)} outcomes. Tap a point for its numbers.</div>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${num(s.n)} ${unit}. Tap a point for its numbers.</div>
     </div>
-    <ul class="slopes">${series.map((k) => `<li><b>${SERIES_NAME[k]}</b>: ${slopeWords(all[k])}. Brier ${num2(all[k].brier, 4)}, log loss ${num2(all[k].log_loss, 4)}.</li>`).join("")}</ul>`;
+    <ul class="slopes">${series.map((k) => `<li><b>${names[k]}</b>: ${slopeWords(all[k])}. Brier ${num2(all[k].brier, 4)}, log loss ${num2(all[k].log_loss, 4)}.</li>`).join("")}</ul>`;
 }
 // (b)–(d) Per bin of the predicted chance: what it said (ring), the price's break-even
 // (tick) and how often it won (dot with its range; blue when it won at least as often as
@@ -2940,10 +2994,11 @@ function modelViewHtml(cur, x, lg) {
     const quotes = !qc ? `<p class="note">The corner quotes' calibration isn't in this update.</p>`
       : qc.error ? `<p class="note">The corner quotes' calibration couldn't be worked out this time (${esc(qc.error)}).</p>`
       : !q || !q.settled ? `<p class="note">No settled ${BOOK_POSS[x.key] || ""} corner lines yet.</p>`
-      : `${binRowsChart(`quotes-${x.key}`, q.model, "lines")}
-        <ul class="slopes"><li><b>Model (f)</b>: ${slopeWords(q.model)}. Brier ${num2(q.model?.brier, 4)}.</li><li><b>${esc(BOOK_POSS[x.key])} fair price</b>: ${slopeWords(q.price)}. Brier ${num2(q.price?.brier, 4)}.</li></ul>
-        <p class="note">Every half line ${esc(BOOK_NAME[x.key])} quoted before kickoff (its newest quote per team line), ${num(q.settled)} settled over ${num(q.matches)} matches${q.unsettled ? `, ${num(q.unsettled)} still waiting for a result` : ""}${q.whole_lines ? `; ${num(q.whole_lines)} whole lines left out (they can push)` : ""}. Ring = model (f)'s chance of the over, tick = ${esc(BOOK_POSS[x.key])} margin-free chance, dot = how often the over won. Every competition together.</p>${howFold(qc.note)}`;
+      : `${reliabilityChart(`qrel-${x.key}`, { model: q.model, price: q.price }, { model: "Model (f)", price: `${BOOK_POSS[x.key]} fair price` }, "lines")}
+        <details class="fold mk-fold"><summary>Per bin, with the price beside the model</summary>${binRowsChart(`quotes-${x.key}`, q.model, "lines")}</details>
+        <p class="note">Every half line ${esc(BOOK_NAME[x.key])} quoted before kickoff (its newest quote per team line), ${num(q.settled)} settled over ${num(q.matches)} matches${q.unsettled ? `, ${num(q.unsettled)} still waiting for a result` : ""}${q.whole_lines ? `; ${num(q.whole_lines)} whole lines left out (they can push)` : ""}. Each mark groups lines by the chance it gave the over, against how often the over won: ring = model (f), tick = ${esc(BOOK_POSS[x.key])} margin-free price; on the dashed diagonal is right. Every competition together.</p>${howFold(qc.note)}`;
     results = `
+      ${cornerShapeChart(lg)}
       <div class="section-title">Lined up with results: every logged line</div>${quotes}
       <div class="section-title">Lined up with results: live paper trades</div>
       ${liveCalHtml(`live-${x.key}-${lg || "all"}`, x.st?.calibration, lg, "trades")}`;
@@ -3105,19 +3160,61 @@ function settledCurve(trades) {
   for (const t of trades) {
     if (!["won", "lost", "void"].includes(t.status) || t.profit == null) continue;
     const d = String(t.settled_at || t.kickoff).slice(0, 10);
-    const g = days.get(d) || { date: d, profit: 0, n: 0 };
-    g.profit += t.profit; g.n += 1;
+    const g = days.get(d) || { date: d, profit: 0, n: 0, won: 0, lost: 0, void: 0 };
+    g.profit += t.profit; g.n += 1; g[t.status] += 1;
     days.set(d, g);
   }
   let cum = 0;
   return [...days.values()].sort((a, b) => a.date.localeCompare(b.date)).map((g) => ({ ...g, cum: (cum += g.profit) }));
 }
-let curveData = null;
-const curveReadout = (c) => `<b>${esc(new Date(`${c.date}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }))}</b>: ${c.n} trade${c.n > 1 ? "s" : ""} settled, ${usd(c.profit, 2)} that day · running total ${usd(c.cum, 2)}`;
-// The baseball app's profit chart: $0 line, the end label, each settled day a tappable
-// point whose numbers go in the readout line under the chart (no hover tooltips).
+// ---------- Scrubbable charts (owner, 23 Oct): point, drag or use the arrow keys ----------
+// A chart wrapper with data-scrub="<id>" holds an SVG with one `.cursor` line and `.cdot`
+// circles; scrubCharts[id] = {xs (SVG x per point), points(i) → [{x, y}] for the dots,
+// readout(i) → HTML for the readout line (readoutId), at}. Pointer moves snap to the
+// nearest point; a mouse scrubs on hover, a finger while pressed (the SVG keeps
+// touch-action: pan-y, so vertical swipes still scroll the page); release keeps the spot.
+const scrubCharts = {};
+const plain = (html) => html.replace(/<[^>]+>/g, "");
+function scrubTo(wrap, i) {
+  const sc = scrubCharts[wrap.dataset.scrub];
+  if (!sc || !sc.xs.length) return;
+  i = Math.max(0, Math.min(sc.xs.length - 1, i));
+  sc.at = i;
+  const svg = wrap.querySelector("svg");
+  const cur = svg?.querySelector(".cursor");
+  if (cur) { cur.setAttribute("x1", sc.xs[i]); cur.setAttribute("x2", sc.xs[i]); cur.style.display = ""; }
+  const pts = sc.points(i);
+  svg?.querySelectorAll(".cdot").forEach((d, k) => {
+    if (!pts[k]) { d.style.display = "none"; return; }
+    d.setAttribute("cx", pts[k].x); d.setAttribute("cy", pts[k].y); d.style.display = "";
+  });
+  const html = sc.readout(i);
+  const el = document.getElementById(sc.readoutId);
+  if (el) el.innerHTML = html;
+  wrap.setAttribute("aria-valuenow", String(i));
+  wrap.setAttribute("aria-valuetext", plain(html));
+}
+function scrubIndex(wrap, clientX) {
+  const sc = scrubCharts[wrap.dataset.scrub];
+  const svg = wrap.querySelector("svg");
+  if (!sc || !svg) return 0;
+  const r = svg.getBoundingClientRect();
+  const x = ((clientX - r.left) / (r.width || 1)) * svg.viewBox.baseVal.width;
+  let best = 0;
+  sc.xs.forEach((v, i) => { if (Math.abs(v - x) < Math.abs(sc.xs[best] - x)) best = i; });
+  return best;
+}
+const scrubAttrs = (id, n, label) => `data-scrub="${id}" tabindex="0" role="slider" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="${n - 1}" aria-valuenow="${n - 1}"`;
+
+const dayName = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+// "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)".
+function curveReadout(c) {
+  const rec = `${c.won ?? 0}–${c.lost ?? 0}${c.void ? `, ${c.void} void` : ""}`;
+  return `<b>${esc(dayName(c.date))}</b> · <b class="${signCls(c.cum)}">${usd(c.cum, 2)}</b> to date · that day ${usd(c.profit, 2)} on ${c.n} trade${c.n > 1 ? "s" : ""} (${rec})`;
+}
+// The baseball app's profit chart: $0 line and the end label. Point at it (laptop) or drag
+// a finger across it (phone) to trace the running total; the readout line follows.
 function curveChart(curve) {
-  curveData = curve;
   if (!curve.length) return "";
   const pts = [{ cum: 0 }, ...curve];
   const W = 320, H = 170, L = 44, R = 52, T = 12, B = 22;
@@ -3131,9 +3228,16 @@ function curveChart(curve) {
   const path = pts.map((c, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ");
   const last = pts.length - 1, end = pts[last].cum;
   const neg = end < 0 ? " neg" : "";
-  const dots = curve.map((c, i) => `<circle class="pt${neg}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="3"/><circle class="hit" data-cv="${i}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="13" fill="transparent"/>`).join("");
+  const dots = curve.map((c, i) => `<circle class="pt${neg}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="3"/>`).join("");
+  scrubCharts.cv = {
+    readoutId: "cv-readout",
+    xs: curve.map((_, i) => sx(i + 1)),
+    points: (i) => [{ x: sx(i + 1), y: sy(curve[i].cum) }],
+    readout: (i) => curveReadout(curve[i]),
+    data: curve,
+  };
   return `
-    <div class="chart curve">
+    <div class="chart curve scrub" ${scrubAttrs("cv", curve.length, "Profit over time: drag or use the arrow keys to move along the line")}>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${usd(end, 2)} so far">
         <g class="grid">${grid}</g>
         <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
@@ -3144,6 +3248,9 @@ function curveChart(curve) {
         <text class="end ${end > 0 ? "pos" : end < 0 ? "neg" : ""}" x="${sx(last) + 8}" y="${sy(end) + 4}">${usd(end, Math.abs(end) < 10 ? 2 : 0)}</text>
         <text class="xlab" x="${L}" y="${H - 6}">start</text>
         <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${curve[curve.length - 1].date}T12:00:00Z`))}</text>
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        <circle class="cdot${neg}" r="5" cx="0" cy="0" style="display:none"/>
+        <rect class="scrub-pad" x="${L - 8}" y="0" width="${W - L - R + 16}" height="${H}" fill="transparent"/>
       </svg>
       <div class="eb-readout" id="cv-readout" aria-live="polite">${curveReadout(curve[curve.length - 1])}</div>
     </div>`;
@@ -3438,13 +3545,6 @@ function setUpdated() {
 
 // ---------- events ----------
 document.addEventListener("click", (ev) => {
-  const cv = ev.target.closest?.("[data-cv]");
-  if (cv && curveData) { // Portfolio profit chart: the tapped day's numbers in the readout line
-    const el = document.getElementById("cv-readout");
-    const c = curveData[Number(cv.dataset.cv)];
-    if (el && c) el.innerHTML = curveReadout(c);
-    return;
-  }
   const rp = ev.target.closest?.("[data-rcpt]");
   if (rp) { // Model view charts: the tapped point's numbers in the readout line
     const el = document.getElementById(`rc-readout-${rp.dataset.rc}`);
@@ -3628,3 +3728,31 @@ if ("serviceWorker" in navigator) {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
 }
 load();
+
+// Scrubbable charts: a mouse scrubs on hover, a finger or pen while pressed; release keeps
+// the spot; arrow keys (and Home/End) step when the chart has focus.
+document.addEventListener("pointerdown", (ev) => {
+  const w = ev.target.closest?.("[data-scrub]");
+  if (!w) return;
+  w.dataset.drag = "1";
+  scrubTo(w, scrubIndex(w, ev.clientX));
+});
+document.addEventListener("pointermove", (ev) => {
+  const w = ev.target.closest?.("[data-scrub]");
+  if (!w || (ev.pointerType !== "mouse" && !w.dataset.drag)) return;
+  scrubTo(w, scrubIndex(w, ev.clientX));
+});
+const endDrag = () => document.querySelectorAll("[data-scrub][data-drag]").forEach((w) => delete w.dataset.drag);
+document.addEventListener("pointerup", endDrag);
+document.addEventListener("pointercancel", endDrag);
+document.addEventListener("keydown", (ev) => {
+  const w = document.activeElement?.closest?.("[data-scrub]");
+  if (!w) return;
+  const sc = scrubCharts[w.dataset.scrub];
+  if (!sc) return;
+  const at = sc.at ?? sc.xs.length - 1;
+  const to = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: sc.xs.length - 1 }[ev.key];
+  if (to === undefined) return;
+  ev.preventDefault();
+  scrubTo(w, to);
+});
