@@ -1162,6 +1162,8 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
     for code, r in out["leagues"].items():
         _print_calibration(code, r.get("calibration"))
     _print_calibration("early-price leagues pooled", out["all"].get("calibration"))
+    _print_bands("early-price leagues pooled", out["all"])
+    print("LEAN_BANDS_JSON " + json_dumps(_bands_brief(out)))
     print(
         "LEAN_CALIBRATION_JSON "
         + json_dumps(
@@ -1221,6 +1223,64 @@ def _print_edge12(name: str, rep: dict) -> None:
     _print_edge12_block("Model 12%", rep.get("edge12") or {})
     for s in rep.get("by_season") or []:
         _print_edge12_block(s["label"], s)
+
+
+def _print_bands(label: str, block: dict) -> None:
+    """The pooled odds, claimed-edge and CLV bands (bands.py), one line per band."""
+
+    def rng(r):
+        return _fmt_range(r) if r and None not in r else "n/a"
+
+    def edge(x):
+        return "?" if x is None else f"{x:.1%}"
+
+    print(f"  Bands, {label}:")
+    for b in block.get("by_odds_band") or []:
+        lo, hi = b["lo"], b["hi"]
+        if lo is None:
+            name = f"<= {hi:.2f}"
+        elif hi is None:
+            name = f"> {lo:.2f}"
+        else:
+            name = f"{lo:.2f}-{hi:.2f}"
+        if not b["bets"]:
+            print(f"    odds {name}: 0 bets")
+            continue
+        clv = "n/a" if b.get("clv") is None else f"{b['clv']:+.1%}"
+        print(
+            f"    odds {name}: {b['bets']} bets ({b['share']:.0%}), won {b['win_rate']:.1%} vs "
+            f"{b['breakeven']:.1%}, ROI {b['roi']:+.1%} ({rng(b.get('roi_ci95'))}), CLV {clv} "
+            f"({rng(b.get('clv_ci95'))})"
+        )
+    for b in block.get("by_edge_band") or []:
+        if not b["bets"]:
+            continue
+        clv = "n/a" if b.get("clv") is None else f"{b['clv']:+.1%}"
+        z = f", z {b['z']:.2f}" if b.get("z") is not None else ""
+        print(
+            f"    claimed {edge(b['lo'])}-{edge(b['hi'])}: {b['bets']} bets, claimed "
+            f"{b['claimed']:+.1%}{z}, CLV {clv} ({rng(b.get('clv_ci95'))}), ROI "
+            f"{b['roi']:+.1%} ({rng(b.get('roi_ci95'))})"
+        )
+    for b in block.get("by_clv_band") or []:
+        if not b["bets"]:
+            continue
+        print(
+            f"    CLV {edge(b['lo'])}-{edge(b['hi'])}: {b['bets']} bets, CLV {b['clv']:+.1%}, "
+            f"ROI {b['roi']:+.1%} ({rng(b.get('roi_ci95'))})"
+        )
+
+
+def _bands_brief(out: dict) -> dict:
+    """The pooled band blocks (and the Champions League's) for the BANDS_JSON log line;
+    every league's are in the saved file."""
+    keys = ("by_odds_band", "by_edge_band", "by_clv_band")
+    ucl = out["leagues"].get("UCL") or {}
+    return {
+        "bands": {k: v for k, v in (out.get("bands") or {}).items() if k != "note"},
+        "all": {k: out["all"].get(k) for k in keys},
+        **({"UCL": {k: ucl.get(k) for k in keys}} if "by_odds_band" in ucl else {}),
+    }
 
 
 def _print_calibration(label: str, calib: dict | None) -> None:
@@ -1302,6 +1362,10 @@ def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     for code, r in out["leagues"].items():
         _print_calibration(code, r.get("calibration"))
     _print_calibration("early-price leagues pooled", out["all"].get("calibration"))
+    _print_bands("early-price leagues pooled", out["all"])
+    if "by_odds_band" in out["leagues"].get("UCL", {}):
+        _print_bands("Champions League at the close", out["leagues"]["UCL"])
+    print("EDGE12_BANDS_JSON " + json_dumps(_bands_brief(out)))
     dk = out["draftkings_replay"]
     if dk:
         sm = dk["summary"]

@@ -29,6 +29,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from soccer_stats import bands as bd
 from soccer_stats import calibration as cal
 from soccer_stats import match_calibration as mc
 from soccer_stats import trades as tr
@@ -520,6 +521,8 @@ def build(
     rows = compact(pd.concat(every, ignore_index=True)) if every else []
     by_league = {code: summary(b)["lean"] for code, b in early}
     calib = pooled_calibration(reports, pooled, SERIES, "p_bet", [c for c, _ in early])
+    claimed = {code: bd.with_claimed(b, "p_bet") for code, b in zip(reports, all_bets, strict=True)}
+    band_cuts = bd.cuts(bd.with_claimed(pooled, "p_bet"))
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "kind": "lean_backtest",
@@ -542,12 +545,18 @@ def build(
             "the fitted blend (c = 0, a and b kept as fitted, no refit); model = only with it",
             "driver_note": tr.DRIVER_NOTE,
         },
+        "bands": bd.header(band_cuts, "p_bet x odds - 1 (the blend's edge); z beside it"),
         "leagues": {
-            code: {"name": (names or {}).get(code, code), **saved(rep)}
+            code: {
+                "name": (names or {}).get(code, code),
+                **saved(rep),
+                **({} if rep.get("error") else bd.blocks(claimed[code], band_cuts, ("z",))),
+            }
             for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
+            **bd.blocks(bd.with_claimed(pooled, "p_bet"), band_cuts, ("z",)),
             "calibration": calib,
             "leagues": [code for code, _ in early],
             "by_league": by_league,

@@ -235,6 +235,17 @@ the owner's baseball app, so the balance can drop without any run here.
   each report under `lb.OUTCOMES` for the pooled view and are never saved (`lb.saved`). Log lines
   `LEAN_CALIBRATION_JSON` / `EDGE12_CALIBRATION_JSON` (n, slope and range, Brier, log loss per
   series; the bets' predicted, implied, won).
+- Bands in both files (owner via the Research lab, 23 Oct; `bands.py`): every league entry
+  (UCL included, not `{error}` ones) and `all` carry `by_odds_band` (`ODDS_BANDS` ≤1.50,
+  1.50–2.00, 2.00–3.00, 3.00–5.00, >5.00, lo < odds ≤ hi; empty bands kept as `bets: 0`;
+  `{lo, hi, bets, share, wins, win_rate, breakeven, roi, roi_ci95, clv, clv_ci95}`),
+  `by_edge_band` (five bands of the claimed edge, `claimed` = chance × odds − 1: `model_p` for
+  Model 12%, `p_bet` for Lean, which adds the mean `z`; the band dict adds `claimed`) and
+  `by_clv_band` (five CLV bands with their ROI). Edge and CLV cuts are the pooled domestic bets'
+  quintiles, computed once in `build` and applied to every league; the file's top-level `bands`
+  = `{odds_bands, edge_cuts, clv_cuts, edge_from, note}`. Every bet counts (not the trimmed
+  rows); ranges resample matches (`boot_mean`, 2,000 draws). Log lines `LEAN_BANDS_JSON` /
+  `EDGE12_BANDS_JSON` (pooled and UCL). `app_section` passes them through.
 - `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None)` =
   `{n, wins, predicted, implied?, realized, brier, log_loss, intercept, intercept_ci95, slope,
   slope_ci95, bins: [{lo, hi, n, wins, predicted, implied?, realized, realized_lo, realized_hi}]}`.
