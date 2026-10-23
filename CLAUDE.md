@@ -510,7 +510,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v51) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v52) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -587,23 +587,35 @@ the owner's baseball app, so the balance can drop without any run here.
   3.5 / 4.5 / 5.5 corners against the team's expected corners, 2 to 9, NB2 via `nbOver` with the
   league's `alpha_home`; under All the Premier League's fit) and the diagonal reliability chart
   over every logged half line (model (f) ring, the book's fair price tick), with the per-bin rows
-  folded below it. Taps fill a readout line (`data-rcpt` on SVG points, `data-rcrow` on rows;
-  `rcCharts`). Missing blocks or `error` give a plain note; the data files' own notes are
+  folded below it. Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
-- **Scrubbable charts** (owner, 23 Oct): a wrapper with `data-scrub="<id>"` (role slider,
-  focusable) around an SVG with a `.cursor` line and `.cdot` circles; `scrubCharts[id]` =
-  `{xs, points(i), readout(i), readoutId, at}`. Delegated pointer events snap to the nearest
-  point (`scrubIndex`, `scrubTo`): a mouse scrubs on hover, a finger or pen while pressed, release
-  keeps the spot; Left/Right/Home/End step when focused. Chart SVGs keep `touch-action: pan-y`,
-  so vertical swipes still scroll the page. No tooltips: the readout line follows. Used by
-  "Profit over time" (`curveChart`, id `cv`; `settledCurve` days carry won/lost/void; readout
-  "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)", the latest day by
-  default). Its $0 origin is a stop too (owner, 23 Oct), labelled with the first trade opened
-  (`firstOpened`; readout "Thu, Oct 9 · first trade opened · …"), in `curveChart` and
-  `overlayCurveChart`; the hit area (`scrubPad`) spans the whole SVG, so a pointer past
-  either end selects that end
-  and the corners shape chart (`cshape-<code>`).
+- **Scrubbable charts** (owner, 23 Oct; every chart since v52): a wrapper with
+  `data-scrub="<id>"` (role slider, focusable, `touch-action: pan-y` so vertical swipes still
+  scroll the page); `scrubCharts[id]` = `{n?, readout(i), readoutId, at}` plus how a pointer
+  finds a stop: `xs` (nearest by x; `points(i)` place the `.cdot` circles and the `.cursor`
+  line follows), `pick(x, y)` (point charts, SVG units) or `rows: true` (the `[data-stop]`
+  element nearest the pointer's height; Up/Down step too). Any `[data-stop="i"]` element gets
+  `.sel` while stop i is on. Delegated pointer events (`scrubIndex`, `scrubTo`; the readout and
+  legend inside a wrapper are ignored): a mouse scrubs on hover, a finger or pen while pressed,
+  release keeps the spot; Left/Right/Home/End step when focused. No tooltips: the readout line
+  follows. The hit area (`scrubPad`) spans the whole SVG, so a pointer past either end selects
+  that end. Charts:
+  - line (`xs`): "Profit over time" (`curveChart`, id `cv`; `settledCurve` days carry
+    won/lost/void; readout "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)",
+    the latest day by default; its $0 origin is a stop too, labelled with the first trade
+    opened, `firstOpened`, readout "Thu, Oct 9 · first trade opened · …"), `overlayCurveChart`
+    (same id), Record's running profit (`profitChart`, id `pc`, readout under the chart), the
+    blend's shape (`shape-<code>`, 1-point steps 4–94%, a dot on each of the three curves) and
+    model (f)'s shape (`cshape-<code>`);
+  - point (`pick`): `reliabilityChart` (`rel-…`, `qrel-<book>`): one stop per bin of chances
+    holding every series' point, nearest by x then distance, all series' marks highlighted and
+    compared in one readout;
+  - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, Record → Goals &
+    corners), `binRowsChart` (bets and live trades), `edgeBucketsHtml` (`eb-<pfId>`) and the
+    Teams players chart (`devChartHtml`, id `dev`, bars as stops).
+  Not charts: the match card's 1X2 bar, the Teams table's net bars and the team-total progress
+  bar (numbers printed beside them); Record's threshold sweeps are tables.
 - **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
   Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts
   and `rangeChart` per league, team-total progress), Player shots (strategy switch, threshold

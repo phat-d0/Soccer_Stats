@@ -57,6 +57,72 @@ const tab = (name) => async (p) => { await p.click(`.tabbar button[data-tab="${n
 const click = (sel) => async (p) => { await p.click(sel); };
 const sheet = async (p) => { await p.waitForSelector("#sheet:not([hidden])"); };
 const closeSheet = async (p) => { await p.click(".sheet-close"); };
+// Every chart scrubs (owner, 23 Oct): for the chart `sel` (a [data-scrub] wrapper), a mouse
+// hover and a finger drag each land on the stop under the pointer, with the readout line
+// equal to the chart's own readout for that stop (and only that stop's marks highlighted);
+// Home then the right (or down) arrow step; the page still scrolls over the chart.
+async function scrubCheck(p, sel) {
+  const wrap = p.locator(sel).first();
+  await wrap.scrollIntoViewIfNeeded();
+  const id = await wrap.getAttribute("data-scrub");
+  const info = await p.evaluate((id) => { const sc = scrubCharts[id]; return { n: scrubLen(sc), rows: !!sc.rows }; }, id);
+  if (info.n < 2) throw new Error(`${id}: ${info.n} stops`);
+  const now = () => p.evaluate((id) => {
+    const sc = scrubCharts[id];
+    const sel = [...document.querySelectorAll(`[data-scrub="${id}"] [data-stop].sel`)].map((e) => Number(e.dataset.stop));
+    return { at: sc.at, text: (document.getElementById(sc.readoutId)?.textContent || "").replace(/\s+/g, " ").trim(), want: sc.at == null ? "" : plain(sc.readout(sc.at)).replace(/\s+/g, " ").trim(), sel };
+  }, id);
+  const verify = async (what, at) => {
+    const s = await now();
+    if (s.at == null || (at != null && s.at !== at)) throw new Error(`${id} ${what}: at ${s.at}, wanted ${at}`);
+    if (!s.text || s.text !== s.want) throw new Error(`${id} ${what}: readout "${s.text}" vs "${s.want}"`);
+    if (s.sel.some((k) => k !== s.at)) throw new Error(`${id} ${what}: other stops highlighted ${s.sel}`);
+    return s;
+  };
+  // Two targets: the first and last stops' own marks when the chart has them (rows, points),
+  // else a quarter and three quarters of the way across the plot.
+  const marks = wrap.locator("[data-stop]");
+  const centre = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+  let a, b, ia = null, ib = null;
+  if (await marks.count()) {
+    // (a tall row chart: the fifth row at most, so both stay on screen)
+    ia = 0; ib = info.rows ? Math.min(info.n - 1, 4) : info.n - 1;
+    a = centre(await wrap.locator('[data-stop="0"]').first().boundingBox());
+    b = centre(await wrap.locator(`[data-stop="${ib}"]`).first().boundingBox());
+  } else {
+    const box = await wrap.locator("svg").first().boundingBox();
+    a = { x: box.x + box.width * 0.25, y: box.y + box.height / 2 };
+    b = { x: box.x + box.width * 0.75, y: box.y + box.height / 2 };
+  }
+  // Hover (a mouse, no button).
+  await p.mouse.move(a.x, a.y);
+  const h1 = await verify("hover", ia);
+  await p.mouse.move(b.x, b.y, { steps: 4 });
+  const h2 = await verify("hover across", ib);
+  if (h2.at === h1.at) throw new Error(`${id}: hovering across didn't move the stop`);
+  await p.mouse.move(0, 0);
+  // A finger drag from the second target back to the first.
+  const target = info.rows ? wrap : wrap.locator("svg").first();
+  await target.dispatchEvent("pointerdown", { pointerType: "touch", pointerId: 21, clientX: b.x, clientY: b.y, bubbles: true });
+  await verify("touch down", ib);
+  await target.dispatchEvent("pointermove", { pointerType: "touch", pointerId: 21, clientX: a.x, clientY: a.y, bubbles: true });
+  await verify("touch drag", ia ?? h1.at);
+  await target.dispatchEvent("pointerup", { pointerType: "touch", pointerId: 21, bubbles: true });
+  // Keys.
+  await wrap.focus();
+  await p.keyboard.press("Home");
+  await verify("Home", 0);
+  await p.keyboard.press(info.rows ? "ArrowDown" : "ArrowRight");
+  await verify("arrow", 1);
+  // The page still scrolls with the pointer over the chart.
+  const ta = await (info.rows ? wrap : wrap.locator("svg").first()).evaluate((el) => getComputedStyle(el).touchAction);
+  if (ta !== "pan-y") throw new Error(`${id}: touch-action ${ta}`);
+  await p.mouse.move(a.x, a.y);
+  const y0 = await p.evaluate(() => window.scrollY);
+  const room = await p.evaluate(() => window.scrollY + innerHeight + 50 < document.documentElement.scrollHeight);
+  await p.mouse.wheel(0, room ? 200 : -200);
+  await p.waitForFunction((y) => window.scrollY !== y, y0, { timeout: 3000 });
+}
 const STEPS = [
   ["matches", tab("matches")],
   ["match-sheet", async (p) => { await p.click('button.match[data-fixture="0"]'); await sheet(p); }, true],
@@ -299,7 +365,7 @@ const STEPS = [
   ["teams", tab("ratings")],
   ["players-stats", async (p) => { await p.click('button[data-tv="players"]'); await p.waitForSelector("#pl-list .bet-row"); }],
   ["players-stats-club", async (p) => { await p.selectOption("#pl-team", { index: 1 }); }],
-  ["players-chart", async (p) => { await p.selectOption("#pl-team", ""); await p.click('button[data-plview="chart"]'); await p.waitForSelector("#dev-chart .dev-row"); await p.click("#dev-chart .dev-row >> nth=0"); }],
+  ["players-chart", async (p) => { await p.selectOption("#pl-team", ""); await p.click('button[data-plview="chart"]'); await p.waitForSelector("#dev-chart .dev-row"); await p.click("#dev-chart .dev-row >> nth=0"); await scrubCheck(p, "[data-scrub='dev']"); }],
   ["players-chart-gxg", async (p) => { await p.selectOption("#pl-metric", "gxg"); }],
   ["player-sheet", async (p) => { await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["players-model", async (p) => { await closeSheet(p); await p.click('button[data-plmode="model"]'); await p.waitForSelector("#pl-list .bet-row"); }],
@@ -321,7 +387,11 @@ const STEPS = [
   ["players-model-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-plmode="model"]'); }],
   ["players-e0-sheet", async (p) => { await p.click('.chip[data-league="E0"]'); await p.click('button[data-plmode="stats"]'); await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
   ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
-  ["record-match-bucket", click('.eb-row[data-ebrow="0"]')],
+  ["record-match-bucket", async (p) => {
+    await p.click('.eb-row[data-ebrow="0"]');
+    await scrubCheck(p, "[data-scrub^='eb-']");
+    await scrubCheck(p, "[data-scrub='pc']");
+  }],
   // Blend trades through Blend Lean now: its tiles are Lean's Premier League backtest.
   ["record-match-blend-lean", async (p) => {
     await p.click('button[data-recdk="blend"]');
@@ -354,6 +424,7 @@ const STEPS = [
     await p.click('.rc-row[data-rc="co"][data-rcrow="4"]');
     const readout = await p.textContent("#rc-readout-co");
     if (!readout.includes("Ligue 1") || !readout.includes("2025/26")) throw new Error(`corner readout: ${readout}`);
+    await scrubCheck(p, "[data-scrub='co']");
     const text = await p.textContent("#view");
     for (const run of ["37863800450", "38004172501", "38022942019"]) if (!text.includes(run)) throw new Error(`run ${run} not shown`);
   }],
@@ -529,6 +600,7 @@ const STEPS = [
     }
     await p.click('.rc-row[data-rc="lbroi"][data-rcrow="0"]');
     if (!(await p.textContent("#rc-readout-lbroi")).includes("bets")) throw new Error("ROI readout");
+    await scrubCheck(p, "[data-scrub='lbroi']");
   }],
   ["portfolio-lean-backtest-model", async (p) => {
     await p.click('button[data-pfdriver="model"]');
@@ -613,10 +685,18 @@ const STEPS = [
       if (!text.includes(w)) throw new Error(`Lean model view lacks "${w}"`);
     }
     if ((await p.locator("#view .model-table").count()) < 2) throw new Error("per-league tables under All");
-    await p.click('[data-rc="shape-E0"][data-rcpt="2"]');
-    if (!(await p.textContent("#rc-readout-shape-E0")).includes("Market 50%")) throw new Error("shape readout");
-    await p.locator('[data-rc="rel-lean-all"][data-rcpt="0"]').dispatchEvent("click");
-    if (!(await p.textContent("#rc-readout-rel-lean-all")).includes("outcomes")) throw new Error("reliability readout");
+    // The blend's shape scrubs in 1-point steps: halfway along the drawn range is 49%.
+    await scrubCheck(p, "[data-scrub='shape-E0']");
+    await p.keyboard.press("Home");
+    for (let i = 0; i < 46; i++) await p.keyboard.press("ArrowRight");
+    const sh = await p.textContent("#rc-readout-shape-E0");
+    if (!/^Market 50%: blend \d+\.\d% with the model agreeing, \d+\.\d% with the model 10 points higher, \d+\.\d% with it 10 points lower\.$/.test(sh)) throw new Error(`shape readout: ${sh}`);
+    // Every outcome: each stop is a bin with all three series in one readout.
+    await scrubCheck(p, "[data-scrub='rel-lean-all']");
+    const rel = await p.textContent("#rc-readout-rel-lean-all");
+    for (const w of ["Model", "Blend", "Price", "outcomes", "said", "happened"]) if (!rel.includes(w)) throw new Error(`reliability readout lacks "${w}": ${rel}`);
+    const lit = await p.locator("[data-scrub='rel-lean-all'] .mk.sel").count();
+    if (lit < 2) throw new Error(`only ${lit} series highlighted in the bin`);
     if (!text.includes("slope")) throw new Error("slope in words");
   }],
   ["portfolio-model-lean-e0", async (p) => {
@@ -627,6 +707,7 @@ const STEPS = [
     }
     await p.click('.rc-row[data-rc="bets-lean-E0"][data-rcrow="0"]');
     if (!(await p.textContent("#rc-readout-bets-lean-E0")).includes("bets")) throw new Error("bets readout");
+    await scrubCheck(p, "[data-scrub='bets-lean-E0']");
   }],
   ["portfolio-model-lean-e3", async (p) => {
     await p.click('.chip[data-league="E3"]');
@@ -812,8 +893,9 @@ const STEPS = [
     }
     for (const w of ["Model (f)'s shape, Premier League", "Over 4.5", "Model (f)"]) if (!text.includes(w)) throw new Error(`corners model view lacks "${w}"`);
     if (!(await p.locator("#view .rel-chart").count())) throw new Error("corners diagonal reliability chart");
-    await p.locator('[data-rc="qrel-pinnacle"][data-rcpt="0"]').dispatchEvent("click");
+    await scrubCheck(p, "[data-scrub='qrel-pinnacle']");
     if (!(await p.textContent("#rc-readout-qrel-pinnacle")).includes("lines")) throw new Error("quote readout");
+    await scrubCheck(p, "[data-scrub='cshape-E0']");
     // The shape chart scrubs too: pointing near the left edge reads about 2 expected corners.
     const shape = p.locator("[data-scrub='cshape-E0'] svg");
     await shape.scrollIntoViewIfNeeded();

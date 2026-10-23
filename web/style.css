@@ -328,21 +328,7 @@ td.edge-pos { color: var(--good-text); font-weight: 600; }
 .chart .grid text, .chart .xlab { fill: var(--text-muted); font-size: 10px; }
 .chart .zero { stroke: var(--text-muted); stroke-width: 1; opacity: 0.6; }
 .chart .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
-.chart .cross { stroke: var(--text-muted); stroke-width: 1; }
 .chart .dot { fill: var(--accent); stroke: var(--surface-2); stroke-width: 2; }
-.tooltip {
-  position: absolute;
-  top: 0;
-  pointer-events: none;
-  background: var(--surface-1);
-  border: 0.5px solid var(--border);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
-  white-space: nowrap;
-  transform: translateX(-50%);
-}
 
 .bet-row {
   display: grid;
@@ -489,8 +475,8 @@ select.metric { display: block; width: 100%; margin-bottom: 8px; font: inherit; 
 .chart .dev-neg { fill: var(--neg); }
 .chart .dev-name { fill: var(--text-secondary); font-size: 11px; }
 .chart .dev-row .hit { fill: transparent; }
-.chart .dev-row.on .dev-name { fill: var(--text-primary); font-weight: 600; }
-.chart .dev-row.on .hit { fill: var(--track); opacity: 0.5; }
+.chart .dev-row.sel .dev-name { fill: var(--text-primary); font-weight: 600; }
+.chart .dev-row.sel .hit { fill: var(--track); opacity: 0.5; }
 .dev-readout { min-height: 40px; font-size: 13px; color: var(--text-secondary); padding: 6px 0 8px; border-bottom: 0.5px solid var(--border); margin-bottom: 6px; }
 
 /* Record tab, player shots: the threshold sweep (the chosen strategy's column is shaded) */
@@ -818,3 +804,21 @@ details.drv-fold { margin-top: 10px; }
 .judged .note { margin: 8px 0 0; }
 /* The whole-period part sits above the pre-registered "Judged from" part in one card. */
 .judged-head.judged-since { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ---------- every chart scrubs (owner, 23 Oct) ---------- */
+/* Any scrub chart lets vertical swipes scroll the page. */
+[data-scrub] { touch-action: pan-y; }
+/* Row charts (range plots, bins, edge buckets): the card is the slider; rows highlight. */
+.scrub-rows { outline: none; touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.scrub-rows:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.scrub-rows .eb-row.sel { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+/* The blend's shape: one dot per curve under the cursor. */
+.shape-chart .cdot.same { fill: var(--accent); }
+.shape-chart .cdot.up, .shape-chart .cdot.down { fill: var(--text-secondary); }
+/* Reliability: every series' mark in the chosen bin stands out together. */
+.rel-chart circle.mk.sel { r: 6; }
+.rel-chart .mk.model.sel { stroke-width: 2.6; }
+.rel-chart .mk.price.sel { stroke-width: 4; }
+.rel-chart .rng.sel { opacity: 1; stroke-width: 2.4; }
+/* The Record profit chart's dot. */
+#profit-chart .cdot { fill: var(--accent); }
