@@ -509,7 +509,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v50) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v51) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -550,8 +550,12 @@ the owner's baseball app, so the balance can drop without any run here.
   close and CLV), the rule note. Shadow-filter variants (owner, 23 Oct; any live strategy
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60`): an
   indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
-  Backtest and Model show the parent), its own trades and tiles via `trade_ids`, a "Judged
-  from <date>" box (`sinceDefinedHtml`: `since_defined` variant vs parent, each
+  Backtest and Model show the parent), its own trades and tiles via `trade_ids`, one box
+  (`sinceDefinedHtml`) with a descriptive "Whole period, from <first trade>" part on top
+  (the variant's and parent's full summaries, and the CLV difference kept minus all computed
+  in the app from the trades' `clv_pinnacle`, won or lost with a value (as the summaries), with n; "includes the
+  trades the 60% cut was chosen from, so it can't prove the filter") and the pre-registered
+  "Judged from <date>" part below: `since_defined` variant vs parent, each
   `clv_diff` difference and range with `trades`, `kept`, `matches`: `clv_pinnacle` is the
   judged measure on both corner tracks, `clv_dk` a descriptive line on DraftKings'; "Not
   enough trades yet" under `JUDGE_MIN` 30 kept; N in "picked after the first N settled
@@ -593,7 +597,11 @@ the owner's baseball app, so the balance can drop without any run here.
   keeps the spot; Left/Right/Home/End step when focused. Chart SVGs keep `touch-action: pan-y`,
   so vertical swipes still scroll the page. No tooltips: the readout line follows. Used by
   "Profit over time" (`curveChart`, id `cv`; `settledCurve` days carry won/lost/void; readout
-  "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)", the latest day by default)
+  "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)", the latest day by
+  default). Its $0 origin is a stop too (owner, 23 Oct), labelled with the first trade opened
+  (`firstOpened`; readout "Thu, Oct 9 · first trade opened · …"), in `curveChart` and
+  `overlayCurveChart`; the hit area (`scrubPad`) spans the whole SVG, so a pointer past
+  either end selects that end
   and the corners shape chart (`cshape-<code>`).
 - **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
   Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts

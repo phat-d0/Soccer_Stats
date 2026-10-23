@@ -405,19 +405,22 @@ const STEPS = [
     await svg.scrollIntoViewIfNeeded();
     const box = await svg.boundingBox();
     const y = box.y + box.height / 2;
-    const expected = () => p.evaluate(() => ({ at: scrubCharts.cv.at, text: plain(curveReadout(scrubCharts.cv.data[scrubCharts.cv.at])), cum: usd(scrubCharts.cv.data[scrubCharts.cv.at].cum, 2), n: scrubCharts.cv.data.length }));
+    const expected = () => p.evaluate(() => ({ at: scrubCharts.cv.at, text: plain(curveReadout(scrubCharts.cv.data[scrubCharts.cv.at])), cum: usd(scrubCharts.cv.data[scrubCharts.cv.at].cum, 2), origin: !!scrubCharts.cv.data[scrubCharts.cv.at].origin, n: scrubCharts.cv.data.length }));
     const check = async (what) => {
       const e = await expected();
       const r = await p.textContent("#cv-readout");
-      if (r !== e.text || !r.includes(`${e.cum} to date`)) throw new Error(`${what}: readout "${r}" vs day ${e.at} "${e.text}"`);
+      if (r !== e.text || !r.includes(e.origin ? "first trade opened" : `${e.cum} to date`)) throw new Error(`${what}: readout "${r}" vs day ${e.at} "${e.text}"`);
       if (await p.locator("[data-scrub='cv'] .cursor").evaluate((el) => el.style.display) === "none") throw new Error(`${what}: no cursor`);
       return e;
     };
-    // Pointing (no button) at the left edge snaps to the first settled day.
-    await p.mouse.move(box.x + 2, y);
-    await p.mouse.move(box.x + box.width * 0.2, y, { steps: 4 });
+    // Pointing (no button) left of the first stop snaps to the $0 origin, dated by the
+    // first Lean trade opened (owner, 23 Oct).
+    await p.mouse.move(box.x + box.width * 0.5, y);
+    await p.mouse.move(box.x + 2, y, { steps: 4 });
     const a = await check("hover left");
-    if (a.at !== 0) throw new Error(`hover left should be day 0, got ${a.at}`);
+    if (a.at !== 0 || !a.origin) throw new Error(`hover left should be the origin, got ${a.at}`);
+    const first = await p.evaluate(() => dayName(firstOpened(stratSet(pfById("moneyline").live, pfById("moneyline").live.strategies.find((x) => x.key === "lean")).trades)));
+    if (!(await p.textContent("#cv-readout")).startsWith(`${first} · first trade opened`)) throw new Error(`origin readout should start "${first}"`);
     // Press and drag to the right edge: the latest day; release keeps it.
     await p.mouse.down();
     await p.mouse.move(box.x + box.width - 2, y, { steps: 8 });
@@ -731,9 +734,16 @@ const STEPS = [
     const mark = await p.locator("[data-scrub='cv'] .filter-lab").textContent();
     if (mark !== "filter set (judged from here)") throw new Error(`filter marker: ${mark}`);
     if (await p.locator("[data-scrub='cv'] text.end.ser").count() !== 2) throw new Error("overlay end labels");
-    await p.locator("[data-scrub='cv']").focus(); await p.keyboard.press("Home");
+    // The origin is a stop: a pointer left of it selects it, dated by the first trade opened.
+    const svg = await p.locator("[data-scrub='cv'] svg").boundingBox();
+    await p.locator("[data-scrub='cv'] svg").dispatchEvent("pointerdown", { pointerType: "touch", pointerId: 9, clientX: svg.x + 1, clientY: svg.y + svg.height / 2, bubbles: true });
+    await p.locator("[data-scrub='cv'] svg").dispatchEvent("pointerup", { pointerType: "touch", pointerId: 9, bubbles: true });
+    const o = (await p.textContent("#cv-readout")).replace(/\s+/g, " ");
+    const first = await p.evaluate(() => dayName(firstOpened(stratSet(pfById("corners").live, pfById("corners").live.strategies.find((x) => x.key === "pinnacle")).trades)));
+    if (o !== `${first} · first trade opened · All $0.00 · Below 60% $0.00`) throw new Error(`overlay origin readout: ${o}`);
+    await p.locator("[data-scrub='cv']").focus(); await p.keyboard.press("Home"); await p.keyboard.press("ArrowRight");
     const r = (await p.textContent("#cv-readout")).replace(/\s+/g, " ");
-    const want = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
+    const want = await p.evaluate(() => plain(scrubCharts.cv.readout(1)));
     if (r !== want || !/ · All [+−]?\$[\d.]+ · Below 60% [+−]?\$[\d.]+ \(difference [+−]?\$[\d.]+\)$/.test(r)) throw new Error(`overlay readout: ${r}`);
     await p.keyboard.press("End");
   }],
@@ -748,6 +758,20 @@ const STEPS = [
       if (!box.includes(want)) throw new Error(`Judged-from box lacks "${want}": ${box}`);
     }
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2) throw new Error("variant view lacks the overlay");
+    // The whole-period part (owner, 23 Oct): above the judged part, the same columns from
+    // each version's full summary, and a descriptive CLV difference.
+    if (!box.includes("Whole period, from") || box.indexOf("Whole period") > box.indexOf("Judged from")) throw new Error(`whole period first: ${box}`);
+    if (!box.includes("Descriptive only:") || !box.includes("can't prove the filter") || !/minus all: [+−][\d.]+% \(/.test(box)) throw new Error(`whole-period notes: ${box}`);
+    const rows = await p.locator(".whole-tab tbody tr").evaluateAll((trs) => trs.map((tr) => [...tr.children].map((td) => td.textContent.trim())));
+    const want = await p.evaluate(() => {
+      const ss = pfById("corners").live.strategies;
+      const row = (label, s) => [label, String(s.trades), String(s.settled), usd(s.profit, 2), signedPct(s.roi), signedPct(s.clv_pinnacle)];
+      return [row("Below 60%", ss.find((x) => x.key === "pinnacle_below60").summary), row("All", ss.find((x) => x.key === "pinnacle").summary)];
+    });
+    if (JSON.stringify(rows) !== JSON.stringify(want)) throw new Error(`whole-period rows ${JSON.stringify(rows)} vs ${JSON.stringify(want)}`);
+    // Its CLV difference's two means are the table's CLV column.
+    const m = box.match(/minus all: ([+−][\d.]+%) \(([+−][\d.]+%) vs ([+−][\d.]+%);/);
+    if (!m || m[2] !== want[0][5] || m[3] !== want[1][5]) throw new Error(`whole-period CLV means ${m && m.slice(1)} vs ${want[0][5]}, ${want[1][5]}`);
   }],
   // The DraftKings track's variant: judged on Pinnacle's close too, DraftKings' own close
   // shown as descriptive only.
