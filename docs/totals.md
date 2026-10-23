@@ -1187,6 +1187,49 @@ bets, we'll still keep the Pinnacle track live too").**
   Settled exactly like the Pinnacle trades. The portfolio's live section lists both
   strategies (`strategies`, Pinnacle first). The February test is unchanged.
 
+#### Shadow filter: below 60% (owner, 23 Oct; pre-registered in this commit, before any code)
+
+**Why.** On 23 Oct the Pinnacle track's live calibration split its 55 settled trades by the
+model's chance given no push:
+
+| Model chance | Trades | Said | Break-even | Won | P/L |
+| --- | --- | --- | --- | --- | --- |
+| 60–100% | 32 | 66.3% | 55.1% | 53.1% (36–69%) | −$19.40 |
+| 50–60% | 23 | 56% | 49% | 57% | +$43.20 |
+
+CLV against Pinnacle's close is the same in both groups (−5.9% and −6.0%), so the split is
+most likely noise. The owner still wants a strategy without the 60%+ bets tracked beside
+the original, so the difference can be watched. It is a **shadow filter**: no new bets, no
+new ledger rows, only a subset of each corner track's real trades.
+
+**The rule.** For each corner track (Pinnacle, DraftKings), keep the trades whose model
+chance given no push, `model_p / (1 − p_push)` (`p_push` missing = 0), is **below 0.60**.
+Everything else about the trades (stake, odds, close, settlement) is the parent's. Keys
+`pinnacle_below60` and `draftkings_below60`.
+
+**When it is judged.** The 0.60 cut-off was chosen after seeing those 55 settled Pinnacle
+trades, so it can't be judged on them. `defined_at` is the time of this commit (stored as
+a constant in `trades.py`). Only trades **opened at or after `defined_at`** count toward the
+verdict; earlier trades are shown in the app, labelled, and never judged.
+
+**What is judged.**
+- **Primary:** CLV against Pinnacle's close (`clv_pinnacle`, which both tracks record;
+  trades without it are left out of the CLV comparison). Statistic: mean CLV of the
+  filtered trades minus mean CLV of all the parent's trades, both on the parent's trades
+  opened since `defined_at`. Its 95% range comes from a bootstrap that resamples **matches**
+  (all of a match's trades together; 2,000 draws, seed 0, percentile range); each draw
+  recomputes both means on the same resampled trades, and a draw with no filtered trade is
+  skipped. The DraftKings track also shows the same difference on `clv_dk`, descriptive only.
+- **Secondary (descriptive):** ROI and P/L of the filtered set against the parent's, on the
+  same trades.
+- **Pass:** the primary difference's 95% range lies entirely above 0. Anything else
+  (including too few trades for a range) is not a pass.
+
+**Review.** At the 8 Dec live corners review (`trig_01SJk1xh2PSaKfKEe6VfHW2m`), with
+whatever sample exists then: both tracks, the filtered and full sets' trades, CLV and ROI
+since `defined_at`, the primary difference and its range. No live change follows from it
+unless the owner decides one after that review. No other cut-off is tried on these trades.
+
 ## Historical corner prices probe (owner-approved 50-credit cap, 11 Oct; probe only, no backtest)
 
 The question: do The Odds API's historical endpoints carry Pinnacle's team-corner prices
