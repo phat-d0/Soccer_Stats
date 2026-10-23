@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v50";
+const APP_VERSION = "v51";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3228,14 +3228,22 @@ const scrubAttrs = (id, n, label) => `data-scrub="${id}" tabindex="0" role="slid
 const dayName = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 // "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)".
 function curveReadout(c) {
+  if (c.origin) return `<b>${esc(dayName(c.date))}</b> · first trade opened · <b>${usd(0, 2)}</b>`;
   const rec = `${c.won ?? 0}–${c.lost ?? 0}${c.void ? `, ${c.void} void` : ""}`;
   return `<b>${esc(dayName(c.date))}</b> · <b class="${signCls(c.cum)}">${usd(c.cum, 2)}</b> to date · that day ${usd(c.profit, 2)} on ${c.n} trade${c.n > 1 ? "s" : ""} (${rec})`;
 }
+// The day of the first trade opened in a set (the curves' $0 origin), else the first
+// settled day.
+const firstOpened = (trades, curve = []) => trades.map((t) => t.opened_at).filter(Boolean).sort()[0]?.slice(0, 10) || curve[0]?.date || null;
+// The scrub hit area covers the whole SVG, so a pointer past either end snaps to that end.
+const scrubPad = (W, H) => `<rect class="scrub-pad" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>`;
 // The baseball app's profit chart: $0 line and the end label. Point at it (laptop) or drag
-// a finger across it (phone) to trace the running total; the readout line follows.
-function curveChart(curve) {
+// a finger across it (phone) to trace the running total; the readout line follows. The $0
+// origin is a stop too, dated by the first trade opened (owner, 23 Oct).
+function curveChart(curve, start) {
   if (!curve.length) return "";
-  const pts = [{ cum: 0 }, ...curve];
+  start = start || curve[0].date;
+  const pts = [{ date: start, cum: 0, origin: true }, ...curve];
   const W = 320, H = 170, L = 44, R = 52, T = 12, B = 22;
   const ys = pts.map((c) => c.cum);
   const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
@@ -3250,13 +3258,13 @@ function curveChart(curve) {
   const dots = curve.map((c, i) => `<circle class="pt${neg}" cx="${sx(i + 1)}" cy="${sy(c.cum)}" r="3"/>`).join("");
   scrubCharts.cv = {
     readoutId: "cv-readout",
-    xs: curve.map((_, i) => sx(i + 1)),
-    points: (i) => [{ x: sx(i + 1), y: sy(curve[i].cum) }],
-    readout: (i) => curveReadout(curve[i]),
-    data: curve,
+    xs: pts.map((_, i) => sx(i)),
+    points: (i) => [{ x: sx(i), y: sy(pts[i].cum) }],
+    readout: (i) => curveReadout(pts[i]),
+    data: pts,
   };
   return `
-    <div class="chart curve scrub" ${scrubAttrs("cv", curve.length, "Profit over time: drag or use the arrow keys to move along the line")}>
+    <div class="chart curve scrub" ${scrubAttrs("cv", pts.length, "Profit over time: drag or use the arrow keys to move along the line")}>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${usd(end, 2)} so far">
         <g class="grid">${grid}</g>
         <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
@@ -3265,11 +3273,11 @@ function curveChart(curve) {
         ${dots}
         <circle class="dot${neg}" cx="${sx(last)}" cy="${sy(end)}" r="4.5"/>
         <text class="end ${end > 0 ? "pos" : end < 0 ? "neg" : ""}" x="${sx(last) + 8}" y="${sy(end) + 4}">${usd(end, Math.abs(end) < 10 ? 2 : 0)}</text>
-        <text class="xlab" x="${L}" y="${H - 6}">start</text>
+        <text class="xlab" x="${L}" y="${H - 6}">${esc(monthDay(`${start}T12:00:00Z`))}</text>
         <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${curve[curve.length - 1].date}T12:00:00Z`))}</text>
         <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
         <circle class="cdot${neg}" r="5" cx="0" cy="0" style="display:none"/>
-        <rect class="scrub-pad" x="${L - 8}" y="0" width="${W - L - R + 16}" height="${H}" fill="transparent"/>
+        ${scrubPad(W, H)}
       </svg>
       <div class="eb-readout" id="cv-readout" aria-live="polite">${curveReadout(curve[curve.length - 1])}</div>
     </div>`;
@@ -3280,13 +3288,15 @@ function curveChart(curve) {
 // series holding its total on days it didn't move. One scrub point per day; the readout
 // gives every series that day and each variant's difference from the first.
 const SERIES_CLS = ["s0", "s1", "s2", "s3"];
-function overlayCurveChart(series, definedAt) {
+function overlayCurveChart(series, definedAt, start) {
   const days = [...new Set(series.flatMap((o) => o.curve.map((c) => c.date)))].sort();
   if (!days.length) return "";
+  start = start || days[0];
+  // Stop 0 is the $0 origin (the first trade opened), then one stop per settled day.
   const rows = series.map((o) => {
     const at = new Map(o.curve.map((c) => [c.date, c]));
     let cum = 0;
-    return days.map((d) => { const c = at.get(d); if (c) cum = c.cum; return { date: d, cum, day: c || null }; });
+    return [{ date: start, cum: 0, origin: true }, ...days.map((d) => { const c = at.get(d); if (c) cum = c.cum; return { date: d, cum, day: c || null }; })];
   });
   const W = 320, H = 190, L = 44, R = 58, T = 16, B = 22;
   const ys = rows.flat().map((c) => c.cum);
@@ -3296,7 +3306,7 @@ function overlayCurveChart(series, definedAt) {
   const sy = (v) => T + (1 - (v - lo) / span) * (H - T - B);
   const ticks = [lo, hi].filter((v) => Math.abs(v) > span * 0.12);
   const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${usd(v)}</text>`).join("");
-  const paths = rows.map((r, k) => `<path class="line ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" d="M${sx(0).toFixed(1)},${sy(0).toFixed(1)} ${r.map((c, i) => `L${sx(i + 1).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ")}"/>`).join("");
+  const paths = rows.map((r, k) => `<path class="line ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" d="${r.map((c, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ")}"/>`).join("");
   // End labels, nudged apart when two totals sit close together.
   const ends = rows.map((r, k) => ({ k, v: r[r.length - 1].cum, y: sy(r[r.length - 1].cum) })).sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
@@ -3314,39 +3324,40 @@ function overlayCurveChart(series, definedAt) {
   const id = "cv";
   scrubCharts[id] = {
     readoutId: "cv-readout",
-    xs: days.map((_, i) => sx(i + 1)),
-    points: (i) => rows.map((r) => ({ x: sx(i + 1), y: sy(r[i].cum) })),
+    xs: rows[0].map((_, i) => sx(i)),
+    points: (i) => rows.map((r) => ({ x: sx(i), y: sy(r[i].cum) })),
     readout: (i) => overlayReadout(series, rows, i),
-    data: days,
+    data: rows[0].map((c) => c.date),
   };
   const legend = series.map((o, k) => `<span class="lg-item"><svg class="lg-sw" viewBox="0 0 22 8" aria-hidden="true"><line class="ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" x1="1" x2="21" y1="4" y2="4"/></svg>${esc(o.name)}${o.label ? `<span class="muted"> · ${esc(o.label)}</span>` : ""}</span>`).join("");
   return `
     <div class="curve-legend">${legend}</div>
-    <div class="chart curve overlay scrub" ${scrubAttrs(id, days.length, "Profit over time, every version: drag or use the arrow keys to move along the lines")}>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${esc(series.map((o, k) => `${o.name} ${usd(rows[k][last - 1].cum, 2)}`).join(", "))}">
+    <div class="chart curve overlay scrub" ${scrubAttrs(id, last + 1, "Profit over time, every version: drag or use the arrow keys to move along the lines")}>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${esc(series.map((o, k) => `${o.name} ${usd(rows[k][last].cum, 2)}`).join(", "))}">
         <g class="grid">${grid}</g>
         <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
         <text class="xlab" x="${L - 4}" y="${sy(0) + 3}" text-anchor="end">$0</text>
         ${marker}
         ${paths}
         ${endLabels}
-        <text class="xlab" x="${L}" y="${H - 6}">start</text>
+        <text class="xlab" x="${L}" y="${H - 6}">${esc(monthDay(`${start}T12:00:00Z`))}</text>
         <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${days[last - 1]}T12:00:00Z`))}</text>
         <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
         ${rows.map((_, k) => `<circle class="cdot ser ${SERIES_CLS[k % 4]}" r="4.5" cx="0" cy="0" style="display:none"/>`).join("")}
-        <rect class="scrub-pad" x="${L - 8}" y="0" width="${W - L - R + 16}" height="${H}" fill="transparent"/>
+        ${scrubPad(W, H)}
       </svg>
-      <div class="eb-readout" id="cv-readout" aria-live="polite">${overlayReadout(series, rows, last - 1)}</div>
+      <div class="eb-readout" id="cv-readout" aria-live="polite">${overlayReadout(series, rows, last)}</div>
     </div>`;
 }
-// "Sat 18 Oct · All +$23.40 · Below 60% +$31.10 (difference +$7.70)".
+// "Sat 18 Oct · All +$23.40 · Below 60% +$31.10 (difference +$7.70)"; at the origin
+// "Thu, Oct 9 · first trade opened · All $0.00 · Below 60% $0.00".
 function overlayReadout(series, rows, i) {
   const base = rows[0][i].cum;
   const parts = series.map((o, k) => {
     const v = rows[k][i].cum;
-    return `${esc(o.name)} <b class="${signCls(v)}">${usd(v, 2)}</b>${k ? ` (difference ${usd(v - base, 2)})` : ""}`;
+    return `${esc(o.name)} <b class="${signCls(v)}">${usd(v, 2)}</b>${k && !rows[0][i].origin ? ` (difference ${usd(v - base, 2)})` : ""}`;
   });
-  return `<b>${esc(dayName(rows[0][i].date))}</b> · ${parts.join(" · ")}`;
+  return `<b>${esc(dayName(rows[0][i].date))}</b>${rows[0][i].origin ? " · first trade opened" : ""} · ${parts.join(" · ")}`;
 }
 // A variant's own judgement (paper.variant_since): only trades opened at or after
 // defined_at count, since the cut was chosen after seeing the earlier ones. since_defined =
@@ -3385,10 +3396,30 @@ function sinceDefinedHtml(cur, x, parent, lg) {
   const none = !sd.parent?.trades;
   const enough = none ? `<p class="note judge-few"><b>Nothing to judge yet:</b> no trade has opened since ${monthDay(at)}.</p>`
     : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} settled with ${CLV_FIELD_NAME[clvKey]} since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
+  // Whole period (owner, 23 Oct): the same columns from each version's own full summary,
+  // and the CLV difference computed here from the trades: won or lost with a value, the
+  // same trades the summaries' CLV averages, so the two means match the CLV column.
+  // Descriptive: it includes the trades the cut was chosen on.
+  const allTrades = strategyLiveSet(cur, parent, "").trades || [];
+  const keptIds = new Set(x.st?.trade_ids || []);
+  const withClv = allTrades.filter((t) => (t.status === "won" || t.status === "lost") && isNum(t[clvKey]));
+  const keptClv = withClv.filter((t) => keptIds.has(t.id));
+  const meanAll = meanOf(withClv.map((t) => t[clvKey])), meanKept = meanOf(keptClv.map((t) => t[clvKey]));
+  const from = firstOpened(allTrades);
+  const fullLine = (label, st) => line(label, st?.summary ? { trades: st.summary.trades, summary: st.summary } : null);
+  const whole = `
+      <div class="judged-head">Whole period, from ${from ? esc(dayName(from)) : "the first trade"}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
+      <table class="judged-tab whole-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
+        <tbody>${fullLine(name, x.st)}${fullLine("All", parent.st)}</tbody></table>
+      <p class="note">CLV against ${CLV_FIELD_NAME[clvKey]}, ${esc(name.toLowerCase())} minus all: ${isNum(meanKept) && isNum(meanAll)
+        ? `<b class="${signCls(meanKept - meanAll)}">${signedPct(meanKept - meanAll)}</b> (${signedPct(meanKept)} vs ${signedPct(meanAll)}; ${keptClv.length} kept of ${withClv.length} trade${withClv.length === 1 ? "" : "s"} with a close)`
+        : "none yet (no trade with a close)"}.</p>
+      <p class="note"><b>Descriptive only:</b> this includes the trades the ${pct(x.st?.filter?.max ?? 0.6)} cut was chosen from, so it can't prove the filter.</p>`;
   const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
   return `
     <div class="card judged">
-      <div class="judged-head">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
+      ${whole}
+      <div class="judged-head judged-since">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
       <table class="judged-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
         <tbody>${line(name, sd.variant)}${line("All", sd.parent)}</tbody></table>
       ${diffs.map(diffLine).join("")}
@@ -3462,8 +3493,10 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     }))
     : null;
   const definedAt = family.map((s) => s.st?.defined_at).find(Boolean) || null;
-  const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt)
-    : curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
+  // The origin is the first trade opened: the parent's (every version starts there) or this set's.
+  const start = overlay ? firstOpened(strategyLiveSet(cur, parent, lg).trades || []) : firstOpened(trades, curve);
+  const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt, start)
+    : curve.length ? curveChart(curve, start) : `<p class="muted">The chart starts when the first trade settles.</p>`;
   const judged = x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);

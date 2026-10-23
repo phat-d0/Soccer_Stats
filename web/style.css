@@ -816,3 +816,5 @@ details.drv-fold { margin-top: 10px; }
 .judged-tab { width: 100%; font-variant-numeric: tabular-nums; }
 .judged-tab th:first-child { text-align: left; }
 .judged .note { margin: 8px 0 0; }
+/* The whole-period part sits above the pre-registered "Judged from" part in one card. */
+.judged-head.judged-since { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
