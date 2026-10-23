@@ -491,8 +491,14 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v47) on every web change, or phones
-  keep the old app.
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v48) on every web change, and
+  `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
+  app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
+  the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
+  can't loop), calls `registration.update()` when the app comes back to the front and on ↻, and
+  on ↻ also reloads when the deployed `sw.js` names another version (`newerAppDeployed`). The
+  header subtitle ends "app vNN". The smoke test's `updateCheck` runs with the service worker
+  allowed: first install no reload, a new `sw.js` one reload, ↻ on a newer `sw.js` one reload.
 - Tabs: Matches; Teams (per league, with Players season stats); Record (Match bets, Goals &
   corners, Player shots); Portfolio; Explore.
 - Competition filter (`leagueFilter`, localStorage `league`): chips for every league with fixtures
