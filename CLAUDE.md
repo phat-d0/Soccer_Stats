@@ -521,7 +521,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v52) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v53) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -579,7 +579,16 @@ the owner's baseball app, so the balance can drop without any run here.
   (`strategyBacktestHtml(bt, lg, key)` for `strategy_backtests.lean` and `.edge12`): verdict, units
   tiles, per-league ROI and CLV range plots, seasons, coverage and fits, bet list; UCL (`kind:
   "close"`) gets `closeVerdict`; Model 12% under the Premier League shows the DraftKings backtest
-  first. Corners' backtest is the research view (`researchBacktestHtml`). Model (third view,
+  first. Bands (owner via the Research lab, 23 Oct; `backtestBandsHtml`, in the full and brief
+  views, from the part's `by_odds_band`, `by_edge_band`, `by_clv_band` and the file's `bands`):
+  "Where the bets sit on the odds" (`oddsBandChart`, rows `ob-<key>-<lg|all>`: share bar,
+  CLV dot and range with 0 marked, "no bets" for empty bands; ROI, range, bets and won vs
+  needed in a table below, not plotted), "Claimed edge vs what the price did" (`edgeClvChart`,
+  `ce-…`: x = the band's mean `claimed`, y = CLV with range, dashed y = claimed and y = 0; a
+  verdict from `edgeVerdict`/`bandTrend`, the bet-weighted slope and the first and last bands
+  agreeing; a table with claimed, σ for Lean, CLV, ROI, bets) and the fold "Does beating the
+  close predict profit?" (`clvProfitFold`, a `rangeChart` of ROI by CLV band, `cb-…`). UCL Lean
+  (0 bets) keeps its note and draws none; UCL's CLV says "Pinnacle's close at the same moment". Corners' backtest is the research view (`researchBacktestHtml`). Model (third view,
   Moneyline and Team corners only; `modelViewHtml(cur, x, lg)`): equation cards from
   `portfolio.models` (`MODEL_KEYS`: Lean → `blend` then `match`, Model 12% → `match`, corners →
   `corners_f`; `equationCard`: equation lines, terms folded, the chosen competition's fitted
@@ -618,12 +627,13 @@ the owner's baseball app, so the balance can drop without any run here.
     opened, `firstOpened`, readout "Thu, Oct 9 · first trade opened · …"), `overlayCurveChart`
     (same id), Record's running profit (`profitChart`, id `pc`, readout under the chart), the
     blend's shape (`shape-<code>`, 1-point steps 4–94%, a dot on each of the three curves) and
-    model (f)'s shape (`cshape-<code>`);
+    model (f)'s shape (`cshape-<code>`) and the backtest's claimed edge vs CLV (`ce-…`);
   - point (`pick`): `reliabilityChart` (`rel-…`, `qrel-<book>`): one stop per bin of chances
     holding every series' point, nearest by x then distance, all series' marks highlighted and
     compared in one readout;
   - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, Record → Goals &
-    corners), `binRowsChart` (bets and live trades), `edgeBucketsHtml` (`eb-<pfId>`) and the
+    corners, the backtest's CLV bands), `binRowsChart` (bets and live trades), `oddsBandChart`
+    (`ob-…`), `edgeBucketsHtml` (`eb-<pfId>`) and the
     Teams players chart (`devChartHtml`, id `dev`, bars as stops).
   Not charts: the match card's 1X2 bar, the Teams table's net bars and the team-total progress
   bar (numbers printed beside them); Record's threshold sweeps are tables.
@@ -648,8 +658,8 @@ the owner's baseball app, so the balance can drop without any run here.
 - Test data: `tests/fixtures/web/` (all JSON files together under 1 MB). Rebuild with
   `uv run python tests/web/make_fixture.py` (synthetic leagues through `publish.build_data`, the real
   ledger and backtests from `origin/data-log` through `paper.run`; fixed `NOW`, reproducible).
-  To stay under 1 MB it trims lists (`LEAN_BETS`, `EDGE12_BETS`, `DK_BT_TRADES` 30,
-  `PLAYER_BT_TRADES` 40, `SAMPLE_PLAYERS`); `add_models` rebuilds `portfolio.models` once every
+  To stay under 1 MB it trims lists (`LEAN_BETS`, `EDGE12_BETS` 30, `DK_BT_TRADES` 20,
+  `PLAYER_BT_TRADES` 25, `SAMPLE_PLAYERS`); `add_models` rebuilds `portfolio.models` once every
   block is in (the synthetic leagues' fits via `publish.safe_fit_info`, data-log's real
   `match_blends.json` for the blend's numbers) and gives the corners live section a synthetic
   `quote_calibration` (the fixture logs no quotes); synthetic blocks (`add_lean_strategy`, `add_corners`,

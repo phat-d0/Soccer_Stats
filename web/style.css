@@ -822,3 +822,21 @@ details.drv-fold { margin-top: 10px; }
 .rel-chart .rng.sel { opacity: 1; stroke-width: 2.4; }
 /* The Record profit chart's dot. */
 #profit-chart .cdot { fill: var(--accent); }
+/* ---------- backtest bands (owner via the Research lab, 23 Oct) ---------- */
+/* Odds bands: label, share-of-bets bar, then the CLV plot. */
+.eb-row.band-row, .eb-axis.band-row { grid-template-columns: minmax(96px, 34%) 56px minmax(0, 1fr); }
+.band-row .eb-label { font-size: 12px; line-height: 1.3; }
+.band-share { position: relative; height: 14px; font-size: 11px; color: var(--text-secondary); }
+.band-share .share-bar { position: absolute; left: 0; top: 2px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.band-share .share-num { position: relative; padding-left: 3px; line-height: 14px; font-variant-numeric: tabular-nums; }
+.eb-key.share { width: 14px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+/* Claimed edge against CLV. */
+.band-chart svg { max-width: 420px; }
+.band-chart .diag { stroke: var(--text-muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.band-chart .rng { stroke: var(--text-secondary); stroke-width: 1.4; opacity: 0.6; }
+.band-chart .mk.neg { fill: var(--neg); }
+.band-chart .mk.pos { fill: var(--pos); }
+.band-chart .cdot { fill: none; stroke: var(--text-primary); stroke-width: 1.6; }
+.band-table td .meta { display: block; font-size: 11px; color: var(--text-muted); }
+.band-table { font-size: 13px; }
+.band-table td, .band-table th { vertical-align: top; }
