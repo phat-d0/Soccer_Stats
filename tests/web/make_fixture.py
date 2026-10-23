@@ -1013,6 +1013,7 @@ def add_corners(data: dict) -> None:
             1.80,
         ),
     ]
+    past += corner_history()
     for lg, h, a, ko, side, line, ps, odds, mp, push, count, co, cu in past:
         c = {"league": lg, "home": h, "away": a, "kickoff": ko}
         pk = {"side": ps, "odds": odds, "model_p": mp, "p_push": push}
@@ -1063,6 +1064,47 @@ def add_corners(data: dict) -> None:
             | {"strategies": paper.corner_strategies(corner_trades)}
         },
     )
+
+
+# Six weeks of settled Pinnacle corner trades (seeded), so "Profit over time" has a real
+# shape and the below-60% variant differs from its parent: model
+# chances 48% to 70%, over or under, half lines, one a day or so from 1 Sep.
+CORNER_PAIRS = [
+    ("Liverpool", "Wolves"), ("Spurs", "Burnley"), ("Newcastle", "Bournemouth"),
+    ("Man City", "Brighton"), ("West Ham", "Everton"), ("Aston Villa", "Leeds"),
+    ("Arsenal", "Nott'm Forest"), ("Man United", "Sunderland"), ("Fulham", "Crystal Palace"),
+]  # fmt: skip
+
+
+def corner_history() -> list[tuple]:
+    rng = np.random.default_rng(23)
+    rows = []
+    for i, day in enumerate(
+        pd.date_range("2026-09-01T14:00:00Z", "2026-10-03T14:00:00Z", freq="2D")
+    ):
+        h, a = CORNER_PAIRS[i % len(CORNER_PAIRS)]
+        mp = round(float(rng.uniform(0.48, 0.70)), 3)
+        ps = "over" if rng.random() < 0.6 else "under"
+        line = float(rng.choice([3.5, 4.5, 5.5]))
+        odds = round((1.14 + 0.02 * rng.random()) / mp, 2)
+        won = rng.random() < (mp - 0.08 if mp < 0.6 else mp - 0.2)
+        count = int(line + 1.5) if (ps == "over") == won else int(line - 0.5)
+        co, cu = round(odds * (0.94 + 0.08 * rng.random()), 2), round(1.95 + 0.2 * rng.random(), 2)
+        if ps == "under":
+            co, cu = cu, co
+        side = "home" if i % 2 else "away"
+        rows.append(("E0", h, a, day.isoformat(), side, line, ps, odds, mp, 0.0, count, co, cu))
+    return rows
+
+
+# Shadow-filter variants (owner, 23 Oct): paper.corner_strategies adds each track's
+# below-60% variant (tr.CORNER_VARIANTS). Its real defined_at (23 Oct) is after this
+# fixture's NOW, so nothing would be judged; the fixture moves it to 20 Sep so the
+# "Judged from" box and the chart's marker have trades on both sides.
+FIXTURE_DEFINED_AT = "2026-09-20T12:00:00+00:00"
+tr.CORNER_VARIANTS = {
+    k: [v | {"defined_at": FIXTURE_DEFINED_AT} for v in vs] for k, vs in tr.CORNER_VARIANTS.items()
+}
 
 
 def dk_corner_trades(e0, trade, at) -> list[dict]:

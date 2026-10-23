@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v49";
+const APP_VERSION = "v50";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2603,7 +2603,7 @@ function pfClassic(topIn) {
   // own rule, summary, breakdowns, by_league; trade_ids point into the combined trades.
   // The switch shows on Backtest too: Blend Lean's backtest is its own replay at Pinnacle
   // (portfolio.strategy_backtests.lean); Model 12%'s is the DraftKings backtest.
-  const strats = cur.id === "moneyline" ? cur.live?.strategies || [] : [];
+  const strats = cur.id === "moneyline" ? (cur.live?.strategies || []).filter((x) => !x.variant_of) : [];
   const strat = strats.find((x) => x.key === state.pfStrat) || strats[0] || null;
   const leanBt = state.pfView === "backtest" && strat?.key === "lean";
   const fullSet = state.pfView === "live" && strat ? stratSet(pfSet(), strat) : pfSet();
@@ -3015,13 +3015,29 @@ function modelViewHtml(cur, x, lg) {
 // extras and the rule note. Backtest keeps its own views under the same list.
 function pfStrategies(cur) {
   const st = cur.id === "moneyline" || cur.id === "corners" ? cur.live?.strategies || [] : [];
-  if (st.length) return st.map((x) => ({ key: x.key, label: x.label, st: x, rule: x.rule }));
+  if (st.length) {
+    // Shadow-filter variants (variant_of) sit directly under their parent, whatever order
+    // they arrive in; a variant whose parent is missing is dropped.
+    const row = (x) => ({ key: x.key, label: x.label, st: x, rule: x.rule, variantOf: x.variant_of || null });
+    return st.filter((x) => !x.variant_of).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]);
+  }
   const label = cur.id === "corners" ? "Model (f) 12% vs Pinnacle" : cur.name;
   return [{ key: cur.id, label, st: null, rule: cur.live?.rule || (cur.id === "moneyline" ? state.data.portfolio?.rule : null) }];
 }
 // Each portfolio keeps its own selection (Moneyline: Lean / 12%; Team corners: the book).
 const pfStratKey = (cur) => (cur?.id === "corners" ? state.pfStratCorners : state.pfStrat);
 const pfSelected = (strats, cur = pfCurrent()) => strats.find((x) => x.key === pfStratKey(cur)) || strats[0];
+// A strategy's parent (itself when it isn't a variant) and the variants filed under a parent.
+const pfParent = (strats, x) => (x.variantOf && strats.find((p) => p.key === x.variantOf)) || x;
+const pfVariants = (strats, x) => strats.filter((v) => v.variantOf === x.key);
+// "Below 60%" from the variant's filter (else the part of its label after the parent's).
+function variantShort(x, parent) {
+  const f = x.st?.filter;
+  if (f && isNum(f.max)) return `Below ${pct(f.max)}`;
+  if (f && isNum(f.min)) return `${pct(f.min)} and up`;
+  const rest = parent && x.label.startsWith(parent.label) ? x.label.slice(parent.label.length).replace(/^[,\s·]+/, "") : x.label;
+  return rest ? rest[0].toUpperCase() + rest.slice(1) : x.label;
+}
 // One strategy's live trades, narrowed to a competition (and Lean's driver filter).
 function strategyLiveSet(cur, x, lg, drv = "") {
   let set = x.st ? stratSet(cur.live || {}, x.st) : { ...(cur.live || {}), trades: cur.live?.trades || [] };
@@ -3103,19 +3119,22 @@ function strategyList(cur, strats, sel, lg, backtest) {
       : cur.status === "testing" && !m.open && !m.n ? "In testing"
       : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`;
     const rule = ruleText(x);
+    const variant = !!x.variantOf;
     let right;
     if (backtest) {
       const h = backtestHeadline(cur, x, lg);
       right = h ? `<b class="${h.cls}">${h.v}</b><small>${esc(h.sub)}</small>` : `<b class="muted">–</b><small>no backtest</small>`;
     } else {
-      right = m.n
+      right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
         ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
         : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     }
     const attrs = strats.length > 1 ? ` data-pfstrat="${esc(x.key)}" aria-pressed="${on}"` : ` aria-current="true"`;
     return `
-      <button class="row-btn strat${on ? " on" : ""}${cur.status === "retired" ? " retired" : ""}"${attrs}>
-        <span class="who"><b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span></span>
+      <button class="row-btn strat${variant ? " variant" : ""}${on ? " on" : ""}${cur.status === "retired" ? " retired" : ""}"${attrs}${variant ? ` aria-label="${esc(x.label)}"` : ""}>
+        <span class="who">${variant
+          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">Filtered${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
+          : `<b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span>`}</span>
         <span class="vals">${right}</span>
       </button>`;
   }).join("");
@@ -3255,6 +3274,129 @@ function curveChart(curve) {
       <div class="eb-readout" id="cv-readout" aria-live="polite">${curveReadout(curve[curve.length - 1])}</div>
     </div>`;
 }
+// Several cumulative curves on one chart (a strategy and its shadow-filter variants,
+// owner 23 Oct): the first solid, the rest dashed, each with its end label; a legend; a
+// marker where the filter was set. Days are the union of every series' settled days, each
+// series holding its total on days it didn't move. One scrub point per day; the readout
+// gives every series that day and each variant's difference from the first.
+const SERIES_CLS = ["s0", "s1", "s2", "s3"];
+function overlayCurveChart(series, definedAt) {
+  const days = [...new Set(series.flatMap((o) => o.curve.map((c) => c.date)))].sort();
+  if (!days.length) return "";
+  const rows = series.map((o) => {
+    const at = new Map(o.curve.map((c) => [c.date, c]));
+    let cum = 0;
+    return days.map((d) => { const c = at.get(d); if (c) cum = c.cum; return { date: d, cum, day: c || null }; });
+  });
+  const W = 320, H = 190, L = 44, R = 58, T = 16, B = 22;
+  const ys = rows.flat().map((c) => c.cum);
+  const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+  const span = hi - lo || 1;
+  const sx = (i) => L + (i / days.length) * (W - L - R); // index 0 = start ($0), day k at k + 1
+  const sy = (v) => T + (1 - (v - lo) / span) * (H - T - B);
+  const ticks = [lo, hi].filter((v) => Math.abs(v) > span * 0.12);
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${usd(v)}</text>`).join("");
+  const paths = rows.map((r, k) => `<path class="line ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" d="M${sx(0).toFixed(1)},${sy(0).toFixed(1)} ${r.map((c, i) => `L${sx(i + 1).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ")}"/>`).join("");
+  // End labels, nudged apart when two totals sit close together.
+  const ends = rows.map((r, k) => ({ k, v: r[r.length - 1].cum, y: sy(r[r.length - 1].cum) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  const last = days.length;
+  const endLabels = ends.map((e) => `<circle class="dot ser ${SERIES_CLS[e.k % 4]}" cx="${sx(last)}" cy="${sy(e.v)}" r="4"/><text class="end ser ${SERIES_CLS[e.k % 4]}" x="${sx(last) + 8}" y="${e.y + 4}">${usd(e.v, Math.abs(e.v) < 10 ? 2 : 0)}</text>`).join("");
+  // The filter marker sits between the last day before it and the first day on or after it.
+  let marker = "";
+  if (definedAt) {
+    const d0 = String(definedAt).slice(0, 10);
+    const k = days.findIndex((d) => d >= d0);
+    const mx = k < 0 ? sx(last) : k === 0 ? sx(0) : (sx(k) + sx(k + 1)) / 2;
+    const anchor = mx > (L + W - R) / 2 ? "end" : "start";
+    marker = `<line class="filter-mark" x1="${mx}" x2="${mx}" y1="${T - 6}" y2="${H - B}"/><text class="filter-lab" x="${mx + (anchor === "end" ? -4 : 4)}" y="${T - 6}" text-anchor="${anchor}">filter set (judged from here)</text>`;
+  }
+  const id = "cv";
+  scrubCharts[id] = {
+    readoutId: "cv-readout",
+    xs: days.map((_, i) => sx(i + 1)),
+    points: (i) => rows.map((r) => ({ x: sx(i + 1), y: sy(r[i].cum) })),
+    readout: (i) => overlayReadout(series, rows, i),
+    data: days,
+  };
+  const legend = series.map((o, k) => `<span class="lg-item"><svg class="lg-sw" viewBox="0 0 22 8" aria-hidden="true"><line class="ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" x1="1" x2="21" y1="4" y2="4"/></svg>${esc(o.name)}${o.label ? `<span class="muted"> · ${esc(o.label)}</span>` : ""}</span>`).join("");
+  return `
+    <div class="curve-legend">${legend}</div>
+    <div class="chart curve overlay scrub" ${scrubAttrs(id, days.length, "Profit over time, every version: drag or use the arrow keys to move along the lines")}>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${esc(series.map((o, k) => `${o.name} ${usd(rows[k][last - 1].cum, 2)}`).join(", "))}">
+        <g class="grid">${grid}</g>
+        <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
+        <text class="xlab" x="${L - 4}" y="${sy(0) + 3}" text-anchor="end">$0</text>
+        ${marker}
+        ${paths}
+        ${endLabels}
+        <text class="xlab" x="${L}" y="${H - 6}">start</text>
+        <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${days[last - 1]}T12:00:00Z`))}</text>
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        ${rows.map((_, k) => `<circle class="cdot ser ${SERIES_CLS[k % 4]}" r="4.5" cx="0" cy="0" style="display:none"/>`).join("")}
+        <rect class="scrub-pad" x="${L - 8}" y="0" width="${W - L - R + 16}" height="${H}" fill="transparent"/>
+      </svg>
+      <div class="eb-readout" id="cv-readout" aria-live="polite">${overlayReadout(series, rows, last - 1)}</div>
+    </div>`;
+}
+// "Sat 18 Oct · All +$23.40 · Below 60% +$31.10 (difference +$7.70)".
+function overlayReadout(series, rows, i) {
+  const base = rows[0][i].cum;
+  const parts = series.map((o, k) => {
+    const v = rows[k][i].cum;
+    return `${esc(o.name)} <b class="${signCls(v)}">${usd(v, 2)}</b>${k ? ` (difference ${usd(v - base, 2)})` : ""}`;
+  });
+  return `<b>${esc(dayName(rows[0][i].date))}</b> · ${parts.join(" · ")}`;
+}
+// A variant's own judgement (paper.variant_since): only trades opened at or after
+// defined_at count, since the cut was chosen after seeing the earlier ones. since_defined =
+// {defined_at, parent: {trades, summary}, variant: {trades, summary}, clv_diff: {clv_pinnacle,
+// clv_dk: {trades, kept, matches, mean_all, mean_kept, diff, ci95, draws}}}; clv_pinnacle is
+// the pre-registered measure. Pooled over every competition.
+const JUDGE_MIN = 30;
+const CLV_FIELD_NAME = { clv_pinnacle: "Pinnacle's close", clv_dk: "DraftKings' close" };
+function sinceDefinedHtml(cur, x, parent, lg) {
+  const sd = x.st?.since_defined;
+  const at = sd?.defined_at || x.st?.defined_at;
+  if (!sd || !at) return "";
+  const name = variantShort(x, parent);
+  // The trades the cut was chosen on: the parent's settled ones opened before defined_at.
+  const before = (strategyLiveSet(cur, parent, "").trades || []).filter((t) => t.opened_at && t.opened_at < at && t.status !== "open").length;
+  // Corners (both books) are judged on Pinnacle's close; Moneyline keeps DraftKings'.
+  const clvKey = cur.id === "corners" ? "clv_pinnacle" : "clv_dk";
+  const line = (label, part) => {
+    const s = part?.summary;
+    if (!part?.trades || !s) return `<tr><th>${esc(label)}</th><td>0</td><td colspan="4" class="muted">none yet</td></tr>`;
+    const c = s[clvKey];
+    return `<tr><th>${esc(label)}</th><td>${part.trades}</td><td>${s.settled ?? 0}</td><td class="${signCls(s.profit || 0)}">${usd(s.profit || 0, 2)}</td><td>${s.settled ? signedPct(s.roi) : "–"}</td><td>${isNum(c) ? signedPct(c) : "–"}</td></tr>`;
+  };
+  // The judged field first; DraftKings' own close only on the DraftKings track.
+  const dkTrack = cur.id === "corners" && parent.key === "draftkings";
+  const diffs = Object.entries(sd.clv_diff || {})
+    .filter(([f, d]) => d && d.trades && (f === clvKey || dkTrack))
+    .sort(([a], [b]) => (a === clvKey ? -1 : b === clvKey ? 1 : 0));
+  const diffLine = ([f, d]) => {
+    const where = CLV_FIELD_NAME[f] || f;
+    const head = f === clvKey ? "<b>The judged measure</b>, CLV" : "Descriptive only, CLV";
+    if (!isNum(d.diff)) return `<p class="note">${head} against ${where}: no ${esc(name.toLowerCase())} trade has a close yet (${d.trades} of all do).</p>`;
+    return `<p class="note">${head} against ${where}: ${esc(name.toLowerCase())} ${signedPct(d.mean_kept)} vs all ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : " (no range yet: it needs trades from at least 2 matches)"}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close, from ${d.matches} match${d.matches === 1 ? "" : "es"}.</p>`;
+  };
+  const kept = sd.clv_diff?.[clvKey]?.kept ?? 0;
+  const none = !sd.parent?.trades;
+  const enough = none ? `<p class="note judge-few"><b>Nothing to judge yet:</b> no trade has opened since ${monthDay(at)}.</p>`
+    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} settled with ${CLV_FIELD_NAME[clvKey]} since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
+  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
+  return `
+    <div class="card judged">
+      <div class="judged-head">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
+      <table class="judged-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
+        <tbody>${line(name, sd.variant)}${line("All", sd.parent)}</tbody></table>
+      ${diffs.map(diffLine).join("")}
+      ${enough}
+      <p class="note">${why}</p>
+      ${x.st?.filter?.note ? `<details class="fold"><summary>How this filter works</summary><p class="note">${esc(x.st.filter.note)}</p></details>` : ""}
+    </div>`;
+}
 function liveRuleNote(cur, x) {
   const rule = state.data.portfolio?.rule || {};
   if (cur.id === "corners" && (x.rule?.book || x.key) === "draftkings") return `<b>Live test: fixed ${pct(x.rule?.threshold ?? PAPER_EDGE)} on model (f) against DraftKings.</b> The same model and rule as the Pinnacle track, on DraftKings' price: a $${x.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(x.rule?.threshold ?? PAPER_EDGE)} edge, at most one per team and line, in the Premier League, La Liga, the Bundesliga, Serie A and Ligue 1 (DraftKings lists no team corners in the Championship). On a whole line (say 5), exactly 5 corners is a push: the stake comes back. Closing line value is against DraftKings' own close; where DraftKings priced only one side at the close there is none, and Pinnacle's close at the same line is the second check. Prices: logged with Pinnacle's, about a day before kickoff and again just before it.`;
@@ -3264,15 +3406,16 @@ function liveRuleNote(cur, x) {
   if (cur.id === "moneyline") return rule.threshold == null ? "No new paper trades: no minimum edge has beaten the market in past bets." : `A $${rule.stake ?? 10} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.`;
   return esc(cur.note || "");
 }
-function liveStrategyHtml(cur, x, lg) {
+function liveStrategyHtml(cur, x, lg, strats = []) {
   const lean = x.key === "lean";
   const drv = lean ? state.pfDriver : "";
   const set = strategyLiveSet(cur, x, lg, drv);
   const trades = set.trades || [];
   const m = tradeStats(trades);
-  const dkCorners = cur.id === "corners" && x.key === "draftkings";
+  const dkCorners = cur.id === "corners" && (x.variantOf || x.key) === "draftkings";
   const book = cur.id === "corners" ? BOOK_POSS[dkCorners ? "draftkings" : "pinnacle"] : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
-  const banner = set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
+  const banner = x.st?.error ? `<div class="banner">This filtered view could not be built this time (${esc(x.st.error)}); the full track's record is unaffected.</div>`
+    : set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   const rules = `<div class="explain live-test rule-note">${liveRuleNote(cur, x)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
   const title = `<div class="section-title nocase">${esc(x.label)}${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>`;
@@ -3308,7 +3451,20 @@ function liveStrategyHtml(cur, x, lg) {
   const ci = s.roi_ci95 && s.settled === m.n && Math.abs((s.profit ?? 0) - m.profit) < 0.005
     ? `<p class="note">95% range on ROI: ${signedPct(s.roi_ci95[0])} to ${signedPct(s.roi_ci95[1])} (resampling match weeks). Won ${pct(s.win_rate, 1)} vs ${pct(s.breakeven, 1)} needed to break even.</p>` : "";
   const curve = settledCurve(trades);
-  const chart = curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
+  // A parent with variants, or a variant: every one of them on one chart, parent solid.
+  const parent = pfParent(strats, x);
+  const family = [parent, ...pfVariants(strats, parent)];
+  const overlay = family.length > 1
+    ? family.map((s, k) => ({
+      name: k ? variantShort(s, parent) : "All",
+      label: k ? "" : s.label,
+      curve: settledCurve(s === x ? trades : strategyLiveSet(cur, s, lg).trades || []),
+    }))
+    : null;
+  const definedAt = family.map((s) => s.st?.defined_at).find(Boolean) || null;
+  const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt)
+    : curve.length ? curveChart(curve) : `<p class="muted">The chart starts when the first trade settles.</p>`;
+  const judged = x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
   const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
@@ -3318,6 +3474,7 @@ function liveStrategyHtml(cur, x, lg) {
     ${tiles}
     ${caveat}
     ${ci}
+    ${judged}
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card">${chart}</div>
@@ -3354,15 +3511,19 @@ function viewPortfolio() {
       ${views.map(([k, l]) => `<button data-pf="${k}" class="${view === k ? "on" : ""}" aria-pressed="${view === k}">${l}</button>`).join("")}
     </div>`;
   const backtest = view === "backtest";
-  const strats = pfStrategies(cur);
-  const sel = pfSelected(strats, cur);
+  const allStrats = pfStrategies(cur);
+  // Variants have no backtest or model of their own: those views list the parents only
+  // and show the selected variant's parent.
+  const strats = view === "live" ? allStrats : allStrats.filter((x) => !x.variantOf);
+  const sel = pfParent(allStrats, pfSelected(allStrats, cur));
+  const live = view === "live" ? pfSelected(allStrats, cur) : sel;
   const research = backtest && cur.backtest?.kind === "research";
   const byComp = cur.id === "moneyline" || cur.id === "corners";
   const lg = byComp && !research ? leagueOn() : "";
-  const list = `<div class="section-title">${backtest ? "Strategies, tested on past prices" : "Paper strategies"}</div>${strategyList(cur, strats, sel, lg, backtest)}`;
+  const list = `<div class="section-title">${backtest ? "Strategies, tested on past prices" : "Paper strategies"}</div>${strategyList(cur, strats, live, lg, backtest)}`;
   const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${list}`;
   if (view === "model") return `${top}${modelViewHtml(cur, sel, lg)}${retiredLinks}`;
-  if (!backtest) return `${top}${liveStrategyHtml(cur, sel, lg)}${retiredLinks}`;
+  if (!backtest) return `${top}${liveStrategyHtml(cur, live, lg, allStrats)}${retiredLinks}`;
   return pfClassic(top);
 }
 
