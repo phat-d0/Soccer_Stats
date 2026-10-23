@@ -38,6 +38,11 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
 - One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
   corner cap 550 credits a month.
+- Shadow filter "below 60%" (owner, 23 Oct; pre-registered in `docs/totals.md` "Shadow filter:
+  below 60%", commit e0b0bcd): each track's trades with model chance given no push < 0.60, shown
+  beside the track (`pinnacle_below60`, `draftkings_below60`). No bets of its own. Judged only on
+  trades opened from 23 Oct 08:39 UTC (`trades.SHADOW_DEFINED_AT`), on the matched CLV difference
+  vs Pinnacle's close, at the 8 Dec review; no live change unless the owner decides then.
 - No corners in E2, E3 or the cups: Pinnacle quotes none in E2/E3 (11 Oct probe), and the
   cup corner model failed its pre-registered test (PR #69; `docs/totals.md` "Cup corners model").
 - A League One / League Two corner re-check runs on 24 Oct. If Pinnacle lists team corners
@@ -344,7 +349,11 @@ the owner's baseball app, so the balance can drop without any run here.
   - Corners: `corners_rule(book="pinnacle")` = `{threshold: 0.12 (CORNERS_EDGE), source:
     "owner_fixed", note, rule: "fixed_raw", p_source: "model_f", book, stake: 10}`;
     `CORNER_STRATEGY_ORDER = ["pinnacle", "draftkings"]`, `CORNER_STRATEGY_LABELS`,
-    `corner_strategy_of(t)` (`strategy`, else `bookmaker`, else Pinnacle); `new_corner_trade(...,
+    `corner_strategy_of(t)` (`strategy`, else `bookmaker`, else Pinnacle). Shadow variants:
+    `SHADOW_DEFINED_AT`, `chance_no_push(t)` (model_p / (1 − p_push) on corners), `FILTER_FIELDS`
+    / `filter_value` / `passes_filter(t, {field, min?, max?, note})` (min ≤ value < max; missing =
+    out), `CORNER_VARIANTS` (`{parent: [{key, label, filter, defined_at}]}`: `<book>_below60`,
+    max 0.60, `BELOW60_NOTE`), `variant_rule`. `new_corner_trade(...,
     book=)` (DraftKings ids end `|dk`, `CORNER_ID_SUFFIX`); `settle_corner` (over wins at count >
     line; exact whole line = push, `status: "void"`, `push: true`).
   - Players: `player_picks` (best line per player and market, ≤ 4 a match); `PLAYER_PAPER_TRADES
@@ -393,7 +402,16 @@ the owner's baseball app, so the balance can drop without any run here.
     live, backtest`). Moneyline `live.strategies` (`match_strategies`) = `[{key, label, rule,
     summary, breakdowns, by_league, by_driver (Lean), trade_ids}]`, Lean first, beside the combined
     `trades`/`summary`; Lean has `driver_note`. Corners `live.strategies` (`corner_strategies`),
-    Pinnacle first. `by_league` per section when trades span 2+ leagues. Corners' backtest =
+    Pinnacle first, each followed by its shadow variants (`with_variants(sections, trades,
+    variants, of)`, generic for any strategy list; `variant_section`): a variant is the parent's
+    trades passing `filter`, no ledger rows of its own, with the usual section fields plus
+    `variant_of`, `filter`, `defined_at`, `rule` (the parent's plus `variant_of`, `filter`,
+    `defined_at`) and `since_defined` (`variant_since`: `{defined_at, parent: {trades, summary},
+    variant: {trades, summary}, clv_diff: {clv_pinnacle, clv_dk}}` on trades opened at or after
+    `defined_at`; `clv_difference` = mean of the kept minus mean of all, settled trades with a
+    value, 95% range resampling matches, 2,000 draws, seed 0, `{field, trades, kept, matches,
+    mean_all, mean_kept, diff, ci95, draws}`). A failing variant is `{key, label, variant_of,
+    filter, defined_at, error}`. `by_league` per section when trades span 2+ leagues. Corners' backtest =
     `corners_research()` (`kind: "research"`, from `lab/markets_research.json`).
     `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Every
     `strategy_section` (both Moneyline and both corner strategies) has `calibration` =
