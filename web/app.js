@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v51";
+const APP_VERSION = "v52";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -991,15 +991,16 @@ function edgeBucketsHtml(pfId, lg = "") {
       ? `<span class="eb-range ${beat ? "pos" : "neg"}" style="left:${x(r.realized_lo)}%;width:${Math.max(0.5, x(r.realized_hi) - x(r.realized_lo))}%"></span>` : "";
     const dot = (v, cls) => (v == null ? "" : `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>`);
     const above = et.min_edge != null && r.edge_lo >= et.min_edge - 1e-9;
-    return `<button class="eb-row${above ? " above" : ""}" data-ebrow="${i}" data-eb="${esc(pfId)}">
+    return `<div class="eb-row${above ? " above" : ""}" data-stop="${i}" data-ebrow="${i}" data-eb="${esc(pfId)}">
       <span class="eb-label">${label(r)}<span class="meta">${r.n} bets</span>${r.roi != null ? `<span class="meta ${plClass(r.roi)}">ROI ${signedPct(r.roi, 0)}</span>` : ""}</span>
       <span class="eb-plot">${range}${dot(r.implied, "imp")}${dot(r.model, "mod")}${dot(r.realized, `real ${beat ? "pos" : "neg"}`)}</span>
-    </button>`;
+    </div>`;
   }).join("");
   const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${pct(v)}</span>`).join("")}</span></div>`;
+  scrubCharts[`eb-${pfId}`] = { n: rows.length, rows: true, readoutId: `eb-readout-${pfId}`, readout: (i) => ebReadout(et, i) };
   return `
     <div class="section-title">Claimed edge vs what happened</div>
-    <div class="card eb-card" data-ebcard="${esc(pfId)}">
+    <div class="card eb-card scrub-rows" data-ebcard="${esc(pfId)}" ${scrubAttrs(`eb-${esc(pfId)}`, rows.length, "Point at or drag across the rows, or use the arrow keys")}>
       <div class="eb-legend"><span><i class="eb-key imp"></i>Book's chance</span><span><i class="eb-key mod"></i>Model's chance</span><span><i class="eb-key real pos"></i>Won (range)</span></div>
       ${body}
       ${axis}
@@ -1284,7 +1285,6 @@ const DEV_METRICS = {
   shots: ["Shots (total)", (r) => r.shots, () => true, 0, ""],
 };
 const DEV_MAX_ROWS = 40;
-let devData = null;
 
 function devChartHtml() {
   const [label, val, qualifies, dp, unit] = devMetrics()[state.pl.metric] || DEV_METRICS.p90;
@@ -1314,7 +1314,7 @@ function devChartHtml() {
       ? `M${left},${yy + 4} h${w - r} a${r},${r} 0 0 1 ${r},${r} v${RH - 8 - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - r} z`
       : `M${left + w},${yy + 4} h-${w - r} a${r},${r} 0 0 0 -${r},${r} v${RH - 8 - 2 * r} a${r},${r} 0 0 0 ${r},${r} h${w - r} z`;
     const name = x.r.player.length > 16 ? `${x.r.player.slice(0, 15)}…` : x.r.player;
-    return `<g class="dev-row" data-i="${i}">
+    return `<g class="dev-row" data-stop="${i}">
       <rect class="hit" x="0" y="${yy}" width="${W}" height="${RH}"/>
       <text class="dev-name" x="${LBL - 8}" y="${yy + RH / 2 + 4}" text-anchor="end">${esc(name)}</text>
       <path class="${x.d >= 0 ? "dev-pos" : "dev-neg"}" d="${path}"/>
@@ -1323,13 +1323,20 @@ function devChartHtml() {
   // SD labels only when there's room beside the average's label.
   const roomy = sx(sd) - x0 > 46;
   const ticks = [-1, 0, 1].filter((k) => k === 0 || roomy).map((k) => `<text class="xlab" x="${sx(k * sd)}" y="${H - 8}" text-anchor="${k < 0 ? "end" : k > 0 ? "start" : "middle"}" dx="${k * 4}">${k === 0 ? `avg ${mean.toFixed(dp)}${unit}` : `${k > 0 ? "+" : "−"}1 SD`}</text>`).join("");
-  devData = { rows, mean, sd, dp, unit, label, W };
+  // Each bar is a scrub stop (row chart): point at, drag or tap; arrows step.
+  scrubCharts.dev = {
+    n: rows.length, rows: true, readoutId: "dev-readout",
+    readout: (i) => {
+      const x = rows[i], r = x.r;
+      return `<b>${esc(r.player)}</b> <span class="muted">${esc(r.team)} · ${esc(r.position || "")}</span><br>${esc(label)} ${x.v.toFixed(dp)}${unit} · <span class="${x.d >= 0 ? "gain" : "loss"}">${x.d >= 0 ? "+" : "−"}${Math.abs(x.d).toFixed(dp)}${unit} vs average (${x.z >= 0 ? "+" : "−"}${Math.abs(x.z).toFixed(1)} SD)</span> · ${r.shots} shots, ${r.minutes} min`;
+    },
+  };
   const ps = curPs();
   const scope = [seasonName(ps.seasons.includes(state.pl.season) ? state.pl.season : ps.seasons[0]), state.pl.team || "all clubs", state.pl.pos || "all positions"].join(" · ");
   return `
     <p class="note" style="margin-top:0"><b>${esc(label)}</b>, each player against the average of this group (${esc(scope)}, ${group.length} players${state.pl.metric === "shots" ? "" : " who qualify"}). Blue = above average, red = below; the gray band is ±1 standard deviation (${sd.toFixed(dp)}${unit}).${cut ? ` Showing the top and bottom ${DEV_MAX_ROWS / 2}.` : ""}</p>
-    <div class="dev-readout" id="dev-readout" aria-live="polite">Tap a bar for that player's numbers.</div>
-    <div class="chart" id="dev-chart">
+    <div class="dev-readout" id="dev-readout" aria-live="polite">Point at, drag across or tap a bar for that player's numbers.</div>
+    <div class="chart scrub" id="dev-chart" ${scrubAttrs("dev", rows.length, "Players against the average: point at or drag across the bars, or use the arrow keys")}>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: deviation from the group average of ${mean.toFixed(dp)}${unit}">
         ${band}
         <line class="zero" x1="${x0}" x2="${x0}" y1="${T - 6}" y2="${H - B + 2}"/>
@@ -1339,26 +1346,8 @@ function devChartHtml() {
     </div>`;
 }
 
-function bindDevChart() {
-  const el = $("#dev-chart");
-  if (!el || !devData) return;
-  const out = $("#dev-readout");
-  const show = (g) => {
-    const x = devData.rows[Number(g.dataset.i)];
-    el.querySelectorAll(".dev-row.on").forEach((n) => n.classList.remove("on"));
-    g.classList.add("on");
-    const r = x.r, u = devData.unit, dp = devData.dp;
-    out.innerHTML = `<b>${esc(r.player)}</b> <span class="muted">${esc(r.team)} · ${esc(r.position || "")}</span><br>${esc(devData.label)} ${x.v.toFixed(dp)}${u} · <span class="${x.d >= 0 ? "gain" : "loss"}">${x.d >= 0 ? "+" : "−"}${Math.abs(x.d).toFixed(dp)}${u} vs average (${x.z >= 0 ? "+" : "−"}${Math.abs(x.z).toFixed(1)} SD)</span> · ${r.shots} shots, ${r.minutes} min`;
-  };
-  el.querySelectorAll(".dev-row").forEach((g) => {
-    g.addEventListener("pointerenter", () => show(g));
-    g.addEventListener("pointerdown", () => show(g));
-  });
-}
-
 function refreshPlayerList() {
   $("#pl-list").innerHTML = state.pl.mode === "stats" ? statsBodyHtml() : playerListHtml();
-  if (state.pl.mode === "stats" && state.pl.view === "chart") bindDevChart();
 }
 
 function statsBodyHtml() {
@@ -1574,20 +1563,29 @@ function profitChart(sel, unit = "units") {
     dt.setMonth(dt.getMonth() + 3);
   }
   const xl = months.map((t) => `<text class="xlab" x="${x(t)}" y="${H - 6}" text-anchor="middle">${new Date(t).toLocaleDateString(undefined, { month: "short", year: "2-digit" })}</text>`).join("");
-  chartData = { daily, x, y, W, unit };
+  // Scrub stops: one per betting day; the readout line under the chart follows.
+  const pr = (p) => `<b>${new Date(p.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</b> · ${p.n} ${unit === "$" ? "trade" : "bet"}${p.n > 1 ? "s" : ""}, ${fmtAmount(p.day, unit, 2)} · running total ${fmtAmount(p.cum, unit)}`;
+  scrubCharts.pc = {
+    readoutId: "pc-readout",
+    xs: daily.map((p) => x(Date.parse(p.date))),
+    points: (i) => [{ x: x(Date.parse(daily[i].date)), y: y(daily[i].cum) }],
+    readout: (i) => pr(daily[i]),
+    data: daily,
+  };
   return `
-    <div class="chart" id="profit-chart">
+    <div class="chart scrub" id="profit-chart" ${scrubAttrs("pc", daily.length, "Running profit: point at or drag along the line, or use the arrow keys")}>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running profit in ${unit === "$" ? "dollars" : "units"}, ending at ${fmtAmount(cum, unit)}">
         <g class="grid">${grid}</g>
         <line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>
         <path class="line" d="${path}" vector-effect="non-scaling-stroke"/>
         ${xl}
-        <line class="cross" id="cross" y1="${T}" y2="${H - B}" visibility="hidden" vector-effect="non-scaling-stroke"/>
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        <circle class="cdot" r="4" cx="0" cy="0" style="display:none"/>
+        ${scrubPad(W, H)}
       </svg>
-      <div class="tooltip" id="tip" hidden></div>
+      <div class="eb-readout" id="pc-readout" aria-live="polite">${pr(daily[daily.length - 1])}</div>
     </div>`;
 }
-let chartData = null;
 function fmtAmount(v, unit, d = 1) {
   if (unit !== "$") return `${signed(v, d)} units`;
   return `${v >= 0 ? "+" : "−"}$${Math.abs(v).toFixed(d === 1 ? 0 : 2)}`;
@@ -1597,32 +1595,6 @@ function niceStep(raw) {
   const f = raw / p;
   return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
 }
-function bindChart() {
-  const el = $("#profit-chart");
-  if (!el || !chartData) return;
-  const svg = $("svg", el), tip = $("#tip", el), cross = $("#cross", el);
-  const move = (ev) => {
-    const rect = svg.getBoundingClientRect();
-    const sx = ((ev.clientX - rect.left) / rect.width) * chartData.W;
-    let best = chartData.daily[0], bd = Infinity;
-    for (const p of chartData.daily) {
-      const dd = Math.abs(chartData.x(Date.parse(p.date)) - sx);
-      if (dd < bd) { bd = dd; best = p; }
-    }
-    const px = chartData.x(Date.parse(best.date));
-    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
-    tip.hidden = false;
-    const u = chartData.unit;
-    tip.innerHTML = `<b>${new Date(best.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</b><br>${best.n} ${u === "$" ? "trade" : "bet"}${best.n > 1 ? "s" : ""}, ${fmtAmount(best.day, u, 2)}<br>Running total ${fmtAmount(best.cum, u)}`;
-    const left = Math.min(Math.max((px / chartData.W) * rect.width, 70), rect.width - 70);
-    tip.style.left = `${left}px`;
-  };
-  const leave = () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); };
-  svg.addEventListener("pointermove", move);
-  svg.addEventListener("pointerdown", move);
-  svg.addEventListener("pointerleave", leave);
-}
-
 function recordToggle() {
   return `
     <div class="segmented" role="group" aria-label="Bet type" style="margin-bottom:12px">
@@ -1637,26 +1609,26 @@ function viewRecord() {
 
 // ---------- Record → Goals & corners: research results (lab/markets_research.json) ----------
 // A range plot per league (dot = estimate, bar = its range, line at 0). Blue when the whole
-// range is above 0, red when it is all below, grey when it could be 0. Tap a row to read it.
-const rcCharts = {};
+// range is above 0, red when it is all below, grey when it could be 0. Point at, drag or
+// tap a row to read it (a row scrub chart).
 function rangeChart(id, rows, fmt) {
   rows = rows.filter((r) => r.v != null && r.lo != null && r.hi != null);
   if (!rows.length) return "";
-  rcCharts[id] = rows;
+  scrubCharts[id] = { n: rows.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => rows[i].readout };
   const vals = rows.flatMap((r) => [r.lo, r.hi]).concat(0);
   const span = Math.max(...vals) - Math.min(...vals) || 1;
   const lo = Math.min(...vals) - span * 0.08, hi = Math.max(...vals) + span * 0.08;
   const x = (v) => ((v - lo) / (hi - lo)) * 100;
   const tone = (r) => (r.lo > 0 ? "pos" : r.hi < 0 ? "neg" : "mid");
   const body = rows.map((r, i) => `
-    <button class="eb-row rc-row" data-rcrow="${i}" data-rc="${esc(id)}">
+    <div class="eb-row rc-row" data-stop="${i}" data-rcrow="${i}" data-rc="${esc(id)}">
       <span class="eb-label">${esc(r.label)}${r.sub ? `<span class="meta">${esc(r.sub)}</span>` : ""}</span>
       <span class="eb-plot"><span class="rc-zero" style="left:${x(0)}%"></span><span class="eb-range ${tone(r)}" style="left:${x(r.lo)}%;width:${Math.max(0.5, x(r.hi) - x(r.lo))}%"></span><span class="eb-dot real ${tone(r)}" style="left:${x(r.v)}%"></span></span>
-    </button>`).join("");
+    </div>`).join("");
   // Ticks at 0 and near each end, skipping any that would crowd the 0 label.
   const ticks = [lo + (hi - lo) * 0.1, hi - (hi - lo) * 0.1].filter((v) => Math.abs(x(v) - x(0)) > 18);
   const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${fmt(v)}</span>`).join("")}<span style="left:${x(0)}%">0</span></span></div>`;
-  return `<div class="card eb-card">${body}${axis}<div class="eb-readout" id="rc-readout-${esc(id)}" aria-live="polite">${rows[0].readout}</div></div>`;
+  return `<div class="card eb-card scrub-rows" ${scrubAttrs(id, rows.length, "Point at or drag across the rows, or use the arrow keys")}>${body}${axis}<div class="eb-readout" id="rc-readout-${esc(id)}" aria-live="polite">${rows[0].readout}</div></div>`;
 }
 
 const gainFmt = (v, d = 3) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`);
@@ -2804,13 +2776,19 @@ function shapeChart(lg) {
   const ticks = [0, 0.25, 0.5, 0.75, 1];
   const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text><text x="${sx(v)}" y="${H - 14}" text-anchor="middle">${pct(v)}</text>`).join("");
   const at = [0.2, 0.5, 0.8].map((p) => `${pct(p)} → ${pct(blendHome(coef, p, 0), 1)}`).join(", ");
-  rcCharts[`shape-${code}`] = [0.2, 0.35, 0.5, 0.65, 0.8].map((p) => ({
-    readout: `<b>Market ${pct(p)}</b>: blend ${pct(blendHome(coef, p, 0), 1)} with the model agreeing, ${pct(blendHome(coef, p, 0.1), 1)} with the model 10 points higher, ${pct(blendHome(coef, p, -0.1), 1)} with it 10 points lower.`,
-  }));
-  const hits = [0.2, 0.35, 0.5, 0.65, 0.8].map((p, i) => `<circle class="pt" cx="${sx(p)}" cy="${sy(blendHome(coef, p, 0))}" r="2.5"/><circle class="hit" data-rcpt="${i}" data-rc="shape-${code}" cx="${sx(p)}" cy="${sy(blendHome(coef, p, 0))}" r="12" fill="transparent"/>`).join("");
+  // Scrub stops: the market's chance in 1-point steps, 4% to 94% (the drawn range).
+  const steps = Array.from({ length: 91 }, (_, i) => (4 + i) / 100);
+  const DMS = [0, 0.1, -0.1];
+  const id = `shape-${code}`;
+  scrubCharts[id] = {
+    readoutId: `rc-readout-${id}`,
+    xs: steps.map(sx),
+    points: (i) => DMS.map((dm) => ({ x: sx(steps[i]), y: sy(blendHome(coef, steps[i], dm)) })),
+    readout: (i) => `<b>Market ${pct(steps[i])}</b>: blend ${pct(blendHome(coef, steps[i], 0), 1)} with the model agreeing, ${pct(blendHome(coef, steps[i], 0.1), 1)} with the model 10 points higher, ${pct(blendHome(coef, steps[i], -0.1), 1)} with it 10 points lower.`,
+  };
   return `
     <div class="section-title">The blend's shape${lg ? "" : ", Premier League"}</div>
-    <div class="chart curve shape-chart">
+    <div class="chart curve shape-chart scrub" ${scrubAttrs(id, steps.length, "The blend's shape: drag or use the arrow keys")}>
       <div class="eb-legend"><span><i class="ln-key diag"></i>Blend = market</span><span><i class="ln-key same"></i>Model agrees</span><span><i class="ln-key up"></i>Model 10 pts higher</span><span><i class="ln-key down"></i>Model 10 pts lower</span></div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Blend's home chance against the market's: ${esc(at)}">
         <g class="grid">${grid}</g>
@@ -2818,10 +2796,12 @@ function shapeChart(lg) {
         <path class="shape up" d="${curve(0.1)}"/>
         <path class="shape down" d="${curve(-0.1)}"/>
         <path class="shape same" d="${curve(0)}"/>
-        ${hits}
+        <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+        ${["same", "up", "down"].map((k) => `<circle class="cdot ${k}" r="4" cx="0" cy="0" style="display:none"/>`).join("")}
+        ${scrubPad(W, H)}
         <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Market's fair home chance</text>
       </svg>
-      <div class="eb-readout" id="rc-readout-shape-${code}" aria-live="polite">With the model agreeing with the market, ${at}.</div>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">With the model agreeing with the market, ${at}. Point at or drag along the chart for any price.</div>
     </div>
     <p class="note">Drawn for the home side, with the draw and away sharing the rest of the chance 45 : 55 (the model's split too). Above the diagonal the blend rates the home side higher than the market. ${coef.b > 1.02 ? `With b = ${num2(coef.b)} above 1 the solid line bends away from the diagonal: favourites get a little likelier and long shots a little less likely, whatever the model says.` : `With b = ${num2(coef.b)} the solid line stays close to the diagonal.`} The gap between the dashed lines is all the model can move it${isNum(coef.c) ? ` (c = ${sgn2(coef.c)})` : ""}.${lg ? "" : " Choose a competition above to see its own fit."}</p>`;
 }
@@ -2872,7 +2852,7 @@ function cornerShapeChart(lg) {
         ${CORNER_LINES.map((line, k) => `<path class="shape l${k}" d="${curve(line)}"/>`).join("")}
         <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
         ${CORNER_LINES.map((_, k) => `<circle class="cdot l${k}" r="4" cx="0" cy="0" style="display:none"/>`).join("")}
-        <rect class="scrub-pad" x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent"/>
+        ${scrubPad(W, H)}
         <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Team's expected corners</text>
       </svg>
       <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">At the league's average for a home side (${num2(mid, 1)} corners): over 3.5 ${at(3.5)}, over 4.5 ${at(4.5)}, over 5.5 ${at(5.5)}. Drag along the chart for other teams.</div>
@@ -2891,26 +2871,45 @@ function reliabilityChart(id, all, names = SERIES_NAME, unit = "outcomes") {
   const ticks = [];
   for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v);
   const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${pct(v)}</text><text x="${sx(v)}" y="${H - 14}" text-anchor="middle">${pct(v)}</text>`).join("");
-  rcCharts[id] = pts.map(({ k, b }) => ({
-    readout: `<b>${names[k]}, chances ${pctRange(b.lo, b.hi)}</b>: ${num(b.n)} ${unit}, it said ${pct(b.predicted, 1)} on average, they happened ${pct(b.realized, 1)} of the time${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 1)} to ${pct(b.realized_hi, 1)})` : ""}.`,
-  }));
-  const marks = pts.map(({ k, b }, i) => {
-    const x = sx(b.predicted), y = sy(b.realized);
-    const range = isNum(b.realized_lo) ? `<line class="rng ${k}" x1="${x}" x2="${x}" y1="${sy(b.realized_lo)}" y2="${sy(b.realized_hi)}"/>` : "";
-    const mark = k === "price" ? `<line class="mk price" x1="${x - 5}" x2="${x + 5}" y1="${y}" y2="${y}"/>` : `<circle class="mk ${k}" cx="${x}" cy="${y}" r="${k === "model" ? 4 : 3.5}"/>`;
-    return `${range}${mark}<circle class="hit" data-rcpt="${i}" data-rc="${id}" cx="${x}" cy="${y}" r="10" fill="transparent"/>`;
+  // One stop per bin of chances (lo–hi), holding every series' point in it, so one
+  // readout compares them; a pointer picks the nearest point by x, then by distance.
+  const binKey = (b) => `${b.lo}|${b.hi}`;
+  const stops = [...new Set(pts.map(({ b }) => binKey(b)))].map((key) => pts.filter(({ b }) => binKey(b) === key))
+    .sort((a, c) => a[0].b.lo - c[0].b.lo);
+  const stopOf = new Map(stops.flatMap((g, i) => g.map((p) => [p, i])));
+  const relLine = ({ k, b }) => `${names[k]} ${num(b.n)} ${unit}: said ${pct(b.predicted, 1)}, happened ${pct(b.realized, 1)}${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 1)} to ${pct(b.realized_hi, 1)})` : ""}`;
+  scrubCharts[id] = {
+    n: stops.length,
+    readoutId: `rc-readout-${id}`,
+    pick: (x, y) => {
+      let best = 0, bd = Infinity;
+      stops.forEach((g, i) => g.forEach(({ b }) => {
+        const d = Math.abs(sx(b.predicted) - x) * 4 + Math.abs(sy(b.realized) - y);
+        if (d < bd) { bd = d; best = i; }
+      }));
+      return best;
+    },
+    readout: (i) => `<b>Chances ${pctRange(stops[i][0].b.lo, stops[i][0].b.hi)}</b>: ${stops[i].map(relLine).join("; ")}.`,
+  };
+  const marks = pts.map((p) => {
+    const { k, b } = p;
+    const x = sx(b.predicted), y = sy(b.realized), st = stopOf.get(p);
+    const range = isNum(b.realized_lo) ? `<line class="rng ${k}" data-stop="${st}" x1="${x}" x2="${x}" y1="${sy(b.realized_lo)}" y2="${sy(b.realized_hi)}"/>` : "";
+    const mark = k === "price" ? `<line class="mk price" data-stop="${st}" x1="${x - 5}" x2="${x + 5}" y1="${y}" y2="${y}"/>` : `<circle class="mk ${k}" data-stop="${st}" cx="${x}" cy="${y}" r="${k === "model" ? 4 : 3.5}"/>`;
+    return `${range}${mark}`;
   }).join("");
   const s = all[series[0]];
   return `
-    <div class="chart curve rel-chart">
+    <div class="chart curve rel-chart scrub" ${scrubAttrs(id, stops.length, "Predicted against happened: point at or drag across the chart, or use the arrow keys")}>
       <div class="eb-legend">${series.map((k) => `<span><i class="rel-key ${k}"></i>${names[k]}</span>`).join("")}<span><i class="ln-key diag"></i>Perfect</span></div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Predicted chance against how often it happened">
         <g class="grid">${grid}</g>
         <line class="diag" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(top)}" y2="${sy(top)}"/>
         ${marks}
+        ${scrubPad(W, H)}
         <text class="xlab" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">Predicted chance</text>
       </svg>
-      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${num(s.n)} ${unit}. Tap a point for its numbers.</div>
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${num(s.n)} ${unit}. Point at or drag across the chart for each group's numbers.</div>
     </div>
     <ul class="slopes">${series.map((k) => `<li><b>${names[k]}</b>: ${slopeWords(all[k])}. Brier ${num2(all[k].brier, 4)}, log loss ${num2(all[k].log_loss, 4)}.</li>`).join("")}</ul>`;
 }
@@ -2927,7 +2926,7 @@ function binRowsChart(id, cal, what) {
   const step = hi - lo > 0.5 ? 0.2 : 0.1;
   const ticks = [];
   for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
-  rcCharts[id] = bins.map((b) => ({
+  const binText = bins.map((b) => ({
     readout: `<b>Said ${pctRange(b.lo, b.hi)}</b>, ${num(b.n)} ${what}: said ${pct(b.predicted, 1)} on average${isNum(b.implied) ? `, the price's break-even ${pct(b.implied, 1)}` : ""}, won ${pct(b.realized, 1)}${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 0)} to ${pct(b.realized_hi, 0)})` : ""}.`,
   }));
   const body = bins.map((b, i) => {
@@ -2935,15 +2934,16 @@ function binRowsChart(id, cal, what) {
     const tone = isNum(b.implied) ? (beat ? "pos" : "neg") : "mid";
     const range = isNum(b.realized_lo) ? `<span class="eb-range ${tone}" style="left:${x(b.realized_lo)}%;width:${Math.max(0.5, x(b.realized_hi) - x(b.realized_lo))}%"></span>` : "";
     const dot = (v, cls) => (isNum(v) ? `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>` : "");
-    return `<button class="eb-row rc-row" data-rcrow="${i}" data-rc="${id}">
+    return `<div class="eb-row rc-row" data-stop="${i}" data-rcrow="${i}" data-rc="${id}">
       <span class="eb-label">${pctRange(b.lo, b.hi)}<span class="meta">${num(b.n)} ${what}</span></span>
       <span class="eb-plot">${range}${dot(b.implied, "imp")}${dot(b.predicted, "mod")}${dot(b.realized, `real ${tone}`)}</span>
-    </button>`;
+    </div>`;
   }).join("");
   const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${pct(v)}</span>`).join("")}</span></div>`;
+  scrubCharts[id] = { n: bins.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => binText[i].readout };
   const sum = `All ${num(cal.n)} ${what}: said ${pct(cal.predicted, 1)}${isNum(cal.implied) ? `, the price's break-even ${pct(cal.implied, 1)}` : ""}, won ${pct(cal.realized, 1)}.`;
   return `
-    <div class="card eb-card">
+    <div class="card eb-card scrub-rows" ${scrubAttrs(id, bins.length, "Point at or drag across the rows, or use the arrow keys")}>
       <div class="eb-legend">${bins.some((b) => isNum(b.implied)) ? '<span><i class="eb-key imp"></i>Price\'s break-even</span>' : ""}<span><i class="eb-key mod"></i>What it said</span><span><i class="eb-key real pos"></i>Won (range)</span></div>
       ${body}
       ${axis}
@@ -3187,38 +3187,58 @@ function settledCurve(trades) {
   return [...days.values()].sort((a, b) => a.date.localeCompare(b.date)).map((g) => ({ ...g, cum: (cum += g.profit) }));
 }
 // ---------- Scrubbable charts (owner, 23 Oct): point, drag or use the arrow keys ----------
-// A chart wrapper with data-scrub="<id>" holds an SVG with one `.cursor` line and `.cdot`
-// circles; scrubCharts[id] = {xs (SVG x per point), points(i) → [{x, y}] for the dots,
-// readout(i) → HTML for the readout line (readoutId), at}. Pointer moves snap to the
-// nearest point; a mouse scrubs on hover, a finger while pressed (the SVG keeps
-// touch-action: pan-y, so vertical swipes still scroll the page); release keeps the spot.
+// A chart wrapper with data-scrub="<id>"; scrubCharts[id] = {n (stops), readout(i) → HTML
+// for the readout line (readoutId), at, and how a pointer finds a stop}:
+// - line charts: xs (SVG x per stop; the nearest by x wins), points(i) → [{x, y}] for the
+//   `.cdot` circles, and the SVG's `.cursor` line follows;
+// - point charts: pick(x, y) → the stop nearest a point in SVG units (the reliability
+//   charts: nearest by x first, then by distance);
+// - row charts: rows: true, the stop whose `[data-stop]` element is nearest the pointer's
+//   height (up and down arrows step too).
+// Any element with data-stop="i" gets `.sel` while stop i is on. A mouse scrubs on hover,
+// a finger or pen while pressed (the chart keeps touch-action: pan-y, so vertical swipes
+// still scroll the page); release keeps the spot. No tooltips: the readout line follows.
 const scrubCharts = {};
 const plain = (html) => html.replace(/<[^>]+>/g, "");
+const scrubLen = (sc) => sc.n ?? sc.xs?.length ?? 0;
 function scrubTo(wrap, i) {
   const sc = scrubCharts[wrap.dataset.scrub];
-  if (!sc || !sc.xs.length) return;
-  i = Math.max(0, Math.min(sc.xs.length - 1, i));
+  if (!sc || !scrubLen(sc)) return;
+  i = Math.max(0, Math.min(scrubLen(sc) - 1, i));
   sc.at = i;
   const svg = wrap.querySelector("svg");
   const cur = svg?.querySelector(".cursor");
-  if (cur) { cur.setAttribute("x1", sc.xs[i]); cur.setAttribute("x2", sc.xs[i]); cur.style.display = ""; }
-  const pts = sc.points(i);
+  if (cur && sc.xs) { cur.setAttribute("x1", sc.xs[i]); cur.setAttribute("x2", sc.xs[i]); cur.style.display = ""; }
+  const pts = sc.points ? sc.points(i) : [];
   svg?.querySelectorAll(".cdot").forEach((d, k) => {
     if (!pts[k]) { d.style.display = "none"; return; }
     d.setAttribute("cx", pts[k].x); d.setAttribute("cy", pts[k].y); d.style.display = "";
   });
+  wrap.querySelectorAll("[data-stop]").forEach((el) => el.classList.toggle("sel", Number(el.dataset.stop) === i));
   const html = sc.readout(i);
   const el = document.getElementById(sc.readoutId);
   if (el) el.innerHTML = html;
   wrap.setAttribute("aria-valuenow", String(i));
   wrap.setAttribute("aria-valuetext", plain(html));
 }
-function scrubIndex(wrap, clientX) {
+function scrubIndex(wrap, clientX, clientY) {
   const sc = scrubCharts[wrap.dataset.scrub];
+  if (!sc) return 0;
+  if (sc.rows) {
+    let best = 0, bd = Infinity;
+    wrap.querySelectorAll("[data-stop]").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const d = Math.abs(clientY - (r.top + r.height / 2));
+      if (d < bd) { bd = d; best = Number(el.dataset.stop); }
+    });
+    return best;
+  }
   const svg = wrap.querySelector("svg");
-  if (!sc || !svg) return 0;
-  const r = svg.getBoundingClientRect();
-  const x = ((clientX - r.left) / (r.width || 1)) * svg.viewBox.baseVal.width;
+  if (!svg) return 0;
+  const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+  const x = ((clientX - r.left) / (r.width || 1)) * vb.width;
+  const y = ((clientY - r.top) / (r.height || 1)) * vb.height;
+  if (sc.pick) return sc.pick(x, y);
   let best = 0;
   sc.xs.forEach((v, i) => { if (Math.abs(v - x) < Math.abs(sc.xs[best] - x)) best = i; });
   return best;
@@ -3704,16 +3724,12 @@ function tradeHtml(t) {
 const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, portfolio: viewPortfolio, explore: viewExplore };
 
 function render() {
-  chartData = null;
-  devData = null;
   $("#view").innerHTML = VIEWS[state.tab]();
   document.querySelectorAll(".tabbar button").forEach((b) => {
     const on = b.dataset.tab === state.tab;
     b.classList.toggle("active", on);
     b.setAttribute("aria-current", on ? "page" : "false");
   });
-  bindChart();
-  bindDevChart();
 }
 
 function setTab(tab) {
@@ -3739,13 +3755,6 @@ function setUpdated() {
 
 // ---------- events ----------
 document.addEventListener("click", (ev) => {
-  const rp = ev.target.closest?.("[data-rcpt]");
-  if (rp) { // Model view charts: the tapped point's numbers in the readout line
-    const el = document.getElementById(`rc-readout-${rp.dataset.rc}`);
-    const r = rcCharts[rp.dataset.rc]?.[Number(rp.dataset.rcpt)];
-    if (el && r) el.innerHTML = r.readout;
-    return;
-  }
   const t = ev.target.closest("button, [data-close]");
   if (!t) return;
   if (t.dataset.tab) {
@@ -3770,20 +3779,12 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.recbet) {
     state.recBet = t.dataset.recbet;
     render();
-  } else if (t.dataset.ebrow !== undefined) {
-    const el = document.getElementById(`eb-readout-${t.dataset.eb}`);
-    const src = edgeChartSource(t.dataset.eb, t.dataset.eb === "moneyline" ? leagueOn() : "");
-    if (el && src) el.innerHTML = ebReadout(src.et, Number(t.dataset.ebrow));
-    t.parentElement.querySelectorAll(".eb-row").forEach((r) => r.classList.toggle("sel", r === t));
+
   } else if (t.dataset.gotoPf) {
     state.pfId = t.dataset.gotoPf; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     store.set("pfId", state.pfId);
     setTab("portfolio");
-  } else if (t.dataset.rcrow !== undefined) {
-    const rows = rcCharts[t.dataset.rc];
-    const el = document.getElementById(`rc-readout-${t.dataset.rc}`);
-    if (rows && el) el.innerHTML = rows[Number(t.dataset.rcrow)]?.readout || "";
-    t.parentElement.querySelectorAll(".rc-row").forEach((r) => r.classList.toggle("sel", r === t));
+
   } else if (t.dataset.recdk) {
     state.recDk = t.dataset.recdk;
     render();
@@ -3925,16 +3926,18 @@ load();
 
 // Scrubbable charts: a mouse scrubs on hover, a finger or pen while pressed; release keeps
 // the spot; arrow keys (and Home/End) step when the chart has focus.
+// The readout line and legend inside a chart's wrapper don't move the selection.
+const scrubTarget = (ev) => (ev.target.closest?.(".eb-readout, .eb-legend, .curve-legend") ? null : ev.target.closest?.("[data-scrub]"));
 document.addEventListener("pointerdown", (ev) => {
-  const w = ev.target.closest?.("[data-scrub]");
+  const w = scrubTarget(ev);
   if (!w) return;
   w.dataset.drag = "1";
-  scrubTo(w, scrubIndex(w, ev.clientX));
+  scrubTo(w, scrubIndex(w, ev.clientX, ev.clientY));
 });
 document.addEventListener("pointermove", (ev) => {
-  const w = ev.target.closest?.("[data-scrub]");
+  const w = scrubTarget(ev);
   if (!w || (ev.pointerType !== "mouse" && !w.dataset.drag)) return;
-  scrubTo(w, scrubIndex(w, ev.clientX));
+  scrubTo(w, scrubIndex(w, ev.clientX, ev.clientY));
 });
 const endDrag = () => document.querySelectorAll("[data-scrub][data-drag]").forEach((w) => delete w.dataset.drag);
 document.addEventListener("pointerup", endDrag);
@@ -3944,8 +3947,11 @@ document.addEventListener("keydown", (ev) => {
   if (!w) return;
   const sc = scrubCharts[w.dataset.scrub];
   if (!sc) return;
-  const at = sc.at ?? sc.xs.length - 1;
-  const to = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: sc.xs.length - 1 }[ev.key];
+  const n = scrubLen(sc);
+  const at = sc.at ?? (sc.rows ? -1 : n - 1);
+  const keys = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: n - 1 };
+  if (sc.rows) Object.assign(keys, { ArrowUp: at - 1, ArrowDown: at + 1 });
+  const to = keys[ev.key];
   if (to === undefined) return;
   ev.preventDefault();
   scrubTo(w, to);
