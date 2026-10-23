@@ -552,9 +552,10 @@ the owner's baseball app, so the balance can drop without any run here.
   indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
   Backtest and Model show the parent), its own trades and tiles via `trade_ids`, a "Judged
   from <date>" box (`sinceDefinedHtml`: `since_defined` variant vs parent, each
-  `clv_diff` field's difference and range with `clv_pinnacle` as the judged measure, "Not
-  enough trades yet" under `JUDGE_MIN` 30 kept trades, how many trades the cut was picked
-  after; an `error` variant shows a banner); with a parent or its variant selected, "Profit over time" is
+  `clv_diff` difference and range with `trades`, `kept`, `matches`: `clv_pinnacle` is the
+  judged measure on both corner tracks, `clv_dk` a descriptive line on DraftKings'; "Not
+  enough trades yet" under `JUDGE_MIN` 30 kept; N in "picked after the first N settled
+  trades" = the parent's settled trades opened before `defined_at`; an `error` variant shows a banner); with a parent or its variant selected, "Profit over time" is
   `overlayCurveChart` (parent solid, variants dashed, end labels, legend, a "filter set
   (judged from here)" marker at `defined_at`; readout "Sat 18 Oct · All +$23.40 · Below 60%
   +$31.10 (difference +$7.70)"). The fixture builds them through `paper.corner_strategies`, moving `defined_at` to 20 Sep

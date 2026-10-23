@@ -3360,26 +3360,32 @@ function sinceDefinedHtml(cur, x, parent, lg) {
   const at = sd?.defined_at || x.st?.defined_at;
   if (!sd || !at) return "";
   const name = variantShort(x, parent);
-  const before = (strategyLiveSet(cur, parent, "").trades || []).filter((t) => t.opened_at && t.opened_at < at).length;
-  const clvKey = cur.id === "corners" && parent.key !== "draftkings" ? "clv_pinnacle" : "clv_dk";
+  // The trades the cut was chosen on: the parent's settled ones opened before defined_at.
+  const before = (strategyLiveSet(cur, parent, "").trades || []).filter((t) => t.opened_at && t.opened_at < at && t.status !== "open").length;
+  // Corners (both books) are judged on Pinnacle's close; Moneyline keeps DraftKings'.
+  const clvKey = cur.id === "corners" ? "clv_pinnacle" : "clv_dk";
   const line = (label, part) => {
     const s = part?.summary;
     if (!part?.trades || !s) return `<tr><th>${esc(label)}</th><td>0</td><td colspan="4" class="muted">none yet</td></tr>`;
     const c = s[clvKey];
     return `<tr><th>${esc(label)}</th><td>${part.trades}</td><td>${s.settled ?? 0}</td><td class="${signCls(s.profit || 0)}">${usd(s.profit || 0, 2)}</td><td>${s.settled ? signedPct(s.roi) : "–"}</td><td>${isNum(c) ? signedPct(c) : "–"}</td></tr>`;
   };
-  const diffs = Object.entries(sd.clv_diff || {}).filter(([, d]) => d && d.trades);
+  // The judged field first; DraftKings' own close only on the DraftKings track.
+  const dkTrack = cur.id === "corners" && parent.key === "draftkings";
+  const diffs = Object.entries(sd.clv_diff || {})
+    .filter(([f, d]) => d && d.trades && (f === clvKey || dkTrack))
+    .sort(([a], [b]) => (a === clvKey ? -1 : b === clvKey ? 1 : 0));
   const diffLine = ([f, d]) => {
     const where = CLV_FIELD_NAME[f] || f;
-    const head = f === "clv_pinnacle" ? "<b>The judged measure</b>, CLV" : "CLV";
+    const head = f === clvKey ? "<b>The judged measure</b>, CLV" : "Descriptive only, CLV";
     if (!isNum(d.diff)) return `<p class="note">${head} against ${where}: no ${esc(name.toLowerCase())} trade has a close yet (${d.trades} of all do).</p>`;
-    return `<p class="note">${head} against ${where}: ${esc(name.toLowerCase())} ${signedPct(d.mean_kept)} vs all ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : ""}, on ${d.kept} of ${d.trades} trades.</p>`;
+    return `<p class="note">${head} against ${where}: ${esc(name.toLowerCase())} ${signedPct(d.mean_kept)} vs all ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : " (no range yet: it needs trades from at least 2 matches)"}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close, from ${d.matches} match${d.matches === 1 ? "" : "es"}.</p>`;
   };
-  const kept = sd.clv_diff?.clv_pinnacle?.kept ?? 0;
+  const kept = sd.clv_diff?.[clvKey]?.kept ?? 0;
   const none = !sd.parent?.trades;
   const enough = none ? `<p class="note judge-few"><b>Nothing to judge yet:</b> no trade has opened since ${monthDay(at)}.</p>`
-    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} with a Pinnacle close since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
-  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
+    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} settled with ${CLV_FIELD_NAME[clvKey]} since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
+  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
   return `
     <div class="card judged">
       <div class="judged-head">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>

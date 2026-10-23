@@ -749,6 +749,15 @@ const STEPS = [
     }
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2) throw new Error("variant view lacks the overlay");
   }],
+  // The DraftKings track's variant: judged on Pinnacle's close too, DraftKings' own close
+  // shown as descriptive only.
+  ["portfolio-corners-dk-variant", async (p) => {
+    await p.click('button[data-pfstrat="draftkings_below60"]');
+    const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
+    const judged = box.indexOf("The judged measure, CLV against Pinnacle's close"), desc = box.indexOf("Descriptive only, CLV against DraftKings' close");
+    if (judged < 0 || desc < judged) throw new Error(`DraftKings variant box: ${box}`);
+    if (!/kept of \d+ trades? with a close, from \d+ match/.test(box)) throw new Error(`DraftKings variant counts: ${box}`);
+  }],
   ["portfolio-corners-pin-back", click('button[data-pfstrat="pinnacle"]')],
   ["portfolio-corners-awaiting", async (p) => {
     const text = await p.textContent("#view");
