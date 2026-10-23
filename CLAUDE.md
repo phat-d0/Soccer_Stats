@@ -491,7 +491,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v47) on every web change, or phones
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v48) on every web change, or phones
   keep the old app.
 - Tabs: Matches; Teams (per league, with Players season stats); Record (Match bets, Goals &
   corners, Player shots); Portfolio; Explore.
@@ -521,7 +521,7 @@ the owner's baseball app, so the balance can drop without any run here.
   `pfStratCorners`). Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
   the filters (`tradeStats`), the <200-settled caveat, paper.py's ROI range only when its summary
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
-  over time" (`curveChart`, readout line), Open / Awaiting result / Settled lists (`tradePhase`:
+  over time" (`curveChart`: scrubbable, see below), Open / Awaiting result / Settled lists (`tradePhase`:
   upcoming, in play under `IN_PLAY_MIN` 135 min, awaiting, settled; started trades show their
   close and CLV), the rule note. Corner CLV is the trade's own book's (`tradeClv`). Backtest
   (`strategyBacktestHtml(bt, lg, key)` for `strategy_backtests.lean` and `.edge12`): verdict, units
@@ -542,10 +542,23 @@ the owner's baseball app, so the balance can drop without any run here.
   as often as the price implied; `calibration.bets`, the live section's `calibration` and its
   `by_league`), (d) corners: every logged half line per book (`quote_calibration[book].model`,
   with the model's and the price's slopes). Slopes in words (`slopeWords`: 1 = right, below 1
-  over-confident). Taps fill a readout line (`data-rcpt` on SVG points, `data-rcrow` on rows;
+  over-confident). Corners also get model (f)'s shape (`cornerShapeChart`: the chance of over
+  3.5 / 4.5 / 5.5 corners against the team's expected corners, 2 to 9, NB2 via `nbOver` with the
+  league's `alpha_home`; under All the Premier League's fit) and the diagonal reliability chart
+  over every logged half line (model (f) ring, the book's fair price tick), with the per-bin rows
+  folded below it. Taps fill a readout line (`data-rcpt` on SVG points, `data-rcrow` on rows;
   `rcCharts`). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
+- **Scrubbable charts** (owner, 23 Oct): a wrapper with `data-scrub="<id>"` (role slider,
+  focusable) around an SVG with a `.cursor` line and `.cdot` circles; `scrubCharts[id]` =
+  `{xs, points(i), readout(i), readoutId, at}`. Delegated pointer events snap to the nearest
+  point (`scrubIndex`, `scrubTo`): a mouse scrubs on hover, a finger or pen while pressed, release
+  keeps the spot; Left/Right/Home/End step when focused. Chart SVGs keep `touch-action: pan-y`,
+  so vertical swipes still scroll the page. No tooltips: the readout line follows. Used by
+  "Profit over time" (`curveChart`, id `cv`; `settledCurve` days carry won/lost/void; readout
+  "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)", the latest day by default)
+  and the corners shape chart (`cshape-<code>`).
 - **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
   Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts
   and `rangeChart` per league, team-total progress), Player shots (strategy switch, threshold
