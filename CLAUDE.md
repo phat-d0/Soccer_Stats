@@ -491,7 +491,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v49) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v50) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -529,7 +529,16 @@ the owner's baseball app, so the balance can drop without any run here.
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
   over time" (`curveChart`: scrubbable, see below), Open / Awaiting result / Settled lists (`tradePhase`:
   upcoming, in play under `IN_PLAY_MIN` 135 min, awaiting, settled; started trades show their
-  close and CLV), the rule note. Corner CLV is the trade's own book's (`tradeClv`). Backtest
+  close and CLV), the rule note. Shadow-filter variants (owner, 23 Oct; any live strategy
+  with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60`): an
+  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
+  Backtest and Model show the parent), its own trades and tiles via `trade_ids`, a "Judged
+  from <date>" box (`sinceDefinedHtml`: `since_defined` variant vs parent, CLV difference
+  and range, "Not enough trades yet" under `JUDGE_MIN` 30 settled, how many trades the cut
+  was picked after); with a parent or its variant selected, "Profit over time" is
+  `overlayCurveChart` (parent solid, variants dashed, end labels, legend, a "filter set
+  (judged from here)" marker at `defined_at`; readout "Sat 18 Oct · All +$23.40 · Below 60%
+  +$31.10 (difference +$7.70)"). The fixture's `add_corner_variants` mirrors the contract. Corner CLV is the trade's own book's (`tradeClv`). Backtest
   (`strategyBacktestHtml(bt, lg, key)` for `strategy_backtests.lean` and `.edge12`): verdict, units
   tiles, per-league ROI and CLV range plots, seasons, coverage and fits, bet list; UCL (`kind:
   "close"`) gets `closeVerdict`; Model 12% under the Premier League shows the DraftKings backtest

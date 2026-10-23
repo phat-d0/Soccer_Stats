@@ -361,6 +361,7 @@ def build(src: Path, out: Path) -> dict:
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
+    add_corner_variants(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
     # The same for Model 12%'s per-league replay (edge12_backtest.json), keeping a few of
@@ -1013,6 +1014,7 @@ def add_corners(data: dict) -> None:
             1.80,
         ),
     ]
+    past += corner_history()
     for lg, h, a, ko, side, line, ps, odds, mp, push, count, co, cu in past:
         c = {"league": lg, "home": h, "away": a, "kickoff": ko}
         pk = {"side": ps, "odds": odds, "model_p": mp, "p_push": push}
@@ -1063,6 +1065,110 @@ def add_corners(data: dict) -> None:
             | {"strategies": paper.corner_strategies(corner_trades)}
         },
     )
+
+
+# Six weeks of settled Pinnacle corner trades (seeded), so "Profit over time" has a real
+# shape and the below-60% variant (add_corner_variants) differs from its parent: model
+# chances 48% to 70%, over or under, half lines, one a day or so from 1 Sep.
+CORNER_PAIRS = [
+    ("Liverpool", "Wolves"), ("Spurs", "Burnley"), ("Newcastle", "Bournemouth"),
+    ("Man City", "Brighton"), ("West Ham", "Everton"), ("Aston Villa", "Leeds"),
+    ("Arsenal", "Nott'm Forest"), ("Man United", "Sunderland"), ("Fulham", "Crystal Palace"),
+]  # fmt: skip
+
+
+def corner_history() -> list[tuple]:
+    rng = np.random.default_rng(23)
+    rows = []
+    for i, day in enumerate(
+        pd.date_range("2026-09-01T14:00:00Z", "2026-10-03T14:00:00Z", freq="2D")
+    ):
+        h, a = CORNER_PAIRS[i % len(CORNER_PAIRS)]
+        mp = round(float(rng.uniform(0.48, 0.70)), 3)
+        ps = "over" if rng.random() < 0.6 else "under"
+        line = float(rng.choice([3.5, 4.5, 5.5]))
+        odds = round((1.14 + 0.02 * rng.random()) / mp, 2)
+        won = rng.random() < (mp - 0.08 if mp < 0.6 else mp - 0.2)
+        count = int(line + 1.5) if (ps == "over") == won else int(line - 0.5)
+        co, cu = round(odds * (0.94 + 0.08 * rng.random()), 2), round(1.95 + 0.2 * rng.random(), 2)
+        if ps == "under":
+            co, cu = cu, co
+        side = "home" if i % 2 else "away"
+        rows.append(("E0", h, a, day.isoformat(), side, line, ps, odds, mp, 0.0, count, co, cu))
+    return rows
+
+
+# Shadow-filter variants (owner, 23 Oct): the corners strategies' "below 60%" views. This
+# mirrors the contract Moneyline is building in paper (variant_of, filter, defined_at,
+# since_defined; trade_ids a subset of the parent's) until that lands.
+CORNER_VARIANT_MAX = 0.60
+CORNER_VARIANT_DEFINED = "2026-09-20T12:00:00+00:00"
+
+
+def add_corner_variants(data: dict) -> None:
+    pf = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")
+    live = pf["live"]
+    by_id = {t["id"]: t for t in live["trades"]}
+    out = []
+    for st in live["strategies"]:
+        out.append(st)
+        if st.get("variant_of"):
+            continue
+        mine = [by_id[i] for i in st["trade_ids"] if i in by_id]
+        keep = [t for t in mine if (paper._trade_chance(t) or 1) < CORNER_VARIANT_MAX]
+        sec = paper.strategy_section(
+            keep, st["key"], st["label"], st["rule"], of=lambda t, k=st["key"]: k
+        )
+        clv_key = "clv_dk" if st["key"] == "draftkings" else "clv_pinnacle"
+
+        def since(ts):
+            return [t for t in ts if t["opened_at"] >= CORNER_VARIANT_DEFINED]
+
+        def clvs(ts, clv_key=clv_key):
+            return [
+                t[clv_key]
+                for t in ts
+                if t["status"] in ("won", "lost") and t.get(clv_key) is not None
+            ]
+
+        vs, ps = since(keep), since(mine)
+        diff, ci = None, None
+        if clvs(vs) and clvs(ps):
+            diff = round(float(np.mean(clvs(vs)) - np.mean(clvs(ps))), 4)
+            rng = np.random.default_rng(5)
+            boots = []
+            for _ in range(400):
+                pick = [ps[j] for j in rng.integers(0, len(ps), len(ps))]
+                sub = [t for t in pick if t in vs]
+                if clvs(sub) and clvs(pick):
+                    boots.append(np.mean(clvs(sub)) - np.mean(clvs(pick)))
+            ci = [
+                round(float(np.percentile(boots, 2.5)), 4),
+                round(float(np.percentile(boots, 97.5)), 4),
+            ]
+        label = f"{st['label']}, below {round(CORNER_VARIANT_MAX * 100)}%"
+        out.append(
+            sec
+            | {"key": f"{st['key']}_below60", "label": label, "variant_of": st["key"]}
+            | {"defined_at": CORNER_VARIANT_DEFINED, "rule": st["rule"]}
+            | {
+                "filter": {
+                    "field": "model_p_no_push",
+                    "max": CORNER_VARIANT_MAX,
+                    "note": "Only trades whose model chance (given no push) is under 60%.",
+                }
+            }
+            | {
+                "since_defined": {
+                    "variant": paper.portfolio_section(vs)["summary"],
+                    "parent": paper.portfolio_section(ps)["summary"],
+                    "clv_diff": diff,
+                    "clv_diff_ci95": ci,
+                    "n": sum(t["status"] in ("won", "lost") for t in vs),
+                }
+            }
+        )
+    live["strategies"] = out
 
 
 def dk_corner_trades(e0, trade, at) -> list[dict]:

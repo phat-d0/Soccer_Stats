@@ -718,6 +718,38 @@ const STEPS = [
     }
   }, true],
   ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await p.click('button[data-pfstrat="pinnacle"]'); }],
+  // Shadow-filter variant (owner, 23 Oct): "↳ below 60%" indented under its parent, and
+  // both curves on one chart (parent solid, variant dashed) with a legend, the "filter set"
+  // marker and a readout giving both totals and their difference on the same day.
+  ["portfolio-corners-overlay", async (p) => {
+    const next = await p.locator('button[data-pfstrat="pinnacle"] + button').getAttribute("data-pfstrat");
+    if (next !== "pinnacle_below60") throw new Error(`row under the Pinnacle track: ${next}`);
+    const row = (await p.locator('button[data-pfstrat="pinnacle_below60"]').innerText()).replace(/\s+/g, " ");
+    if (!row.includes("↳ below 60%") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
+    if (await p.locator(".curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
+    if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2 || await p.locator("[data-scrub='cv'] path.line.ser.dash").count() !== 1) throw new Error("overlay curves");
+    const mark = await p.locator("[data-scrub='cv'] .filter-lab").textContent();
+    if (mark !== "filter set (judged from here)") throw new Error(`filter marker: ${mark}`);
+    if (await p.locator("[data-scrub='cv'] text.end.ser").count() !== 2) throw new Error("overlay end labels");
+    await p.locator("[data-scrub='cv']").focus(); await p.keyboard.press("Home");
+    const r = (await p.textContent("#cv-readout")).replace(/\s+/g, " ");
+    const want = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
+    if (r !== want || !/ · All [+−]?\$[\d.]+ · Below 60% [+−]?\$[\d.]+ \(difference [+−]?\$[\d.]+\)$/.test(r)) throw new Error(`overlay readout: ${r}`);
+    await p.keyboard.press("End");
+  }],
+  // The variant selected: its own trades and tiles, and the "Judged from" box.
+  ["portfolio-corners-variant", async (p) => {
+    await p.click('button[data-pfstrat="pinnacle_below60"]');
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    const mine = await p.evaluate(() => pfById("corners").live.strategies.find((s) => s.key === "pinnacle_below60").trade_ids);
+    if (!ids.length || ids.some((id) => !mine.includes(id))) throw new Error(`variant lists: ${ids.join(", ")}`);
+    const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
+    for (const want of ["Judged from", "Below 60%", "All", "CLV difference", "95% range", "Not enough trades yet", "was picked after seeing the first", "only trades opened after"]) {
+      if (!box.includes(want)) throw new Error(`Judged-from box lacks "${want}": ${box}`);
+    }
+    if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2) throw new Error("variant view lacks the overlay");
+  }],
+  ["portfolio-corners-pin-back", click('button[data-pfstrat="pinnacle"]')],
   ["portfolio-corners-awaiting", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("corners awaiting group");
