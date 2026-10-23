@@ -1225,6 +1225,13 @@ verdict; earlier trades are shown in the app, labelled, and never judged.
 - **Pass:** the primary difference's 95% range lies entirely above 0. Anything else
   (including too few trades for a range) is not a pass.
 
+**Clarification (23 Oct; set before any judged trade settled).** The primary
+statistic uses the same trades as the summaries' `clv_pinnacle`: won and lost trades with a
+close. Pushes and voids are left out (and counted as `left_out`), matching the summaries.
+The code first counted pushes that had a close, so its means could differ from the table's
+CLV column. When this was written, data-log held 9 corner trades opened since `defined_at`,
+all still open, so no judged result had been seen.
+
 **Review.** At the 8 Dec live corners review (`trig_01SJk1xh2PSaKfKEe6VfHW2m`), with
 whatever sample exists then: both tracks, the filtered and full sets' trades, CLV and ROI
 since `defined_at`, the primary difference and its range. No live change follows from it

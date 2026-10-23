@@ -408,9 +408,10 @@ the owner's baseball app, so the balance can drop without any run here.
     `variant_of`, `filter`, `defined_at`, `rule` (the parent's plus `variant_of`, `filter`,
     `defined_at`) and `since_defined` (`variant_since`: `{defined_at, parent: {trades, summary},
     variant: {trades, summary}, clv_diff: {clv_pinnacle, clv_dk}}` on trades opened at or after
-    `defined_at`; `clv_difference` = mean of the kept minus mean of all, settled trades with a
-    value, 95% range resampling matches, 2,000 draws, seed 0, `{field, trades, kept, matches,
-    mean_all, mean_kept, diff, ci95, draws}`). A failing variant is `{key, label, variant_of,
+    `defined_at`; `clv_difference` = mean of the kept minus mean of all, on the summaries' CLV
+    trades (won or lost with a value; pushes and voids counted as `left_out`), 95% range
+    resampling matches, 2,000 draws, seed 0, `{field, trades, left_out, kept, matches, mean_all,
+    mean_kept, diff, ci95, draws}`). A failing variant is `{key, label, variant_of,
     filter, defined_at, error}`. `by_league` per section when trades span 2+ leagues. Corners' backtest =
     `corners_research()` (`kind: "research"`, from `lab/markets_research.json`).
     `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Every

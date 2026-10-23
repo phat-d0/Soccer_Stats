@@ -165,3 +165,21 @@ def test_variants_are_generic_and_a_failing_one_costs_only_itself():
     bad = {**spec, "filter": None}
     out = paper.with_variants([parent], trades, {"edge12": [bad]}, of)
     assert out[0] == parent and out[1]["error"] and out[1]["variant_of"] == "edge12"
+
+
+def test_the_difference_uses_the_same_trades_as_the_summaries_clv():
+    trades = [
+        corner(1, 0.55, clv=0.10, match=1),
+        corner(2, 0.70, clv=-0.20, status="lost", match=1),
+        corner(3, 0.50, clv=0.30, status="void", match=2),  # a push with a close: left out
+        corner(4, 0.65, clv=0.25, status="void", match=3),  # a push in the dropped set
+        corner(5, 0.52, clv=0.04, status="lost", match=4),
+        corner(6, 0.58, clv=None, status="void", match=5),  # a moved match: left out too
+        corner(7, 0.55, clv=0.90, hours=-2, match=6),  # before defined_at
+    ]
+    sd = sections(trades)["pinnacle_below60"]["since_defined"]
+    d = sd["clv_diff"]["clv_pinnacle"]
+    assert d["mean_all"] == pytest.approx(sd["parent"]["summary"]["clv_pinnacle"])
+    assert d["mean_kept"] == pytest.approx(sd["variant"]["summary"]["clv_pinnacle"])
+    assert d["trades"] == 3 and d["kept"] == 2 and d["left_out"] == 3
+    assert d["diff"] == pytest.approx(np.mean([0.10, 0.04]) - np.mean([0.10, -0.20, 0.04]))
