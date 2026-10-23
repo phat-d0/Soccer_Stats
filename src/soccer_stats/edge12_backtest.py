@@ -21,6 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from soccer_stats import bands as bd
 from soccer_stats import cup_backtest as cb
 from soccer_stats import lean_backtest as lb
 from soccer_stats.lab import edge12_filters as ef
@@ -202,6 +203,7 @@ def build(
     every = [b for b in league_bets.values() if len(b)]
     rows = compact(pd.concat(every, ignore_index=True)) if every else []
     calib = lb.pooled_calibration(reports, pooled, SERIES, "model_p", early)
+    band_cuts = bd.cuts(bd.with_claimed(pooled, "model_p"))
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "kind": KIND,
@@ -218,12 +220,24 @@ def build(
             "clv": "entry odds x Pinnacle's margin-free (Shin) close - 1",
             "cup": cb.PRICE + "; " + cb.CLV,
         },
+        "bands": bd.header(band_cuts, "model_p x odds - 1 (the model's own edge)"),
         "leagues": {
-            code: {"name": (names or {}).get(code, code), **lb.saved(rep)}
+            code: {
+                "name": (names or {}).get(code, code),
+                **lb.saved(rep),
+                **(
+                    {}
+                    if rep.get("error")
+                    else bd.blocks(
+                        bd.with_claimed(league_bets.get(code, empty_bets()), "model_p"), band_cuts
+                    )
+                ),
+            }
             for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
+            **bd.blocks(bd.with_claimed(pooled, "model_p"), band_cuts),
             "calibration": calib,
             "leagues": early,
             "by_league": {c: metrics(league_bets[c]) for c in early},
