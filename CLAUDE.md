@@ -594,7 +594,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v54) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v55) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -610,8 +610,14 @@ the owner's baseball app, so the balance can drop without any run here.
 - **Matches** (with `portfolio.strategy_order` containing `lean`, `leanOn()`): cards show only the
   Lean badge (`leanPick(fx)` = the card's `lean_pick`; "Strong · 2.6σ: Away @ +650 · Market-driven",
   or "Would pick now" when its Lean trade is on another side) and the open Lean trade. Open
-  trades are keyed by match and strategy (`tradeKey(home, away, strategy)`). The note counts Lean
-  picks and says Model 12% runs under Portfolio. Started matches: "In play"/"Finished", no pick.
+  trades are keyed by match and strategy (`tradeKey(home, away, strategy)`). Lean's odds range
+  (owner, 24 Oct; `leanOut(lp)` = `lean_pick.in_range === false`, `leanRangeInfo` from the Lean
+  rule's `odds_range`, `odds_range_from`, `odds_range_note`): an out-of-range pick is shown
+  greyed, not hidden ("Lean pick outside its odds range, no trade: Away @ +650 (Lean trades
+  −200 to +200 only)", `.badge.lean-out`), the note counts in-range picks and the ones outside,
+  and the match sheet says "No Lean trade: the pick is … at +330, outside Lean's −200
+  to +200 range since 24 Oct". The note counts Lean picks and says Model 12% runs under
+  Portfolio. Started matches: "In play"/"Finished", no pick.
   Without `strategy_order` (older data) the 12% live test shows instead (`bestPick` on
   `pickProbs(fx)`: raw `p` under `fixed_raw`, else `p_bet || p`; must match `trades.best_pick`).
 - **Match sheet**: Markets (Model, Blend `p_bet`, DK margin-free, Odds, Edge = blend × payout − 1,
@@ -638,8 +644,10 @@ the owner's baseball app, so the balance can drop without any run here.
   backtest bands answer the edge question; corners have no priced backtest, so no
   comparison), Open / Awaiting result / Settled lists (`tradePhase`:
   upcoming, in play under `IN_PLAY_MIN` 135 min, awaiting, settled; started trades show their
-  close and CLV), the rule note. Shadow-filter variants (owner, 23 Oct; any live strategy
-  with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60`): an
+  close and CLV), the rule note (Lean's row reads "1σ+ · −200 to +200" and its rule box leads
+  with the odds range). Shadow-filter variants (owner, 23 Oct; any live strategy
+  with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60` and Lean's
+  `lean_all_odds`): an
   indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
   Backtest and Model show the parent), its own trades and tiles via `trade_ids`, one box
   (`sinceDefinedHtml`) with a descriptive "Whole period, from <first trade>" part on top
@@ -650,8 +658,20 @@ the owner's baseball app, so the balance can drop without any run here.
   `clv_diff` difference and range with `trades`, `kept`, `matches`: `clv_pinnacle` is the
   judged measure on both corner tracks, `clv_dk` a descriptive line on DraftKings'; "Not
   enough trades yet" under `JUDGE_MIN` 30 kept; N in "picked after the first N settled
-  trades" = the parent's settled trades opened before `defined_at`; an `error` variant shows a banner); with a parent or its variant selected, "Profit over time" is
-  `overlayCurveChart` (parent solid, variants dashed, end labels, legend, a "filter set
+  trades" = the parent's settled trades opened before `defined_at`; an `error` variant shows a banner).
+  A variant with `adds: "shadow"` (Blend Lean, all odds (old rule), 24 Oct) is a superset: its
+  `trade_ids` resolve against the live `trades` and `shadow_trades` together
+  (`strategyLiveSet`), shadow rows carry "Shadow: no trade opened (outside the odds range)"
+  (`shadowChip`), the row reads "↳ all odds (old rule) · Adds the picks the rule now skips", the
+  live rule is the kept side ("Live rule" vs "All odds (old rule)"; the cut is "the odds
+  range"; `old_code` trades are noted), notes come from the variant's `note` (or its
+  `filter.note`) and its rule note precedes the parent's. Lean's own line is the new rule
+  backcast from its first trade (`backcast`, Moneyline #91): both overlay lines start at
+  `backcast.lean_started`, the marker reads "rule set (judged from here)", Lean's view notes
+  "Backcast before <date>: …" (descriptive), and the variant box's descriptive part is "Before
+  the rule, <start> to <date> · backcast" from the variant's `before_defined` (same shape as
+  `since_defined`, "Live rule (backcast)" vs "All odds (old rule)") in place of "Whole period"; with a parent or its variant selected, "Profit over time" is
+  `overlayCurveChart` (parent solid, named "All", or "Live rule" beside a shadow; variants dashed, end labels, legend, a "filter set
   (judged from here)" marker at `defined_at`; readout "Sat 18 Oct · All +$23.40 · Below 60%
   +$31.10 (difference +$7.70)"). The fixture builds them through `paper.corner_strategies`, moving `defined_at` to 20 Sep
   (`FIXTURE_DEFINED_AT`; the real 23 Oct is after its `NOW`). Corner CLV is the trade's own book's (`tradeClv`). Backtest
