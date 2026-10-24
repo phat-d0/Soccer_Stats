@@ -2897,7 +2897,7 @@ def main(argv: list[str] | None = None) -> None:
 
     e12b = sub.add_parser(
         "backtest-edge12",
-        help="replay Model 12% on Pinnacle's early prices per league (no key)",
+        help="replay Model 12%% on Pinnacle's early prices per league (no key)",
     )
     e12b.add_argument("--leagues", nargs="+", help="football-data codes (default: every live one)")
     e12b.add_argument("--from-season", type=int, default=2019, help="first season of bets")
@@ -2913,7 +2913,7 @@ def main(argv: list[str] | None = None) -> None:
 
     e12 = sub.add_parser(
         "backtest-edge12-filters",
-        help="the live 12% rule and two filters on Pinnacle's early prices (no key)",
+        help="the live 12%% rule and two filters on Pinnacle's early prices (no key)",
     )
     e12.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
     e12.add_argument("--from-season", type=int, default=2019, help="first season of bets")

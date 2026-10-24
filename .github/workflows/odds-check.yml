@@ -119,7 +119,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04 (Python 3.14, no Playwright Chromium)
     timeout-minutes: 150  # lineups downloads ~3,400 Understat match files per league
     steps:
       - uses: actions/checkout@v4
