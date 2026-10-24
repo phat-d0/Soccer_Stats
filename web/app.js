@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v54";
+const APP_VERSION = "v55";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -135,6 +135,14 @@ const leanRule = (lg) => leagueRule(lg)?.lean || null;
 const leanSigma = (lg) => state.data?.match_blends?.leagues?.[lg || "E0"]?.sigma ?? leanRule(lg)?.sigma ?? null;
 // No pick once the match has kicked off: paper trades only open before kickoff.
 const leanPick = (fx) => (leanOn() && !fx.low_data && kickoffPhase(fx.kickoff) === "upcoming" ? fx.lean_pick || null : null);
+// Blend Lean's odds range (owner, 24 Oct; trades.LEAN_ODDS_RANGE): a pick outside it opens no
+// trade. `in_range` false on the card's pick; the range and its start from the Lean rule.
+const leanOut = (lp) => lp?.in_range === false;
+const rangeWords = (r) => (r ? `${american(r[0])} to ${american(r[1])}` : "");
+function leanRangeInfo(lg = "") {
+  const r = leanRule(lg) || (pfById("moneyline")?.live?.strategies || []).find((x) => x.key === "lean")?.rule || {};
+  return r.odds_range ? { range: r.odds_range, words: rangeWords(r.odds_range), from: r.odds_range_from, note: r.odds_range_note } : null;
+}
 const sigmaText = (z) => (z == null ? "–" : `${z < 0 ? "−" : z > 0 ? "+" : ""}${Math.abs(z).toFixed(1)}σ`);
 const ptsText = (x) => `${(x * 100).toFixed(1)} points`;
 const tierName = (pick) => (pick.tier === "strong" ? "Strong" : "Lean");
@@ -886,6 +894,10 @@ function leanPickText(fx) {
   } else if (t) {
     const same = lp && PICK_LABEL[lp.market] === PICK_LABEL[t.market];
     head = `<b>Blend Lean: paper trade already open:</b> ${esc(tradeLabel(t))} at ${price(t.odds)}${t.z != null ? ` (${sigmaText(t.z)} when it opened${driverOf(t) ? `, ${DRIVER_NAME[driverOf(t)].toLowerCase()}` : ""})` : ""}. ${driverText(t)}One Lean trade per match, so nothing new opens here.${same ? ` Still the pick today: ${side(lp.market)}.` : lp ? ` At today's price Lean would pick ${side(lp.market)}.` : " At today's price no side reaches 1σ any more; the trade stays open until it settles."} ${LEAN_CAVEAT}`;
+  } else if (leanOut(lp)) {
+    const ri = leanRangeInfo(lg);
+    const m = lp.market;
+    head = `<b>No Lean trade:</b> the pick is ${esc(PICK_LABEL[m])} at ${price(lp.odds)}, outside Lean's ${ri ? ri.words : "odds"} range${ri?.from ? ` since ${monthDay(ri.from)}` : ""}. The blend gives it ${pct(fx.p_bet[m], 1)} against the ${pct(1 / fx.odds[m], 1)} this price needs to break even, ${sigmaText(z[m])}, but Lean no longer trades at these odds. ${ri?.note ? esc(ri.note) : ""}`;
   } else if (lp) {
     head = `<b>Blend Lean pick (${tierName(lp)}, ${DRIVER_NAME[driverOf(lp) || "unknown"].toLowerCase()}):</b> ${side(lp.market)}. ${driverText(lp)}A $10 paper trade opens on it at the next update with fresh odds. ${LEAN_CAVEAT}`;
   } else {
@@ -1033,14 +1045,16 @@ function viewMatches() {
   const allNull = shown.every(([fx]) => fxEdge(fx) == null);
   const openTrades = openMatchTrades(); // keyed by match and strategy: never mix Lean and 12%
   const lean = leanOn();
-  const nLean = shown.filter(([fx]) => leanPick(fx)).length;
+  const nLean = shown.filter(([fx]) => leanPick(fx) && !leanOut(leanPick(fx))).length;
+  const nOut = shown.filter(([fx]) => leanOut(leanPick(fx))).length;
+  const ri = leanRangeInfo(lg);
   const leanNoFit = lean && (state.data.match_blends?.note || (lg && leanSigma(lg) == null ? leanRule(lg)?.note : ""));
-  const leanCount = lean ? `<b>${nLean}</b> of ${shown.length} matches have a Blend Lean pick (the blend beats ${bookPoss()} break-even by 1σ or more).${leanNoFit ? ` ${esc(leanNoFit)}` : ""} ` : "";
+  const leanCount = lean ? `<b>${nLean}</b> of ${shown.length} matches have a Blend Lean pick (the blend beats ${bookPoss()} break-even by 1σ or more${ri ? `, at odds ${ri.words}` : ""}).${nOut ? ` ${nOut} more pick${nOut === 1 ? " is" : "s are"} outside Lean's odds range, so no trade opens (shown greyed).` : ""}${leanNoFit ? ` ${esc(leanNoFit)}` : ""} ` : "";
   const countText = lean
-    ? `${leanCount}Each Lean pick opens one $10 paper trade per match. The Model 12% test still runs alongside; its picks and trades are under Portfolio → Moneyline.`
+    ? `${leanCount}Each Lean pick${ri ? " in range" : ""} opens one $10 paper trade per match. The Model 12% test still runs alongside; its picks and trades are under Portfolio → Moneyline.`
     : `<b>${nValue}</b> of ${shown.length} matches have a live-test pick: the model alone shows ${minE != null ? `${pct(minE)}+` : "enough"} edge against ${bookPoss()} price. A $10 paper trade opens on each match that doesn't have one yet (one per match).`;
   const ruleBox = lean
-    ? `<div class="explain live-test"><b>Blend Lean:</b> ${esc(leanNote(lg))}</div>`
+    ? `<div class="explain live-test"><b>Blend Lean:</b> ${esc(leanNote(lg))}${ri?.note ? ` <b>Odds range:</b> ${esc(ri.note)}` : ""}</div>`
     : fixedRule() && fixedNote(lg) ? `<div class="explain live-test">${esc(fixedNote(lg))}</div>` : "";
   let html = `${leagueFilter()}<p class="note">Chances of each result: the model vs ${bookName()}. ${oddsAge()} ${lg && shown.every(([fx]) => !fx.odds) ? `No ${bookName()} odds for ${esc(leagueName(lg))} matches yet: odds for this league are fetched from 48 hours before a kickoff, so there are no value bets here.` : fixedRule() || lean ? countText : `${nValue ? `<b>${nValue}</b> of ${shown.length} matches have a value bet${minE != null ? ` at ${pct(minE)}+ edge` : ""}.` : allNull ? noEdgeText("moneyline", lg) : d.match_blend?.live ? `No value bets right now. Value picks use the model blended with ${bookPoss()} price, and in past matches the price already held what the model knows, so the blend rarely beats ${bookPoss()} margin. Tap a match to see model, blend and ${bookName()} side by side.` : "No value bets right now."}`}</p>${ruleBox}`;
   for (const [day, items] of byDay) {
@@ -2089,7 +2103,9 @@ function pfSet() {
   return p ? p[state.pfView === "backtest" ? "backtest" : "live"] : null;
 }
 // Every trade in every portfolio, live and backtest (for the trade sheet).
-const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.backtest?.trades || [])]);
+const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.live?.shadow_trades || []), ...(p.backtest?.trades || [])]);
+// A shadow entry (Blend Lean's old rule): what the old rule would have bet; never real P/L.
+const shadowChip = (t) => (t.shadow ? `<span class="chip-shadow">Shadow: no trade opened${t.excluded_by === "odds_range" ? " (outside the odds range)" : ""}</span>` : "");
 const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired" };
 
 // Current DraftKings price for an open trade: the latest price in data.json, else the
@@ -2310,6 +2326,11 @@ function openBadge(t) {
 function leanBadges(fx, t) {
   const lp = leanPick(fx);
   const moved = lp && t && PICK_LABEL[t.market] !== PICK_LABEL[lp.market];
+  if (leanOut(lp)) {
+    const ri = leanRangeInfo(fxLeague(fx));
+    const out = `<span class="badge lean-out">Lean pick outside its odds range, no trade: ${esc(PICK_LABEL[lp.market])} @ ${price(lp.odds)}${ri ? ` (Lean trades ${ri.words} only)` : ""}</span>`;
+    return `${out}${t ? openBadge(t) : ""}`;
+  }
   const pickB = lp ? `<span class="badge lean">${CHECK}${moved ? "Would pick now, " : ""}${tierName(lp)} · ${sigmaText(lp.z).replace("+", "")}: ${esc(PICK_LABEL[lp.market])} @ ${price(lp.odds)}${driverOf(lp) ? ` · ${DRIVER_NAME[driverOf(lp)]}` : ""}</span>` : "";
   return `${pickB}${t ? openBadge(t) : ""}`;
 }
@@ -3177,12 +3198,17 @@ function variantShort(x, parent) {
   const f = x.st?.filter;
   if (f && isNum(f.max)) return `Below ${pct(f.max)}`;
   if (f && isNum(f.min)) return `${pct(f.min)} and up`;
-  const rest = parent && x.label.startsWith(parent.label) ? x.label.slice(parent.label.length).replace(/^[,\s·]+/, "") : x.label;
+  const base = parent ? parent.label.replace(/\s*\(.*\)\s*$/, "") : "";
+  const rest = base && x.label.startsWith(base) ? x.label.slice(base.length).replace(/^[,\s·]+/, "") : x.label;
   return rest ? rest[0].toUpperCase() + rest.slice(1) : x.label;
 }
 // One strategy's live trades, narrowed to a competition (and Lean's driver filter).
 function strategyLiveSet(cur, x, lg, drv = "") {
-  let set = x.st ? stratSet(cur.live || {}, x.st) : { ...(cur.live || {}), trades: cur.live?.trades || [] };
+  // A variant that adds shadow entries (Blend Lean's old rule) resolves its trade_ids
+  // against the live trades and `shadow_trades` together (paper keeps shadows apart).
+  const live = cur.live || {};
+  const pool = x.st?.adds === "shadow" ? { ...live, trades: [...(live.trades || []), ...(live.shadow_trades || [])] } : live;
+  let set = x.st ? stratSet(pool, x.st) : { ...live, trades: live.trades || [] };
   if (lg) set = leagueSet(set, lg);
   if (drv && x.st) set = driverSet(set, x.st, drv, lg);
   return set;
@@ -3209,7 +3235,7 @@ function tradeStats(trades) {
 const monthDay = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const signCls = (v) => (v > 0.005 ? "pos-text" : v < -0.005 ? "neg-text" : "");
 function ruleText(x) {
-  if (x.key === "lean") return `${x.rule?.min_z ?? 1}σ+`;
+  if (x.key === "lean") return `${x.rule?.min_z ?? 1}σ+${x.rule?.odds_range ? ` · ${rangeWords(x.rule.odds_range)}` : ""}`;
   return x.rule?.threshold != null ? `${pct(x.rule.threshold)}+` : "";
 }
 // Backtest headline for a strategy row, for the chosen competition (lg "" = All): bets and
@@ -3275,7 +3301,7 @@ function strategyList(cur, strats, sel, lg, backtest) {
     return `
       <button class="row-btn strat${variant ? " variant" : ""}${on ? " on" : ""}${cur.status === "retired" ? " retired" : ""}"${attrs}${variant ? ` aria-label="${esc(x.label)}"` : ""}>
         <span class="who">${variant
-          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">Filtered${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
+          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">${x.st?.adds === "shadow" ? "Adds the picks the rule now skips" : "Filtered"}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
           : `<b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span>`}</span>
         <span class="vals">${right}</span>
       </button>`;
@@ -3309,7 +3335,7 @@ function pfTradeRow(t) {
       : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(t.profit, 2)}</b><small>${t.status}</small>`;
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
-      <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}
+      <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}${shadowChip(t)}
         <span class="meta">${open && ph !== "upcoming" ? `<b class="phase-tag ${ph}">${PHASE_LABEL[ph]}</b> · ` : ""}${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
         <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span>${pinLine}</span>
       <span class="vals">${right}</span>
@@ -3533,6 +3559,12 @@ function sinceDefinedHtml(cur, x, parent, lg) {
   const at = sd?.defined_at || x.st?.defined_at;
   if (!sd || !at) return "";
   const name = variantShort(x, parent);
+  // Which side is "kept" and which is "all": a filter keeps part of its parent (below 60%
+  // vs all); a shadow variant (adds: "shadow", Blend Lean's old rule) adds the picks the
+  // live rule now skips, so the live rule is the kept part and the variant is all of them.
+  const shadow = x.st?.adds === "shadow";
+  const keptName = shadow ? "Live rule" : name, allName = shadow ? name : "All";
+  const cut = shadow ? "odds range" : `${pct(x.st?.filter?.max ?? 0.6)} cut`;
   // The trades the cut was chosen on: the parent's settled ones opened before defined_at.
   const before = (strategyLiveSet(cur, parent, "").trades || []).filter((t) => t.opened_at && t.opened_at < at && t.status !== "open").length;
   // Corners (both books) are judged on Pinnacle's close; Moneyline keeps DraftKings'.
@@ -3551,43 +3583,44 @@ function sinceDefinedHtml(cur, x, parent, lg) {
   const diffLine = ([f, d]) => {
     const where = CLV_FIELD_NAME[f] || f;
     const head = f === clvKey ? "<b>The judged measure</b>, CLV" : "Descriptive only, CLV";
-    if (!isNum(d.diff)) return `<p class="note">${head} against ${where}: no ${esc(name.toLowerCase())} trade has a close yet (${d.trades} of all do).</p>`;
-    return `<p class="note">${head} against ${where}: ${esc(name.toLowerCase())} ${signedPct(d.mean_kept)} vs all ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : " (no range yet: it needs trades from at least 2 matches)"}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close, from ${d.matches} match${d.matches === 1 ? "" : "es"}.</p>`;
+    if (!isNum(d.diff)) return `<p class="note">${head} against ${where}: no ${esc(keptName.toLowerCase())} trade has a close yet (${d.trades} of ${esc(allName.toLowerCase())} ${d.trades === 1 ? "does" : "do"}).</p>`;
+    return `<p class="note">${head} against ${where}: ${esc(keptName.toLowerCase())} ${signedPct(d.mean_kept)} vs ${esc(allName.toLowerCase())} ${signedPct(d.mean_all)}, a difference of <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b>${d.ci95 ? ` (95% range ${ciText(d.ci95)})` : " (no range yet: it needs trades from at least 2 matches)"}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close, from ${d.matches} match${d.matches === 1 ? "" : "es"}.</p>`;
   };
   const kept = sd.clv_diff?.[clvKey]?.kept ?? 0;
   const none = !sd.parent?.trades;
   const enough = none ? `<p class="note judge-few"><b>Nothing to judge yet:</b> no trade has opened since ${monthDay(at)}.</p>`
-    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(name.toLowerCase())} trade${kept === 1 ? "" : "s"} settled with ${CLV_FIELD_NAME[clvKey]} since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
+    : kept < JUDGE_MIN ? `<p class="note judge-few"><b>Not enough trades yet:</b> ${kept} ${esc(keptName.toLowerCase())} trade${kept === 1 ? "" : "s"} settled with ${CLV_FIELD_NAME[clvKey]} since ${monthDay(at)}; it takes a few dozen before the difference means much.</p>` : "";
   // Whole period (owner, 23 Oct): the same columns from each version's own full summary,
   // and the CLV difference computed here from the trades: won or lost with a value, the
   // same trades the summaries' CLV averages, so the two means match the CLV column.
   // Descriptive: it includes the trades the cut was chosen on.
-  const allTrades = strategyLiveSet(cur, parent, "").trades || [];
-  const keptIds = new Set(x.st?.trade_ids || []);
+  const allTrades = strategyLiveSet(cur, shadow ? x : parent, "").trades || [];
+  const keptIds = new Set((shadow ? parent.st : x.st)?.trade_ids || []);
   const withClv = allTrades.filter((t) => (t.status === "won" || t.status === "lost") && isNum(t[clvKey]));
   const keptClv = withClv.filter((t) => keptIds.has(t.id));
   const meanAll = meanOf(withClv.map((t) => t[clvKey])), meanKept = meanOf(keptClv.map((t) => t[clvKey]));
-  const from = firstOpened(allTrades);
+  const from = firstOpened(strategyLiveSet(cur, parent, "").trades || []);
   const fullLine = (label, st) => line(label, st?.summary ? { trades: st.summary.trades, summary: st.summary } : null);
   const whole = `
       <div class="judged-head">Whole period, from ${from ? esc(dayName(from)) : "the first trade"}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
       <table class="judged-tab whole-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
-        <tbody>${fullLine(name, x.st)}${fullLine("All", parent.st)}</tbody></table>
-      <p class="note">CLV against ${CLV_FIELD_NAME[clvKey]}, ${esc(name.toLowerCase())} minus all: ${isNum(meanKept) && isNum(meanAll)
+        <tbody>${fullLine(name, x.st)}${fullLine(shadow ? keptName : "All", parent.st)}</tbody></table>
+      <p class="note">CLV against ${CLV_FIELD_NAME[clvKey]}, ${esc(keptName.toLowerCase())} minus ${esc(allName.toLowerCase())}: ${isNum(meanKept) && isNum(meanAll)
         ? `<b class="${signCls(meanKept - meanAll)}">${signedPct(meanKept - meanAll)}</b> (${signedPct(meanKept)} vs ${signedPct(meanAll)}; ${keptClv.length} kept of ${withClv.length} trade${withClv.length === 1 ? "" : "s"} with a close)`
         : "none yet (no trade with a close)"}.</p>
-      <p class="note"><b>Descriptive only:</b> this includes the trades the ${pct(x.st?.filter?.max ?? 0.6)} cut was chosen from, so it can't prove the filter.</p>`;
-  const why = `The ${pct(x.st?.filter?.max ?? 0.6)} cut was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.`;
+      <p class="note"><b>Descriptive only:</b> this includes the trades the ${cut} was chosen from, so it can't prove ${shadow ? "the range" : "the filter"}.</p>`;
+  const oldCode = sd.old_code ? ` ${sd.old_code} trade${sd.old_code === 1 ? "" : "s"} the old code opened in that window ${sd.old_code === 1 ? "is" : "are"} left out of both.` : "";
+  const why = `The ${cut} was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.${oldCode}`;
   return `
     <div class="card judged">
       ${whole}
       <div class="judged-head judged-since">Judged from ${esc(dayName(String(at).slice(0, 10)))}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
       <table class="judged-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
-        <tbody>${line(name, sd.variant)}${line("All", sd.parent)}</tbody></table>
+        <tbody>${line(name, sd.variant)}${line(shadow ? keptName : "All", sd.parent)}</tbody></table>
       ${diffs.map(diffLine).join("")}
       ${enough}
       <p class="note">${why}</p>
-      ${x.st?.filter?.note ? `<details class="fold"><summary>How this filter works</summary><p class="note">${esc(x.st.filter.note)}</p></details>` : ""}
+      ${x.st?.filter?.note || x.st?.note ? `<details class="fold"><summary>How this ${shadow ? "comparison" : "filter"} works</summary><p class="note">${esc(x.st.filter?.note || x.st.note)}</p></details>` : ""}
     </div>`;
 }
 // Live paper by odds band (owner, 24 Oct; paper.live_odds_bands): the backtest's odds chart
@@ -3628,13 +3661,14 @@ function liveRuleNote(cur, x) {
   const rule = state.data.portfolio?.rule || {};
   if (cur.id === "corners" && (x.rule?.book || x.key) === "draftkings") return `<b>Live test: fixed ${pct(x.rule?.threshold ?? PAPER_EDGE)} on model (f) against DraftKings.</b> The same model and rule as the Pinnacle track, on DraftKings' price: a $${x.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(x.rule?.threshold ?? PAPER_EDGE)} edge, at most one per team and line, in the Premier League, La Liga, the Bundesliga, Serie A and Ligue 1 (DraftKings lists no team corners in the Championship). On a whole line (say 5), exactly 5 corners is a push: the stake comes back. Closing line value is against DraftKings' own close; where DraftKings priced only one side at the close there is none, and Pinnacle's close at the same line is the second check. Prices: logged with Pinnacle's, about a day before kickoff and again just before it.`;
   if (cur.id === "corners") return `<b>Live test: fixed ${pct(x.rule?.threshold ?? PAPER_EDGE)} on model (f) against Pinnacle.</b> A $${x.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(x.rule?.threshold ?? PAPER_EDGE)} edge against Pinnacle's price, at most one per team and line, in every competition. On a whole line (say 5), exactly 5 corners is a push: the stake comes back. Prices: Pinnacle's team corners, logged about a day before kickoff and again just before it.`;
-  if (x.key === "lean") return `<b>Blend Lean (1σ+).</b> A $${x.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(x.rule?.sigma)}. Be warned: most Lean picks come from the part of the blend that sharpens DraftKings' own price (it makes favourites a little likelier and long shots less likely, a pattern fitted on Pinnacle's prices), not from the model, which gets little weight. With that sharpening switched off, only 2 of the 12 matches that reached 1σ from 1 to 10 Oct would still have qualified. Lean hasn't proven itself, and neither has the baseball app's Lean tier it comes from. Expect few picks, mostly outside the Premier League, and judge it on closing line value rather than a few dozen results.`;
+  if (x.key === "lean") return `${x.rule?.odds_range ? `<b>Odds range since ${monthDay(x.rule.odds_range_from)}: ${rangeWords(x.rule.odds_range)} only</b> (decimal ${x.rule.odds_range[0].toFixed(2)} to ${x.rule.odds_range[1].toFixed(2)}). ${esc(x.rule.odds_range_note || "")}<br><br>` : ""}<b>Blend Lean (1σ+).</b> A $${x.rule?.stake ?? 10} paper trade opens on the side whose blended chance (model mixed with DraftKings' price) beats the price's break-even by at least one σ, Strong at 2σ, one per match, in every competition. σ is how far the blend usually strays from the market in that competition${sigmaList(x.rule?.sigma)}. Be warned: most Lean picks come from the part of the blend that sharpens DraftKings' own price (it makes favourites a little likelier and long shots less likely, a pattern fitted on Pinnacle's prices), not from the model, which gets little weight. With that sharpening switched off, only 2 of the 12 matches that reached 1σ from 1 to 10 Oct would still have qualified. Lean hasn't proven itself, and neither has the baseball app's Lean tier it comes from. Expect few picks, mostly outside the Premier League, and judge it on closing line value rather than a few dozen results.`;
   if (cur.id === "moneyline" && fixedRule()) return `<b>Your live test: fixed ${pct(rule.threshold ?? PAPER_EDGE)} on the model alone.</b> A $${rule.stake ?? 10} paper trade opens on every match where the model's own chance (not blended with the market) shows at least ${aPct(rule.threshold ?? PAPER_EDGE)} edge against DraftKings' quoted price, in every competition. The Matches tab flags exactly these.`;
   if (cur.id === "moneyline") return rule.threshold == null ? "No new paper trades: no minimum edge has beaten the market in past bets." : `A $${rule.stake ?? 10} paper trade opens whenever a pick reaches a ${pct(rule.threshold)} edge, the same minimum the Matches tab flags with.`;
   return esc(cur.note || "");
 }
 function liveStrategyHtml(cur, x, lg, strats = []) {
   const lean = x.key === "lean";
+  const leanLike = (x.variantOf || x.key) === "lean";
   const drv = lean ? state.pfDriver : "";
   const set = strategyLiveSet(cur, x, lg, drv);
   const trades = set.trades || [];
@@ -3643,7 +3677,10 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const book = cur.id === "corners" ? BOOK_POSS[dkCorners ? "draftkings" : "pinnacle"] : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
   const banner = x.st?.error ? `<div class="banner">This filtered view could not be built this time (${esc(x.st.error)}); the full track's record is unaffected.</div>`
     : set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
-  const rules = `<div class="explain live-test rule-note">${liveRuleNote(cur, x)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
+  // A variant shows its own note, then its parent's rule.
+  const ruleParent = x.variantOf ? pfParent(strats, x) : x;
+  const vNote = x.variantOf ? x.st?.note || x.st?.filter?.note : "";
+  const rules = `<div class="explain live-test rule-note">${vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
   const title = `<div class="section-title nocase">${esc(x.label)}${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>`;
   if (!trades.length) {
@@ -3655,7 +3692,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
       : "No paper trades yet.";
     return `${title}${banner}${drvPanel}<div class="empty">${empty}</div>${rules}`;
   }
-  const avg = lean && m.avgZ != null ? sigmaText(m.avgZ) : signedPct(m.avgEdge);
+  const avg = leanLike && m.avgZ != null ? sigmaText(m.avgZ) : signedPct(m.avgEdge);
   // Unsettled trades split by kickoff: upcoming and in play stay "Open"; a finished match
   // waits for its result in its own group until the ledger settles it.
   const open = trades.filter((t) => t.status === "open" && tradePhase(t) !== "awaiting");
@@ -3666,7 +3703,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
       <div class="tile"><div class="label">Profit, settled</div><div class="value ${m.n ? signCls(m.profit) : ""}">${m.n ? usd(m.profit, 2) : "–"}</div><div class="sub">${m.n ? `on $${m.staked.toFixed(0)} staked · ${signedPct(m.roi)}` : "nothing settled yet"}</div></div>
       <div class="tile"><div class="label">Record</div><div class="value">${m.won}–${m.lost}</div><div class="sub">${m.void} void${m.clv != null ? ` · CLV ${signedPct(m.clv)}` : ""}</div></div>
       <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk${awaiting.length ? ` · ${awaiting.length} finished, awaiting result (not in profit yet)` : ""}</div></div>
-      <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${lean ? " (σ above break-even)" : ""}</div></div>
+      <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${leanLike ? " (σ above break-even)" : ""}</div></div>
     </div>`;
   // Closes taken over an hour before kickoff (throttled scheduled builds): approximate CLV.
   const early = trades.filter((t) => !isPlayer(t) && !isCorner(t) && (t.status === "won" || t.status === "lost") && tradeClv(t) != null && closeApprox(t)).length;
@@ -3681,9 +3718,11 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   // A parent with variants, or a variant: every one of them on one chart, parent solid.
   const parent = pfParent(strats, x);
   const family = [parent, ...pfVariants(strats, parent)];
+  // A filter's parent is "All"; with a shadow variant (more trades) the parent is the live rule.
+  const parentName = family.slice(1).some((v) => v.st?.adds === "shadow") ? "Live rule" : "All";
   const overlay = family.length > 1
     ? family.map((s, k) => ({
-      name: k ? variantShort(s, parent) : "All",
+      name: k ? variantShort(s, parent) : parentName,
       label: k ? "" : s.label,
       curve: settledCurve(s === x ? trades : strategyLiveSet(cur, s, lg).trades || []),
     }))

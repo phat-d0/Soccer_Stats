@@ -284,7 +284,7 @@ const STEPS = [
   // Portfolio only.
   ["matches-lean-only", async (p) => {
     const text = await p.textContent("#view");
-    for (const want of ["have a Blend Lean pick", "Each Lean pick opens one $10 paper trade", "under Portfolio → Moneyline", "Blend Lean rule"]) {
+    for (const want of ["have a Blend Lean pick", "Each Lean pick in range opens one $10 paper trade", "under Portfolio → Moneyline", "Blend Lean rule"]) {
       if (!text.includes(want)) throw new Error(`Matches lacks "${want}"`);
     }
     for (const bad of ["Fixed 12% (your live test)", "a 12% pick", "12% would pick now", "Model 12% (second)", "First strategy"]) {
@@ -387,8 +387,14 @@ const STEPS = [
   ["matches-lean", async (p) => {
     await p.click('.chip[data-league=""]');
     const card = p.locator("button.match", { hasText: "Leeds" }).first();
-    const lean = await card.locator(".badge.lean").innerText();
-    if (!/Strong · 2\.6σ: Away/.test(lean) || lean.includes("Would pick") || !lean.includes("Market-driven")) throw new Error(`Lean badge: ${lean}`);
+    // Lean trades only at −200 to +200 since 24 Oct (owner): Leeds at +650 is outside, so
+    // its pick is greyed as "no trade"; the trade the old rule opened stays shown.
+    const lean = await card.locator(".badge.lean-out").innerText();
+    if (!lean.includes("Lean pick outside its odds range, no trade: Away @ +650") || !lean.includes("−200 to +200 only")) throw new Error(`Lean out-of-range badge: ${lean}`);
+    if (await card.locator(".badge.lean").count()) throw new Error("an out-of-range Lean pick has the pick badge");
+    const cb = p.locator("button.match", { hasText: "Bournemouth" }).first();
+    if (!(await cb.locator(".badge.lean-out").count()) || (await cb.locator(".badge.lean, .badge.paper").count())) throw new Error("Chelsea v Bournemouth's out-of-range pick");
+    if (!(await p.textContent("#view")).includes("more picks are outside Lean's odds range, so no trade opens")) throw new Error("Matches note lacks the out-of-range count");
     const open = await card.locator(".badge.paper").allInnerTexts();
     if (!open.some((t) => t.includes("(Lean): Away")) || open.some((t) => t.includes("(12%)"))) throw new Error(`open badges: ${open.join(" | ")}`);
     if (await card.locator(".badge.second").count()) throw new Error("Arsenal v Leeds shows a 12% badge");
@@ -399,6 +405,12 @@ const STEPS = [
     const text = await p.textContent("#view");
     for (const want of ["Blend Lean pick", "Blend Lean: 1σ", "σ by competition"]) if (!text.includes(want)) throw new Error(`Matches lacks "${want}"`);
   }],
+  ["match-sheet-lean-out", async (p) => {
+    await p.click('button.match[data-fixture="2"]'); await sheet(p);
+    const text = await p.textContent("#sheet-body");
+    if (!/No Lean trade: the pick is Away at \+330, outside Lean's −200 to \+200 range since \w+ \d+\. The blend gives it [\d.]+% against the [\d.]+% this price needs/.test(text)) throw new Error(`out-of-range sheet text: ${text.replace(/\s+/g, " ").slice(0, 400)}`);
+    await closeSheet(p);
+  }, true],
   ["match-sheet-lean", async (p) => {
     await p.locator("button.match", { hasText: "Leeds" }).first().click(); await sheet(p);
     const text = await p.textContent("#sheet-body");
@@ -526,8 +538,9 @@ const STEPS = [
     if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow)) throw new Error(`Lean row: ${leanRow}`);
     // Profit over time: before any pointer, the readout is the latest settled day.
     const readout = await p.textContent("#cv-readout");
-    const latest = await p.evaluate(() => plain(curveReadout(scrubCharts.cv.data.at(-1))));
-    if (readout !== latest || !readout.includes("to date")) throw new Error(`curve readout: ${readout}`);
+    // (Lean has its old-rule variant since 24 Oct, so its chart is the overlay.)
+    const latest = await p.evaluate(() => plain(scrubCharts.cv.readout(scrubCharts.cv.xs.length - 1)));
+    if (readout !== latest || !readout.includes("Live rule")) throw new Error(`curve readout: ${readout}`);
     const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
     if (!avg.endsWith("σ")) throw new Error(`Lean avg edge should be in σ: ${avg}`);
   }],
@@ -538,11 +551,11 @@ const STEPS = [
     await svg.scrollIntoViewIfNeeded();
     const box = await svg.boundingBox();
     const y = box.y + box.height / 2;
-    const expected = () => p.evaluate(() => ({ at: scrubCharts.cv.at, text: plain(curveReadout(scrubCharts.cv.data[scrubCharts.cv.at])), cum: usd(scrubCharts.cv.data[scrubCharts.cv.at].cum, 2), origin: !!scrubCharts.cv.data[scrubCharts.cv.at].origin, n: scrubCharts.cv.data.length }));
+    const expected = () => p.evaluate(() => ({ at: scrubCharts.cv.at, text: plain(scrubCharts.cv.readout(scrubCharts.cv.at)), origin: scrubCharts.cv.at === 0, n: scrubCharts.cv.xs.length }));
     const check = async (what) => {
       const e = await expected();
       const r = await p.textContent("#cv-readout");
-      if (r !== e.text || !r.includes(e.origin ? "first trade opened" : `${e.cum} to date`)) throw new Error(`${what}: readout "${r}" vs day ${e.at} "${e.text}"`);
+      if (r !== e.text || !r.includes(e.origin ? "first trade opened" : "Live rule")) throw new Error(`${what}: readout "${r}" vs day ${e.at} "${e.text}"`);
       if (await p.locator("[data-scrub='cv'] .cursor").evaluate((el) => el.style.display) === "none") throw new Error(`${what}: no cursor`);
       return e;
     };
@@ -583,6 +596,34 @@ const STEPS = [
     await p.waitForFunction((y0) => window.scrollY !== y0, before, { timeout: 3000 });
   }],
   ["portfolio-live-bands", async (p) => { await liveBandsCheck(p, "moneyline", "lean", ""); }],
+  // Blend Lean's odds range (owner, 24 Oct): the rule on Lean's row and rule box; the old
+  // rule (all odds) as an indented variant that adds the shadow entries, with the overlay.
+  ["portfolio-lean-old-rule", async (p) => {
+    const row = (await p.locator('button[data-pfstrat="lean"]').innerText()).replace(/\s+/g, " ");
+    if (!row.includes("1σ+ · −200 to +200")) throw new Error(`Lean row: ${row}`);
+    if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
+    const next = await p.locator('button[data-pfstrat="lean"] + button').getAttribute("data-pfstrat");
+    if (next !== "lean_all_odds") throw new Error(`row under Lean: ${next}`);
+    const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
+    if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips")) throw new Error(`old-rule row: ${vrow}`);
+    if ((await p.locator(".curve-legend .lg-item").allInnerTexts()).join("|").indexOf("Live rule") < 0) throw new Error("overlay legend lacks the live rule");
+    await p.click('button[data-pfstrat="lean_all_odds"]');
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    const want = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "lean_all_odds").trade_ids);
+    if (!ids.some((id) => id.endsWith("|shadow")) || ids.some((id) => !want.includes(id))) throw new Error(`old-rule trades: ${ids.join(", ")}`);
+    const chip = await p.locator('#view button[data-trade$="|shadow"] .chip-shadow').first().innerText();
+    if (chip !== "Shadow: no trade opened (outside the odds range)") throw new Error(`shadow chip: ${chip}`);
+    const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
+    for (const w of ["Whole period, from", "Judged from", "Live rule", "All odds (old rule)", "odds range was picked after seeing the first", "the old code opened in that window", "How this comparison works", "minus all odds (old rule)"]) {
+      if (!box.includes(w)) throw new Error(`old-rule box lacks "${w}": ${box}`);
+    }
+    if (box.includes("60%")) throw new Error("old-rule box talks about the 60% cut");
+    const text = await p.textContent("#view");
+    if (!text.includes("Blend Lean, all odds (old rule).") || !text.includes("Odds range since")) throw new Error("old-rule rule note");
+    await scrubCheck(p, "[data-scrub='cv']");
+    await p.locator(".band-share").first().scrollIntoViewIfNeeded();
+    await p.click('button[data-pfstrat="lean"]');
+  }],
   ["portfolio-live-lean-trade", async (p) => {
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const text = await p.textContent("#sheet-body");

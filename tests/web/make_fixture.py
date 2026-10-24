@@ -1199,6 +1199,19 @@ STARTED_OPEN = [
 ]
 
 
+# The Lean odds range's start in the fixture: the real one (tr.LEAN_RANGE_FROM, 24 Oct) is
+# after the fixture's NOW, so nothing would be judged; paper reads it at call time.
+FIXTURE_LEAN_RANGE_FROM = "2026-09-24T12:00:00+00:00"
+tr.LEAN_RANGE_FROM = FIXTURE_LEAN_RANGE_FROM
+# Out-of-range Lean picks after the start: shadow entries (league, home, away, kickoff,
+# market, odds, z, close odds, won).
+LEAN_SHADOWS = [
+    ("E0", "Burnley", "Man City", "2026-09-28T14:00:00Z", "home", 6.5, 1.3, 6.8, False),
+    ("E0", "Liverpool", "Sunderland", "2026-10-02T19:00:00Z", "home", 1.38, 1.1, 1.36, True),
+    ("SP1", "Getafe", "Barcelona", "2026-10-04T16:00:00Z", "home", 4.8, 1.2, 4.6, True),
+]
+
+
 def add_lean_strategy(data: dict) -> None:
     pub.add_lean(data, SYNTHETIC_BLENDS)
     codes = list(data["portfolio"]["rules"])
@@ -1273,6 +1286,30 @@ def add_lean_strategy(data: dict) -> None:
             t |= {"close_fetched_at": (kick - pd.Timedelta(minutes=12)).isoformat()}
             t |= {"beat_close_dk": clv > 0}
         (lean if strat == "lean" else trades).append(t)
+    # Blend Lean's odds range (owner, 24 Oct): from FIXTURE_LEAN_RANGE_FROM a Lean trade in
+    # range is rule version 2; the out-of-range picks are shadow entries (what the old rule
+    # would have bet). Wolves v Everton and Sevilla v Valencia, out of range after the start,
+    # stay version 1: trades the old code opened in that window (since_defined's old_code).
+    start = pd.Timestamp(FIXTURE_LEAN_RANGE_FROM)
+    for t in lean:
+        if pd.Timestamp(t["opened_at"]) >= start and tr.in_lean_range(t["odds"]):
+            t |= {"rule_version": tr.LEAN_RULE_VERSION, "odds_range": list(tr.LEAN_ODDS_RANGE)}
+    shadows = []
+    for lg, home, away, ko, market, odds, z, close, won in LEAN_SHADOWS:
+        kick = pd.Timestamp(ko)
+        sigma = SYNTHETIC_BLENDS["leagues"][lg]["sigma"]
+        p = 1 / odds + z * sigma
+        pick = {"market": market, "odds": odds, "p_bet": p, "model_p": p, "edge": p * odds - 1}
+        pick |= {"z": z, "tier": "lean", "sigma": sigma, "z_market": 1.1, "driver": "market"}
+        t = lean_trade(lg, home, away, kick, pick, kick - pd.Timedelta(hours=26))
+        clv = odds / close - 1
+        t |= {"id": t["id"] + tr.SHADOW_SUFFIX, "shadow": True, "excluded_by": "odds_range"}
+        t |= {"close_odds": close, "close_fetched_at": (kick - pd.Timedelta(minutes=9)).isoformat()}
+        t |= {"close_minutes_before": 9, "clv_dk": round(clv, 4), "beat_close_dk": clv > 0}
+        t |= {"status": "won" if won else "lost", "score": "2-1" if won else "0-1"}
+        t |= {"profit": round(10 * (odds - 1), 2) if won else -10.0}
+        t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+        shadows.append(t)
     ml = pfs["moneyline"]
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     rule = data["portfolio"]["rules"]["E0"]  # paper.run: rules[league], sigma and lean added
@@ -1287,6 +1324,7 @@ def add_lean_strategy(data: dict) -> None:
         },
         paper.match_strategies(leans, rule),
         now=NOW,
+        shadow_trades=shadows,
     )
 
 
