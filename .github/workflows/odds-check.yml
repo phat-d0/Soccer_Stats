@@ -21,6 +21,10 @@
 #   corners2: corners bake-off 2 for `league` (docs/totals.md, round 13): development
 #            2017/18-2023/24; `reason` + `finalists` (the league's finalist, f/g/h) + `cap`
 #            (leagues judged) open the 2026/27 test (to 31 Jan 2027) once, not before 3 Feb 2027.
+#   comebacks-fetch: one `league`'s Understat goal minutes (E0, SP1, D1, I1, F1),
+#            downloaded and cached (comebacks-<league>-); prints counts only, never outcomes.
+#   comebacks: favourites coming back from behind (docs/lab.md, 24 Oct): eight leagues
+#            pooled from the cached files, against a fair time-scaled Poisson model.
 #   corner-coverage: 2025/26 corner-count coverage in all six leagues (counts only).
 #   cup-corner-coverage: the cup corners model's coverage count (docs/totals.md "Cup corners
 #            model"): football-data HC/AC per file, ESPN cup summaries with corner counts,
@@ -74,9 +78,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
@@ -134,11 +138,18 @@ jobs:
           restore-keys: raw-data-
       # Goalscorer leagues: each league's Understat files have their own cache prefix.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'comebacks-fetch' }}
         with:
           path: data/raw
           key: understat-${{ inputs.league }}-none
           restore-keys: understat-${{ inputs.league }}-
+      # Favourite comebacks: each league's Understat goal files have their own prefix too.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks-fetch' }}
+        with:
+          path: data/raw
+          key: comebacks-${{ inputs.league }}-none
+          restore-keys: comebacks-${{ inputs.league }}-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'goal-leagues' }}
         with:
@@ -163,6 +174,36 @@ jobs:
           path: data/raw
           key: understat-F1-none
           restore-keys: understat-F1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks' }}
+        with:
+          path: data/raw
+          key: comebacks-E0-none
+          restore-keys: comebacks-E0-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks' }}
+        with:
+          path: data/raw
+          key: comebacks-SP1-none
+          restore-keys: comebacks-SP1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks' }}
+        with:
+          path: data/raw
+          key: comebacks-D1-none
+          restore-keys: comebacks-D1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks' }}
+        with:
+          path: data/raw
+          key: comebacks-I1-none
+          restore-keys: comebacks-I1-
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comebacks' }}
+        with:
+          path: data/raw
+          key: comebacks-F1-none
+          restore-keys: comebacks-F1-
       # The cup corners model: ESPN's cup scoreboards (warmed by backfill.yml's match_blends
       # and the closes download), then this task's own cache of corner counts (saved below).
       - uses: actions/cache/restore@v4
@@ -226,6 +267,8 @@ jobs:
               T=$([ "$CAP" = "0" ] && echo 6 || echo "$CAP")
               uv run python -m soccer_stats.edge.corners2 --league "$LEAGUE" --reason "$REASON" \
                 --finalist "$FINALISTS" --tests "$T" --json out/corners2.json ;;
+            comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
+            comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
             cup-corner-coverage) uv run soccer-stats cup-corners --coverage-only \
                      --json out/cup_corner_coverage.json ;;
@@ -302,6 +345,14 @@ jobs:
             data/raw/cups/corners
             data/raw/cups/espn
           key: cup-corners-${{ github.run_id }}
+      # Favourite comebacks: one league's Understat files (match goals and season lists).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'comebacks-fetch' }}
+        with:
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
+          key: comebacks-${{ inputs.league }}-${{ github.run_id }}
       # Only goal-league saves a cache, under its own league's prefix (never raw-data-).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'goal-league' && inputs.league != 'E0' }}
