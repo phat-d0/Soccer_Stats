@@ -172,7 +172,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
 | `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, inplay-probe, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`. | 0 except the capped tasks |
-| `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web`: Playwright Chromium (cached) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
+| `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
 - Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
@@ -635,7 +635,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v57) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v58) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -671,10 +671,20 @@ the owner's baseball app, so the balance can drop without any run here.
   `WEAK_CORNER_FIT` note for SP1, D1, E1; `UNTESTED_CORNER_FIT` note for E2, E3, where model (f) was never tested; `NO_DK_CORNERS` E1, E2, E3 get "DraftKings lists no team corners in …"); Player shots (Premier League; player trades are off).
   Cards with `no_model` (UCL clubs no league covers) show "No model chance: odds only"
   (`noModelHtml`).
-- **Portfolio**: switcher (localStorage `pfId`; retired Player shots behind a link), status and
-  note, competition filter, Live / Backtest, then "Paper strategies" (`strategyList`; Moneyline
-  Lean then Model 12%, selection `pfStrat`; Team corners Pinnacle then DraftKings, selection
-  `pfStratCorners`). Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
+- **Portfolio** (drill-down lists since v58, owner, 24 Oct; `state.pfLevel` "home" /
+  "portfolio" / "strategy", in memory only, `pfLevelOn`): the top level (`pfHomeHtml`) lists one
+  row per portfolio (name, status pill, its strategies, live profit of all of them together,
+  settled and open counts) with retired Player shots behind a link; Anytime goalscorer is hidden
+  (`PF_HIDDEN`). A portfolio (`pfFolderHtml`, `data-pfid`) shows crumbs ("‹ Portfolio"), its
+  name, status and note, the competition filter and one row per strategy (`strategyFolders`,
+  `data-pfstrat`: live profit and record, a "Backtest:" line from `backtestHeadline`; shadow
+  variants "↳ …" under their parent, no backtest line). A strategy (`pfStrategyHtml`) shows crumbs
+  "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status · rule (variants: "Shadow filter
+  of …"), the competition filter and Live paper / Backtest / Model (a variant's Backtest and
+  Model are its parent's, with a note). A portfolio with one strategy (Player shots) opens
+  straight on its views. Tapping the Portfolio tab again goes back to the top; the match sheet's
+  corners link opens the Team corners list. Selections stay in `pfId`, `pfStrat` (Moneyline)
+  and `pfStratCorners`. Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
   the filters (`tradeStats`), the <200-settled caveat, paper.py's ROI range only when its summary
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
   over time" (`curveChart`: scrubbable, see below), "Bankroll: flat $10 vs ¼ Kelly" (owner, 24
@@ -700,8 +710,8 @@ the owner's baseball app, so the balance can drop without any run here.
   with the odds range). Shadow-filter variants (owner, 23 Oct; any live strategy
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60` and Lean's
   `lean_all_odds`): an
-  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
-  Backtest and Model show the parent), its own trades and tiles via `trade_ids`, one box
+  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; its Backtest
+  and Model show the parent's), its own trades and tiles via `trade_ids`, one box
   (`sinceDefinedHtml`) with a descriptive "Whole period, from <first trade>" part on top
   (the variant's and parent's full summaries, and the CLV difference kept minus all computed
   in the app from the trades' `clv_pinnacle`, won or lost with a value (as the summaries), with n; "includes the
@@ -886,8 +896,7 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 - Name watch: check each publish log's "Duplicate fixtures" and "odds events unmatched" lines; a
   promoted or relegated club needs its spelling checked (`odds-check.yml` `task=markets` /
   `task=espn` with `leagues=…`, free).
-- Housekeeping: a step-level time limit on the Playwright install in `ci.yml` (it hung twice);
-  drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading
+- Housekeeping: drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading
   `player_model`.
 
 ## Conventions
