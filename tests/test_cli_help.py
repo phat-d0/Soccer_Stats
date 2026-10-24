@@ -19,6 +19,8 @@ MODULES = [
     "soccer_stats.edge.corner_recal",
     "soccer_stats.lab.run",
     "soccer_stats.lab.comebacks",
+    "soccer_stats.lab.comeback_plan",
+    "soccer_stats.lab.inplay_probe",
 ]
 
 
