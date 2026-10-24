@@ -681,7 +681,8 @@ the owner's baseball app, so the balance can drop without any run here.
   `backcast.lean_started`, the marker reads "rule set (judged from here)", Lean's view notes
   "Backcast before <date>: …" (descriptive), and the variant box's descriptive part is "Before
   the rule, <start> to <date> · backcast" from the variant's `before_defined` (same shape as
-  `since_defined`, "Live rule (backcast)" vs "All odds (old rule)") in place of "Whole period"; with a parent or its variant selected, "Profit over time" is
+  `since_defined`, "Live rule (backcast)" vs "All odds (old rule)", plus "Cut (outside the range)" from
+  `backcast.cut`) in place of "Whole period"; with a parent or its variant selected, "Profit over time" is
   `overlayCurveChart` (parent solid, named "All", or "Live rule" beside a shadow; variants dashed, end labels, legend, a "filter set
   (judged from here)" marker at `defined_at`; readout "Sat 18 Oct · All +$23.40 · Below 60%
   +$31.10 (difference +$7.70)"). The fixture builds them through `paper.corner_strategies`, moving `defined_at` to 20 Sep
