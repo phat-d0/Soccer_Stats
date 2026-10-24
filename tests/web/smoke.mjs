@@ -101,6 +101,28 @@ async function bandsCheck(p, key, lg) {
   await p.click(".band-fold > summary");
   await scrubCheck(p, `[data-scrub="cb-${sfx}"]`);
 }
+// Live paper by odds band (owner, 24 Oct): strategy `key` of portfolio `pfId` under
+// competition `lg`: one row per band with its share or "no trades", readouts with that band's
+// own trades and CLV, the ROI table, and (Moneyline) the backtest beside it.
+async function liveBandsCheck(p, pfId, key, lg) {
+  if (lg === undefined) lg = await p.evaluate(() => leagueOn()); // the chip that's on
+  const id = `lob-${key}-${lg || "all"}`;
+  const bands = await p.evaluate(([pfId, key, lg]) => {
+    const st = pfById(pfId).live.strategies.find((s) => s.key === key);
+    return lg ? st.by_league[lg].by_odds_band : st.by_odds_band;
+  }, [pfId, key, lg]);
+  const text = await p.textContent("#view");
+  for (const w of ["Where the bets sit on the odds", "Live samples are small", "where the edge question is answered"]) if (!text.includes(w)) throw new Error(`${id} lacks "${w}"`);
+  const shares = (await p.locator(`[data-scrub="${id}"] .band-row[data-stop] .band-share`).allInnerTexts()).map((t) => t.trim());
+  const want = await p.evaluate((b) => b.map((x) => (x.bets ? pct(x.share, 0) : "no trades")), bands);
+  if (shares.join("|") !== want.join("|")) throw new Error(`${id} shares ${shares} vs ${want}`);
+  const bad = await p.evaluate(([id, b]) => b.map((x, i) => [x, plain(scrubCharts[id].readout(i))]).filter(([x, r]) => (x.bets ? !r.includes(`${num(x.bets)} trades`) || (x.clv != null && !r.includes(`CLV ${signedPct(x.clv)}`)) : !r.includes("no trades"))).map(([, r]) => r), [id, bands]);
+  if (bad.length) throw new Error(`${id} readouts: ${bad.join(" | ")}`);
+  const beside = text.includes("Beside the backtest");
+  if (beside !== (pfId === "moneyline")) throw new Error(`${id}: backtest comparison ${beside ? "shown" : "missing"}`);
+  if (beside && !text.includes("In the backtest")) throw new Error(`${id}: comparison table`);
+  await scrubCheck(p, `[data-scrub="${id}"]`);
+}
 async function scrubCheck(p, sel) {
   const wrap = p.locator(sel).first();
   await wrap.scrollIntoViewIfNeeded();
@@ -560,6 +582,7 @@ const STEPS = [
     await p.mouse.wheel(0, 400);
     await p.waitForFunction((y0) => window.scrollY !== y0, before, { timeout: 3000 });
   }],
+  ["portfolio-live-bands", async (p) => { await liveBandsCheck(p, "moneyline", "lean", ""); }],
   ["portfolio-live-lean-trade", async (p) => {
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const text = await p.textContent("#sheet-body");
@@ -734,6 +757,11 @@ const STEPS = [
       if (!text.includes(w)) throw new Error(`Lean model view lacks "${w}"`);
     }
     if ((await p.locator("#view .model-table").count()) < 2) throw new Error("per-league tables under All");
+    // Live bins merge only under 3 trades; a bin under 10 is greyed and says "few trades".
+    const few = await p.evaluate(() => (pfById("moneyline").live.strategies.find((x) => x.key === "lean").calibration.bins || []).filter((b) => b.few).length);
+    const shown = await p.locator('[data-scrub="live-lean-all"] .rc-row.few').count();
+    if (shown !== few) throw new Error(`few bins: ${shown} greyed for ${few} in the data`);
+    if (few && !(await p.locator('[data-scrub="live-lean-all"] .rc-row.few').first().innerText()).includes("few trades")) throw new Error("few bin label");
     // The blend's shape scrubs in 1-point steps: halfway along the drawn range is 49%.
     await scrubCheck(p, "[data-scrub='shape-E0']");
     await p.keyboard.press("Home");
@@ -796,6 +824,7 @@ const STEPS = [
     if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
     if (!text.includes("95% range on ROI")) throw new Error("12% live lacks paper.py's ROI range");
   }],
+  ["portfolio-live-edge12-bands", async (p) => { await liveBandsCheck(p, "moneyline", "edge12", ""); }],
   ["portfolio-live-edge12-states", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("12% awaiting group");
@@ -808,7 +837,12 @@ const STEPS = [
   ["portfolio-backtest-sp1", click('button[data-pf="backtest"]')],
   ["portfolio-live-all", async (p) => { await p.click('button[data-pf="live"]'); await p.click('.chip[data-league=""]'); }],
   // A settled live match trade whose close was taken early (approximate CLV; fixture data).
-  ["portfolio-live-close-sheet", async (p) => { await p.click('button[data-trade="E0|2627|Spurs|Brentford"]'); await sheet(p); }, true],
+  // (the ledger grows, so page through "Show more" until its row is listed)
+  ["portfolio-live-close-sheet", async (p) => {
+    const row = p.locator('button[data-trade="E0|2627|Spurs|Brentford"]');
+    for (let i = 0; i < 20 && !(await row.count()) && (await p.locator("#pf-more").count()); i++) await p.click("#pf-more");
+    await row.click(); await sheet(p);
+  }, true],
   ["portfolio-live-trade", async (p) => { await closeSheet(p); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   // The DraftKings backtest's own trades: Model 12% under the Premier League.
   ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await p.click('button[data-pfstrat="edge12"]'); await p.click("details.fold > summary"); }],
@@ -830,6 +864,7 @@ const STEPS = [
     }
     if (await p.locator('#view button[data-trade$="|dk"]').count()) throw new Error("a DraftKings trade shows under the Pinnacle track");
   }],
+  ["portfolio-corners-bands", async (p) => { await liveBandsCheck(p, "corners", "pinnacle"); }],
   // The DraftKings track: its own trades, CLV vs DraftKings' close with Pinnacle's as a
   // second line, a one-sided close without DraftKings CLV; Moneyline's selection untouched.
   ["portfolio-corners-dk", async (p) => {

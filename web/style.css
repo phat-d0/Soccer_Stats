@@ -840,3 +840,6 @@ details.drv-fold { margin-top: 10px; }
 .band-table td .meta { display: block; font-size: 11px; color: var(--text-muted); }
 .band-table { font-size: 13px; }
 .band-table td, .band-table th { vertical-align: top; }
+/* Live calibration bins under 10 trades (paper LIVE_FEW): greyed and labelled "few trades". */
+.rc-row.few .eb-plot { opacity: 0.4; }
+.rc-row.few .eb-label { color: var(--text-muted); }
