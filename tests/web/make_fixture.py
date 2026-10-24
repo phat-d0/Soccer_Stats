@@ -551,7 +551,9 @@ def add_settled_live_matches(data: dict) -> None:
         "source": r.get("threshold_source"),
         "note": r.get("threshold_note"),
     }
-    data["portfolio"]["portfolios"] = paper.portfolios_section(live, trades, backtests, match_rule)
+    data["portfolio"]["portfolios"] = paper.portfolios_section(
+        live, trades, backtests, match_rule, now=NOW
+    )
     # The app reads only `portfolios`: leave the old top-level copies out of the fixture
     # (production keeps them for one release), so the smoke test proves nothing needs them.
     data["portfolio"].pop("live", None)
@@ -1061,8 +1063,9 @@ def add_corners(data: dict) -> None:
         ml["live"].get("rule"),
         {
             "corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
-            | {"strategies": paper.corner_strategies(corner_trades)}
+            | {"strategies": paper.corner_strategies(corner_trades, NOW)}
         },
+        now=NOW,
     )
 
 
@@ -1280,9 +1283,10 @@ def add_lean_strategy(data: dict) -> None:
         rule,
         {
             "corners": {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
-            | {"strategies": paper.corner_strategies(pfs["corners"]["live"]["trades"])}
+            | {"strategies": paper.corner_strategies(pfs["corners"]["live"]["trades"], NOW)}
         },
         paper.match_strategies(leans, rule),
+        now=NOW,
     )
 
 
@@ -1362,7 +1366,7 @@ def add_second_league(data: dict) -> None:
         et.setdefault("by_league", {})["SP1"] = SP1_EDGE
     live = {"error": ml["live"].get("error"), "note": ml["live"].get("note")}
     data["portfolio"]["portfolios"] = paper.portfolios_section(
-        live, live_trades, backtests, ml["live"].get("rule")
+        live, live_trades, backtests, ml["live"].get("rule"), now=NOW
     )
 
 

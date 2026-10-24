@@ -246,9 +246,10 @@ the owner's baseball app, so the balance can drop without any run here.
   = `{odds_bands, edge_cuts, clv_cuts, edge_from, note}`. Every bet counts (not the trimmed
   rows); ranges resample matches (`boot_mean`, 2,000 draws). Log lines `LEAN_BANDS_JSON` /
   `EDGE12_BANDS_JSON` (pooled and UCL). `app_section` passes them through.
-- `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None)` =
-  `{n, wins, predicted, implied?, realized, brier, log_loss, intercept, intercept_ci95, slope,
-  slope_ci95, bins: [{lo, hi, n, wins, predicted, implied?, realized, realized_lo, realized_hi}]}`.
+- `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None,
+  few_below=None)` = `{n, wins, predicted, implied?, realized, brier, log_loss, intercept,
+  intercept_ci95, slope, slope_ci95, bins: [{lo, hi, n, wins, predicted, implied?, realized,
+  realized_lo, realized_hi, few?}]}` (`few: true` when n < `few_below`).
   Bins on the predicted chance at 0–10, …, 60–70, 70–100%; empty bins dropped, a bin under 20 rows
   joins the next (the last joins the one before); Wilson 95% ranges. Recalibration logit(won) = a
   + b·logit(pred) by Newton, 95% ranges from standard errors, cluster-robust over `groups` (one
@@ -428,7 +429,17 @@ the owner's baseball app, so the balance can drop without any run here.
     `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Every
     `strategy_section` (both Moneyline and both corner strategies) has `calibration` =
     `trade_calibration`: settled won/lost trades' `model_p` (a corner's given no push, ÷ (1 −
-    `p_push`)) vs 1/odds vs won, `pushes`, `voids`, `by_league`, `note`. Corners' live section has
+    `p_push`)) vs 1/odds vs won, `pushes`, `voids`, `by_league`, `note`; live bins (owner, 24 Oct)
+    merge only under `LIVE_MIN_BIN` 3 trades and carry `few: true` under `LIVE_FEW` 10 (the
+    backtests keep 20). Every `strategy_section`, variants included, also has `by_odds_band`
+    (`live_odds_bands`: `bands.ODDS_BANDS`, every band kept, `{lo, hi, bets, share, settled, wins,
+    win_rate, breakeven, roi, roi_ci95, clv_trades, clv, clv_ci95}`; `bets` = every trade, win
+    rate and ROI per $1 on settled won/lost, CLV on trades whose close is final (`_close_final`:
+    settled, or open with its kickoff at or before the build's `now`; voids out), ranges
+    resampling matches), `odds_bands` = `{clv_field, note}` (`live_clv_field`: `clv_pinnacle` on
+    both corner tracks, `clv_dk` on Moneyline) and `by_league[code].by_odds_band` when the
+    trades span 2+ leagues. `now` threads from `run` through `portfolios_section`,
+    `corner_strategies`, `with_variants` and `variant_section`. Corners' live section has
     `quote_calibration` (`corners_live.quote_calibration`: per book the newest pre-kickoff quote
     of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
     counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,
