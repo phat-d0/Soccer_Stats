@@ -91,6 +91,12 @@ settlement runs after them.
   bets, ROI −2.2% (−7.5% to +2.9%), CLV −3.1% (−3.4% to −2.8%); the branch run in
   `docs/leagues.md` had 2,629 bets, ROI −2.3%. UCL Lean: 0 bets (only one block reaches the
   300-row minimum).
+- Draw no bet (owner, 24 Oct; `docs/lab.md` "Draw no bet", run 40140494754): both rules as DNB
+  beside their 1X2 versions on the same matches, eight leagues. Neither passes: DNB 12% 7,017 bets,
+  CLV −6.2% (−6.5% to −5.8%) per stake not refunded, −4.8% per $ (1X2 12%: −4.6%), ROI −5.0%;
+  DNB Lean 1,995 bets, CLV −4.2% (−4.8% to −3.7%), −3.2% per $ (1X2 Lean: −3.1%), ROI −4.2%. Hit
+  rate 31% vs 27% (the rule still bets underdogs, average DNB odds 3.90); a third fewer bets
+  needed to see a 5% edge. No live change.
 - Favourites coming back from behind (owner, 24 Oct; phase 1, free data): a gap against a fair
   time-scaled model with no game state. Favourites behind at half-time win 19.7% vs 14.0%
   (2,166 matches, eight leagues), after conceding first 28.8% vs 24.5% (2,174, five

@@ -1512,3 +1512,48 @@ loses with less noise still loses. Everything else is descriptive.
 **Run:** `backfill.yml` input `dnb_backtest` (`soccer-stats backtest-dnb`), 0 credits, no key;
 from a branch it prints and keeps a 7-day artifact, from the default branch it writes data-log
 `backtest/dnb_backtest.json`.
+
+### Results (2026-10-24; `backfill.yml` run 40140494754 from the branch, 0 credits, no key)
+
+Eight leagues, 2019/20–2024/25, 19,553 scored matches (draws 22.9–27.7% by league). Every
+rule is on the same matches; ranges resample matches. CLV for DNB is per stake not refunded;
+"per $" multiplies by the close's no-draw chance, so it compares directly with 1X2.
+
+| Rule | Bets | Won / refunded / lost | Hit rate vs break-even | Avg odds | ROI (95%) | CLV (97.5%) | CLV per $ | Bets for a 5% edge |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DNB 12% | 7,017 | 1,652 / 1,738 / 3,627 | 31.3% vs 34.1% | 3.90 | −5.0% (−8.5% to −1.3%) | −6.2% (−6.5% to −5.8%) | −4.8% | 3,737 |
+| 1X2 Model 12% | 8,909 | 2,370 / 0 / 6,539 | 26.6% vs 28.4% | 4.52 | −5.6% (−9.5% to −1.7%) | −4.6% (−4.9% to −4.4%) | −4.6% | 5,520 |
+| DNB Lean | 1,995 | 620 / 525 / 850 | 42.2% vs 43.2% | 2.91 | −4.2% (−9.4% to +1.0%) | −4.2% (−4.8% to −3.7%) | −3.2% | 2,062 |
+| 1X2 Lean (all odds) | 2,627 | 1,068 / 0 / 1,559 | 40.7% vs 41.4% | 2.95 | −2.3% (−7.4% to +3.0%) | −3.1% (−3.5% to −2.7%) | −3.1% | 2,971 |
+
+- **Neither DNB rule passes.** Both CLV ranges sit well below 0, in every league and every season
+  (DNB 12% −4.8% to −8.0% by season; DNB Lean −3.3% to −5.5%).
+- **Per dollar, DNB loses to the close about as much as 1X2** (−4.8% vs −4.6%; −3.2% vs −3.1%).
+  Taking the draw out removes the model's draw errors but none of its home-vs-away error, which
+  is where its edge claims come from.
+- **The hit rate rises less than hoped:** 31% vs 27% for the 12% rule. The rule still finds its
+  biggest claimed edges on underdogs, and an underdog's DNB price stays long (average 3.90; 49%
+  of DNB 12% bets are at 3.00 or more). DNB Lean's hit rate is 42% vs 41%.
+- **Noise:** about a third fewer bets are needed before a 5% edge shows (3,737 vs 5,520; 2,062 vs
+  2,971), not the fourfold gain a 2.20 price would give. That is a real but modest monitoring gain.
+- **The model overrates its DNB picks as it does its 1X2 picks:** DNB 12%'s bets said 43.6%,
+  the price implied 34.2%, 31.3% won (slope 0.81, 0.74 to 0.89). On every match, the model's DNB
+  chance is roughly calibrated in the top five leagues (slopes 0.92–1.19) but over-confident in
+  the Championship and League Two (0.69, 0.59).
+- **Odds bands:** DNB 12% CLV runs from −4.1% at 1.50 or shorter to −9.0% above 5.00; DNB Lean
+  −3.0% to −5.0%. No band is above 0.
+- **AH 0 check:** where Pinnacle's line is 0 (11–19% of matches, close games), the synthetic DNB's
+  margin is 3.9–5.0% against 2.1–3.2% for the real AH 0, and their fair chances agree (mean gap
+  0.001). Decided and paid at the real AH-0 price, both rules still lose to the close: DNB 12%
+  1,001 bets, CLV −2.8% (−3.4% to −2.3%), ROI −3.3%; DNB Lean 436 bets, CLV −2.8% (−3.6% to −2.0%),
+  ROI −2.0%. The cheaper real market narrows the loss (and these are short-priced, close
+  matches), but doesn't turn it positive.
+
+## Verdict (draw no bet)
+
+**No DNB track: it doesn't pass, and it isn't a better way to run the same picks.** DNB changes
+the bet, not the model's mistake. The model's edge claims come from rating one side above the
+other more than the price does, and DNB keeps exactly that, so it loses to Pinnacle's close as
+much per dollar as the 1X2 rules. The synthetic DNB we could build from DraftKings' h2h also pays
+about 1.7 points more margin than a real DNB market. The noise falls by about a third, not enough
+to justify a new track by itself. Nothing changes live. No handover.
