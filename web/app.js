@@ -3476,7 +3476,7 @@ function curveChart(curve, start) {
 // series holding its total on days it didn't move. One scrub point per day; the readout
 // gives every series that day and each variant's difference from the first.
 const SERIES_CLS = ["s0", "s1", "s2", "s3"];
-function overlayCurveChart(series, definedAt, start) {
+function overlayCurveChart(series, definedAt, start, markLabel = "filter set (judged from here)") {
   const days = [...new Set(series.flatMap((o) => o.curve.map((c) => c.date)))].sort();
   if (!days.length) return "";
   start = start || days[0];
@@ -3507,7 +3507,7 @@ function overlayCurveChart(series, definedAt, start) {
     const k = days.findIndex((d) => d >= d0);
     const mx = k < 0 ? sx(last) : k === 0 ? sx(0) : (sx(k) + sx(k + 1)) / 2;
     const anchor = mx > (L + W - R) / 2 ? "end" : "start";
-    marker = `<line class="filter-mark" x1="${mx}" x2="${mx}" y1="${T - 6}" y2="${H - B}"/><text class="filter-lab" x="${mx + (anchor === "end" ? -4 : 4)}" y="${T - 6}" text-anchor="${anchor}">filter set (judged from here)</text>`;
+    marker = `<line class="filter-mark" x1="${mx}" x2="${mx}" y1="${T - 6}" y2="${H - B}"/><text class="filter-lab" x="${mx + (anchor === "end" ? -4 : 4)}" y="${T - 6}" text-anchor="${anchor}">${esc(markLabel)}</text>`;
   }
   const id = "cv";
   scrubCharts[id] = {
@@ -3601,7 +3601,7 @@ function sinceDefinedHtml(cur, x, parent, lg) {
   const meanAll = meanOf(withClv.map((t) => t[clvKey])), meanKept = meanOf(keptClv.map((t) => t[clvKey]));
   const from = firstOpened(strategyLiveSet(cur, parent, "").trades || []);
   const fullLine = (label, st) => line(label, st?.summary ? { trades: st.summary.trades, summary: st.summary } : null);
-  const whole = `
+  let whole = `
       <div class="judged-head">Whole period, from ${from ? esc(dayName(from)) : "the first trade"}${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
       <table class="judged-tab whole-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
         <tbody>${fullLine(name, x.st)}${fullLine(shadow ? keptName : "All", parent.st)}</tbody></table>
@@ -3609,6 +3609,23 @@ function sinceDefinedHtml(cur, x, parent, lg) {
         ? `<b class="${signCls(meanKept - meanAll)}">${signedPct(meanKept - meanAll)}</b> (${signedPct(meanKept)} vs ${signedPct(meanAll)}; ${keptClv.length} kept of ${withClv.length} trade${withClv.length === 1 ? "" : "s"} with a close)`
         : "none yet (no trade with a close)"}.</p>
       <p class="note"><b>Descriptive only:</b> this includes the trades the ${cut} was chosen from, so it can't prove ${shadow ? "the range" : "the filter"}.</p>`;
+  // A rule backcast to the strategy's start (Blend Lean, 24 Oct): the descriptive part is
+  // before the rule, from paper's before_defined (same shape as since_defined), instead of
+  // the whole period; the judged part below stays since the rule date.
+  const bd = x.st?.before_defined;
+  if (bd) {
+    const bc = parent.st?.backcast;
+    const startDay = bc?.lean_started ? String(bc.lean_started).slice(0, 10) : from;
+    const preDiffs = Object.entries(bd.clv_diff || {}).filter(([f, d]) => d && d.trades && f === clvKey);
+    whole = `
+      <div class="judged-head">Before the rule, ${startDay ? `${esc(dayName(startDay))} to ` : ""}${esc(dayName(String(bd.until || at).slice(0, 10)))} <span class="muted">· backcast</span>${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
+      <table class="judged-tab whole-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
+        <tbody>${line(name, bd.variant)}${line(`${keptName} (backcast)`, bd.parent)}</tbody></table>
+      ${preDiffs.map(([f, d]) => (isNum(d.diff)
+        ? `<p class="note">CLV against ${CLV_FIELD_NAME[f]}, ${esc(keptName.toLowerCase())} minus ${esc(allName.toLowerCase())}: <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b> (${signedPct(d.mean_kept)} vs ${signedPct(d.mean_all)}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close${d.ci95 ? `, 95% range ${ciText(d.ci95)}` : ""}).</p>`
+        : `<p class="note">CLV against ${CLV_FIELD_NAME[f]}: no ${esc(keptName.toLowerCase())} trade with a close before the rule.</p>`)).join("")}
+      <p class="note"><b>Descriptive only:</b> ${esc((bd.note || `the ${cut} was chosen after seeing these trades, so they can't show that it helps.`).replace(/^before the rule, descriptive only:\s*/i, ""))}</p>`;
+  }
   const oldCode = sd.old_code ? ` ${sd.old_code} trade${sd.old_code === 1 ? "" : "s"} the old code opened in that window ${sd.old_code === 1 ? "is" : "are"} left out of both.` : "";
   const why = `The ${cut} was picked after seeing the first ${before} settled trade${before === 1 ? "" : "s"}, so only trades opened from ${monthDay(at)} count when judging it; the earlier ones still show in the list and the chart.${oldCode}`;
   return `
@@ -3729,10 +3746,18 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     : null;
   const definedAt = family.map((s) => s.st?.defined_at).find(Boolean) || null;
   // The origin is the first trade opened: the parent's (every version starts there) or this set's.
-  const start = overlay ? firstOpened(strategyLiveSet(cur, parent, lg).trades || []) : firstOpened(trades, curve);
-  const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt, start)
+  // Both lines start together: at the backcast's lean_started (Blend Lean's first trade,
+  // owner 24 Oct) or else the first trade any version opened.
+  const famStart = () => family.map((s) => firstOpened(strategyLiveSet(cur, s, lg).trades || [])).filter(Boolean).sort()[0];
+  const bcStart = parent.st?.backcast?.lean_started ? String(parent.st.backcast.lean_started).slice(0, 10) : null;
+  const start = overlay ? [bcStart, famStart()].filter(Boolean).sort()[0] : firstOpened(trades, curve);
+  const markLabel = family.slice(1).some((v) => v.st?.adds === "shadow") ? "rule set (judged from here)" : "filter set (judged from here)";
+  const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt, start, markLabel)
     : curve.length ? curveChart(curve, start) : `<p class="muted">The chart starts when the first trade settles.</p>`;
   const judged = x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
+  // Blend Lean's line is the new rule backcast from its first trade (owner, 24 Oct).
+  const bc = x.st?.backcast;
+  const backcast = bc?.applied ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is the indented row below.</p>` : "";
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
   const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
@@ -3742,6 +3767,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${tiles}
     ${caveat}
     ${ci}
+    ${backcast}
     ${judged}
     ${drvPanel}
     <div class="section-title">Profit over time</div>

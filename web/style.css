@@ -847,3 +847,8 @@ details.drv-fold { margin-top: 10px; }
    rule's shadow entries in trade lists. */
 .badge.lean-out { background: var(--track); color: var(--text-secondary); }
 .chip-shadow { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 500; color: var(--text-secondary); border: 1px dashed var(--text-muted); white-space: nowrap; }
+/* The variant box's tables fit a phone: a fixed first column that wraps, tighter cells. */
+.judged-tab { font-size: 12px; }
+.judged-tab th:first-child { width: 24%; white-space: normal; line-height: 1.25; }
+.judged-tab td { white-space: nowrap; }
+.judged-tab th, .judged-tab td { padding-left: 2px; padding-right: 2px; }

@@ -604,6 +604,14 @@ const STEPS = [
     if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
     const next = await p.locator('button[data-pfstrat="lean"] + button').getAttribute("data-pfstrat");
     if (next !== "lean_all_odds") throw new Error(`row under Lean: ${next}`);
+    // The new rule's line is backcast from Lean's first trade: both lines start there, the
+    // rule date is marked, and Lean's view says the early part is a backcast.
+    const bc = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "lean").backcast);
+    if (!(await p.textContent("#view")).includes(`Backcast before`)) throw new Error("Lean view lacks the backcast note");
+    if ((await p.locator("[data-scrub='cv'] .filter-lab").textContent()) !== "rule set (judged from here)") throw new Error("rule marker");
+    const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
+    const want0 = await p.evaluate((d) => dayName(String(d).slice(0, 10)), bc.lean_started);
+    if (!origin.startsWith(`${want0} · first trade opened`)) throw new Error(`overlay origin ${origin} vs lean_started ${want0}`);
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
     if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips")) throw new Error(`old-rule row: ${vrow}`);
     if ((await p.locator(".curve-legend .lg-item").allInnerTexts()).join("|").indexOf("Live rule") < 0) throw new Error("overlay legend lacks the live rule");
@@ -614,7 +622,7 @@ const STEPS = [
     const chip = await p.locator('#view button[data-trade$="|shadow"] .chip-shadow').first().innerText();
     if (chip !== "Shadow: no trade opened (outside the odds range)") throw new Error(`shadow chip: ${chip}`);
     const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
-    for (const w of ["Whole period, from", "Judged from", "Live rule", "All odds (old rule)", "odds range was picked after seeing the first", "the old code opened in that window", "How this comparison works", "minus all odds (old rule)"]) {
+    for (const w of ["Before the rule,", "backcast", "Live rule (backcast)", "Descriptive only:", "Judged from", "Live rule", "All odds (old rule)", "odds range was picked after seeing the first", "the old code opened in that window", "How this comparison works", "minus all odds (old rule)"]) {
       if (!box.includes(w)) throw new Error(`old-rule box lacks "${w}": ${box}`);
     }
     if (box.includes("60%")) throw new Error("old-rule box talks about the 60% cut");
@@ -624,7 +632,11 @@ const STEPS = [
     await p.locator(".band-share").first().scrollIntoViewIfNeeded();
     await p.click('button[data-pfstrat="lean"]');
   }],
+  // Arsenal v Leeds's Strong Lean trade (+650) is outside the odds range, so it sits in the
+  // old rule's line, not the live rule's (owner, 24 Oct).
   ["portfolio-live-lean-trade", async (p) => {
+    await p.click('button[data-pfstrat="lean_all_odds"]');
+    if (await p.locator('button[data-pfstrat="lean"].on').count()) throw new Error("old rule not selected");
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const text = await p.textContent("#sheet-body");
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
@@ -632,14 +644,15 @@ const STEPS = [
   // Trade states (owner, 18 Oct): kicked off under ~2 h 15 min ago = "In play"; a finished
   // match still open waits in its own "Awaiting result" group, between Open and Settled.
   ["portfolio-live-states", async (p) => {
-    await closeSheet(p);
+    await closeSheet(p); await p.click('button[data-pfstrat="lean"]');
     const text = await p.textContent("#view");
     for (const want of ["Awaiting result · 1", "These matches have finished. Results usually come in within a few hours of full time, and each trade then settles automatically.", "Their close and CLV are final", "finished, awaiting result (not in profit yet)"]) {
       if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
     }
-    // Open = upcoming + in play only (Arsenal v Leeds upcoming, Aston Villa v Brentford in play).
+    // Open = upcoming + in play only (Aston Villa v Brentford in play; Arsenal v Leeds, upcoming,
+    // is out of range and so in the old rule's line only).
     const openHead = await p.locator(".section-title", { hasText: "Open · " }).innerText();
-    if (!/Open · 2 · \$20 at risk/i.test(openHead)) throw new Error(`open header: ${openHead}`);
+    if (!/Open · 1 · \$10 at risk/i.test(openHead)) throw new Error(`open header: ${openHead}`);
     const inplay = await p.locator('button[data-trade="E0|2627|Aston Villa|Brentford|lean"]').innerText();
     if (!inplay.includes("In play") || !inplay.includes("Close") || inplay.includes("now ")) throw new Error(`in-play row: ${inplay}`);
     const waiting = await p.locator('button[data-trade="SP1|2627|Sevilla|Valencia|lean"]').innerText();

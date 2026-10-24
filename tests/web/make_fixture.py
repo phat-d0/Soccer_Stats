@@ -1184,7 +1184,7 @@ LEAN_SETTLED = [
         "2-1",
         True,
     ),
-    ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 3.1, 2.15, 0.4, 3.2, "1-1", False),
+    ("E0", "Wolves", "Everton", "2026-09-27T14:00:00Z", "away", 2.9, 2.15, 0.4, 3.0, "1-1", False),
     ("SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 1.72, 1.04, 0.71, 1.70, "2-0", True),
 ]
 # Open trades whose matches have started, relative to NOW (the app's trade states, 18 Oct):
@@ -1193,7 +1193,7 @@ LEAN_SETTLED = [
 # strategy, league, home, away, minutes since kickoff, market, odds, z (Lean), close odds
 STARTED_OPEN = [
     ("lean", "E0", "Aston Villa", "Brentford", 50, "home", 2.1, 1.18, 2.0),
-    ("lean", "SP1", "Sevilla", "Valencia", 300, "away", 3.4, 1.07, 3.6),
+    ("lean", "SP1", "Sevilla", "Valencia", 300, "away", 2.85, 1.07, 3.0),
     ("edge12", "E0", "Bournemouth", "Wolves", 240, "draw", 3.7, None, 3.5),
     ("edge12", "E0", "Brighton", "Everton", 30, "away", 4.2, None, None),
 ]
@@ -1201,7 +1201,7 @@ STARTED_OPEN = [
 
 # The Lean odds range's start in the fixture: the real one (tr.LEAN_RANGE_FROM, 24 Oct) is
 # after the fixture's NOW, so nothing would be judged; paper reads it at call time.
-FIXTURE_LEAN_RANGE_FROM = "2026-09-24T12:00:00+00:00"
+FIXTURE_LEAN_RANGE_FROM = "2026-09-27T00:00:00+00:00"
 tr.LEAN_RANGE_FROM = FIXTURE_LEAN_RANGE_FROM
 # Out-of-range Lean picks after the start: shadow entries (league, home, away, kickoff,
 # market, odds, z, close odds, won).
