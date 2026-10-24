@@ -723,8 +723,9 @@ def add_lean(data: dict, blends: dict | None) -> int:
     h2h part of E0_dk.json's blend, so p_bet and z use one fit; its totals part stays),
     `z` per side = (p_bet - 1/decimal) / sigma, `z_market` per side = the same with the
     blend's model term removed (trades.market_side_z: c = 0, a_k and b kept), and
-    `lean_pick` = {market, odds, p_bet, model_p, edge, z, tier, sigma, z_market, driver}
-    or None (always None on low_data cards, which paper trades skip); driver "market"
+    `lean_pick` = {market, odds, p_bet, model_p, edge, z, tier, sigma, z_market, driver,
+    in_range, odds_range} or None (always None on low_data cards, which paper trades skip;
+    `in_range` False = outside tr.LEAN_ODDS_RANGE, so no trade opens); driver "market"
     when the pick reaches 1 sigma on the price alone, else "model". Cards without a fit
     get z, z_market and lean_pick None. `data.match_blends` =
     {generated_at, note, leagues: {code: LEAN_CARD_KEYS}}.
@@ -775,6 +776,10 @@ def add_lean(data: dict, blends: dict | None) -> int:
                 "edge": round(pick["edge"], 4),
                 "p_bet": round(pick["p_bet"], 4),
                 "model_p": round(pick["model_p"], 4),
+                # The live rule trades only inside its odds range (owner, 24 Oct): outside
+                # it the pick stays shown but opens no trade (only a shadow entry).
+                "in_range": tr.in_lean_range(pick["odds"]),
+                "odds_range": list(tr.LEAN_ODDS_RANGE),
             }
             n += 1
     mb = data.get("match_blend")

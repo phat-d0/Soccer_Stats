@@ -258,6 +258,48 @@ Coverage, Champions League: 2024/25 189 finished matches, 150 with a model chanc
 low-data), 180 with DraftKings' close, 183 with Pinnacle's, 143 candidates; 2025/26 189,
 157, 184, 189, 152.
 
+## Blend Lean odds range (24 Oct, owner; 0 credits)
+
+**The rule.** From `trades.LEAN_RANGE_FROM` (2026-10-24 07:32 UTC, the commit that adds it),
+Blend Lean opens a trade only when the picked side's DraftKings decimal odds are in
+1.50 < odds <= 3.00 (`trades.LEAN_ODDS_RANGE`; the backtests' band convention, so +200 =
+3.00 stays in and -200 = 1.50 is out). The pick itself is unchanged: the home/draw/away side
+with the highest z, at z >= 1. When that side is outside the range, no Lean trade opens
+for the match; the rule does not fall back to another side. New Lean trades record
+`odds_range` and `rule_version: 2` (older trades have no `rule_version` and read as version
+1, any odds). Model 12% and both corner tracks are unchanged, and so is the Lean backtest
+(`lean_backtest.json` still replays the old rule).
+
+**The owner's reasons.** "+200 or longer: they lose too often." "-200 or shorter: they
+happen too little and the payout isn't worth it."
+
+**The evidence at decision time.**
+- Live paper (data-log at 24 Oct 00:34 UTC, 22 Lean trades, 15 settled): <=1.50 had 4
+  trades (2 of 3 settled won, break-even 73%); 3.00-5.00 had 11 (1 of 8 won, break-even
+  26%, ROI -45%, 95% range -100% to +65%). Far too few trades to tell anything apart.
+- Backtest (`lean_backtest.json` of 23 Oct, eight domestic leagues pooled, Pinnacle's early
+  price), CLV by odds band: <=1.50 -1.9% (232 bets), 1.50-2.00 -2.7% (632), 2.00-3.00 -3.1%
+  (712), 3.00-5.00 -3.8% (790), >5.00 -3.0% (261). Every band is below 0, and the shortest
+  band is the least bad, so the backtest gives no support for cutting the short end; the
+  long end is a little worse than the middle. ROI ranges include 0 in every band.
+
+**Tracking.** A pick that clears 1 sigma outside the range writes a shadow entry instead of a
+trade: the same fields plus `shadow: true` and `excluded_by: "odds_range"`, id = the Lean id
+plus `|shadow`, in its own file `paper_trades/<code>_lean_shadow_<season>.jsonl`, never the
+real ledger. A shadow opens only while its match has no Lean trade and no shadow yet (the
+old rule bet once per match). Shadows close, get CLV and settle through the same
+`update_ledger` code, but never count in the real P/L or Moneyline's combined summary. The
+Lean live section gets the variant "Blend Lean, all odds (old rule)" (`lean_all_odds`) =
+every real Lean trade plus the shadows (a real trade on a match that already has a shadow
+is left out of it: the old rule had bet the shadow). Its `since_defined` compares, on
+trades opened from `LEAN_RANGE_FROM` under the new code (`rule_version` 2 and shadows; a
+trade the old code opened in the window before the merge reached the publish job is
+counted as `old_code` and left out), the live rule's summary with the old rule's, and the
+CLV difference in range minus all on `clv_dk` (the judged measure; `clv_pinnacle` beside
+it), on the summaries' won/lost trades, ranges resampling matches. Above 0 means the cut
+helps. This lets us see whether the cut helps instead of guessing; nothing changes again
+unless the owner decides.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

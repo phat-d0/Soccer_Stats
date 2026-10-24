@@ -9,6 +9,7 @@ no network. Published as data.json `portfolio.models`.
 from __future__ import annotations
 
 from soccer_stats import leagues as lgs
+from soccer_stats import trades as tr
 
 MATCH = {
     "key": "match",
@@ -50,6 +51,8 @@ BLEND = {
         "(a_home = 0)",
         "p_bet_k = exp(score_k) / (exp(score_home) + exp(score_draw) + exp(score_away))",
         "z_k = (p_bet_k - 1/odds_k) / sigma; a Lean pick at z >= 1, Strong at z >= 2",
+        "a Lean trade opens only when 1.50 < odds_k <= 3.00 (since 24 Oct); a pick outside "
+        "it opens none",
     ],
     "terms": {
         "price_k": "the bookmaker's margin-free chance (Shin): Pinnacle's close when the "
@@ -63,6 +66,8 @@ BLEND = {
         "sigma": "how far the blend usually strays from the price in this competition "
         "(sd of blend - price on the fit's matches)",
         "1/odds_k": "DraftKings' break-even chance, margin included",
+        "odds range": "decimal 1.50 to 3.00 (-200 to +200), the owner's cut of 24 Oct: "
+        "the shortest and longest prices are left out",
     },
     "note": "Fitted per league on every earlier match with Pinnacle's close; the live fit "
     "is in match_blends.json. A pick is market-driven when it still reaches 1 sigma with "
@@ -124,6 +129,9 @@ def section(data: dict) -> dict:
         "blend": {
             **BLEND,
             "generated_at": (data.get("match_blends") or {}).get("generated_at"),
+            "odds_range": list(tr.LEAN_ODDS_RANGE),
+            "odds_range_from": tr.LEAN_RANGE_FROM,
+            "odds_range_note": tr.LEAN_RANGE_NOTE,
             "leagues": blend,
         },
         "corners_f": {**CORNERS, "leagues": corners},

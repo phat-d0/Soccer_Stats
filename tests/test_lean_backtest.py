@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from scipy.special import softmax
-from test_blend_lean import P_BET_HOME, SIGMA, implied, lean
+from test_blend_lean import ODDS_IN, P_BET_HOME, P_BET_IN, SIGMA, implied, lean
 from test_paper import NOW, card, src
 
 from soccer_stats import lean_backtest as lb
@@ -88,9 +88,10 @@ def test_new_lean_trades_record_z_market_and_driver():
     led = {}
     rule = tr.lean_rule({"leagues": {"E0": {"coef": [0, 0, 1, 0], "sigma": SIGMA}}}, "E0")
     assert rule["coef"] == [0, 0, 1, 0]
-    paper.update_ledger(led, [card(p_bet=P_BET_HOME)], src(), None, NOW, threshold=None, lean=rule)
+    c = card(p_bet=P_BET_IN, odds=ODDS_IN)  # inside the Lean odds range
+    paper.update_ledger(led, [c], src(), None, NOW, threshold=None, lean=rule)
     t = led["E0|2627|Arsenal|Leeds|lean"]
-    zm = tr.market_side_z([0, 0, 1, 0], card()["odds"], SIGMA)["home"]
+    zm = tr.market_side_z([0, 0, 1, 0], ODDS_IN, SIGMA)["home"]
     assert t["z_market"] == pytest.approx(zm, abs=1e-3)
     assert t["driver"] == "model"  # the identity blend on the price alone never clears 1σ
     assert {"z_market", "driver"} <= set(tr.LEAN_ENTRY_FIELDS)
@@ -100,14 +101,25 @@ def test_new_lean_trades_record_z_market_and_driver():
 
 
 def old_lean_trade():
-    """A Lean trade as PR #43 opened it: no z_market, no driver."""
-    led = {}
+    """A Lean trade as PR #43 opened it: no z_market, no driver, any odds (home at 1.40,
+    which the odds range of 24 Oct now sends to the shadow ledger: taken from there and
+    stripped of the newer fields)."""
+    shadow = {}
     paper.update_ledger(
-        led, [card(p_bet=P_BET_HOME)], src(), None, NOW, threshold=None, lean=lean()
+        {},
+        [card(p_bet=P_BET_HOME)],
+        src(),
+        None,
+        NOW,
+        threshold=None,
+        lean=lean(),
+        shadow=shadow,
     )
-    t = led["E0|2627|Arsenal|Leeds|lean"]
-    t.pop("z_market"), t.pop("driver")
-    return led, t
+    t = shadow.pop("E0|2627|Arsenal|Leeds|lean" + tr.SHADOW_SUFFIX)
+    for k in ("z_market", "driver", "shadow", "excluded_by", "odds_range", "rule_version"):
+        t.pop(k)
+    t["id"] = "E0|2627|Arsenal|Leeds|lean"
+    return {t["id"]: t}, t
 
 
 def odds_log_row(t, prices, downloaded):
