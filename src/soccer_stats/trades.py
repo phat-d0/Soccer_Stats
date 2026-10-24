@@ -173,6 +173,29 @@ LEAN_NOTE = (
     "price's break-even by at least one sigma. The blend gives the model almost no weight, so "
     "expect few picks; baseball's own tier backtest was noise."
 )
+# The owner's odds range for Blend Lean (24 Oct; docs/leagues.md "Blend Lean odds range"):
+# from LEAN_RANGE_FROM a Lean trade opens only when the picked side's DraftKings decimal
+# odds are in lo < odds <= hi (the backtests' bands convention, so +200 = 3.00 stays in and
+# -200 = 1.50 is out). The pick is still the highest-z side; outside the range no Lean
+# trade opens (no fallback to another side) and a shadow entry records what the old rule
+# would have bet (paper.py, `<code>_lean_shadow_<season>.jsonl`).
+LEAN_ODDS_RANGE = (1.50, 3.00)
+LEAN_RANGE_FROM = "2026-10-24T07:32:00+00:00"  # the commit that adds the rule
+LEAN_RULE_VERSION = 2  # trades without `rule_version` are version 1 (any odds)
+LEAN_RANGE_NOTE = (
+    "Since 24 Oct, Blend Lean only trades between -200 and +200 (decimal 1.50 to 3.00): "
+    "owner's decision after the first 15 settled trades. Picks outside the range open no "
+    "trade; the old rule (all odds) is tracked beside it as a shadow."
+)
+SHADOW_SUFFIX = "|shadow"  # a Lean shadow entry's id: the Lean trade id plus this
+
+
+def in_lean_range(odds: float | None, rng: tuple[float, float] = LEAN_ODDS_RANGE) -> bool:
+    """Whether a decimal price is inside the Lean odds range (lo < odds <= hi)."""
+    lo, hi = rng
+    return _ok(odds) and lo < float(odds) <= hi + EPS
+
+
 # Match strategies paper traded side by side, in the order the app lists them. A match
 # trade without a `strategy` field (all of them before 10 Oct) is the fixed 12% test.
 STRATEGY_ORDER = ["lean", "edge12"]
@@ -277,7 +300,8 @@ def lean_pick(
 
 def lean_rule(blends: dict | None, league: str) -> dict:
     """The Lean rule for one league: {key, rule, min_z, strong_z, p_source, stake, sigma,
-    coef, matches, source, note}. `blends` is data.json's `match_blends` (publish.add_lean); no
+    coef, matches, source, note, odds_range, odds_range_from, odds_range_note,
+    rule_version}. `blends` is data.json's `match_blends` (publish.add_lean); no
     file or no fit for the league = sigma None, so no Lean picks, and the note says why."""
     entry = ((blends or {}).get("leagues") or {}).get(league) or {}
     sd = entry.get("sigma")
@@ -303,6 +327,10 @@ def lean_rule(blends: dict | None, league: str) -> dict:
         "matches": entry.get("matches"),
         "source": "match_blends" if ok else "none",
         "note": note,
+        "odds_range": list(LEAN_ODDS_RANGE),
+        "odds_range_from": LEAN_RANGE_FROM,
+        "odds_range_note": LEAN_RANGE_NOTE,
+        "rule_version": LEAN_RULE_VERSION,
     }
 
 

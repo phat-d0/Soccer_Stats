@@ -29,6 +29,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   z = (p_bet − 1/DraftKings' price)/σ ≥ 1; "strong" at z ≥ 2. Most Lean picks come from the
   blend's price weight b > 1 sharpening the price, not from the model; each pick's `driver`
   ("market"/"model") says which (`docs/history.md`, round 14 "Blend Lean beside the 12% test").
+  Blend Lean trades only 1.50–3.00 since 24 Oct (owner; `trades.LEAN_ODDS_RANGE`, lo < odds ≤
+  hi, no fallback to another side); the old rule is tracked as a shadow ("Blend Lean, all
+  odds (old rule)"; `docs/leagues.md` "Blend Lean odds range").
 - **Model 12%**: `trades.PAPER_RULE = "fixed_raw"`, the raw model's chance at a 12% edge
   against DraftKings' quoted price. The owner's live test.
 - The Matches tab shows Lean only; Portfolio → Moneyline shows both.
@@ -262,7 +265,8 @@ the owner's baseball app, so the balance can drop without any run here.
   `xi`, `half_life_days`, `xg_weight`, `ridge`, `matches`, `teams`, `fit_from`, `fit_to`; E0 from
   `build_data`, the others from `league_fixtures`/`cup_league_fixtures` via the odds source's
   `model_fit`, popped before `odds_sources`), `match_blends.leagues` (`coef` as {a_draw, a_away, b,
-  c}, `sigma`, `matches`, `fit_from`, `fit_to`, `fit_date`) and `corners_model` (now with
+  c}, `sigma`, `matches`, `fit_from`, `fit_to`, `fit_date`; the blend card also carries
+  `odds_range`, `odds_range_from`, `odds_range_note` and an equation line for the range) and `corners_model` (now with
   `alpha_home`/`alpha_away`).
 - `cup_backtest.py`: the Champions League in both files (`leagues.UCL`, `kind: "close"`, out of
   `all`): `cup_model.history()` chances bet at DraftKings' bought close, CLV vs Pinnacle's
@@ -357,7 +361,11 @@ the owner's baseball app, so the balance can drop without any run here.
     ("strong" at `STRONG_Z` 2), sigma, z_market?, driver?}`; `market_side_z(coef, odds, sigma)`
     (c = 0); `lean_driver` ("market" at z_market ≥ 1, else "model"); `DRIVER_NOTE`;
     `lean_rule(match_blends, league)` = `{key, rule: "lean_1sigma", min_z, strong_z, p_source:
-    "blend", stake, sigma, matches, coef, source, note}` (no fit = σ None, no picks).
+    "blend", stake, sigma, matches, coef, source, note, odds_range, odds_range_from,
+    odds_range_note, rule_version}` (no fit = σ None, no picks). Odds range (owner, 24 Oct):
+    `LEAN_ODDS_RANGE` (1.50, 3.00), `in_lean_range(odds)` (lo < odds ≤ hi), `LEAN_RANGE_FROM`
+    (the commit adding it, 2026-10-24T07:32Z), `LEAN_RULE_VERSION` 2, `LEAN_RANGE_NOTE`,
+    `SHADOW_SUFFIX` "|shadow". `lean_pick` itself is unchanged (the backtest replays it).
   - Corners: `corners_rule(book="pinnacle")` = `{threshold: 0.12 (CORNERS_EDGE), source:
     "owner_fixed", note, rule: "fixed_raw", p_source: "model_f", book, stake: 10}`;
     `CORNER_STRATEGY_ORDER = ["pinnacle", "draftkings"]`, `CORNER_STRATEGY_LABELS`,
@@ -382,7 +390,14 @@ the owner's baseball app, so the balance can drop without any run here.
     `FRESH_HOURS` 3 old, not `low_data`, priced. Model 12% opens on raw `p`; Lean opens on
     `p_bet` (id `<code>|<season>|<home>|<away>|lean`; records `z`, `tier`, `sigma`, `p_bet`,
     `p_model`, `z_market`, `driver`, `rule: "lean_1sigma"`, `p_source: "blend"`,
-    `model_ref.probs: "blend"`; `LEAN_ENTRY_FIELDS`). Every new trade records `threshold`,
+    `model_ref.probs: "blend"`; `LEAN_ENTRY_FIELDS`), plus `odds_range` and `rule_version: 2`
+    since 24 Oct. A Lean pick outside `LEAN_ODDS_RANGE` opens no trade (no other side is
+    tried); with `shadow=` (the league's shadow ledger) it becomes a shadow entry (`shadow:
+    true`, `excluded_by: "odds_range"`, id + `|shadow`) when the match has no Lean trade or
+    shadow yet. Shadows live in `paper_trades/<code>_lean_shadow_<season>.jsonl`
+    (`load_lean_shadow`; `load_ledger` skips them, `append_events` routes them by id) and
+    close and settle by `update_ledger` run on the shadow ledger (no threshold, no lean);
+    `awaiting_results` includes them. Every new trade records `threshold`,
     `rule`, `p_source` and `strategy` (`ENTRY_FIELDS`; the 4 E0 trades of 5 Oct predate them).
     Lean trades opened before drivers existed got `z_market`, `driver` and `driver_from:
     "odds_log"` once as an update (`_lean_driver_update`). Entry fields never change; closes
@@ -413,7 +428,14 @@ the owner's baseball app, so the balance can drop without any run here.
     `strategy_order`, `portfolios` (`portfolios_section`: per portfolio `id, name, status, note,
     live, backtest`). Moneyline `live.strategies` (`match_strategies`) = `[{key, label, rule,
     summary, breakdowns, by_league, by_driver (Lean), trade_ids}]`, Lean first, beside the combined
-    `trades`/`summary`; Lean has `driver_note`. Corners `live.strategies` (`corner_strategies`),
+    `trades`/`summary`; Lean has `driver_note`. Right after Lean: `lean_shadow_section` (key
+    `lean_all_odds`, "Blend Lean, all odds (old rule)") over `old_rule_trades` (every shadow
+    plus every real Lean trade on a match without one), with `variant_of: "lean"`, `adds:
+    "shadow"`, `filter: None`, `defined_at` = `LEAN_RANGE_FROM`, `note`, `shadow_trades`
+    (count) and `since_defined` = `{defined_at, parent (real Lean, rule_version 2), variant (old
+    rule: shadows + rule_version 2 trades), old_code, clv_diff: {clv_dk, clv_pinnacle}}` (each
+    `clv_difference` with kept = in range, plus `kept_is`). Moneyline's live section also has
+    `shadow_trades` (the entries, newest first), never in its `trades` or summary. Corners `live.strategies` (`corner_strategies`),
     Pinnacle first, each followed by its shadow variants (`with_variants(sections, trades,
     variants, of)`, generic for any strategy list; `variant_section`): a variant is the parent's
     trades passing `filter`, no ledger rows of its own, with the usual section fields plus
@@ -508,7 +530,8 @@ the owner's baseball app, so the balance can drop without any run here.
     unknown pairs go to the source's `unmatched` list; the log prints "Duplicate fixtures: N".
   - `add_match_blend` (E0's `p_bet` from `E0_dk.json`), then `add_lean(data, match_blends())`: per
     priced card with a league fit, `p_bet` home/draw/away from that fit, `z`, `z_market`,
-    `lean_pick` (None on `low_data` cards or without a fit); `data.match_blends` = `{generated_at,
+    `lean_pick` (None on `low_data` cards or without a fit; with `in_range` (bool) and
+    `odds_range` [1.50, 3.00] since 24 Oct: `in_range` false = the pick opens no trade); `data.match_blends` = `{generated_at,
     note, leagues: {code: {coef, sigma, matches, fit_from, fit_to, fit_date, refit}}}`. Log
     "Match blends: … Lean picks: N".
   - Cards also carry `goals_cdf` (P(team goals ≤ k), k = 0..6), `total_goals_cdf` (P(home + away

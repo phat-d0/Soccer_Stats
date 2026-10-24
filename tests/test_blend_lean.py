@@ -21,6 +21,12 @@ SIGMA = 0.02
 P_BET_DRAW = {"home": 0.70, "draw": 0.26, "away": 0.04, "over25": None, "under25": None}
 # The blend: home 0.74 vs 1/1.4 = 0.714 -> z = 1.29 (Lean); draw 0.20 -> z = 0.
 P_BET_HOME = {"home": 0.74, "draw": 0.20, "away": 0.06, "over25": None, "under25": None}
+# Inside the Lean odds range (1.50 < odds <= 3.00, owner 24 Oct): home at 1.80.
+# The blend: home 0.62 vs 1/1.8 = 0.556 -> z = 3.2 (Strong); draw 0.24 vs 0.20 -> z = 2.0.
+# The raw model still has the 12% test on the draw (0.24 x 5.0 - 1 = 20%; home 9.8%).
+# The book has a normal margin (1/1.8 + 1/5.0 + 1/3.2 = 1.07).
+ODDS_IN = {"home": 1.8, "draw": 5.0, "away": 3.2, "over25": 1.7, "under25": 2.1}
+P_BET_IN = {"home": 0.62, "draw": 0.24, "away": 0.14, "over25": None, "under25": None}
 
 
 def lean(sigma=SIGMA, league="E0"):
@@ -168,17 +174,19 @@ def mc_factory():
 
 
 def test_lean_trade_opens_per_league_with_its_suffix():
-    c = card(league="SP1", p_bet=P_BET_DRAW)
+    c = card(league="SP1", p_bet=P_BET_IN, odds=ODDS_IN)
     led = {}
     kw = {"league": "SP1", "threshold": None, "lean": lean(league="SP1")}
     ev, _ = paper.update_ledger(led, [c], src(), None, NOW, **kw)
     t = led["SP1|2627|Arsenal|Leeds|lean"]
     assert [e["id"] for e in ev] == ["SP1|2627|Arsenal|Leeds|lean"]
     assert t["strategy"] == "lean" and t["rule"] == "lean_1sigma" and t["p_source"] == "blend"
-    assert t["market"] == "draw" and t["tier"] == "strong" and t["z"] == pytest.approx(3.0)
-    assert t["sigma"] == SIGMA and t["p_bet"] == 0.26 and t["p_model"] == 0.24
-    assert t["model_p"] == 0.26 and t["edge"] == pytest.approx(0.3)
-    assert t["stake"] == tr.STAKE and t["close_odds"] == 5.0
+    assert t["market"] == "home" and t["tier"] == "strong"
+    assert t["z"] == pytest.approx((0.62 - 1 / 1.8) / SIGMA, abs=1e-3)
+    assert t["sigma"] == SIGMA and t["p_bet"] == 0.62 and t["p_model"] == 0.61
+    assert t["model_p"] == 0.62 and t["edge"] == pytest.approx(0.62 * 1.8 - 1)
+    assert t["stake"] == tr.STAKE and t["close_odds"] == 1.8
+    assert t["rule_version"] == 2 and t["odds_range"] == [1.5, 3.0] and "shadow" not in t
     assert set(tr.LEAN_ENTRY_FIELDS) <= set(t)
     # The same build again opens nothing.
     ev, _ = paper.update_ledger(led, [c], src(), None, NOW, **kw)
@@ -186,7 +194,7 @@ def test_lean_trade_opens_per_league_with_its_suffix():
 
 
 def test_both_strategies_on_one_match_and_settle_alike(tmp_path):
-    c = card(p_bet=P_BET_HOME)
+    c = card(p_bet=P_BET_IN, odds=ODDS_IN)
     rule = tr.paper_threshold(None, "E0")
     led = paper.load_ledger(tmp_path)
     ev, _ = paper.update_ledger(
@@ -197,7 +205,7 @@ def test_both_strategies_on_one_match_and_settle_alike(tmp_path):
     edge12, leant = led["E0|2627|Arsenal|Leeds"], led["E0|2627|Arsenal|Leeds|lean"]
     assert edge12["market"] == "draw" and edge12["strategy"] == "edge12"
     assert edge12["p_source"] == "model" and edge12["model_p"] == 0.24
-    assert leant["market"] == "home" and leant["tier"] == "lean"
+    assert leant["market"] == "home" and leant["tier"] == "strong"
     # Settlement is the same code for both (draw 1-1).
     res = pd.DataFrame(
         {
@@ -225,10 +233,17 @@ def test_edge12_is_unchanged_by_the_lean_strategy():
     rule = tr.paper_threshold(None, "E0")
     a, b = {}, {}
     ev_a, _ = paper.update_ledger(
-        a, [card()], src(), None, NOW, threshold=0.12, rule=rule, lean=None
+        a, [card(odds=ODDS_IN)], src(), None, NOW, threshold=0.12, rule=rule, lean=None
     )
     ev_b, _ = paper.update_ledger(
-        b, [card(p_bet=P_BET_HOME)], src(), None, NOW, threshold=0.12, rule=rule, lean=lean()
+        b,
+        [card(p_bet=P_BET_IN, odds=ODDS_IN)],
+        src(),
+        None,
+        NOW,
+        threshold=0.12,
+        rule=rule,
+        lean=lean(),
     )
     edge12 = [e for e in ev_b if not e["id"].endswith("|lean")]
     assert edge12 == ev_a
@@ -324,7 +339,7 @@ def test_add_lean_sets_p_bet_z_and_the_pick(tmp_path):
 def test_strategies_listed_lean_first(tmp_path):
     blends = {"leagues": {"E0": {"coef": [0, 0, 1, 0], "sigma": SIGMA, "matches": 900}}}
     data = {
-        "fixtures": [card(p_bet=P_BET_HOME)],
+        "fixtures": [card(p_bet=P_BET_IN, odds=ODDS_IN)],
         "odds_source": src(),
         "portfolio": {},
         "match_blends": blends,
@@ -336,7 +351,9 @@ def test_strategies_listed_lean_first(tmp_path):
     assert rules["threshold"] == 0.12 and rules["rule"] == "fixed_raw"  # the 12% test stays
     ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
     sts = ml["live"]["strategies"]
-    assert [s["key"] for s in sts] == ["lean", "edge12"]
+    # The old rule's shadow variant sits right after Lean (owner, 24 Oct).
+    assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "edge12"]
+    sts = [sts[0], sts[2]]
     assert sts[0]["label"] == "Blend Lean (1σ+)" and sts[1]["label"].startswith("Model 12%")
     assert sts[0]["trade_ids"] == ["E0|2627|Arsenal|Leeds|lean"]
     assert sts[1]["trade_ids"] == ["E0|2627|Arsenal|Leeds"]

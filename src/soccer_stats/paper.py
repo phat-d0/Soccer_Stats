@@ -78,27 +78,54 @@ def ledger_dir(log_dir: Path) -> Path:
     return Path(log_dir) / "paper_trades"
 
 
+def _is_match_ledger(path: Path, league: str) -> bool:
+    """A league's match ledger file, not its corners ledger or Lean shadow file."""
+    name = path.name
+    return not (name.startswith(f"{league}_corners_") or name.startswith(f"{league}_lean_shadow_"))
+
+
 def load_ledger(log_dir: Path, league: str = "E0") -> dict[str, dict]:
     """Fold every ledger file into the current state of each trade, by id."""
+    paths = [
+        p
+        for p in sorted(ledger_dir(log_dir).glob(f"{league}_*.jsonl"))
+        if _is_match_ledger(p, league)  # corners and Lean shadows have their own files
+    ]
+    return _fold(paths, UPDATE_FIELDS)
+
+
+def lean_shadow_files(log_dir: Path, league: str) -> list[Path]:
+    return sorted(ledger_dir(log_dir).glob(f"{league}_lean_shadow_*.jsonl"))
+
+
+def load_lean_shadow(log_dir: Path, league: str) -> dict[str, dict]:
+    """The Blend Lean shadow entries in a league (paper_trades/<code>_lean_shadow_<season>
+    .jsonl): picks the old rule would have traded that the odds range (tr.LEAN_ODDS_RANGE)
+    kept out. Same events and update fields as the match ledger; never in the real P/L."""
+    return _fold(lean_shadow_files(log_dir, league), UPDATE_FIELDS)
+
+
+def _fold(paths: list[Path], fields) -> dict[str, dict]:
+    """ "open" lines hold each trade's entry (a duplicate open never overwrites); "update"
+    lines change only `fields`."""
     trades: dict[str, dict] = {}
-    for path in sorted(ledger_dir(log_dir).glob(f"{league}_*.jsonl")):
-        if path.name.startswith(f"{league}_corners_"):  # the corners ledger (its own files)
-            continue
+    for path in paths:
         for line in path.read_text().splitlines():
             if not line.strip():
                 continue
             ev = json.loads(line)
             kind = ev.pop("type", "open")
             if kind == "open":
-                trades.setdefault(ev["id"], ev)  # a duplicate open never overwrites
+                trades.setdefault(ev["id"], ev)
             elif ev.get("id") in trades:
-                trades[ev["id"]].update({k: v for k, v in ev.items() if k in UPDATE_FIELDS})
+                trades[ev["id"]].update({k: v for k, v in ev.items() if k in fields})
     return trades
 
 
 def append_events(log_dir: Path, events: list[dict], league: str = "E0") -> int:
     """Append events to their league's season ledger file (league and season from the
-    trade id); returns how many were written."""
+    trade id; a Lean shadow entry's, id ending tr.SHADOW_SUFFIX, to its own
+    <code>_lean_shadow_<season>.jsonl); returns how many were written."""
     if not events:
         return 0
     d = ledger_dir(log_dir)
@@ -106,7 +133,8 @@ def append_events(log_dir: Path, events: list[dict], league: str = "E0") -> int:
     by_file: dict[Path, list[str]] = {}
     for ev in events:
         lg, season = ev["id"].split("|")[:2]
-        by_file.setdefault(d / f"{lg or league}_{season}.jsonl", []).append(
+        kind = "lean_shadow_" if ev["id"].endswith(tr.SHADOW_SUFFIX) else ""
+        by_file.setdefault(d / f"{lg or league}_{kind}{season}.jsonl", []).append(
             json.dumps(ev, separators=(",", ":"))
         )
     for path, lines in by_file.items():
@@ -249,6 +277,7 @@ def update_ledger(
     rule: dict | None = None,
     lean: dict | None = None,
     espn: pd.DataFrame | None = None,
+    shadow: dict[str, dict] | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -268,7 +297,11 @@ def update_ledger(
     kickoff, fresh DraftKings odds, not low_data, priced): trades.lean_pick on the card's
     blended `p_bet` at the rule's sigma, $10, one Lean trade per match (id "...|lean"),
     recording z, tier, sigma, p_bet and the raw model chance. Without a sigma, no Lean
-    trades. Closes, CLV and settlement are the same for both.
+    trades. Closes, CLV and settlement are the same for both. A Lean pick opens only inside
+    the odds range (tr.LEAN_ODDS_RANGE, rule_version 2); one outside it goes to `shadow`
+    (the league's Lean shadow ledger, load_lean_shadow) as a shadow entry instead, its open
+    event returned with the others (append_events files it apart). Run update_ledger on the
+    shadow ledger itself (no threshold, no lean) to close and settle its entries.
 
     Settlement takes `results` (football-data; ESPN for a cup) first, else `espn`
     (espn_results.fetch: ESPN's final 90-minute scores, matched to the trade's names and
@@ -299,7 +332,7 @@ def update_ledger(
             kickoff = pd.Timestamp(c["kickoff"])
             if kickoff <= now or c.get("low_data"):
                 continue
-            ev = _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean)
+            ev = _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean, shadow)
             if ev:
                 events.append(ev)
     if fresh and threshold is not None:
@@ -426,9 +459,13 @@ def update_ledger(
     return events, note
 
 
-def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | None:
+def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean, shadow=None) -> dict | None:
     """Open the Lean trade for one card (trades.lean_pick on its p_bet), unless the match
-    already has one or nothing reaches 1 sigma; returns its open event."""
+    already has one or nothing reaches 1 sigma; returns its open event. A pick outside the
+    odds range (tr.in_lean_range) opens no trade (no other side is tried); it becomes a
+    shadow entry in `shadow` (id + tr.SHADOW_SUFFIX, `shadow: true`, `excluded_by:
+    "odds_range"`) when given and neither a Lean trade nor a shadow exists for the match,
+    so the shadow plus the real trades is what the old rule would have bet."""
     zm = tr.market_side_z(lean.get("coef"), c.get("odds"), lean["sigma"])
     pick = tr.lean_pick(
         c.get("p_bet"), c.get("odds"), lean["sigma"], lean.get("min_z", tr.LEAN_Z), zm or {}
@@ -453,7 +490,15 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | No
     )
     if t["id"] in ledger:
         return None
+    in_range = tr.in_lean_range(pick["odds"])
+    if not in_range:
+        if shadow is None or t["id"] + tr.SHADOW_SUFFIX in shadow:
+            return None
+        t["id"] += tr.SHADOW_SUFFIX
+        t.update(shadow=True, excluded_by="odds_range")
     t.update(
+        odds_range=list(tr.LEAN_ODDS_RANGE),
+        rule_version=tr.LEAN_RULE_VERSION,
         z=round(pick["z"], 3),
         z_market=None if pick.get("z_market") is None else round(pick["z_market"], 3),
         driver=pick.get("driver"),
@@ -467,7 +512,7 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean) -> dict | No
     group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
     quoted = c.get("odds_updated") or fetched
     t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
-    ledger[t["id"]] = t
+    (ledger if in_range else shadow)[t["id"]] = t
     return {"type": "open", **t}
 
 
@@ -685,18 +730,7 @@ def corner_ledger_files(log_dir: Path, league: str) -> list[Path]:
 def load_corner_ledger(log_dir: Path, league: str) -> dict[str, dict]:
     """The corners portfolio's trades in a league (paper_trades/<code>_corners_<season>
     .jsonl): "open" lines hold the entry, "update" lines only CORNER_UPDATE_FIELDS."""
-    trades: dict[str, dict] = {}
-    for path in corner_ledger_files(log_dir, league):
-        for line in path.read_text().splitlines():
-            if not line.strip():
-                continue
-            ev = json.loads(line)
-            kind = ev.pop("type", "open")
-            if kind == "open":
-                trades.setdefault(ev["id"], ev)
-            elif ev.get("id") in trades:
-                trades[ev["id"]].update({k: v for k, v in ev.items() if k in CORNER_UPDATE_FIELDS})
-    return trades
+    return _fold(corner_ledger_files(log_dir, league), CORNER_UPDATE_FIELDS)
 
 
 def append_corner_events(log_dir: Path, events: list[dict]) -> int:
@@ -1238,6 +1272,10 @@ def lean_overview(leans: dict[str, dict]) -> dict:
     live = [r for r in leans.values() if r.get("sigma")]
     return {
         **{k: first[k] for k in ("key", "rule", "min_z", "strong_z", "p_source", "stake")},
+        **{
+            k: first[k]
+            for k in ("odds_range", "odds_range_from", "odds_range_note", "rule_version")
+        },
         "sigma": {lg: r.get("sigma") for lg, r in leans.items()},
         "source": "match_blends" if live else "none",
         "note": (live[0] if live else first)["note"],
@@ -1424,6 +1462,96 @@ def clv_difference(
     return out
 
 
+LEAN_SHADOW_KEY = "lean_all_odds"
+LEAN_SHADOW_LABEL = "Blend Lean, all odds (old rule)"
+LEAN_SHADOW_NOTE = (
+    "What Blend Lean's old rule (any odds) would have bet: every real Lean trade plus the "
+    "shadow entries, picks since 24 Oct that cleared 1 sigma outside the odds range (decimal "
+    "1.50 to 3.00) and so opened no trade. Shadow entries close and settle like trades but "
+    "never count in the real profit. Judged from the rule's start on the trades opened under "
+    "it: the CLV difference is the in-range trades minus all of them (above 0 = the cut helps)."
+)
+
+
+def old_rule_trades(real: list[dict], shadow: list[dict]) -> list[dict]:
+    """The old rule's (any odds) Lean trades: every shadow entry plus every real Lean trade
+    on a match without one. A shadow opens only while its match has no Lean trade, so a real
+    trade on a shadow's match came later, when the pick moved into the range: the old rule,
+    one trade per match, had already bet the shadow."""
+    shadowed = {_match_key(t) for t in shadow}
+    lean = [t for t in real if tr.strategy_of(t) == "lean" and not t.get("shadow")]
+    return list(shadow) + [t for t in lean if _match_key(t) not in shadowed]
+
+
+def lean_shadow_section(
+    real: list[dict], shadow: list[dict], rule: dict | None, now: pd.Timestamp | None = None
+) -> dict:
+    """Blend Lean's "all odds (old rule)" variant: strategy_section over old_rule_trades,
+    plus variant_of "lean", `adds` "shadow", `filter` None, `defined_at`
+    (tr.LEAN_RANGE_FROM), the note and `since_defined`: the real Lean trades and the old
+    rule's opened at or after defined_at under the new rule's code (rule_version 2; a real
+    trade the old code opened in that window is counted in `old_code` and left out of
+    both), their summaries, and per CLV field (clv_dk first, the judged one) clv_difference
+    of the in-range trades against all the old rule's (kept = in range)."""
+    old = old_rule_trades(real, shadow)
+    defined_at = tr.LEAN_RANGE_FROM
+    spec = {"key": LEAN_SHADOW_KEY, "filter": None, "defined_at": defined_at}
+    sec = strategy_section(
+        old,
+        LEAN_SHADOW_KEY,
+        LEAN_SHADOW_LABEL,
+        {**tr.variant_rule(rule, spec, "lean"), "adds": "shadow"},
+        of=lambda _t: LEAN_SHADOW_KEY,
+        now=now,
+    )
+    since = _utc(defined_at)
+    lean = [t for t in real if tr.strategy_of(t) == "lean" and not t.get("shadow")]
+    after = [t for t in lean if _opened_since(t, since)]
+    new = [t for t in after if t.get("rule_version") == tr.LEAN_RULE_VERSION]
+    judged = [
+        t
+        for t in old
+        if _opened_since(t, since)
+        and (t.get("shadow") or t.get("rule_version") == tr.LEAN_RULE_VERSION)
+    ]
+    kept = {t["id"] for t in judged if not t.get("shadow")}
+    sec.update(
+        variant_of="lean",
+        adds="shadow",
+        filter=None,
+        defined_at=defined_at,
+        note=LEAN_SHADOW_NOTE,
+        shadow_trades=len(shadow),
+        since_defined={
+            "defined_at": defined_at,
+            "parent": {"trades": len(new), "summary": portfolio_section(new)["summary"]},
+            "variant": {"trades": len(judged), "summary": portfolio_section(judged)["summary"]},
+            "old_code": len(after) - len(new),
+            "clv_diff": {
+                f: {**clv_difference(judged, kept, f), "kept_is": "in range (the live rule)"}
+                for f in ("clv_dk", "clv_pinnacle")
+            },
+        },
+    )
+    return sec
+
+
+def _safe_shadow_section(real, shadow, rule, now) -> dict:
+    """lean_shadow_section for display only: a failure costs only the variant."""
+    try:
+        return lean_shadow_section(real, shadow, rule, now)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "key": LEAN_SHADOW_KEY,
+            "label": LEAN_SHADOW_LABEL,
+            "variant_of": "lean",
+            "adds": "shadow",
+            "filter": None,
+            "defined_at": tr.LEAN_RANGE_FROM,
+            "error": type(exc).__name__,
+        }
+
+
 def portfolios_section(
     live: dict,
     live_trades: list[dict],
@@ -1432,6 +1560,7 @@ def portfolios_section(
     sections: dict[str, dict] | None = None,
     strategies: list[dict] | None = None,
     now: pd.Timestamp | None = None,
+    shadow_trades: list[dict] | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1444,7 +1573,10 @@ def portfolios_section(
     its own ledger and rule). A backtest of `kind` "research" (corners: the research
     record, no prices) passes through unchanged. `strategies` (match_strategies) gives
     Moneyline's live section `strategies`: one strategy_section each, in that order; its
-    combined trades and summary stay for older app code.
+    combined trades and summary stay for older app code. `shadow_trades` (Blend Lean's
+    shadow entries) go on Moneyline's live section as `shadow_trades`, never in its
+    `trades` or summary, and add the "all odds (old rule)" variant right after Lean
+    (lean_shadow_section).
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1470,10 +1602,16 @@ def portfolios_section(
             section["rule"] = match_rule
             section["note"] = live.get("note") or match_rule.get("note")
         if p["id"] == "moneyline" and strategies:
-            section["strategies"] = [
-                strategy_section(mine, st["key"], st["label"], st["rule"], now=now)
-                for st in strategies
-            ]
+            section["strategies"] = []
+            for st in strategies:
+                section["strategies"].append(
+                    strategy_section(mine, st["key"], st["label"], st["rule"], now=now)
+                )
+                if st["key"] == "lean":
+                    section["strategies"].append(
+                        _safe_shadow_section(mine, shadow_trades or [], st["rule"], now)
+                    )
+            section["shadow_trades"] = portfolio_section(shadow_trades or [])["trades"]
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
@@ -1582,6 +1720,7 @@ def run(
     live = {"trades": [], "summary": {"trades": 0}, "error": None, "note": None}
     written = 0
     live_trades: list[dict] = []
+    shadow_trades: list[dict] = []
     corner_trades: list[dict] = []
     corner_section: dict = {"rule": tr.corners_rule(), "note": tr.CORNERS_NOTE, "error": None}
     backtests: dict[str, dict | None] = {"corners": corners_research()}
@@ -1612,8 +1751,10 @@ def run(
     else:
         try:
             ledger: dict[str, dict] = {}
+            shadows: dict[str, dict] = {}  # Blend Lean's shadow entries (old rule, all odds)
             for lg in codes:
                 ledger.update(load_ledger(log_dir, lg))
+                shadows.update(load_lean_shadow(log_dir, lg))
         except Exception as exc:  # corrupt or unreadable: never write blind
             live["error"] = (
                 f"The paper-trade ledger couldn't be read ({type(exc).__name__}), "
@@ -1626,6 +1767,7 @@ def run(
             for lg in codes:
                 # Each league runs the rule on its own trades, fixtures, odds and results.
                 sub = {k: t for k, t in ledger.items() if k.split("|")[0] == lg}
+                shadow = {k: t for k, t in shadows.items() if k.split("|")[0] == lg}
                 cards = [c for c in data.get("fixtures", []) if (c.get("league") or league) == lg]
                 res = results
                 if res is not None and "league" in res and not res.empty:
@@ -1647,13 +1789,28 @@ def run(
                     rule=rules[lg],
                     lean=leans[lg],
                     espn=esp,
+                    shadow=shadow,
+                )
+                # The shadow entries close and settle exactly as trades do; nothing opens.
+                sev, _ = update_ledger(
+                    shadow,
+                    cards,
+                    ol.source_for(data, lg, league),
+                    res,
+                    now,
+                    lg,
+                    odds_log=log,
+                    threshold=None,
+                    espn=esp,
                 )
                 ledger.update(sub)
-                events += ev
+                shadows.update(shadow)
+                events += ev + sev
                 if lg == league:
                     note = n
             written = append_events(log_dir, events, league)
             live_trades = list(ledger.values())
+            shadow_trades = list(shadows.values())
             live.update(portfolio_section(live_trades), note=note)
             try:  # the corners portfolio: its own ledger, rows and results
                 n, corner_trades = _run_corners(
@@ -1723,6 +1880,7 @@ def run(
         {"corners": corner_section},
         match_strategies(leans, rule),
         now=now,
+        shadow_trades=shadow_trades,
     )
     return written
 
@@ -1746,7 +1904,11 @@ def awaiting_results(
     paper step asks ESPN about these only (espn_results.fetch)."""
     out = []
     for lg in codes:
-        books = (("match", load_ledger(log_dir, lg)), ("corners", load_corner_ledger(log_dir, lg)))
+        books = (
+            ("match", load_ledger(log_dir, lg)),
+            ("match", load_lean_shadow(log_dir, lg)),
+            ("corners", load_corner_ledger(log_dir, lg)),
+        )
         for kind, ledger in books:
             for t in ledger.values():
                 if t.get("status") != "open" or t.get("source") != "live":
