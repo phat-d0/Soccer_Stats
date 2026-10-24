@@ -1309,3 +1309,31 @@ does carry in-play prices, a phase-2 test needs a snapshot at half-time of each 
 slot. All eight leagues and seasons would be thousands of slots (tens of thousands of
 credits); a realistic design is one league over recent seasons, about 300 slots and 3,000
 credits (rough estimate; `estimate`-style replay before any spend).
+
+### Phase 2, step 1: the archive keeps in-play prices (24 Oct, owner-approved 10 credits)
+
+`lab/inplay_probe.py` (`odds-check.yml` `task=inplay-probe`, `league`, `cap`; `hist_dates` set to
+one ISO time = a historical snapshot, else a live call). One historical h2h snapshot of the
+Premier League (run 40136522857, **10 credits**, 19,124 → 19,114), asked for 10 Oct 2026
+14:55 UTC and served at 14:50:36, 51 minutes after four 14:00 kickoffs (half-time, minute ~45
+by ESPN's goal minutes):
+
+| Match | Score then (final) | Pinnacle home / draw / away | Books priced |
+| --- | --- | --- | --- |
+| Aston Villa v Brentford | 1-1 (2-2) | 3.10 / 2.79 / 2.70 | 7 |
+| Chelsea v Bournemouth | 2-0 (5-1) | 1.08 / 11.27 / 38.4 | 7 |
+| Sunderland v Brighton | 0-0 (0-2) | 3.31 / 2.60 / 2.74 | 6 |
+| Ipswich v Fulham | 0-0 (2-1) | 3.60 / 2.66 / 2.51 | 7 |
+
+- **All four started matches came back with in-play h2h prices**, at Pinnacle, DraftKings,
+  Betfair's exchange (margin 0.0–1.3%), BetMGM, Betway, Unibet and Paddy Power; FanDuel and
+  William Hill returned pre-match prices only. Book updates were 0.1–0.9 minutes old (one
+  Betway quote 12.8). The prices follow the score (Chelsea 2-0 up at 1.06–1.09; the 0-0 and 1-1
+  matches priced as level games), so they are true in-play prices, not stale pre-match ones.
+- No favourite was trailing at half-time in this snapshot, so it says nothing yet about the
+  comeback gap itself. It answers the gating question only: a historical phase-2 test can be
+  bought, with Pinnacle's in-play price as the sharp benchmark.
+- **Cost lever for phase 2:** the free data (football-data half-time scores, ESPN/Understat goal
+  minutes) already say which kickoff slots had a favourite behind at half-time, so a test need
+  only buy those slots' half-time snapshots (10 credits each), not every slot. The live 1-credit
+  check (25 Oct) shows whether live in-play prices come back the same way.
