@@ -285,3 +285,44 @@ def test_in_range_lean_still_opens_and_the_twelve_percent_is_untouched():
     )
     assert set(led) == {LEAN_ID, "E0|2627|Arsenal|Leeds"} and shadow == {}
     assert led["E0|2627|Arsenal|Leeds"]["market"] == "draw"  # 12% bets 5.0, no range
+
+
+def test_the_new_rule_is_backcast_from_leans_start_and_the_ledger_keeps_everything():
+    real = [
+        lean_trade(1, 2.0, "won", 0.02, -200, version=None),  # before the rule, in range
+        lean_trade(2, 4.0, "lost", -0.06, -150, version=None),  # before, out: cut
+        lean_trade(3, 1.4, "won", -0.01, -100, version=None),  # before, out: cut
+        lean_trade(4, 2.5, "lost", -0.03, 2),  # the new rule
+    ]
+    e12 = {**lean_trade(9, 5.0, "lost", -0.1, -120, version=None), "strategy": "edge12"}
+    e12["id"] = "E0|2627|H9|A9"
+    shadow = [lean_trade(5, 6.0, "lost", -0.08, 3, shadow=True)]
+    pf = paper.portfolios_section(
+        {},
+        [*real, e12],
+        {},
+        tr.paper_threshold(None, "E0"),
+        None,
+        paper.match_strategies({"E0": lean()}, tr.paper_threshold(None, "E0")),
+        shadow_trades=shadow,
+    )
+    live = next(p for p in pf if p["id"] == "moneyline")["live"]
+    sts = {x["key"]: x for x in live["strategies"]}
+    new = sts["lean"]
+    assert new["label"] == "Blend Lean (new rule)"
+    assert set(new["trade_ids"]) == {real[0]["id"], real[3]["id"]}
+    bc = new["backcast"]
+    assert bc["applied"] and bc["trades"] == 1 and bc["settled"] == 1
+    assert bc["from"] == bc["to"] == real[0]["opened_at"]
+    assert bc["lean_started"] == real[0]["opened_at"] and bc["until"] == tr.LEAN_RANGE_FROM
+    old = sts["lean_all_odds"]
+    assert set(old["trade_ids"]) == {t["id"] for t in real} | {shadow[0]["id"]}
+    # The cut trades stay in the ledger's combined record.
+    assert live["summary"]["trades"] == 5 and len(live["trades"]) == 5
+    pre = old["before_defined"]
+    assert pre["descriptive"] and pre["until"] == tr.LEAN_RANGE_FROM
+    assert pre["parent"]["trades"] == 1 and pre["variant"]["trades"] == 3
+    d = pre["clv_diff"]["clv_dk"]
+    assert d["diff"] == pytest.approx(0.02 - np.mean([0.02, -0.06, -0.01]))
+    sd = old["since_defined"]
+    assert sd["parent"]["trades"] == 1 and sd["variant"]["trades"] == 2

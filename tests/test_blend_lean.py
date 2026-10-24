@@ -354,7 +354,7 @@ def test_strategies_listed_lean_first(tmp_path):
     # The old rule's shadow variant sits right after Lean (owner, 24 Oct).
     assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "edge12"]
     sts = [sts[0], sts[2]]
-    assert sts[0]["label"] == "Blend Lean (1σ+)" and sts[1]["label"].startswith("Model 12%")
+    assert sts[0]["label"] == "Blend Lean (new rule)" and sts[1]["label"].startswith("Model 12%")
     assert sts[0]["trade_ids"] == ["E0|2627|Arsenal|Leeds|lean"]
     assert sts[1]["trade_ids"] == ["E0|2627|Arsenal|Leeds"]
     assert sts[0]["rule"]["sigma"] == {"E0": SIGMA} and sts[1]["rule"]["rule"] == "fixed_raw"

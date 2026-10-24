@@ -30,8 +30,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   blend's price weight b > 1 sharpening the price, not from the model; each pick's `driver`
   ("market"/"model") says which (`docs/history.md`, round 14 "Blend Lean beside the 12% test").
   Blend Lean trades only 1.50–3.00 since 24 Oct (owner; `trades.LEAN_ODDS_RANGE`, lo < odds ≤
-  hi, no fallback to another side); the old rule is tracked as a shadow ("Blend Lean, all
-  odds (old rule)"; `docs/leagues.md` "Blend Lean odds range").
+  hi, no fallback to another side), backcast from Lean's start as "Blend Lean (new rule)";
+  the old rule is tracked as a shadow ("Blend Lean, all odds (old rule)"; `docs/leagues.md`
+  "Blend Lean odds range").
 - **Model 12%**: `trades.PAPER_RULE = "fixed_raw"`, the raw model's chance at a 12% edge
   against DraftKings' quoted price. The owner's live test.
 - The Matches tab shows Lean only; Portfolio → Moneyline shows both.
@@ -428,13 +429,18 @@ the owner's baseball app, so the balance can drop without any run here.
     `strategy_order`, `portfolios` (`portfolios_section`: per portfolio `id, name, status, note,
     live, backtest`). Moneyline `live.strategies` (`match_strategies`) = `[{key, label, rule,
     summary, breakdowns, by_league, by_driver (Lean), trade_ids}]`, Lean first, beside the combined
-    `trades`/`summary`; Lean has `driver_note`. Right after Lean: `lean_shadow_section` (key
+    `trades`/`summary`; Lean has `driver_note`. Lean's section is "Blend Lean (new rule)"
+    (`LEAN_NEW_LABEL`) over `new_rule_trades` (real Lean trades inside the range: the new rule
+    backcast from Lean's start) with `backcast` (`lean_backcast`: `{applied, until, trades,
+    settled, from, to, lean_started, note}`); the combined `trades`/`summary` keep every Lean
+    trade. Right after Lean: `lean_shadow_section` (key
     `lean_all_odds`, "Blend Lean, all odds (old rule)") over `old_rule_trades` (every shadow
     plus every real Lean trade on a match without one), with `variant_of: "lean"`, `adds:
     "shadow"`, `filter: None`, `defined_at` = `LEAN_RANGE_FROM`, `note`, `shadow_trades`
     (count) and `since_defined` = `{defined_at, parent (real Lean, rule_version 2), variant (old
     rule: shadows + rule_version 2 trades), old_code, clv_diff: {clv_dk, clv_pinnacle}}` (each
-    `clv_difference` with kept = in range, plus `kept_is`). Moneyline's live section also has
+    `clv_difference` with kept = in range, plus `kept_is`) and `before_defined` (the same
+    shape for trades opened before the rule, `descriptive: true`). Moneyline's live section also has
     `shadow_trades` (the entries, newest first), never in its `trades` or summary. Corners `live.strategies` (`corner_strategies`),
     Pinnacle first, each followed by its shadow variants (`with_variants(sections, trades,
     variants, of)`, generic for any strategy list; `variant_section`): a variant is the parent's
