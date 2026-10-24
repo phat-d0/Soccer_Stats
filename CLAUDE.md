@@ -39,6 +39,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
   at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
+  Backtests: Kelly loses more than flat for Lean and mostly declines Model 12%'s picks; Kelly on
+  the raw model goes broke (`docs/leagues.md` "Kelly sizing").
 
 **Team corners (portfolio "Team corners", testing), two paper tracks, model (f), 12%, $10:**
 - Model (f) 12% vs Pinnacle, in E0, SP1, D1, I1, F1, E1.
