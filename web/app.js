@@ -3620,7 +3620,7 @@ function sinceDefinedHtml(cur, x, parent, lg) {
     whole = `
       <div class="judged-head">Before the rule, ${startDay ? `${esc(dayName(startDay))} to ` : ""}${esc(dayName(String(bd.until || at).slice(0, 10)))} <span class="muted">· backcast</span>${lg ? ` <span class="muted">· every competition</span>` : ""}</div>
       <table class="judged-tab whole-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV</th></tr></thead>
-        <tbody>${line(name, bd.variant)}${line(`${keptName} (backcast)`, bd.parent)}</tbody></table>
+        <tbody>${line(name, bd.variant)}${line(`${keptName} (backcast)`, bd.parent)}${bc?.cut ? line("Cut (outside the range)", { trades: bc.cut.trades, summary: bc.cut }) : ""}</tbody></table>
       ${preDiffs.map(([f, d]) => (isNum(d.diff)
         ? `<p class="note">CLV against ${CLV_FIELD_NAME[f]}, ${esc(keptName.toLowerCase())} minus ${esc(allName.toLowerCase())}: <b class="${signCls(d.diff)}">${signedPct(d.diff)}</b> (${signedPct(d.mean_kept)} vs ${signedPct(d.mean_all)}; ${d.kept} kept of ${d.trades} trade${d.trades === 1 ? "" : "s"} with a close${d.ci95 ? `, 95% range ${ciText(d.ci95)}` : ""}).</p>`
         : `<p class="note">CLV against ${CLV_FIELD_NAME[f]}: no ${esc(keptName.toLowerCase())} trade with a close before the rule.</p>`)).join("")}
