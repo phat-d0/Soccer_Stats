@@ -739,10 +739,16 @@ Results:
   (League Two). Model (f) was never tested in either league (the bake-offs ran on the top
   five and the Championship), so their live record is the only check.
 - **Empty calls.** If Pinnacle lists the market but returns no lines, each look still costs
-  1 credit: at the estimate's pace about 180-240 a month for both leagues. So a league whose
-  last six answered calls logged no rows now pauses for 7 days and then looks once more
-  (`corners_live.paused_leagues`, shown in the publish log line), which keeps an unpriced
-  listing to about 10 credits a league in its first month and 4-5 a month after.
+  1 credit: at the estimate's pace about 180-240 a month for both leagues. So in these two
+  leagues only, a snapshot kind (looks and closes counted apart) whose last six answered
+  calls logged no rows, over at least two runs or kickoff days, pauses for 7 days and then
+  looks once more (`corners_live.paused_leagues`, shown in the publish log line). That keeps
+  an unpriced listing to about 10 credits a league and snapshot kind in its first month and
+  4-5 a month after. The other six leagues never pause: replayed on data-log's October call
+  record (233 calls), a league-wide rule would have paused the Championship on 16 Oct (its
+  looks are often empty while its closes are priced: 12 empty looks in a row, 8 in one run;
+  the lead's review of PR #98); under the per-snapshot, two-run rule nothing in that record
+  pauses, and the Championship's pattern in League One would pause only its looks.
 
 ## European cups: cost estimate (12 Oct)
 

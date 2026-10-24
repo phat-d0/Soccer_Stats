@@ -45,7 +45,7 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 **Team corners (portfolio "Team corners", testing), two paper tracks, model (f), 12%, $10:**
 - Model (f) 12% vs Pinnacle, in E0, SP1, D1, I1, F1, E1, and from 24 Oct E2 and E3 (Pinnacle only:
   `corners_live.PINNACLE_ONLY`; listed in the 24 Oct discovery, run 40088231180, not yet seen
-  priced; a league pauses 7 days after six empty calls in a row).
+  priced; there, a snapshot kind pauses 7 days after six empty calls over two or more runs).
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
 - One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
   corner cap 750 credits a month (550 until 24 Oct; estimate 676 a month with E2/E3,
@@ -341,8 +341,11 @@ the owner's baseball app, so the balance can drop without any run here.
   "team_corners") for `books_for(league)`: `BOOKS` pinnacle, draftkings, or Pinnacle alone in
   `PINNACLE_ONLY` (E2, E3); cap `CORNERS_MONTHLY_CAP` 750 and the reserve checked at
   `expected_cost` (dearest corner call this month, ≥ 1); `LEAGUES` = E0, SP1, D1, I1, F1, E1, E2,
-  E3. `paused_leagues(calls, now)`: a league whose last `EMPTY_PAUSE` 6 answered calls logged no
-  rows makes no call for `EMPTY_PAUSE_DAYS` 7 after the last (summary `paused`). Rows: Pinnacle's two-sided lines, then DraftKings' (`book: "draftkings"`,
+  E3. `paused_leagues(calls, now)`: in a `PINNACLE_ONLY` league, a snapshot kind ("look"/"close",
+  counted apart) whose last `EMPTY_PAUSE` 6 answered calls logged no rows, over ≥ 2 runs or
+  kickoff days, makes no call for `EMPTY_PAUSE_DAYS` 7 after the last (summary `paused` =
+  `{"E2 look": until}`); never in the other leagues (the Championship's looks are often empty
+  while its closes are priced). Rows: Pinnacle's two-sided lines, then DraftKings' (`book: "draftkings"`,
   one-sided lines kept with the missing side and `fair_*`/`margin` None). `newest_quotes(rows,
   book=)`, `add_quotes(cards, dirs, book=, rows=)` → card `corners.pinnacle` / `corners.draftkings`
   = `{book, fetched_at, home/away: [{line, over, under, fair_over, margin, snapshot,
@@ -350,7 +353,7 @@ the owner's baseball app, so the balance can drop without any run here.
   (HC/AC for settlement), `estimate` (CLI `estimate-corners`). Corner files and rows never mix
   into the team-total test (tests). Log lines "Corners (Pinnacle, DraftKings): N calls, C credits,
   R rows (P Pinnacle, D DraftKings); month M of 750 corner credits, credits left X[; paused (no
-  prices in the last 6 calls): E2 until …]" and "Corners
+  prices in the last 6 calls): E2 look until …]" and "Corners
   shown: …".
 - `espn_news.py`: free ESPN team news for all live leagues (`SLUGS`: eng.1–eng.4, esp.1,
   ger.1, ita.1, fra.1, uefa.champions). `add(cards)`: scoreboard one date per call (cached 6 h),

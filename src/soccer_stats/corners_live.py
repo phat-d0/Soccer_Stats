@@ -6,9 +6,10 @@ Owner-approved on 10 Oct (docs/totals.md, "Live corner prices and paper trades")
   probe, run 37889595473, found Pinnacle listing it in all six leagues, one line per team,
   two-sided, median margin 5.8-7.0%) in E0, SP1, D1, I1, F1 and E1, and from 24 Oct in
   League One and League Two (E2, E3: listed in the 24 Oct discovery, run 40088231180, not
-  yet seen priced; Pinnacle only, PINNACLE_ONLY). A league whose last EMPTY_PAUSE calls
-  logged no rows pauses for EMPTY_PAUSE_DAYS (paused_leagues), so listed-but-unpriced
-  costs a few credits, not one per look. One look 18-30 hours
+  yet seen priced; Pinnacle only, PINNACLE_ONLY). There, a snapshot kind whose last
+  EMPTY_PAUSE calls logged no rows over two or more runs or kickoff days pauses for
+  EMPTY_PAUSE_DAYS (paused_leagues), so listed-but-unpriced costs a few credits, not one
+  per look. One look 18-30 hours
   before kickoff and one close just before it, on the team-total schedule
   (team_totals.due_snapshot). Each snapshot is its own `/events/{id}/odds` call with
   `bookmakers=pinnacle` and one market: 1 credit, the same as adding the market to the
@@ -73,8 +74,11 @@ LEAGUES = ("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3")
 PINNACLE_ONLY = ("E2", "E3")
 COST_PER_CALL = 1  # one market, up to ten books (one region): 1 credit
 CORNERS_MONTHLY_CAP = 750  # credits a calendar month (UTC); 500 until 10 Oct, 550 until 24 Oct
-# Listed is not priced: a league whose last EMPTY_PAUSE calls all came back with no rows is
-# paused for EMPTY_PAUSE_DAYS after the last of them, then looked at once more.
+# Listed is not priced: in a PINNACLE_ONLY league, a snapshot kind ("look" or "close") whose
+# last EMPTY_PAUSE answered calls all came back with no rows, over at least two runs or
+# kickoff days, is paused for EMPTY_PAUSE_DAYS after the last of them, then looked at once
+# more. Never the other leagues: the Championship's looks are often empty while its closes
+# are priced (12 empty looks in a row on 16 Oct, 8 of them in one run).
 EMPTY_PAUSE = 6
 EMPTY_PAUSE_DAYS = 7
 LOCAL_CALLS = "corners_calls.jsonl"  # local copy of the call record (raw-data cache)
@@ -98,23 +102,31 @@ def books_for(league: str) -> tuple[str, ...]:
 
 
 def paused_leagues(calls: list[dict], now) -> dict[str, str]:
-    """{league: until} for the leagues whose last EMPTY_PAUSE answered calls (status 200)
-    all logged no rows, while EMPTY_PAUSE_DAYS haven't passed since the last of them: a
-    listed market that isn't priced stops costing a credit per look."""
+    """{"<league> <snapshot>": until} for each PINNACLE_ONLY league and snapshot kind whose
+    last EMPTY_PAUSE answered calls (status 200) all logged no rows, spread over at least
+    two runs (`fetched_at`) or kickoff days, while EMPTY_PAUSE_DAYS haven't passed since the
+    last of them: a listed market that isn't priced stops costing a credit per look. Each
+    snapshot kind counts on its own, so empty looks never stop the closes."""
     now = _ts(now)
-    by: dict[str, list[dict]] = {}
+    by: dict[tuple[str, str], list[dict]] = {}
     for c in calls:
-        if c.get("group", GROUP) == GROUP and c.get("league") and c.get("fetched_at"):
-            by.setdefault(c["league"], []).append(c)
+        lg, snap = c.get("league"), c.get("snapshot")
+        if c.get("group", GROUP) == GROUP and lg in PINNACLE_ONLY and snap and c.get("fetched_at"):
+            by.setdefault((lg, snap), []).append(c)
     out = {}
-    for lg, cs in by.items():
+    for (lg, snap), cs in by.items():
         cs = sorted(cs, key=lambda c: _ts(c["fetched_at"]))[-EMPTY_PAUSE:]
         if len(cs) < EMPTY_PAUSE:
             continue
-        if all(c.get("status") == 200 and not c.get("rows") for c in cs):
-            until = _ts(cs[-1]["fetched_at"]) + pd.Timedelta(days=EMPTY_PAUSE_DAYS)
-            if now < until:
-                out[lg] = until.isoformat(timespec="minutes")
+        if not all(c.get("status") == 200 and not c.get("rows") for c in cs):
+            continue
+        runs = {c["fetched_at"] for c in cs}
+        days = {str(c.get("kickoff", ""))[:10] for c in cs}
+        if len(runs) < 2 and len(days) < 2:  # one run on one matchday proves little
+            continue
+        until = _ts(cs[-1]["fetched_at"]) + pd.Timedelta(days=EMPTY_PAUSE_DAYS)
+        if now < until:
+            out[f"{lg} {snap}"] = until.isoformat(timespec="minutes")
     return out
 
 
@@ -477,7 +489,7 @@ def run(
             by_league.setdefault(c["league"], []).append(c)
     new_rows, new_calls = [], []
     try:  # a crash part-way still writes the calls already made (below)
-        for league in [lg for lg in LEAGUES if lg in by_league and lg not in paused]:
+        for league in [lg for lg in LEAGUES if lg in by_league]:
             lcards = by_league[league]
             books = ",".join(books_for(league))
             due = [(c, s) for c in lcards if (s := tt.due_snapshot(c["kickoff"], now, runs))]
@@ -487,7 +499,7 @@ def run(
             events = tt.event_index(raw_dir, league, known)
             for card, snap in due:
                 eid = tt.match_event(card, events)
-                if eid is None or (eid, snap, GROUP) in done:
+                if eid is None or (eid, snap, GROUP) in done or f"{league} {snap}" in paused:
                     continue
                 summary["due"] += 1
                 if credits is not None and credits - expected < MATCHDAY_RESERVE_CREDITS:
@@ -596,8 +608,7 @@ def summary_line(s: dict) -> str:
         f"month {s.get('month_spent', 0)} of {CORNERS_MONTHLY_CAP} corner credits"
         + (f", credits left {s['credits_left']}" if s.get("credits_left") is not None else "")
         + (
-            "; paused (no prices in the last "
-            + f"{EMPTY_PAUSE} calls): "
+            f"; paused (no prices in the last {EMPTY_PAUSE} calls): "
             + ", ".join(f"{lg} until {u}" for lg, u in sorted(s["paused"].items()))
             if s.get("paused")
             else ""

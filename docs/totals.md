@@ -1249,8 +1249,9 @@ corner cap is 750 a month (550 until 24 Oct); estimate 674 / 638 / 716 for Oct /
 first, else ESPN's `wonCorners` (eng.3, eng.4). Model (f) fits on 1,102 and 1,104 matches
 but was never tested in these leagues, so it carries no backtest there. **Listed is not
 priced**: the first snapshots may come back with no lines, which the call record shows as
-0-row calls at 1 credit each; after six in a row a league pauses for 7 days
-(`corners_live.paused_leagues`).
+0-row calls at 1 credit each; after six in a row over two or more runs, that league's
+snapshot kind (looks or closes, counted apart) pauses for 7 days
+(`corners_live.paused_leagues`; League One and League Two only).
 
 ## Historical corner prices probe (owner-approved 50-credit cap, 11 Oct; probe only, no backtest)
 
