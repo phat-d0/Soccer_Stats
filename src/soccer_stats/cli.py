@@ -1386,6 +1386,156 @@ def _calibration_brief(calib: dict | None) -> dict:
     return out
 
 
+def _dnb_line(label: str, m: dict) -> None:
+    if not m.get("bets"):
+        print(f"  {label}: 0 bets")
+        return
+    clv = "n/a" if m.get("clv") is None else f"{m['clv']:+.1%}"
+    hit = "n/a" if m.get("hit_rate") is None else f"{m['hit_rate']:.1%}"
+    print(
+        f"  {label}: {m['bets']} bets ({m['won']} won, {m['drawn']} refunded, {m['lost']} lost), "
+        f"hit {hit} vs break-even {m['breakeven']:.1%} (chance {m['p']:.1%}), "
+        f"ROI {m['roi']:+.1%} ({_fmt_range(m.get('roi_ci95'))}), CLV {clv} "
+        f"({_fmt_range(m.get('clv_ci95'))}; 97.5% {_fmt_range(m.get('clv_ci975'))}), "
+        f"avg odds {m['avg_odds']:.2f}, sd/bet {m['profit_sd']:.2f}, "
+        f"bets for a 5% edge {m['bets_for_5pct']}"
+    )
+
+
+def _dnb_brief(out: dict) -> dict:
+    """Headline numbers for the DNB_BACKTEST_JSON log line (no seasons or bins)."""
+    keep = (
+        "bets",
+        "won",
+        "drawn",
+        "lost",
+        "hit_rate",
+        "breakeven",
+        "p",
+        "roi",
+        "roi_ci95",
+        "clv",
+        "clv_ci95",
+        "clv_ci975",
+        "clv_staked",
+        "avg_odds",
+        "profit_sd",
+        "bets_for_5pct",
+    )
+
+    def brief(m):
+        return {k: m.get(k) for k in keep if k in m}
+
+    cal_keys = ("n", "predicted", "implied", "realized", "slope", "slope_ci95", "brier")
+    return {
+        "verdict": out["verdict"],
+        "all": {r: brief(m) for r, m in out["all"]["rules"].items()},
+        "bands": {
+            r: [
+                {k: b.get(k) for k in ("lo", "hi", "bets", "hit_rate", "roi", "clv")}
+                for b in m["by_odds_band"]
+            ]
+            for r, m in out["all"]["rules"].items()
+        },
+        "by_league": {
+            c: {r: brief(m) for r, m in rules.items()}
+            for c, rules in out["all"]["by_league"].items()
+        },
+        "ah0": {
+            "all": {r: brief(m) for r, m in out["all"]["ah0"].items()},
+            "leagues": {
+                c: {k: v for k, v in (r.get("ah0") or {}).items() if k != "rules"}
+                for c, r in out["leagues"].items()
+            },
+        },
+        "calibration": {
+            c: {
+                k: {f: v.get(f) for f in cal_keys}
+                for k, v in ((r.get("calibration") or {}).get("all_outcomes") or {}).items()
+            }
+            for c, r in out["leagues"].items()
+        },
+        "calibration_bets": {
+            r: {f: v.get(f) for f in cal_keys} for r, v in out["all"]["calibration_bets"].items()
+        },
+    }
+
+
+def cmd_backtest_dnb(args: argparse.Namespace) -> None:
+    """Draw no bet replayed per league on Pinnacle's early prices beside the 1X2 rules on
+    the same matches (dnb_backtest.py; pre-registered in docs/lab.md, "Draw no bet").
+    Football-data and Understat only: no Odds API key, no credits."""
+    from soccer_stats import dnb_backtest as dnb
+    from soccer_stats import leagues as lgs
+    from soccer_stats.data import download, season_code
+
+    codes = args.leagues or list(dnb.LEAGUES)
+    reports: dict[str, dict] = {}
+    league_bets: dict[str, pd.DataFrame] = {}
+    ah_bets: dict[str, pd.DataFrame] = {}
+    for code in codes:
+        try:
+            preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+            frames = []
+            for y in range(args.from_season, current_season() + 1):
+                raw = pd.read_csv(download(code, y), encoding="latin-1", on_bad_lines="skip")
+                frames.append(dnb.ah_prices(raw).assign(season=season_code(y)))
+            rep, b, ab = dnb.league_report(code, preds, pins, pd.concat(frames, ignore_index=True))
+            rep["xg_weight"] = weight
+        except Exception as exc:  # one league failing never costs the others
+            rep = {"error": f"{type(exc).__name__}: {exc}"}
+            b = ab = dnb.dnb_bets(pd.DataFrame(), code)
+        reports[code] = rep
+        league_bets[code] = b
+        ah_bets[code] = ab
+        print(f"\n=== Draw no bet on Pinnacle early: {lgs.name(code)} ===")
+        if rep.get("error"):
+            print(f"  {rep['error']}")
+            continue
+        print(
+            f"  {rep['candidates']} matches scored ({rep['with_blend']} with a blend fit), "
+            f"draws {rep['draw_share']:.1%}, seasons {', '.join(rep['seasons_included'])}"
+        )
+        for r in dnb.RULES:
+            _dnb_line(dnb.RULE_LABELS[r], rep["rules"][r])
+        ah = rep.get("ah0") or {}
+        if ah.get("matches"):
+            print(
+                f"  AH 0 check: {ah['matches']} matches ({ah['share']:.0%}), margin synthetic "
+                f"{ah['margin_synthetic']:.2%} vs AH 0 {ah['margin_ah0']:.2%}, fair gap "
+                f"{ah['fair_gap_mean']:.3f} (90th pct {ah['fair_gap_p90']:.3f})"
+            )
+            for r, m in (ah.get("rules") or {}).items():
+                _dnb_line(f"at the AH 0 price, {r}", m)
+    out = dnb.build(
+        reports,
+        league_bets,
+        ah_bets,
+        from_season=args.from_season,
+        names={c: lgs.name(c) for c in codes},
+    )
+    print("\n=== Draw no bet, eight leagues pooled ===")
+    for r in dnb.RULES:
+        m = out["all"]["rules"][r]
+        _dnb_line(dnb.RULE_LABELS[r], m)
+        for s in m.get("by_season") or []:
+            _dnb_line(f"    {s['label']}", s)
+    for r, m in out["all"]["ah0"].items():
+        _dnb_line(f"at the AH 0 price, {r}", m)
+
+    def pct(x):
+        return "n/a" if x is None else f"{x:+.2%}"
+
+    for r, v in out["verdict"].items():
+        print(
+            f"VERDICT {r}: {'PASSES' if v['passes'] else 'does not pass'} "
+            f"(CLV {pct(v['clv'])}, 97.5% {_fmt_range(v['clv_ci975'])}; "
+            f"1X2 baseline {v['baseline']} CLV {pct(v['baseline_clv'])})"
+        )
+    print("DNB_BACKTEST_JSON " + json_dumps(_dnb_brief(out)))
+    _write_backtest(out, args, "dnb_backtest.json", "DNB backtest")
+
+
 def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     """Model 12% replayed per league on Pinnacle's early prices (edge12_backtest.py), plus
     the Champions League at DraftKings' bought close (cup_backtest.py). Football-data,
@@ -2910,6 +3060,17 @@ def main(argv: list[str] | None = None) -> None:
     e12b.add_argument("--json", help="path for the results")
     e12b.add_argument("--log-dir", help="data-log checkout: writes backtest/edge12_backtest.json")
     e12b.set_defaults(func=cmd_backtest_edge12)
+
+    dnbp = sub.add_parser(
+        "backtest-dnb",
+        help="draw no bet beside the 1X2 rules on Pinnacle's early prices (no key)",
+    )
+    dnbp.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
+    dnbp.add_argument("--from-season", type=int, default=2019, help="first season of bets")
+    dnbp.add_argument("--burn-in", type=int, default=2, help="seasons of model training before")
+    dnbp.add_argument("--json", help="path for the results")
+    dnbp.add_argument("--log-dir", help="data-log checkout: writes backtest/dnb_backtest.json")
+    dnbp.set_defaults(func=cmd_backtest_dnb)
 
     e12 = sub.add_parser(
         "backtest-edge12-filters",
