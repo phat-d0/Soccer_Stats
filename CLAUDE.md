@@ -532,7 +532,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v53) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v54) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -568,7 +568,13 @@ the owner's baseball app, so the balance can drop without any run here.
   `pfStratCorners`). Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
   the filters (`tradeStats`), the <200-settled caveat, paper.py's ROI range only when its summary
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
-  over time" (`curveChart`: scrubbable, see below), Open / Awaiting result / Settled lists (`tradePhase`:
+  over time" (`curveChart`: scrubbable, see below), "Where the bets sit on the odds" (owner, 24
+  Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
+  `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
+  `odds_bands.clv_field`; the ROI table; on Moneyline a table beside the same strategy's
+  backtest bands, "In the backtest … CLV was x"; a note that live samples are small and the
+  backtest bands answer the edge question; corners have no priced backtest, so no
+  comparison), Open / Awaiting result / Settled lists (`tradePhase`:
   upcoming, in play under `IN_PLAY_MIN` 135 min, awaiting, settled; started trades show their
   close and CLV), the rule note. Shadow-filter variants (owner, 23 Oct; any live strategy
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60`): an
@@ -611,7 +617,8 @@ the owner's baseball app, so the balance can drop without any run here.
   tick with Wilson ranges, from `strategy_backtests.<lean|edge12>` → `calibration.all_outcomes`,
   `all` under All), (b) the strategy's own backtest bets and (c) live paper trades
   (`binRowsChart` rows: said ring, break-even tick, won dot and range, blue when it won at least
-  as often as the price implied; `calibration.bets`, the live section's `calibration` and its
+  as often as the price implied; live bins merge only under 3 trades and a `few` bin, under
+  10, is greyed and labelled "few trades"; `calibration.bets`, the live section's `calibration` and its
   `by_league`), (d) corners: every logged half line per book (`quote_calibration[book].model`,
   with the model's and the price's slopes). Slopes in words (`slopeWords`: 1 = right, below 1
   over-confident). Corners also get model (f)'s shape (`cornerShapeChart`: the chance of over
@@ -666,10 +673,11 @@ the owner's baseball app, so the balance can drop without any run here.
   `edgeBucketsHtml`, `edgeChartSource`, `noEdgeText`) still serves `edge_threshold` data
   (`by_bucket[{edge_lo, edge_hi, n, implied, model, realized, realized_lo, realized_hi, roi, roi_lo,
   roi_hi}]`; null `min_edge` shows its `note`).
-- Test data: `tests/fixtures/web/` (all JSON files together under 1 MB). Rebuild with
+- Test data: `tests/fixtures/web/` (all JSON files together under 1.5 MB: the cap in
+  `tests/test_web_smoke.py` was raised from 1 MB on 24 Oct rather than trim more real data). Rebuild with
   `uv run python tests/web/make_fixture.py` (synthetic leagues through `publish.build_data`, the real
   ledger and backtests from `origin/data-log` through `paper.run`; fixed `NOW`, reproducible).
-  To stay under 1 MB it trims lists (`LEAN_BETS`, `EDGE12_BETS` 30, `DK_BT_TRADES` 20,
+  To stay small it trims lists (`LEAN_BETS`, `EDGE12_BETS` 30, `DK_BT_TRADES` 20,
   `PLAYER_BT_TRADES` 25, `SAMPLE_PLAYERS`); `add_models` rebuilds `portfolio.models` once every
   block is in (the synthetic leagues' fits via `publish.safe_fit_info`, data-log's real
   `match_blends.json` for the blend's numbers) and gives the corners live section a synthetic

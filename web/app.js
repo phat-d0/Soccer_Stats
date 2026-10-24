@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v53";
+const APP_VERSION = "v54";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2509,7 +2509,7 @@ function bandTrend(rows, xk, yk) {
   return { dir, slope, first, last, r };
 }
 // 1. Where the bets sit on the odds: share of bets (bar) and CLV (dot, 95% range, 0 marked).
-function oddsBandChart(id, bands) {
+function oddsBandChart(id, bands, what = "bets") {
   const withClv = bands.filter((b) => b.bets && isNum(b.clv));
   const vals = withClv.flatMap((b) => [b.clv_ci95?.[0] ?? b.clv, b.clv_ci95?.[1] ?? b.clv]).concat(0);
   const span = Math.max(...vals) - Math.min(...vals) || 0.01;
@@ -2517,23 +2517,23 @@ function oddsBandChart(id, bands) {
   const x = (v) => ((v - lo) / (hi - lo)) * 100;
   const top = Math.max(...bands.map((b) => b.share || 0), 0.01);
   const read = (b) => (b.bets
-    ? `<b>${esc(oddsBandLabel(b))}</b>: ${num(b.bets)} bets (${pct(b.share, 0)} of them); CLV ${signedPct(b.clv)}${rngText(b.clv_ci95)}; won ${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)} needed; ROI ${signedPct(b.roi)}${rngText(b.roi_ci95)}.`
-    : `<b>${esc(oddsBandLabel(b))}</b>: no bets.`);
+    ? `<b>${esc(oddsBandLabel(b))}</b>: ${num(b.bets)} ${what} (${pct(b.share, 0)} of them); ${isNum(b.clv) ? `CLV ${signedPct(b.clv)}${rngText(b.clv_ci95)}${isNum(b.clv_trades) ? ` on ${b.clv_trades} with a final close` : ""}` : "no final close yet"}; ${isNum(b.win_rate) ? `won ${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)} needed${isNum(b.settled) ? ` (${b.settled} settled)` : ""}; ROI ${signedPct(b.roi)}${rngText(b.roi_ci95)}` : "none settled yet"}.`
+    : `<b>${esc(oddsBandLabel(b))}</b>: no ${what}.`);
   scrubCharts[id] = { n: bands.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => read(bands[i]) };
   const tone = (b) => (b.clv_ci95?.[0] > 0 ? "pos" : b.clv_ci95?.[1] < 0 ? "neg" : b.clv > 0 ? "pos" : "neg");
   const rows = bands.map((b, i) => `
     <div class="eb-row band-row" data-stop="${i}">
       <span class="eb-label">${esc(oddsBandLabel(b))}</span>
-      <span class="band-share">${b.bets ? `<span class="share-bar" style="width:${((b.share || 0) / top) * 100}%"></span><span class="share-num">${pct(b.share, 0)}</span>` : '<span class="muted">no bets</span>'}</span>
+      <span class="band-share">${b.bets ? `<span class="share-bar" style="width:${((b.share || 0) / top) * 100}%"></span><span class="share-num">${pct(b.share, 0)}</span>` : `<span class="muted">no ${what}</span>`}</span>
       <span class="eb-plot"><span class="rc-zero" style="left:${x(0)}%"></span>${b.bets && isNum(b.clv) ? `${b.clv_ci95 ? `<span class="eb-range ${tone(b)}" style="left:${x(b.clv_ci95[0])}%;width:${Math.max(0.5, x(b.clv_ci95[1]) - x(b.clv_ci95[0]))}%"></span>` : ""}<span class="eb-dot real ${tone(b)}" style="left:${x(b.clv)}%"></span>` : ""}</span>
     </div>`).join("");
   const ticks = [lo + (hi - lo) * 0.12, hi - (hi - lo) * 0.12].filter((v) => Math.abs(x(v) - x(0)) > 18);
   const axis = `<div class="eb-axis band-row"><span></span><span class="band-share muted">Share</span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${signedPct(v, 1)}</span>`).join("")}<span style="left:${x(0)}%">0</span></span></div>`;
   const busiest = bands.filter((b) => b.bets).sort((a, c) => c.share - a.share)[0];
   return `<div class="card eb-card scrub-rows" ${scrubAttrs(id, bands.length, "Odds bands: point at or drag across the rows, or use the arrow keys")}>
-      <div class="eb-legend"><span><i class="eb-key share"></i>Share of bets</span><span><i class="eb-key real pos"></i>CLV (range)</span></div>
+      <div class="eb-legend"><span><i class="eb-key share"></i>Share of ${what}</span><span><i class="eb-key real pos"></i>CLV (range)</span></div>
       ${rows}${axis}
-      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${busiest ? read(busiest) : "No bets."}</div></div>`;
+      <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${busiest ? read(busiest) : `No ${what}.`}</div></div>`;
 }
 const rngCell = (v, ci) => `<td class="${plClass(v)}">${signedPct(v)}${ci && isNum(ci[0]) ? `<span class="meta">${signedPct(ci[0], 1)} to ${signedPct(ci[1], 1)}</span>` : ""}</td>`;
 const bandTable = (head, rows) => `<div class="card" style="padding:8px 14px"><table class="mkts mk-table band-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
@@ -3069,15 +3069,15 @@ function binRowsChart(id, cal, what) {
   const ticks = [];
   for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
   const binText = bins.map((b) => ({
-    readout: `<b>Said ${pctRange(b.lo, b.hi)}</b>, ${num(b.n)} ${what}: said ${pct(b.predicted, 1)} on average${isNum(b.implied) ? `, the price's break-even ${pct(b.implied, 1)}` : ""}, won ${pct(b.realized, 1)}${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 0)} to ${pct(b.realized_hi, 0)})` : ""}.`,
+    readout: `<b>Said ${pctRange(b.lo, b.hi)}</b>, ${num(b.n)} ${what}${b.few ? " (few: read loosely)" : ""}: said ${pct(b.predicted, 1)} on average${isNum(b.implied) ? `, the price's break-even ${pct(b.implied, 1)}` : ""}, won ${pct(b.realized, 1)}${isNum(b.realized_lo) ? ` (range ${pct(b.realized_lo, 0)} to ${pct(b.realized_hi, 0)})` : ""}.`,
   }));
   const body = bins.map((b, i) => {
     const beat = !isNum(b.implied) || b.realized >= b.implied;
     const tone = isNum(b.implied) ? (beat ? "pos" : "neg") : "mid";
     const range = isNum(b.realized_lo) ? `<span class="eb-range ${tone}" style="left:${x(b.realized_lo)}%;width:${Math.max(0.5, x(b.realized_hi) - x(b.realized_lo))}%"></span>` : "";
     const dot = (v, cls) => (isNum(v) ? `<span class="eb-dot ${cls}" style="left:${x(v)}%"></span>` : "");
-    return `<div class="eb-row rc-row" data-stop="${i}" data-rcrow="${i}" data-rc="${id}">
-      <span class="eb-label">${pctRange(b.lo, b.hi)}<span class="meta">${num(b.n)} ${what}</span></span>
+    return `<div class="eb-row rc-row${b.few ? " few" : ""}" data-stop="${i}" data-rcrow="${i}" data-rc="${id}">
+      <span class="eb-label">${pctRange(b.lo, b.hi)}<span class="meta">${num(b.n)} ${what}${b.few ? ` · few ${what}` : ""}</span></span>
       <span class="eb-plot">${range}${dot(b.implied, "imp")}${dot(b.predicted, "mod")}${dot(b.realized, `real ${tone}`)}</span>
     </div>`;
   }).join("");
@@ -3590,6 +3590,40 @@ function sinceDefinedHtml(cur, x, parent, lg) {
       ${x.st?.filter?.note ? `<details class="fold"><summary>How this filter works</summary><p class="note">${esc(x.st.filter.note)}</p></details>` : ""}
     </div>`;
 }
+// Live paper by odds band (owner, 24 Oct; paper.live_odds_bands): the backtest's odds chart
+// on the strategy's live trades, the ROI table, and each band beside the same band in that
+// strategy's backtest (Moneyline only: corners have no priced backtest).
+function liveOddsBandsHtml(cur, x, lg, drv) {
+  const st = x.st;
+  if (!st) return "";
+  const bands = lg ? st.by_league?.[lg]?.by_odds_band : st.by_odds_band;
+  const title = `<div class="section-title">Where the bets sit on the odds</div>`;
+  if (!bands) return lg && st.by_odds_band ? `${title}<p class="note">No ${esc(x.label)} trades in ${esc(leagueName(lg))} to split by odds yet.</p>` : "";
+  if (bands.error) return `${title}<p class="note">The odds bands couldn't be worked out this time (${esc(bands.error)}).</p>`;
+  if (!bands.some((b) => b.bets)) return "";
+  const id = `lob-${x.key}-${lg || "all"}`;
+  const clvField = st.odds_bands?.clv_field || (cur.id === "corners" ? "clv_pinnacle" : "clv_dk");
+  const vs = clvField === "clv_pinnacle" ? "Pinnacle's close" : "DraftKings' close";
+  const table = bandTable(["Odds", "Trades", "Won vs needed", "ROI, 95% range"], bands.map((b) => `<tr><td>${esc(oddsBandLabel(b))}</td><td>${num(b.bets)}${b.bets && isNum(b.settled) ? `<span class="meta">${b.settled} settled</span>` : ""}</td><td>${isNum(b.win_rate) ? `${pct(b.win_rate, 1)} vs ${pct(b.breakeven, 1)}` : b.bets ? "none settled" : "no trades"}</td>${isNum(b.roi) ? rngCell(b.roi, b.roi_ci95) : "<td>–</td>"}</tr>`));
+  // The same strategy's backtest bands (Moneyline: lean / edge12 files), for this competition.
+  const bt = cur.id === "moneyline" ? state.data.portfolio?.strategy_backtests?.[x.key] : null;
+  const btPartBands = bt?.available ? (lg ? bt.leagues?.[lg] : bt.all)?.by_odds_band : null;
+  const btClose = bt?.available && lg && isClose(bt.leagues?.[lg]);
+  const cmpRows = (btPartBands || []).length ? bands.map((b, i) => {
+    const k = btPartBands.find((r) => r.lo === b.lo && r.hi === b.hi) || btPartBands[i] || {};
+    const live = isNum(b.clv) ? `${signedPct(b.clv)}<span class="meta">${b.clv_trades} trade${b.clv_trades === 1 ? "" : "s"}</span>` : b.bets ? "no final close yet" : "no trades";
+    const back = k.bets && isNum(k.clv) ? `CLV was ${signedPct(k.clv)}<span class="meta">${num(k.bets)} bets, range ${ciText(k.clv_ci95)}</span>` : "no bets";
+    return `<tr><td>${esc(oddsBandLabel(b))}</td><td>${live}</td><td>${back}</td></tr>`;
+  }) : [];
+  const compare = cmpRows.length ? `
+    <p class="note"><b>Beside the backtest</b>${lg ? ` (${esc(leagueName(lg))})` : ""}: the same odds bands ${btClose ? "at DraftKings' close" : "at Pinnacle's early prices"}, a much larger sample than the live trades.</p>
+    ${bandTable(["Odds", `Live CLV (vs ${vs})`, "In the backtest"], cmpRows)}` : "";
+  return `${title}
+    ${oddsBandChart(id, bands, "trades")}
+    <p class="note">Bar = the share of ${drv ? "all this strategy's" : "these"} trades in each odds band; dot = their CLV against ${vs} (trades whose close is final), bar = its 95% range, line = 0. Live samples are small, so read the ranges: the backtest's odds bands, under Backtest, are where the edge question is answered.</p>
+    ${table}
+    ${compare}`;
+}
 function liveRuleNote(cur, x) {
   const rule = state.data.portfolio?.rule || {};
   if (cur.id === "corners" && (x.rule?.book || x.key) === "draftkings") return `<b>Live test: fixed ${pct(x.rule?.threshold ?? PAPER_EDGE)} on model (f) against DraftKings.</b> The same model and rule as the Pinnacle track, on DraftKings' price: a $${x.rule?.stake ?? 10} paper trade opens on a team's corner line when the model's chance shows at least ${aPct(x.rule?.threshold ?? PAPER_EDGE)} edge, at most one per team and line, in the Premier League, La Liga, the Bundesliga, Serie A and Ligue 1 (DraftKings lists no team corners in the Championship). On a whole line (say 5), exactly 5 corners is a push: the stake comes back. Closing line value is against DraftKings' own close; where DraftKings priced only one side at the close there is none, and Pinnacle's close at the same line is the second check. Prices: logged with Pinnacle's, about a day before kickoff and again just before it.`;
@@ -3673,6 +3707,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card">${chart}</div>
+    ${liveOddsBandsHtml(cur, x, lg, drv)}
     <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk` : ""}</div>
     ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
     ${awaiting.length ? `<div class="section-title">Awaiting result · ${awaiting.length}</div><p class="note await-note">These matches have finished. ${AWAIT_NOTE} Their close and CLV are final.</p><div class="card list">${awaiting.map(pfTradeRow).join("")}</div>` : ""}
