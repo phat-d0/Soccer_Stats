@@ -4,7 +4,12 @@ Owner-approved on 10 Oct (docs/totals.md, "Live corner prices and paper trades")
 
 * **Prices.** Pinnacle's `alternate_team_totals_corners` (each team's corners; the market
   probe, run 37889595473, found Pinnacle listing it in all six leagues, one line per team,
-  two-sided, median margin 5.8-7.0%) in E0, SP1, D1, I1, F1 and E1. One look 18-30 hours
+  two-sided, median margin 5.8-7.0%) in E0, SP1, D1, I1, F1 and E1, and from 24 Oct in
+  League One and League Two (E2, E3: listed in the 24 Oct discovery, run 40088231180, not
+  yet seen priced; Pinnacle only, PINNACLE_ONLY). There, a snapshot kind whose last
+  EMPTY_PAUSE calls logged no rows over two or more runs or kickoff days pauses for
+  EMPTY_PAUSE_DAYS (paused_leagues), so listed-but-unpriced costs a few credits, not one
+  per look. One look 18-30 hours
   before kickoff and one close just before it, on the team-total schedule
   (team_totals.due_snapshot). Each snapshot is its own `/events/{id}/odds` call with
   `bookmakers=pinnacle` and one market: 1 credit, the same as adding the market to the
@@ -62,9 +67,20 @@ BOOK = "pinnacle"  # the original track: its rows and trades are unchanged
 DK = "draftkings"
 BOOKS = (BOOK, DK)  # one call, both books (one region of up to ten books: 1 credit)
 BOOKS_PARAM = ",".join(BOOKS)
-LEAGUES = ("E0", "SP1", "D1", "I1", "F1", "E1")
+# League One and League Two from 24 Oct (owner, pre-approved 20 Oct; docs/leagues.md "League
+# One and League Two check"): Pinnacle's discovery listed the market there (run
+# 40088231180), DraftKings didn't, so those calls ask Pinnacle alone.
+LEAGUES = ("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3")
+PINNACLE_ONLY = ("E2", "E3")
 COST_PER_CALL = 1  # one market, up to ten books (one region): 1 credit
-CORNERS_MONTHLY_CAP = 550  # credits a calendar month (UTC), corner calls; 500 until 10 Oct
+CORNERS_MONTHLY_CAP = 750  # credits a calendar month (UTC); 500 until 10 Oct, 550 until 24 Oct
+# Listed is not priced: in a PINNACLE_ONLY league, a snapshot kind ("look" or "close") whose
+# last EMPTY_PAUSE answered calls all came back with no rows, over at least two runs or
+# kickoff days, is paused for EMPTY_PAUSE_DAYS after the last of them, then looked at once
+# more. Never the other leagues: the Championship's looks are often empty while its closes
+# are priced (12 empty looks in a row on 16 Oct, 8 of them in one run).
+EMPTY_PAUSE = 6
+EMPTY_PAUSE_DAYS = 7
 LOCAL_CALLS = "corners_calls.jsonl"  # local copy of the call record (raw-data cache)
 TRAIN_DAYS = 730  # corners2's window
 MIN_TRAIN = 300  # matches with corner counts in the window, else no model for the league
@@ -76,6 +92,42 @@ MODEL = "f"
 
 def _ts(x) -> pd.Timestamp:
     return tt._ts(x)
+
+
+def books_for(league: str) -> tuple[str, ...]:
+    """The books one corner call asks for in `league`: Pinnacle alone where DraftKings
+    lists no team corners (PINNACLE_ONLY), else Pinnacle and DraftKings (one region, 1
+    credit either way)."""
+    return (BOOK,) if league in PINNACLE_ONLY else BOOKS
+
+
+def paused_leagues(calls: list[dict], now) -> dict[str, str]:
+    """{"<league> <snapshot>": until} for each PINNACLE_ONLY league and snapshot kind whose
+    last EMPTY_PAUSE answered calls (status 200) all logged no rows, spread over at least
+    two runs (`fetched_at`) or kickoff days, while EMPTY_PAUSE_DAYS haven't passed since the
+    last of them: a listed market that isn't priced stops costing a credit per look. Each
+    snapshot kind counts on its own, so empty looks never stop the closes."""
+    now = _ts(now)
+    by: dict[tuple[str, str], list[dict]] = {}
+    for c in calls:
+        lg, snap = c.get("league"), c.get("snapshot")
+        if c.get("group", GROUP) == GROUP and lg in PINNACLE_ONLY and snap and c.get("fetched_at"):
+            by.setdefault((lg, snap), []).append(c)
+    out = {}
+    for (lg, snap), cs in by.items():
+        cs = sorted(cs, key=lambda c: _ts(c["fetched_at"]))[-EMPTY_PAUSE:]
+        if len(cs) < EMPTY_PAUSE:
+            continue
+        if not all(c.get("status") == 200 and not c.get("rows") for c in cs):
+            continue
+        runs = {c["fetched_at"] for c in cs}
+        days = {str(c.get("kickoff", ""))[:10] for c in cs}
+        if len(runs) < 2 and len(days) < 2:  # one run on one matchday proves little
+            continue
+        until = _ts(cs[-1]["fetched_at"]) + pd.Timedelta(days=EMPTY_PAUSE_DAYS)
+        if now < until:
+            out[f"{lg} {snap}"] = until.isoformat(timespec="minutes")
+    return out
 
 
 def _iso(t) -> str:
@@ -416,6 +468,7 @@ def run(
     except Exception:  # noqa: BLE001  the balance falls back to the DraftKings meta
         others = []
     credits = tt.freshest_credits(raw_dir, calls + others)
+    paused = paused_leagues(calls, now)
     summary = {
         "calls": 0,
         "credits": 0,
@@ -424,6 +477,7 @@ def run(
         "due": 0,
         "month_spent": spent,
         "stop": None,
+        "paused": paused,
     }
     if not api_key:
         summary["stop"] = "no ODDS_API_KEY"
@@ -437,6 +491,7 @@ def run(
     try:  # a crash part-way still writes the calls already made (below)
         for league in [lg for lg in LEAGUES if lg in by_league]:
             lcards = by_league[league]
+            books = ",".join(books_for(league))
             due = [(c, s) for c in lcards if (s := tt.due_snapshot(c["kickoff"], now, runs))]
             if not due:
                 continue
@@ -444,7 +499,7 @@ def run(
             events = tt.event_index(raw_dir, league, known)
             for card, snap in due:
                 eid = tt.match_event(card, events)
-                if eid is None or (eid, snap, GROUP) in done:
+                if eid is None or (eid, snap, GROUP) in done or f"{league} {snap}" in paused:
                     continue
                 summary["due"] += 1
                 if credits is not None and credits - expected < MATCHDAY_RESERVE_CREDITS:
@@ -462,7 +517,7 @@ def run(
                         tt.URL.format(sport=SPORTS[league], event_id=eid),
                         params={
                             "apiKey": api_key,
-                            "bookmakers": BOOKS_PARAM,
+                            "bookmakers": books,
                             "markets": MARKET,
                             "oddsFormat": "decimal",
                             "dateFormat": "iso",
@@ -498,7 +553,7 @@ def run(
                     "status": resp.status_code,
                     "cost": cost,
                     "credits_left": credits,
-                    "books": BOOKS_PARAM,
+                    "books": books,
                     "markets": MARKET,
                     "rows": len(rows),
                 }
@@ -529,14 +584,15 @@ def run(
 
 def expected_cost(calls: list[dict], now) -> int:
     """What the next call is budgeted at: COST_PER_CALL, or the dearest recorded call this
-    month (UTC) that asked for these books, if dearer. The cost always comes from
-    `x-requests-last`; this only keeps the cap and the reserve checks honest if billing
-    for the two-book call is ever more than 1 credit."""
+    month (UTC) at this test's books (both, or Pinnacle alone), if dearer. The cost always
+    comes from `x-requests-last`; this only keeps the cap and the reserve checks honest if
+    billing for a corner call is ever more than 1 credit."""
     month = _ts(now).strftime("%Y-%m")
+    params = {BOOKS_PARAM, BOOK}
     seen = [
         int(c.get("cost") or 0)
         for c in calls
-        if c.get("books") == BOOKS_PARAM
+        if c.get("books") in params
         and c.get("fetched_at")
         and _ts(c["fetched_at"]).strftime("%Y-%m") == month
     ]
@@ -551,6 +607,12 @@ def summary_line(s: dict) -> str:
         f"({by.get(BOOK, 0)} Pinnacle, {by.get(DK, 0)} DraftKings); "
         f"month {s.get('month_spent', 0)} of {CORNERS_MONTHLY_CAP} corner credits"
         + (f", credits left {s['credits_left']}" if s.get("credits_left") is not None else "")
+        + (
+            f"; paused (no prices in the last {EMPTY_PAUSE} calls): "
+            + ", ".join(f"{lg} until {u}" for lg, u in sorted(s["paused"].items()))
+            if s.get("paused")
+            else ""
+        )
         + (f" (stopped: {s['stop']})" if s.get("stop") else "")
     )
 

@@ -59,8 +59,9 @@ LEAGUES: dict[str, League] = {
         League("E1", "Championship", None, "soccer_efl_champ", live=True),
         # League One and League Two: live from 13 Oct (owner; docs/leagues.md "League One
         # and League Two live"). Goals-only like the Championship (no Understat), schedule
-        # from football-data, matchday odds policy. DraftKings h2h only: no team corners
-        # (corners_live.LEAGUES) or team totals (odds_feed.TEAM_TOTAL_LEAGUES) there.
+        # from football-data, matchday odds policy. DraftKings h2h; team corners at Pinnacle
+        # only from 24 Oct (corners_live.PINNACLE_ONLY); no team totals
+        # (odds_feed.TEAM_TOTAL_LEAGUES) there.
         League("E2", "League One", None, "soccer_england_league1", live=True),
         League("E3", "League Two", None, "soccer_england_league2", live=True),
         # The Champions League: live from 13 Oct (owner; docs/leagues.md "Champions League

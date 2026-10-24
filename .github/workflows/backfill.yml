@@ -72,7 +72,7 @@ on:
         type: boolean
         default: false
       estimate_month:
-        description: "Only estimate Odds API credits per league and month (YYYY-MM or YYYY-MM,YYYY-MM,...; plus team-total and team-corner snapshots; League One/Two's corners priced apart; no key, no push)"
+        description: "Only estimate Odds API credits per league and month (YYYY-MM or YYYY-MM,YYYY-MM,...; plus team-total and team-corner snapshots, League One/Two's corners included; no key, no push)"
         default: ""
       cups:
         description: "With estimate_month: also cost the UEFA cups on ESPN's 2024/25-2025/26 calendar (no key, no push; log + 7-day artifact)"
@@ -212,10 +212,9 @@ jobs:
           for m in ${months//,/ }; do uv run soccer-stats estimate-credits --month "$m"; done
           # Team-total snapshots (docs/totals.md): an estimate only, no key, no calls.
           uv run soccer-stats estimate-team-totals --months "$months"
-          # Pinnacle team-corner snapshots, six leagues (owner's live test, 10 Oct), plus
-          # League One and League Two priced apart (Pinnacle quotes no team corners there; not
-          # counted, not fetched).
-          uv run soccer-stats estimate-corners --months "$months" --extra-leagues E2,E3
+          # Pinnacle team-corner snapshots in the eight corner leagues (owner's live test,
+          # 10 Oct; League One and League Two from 24 Oct, Pinnacle only), against the cap.
+          uv run soccer-stats estimate-corners --months "$months"
 
       # The UEFA cups (owner's request, 12 Oct; docs/leagues.md "European cups"): ESPN's
       # free calendar replayed under the matchday rule, snapshot and historical costs, and

@@ -246,7 +246,7 @@ def _record(path, cost, credits=None, at=DAY_BEFORE, name="corners_calls"):
     (path / f"{name}_{at:%Y-%m}.jsonl").write_text(json.dumps(row) + "\n")
 
 
-@pytest.mark.parametrize("spent, allowed", [(549, True), (550, False)])
+@pytest.mark.parametrize("spent, allowed", [(749, True), (750, False)])
 def test_own_monthly_cap(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -259,7 +259,7 @@ def test_own_monthly_cap(tmp_path, spent, allowed):
     )
     assert (len(calls) == 1) == allowed
     if not allowed:
-        assert s["stop"].startswith("monthly cap: 550 of 550")
+        assert s["stop"].startswith("monthly cap: 750 of 750")
 
 
 def test_team_total_spend_never_counts_toward_the_corner_cap_or_back(tmp_path):
@@ -637,3 +637,119 @@ def test_corner_trades_belong_to_the_corners_portfolio():
     assert pf["status"] == "testing" and "February" in pf["note"]
     rule = tr.corners_rule()
     assert rule["threshold"] == 0.12 and rule["rule"] == "fixed_raw" and rule["book"] == "pinnacle"
+
+
+def test_league_one_and_two_ask_pinnacle_alone_and_the_rest_both_books(tmp_path):
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    dk_cache(raw, "E2", events=(("ev2", "Huddersfield", "Wigan", K),))
+    dk_cache(raw, "E3", events=(("ev3", "Bristol Rvs", "Swindon", K),))
+    calls = []
+    cards = [card(), card("Huddersfield", "Wigan", "E2"), card("Bristol Rvs", "Swindon", "E3")]
+    s = cl.run(cards, out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
+    assert s["calls"] == 3 and s["credits"] == 3
+    books = {url.split("/events/")[1].split("/")[0]: p["bookmakers"] for url, p in calls}
+    assert books == {"ev1": "pinnacle,draftkings", "ev2": "pinnacle", "ev3": "pinnacle"}
+    assert "/soccer_england_league1/events/ev2/odds" in calls[1][0]
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert {c["league"]: c["books"] for c in rec} == {
+        "E0": "pinnacle,draftkings",
+        "E2": "pinnacle",
+        "E3": "pinnacle",
+    }
+    assert cl.CORNERS_MONTHLY_CAP == 750 and cl.PINNACLE_ONLY == ("E2", "E3")
+
+
+def _call(league, at, snapshot="look", kickoff=None, rows=0, status=200, i=0):
+    at = pd.Timestamp(at)
+    at = at.tz_localize("UTC") if at.tz is None else at
+    return {
+        "league": league,
+        "event_id": f"{league}{snapshot}{at:%m%d%H%M}{i}",
+        "snapshot": snapshot,
+        "group": "team_corners",
+        "kickoff": (kickoff or at + pd.Timedelta(hours=24)).isoformat(),
+        "fetched_at": at.isoformat(),
+        "status": status,
+        "rows": rows,
+        "cost": 1,
+    }
+
+
+def _empty_runs(league, n, last, snapshot="look", **kw):
+    """n empty calls, one a run, 6 hours apart, the last at `last`."""
+    return [
+        _call(league, last - pd.Timedelta(hours=6 * (n - 1 - i)), snapshot, i=i, **kw)
+        for i in range(n)
+    ]
+
+
+def championship_16_oct(league):
+    """data-log's Championship corner calls of 15-17 Oct: every look empty (one on the 15th,
+    three at 07:03 and eight in the 12:18 run on the 16th), every close priced."""
+    k16, k17 = (
+        pd.Timestamp("2026-10-16 18:45", tz="UTC"),
+        pd.Timestamp("2026-10-17 14:00", tz="UTC"),
+    )
+    calls = [_call(league, "2026-10-15 13:20", kickoff=k16)]
+    calls += [_call(league, "2026-10-16 07:03", kickoff=k17, i=i) for i in range(3)]
+    calls += [_call(league, "2026-10-16 12:18", kickoff=k17, i=i) for i in range(8)]
+    calls += [_call(league, "2026-10-16 18:30", "close", k16, rows=2)]
+    calls += [_call(league, "2026-10-17 11:15", "close", k17, rows=2, i=i) for i in range(3)]
+    return calls
+
+
+def test_the_championship_pattern_never_pauses_anything():
+    at = pd.Timestamp("2026-10-17 12:00", tz="UTC")
+    # The real Championship: not a Pinnacle-only league, so never paused.
+    assert cl.paused_leagues(championship_16_oct("E1"), at) == {}
+    # The same calls in League One: the last six looks are one run on one kickoff day, so
+    # no pause either, and the priced closes are never counted against the looks.
+    assert cl.paused_leagues(championship_16_oct("E2"), at) == {}
+
+
+def test_a_pinnacle_only_snapshot_pauses_after_six_empty_calls_over_two_runs():
+    last = LOOK - pd.Timedelta(days=1)
+    six = _empty_runs("E2", cl.EMPTY_PAUSE, last)
+    until = (last + pd.Timedelta(days=7)).isoformat(timespec="minutes")
+    assert cl.paused_leagues(six, LOOK) == {"E2 look": until}
+    assert cl.paused_leagues(six[1:], LOOK) == {}  # five empty: still looking
+    assert cl.paused_leagues(six[:-1] + [_call("E2", last, rows=4)], LOOK) == {}  # priced
+    assert cl.paused_leagues(six[:-1] + [_call("E2", last, status=500)], LOOK) == {}  # error
+    assert cl.paused_leagues(six, last + pd.Timedelta(days=7, minutes=1)) == {}  # look again
+    # Closes count on their own: empty looks never pause them, and their own empties do.
+    closes = _empty_runs("E2", cl.EMPTY_PAUSE, last, "close")
+    assert set(cl.paused_leagues(six + [_call("E2", last, "close", rows=3)], LOOK)) == {"E2 look"}
+    assert set(cl.paused_leagues(six + closes, LOOK)) == {"E2 look", "E2 close"}
+    # The same six empty looks elsewhere never pause: the pause is for Pinnacle-only leagues.
+    assert cl.paused_leagues(_empty_runs("E1", 12, last) + _empty_runs("D1", 8, last), LOOK) == {}
+    # Six empty in one run on one kickoff day prove little.
+    one_run = [_call("E2", last, i=i) for i in range(8)]
+    assert cl.paused_leagues(one_run, LOOK) == {}
+
+
+def test_a_paused_snapshot_makes_no_call_and_the_log_line_says_so(tmp_path):
+    raw, state = tmp_path / "raw", tmp_path / "state"
+    raw.mkdir()
+    state.mkdir()
+    dk_cache(raw)
+    dk_cache(raw, "E2", events=(("ev2", "Huddersfield", "Wigan", K),))
+    rows = _empty_runs("E2", cl.EMPTY_PAUSE, LOOK - pd.Timedelta(hours=2))
+    (state / "corners_calls_2026-10.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n"
+    )
+    calls = []
+    cards = [card(), card("Huddersfield", "Wigan", "E2")]
+    s = cl.run(
+        cards, tmp_path / "o", [state], raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls)
+    )
+    assert len(calls) == 1 and "/events/ev1/" in calls[0][0]  # the Premier League only
+    assert set(s["paused"]) == {"E2 look"}
+    assert "paused (no prices in the last 6 calls): E2 look until" in cl.summary_line(s)
+    # Its close, just before kickoff, still goes out.
+    close = K - pd.Timedelta(minutes=20)
+    s = cl.run(
+        cards, tmp_path / "o", [state], raw_dir=raw, api_key="k", now=close, get=fake_get(calls)
+    )
+    assert any("/events/ev2/" in url for url, _ in calls[1:])
