@@ -289,6 +289,18 @@ const STEPS = [
     if (!text.includes("model only") || text.includes("FD over") || text.includes("DK over")) throw new Error("SP1 goals should be model only");
     if (!text.includes("No Pinnacle or DraftKings price for this match yet") || !text.includes("fits less well in La Liga")) throw new Error("SP1 corners should be model only, with the weaker-fit note");
   }, true],
+  // League One / League Two corners (24 Oct, Pinnacle only): an E0 corner card relabelled E2
+  // gets the untested-model note and the no-DraftKings line, not the weaker-fit one.
+  ["corners-e2-note", async (p) => {
+    const text = await p.evaluate(() => {
+      const fx = state.data.fixtures.find((f) => f.league === "E0" && f.corners?.pinnacle);
+      const div = document.createElement("div");
+      div.innerHTML = cornersSection({ ...fx, league: "E2" });
+      return div.textContent;
+    });
+    for (const want of ["never been tested in League One", "DraftKings lists no team corners in League One"]) if (!text.includes(want)) throw new Error(`E2 corners lacks "${want}"`);
+    if (text.includes("fits less well")) throw new Error("E2 corners should not carry the weaker-fit note");
+  }],
   // The Champions League (owner, 13 Oct): goals-only model chances ("exp. goals"), and an
   // odds-only card for a club no football-data league covers.
   ["matches-league-ucl", async (p) => {
