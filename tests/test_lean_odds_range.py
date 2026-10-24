@@ -315,6 +315,11 @@ def test_the_new_rule_is_backcast_from_leans_start_and_the_ledger_keeps_everythi
     assert bc["applied"] and bc["trades"] == 1 and bc["settled"] == 1
     assert bc["from"] == bc["to"] == real[0]["opened_at"]
     assert bc["lean_started"] == real[0]["opened_at"] and bc["until"] == tr.LEAN_RANGE_FROM
+    # The pre-rule summaries (owner, 24 Oct): in range, all odds and the cut ones.
+    assert bc["descriptive"] and bc["new_rule"]["trades"] == 1 and bc["old_rule"]["trades"] == 3
+    assert bc["cut"]["trades"] == 2
+    assert bc["cut"]["profit"] == pytest.approx(-10.0 + 10 * (1.4 - 1))
+    assert bc["new_rule"]["profit"] + bc["cut"]["profit"] == pytest.approx(bc["old_rule"]["profit"])
     old = sts["lean_all_odds"]
     assert set(old["trade_ids"]) == {t["id"] for t in real} | {shadow[0]["id"]}
     # The cut trades stay in the ledger's combined record.
