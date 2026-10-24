@@ -25,6 +25,9 @@
 #            downloaded and cached (comebacks-<league>-); prints counts only, never outcomes.
 #   comebacks: favourites coming back from behind (docs/lab.md, 24 Oct): eight leagues
 #            pooled from the cached files, against a fair time-scaled Poisson model.
+#   comeback-plan: phase 2's free planner: kickoff slots where a favourite trailed at
+#            half-time, eight leagues 2022/23-2025/26, costed at one historical snapshot
+#            per slot; designs A-D (docs/lab.md). football-data only, no key.
 #   corner-coverage: 2025/26 corner-count coverage in all six leagues (counts only).
 #   cup-corner-coverage: the cup corners model's coverage count (docs/totals.md "Cup corners
 #            model"): football-data HC/AC per file, ESPN cup summaries with corner counts,
@@ -78,9 +81,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
@@ -282,6 +285,7 @@ jobs:
                 --finalist "$FINALISTS" --tests "$T" --json out/corners2.json ;;
             comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
             comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
+            comeback-plan) uv run python -m soccer_stats.lab.comeback_plan --json out/comeback_plan.json ;;
             inplay-probe)  # comebacks phase 2 step 1: one live h2h call during play (1 credit)
               # hist_dates set to ONE ISO time = a historical snapshot (10 credits); the default
               # (a comma list, for props) or "live" = a live call now (1 credit)

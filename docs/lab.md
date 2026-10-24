@@ -1337,3 +1337,103 @@ by ESPN's goal minutes):
   minutes) already say which kickoff slots had a favourite behind at half-time, so a test need
   only buy those slots' half-time snapshots (10 credits each), not every slot. The live 1-credit
   check (25 Oct) shows whether live in-play prices come back the same way.
+
+**A second historical snapshot** (run 40136975819, **10 credits**, 19,114 → 19,104; a
+duplicate probe from the research session, closed PR #101). Premier League, asked for 25 May
+2025 15:55 UTC and served at 15:50:37, about 50 minutes after all ten final-day 15:00 kickoffs:
+- All ten started matches had in-play h2h prices, from Betfair's exchange, BetMGM, Bovada,
+  DraftKings, FanDuel, Pinnacle, 888sport and Unibet. Most were 4.6 minutes old, FanDuel's 8.7
+  (FanDuel quoted in play then, unlike on 10 Oct 2026). William Hill and Marathonbet quoted none.
+- **Pinnacle's quote was inconsistent with the score in some matches.** Southampton 0-1 Arsenal
+  had Arsenal at 1.34 at Pinnacle (1.25 before kickoff) against 1.09–1.15 at the other books.
+  Ipswich 0-1 West Ham had West Ham at 2.47 against 1.36–1.47. In the other matches Pinnacle
+  was in line, as on 10 Oct 2026. So Pinnacle's archived in-play quote is sometimes stale, not
+  always wrong: a test checks each one against the other books.
+- Two favourites trailed at half-time (anecdotes, not a test). Liverpool, 72% before kickoff,
+  were 0-1 down to Crystal Palace, with Betfair at 2.64 (38% to win). Brighton, about 50%,
+  were 0-1 down at Tottenham, with Betfair at 4.4 (23%). Phase 1's base rates for a favourite
+  one goal down at half-time are 30.5% (65–75% band) and 18.2% (45–55%), so the market was
+  more generous than history in both.
+
+The two probes spent **20 credits** together.
+
+### Phase 2 costing (lead brief, 24 Oct; a costed proposal, nothing pre-registered or spent)
+
+**Prices to use.** Both probes (above) found in-play prices at Betfair's exchange, the US books
+and Pinnacle, but Pinnacle's archived quote was sometimes stale (May 2025). The test therefore
+checks every Pinnacle quote against the median of the other books and falls back to Betfair's
+exchange when it disagrees (the quote check below).
+
+**Planner** (`lab/comeback_plan.py`, `odds-check.yml` `task=comeback-plan`; football-data
+only, no key). A kickoff slot is one league's matches that kicked off together. One historical
+snapshot of that league (h2h, ten books = one region, 10 credits) catches every match in the
+slot at half-time. The planner:
+- uses football-data's `Time` (UK local) for kickoffs and requests kickoff + 55 min. The archive
+  returns the latest 5-minute snapshot at or before that, so +50 to +55, inside the half-time
+  break;
+- finds the favourites the same way as phase 1 (Pinnacle's close, ≥ 45%);
+- reads only which favourites trailed at half-time, never the final score.
+
+| League | 2022/23 | 2023/24 | 2024/25 | 2025/26* |
+| --- | --- | --- | --- | --- |
+| E0 | 51 matches, 46 slots | 44, 37 | 50, 41 | 26, 22 |
+| SP1 | 35, 34 | 44, 44 | 36, 36 | 16, 16 |
+| D1 | 28, 23 | 33, 29 | 41, 35 | 10, 9 |
+| I1 | 36, 35 | 34, 34 | 42, 41 | 18, 18 |
+| F1 | 45, 42 | 32, 31 | 41, 39 | 21, 21 |
+| E1 | 46, 37 | 57, 37 | 57, 43 | 31, 26 |
+| E2 | 50, 36 | 59, 40 | 69, 41 | 19, 13 |
+| E3 | 52, 36 | 70, 42 | 60, 42 | 20, 12 |
+
+Each cell is the number of trailing favourites and the snapshots that cover them; credits = 10 ×
+slots. \* football-data's 2025/26 files have Pinnacle's close for only 30–55% of matches, so the
+favourites there are undercounted.
+
+**Designs.** Each "detects" figure is the gap between the realized win rate and the market's
+implied chance that a two-sided 5% test finds with 80% power, at a win rate near 20%.
+
+| Design | Snapshots | Credits | Trailing favourites | Detects a gap of |
+| --- | --- | --- | --- | --- |
+| A: Premier League, 2022/23–2025/26 | 146 | 1,460 | 171 | 8.6 points |
+| B: top five leagues, 2024/25 | 192 | 1,920 | 210 | 7.7 points |
+| Top five leagues, 2022/23–2024/25 | 547 | 5,470 | 592 | 4.6 points |
+| C: all eight leagues, 2022/23–2024/25 | 901 | 9,010 | 1,112 | 3.4 points |
+| D: all eight leagues, four seasons | 1,038 | 10,380 | 1,273 | 3.1 points |
+
+Phase 1's half-time gap after the second-half correction is +3.8 points (against a simple model,
+not the market). Only C or D could detect a market gap that size, which needs about 870
+matches. The key had about 19,100 credits on 24 Oct, is shared with baseball, and live spend is
+about 3,600 a month, so C would take roughly half the balance. A and B can only find a large
+mispricing (8 points or more). They are pilots, useful mainly to see whether the in-play market
+already prices the comeback. Whether the archive has in-play prices for the Championship,
+League One and League Two is unchecked; one 10-credit snapshot per league would settle it
+before C or D.
+
+**"Conceded first" (event A)** can't share snapshots: each match needs its own, a few minutes
+after its goal. Phase 1 had about 360 such matches a season in the top five, so roughly 3,600
+credits a season. Not proposed.
+
+**What the pre-registered test would be** (to be written and committed before any purchase):
+- *Quote check:* a book's quote counts only if it was updated after kickoff and at most 5
+  minutes before the snapshot, and its implied chance for the trailing favourite is below the
+  same book's pre-match price. A Pinnacle quote also has to sit within a set tolerance of the
+  other passing books' median implied chance (the tolerance is fixed at pre-registration),
+  else Betfair's exchange is the fair price for that match. Matches with no passing quote are
+  counted and dropped.
+- *Primary: bet the trailing favourite at the in-play price.* $1 flat per match at DraftKings'
+  passing in-play price (the owner's book), with Betfair's exchange back price (less 2%
+  commission on wins) as a second line. ROI with a match-resampled 95% range, overall and by
+  phase 1's bands. CLV doesn't exist in play, so ROI is the measure. A pass needs the range
+  entirely above 0.
+- *Secondary: model against the in-play market.* The fair price is the exchange's prices
+  normalised, or Pinnacle's Shin-fair price where it passes the quote check. Report realized
+  minus market-implied win rate by band, and the phase-1 model (with the 55.5% second-half
+  share) against the same market. Does it add anything beyond the price? Use a logistic blend
+  weight on the model with a match-resampled range, as in the lab's other tests.
+- Development and judging sets fixed in advance (for example, a pilot on B, with C minus B as
+  the confirmatory set), with the confirmatory set opened once.
+
+**Recommendation.** If the owner wants to go on: B as a pilot (1,920 credits), plus 30 credits
+to check the lower leagues. Expand to C only if B's point estimate is positive and the owner
+accepts the spend. Nothing is bought until the test is pre-registered and the owner approves the
+cap.
