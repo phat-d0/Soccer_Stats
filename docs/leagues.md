@@ -300,6 +300,25 @@ it), on the summaries' won/lost trades, ranges resampling matches. Above 0 means
 helps. This lets us see whether the cut helps instead of guessing; nothing changes again
 unless the owner decides.
 
+**Backcast (owner, 24 Oct).** The new rule's line, "Blend Lean (new rule)", runs from Lean's
+first trade: before `LEAN_RANGE_FROM` it is the Lean trades already inside the range (the
+section's `backcast`: count, settled, first and last opened, `lean_started`), after it the
+trades the rule opens. The filter only removes trades, so nothing new is opened and the
+ledger keeps every trade: the out-of-range ones stay in the old rule's line and in
+Moneyline's combined record. The old rule's line is every real Lean trade plus the shadows.
+`since_defined` stays the judged part; `before_defined` on the old-rule section gives the
+pre-rule period for both lines, descriptive only, since the cut was chosen after seeing it.
+At the decision (data-log, 24 Oct):
+
+| Lean trades before the rule | Trades | Settled | Won–lost | Profit | ROI | CLV (DraftKings) |
+| --- | --- | --- | --- | --- | --- | --- |
+| All odds (old rule) | 22 | 15 | 5–10 | −$46.90 | −31% | −3.3% |
+| 1.50–3.00 (new rule, backcast) | 7 | 4 | 2–2 | −$7.50 | −19% | −1.0% |
+| Cut (outside the range) | 15 | 11 | 3–8 | −$39.40 | −36% | −4.2% |
+
+The backcast CLV difference, in range minus all, is +2.4% (95% range −1.2% to +7.5%):
+descriptive, on the trades the cut was picked from.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

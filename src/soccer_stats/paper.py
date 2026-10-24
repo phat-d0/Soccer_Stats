@@ -1290,7 +1290,7 @@ def match_strategies(leans: dict[str, dict], rule: dict) -> list[dict]:
         else "Learned minimum edge (blend)"
     )
     rules = {"lean": lean_overview(leans), "edge12": rule}
-    labels = {**tr.STRATEGY_LABELS, "edge12": edge_label}
+    labels = {**tr.STRATEGY_LABELS, "lean": LEAN_NEW_LABEL, "edge12": edge_label}
     return [{"key": k, "label": labels[k], "rule": rules[k]} for k in tr.STRATEGY_ORDER]
 
 
@@ -1462,6 +1462,13 @@ def clv_difference(
     return out
 
 
+LEAN_NEW_LABEL = "Blend Lean (new rule)"
+LEAN_BACKCAST_NOTE = (
+    "The odds range (decimal 1.50 to 3.00) is applied back to Lean's first trade: before "
+    "24 Oct this line is the Lean trades that were inside the range (backcast), from then "
+    "the trades the rule opened. The cut was chosen after seeing the earlier trades, so the "
+    "backcast part is descriptive only."
+)
 LEAN_SHADOW_KEY = "lean_all_odds"
 LEAN_SHADOW_LABEL = "Blend Lean, all odds (old rule)"
 LEAN_SHADOW_NOTE = (
@@ -1481,6 +1488,39 @@ def old_rule_trades(real: list[dict], shadow: list[dict]) -> list[dict]:
     shadowed = {_match_key(t) for t in shadow}
     lean = [t for t in real if tr.strategy_of(t) == "lean" and not t.get("shadow")]
     return list(shadow) + [t for t in lean if _match_key(t) not in shadowed]
+
+
+def new_rule_trades(real: list[dict]) -> list[dict]:
+    """The new rule's Lean line, backcast from Lean's start: every real Lean trade inside
+    the odds range (tr.in_lean_range on the odds it took). Trades opened before
+    tr.LEAN_RANGE_FROM are the backcast; after it every new-rule trade is in range, and an
+    out-of-range trade the old code opened before the merge reached the build is left out.
+    The ledger keeps every trade: out-of-range ones stay in the old rule's line and in
+    Moneyline's combined record."""
+    return [
+        t
+        for t in real
+        if tr.strategy_of(t) == "lean" and not t.get("shadow") and tr.in_lean_range(t.get("odds"))
+    ]
+
+
+def lean_backcast(trades: list[dict], started: str | None = None) -> dict:
+    """The new-rule line's backcast part: `applied`, the trades opened before
+    tr.LEAN_RANGE_FROM (count, settled, first and last opened), `lean_started` (Lean's
+    first trade, in or out of the range: both lines start there) and the note."""
+    since = _utc(tr.LEAN_RANGE_FROM)
+    before = [t for t in trades if not _opened_since(t, since)]
+    opened = sorted(str(t.get("opened_at")) for t in before if t.get("opened_at"))
+    return {
+        "applied": True,
+        "until": tr.LEAN_RANGE_FROM,
+        "trades": len(before),
+        "settled": sum(1 for t in before if t.get("status") in ("won", "lost")),
+        "from": opened[0] if opened else None,
+        "to": opened[-1] if opened else None,
+        "lean_started": started,
+        "note": LEAN_BACKCAST_NOTE,
+    }
 
 
 def lean_shadow_section(
@@ -1515,6 +1555,11 @@ def lean_shadow_section(
         and (t.get("shadow") or t.get("rule_version") == tr.LEAN_RULE_VERSION)
     ]
     kept = {t["id"] for t in judged if not t.get("shadow")}
+    # Before the rule (descriptive): the old rule's trades then, and the in-range ones the
+    # backcast new-rule line keeps.
+    pre_old = [t for t in old if not _opened_since(t, since)]
+    pre_new = {t["id"] for t in new_rule_trades(pre_old)}
+    pre_kept = [t for t in pre_old if t["id"] in pre_new]
     sec.update(
         variant_of="lean",
         adds="shadow",
@@ -1531,6 +1576,18 @@ def lean_shadow_section(
                 f: {**clv_difference(judged, kept, f), "kept_is": "in range (the live rule)"}
                 for f in ("clv_dk", "clv_pinnacle")
             },
+        },
+        before_defined={
+            "until": defined_at,
+            "descriptive": True,
+            "parent": {"trades": len(pre_kept), "summary": portfolio_section(pre_kept)["summary"]},
+            "variant": {"trades": len(pre_old), "summary": portfolio_section(pre_old)["summary"]},
+            "clv_diff": {
+                f: {**clv_difference(pre_old, pre_new, f), "kept_is": "in range (backcast)"}
+                for f in ("clv_dk", "clv_pinnacle")
+            },
+            "note": "Before the rule, descriptive only: the cut was chosen after seeing these "
+            "trades, so they can't show that it helps.",
         },
     )
     return sec
@@ -1573,7 +1630,9 @@ def portfolios_section(
     its own ledger and rule). A backtest of `kind` "research" (corners: the research
     record, no prices) passes through unchanged. `strategies` (match_strategies) gives
     Moneyline's live section `strategies`: one strategy_section each, in that order; its
-    combined trades and summary stay for older app code. `shadow_trades` (Blend Lean's
+    combined trades and summary stay for older app code. Lean's section is the new rule
+    backcast from its start (new_rule_trades, `backcast`: lean_backcast); the combined
+    trades keep every Lean trade. `shadow_trades` (Blend Lean's
     shadow entries) go on Moneyline's live section as `shadow_trades`, never in its
     `trades` or summary, and add the "all odds (old rule)" variant right after Lean
     (lean_shadow_section).
@@ -1604,9 +1663,20 @@ def portfolios_section(
         if p["id"] == "moneyline" and strategies:
             section["strategies"] = []
             for st in strategies:
-                section["strategies"].append(
-                    strategy_section(mine, st["key"], st["label"], st["rule"], now=now)
-                )
+                if st["key"] == "lean":  # the new rule, backcast from Lean's start
+                    lean_line = new_rule_trades(mine)
+                    sec = strategy_section(lean_line, "lean", st["label"], st["rule"], now=now)
+                    first = sorted(
+                        str(t["opened_at"])
+                        for t in mine
+                        if tr.strategy_of(t) == "lean" and t.get("opened_at")
+                    )
+                    sec["backcast"] = lean_backcast(lean_line, first[0] if first else None)
+                    section["strategies"].append(sec)
+                else:
+                    section["strategies"].append(
+                        strategy_section(mine, st["key"], st["label"], st["rule"], now=now)
+                    )
                 if st["key"] == "lean":
                     section["strategies"].append(
                         _safe_shadow_section(mine, shadow_trades or [], st["rule"], now)
