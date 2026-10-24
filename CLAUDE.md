@@ -616,7 +616,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v56) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v57) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -649,7 +649,7 @@ the owner's baseball app, so the balance can drop without any run here.
   team's goals and FanDuel's margin-free over); Corners (`cornersSection`: per team expected
   corners, one row per line and book with Model, Fair, Over, Under, Edge; "Live-test pick" and
   "Paper trade open" marks matched by match, team side, line and book via `cornerTrade`;
-  `WEAK_CORNER_FIT` note for SP1, D1, E1); Player shots (Premier League; player trades are off).
+  `WEAK_CORNER_FIT` note for SP1, D1, E1; `UNTESTED_CORNER_FIT` note for E2, E3, where model (f) was never tested; `NO_DK_CORNERS` E1, E2, E3 get "DraftKings lists no team corners in …"); Player shots (Premier League; player trades are off).
   Cards with `no_model` (UCL clubs no league covers) show "No model chance: odds only"
   (`noModelHtml`).
 - **Portfolio**: switcher (localStorage `pfId`; retired Player shots behind a link), status and

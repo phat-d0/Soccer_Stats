@@ -413,7 +413,8 @@ PORTFOLIOS = [
         "name": "Team corners",
         "status": "testing",
         "note": "Owner's live test (10 Oct): each team's corners, model (f) at a 12% edge "
-        "against Pinnacle's team-corner prices in six leagues, $10 a trade; since 20 Oct the "
+        "against Pinnacle's team-corner prices in six leagues (League One and League Two "
+        "added on 24 Oct, where the model is untested), $10 a trade; since 20 Oct the "
         "same rule also runs against DraftKings' prices as a second track. In development the "
         "model beat the league average in all six leagues, but its chances were well "
         "calibrated only in the Premier League, Serie A and Ligue 1; the locked February test "
