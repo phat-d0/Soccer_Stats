@@ -144,10 +144,13 @@ jobs:
           key: understat-${{ inputs.league }}-none
           restore-keys: understat-${{ inputs.league }}-
       # Favourite comebacks: each league's Understat goal files have their own prefix too.
+      # The paths must match the save step exactly, or the cache version differs and misses.
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks-fetch' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-${{ inputs.league }}-none
           restore-keys: comebacks-${{ inputs.league }}-
       - uses: actions/cache/restore@v4
@@ -177,31 +180,41 @@ jobs:
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-E0-none
           restore-keys: comebacks-E0-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-SP1-none
           restore-keys: comebacks-SP1-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-D1-none
           restore-keys: comebacks-D1-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-I1-none
           restore-keys: comebacks-I1-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comebacks' }}
         with:
-          path: data/raw
+          path: |
+            data/raw/understat_matches
+            data/raw/understat_*.json
           key: comebacks-F1-none
           restore-keys: comebacks-F1-
       # The cup corners model: ESPN's cup scoreboards (warmed by backfill.yml's match_blends
