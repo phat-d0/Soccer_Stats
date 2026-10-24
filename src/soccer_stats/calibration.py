@@ -57,11 +57,12 @@ def bins(
     implied=None,
     edges=EDGES,
     min_n: int = MIN_BIN,
+    few_below: int | None = None,
 ) -> list[dict]:
     """Rows binned on `pred` by `edges` (the last bin includes 1.0). Empty bins are
     dropped; a bin under `min_n` rows joins the next one (the last joins the one before).
     Each bin: lo, hi, n, wins, predicted, implied (when given), realized, realized_lo,
-    realized_hi."""
+    realized_hi, and `few: True` when n < `few_below` (when given)."""
     p = np.asarray(pred, dtype=float)
     y = np.asarray(won, dtype=float)
     imp = None if implied is None else np.asarray(implied, dtype=float)
@@ -92,6 +93,8 @@ def bins(
         if imp is not None:
             row["implied"] = _r(np.nanmean(imp[m])) if np.isfinite(imp[m]).any() else None
         row.update(realized=_r(k / n), realized_lo=_r(lo), realized_hi=_r(hi))
+        if few_below is not None and n < few_below:
+            row["few"] = True
         out.append(row)
     return out
 
@@ -152,6 +155,7 @@ def reliability(
     edges=EDGES,
     min_n: int = MIN_BIN,
     groups=None,
+    few_below: int | None = None,
 ) -> dict:
     """The calibration of one series: n, wins, predicted (mean), implied (mean, when
     given), realized, brier, log_loss, the recalibration fit (intercept, slope and their
@@ -184,7 +188,7 @@ def reliability(
         brier=_r(np.mean((p - y) ** 2), 5),
         log_loss=_r(-np.mean(y * np.log(pc) + (1 - y) * np.log(1 - pc)), 5),
         **recal,
-        bins=bins(p, y, imp, edges, min_n),
+        bins=bins(p, y, imp, edges, min_n, few_below),
     )
     return out
 

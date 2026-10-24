@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from soccer_stats import bands as bd
 from soccer_stats import calibration as cal
 from soccer_stats import edge12_backtest as e12b
 from soccer_stats import equations as eq
@@ -1032,7 +1033,14 @@ def by_league(trades: list[dict]) -> dict | None:
     return out
 
 
-def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None, of=None) -> dict:
+def strategy_section(
+    trades: list[dict],
+    key: str,
+    label: str,
+    rule: dict | None,
+    of=None,
+    now: pd.Timestamp | None = None,
+) -> dict:
     """One strategy's live record (Moneyline -> live -> strategies, and Team corners ->
     live -> strategies with `of` = tr.corner_strategy_of): its rule, summary, breakdowns,
     per-league view and its trades' ids, newest first (the trades themselves are in the
@@ -1040,14 +1048,22 @@ def strategy_section(trades: list[dict], key: str, label: str, rule: dict | None
     of = of or tr.strategy_of
     mine = [t for t in trades if of(t) == key]
     sec = portfolio_section(mine)
+    clv_field = live_clv_field(rule)
+    leagues = by_league(mine)
+    for lg, entry in (leagues or {}).items():
+        entry["by_odds_band"] = _safe_odds_bands(
+            [t for t in mine if (t.get("league") or "E0") == lg], clv_field, now
+        )
     out = {
         "key": key,
         "label": label,
         "rule": rule,
         "summary": sec["summary"],
         "breakdowns": sec["breakdowns"],
-        "by_league": by_league(mine),
+        "by_league": leagues,
         "calibration": _safe_calibration(mine),
+        "by_odds_band": _safe_odds_bands(mine, clv_field, now),
+        "odds_bands": {"clv_field": clv_field, "note": LIVE_BAND_NOTE},
         "trade_ids": [t["id"] for t in sec["trades"]],
     }
     if key == "lean":
@@ -1060,8 +1076,100 @@ LIVE_CAL_NOTE = (
     "Settled paper trades only: the chance each trade was opened on (model_p: the raw "
     "model for Model 12%, the blend for Blend Lean, model (f) for corners) against the "
     "price's 1/odds and how often they won. Corner pushes are left out and counted; a "
-    "corner chance is taken given no push. Small samples: read the ranges. " + cal.NOTE
+    "corner chance is taken given no push. Bins are the backtests' (0-10% ... 60-70%, "
+    "70-100%) but merge only under 3 trades; a bin under 10 trades is marked few. Small "
+    "samples: read the ranges. " + cal.NOTE
 )
+
+
+LIVE_MIN_BIN = 3  # live bins merge only below this many trades (backtests: cal.MIN_BIN)
+LIVE_FEW = 10  # live bins under this many trades carry `few: True` (the app greys them)
+LIVE_BAND_NOTE = (
+    "Every paper trade, split by its decimal odds (lo < odds <= hi), the same bands as the "
+    "backtests. Win rate, break-even and ROI (per $1) use the settled won/lost trades; CLV "
+    "uses every trade whose close is final (settled, or open with its match started; "
+    "voids left out), vs DraftKings' close for Moneyline and Pinnacle's close for both corner "
+    "tracks. 95% ranges resample matches. Small samples: read the ranges."
+)
+
+
+def live_clv_field(rule: dict | None) -> str:
+    """The CLV a live section is banded on: Pinnacle's close for the corner tracks and
+    their variants (rule p_source model_f, the judged measure), DraftKings' otherwise."""
+    return "clv_pinnacle" if (rule or {}).get("p_source") == "model_f" else "clv_dk"
+
+
+def _num(v) -> float:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return float("nan")
+    return x if np.isfinite(x) else float("nan")
+
+
+def _close_final(t: dict, now: pd.Timestamp) -> bool:
+    """A trade's close is final once it is settled won/lost or its match has kicked off
+    (before kickoff the ledger's close is the latest quote so far and still moves)."""
+    if t.get("status") in ("won", "lost"):
+        return True
+    if t.get("status") == "void":
+        return False
+    try:
+        return _utc(t["kickoff"]) <= now
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def live_odds_bands(
+    trades: list[dict], clv_field: str = "clv_dk", now: pd.Timestamp | None = None
+) -> list[dict]:
+    """bands.ODDS_BANDS over live paper trades, every band kept (`bets: 0` when empty):
+    lo, hi, bets (every trade in the band), share, settled (won/lost), wins, win_rate,
+    breakeven and roi (per $1) with roi_ci95 on the settled trades, clv_trades, clv and
+    clv_ci95 on the trades whose close is final (_close_final at `now`) with a value in
+    `clv_field`. Ranges resample matches (bands.boot_mean)."""
+    now = _utc(now) if now is not None else pd.Timestamp.now(tz="UTC")
+    rows = [t for t in trades if t.get("odds")]
+    total = len(rows)
+    odds = np.array([float(t["odds"]) for t in rows])
+    out = []
+    for lo, hi in bd.ODDS_BANDS:
+        mask = bd._in(odds, lo, hi) if total else np.zeros(0, dtype=bool)
+        band = [t for t, m in zip(rows, mask, strict=True) if m]
+        row: dict = {"lo": lo, "hi": hi, "bets": len(band), "share": 0.0}
+        if not band:
+            out.append(row)
+            continue
+        row["share"] = bd._r(len(band) / total)
+        settled = [t for t in band if t.get("status") in ("won", "lost")]
+        won = np.array([t["status"] == "won" for t in settled], dtype=bool)
+        ret = np.array(
+            [_num(t.get("profit")) / (_num(t.get("stake")) or float("nan")) for t in settled]
+        )
+        withclv = [t for t in band if _close_final(t, now)]
+        clv = np.array([_num(t.get(clv_field)) for t in withclv])
+        has = np.isfinite(clv)
+        row.update(
+            settled=len(settled),
+            wins=int(won.sum()),
+            win_rate=bd._r(won.mean()) if len(settled) else None,
+            breakeven=bd._r(np.mean([1 / float(t["odds"]) for t in settled])) if settled else None,
+            roi=bd._r(np.nanmean(ret)) if np.isfinite(ret).any() else None,
+            roi_ci95=bd.boot_mean(ret, [_match_key(t) for t in settled]),
+            clv_trades=int(has.sum()),
+            clv=bd._r(clv[has].mean()) if has.any() else None,
+            clv_ci95=bd.boot_mean(clv, [_match_key(t) for t in withclv], seed=1),
+        )
+        out.append(row)
+    return out
+
+
+def _safe_odds_bands(trades: list[dict], clv_field: str, now=None) -> list[dict] | dict:
+    """live_odds_bands for display only: a failure costs this block, never the section."""
+    try:
+        return live_odds_bands(trades, clv_field, now)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__}
 
 
 def _trade_chance(t: dict) -> float | None:
@@ -1080,7 +1188,8 @@ def _safe_calibration(trades: list[dict]) -> dict:
 def trade_calibration(trades: list[dict]) -> dict:
     """The live trades' calibration: settled won/lost trades (calibration.reliability of
     model_p against 1/odds vs won), pushes and voids counted apart, plus by_league (each
-    league's own reliability, however small)."""
+    league's own reliability, however small). The fixed bins merge only below
+    LIVE_MIN_BIN trades, and a bin under LIVE_FEW carries `few: True`."""
     settled = [t for t in trades if t.get("status") in ("won", "lost")]
     pushes = sum(1 for t in trades if t.get("status") == "void" and t.get("push"))
     voids = sum(1 for t in trades if t.get("status") == "void") - pushes
@@ -1092,6 +1201,8 @@ def trade_calibration(trades: list[dict]) -> dict:
             [p for _, p in rows],
             [1.0 if t["status"] == "won" else 0.0 for t, _ in rows],
             [1 / float(t["odds"]) for t, _ in rows],
+            min_n=LIVE_MIN_BIN,
+            few_below=LIVE_FEW,
         )
 
     leagues: dict[str, list[dict]] = {}
@@ -1145,7 +1256,7 @@ def match_strategies(leans: dict[str, dict], rule: dict) -> list[dict]:
     return [{"key": k, "label": labels[k], "rule": rules[k]} for k in tr.STRATEGY_ORDER]
 
 
-def corner_strategies(trades: list[dict]) -> list[dict]:
+def corner_strategies(trades: list[dict], now: pd.Timestamp | None = None) -> list[dict]:
     """Team corners -> live -> strategies: one strategy_section per book in
     tr.CORNER_STRATEGY_ORDER (Pinnacle first), each with its own rule
     (tr.corners_rule(book)) and followed by its shadow variants (tr.CORNER_VARIANTS). A
@@ -1157,10 +1268,11 @@ def corner_strategies(trades: list[dict]) -> list[dict]:
             tr.CORNER_STRATEGY_LABELS[k],
             tr.corners_rule(k),
             of=tr.corner_strategy_of,
+            now=now,
         )
         for k in tr.CORNER_STRATEGY_ORDER
     ]
-    return with_variants(parents, trades, tr.CORNER_VARIANTS, tr.corner_strategy_of)
+    return with_variants(parents, trades, tr.CORNER_VARIANTS, tr.corner_strategy_of, now)
 
 
 # ---------- shadow variants (owner, 23 Oct; docs/totals.md "Shadow filter: below 60%") ----------
@@ -1170,7 +1282,11 @@ VARIANT_CLV = ("clv_pinnacle", "clv_dk")  # the first is the pre-registered prim
 
 
 def with_variants(
-    sections: list[dict], trades: list[dict], variants: dict[str, list[dict]], of
+    sections: list[dict],
+    trades: list[dict],
+    variants: dict[str, list[dict]],
+    of,
+    now: pd.Timestamp | None = None,
 ) -> list[dict]:
     """`sections` (strategy_section dicts) with each one's variants right after it. A
     variant is computed from its parent's trades only (no ledger rows of its own); a
@@ -1180,7 +1296,7 @@ def with_variants(
         out.append(sec)
         for spec in variants.get(sec["key"]) or []:
             try:
-                out.append(variant_section(trades, sec["key"], spec, sec.get("rule"), of))
+                out.append(variant_section(trades, sec["key"], spec, sec.get("rule"), of, now))
             except Exception as exc:  # noqa: BLE001  display only
                 out.append(
                     {
@@ -1196,7 +1312,12 @@ def with_variants(
 
 
 def variant_section(
-    trades: list[dict], parent: str, spec: dict, parent_rule: dict | None, of
+    trades: list[dict],
+    parent: str,
+    spec: dict,
+    parent_rule: dict | None,
+    of,
+    now: pd.Timestamp | None = None,
 ) -> dict:
     """One shadow variant: strategy_section over the parent's trades that pass
     spec["filter"] (tr.passes_filter), plus `variant_of`, `filter`, `defined_at` and
@@ -1209,6 +1330,7 @@ def variant_section(
         spec["label"],
         tr.variant_rule(parent_rule, spec, parent),
         of=lambda _t: spec["key"],
+        now=now,
     )
     sec.update(
         variant_of=parent,
@@ -1309,6 +1431,7 @@ def portfolios_section(
     match_rule: dict | None = None,
     sections: dict[str, dict] | None = None,
     strategies: list[dict] | None = None,
+    now: pd.Timestamp | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1348,7 +1471,8 @@ def portfolios_section(
             section["note"] = live.get("note") or match_rule.get("note")
         if p["id"] == "moneyline" and strategies:
             section["strategies"] = [
-                strategy_section(mine, st["key"], st["label"], st["rule"]) for st in strategies
+                strategy_section(mine, st["key"], st["label"], st["rule"], now=now)
+                for st in strategies
             ]
         out.append(
             {
@@ -1590,7 +1714,7 @@ def run(
     # above stay for one release.
     if live.get("error") and not corner_section["error"]:
         corner_section["error"] = live["error"]
-    corner_section["strategies"] = corner_strategies(corner_trades)
+    corner_section["strategies"] = corner_strategies(corner_trades, now)
     portfolio["portfolios"] = portfolios_section(
         live,
         live_trades + corner_trades,
@@ -1598,6 +1722,7 @@ def run(
         rule,
         {"corners": corner_section},
         match_strategies(leans, rule),
+        now=now,
     )
     return written
 
