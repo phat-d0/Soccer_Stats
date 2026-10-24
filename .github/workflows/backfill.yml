@@ -19,6 +19,9 @@
 # 3.00 or shorter) on Pinnacle's early prices, plus a descriptive E0 DraftKings check
 # (pre-registered in docs/lab.md, owner 19 Oct). No key, no credits, never pushes;
 # log + 7-day artifact.
+# dnb_backtest: draw no bet beside the 1X2 rules on Pinnacle's early prices (owner, 24 Oct;
+# pre-registered in docs/lab.md "Draw no bet"). No key, no credits; pushes
+# backtest/dnb_backtest.json to data-log only from the default branch.
 # cup_odds: the Champions League's historical closes (owner decision, 13 Oct; lead cap
 # 1,200 credits): Pinnacle and DraftKings h2h, one bulk snapshot per kickoff slot of
 # ESPN's 2024/25-2025/26 calendar (`soccer-stats backfill-cup-odds`). The cap is
@@ -71,6 +74,10 @@ on:
         description: "Research: the live 12% rule with two filters on Pinnacle's early prices + E0 DraftKings check (no key, no push)"
         type: boolean
         default: false
+      dnb_backtest:
+        description: "Research: draw no bet beside the 1X2 rules on Pinnacle's early prices (no key; saved to data-log from the default branch only)"
+        type: boolean
+        default: false
       estimate_month:
         description: "Only estimate Odds API credits per league and month (YYYY-MM or YYYY-MM,YYYY-MM,...; plus team-total and team-corner snapshots, League One/Two's corners included; no key, no push)"
         default: ""
@@ -104,7 +111,7 @@ jobs:
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
       - uses: actions/cache@v4
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -113,14 +120,14 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.estimate_month != '' }}
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.dnb_backtest || inputs.estimate_month != '' }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -443,14 +450,52 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # Draw no bet (owner, 24 Oct; docs/lab.md "Draw no bet"): both match rules as DNB
+      # beside their 1X2 versions on Pinnacle's early prices. Football-data and Understat
+      # only: no key, no credits. Saved to data-log (backtest/dnb_backtest.json) only from
+      # the default branch; elsewhere it prints and uploads a 7-day artifact.
+      - name: Draw no bet backtest on Pinnacle's early prices
+        if: ${{ inputs.dnb_backtest && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && inputs.estimate_month == '' }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          uv run soccer-stats backtest-dnb --json out/dnb_backtest.json
+          if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Not the default branch: printed only, nothing pushed to data-log."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/backtest
+            cp out/dnb_backtest.json ../log/backtest/dnb_backtest.json
+            git -C ../log add backtest/dnb_backtest.json
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Draw no bet backtest on Pinnacle early prices"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.dnb_backtest && always() }}
+        with:
+          name: dnb-backtest
+          path: out/dnb_backtest.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Backtest from cached odds (print only)
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -460,7 +505,7 @@ jobs:
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
