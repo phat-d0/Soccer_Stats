@@ -300,6 +300,76 @@ it), on the summaries' won/lost trades, ranges resampling matches. Above 0 means
 helps. This lets us see whether the cut helps instead of guessing; nothing changes again
 unless the owner decides.
 
+**Backcast (owner, 24 Oct).** The new rule's line, "Blend Lean (new rule)", runs from Lean's
+first trade: before `LEAN_RANGE_FROM` it is the Lean trades already inside the range (the
+section's `backcast`: count, settled, first and last opened, `lean_started`), after it the
+trades the rule opens. The filter only removes trades, so nothing new is opened and the
+ledger keeps every trade: the out-of-range ones stay in the old rule's line and in
+Moneyline's combined record. The old rule's line is every real Lean trade plus the shadows.
+`since_defined` stays the judged part; `before_defined` on the old-rule section gives the
+pre-rule period for both lines, descriptive only, since the cut was chosen after seeing it.
+At the decision (data-log, 24 Oct):
+
+| Lean trades before the rule | Trades | Settled | Won–lost | Profit | ROI | CLV (DraftKings) |
+| --- | --- | --- | --- | --- | --- | --- |
+| All odds (old rule) | 22 | 15 | 5–10 | −$46.90 | −31% | −3.3% |
+| 1.50–3.00 (new rule, backcast) | 7 | 4 | 2–2 | −$7.50 | −19% | −1.0% |
+| Cut (outside the range) | 15 | 11 | 3–8 | −$39.40 | −36% | −4.2% |
+
+The backcast CLV difference, in range minus all, is +2.4% (95% range −1.2% to +7.5%):
+descriptive, on the trades the cut was picked from.
+
+## Kelly sizing tracked beside flat $10 (24 Oct, owner; 0 credits)
+
+**Principle.** Kelly needs a true edge, and every strategy's CLV is below 0, so Kelly on the
+model's own claimed edge would over-bet exactly where the model is most over-confident.
+Kelly is therefore a tracked alternative sizing over the same trades: no new bets, and flat
+$10 stays the record (`sizing.py`).
+
+**Defaults** (stated in every `sizing` block so the owner can change them): a $1,000 paper
+bankroll at each strategy's first trade; quarter Kelly (`KELLY_FRACTION` 0.25) with the stake
+capped at 5% of the bankroll (`KELLY_CAP`), nothing when f* <= 0; f* = (p x d - 1) / (d - 1)
+for the decimal odds d taken and a calibrated chance p:
+- Blend Lean: `p_bet` (the blend).
+- Model 12%: the blend's chance for the trade's side (`p_blend`), recorded at open from 24 Oct;
+  older trades get it once from the logged DraftKings row they opened on (its `p_bet`, else the
+  league's current coefficients on its fair price and model chances: `p_blend_from`
+  "odds_log" / "recomputed"). A second block, "Kelly on the raw model (over-confident)", sizes
+  on the raw `model_p` to show why it isn't used.
+- Corners: model (f)'s chance given no push; model (f) is over-confident (slope about 0.56), so
+  this is illustrative.
+
+**Path.** Sequential: a stake comes from the bankroll at the trade's `opened_at`, which holds
+only trades settled by then; P/L lands at `settled_at`; pushes and voids return the stake.
+Backtest bets are decided 4 days before kickoff and settle that day (the Champions League at
+the close). Each block: bankroll now, profit, ROI on staked, max drawdown ($ and share of the
+peak), growth per bet (log of end over start bankroll per settled bet), bets staked and at
+zero stake, median stake and the curve (at most 200 points).
+
+**Live at the start** (data-log, 24 Oct; $1,000 each):
+
+| Strategy | Trades | Flat $10 | Quarter Kelly | Kelly staked / zero |
+| --- | --- | --- | --- | --- |
+| Blend Lean (new rule) | 7 | -$7.50 | +$1.08 | 7 / 0 |
+| Blend Lean, all odds (old rule) | 22 | -$46.90 | -$21.86 | 22 / 0 |
+| Model 12% (blend chance) | 175 | -$142.30 | -$40.00 | 25 / 150 |
+| Model 12%, Kelly on the raw model | 175 | -$142.30 | -$340.95 | 175 / 0 |
+| Corners vs Pinnacle | 72 | -$6.20 | -$114.66 | 72 / 0 |
+| Corners vs Pinnacle, below 60% | 28 | +$43.20 | +$125.06 | 28 / 0 |
+| Corners vs DraftKings | 9 | -$2.00 | -$12.40 | 9 / 0 |
+
+Model 12%'s blend chance came from the logged row for 138 trades (the fit live when each opened)
+and is missing for 8 (four Premier League trades of 5 Oct, before the odds log, and four
+Champions League ones whose logged row can't give one: stake 0, counted). For 29, opened on
+10 Oct at 09:20, the logged row has no blend chance and the first `match_blends.json` on data-log
+is of 10 Oct 20:08, so no earlier fit exists: their chance comes from the current fit and is
+flagged `p_blend_from: "approx_current_fit"` (a little look-ahead; the coefficients barely
+moved between the three versions of 10 and 13 Oct). On the blend's chance Kelly
+stakes only 25 of the 175 Model 12% trades: on the other 150 the blend sees no edge at all.
+Kelly on the raw model more than doubles the flat loss (max drawdown 36%), the over-betting
+the principle warns about. Corners on model (f) lose more under Kelly than flat for the same
+reason. The backtests' sizing is in both backtest files (`sizing`; branch run below).
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

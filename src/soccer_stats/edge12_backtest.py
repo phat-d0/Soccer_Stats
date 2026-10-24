@@ -24,6 +24,8 @@ import pandas as pd
 from soccer_stats import bands as bd
 from soccer_stats import cup_backtest as cb
 from soccer_stats import lean_backtest as lb
+from soccer_stats import match_calibration as mc
+from soccer_stats import sizing as sz
 from soccer_stats.lab import edge12_filters as ef
 
 KIND = "edge12_backtest"
@@ -98,7 +100,7 @@ def league_report(
     target = lb.target_rows(merged)
     if len(target):
         target = target[target["season"].astype(str).isin(included)]
-    b = ef.bets(target, league, "baseline")
+    b = with_blend(ef.bets(target, league, "baseline"), merged, target)
     calib, long = lb.calibration(target, b, SERIES, "model_p", league)
     return {
         "kind": "early",
@@ -110,6 +112,38 @@ def league_report(
         "calibration": calib,
         lb.OUTCOMES: long,
     }, b
+
+
+def with_blend(b: pd.DataFrame, merged: pd.DataFrame, target: pd.DataFrame) -> pd.DataFrame:
+    """The bets with `p_blend`: the blend's chance for each bet's side (Kelly sizing,
+    24 Oct), from lean_backtest.walk_forward's fits on matches before each block (the
+    Lean backtest's own blend on the early fair price). NaN before a league's first fit."""
+    out = b.copy()
+    out["p_blend"] = np.nan
+    if not len(b) or merged.empty or target.empty:
+        return out
+    train = mc.training_rows(merged, "h2h")
+    scored, _ = lb.walk_forward(train, target)
+    key = ["home", "away"]
+    sc = scored.assign(date=pd.to_datetime(scored["date"]).dt.date.astype(str))
+    sc = sc.drop_duplicates(["date", *key]).set_index(["date", *key])
+    for i, r in out.iterrows():
+        k = (str(r["date"]), r["home"], r["away"])
+        if k in sc.index:
+            v = sc.at[k, f"pb_{r['market']}"]
+            out.at[i, "p_blend"] = float(v) if pd.notna(v) else np.nan
+    return out
+
+
+def sizing(b: pd.DataFrame, rep: dict) -> dict:
+    """Flat $10 vs quarter Kelly on the blend's chance (p_blend), plus quarter Kelly on the
+    raw model_p (over-confident), every bet in time order (sizing.backtest_sizing; decided
+    4 days before kickoff, at the close for the cup); {error} if it fails."""
+    lead = pd.Timedelta(0) if rep.get("kind") == cb.KIND else sz.BACKTEST_LEAD
+    try:
+        return sz.backtest_sizing(b, "p_blend", "blend", raw_col="model_p", lead=lead)
+    except Exception as exc:  # noqa: BLE001  display only
+        return {"error": type(exc).__name__}
 
 
 def cup_report(
@@ -232,12 +266,18 @@ def build(
                         bd.with_claimed(league_bets.get(code, empty_bets()), "model_p"), band_cuts
                     )
                 ),
+                **(
+                    {}
+                    if rep.get("error")
+                    else {"sizing": sizing(league_bets.get(code, empty_bets()), rep)}
+                ),
             }
             for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
             **bd.blocks(bd.with_claimed(pooled, "model_p"), band_cuts),
+            "sizing": sizing(pooled, {}),
             "calibration": calib,
             "leagues": early,
             "by_league": {c: metrics(league_bets[c]) for c in early},
@@ -253,13 +293,15 @@ def build(
 
 def app_section(found: dict | None, max_bets: int = APP_BETS) -> dict:
     """data.json's portfolio.strategy_backtests.edge12: the file with its bets trimmed to
-    the newest `max_bets` (`bets_shown`, `bets_total`), `available` True; without a file,
-    {available: False, note}."""
+    the newest `max_bets` (`bets_shown`, `bets_total`) and each league's sizing curves to
+    sizing.APP_LEAGUE_CURVE points, `available` True; without a file, {available: False,
+    note}."""
     if not isinstance(found, dict) or found.get("kind") != KIND:
         return {"available": False, "note": MISSING_NOTE}
     rows = found.get("bets") or []
     return {
         **{k: v for k, v in found.items() if k != "bets"},
+        "leagues": sz.app_curves(found.get("leagues")),
         "available": True,
         "bets": rows[:max_bets],
         "bets_shown": min(len(rows), max_bets),
