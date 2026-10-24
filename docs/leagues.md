@@ -368,7 +368,44 @@ moved between the three versions of 10 and 13 Oct). On the blend's chance Kelly
 stakes only 25 of the 175 Model 12% trades: on the other 150 the blend sees no edge at all.
 Kelly on the raw model more than doubles the flat loss (max drawdown 36%), the over-betting
 the principle warns about. Corners on model (f) lose more under Kelly than flat for the same
-reason. The backtests' sizing is in both backtest files (`sizing`; branch run below).
+reason. The backtests' sizing is in both backtest files (`sizing`; branch runs below).
+
+**Flat is not held to the bankroll.** The flat line stakes $10 on every bet whatever the
+bankroll, so its profit equals the record's; it can run below $0, and its max drawdown then
+reads over 100% (it would have gone broke). Kelly stakes a share of what is left, so it never
+goes below $0.
+
+**Backtests** (branch runs of `backfill.yml` on 24 Oct, printed only: 40077939042 Lean,
+40077940825 Model 12%; every bet in time order, decided 4 days before kickoff at Pinnacle's
+early price, one $1,000 bankroll for the pooled domestic leagues):
+
+| Pooled, eight domestic leagues | Bets | Flat $10 | Quarter Kelly | Kelly on the raw model |
+| --- | --- | --- | --- | --- |
+| Blend Lean (old rule, all odds) | 2,629 | $420 (-$580; drawdown 74%) | $257 (-$743; drawdown 80%) | - |
+| Model 12% | 8,909 | -$3,995 (-$4,995; broke) | $666 (-$334; drawdown 50%) | $0.07 (broke) |
+
+Growth per bet (log of end over start bankroll): Lean flat -0.0003, Kelly -0.0005; Model 12%
+Kelly -0.00005, Kelly on the raw model -0.0011. Lean's Kelly stakes every bet (median $6);
+Model 12%'s Kelly on the blend's chance stakes 1,840 of the 8,909 (median $2.25): on the rest
+the blend sees no edge.
+
+| League | Lean flat | Lean Kelly | 12% flat | 12% Kelly (staked) | 12% Kelly, raw model |
+| --- | --- | --- | --- | --- | --- |
+| Premier League | -$147 | -$128 | +$467 | -$31 (516) | -$742 |
+| La Liga | -$61 | -$119 | -$532 | -$16 (181) | -$882 |
+| Bundesliga | -$133 | -$187 | +$243 | -$61 (234) | -$126 |
+| Serie A | +$148 | +$164 | -$2,000 (broke) | +$20 (63) | -$988 |
+| Ligue 1 | -$109 | -$186 | -$359 | -$95 (263) | -$832 |
+| Championship | +$56 | -$190 | -$712 | -$176 (571) | -$984 |
+| League One | -$302 | -$468 | -$1,295 (broke) | -$9 (12) | -$987 |
+| League Two | -$33 | -$17 | -$807 | $0 (0) | -$990 |
+| Champions League (close) | 0 bets | 0 bets | -$38 | $0 (0: no blend chance) | -$279 |
+
+What it says: Kelly does not rescue Lean (its edge is not real, so larger stakes on larger
+claimed edges lose more, in five of the eight leagues); for Model 12%, Kelly on the blend is
+mostly "don't bet", which is why it loses far less than flat; Kelly on the raw model loses 74% or
+more of the bankroll in seven of the eight domestic leagues (all but the Bundesliga), the
+over-betting the principle warns about. Flat $10 stays the record.
 
 ## Champions League live (13 Oct, owner)
 
