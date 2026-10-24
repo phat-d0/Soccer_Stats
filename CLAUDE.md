@@ -106,8 +106,8 @@ settlement runs after them.
 **Live paper record** (publish of 20 Oct 08:14 UTC; changes daily, so read the publish log or
 the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
 
-**Credits:** 19,335 left on 24 Oct (after the 4-credit League One/Two corner check, run
-40088231180); about 19,800 on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
+**Credits:** 19,114 left on 24 Oct (after the 10-credit historical in-play probe, run
+40136522857; 19,335 after the 4-credit League One/Two corner check, run 40088231180); about 19,800 on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
 ~2,476 (with League One/Two and UCL ~86), team totals ~682, corners ~471 (up to ~676 with League One/Two). The key is shared with
 the owner's baseball app, so the balance can drop without any run here.
 
@@ -167,7 +167,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`. | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, inplay-probe, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`. | 0 except the capped tasks |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web`: Playwright Chromium (cached) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
@@ -568,6 +568,13 @@ the owner's baseball app, so the balance can drop without any run here.
   dropped first. `odds-check.yml` `task=comebacks-fetch` with `league` (downloads and caches
   `comebacks-<league>-`, counts only) and `task=comebacks` (the analysis; its restore paths
   must match the fetch's save paths).
+- `lab/inplay_probe.py` (comebacks phase 2, step 1; owner-approved): `odds-check.yml`
+  `task=inplay-probe` with `league` and `cap`. `hist_dates` set to one ISO time buys one
+  historical h2h snapshot (10 credits); otherwise one live `/odds` call (1 credit), only if a
+  match is in play (a free events list checks first). Prints each started match's prices per
+  book, their age and ESPN's score then. First run (24 Oct, run 40136522857, 10 credits): the
+  archive keeps in-play prices (four Premier League matches at half-time, Pinnacle,
+  DraftKings and Betfair among the books; `docs/lab.md` "Phase 2, step 1").
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
