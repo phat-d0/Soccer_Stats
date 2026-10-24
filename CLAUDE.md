@@ -880,6 +880,10 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 
 ## Conventions
 
+- Workflows run on `ubuntu-24.04` (pinned 24 Oct: `ubuntu-latest` moved to 26.04 with Python 3.14,
+  where argparse rejects a bare `%` in a help string and Playwright 1.56.1 can't install Chromium;
+  publish failed until the pin). Write `%%` for a percent sign in any argparse `help=`;
+  `tests/test_cli_help.py` expands every help string.
 - Checks before every push: `uv run ruff format src tests && uv run ruff check src tests && uv run
   pytest -q` (CI runs the same; `.venv/bin/pytest` if `uv` isn't on the path). JS: `node --check
   web/app.js`, and after web changes `node tests/web/smoke.mjs` (regenerate the fixture first if
