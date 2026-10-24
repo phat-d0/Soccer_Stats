@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   players:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04 (Python 3.14, no Playwright Chromium)
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

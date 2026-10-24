@@ -95,7 +95,7 @@ concurrency:
 
 jobs:
   backfill:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04 (Python 3.14, no Playwright Chromium)
     steps:
       - uses: actions/checkout@v4
 
