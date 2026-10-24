@@ -358,8 +358,13 @@ zero stake, median stake and the curve (at most 200 points).
 | Corners vs Pinnacle, below 60% | 28 | +$43.20 | +$125.06 | 28 / 0 |
 | Corners vs DraftKings | 9 | -$2.00 | -$12.40 | 9 / 0 |
 
-Model 12%'s blend chance came from the logged row for 138 trades, was recomputed for 29 and is
-missing for 8 (no logged entry quote: those get no Kelly stake). On the blend's chance Kelly
+Model 12%'s blend chance came from the logged row for 138 trades (the fit live when each opened)
+and is missing for 8 (four Premier League trades of 5 Oct, before the odds log, and four
+Champions League ones whose logged row can't give one: stake 0, counted). For 29, opened on
+10 Oct at 09:20, the logged row has no blend chance and the first `match_blends.json` on data-log
+is of 10 Oct 20:08, so no earlier fit exists: their chance comes from the current fit and is
+flagged `p_blend_from: "approx_current_fit"` (a little look-ahead; the coefficients barely
+moved between the three versions of 10 and 13 Oct). On the blend's chance Kelly
 stakes only 25 of the 175 Model 12% trades: on the other 150 the blend sees no edge at all.
 Kelly on the raw model more than doubles the flat loss (max drawdown 36%), the over-betting
 the principle warns about. Corners on model (f) lose more under Kelly than flat for the same

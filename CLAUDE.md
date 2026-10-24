@@ -385,8 +385,8 @@ the owner's baseball app, so the balance can drop without any run here.
     ("strong" at `STRONG_Z` 2), sigma, z_market?, driver?}`; `market_side_z(coef, odds, sigma)`
     (c = 0); `lean_driver` ("market" at z_market ≥ 1, else "model"); `DRIVER_NOTE`;
     `lean_rule(match_blends, league)` = `{key, rule: "lean_1sigma", min_z, strong_z, p_source:
-    "blend", stake, sigma, matches, coef, source, note, odds_range, odds_range_from,
-    odds_range_note, rule_version}` (no fit = σ None, no picks). Odds range (owner, 24 Oct):
+    "blend", stake, sigma, matches, coef, source, note, fit_made_at, odds_range,
+    odds_range_from, odds_range_note, rule_version}` (no fit = σ None, no picks). Odds range (owner, 24 Oct):
     `LEAN_ODDS_RANGE` (1.50, 3.00), `in_lean_range(odds)` (lo < odds ≤ hi), `LEAN_RANGE_FROM`
     (the commit adding it, 2026-10-24T07:32Z), `LEAN_RULE_VERSION` 2, `LEAN_RANGE_NOTE`,
     `SHADOW_SUFFIX` "|shadow". `lean_pick` itself is unchanged (the backtest replays it).
@@ -455,7 +455,8 @@ the owner's baseball app, so the balance can drop without any run here.
     `trades`/`summary`; Lean has `driver_note`. Lean's section is "Blend Lean (new rule)"
     (`LEAN_NEW_LABEL`) over `new_rule_trades` (real Lean trades inside the range: the new rule
     backcast from Lean's start) with `backcast` (`lean_backcast`: `{applied, until, trades,
-    settled, from, to, lean_started, note}`); the combined `trades`/`summary` keep every Lean
+    settled, from, to, lean_started, note, new_rule, old_rule, cut, descriptive}`, the last
+    three pre-rule summaries); the combined `trades`/`summary` keep every Lean
     trade. Right after Lean: `lean_shadow_section` (key
     `lean_all_odds`, "Blend Lean, all odds (old rule)") over `old_rule_trades` (every shadow
     plus every real Lean trade on a match without one), with `variant_of: "lean"`, `adds:
@@ -495,7 +496,9 @@ the owner's baseball app, so the balance can drop without any run here.
     rule; `{error}` on failure). Model 12% trades record `p_blend` (the card's blend `p_bet` for
     their side) and `p_blend_from: "open"` since 24 Oct; older ones get it once as an update
     (`_blend_update`: the logged entry quote's `p_bet` = "odds_log", else the league's current
-    coefficients on its `fair` and `p` = "recomputed", a totals trade "not_h2h"). Corners' live
+    coefficients on its `fair` and `p` = "recomputed" when that fit was made before the trade
+    opened (`lean_rule`'s `fit_made_at`), else "approx_current_fit" (look-ahead, flagged and
+    counted in `sizing.blend_from`); a totals trade "not_h2h"; no quote = no chance, stake 0). Corners' live
     section has `quote_calibration` (`corners_live.quote_calibration`: per book the newest pre-kickoff quote
     of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
     counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,

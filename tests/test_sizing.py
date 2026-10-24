@@ -196,9 +196,13 @@ def old_12(led):
 def test_older_twelve_percent_trades_get_their_blend_chance_once_from_the_odds_log():
     rule = tr.paper_threshold(None, "E0")
     later = NOW + pd.Timedelta(hours=1)
-    for p_bet, want, source in (
-        ({"home": 0.5, "draw": 0.21, "away": 0.29}, 0.21, "odds_log"),
-        (None, None, "recomputed"),
+    opened = pd.Timestamp(NOW)
+    for p_bet, want, source, made in (
+        ({"home": 0.5, "draw": 0.21, "away": 0.29}, 0.21, "odds_log", None),
+        (None, None, "recomputed", (opened - pd.Timedelta(days=1)).isoformat()),
+        # A fit made after the trade opened: look-ahead, so it is flagged.
+        (None, None, "approx_current_fit", (opened + pd.Timedelta(days=1)).isoformat()),
+        (None, None, "approx_current_fit", None),  # unknown fit time: flagged too
     ):
         led = {}
         paper.update_ledger(
@@ -207,9 +211,8 @@ def test_older_twelve_percent_trades_get_their_blend_chance_once_from_the_odds_l
         t = old_12(led)
         log = pd.DataFrame([log_row(t, p_bet)])
         coef = [0.0, 0.0, 0.5, 0.5]
-        ev, _ = paper.update_ledger(
-            led, [], src(later), None, later, odds_log=log, lean={**lean(), "coef": coef}
-        )
+        rule_l = {**lean(), "coef": coef, "fit_made_at": made}
+        ev, _ = paper.update_ledger(led, [], src(later), None, later, odds_log=log, lean=rule_l)
         upd = [e for e in ev if "p_blend" in e]
         assert len(upd) == 1 and upd[0]["p_blend_from"] == source
         if want is None:  # the league's blend on the logged fair price and model chances

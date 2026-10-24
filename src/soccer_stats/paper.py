@@ -403,7 +403,9 @@ def update_ledger(
                 ev = _lean_driver_update(t, odds_log, (lean or {}).get("coef"), now)
                 if ev:
                     events.append(ev)
-                ev = _blend_update(t, odds_log, (lean or {}).get("coef"), now)
+                ev = _blend_update(
+                    t, odds_log, (lean or {}).get("coef"), now, (lean or {}).get("fit_made_at")
+                )
                 if ev:
                     events.append(ev)
 
@@ -572,13 +574,18 @@ def _lean_driver_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> 
     return _update(t, now, z_market=round(zm, 3), driver=tr.lean_driver(zm), driver_from="odds_log")
 
 
-def _blend_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> dict | None:
+def _blend_update(
+    t: dict, log: pd.DataFrame, coef, now: pd.Timestamp, fit_made_at=None
+) -> dict | None:
     """For a Model 12% trade opened before trades recorded `p_blend` (Kelly sizing, 24 Oct):
     an update event with the blend's chance for its side at open time, from the logged
-    DraftKings quote it opened on (_entry_quote): that row's own p_bet ("odds_log") or,
-    when the row has none, the league's current blend coefficients on the row's fair price
-    and model chances ("recomputed", as _lean_driver_update does). A totals trade gets
-    p_blend None ("not_h2h"). None when the quote isn't there yet (it tries again)."""
+    DraftKings quote it opened on (_entry_quote): that row's own p_bet ("odds_log", the
+    fit live then) or, when the row has none, the league's current blend coefficients on
+    the row's fair price and model chances. That is "recomputed" when the fit was made
+    (`fit_made_at`) before the trade opened, else "approx_current_fit": a later fit, so a
+    little look-ahead (no earlier fit is kept live; the first match_blends.json is of 10
+    Oct 20:08). A totals trade gets p_blend None ("not_h2h"). None when the quote isn't
+    there yet (it tries again)."""
     if "p_blend" in t or tr.strategy_of(t) != "edge12" or t.get("bet_type") not in (None, "match"):
         return None
     if t["market"] not in tr.LEAN_MARKETS:
@@ -601,7 +608,18 @@ def _blend_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> dict |
     v = float(out[tr.LEAN_MARKETS.index(t["market"])])
     if not np.isfinite(v):
         return None
-    return _update(t, now, p_blend=round(v, 4), p_blend_from="recomputed")
+    made = _ts_or_none(fit_made_at)
+    later = made is None or _utc(t["opened_at"]) < made
+    return _update(
+        t, now, p_blend=round(v, 4), p_blend_from="approx_current_fit" if later else "recomputed"
+    )
+
+
+def _ts_or_none(v) -> pd.Timestamp | None:
+    try:
+        return _utc(v) if v else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _fresh(fetched: str | None, now: pd.Timestamp) -> bool:
@@ -1556,13 +1574,31 @@ def new_rule_trades(real: list[dict]) -> list[dict]:
     ]
 
 
-def lean_backcast(trades: list[dict], started: str | None = None) -> dict:
+def lean_backcast(
+    trades: list[dict], started: str | None = None, real: list[dict] | None = None
+) -> dict:
     """The new-rule line's backcast part: `applied`, the trades opened before
     tr.LEAN_RANGE_FROM (count, settled, first and last opened), `lean_started` (Lean's
-    first trade, in or out of the range: both lines start there) and the note."""
+    first trade, in or out of the range: both lines start there), the note and, with
+    `real` (every real Lean trade), the pre-rule summaries `new_rule` (in range), `old_rule`
+    (all odds) and `cut` (outside the range), descriptive only."""
     since = _utc(tr.LEAN_RANGE_FROM)
     before = [t for t in trades if not _opened_since(t, since)]
     opened = sorted(str(t.get("opened_at")) for t in before if t.get("opened_at"))
+    extra = {}
+    if real is not None:
+        old = [
+            t
+            for t in real
+            if tr.strategy_of(t) == "lean" and not t.get("shadow") and not _opened_since(t, since)
+        ]
+        kept = {t["id"] for t in before}
+        extra = {
+            "new_rule": portfolio_section(before)["summary"],
+            "old_rule": portfolio_section(old)["summary"],
+            "cut": portfolio_section([t for t in old if t["id"] not in kept])["summary"],
+            "descriptive": True,
+        }
     return {
         "applied": True,
         "until": tr.LEAN_RANGE_FROM,
@@ -1572,6 +1608,7 @@ def lean_backcast(trades: list[dict], started: str | None = None) -> dict:
         "to": opened[-1] if opened else None,
         "lean_started": started,
         "note": LEAN_BACKCAST_NOTE,
+        **extra,
     }
 
 
@@ -1723,7 +1760,7 @@ def portfolios_section(
                         for t in mine
                         if tr.strategy_of(t) == "lean" and t.get("opened_at")
                     )
-                    sec["backcast"] = lean_backcast(lean_line, first[0] if first else None)
+                    sec["backcast"] = lean_backcast(lean_line, first[0] if first else None, mine)
                     section["strategies"].append(sec)
                 else:
                     section["strategies"].append(
