@@ -300,7 +300,7 @@ def lean_pick(
 
 def lean_rule(blends: dict | None, league: str) -> dict:
     """The Lean rule for one league: {key, rule, min_z, strong_z, p_source, stake, sigma,
-    coef, matches, source, note, odds_range, odds_range_from, odds_range_note,
+    coef, matches, source, note, fit_made_at, odds_range, odds_range_from, odds_range_note,
     rule_version}. `blends` is data.json's `match_blends` (publish.add_lean); no
     file or no fit for the league = sigma None, so no Lean picks, and the note says why."""
     entry = ((blends or {}).get("leagues") or {}).get(league) or {}
@@ -327,6 +327,9 @@ def lean_rule(blends: dict | None, league: str) -> dict:
         "matches": entry.get("matches"),
         "source": "match_blends" if ok else "none",
         "note": note,
+        # When the fit was made (match_blends.json's generated_at, else its fit_date): a
+        # chance recomputed from it for a trade opened earlier uses a later fit.
+        "fit_made_at": (blends or {}).get("generated_at") or entry.get("fit_date"),
         "odds_range": list(LEAN_ODDS_RANGE),
         "odds_range_from": LEAN_RANGE_FROM,
         "odds_range_note": LEAN_RANGE_NOTE,

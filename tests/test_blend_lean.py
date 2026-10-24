@@ -246,7 +246,12 @@ def test_edge12_is_unchanged_by_the_lean_strategy():
         lean=lean(),
     )
     edge12 = [e for e in ev_b if not e["id"].endswith("|lean")]
-    assert edge12 == ev_a
+
+    def decision(evs):  # the blend's chance is recorded for Kelly sizing, not traded on
+        return [{k: v for k, v in e.items() if k != "p_blend"} for e in evs]
+
+    assert decision(edge12) == decision(ev_a)
+    assert ev_a[0]["p_blend"] is None and edge12[0]["p_blend"] == P_BET_IN["draw"]
     assert ev_a[0]["strategy"] == "edge12"
     # Trades opened before the strategy field existed read as the 12% test.
     assert tr.strategy_of({"id": "E0|2627|A|B"}) == "edge12"
@@ -354,7 +359,7 @@ def test_strategies_listed_lean_first(tmp_path):
     # The old rule's shadow variant sits right after Lean (owner, 24 Oct).
     assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "edge12"]
     sts = [sts[0], sts[2]]
-    assert sts[0]["label"] == "Blend Lean (1σ+)" and sts[1]["label"].startswith("Model 12%")
+    assert sts[0]["label"] == "Blend Lean (new rule)" and sts[1]["label"].startswith("Model 12%")
     assert sts[0]["trade_ids"] == ["E0|2627|Arsenal|Leeds|lean"]
     assert sts[1]["trade_ids"] == ["E0|2627|Arsenal|Leeds"]
     assert sts[0]["rule"]["sigma"] == {"E0": SIGMA} and sts[1]["rule"]["rule"] == "fixed_raw"

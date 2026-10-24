@@ -1164,6 +1164,8 @@ def cmd_backtest_lean(args: argparse.Namespace) -> None:
     _print_calibration("early-price leagues pooled", out["all"].get("calibration"))
     _print_bands("early-price leagues pooled", out["all"])
     print("LEAN_BANDS_JSON " + json_dumps(_bands_brief(out)))
+    _print_sizing(out)
+    print("LEAN_SIZING_JSON " + json_dumps(_sizing_brief(out)))
     print(
         "LEAN_CALIBRATION_JSON "
         + json_dumps(
@@ -1223,6 +1225,64 @@ def _print_edge12(name: str, rep: dict) -> None:
     _print_edge12_block("Model 12%", rep.get("edge12") or {})
     for s in rep.get("by_season") or []:
         _print_edge12_block(s["label"], s)
+
+
+SIZING_KEYS = (
+    "bankroll_now",
+    "profit",
+    "roi_on_staked",
+    "max_drawdown",
+    "max_drawdown_pct",
+    "growth_per_bet",
+    "bets",
+    "bets_staked",
+    "bets_zero_stake",
+    "median_stake",
+)
+
+
+def _sizing_brief(out: dict) -> dict:
+    """Flat $10 vs quarter Kelly (and Kelly on the raw model, Model 12%) per league and
+    pooled, headline numbers only (no curves), for the SIZING_JSON log line."""
+
+    def brief(sizing):
+        if not isinstance(sizing, dict) or sizing.get("error"):
+            return sizing
+        return {
+            k: {f: v.get(f) for f in SIZING_KEYS} for k, v in sizing.items() if isinstance(v, dict)
+        }
+
+    return {
+        "all": brief(out["all"].get("sizing")),
+        "leagues": {c: brief(r.get("sizing")) for c, r in out["leagues"].items() if "sizing" in r},
+    }
+
+
+def _print_sizing(out: dict) -> None:
+    """One line per sizing block, pooled and per league: bankroll, profit, max drawdown,
+    growth per bet."""
+
+    def line(label, sizing):
+        if not isinstance(sizing, dict) or sizing.get("error"):
+            print(f"    {label}: {sizing.get('error') if isinstance(sizing, dict) else 'none'}")
+            return
+        parts = []
+        for k, v in sizing.items():
+            if not isinstance(v, dict):
+                continue
+            g = v.get("growth_per_bet")
+            parts.append(
+                f"{k} ${v['bankroll_now']:,.0f} (profit {v['profit']:+,.0f}, max drawdown "
+                f"{v['max_drawdown_pct']:.0%}, growth/bet {'n/a' if g is None else f'{g:+.5f}'}, "
+                f"{v['bets_staked']} staked)"
+            )
+        print(f"    {label}: " + "; ".join(parts))
+
+    print("  Sizing ($1,000 start; flat $10 vs quarter Kelly, cap 5%):")
+    line("pooled", out["all"].get("sizing"))
+    for c, r in out["leagues"].items():
+        if "sizing" in r:
+            line(c, r["sizing"])
 
 
 def _print_bands(label: str, block: dict) -> None:
@@ -1366,6 +1426,8 @@ def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     if "by_odds_band" in out["leagues"].get("UCL", {}):
         _print_bands("Champions League at the close", out["leagues"]["UCL"])
     print("EDGE12_BANDS_JSON " + json_dumps(_bands_brief(out)))
+    _print_sizing(out)
+    print("EDGE12_SIZING_JSON " + json_dumps(_sizing_brief(out)))
     dk = out["draftkings_replay"]
     if dk:
         sm = dk["summary"]
