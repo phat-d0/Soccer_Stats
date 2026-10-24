@@ -246,7 +246,7 @@ def _record(path, cost, credits=None, at=DAY_BEFORE, name="corners_calls"):
     (path / f"{name}_{at:%Y-%m}.jsonl").write_text(json.dumps(row) + "\n")
 
 
-@pytest.mark.parametrize("spent, allowed", [(549, True), (550, False)])
+@pytest.mark.parametrize("spent, allowed", [(749, True), (750, False)])
 def test_own_monthly_cap(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -259,7 +259,7 @@ def test_own_monthly_cap(tmp_path, spent, allowed):
     )
     assert (len(calls) == 1) == allowed
     if not allowed:
-        assert s["stop"].startswith("monthly cap: 550 of 550")
+        assert s["stop"].startswith("monthly cap: 750 of 750")
 
 
 def test_team_total_spend_never_counts_toward_the_corner_cap_or_back(tmp_path):
@@ -637,3 +637,75 @@ def test_corner_trades_belong_to_the_corners_portfolio():
     assert pf["status"] == "testing" and "February" in pf["note"]
     rule = tr.corners_rule()
     assert rule["threshold"] == 0.12 and rule["rule"] == "fixed_raw" and rule["book"] == "pinnacle"
+
+
+def test_league_one_and_two_ask_pinnacle_alone_and_the_rest_both_books(tmp_path):
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    dk_cache(raw, "E2", events=(("ev2", "Huddersfield", "Wigan", K),))
+    dk_cache(raw, "E3", events=(("ev3", "Bristol Rvs", "Swindon", K),))
+    calls = []
+    cards = [card(), card("Huddersfield", "Wigan", "E2"), card("Bristol Rvs", "Swindon", "E3")]
+    s = cl.run(cards, out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
+    assert s["calls"] == 3 and s["credits"] == 3
+    books = {url.split("/events/")[1].split("/")[0]: p["bookmakers"] for url, p in calls}
+    assert books == {"ev1": "pinnacle,draftkings", "ev2": "pinnacle", "ev3": "pinnacle"}
+    assert "/soccer_england_league1/events/ev2/odds" in calls[1][0]
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert {c["league"]: c["books"] for c in rec} == {
+        "E0": "pinnacle,draftkings",
+        "E2": "pinnacle",
+        "E3": "pinnacle",
+    }
+    assert cl.CORNERS_MONTHLY_CAP == 750 and cl.PINNACLE_ONLY == ("E2", "E3")
+
+
+def _empty_calls(league, n, last, rows=0, status=200):
+    return [
+        {
+            "league": league,
+            "event_id": f"{league}{i}",
+            "snapshot": "look",
+            "group": "team_corners",
+            "fetched_at": (last - pd.Timedelta(hours=6 * (n - 1 - i))).isoformat(),
+            "status": status,
+            "rows": rows,
+            "cost": 1,
+        }
+        for i in range(n)
+    ]
+
+
+def test_a_league_listed_but_never_priced_pauses_after_six_empty_calls():
+    last = LOOK - pd.Timedelta(days=1)
+    six = _empty_calls("E2", cl.EMPTY_PAUSE, last)
+    assert cl.paused_leagues(six, LOOK) == {
+        "E2": (last + pd.Timedelta(days=7)).isoformat(timespec="minutes")
+    }
+    assert cl.paused_leagues(six[1:], LOOK) == {}  # five empty: still looking
+    priced = six[:-1] + _empty_calls("E2", 1, last, rows=4)
+    assert cl.paused_leagues(priced, LOOK) == {}  # the newest call had prices
+    failed = six[:-1] + _empty_calls("E2", 1, last, status=500)
+    assert cl.paused_leagues(failed, LOOK) == {}  # an error isn't "no prices"
+    assert cl.paused_leagues(six, last + pd.Timedelta(days=7, minutes=1)) == {}  # look again
+
+
+def test_a_paused_league_makes_no_call_and_the_log_line_says_so(tmp_path):
+    raw, state = tmp_path / "raw", tmp_path / "state"
+    raw.mkdir()
+    state.mkdir()
+    dk_cache(raw)
+    dk_cache(raw, "E2", events=(("ev2", "Huddersfield", "Wigan", K),))
+    rows = _empty_calls("E2", cl.EMPTY_PAUSE, LOOK - pd.Timedelta(hours=2))
+    (state / "corners_calls_2026-10.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n"
+    )
+    calls = []
+    cards = [card(), card("Huddersfield", "Wigan", "E2")]
+    s = cl.run(
+        cards, tmp_path / "o", [state], raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls)
+    )
+    assert len(calls) == 1 and "/events/ev1/" in calls[0][0]  # the Premier League only
+    assert set(s["paused"]) == {"E2"}
+    assert "paused (no prices in the last 6 calls): E2 until" in cl.summary_line(s)

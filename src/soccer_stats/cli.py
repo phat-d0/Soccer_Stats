@@ -135,7 +135,8 @@ def cmd_log_corners(args: argparse.Namespace) -> None:
 
 def cmd_estimate_corners(args: argparse.Namespace) -> None:
     """Credits to log Pinnacle's team corners, a look (24 h) and a close per match, one
-    credit a call, in the six leagues of the live corner test (estimate only: no key, no calls)."""
+    credit a call, in the eight leagues of the live corner test (corners_live.LEAGUES;
+    estimate only: no key, no calls). `--extra-leagues` prices leagues outside it apart."""
     from soccer_stats import corners_live
     from soccer_stats.data import season_kickoffs
     from soccer_stats.leagues import LEAGUES

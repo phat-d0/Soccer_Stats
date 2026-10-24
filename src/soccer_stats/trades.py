@@ -650,13 +650,15 @@ CORNERS_EDGE = PAPER_EDGE
 CORNERS_MARKET = "team_corners"
 CORNERS_NOTE = (
     "Owner's live test (10 Oct): corners model (f) at a fixed 12% edge on its own chance "
-    "against Pinnacle's team-corner prices, all six leagues. The February test is unchanged."
+    "against Pinnacle's team-corner prices, in the six leagues and, from 24 Oct, League One "
+    "and League Two (Pinnacle only there). The February test is unchanged."
 )
 
 CORNERS_DK_NOTE = (
     "Owner's second corner track (20 Oct): the same model (f) and fixed 12% edge on its own "
     "chance, against DraftKings' team-corner prices (Premier League, La Liga, Bundesliga, "
-    "Serie A, Ligue 1; DraftKings lists no team corners in the Championship). CLV against "
+    "Serie A, Ligue 1; DraftKings lists no team corners in the Championship, League One or "
+    "League Two). CLV against "
     "DraftKings' own close, and against Pinnacle's close where Pinnacle has the same line."
 )
 

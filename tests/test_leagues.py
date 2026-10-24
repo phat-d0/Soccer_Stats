@@ -162,12 +162,12 @@ def test_league_one_and_two_log_odds_to_their_own_files(tmp_path):
     assert set(ol.load(tmp_path, "E2")["home"]) == {"Peterboro"}
 
 
-def test_league_one_and_two_make_no_corner_or_team_total_calls(tmp_path):
+def test_league_one_and_two_make_no_team_total_calls_and_corners_ask_pinnacle_only(tmp_path):
     from soccer_stats import corners_live, team_totals
 
-    for code in L12:  # Pinnacle quotes no team corners there; FanDuel isn't listed
-        assert code not in corners_live.LEAGUES and code not in feed.TEAM_TOTAL_LEAGUES
-        assert code not in team_totals.TEAM_TOTAL_LEAGUES
+    for code in L12:  # FanDuel isn't listed; team corners at Pinnacle only, from 24 Oct
+        assert code not in feed.TEAM_TOTAL_LEAGUES and code not in team_totals.TEAM_TOTAL_LEAGUES
+        assert code in corners_live.LEAGUES and corners_live.books_for(code) == ("pinnacle",)
     kick = T + pd.Timedelta(hours=24)  # inside the 18-30 h look window
     cards = []
     for code, (h, a) in (("E2", ("Peterboro", "Wycombe")), ("E3", ("York", "Barnet"))):
@@ -177,6 +177,7 @@ def test_league_one_and_two_make_no_corner_or_team_total_calls(tmp_path):
     fail = lambda *a, **k: pytest.fail("no call for League One or Two")  # noqa: E731
     s = team_totals.run(cards, tmp_path / "tt", raw_dir=tmp_path, api_key="k", now=T, get=fail)
     assert s["calls"] == 0 and s["due"] == 0
+    # No cached DraftKings events for these cards here, so no corner call either.
     s = corners_live.run(cards, tmp_path / "c", raw_dir=tmp_path, api_key="k", now=T, get=fail)
     assert s["calls"] == 0
 
@@ -361,12 +362,13 @@ def test_estimate_cli_counts_league_one_and_two_as_live(monkeypatch, capsys):
     e2 = next(int(c) for c, r in credits if "One" in r)
     assert e2 > 0
 
+    # League One and Two are in the live corner test from 24 Oct: counted in the total.
     cli.cmd_estimate_corners(argparse.Namespace(months="2026-10", extra_leagues="E2,E3"))
     out = capsys.readouterr().out
-    assert "not in the corner test, E2: 4 matches" in out
-    assert "not in the corner test, E3: 4 matches" in out
-    assert "Not in the corner test, average a month (would add): E2 8, E3 8" in out
-    assert "E2" not in out.split("Oct 2026:")[1].split("\n")[0]  # not in the live total
+    oct_line = out.split("Oct 2026:")[1].split("\n")[0]
+    assert "E2 4 matches 8" in oct_line and "E3 4 matches 8" in oct_line
+    assert "not in the corner test" not in out.lower()  # the extra flag is now a no-op
+    assert "(cap 750)" in out
 
 
 # ---------- refresh policy ----------

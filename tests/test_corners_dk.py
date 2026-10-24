@@ -127,21 +127,23 @@ def test_one_call_asks_both_books_and_logs_both(tmp_path):
 # ---------- budget ----------
 
 
-def test_expected_cost_follows_the_dearest_two_book_call_this_month():
+def test_expected_cost_follows_the_dearest_corner_call_this_month():
     at = LOOK.isoformat()
     calls = [
-        {"books": "pinnacle", "cost": 3, "fetched_at": at},  # the old one-book calls don't count
+        {"books": "fanduel,bovada,pinnacle", "cost": 3, "fetched_at": at},  # not a corner call
         {"books": "pinnacle,draftkings", "cost": 1, "fetched_at": at},
     ]
     assert cl.expected_cost(calls, LOOK) == 1
     calls.append({"books": "pinnacle,draftkings", "cost": 2, "fetched_at": at})
     assert cl.expected_cost(calls, LOOK) == 2
+    # Pinnacle-only calls (League One and Two from 24 Oct) count too.
+    assert cl.expected_cost([*calls, {"books": "pinnacle", "cost": 3, "fetched_at": at}], LOOK) == 3
     last_month = (LOOK - pd.Timedelta(days=40)).isoformat()
     old = [{"books": "pinnacle,draftkings", "cost": 5, "fetched_at": last_month}]
     assert cl.expected_cost(old, LOOK) == cl.COST_PER_CALL
 
 
-@pytest.mark.parametrize("spent, allowed", [(548, True), (549, False)])
+@pytest.mark.parametrize("spent, allowed", [(748, True), (749, False)])
 def test_cap_holds_if_the_two_book_call_costs_more(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -163,7 +165,7 @@ def test_cap_holds_if_the_two_book_call_costs_more(tmp_path, spent, allowed):
     s = cl.run(
         [card()], tmp_path / "o", [state], raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls)
     )
-    assert (len(calls) == 1) == allowed  # 548 + 2 <= 550; 549 + 2 > 550
+    assert (len(calls) == 1) == allowed  # 748 + 2 <= 750; 749 + 2 > 750
     if not allowed:
         assert s["stop"].startswith("monthly cap")
 
