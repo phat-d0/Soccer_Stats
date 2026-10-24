@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04 (Python 3.14, no Playwright Chromium)
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
         run: node --check web/app.js && node --check web/sw.js
 
   web:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04 (Python 3.14, no Playwright Chromium)
     timeout-minutes: 15
     env:
       PLAYWRIGHT_VERSION: 1.56.1

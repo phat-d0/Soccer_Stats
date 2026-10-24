@@ -1310,18 +1310,59 @@ slot. All eight leagues and seasons would be thousands of slots (tens of thousan
 credits); a realistic design is one league over recent seasons, about 300 slots and 3,000
 credits (rough estimate; `estimate`-style replay before any spend).
 
+### Phase 2, step 1: the archive keeps in-play prices (24 Oct, owner-approved 10 credits)
+
+`lab/inplay_probe.py` (`odds-check.yml` `task=inplay-probe`, `league`, `cap`; `hist_dates` set to
+one ISO time = a historical snapshot, else a live call). One historical h2h snapshot of the
+Premier League (run 40136522857, **10 credits**, 19,124 → 19,114), asked for 10 Oct 2026
+14:55 UTC and served at 14:50:36, 51 minutes after four 14:00 kickoffs (half-time, minute ~45
+by ESPN's goal minutes):
+
+| Match | Score then (final) | Pinnacle home / draw / away | Books priced |
+| --- | --- | --- | --- |
+| Aston Villa v Brentford | 1-1 (2-2) | 3.10 / 2.79 / 2.70 | 7 |
+| Chelsea v Bournemouth | 2-0 (5-1) | 1.08 / 11.27 / 38.4 | 7 |
+| Sunderland v Brighton | 0-0 (0-2) | 3.31 / 2.60 / 2.74 | 6 |
+| Ipswich v Fulham | 0-0 (2-1) | 3.60 / 2.66 / 2.51 | 7 |
+
+- **All four started matches came back with in-play h2h prices**, at Pinnacle, DraftKings,
+  Betfair's exchange (margin 0.0–1.3%), BetMGM, Betway, Unibet and Paddy Power; FanDuel and
+  William Hill returned pre-match prices only. Book updates were 0.1–0.9 minutes old (one
+  Betway quote 12.8). The prices follow the score (Chelsea 2-0 up at 1.06–1.09; the 0-0 and 1-1
+  matches priced as level games), so they are true in-play prices, not stale pre-match ones.
+- No favourite was trailing at half-time in this snapshot, so it says nothing yet about the
+  comeback gap itself. It answers the gating question only: a historical phase-2 test can be
+  bought, with Pinnacle's in-play price as the sharp benchmark.
+- **Cost lever for phase 2:** the free data (football-data half-time scores, ESPN/Understat goal
+  minutes) already say which kickoff slots had a favourite behind at half-time, so a test need
+  only buy those slots' half-time snapshots (10 credits each), not every slot. The live 1-credit
+  check (25 Oct) shows whether live in-play prices come back the same way.
+
+**A second historical snapshot** (run 40136975819, **10 credits**, 19,114 → 19,104; a
+duplicate probe from the research session, closed PR #101). Premier League, asked for 25 May
+2025 15:55 UTC and served at 15:50:37, about 50 minutes after all ten final-day 15:00 kickoffs:
+- All ten started matches had in-play h2h prices, from Betfair's exchange, BetMGM, Bovada,
+  DraftKings, FanDuel, Pinnacle, 888sport and Unibet. Most were 4.6 minutes old, FanDuel's 8.7
+  (FanDuel quoted in play then, unlike on 10 Oct 2026). William Hill and Marathonbet quoted none.
+- **Pinnacle's quote was inconsistent with the score in some matches.** Southampton 0-1 Arsenal
+  had Arsenal at 1.34 at Pinnacle (1.25 before kickoff) against 1.09–1.15 at the other books.
+  Ipswich 0-1 West Ham had West Ham at 2.47 against 1.36–1.47. In the other matches Pinnacle
+  was in line, as on 10 Oct 2026. So Pinnacle's archived in-play quote is sometimes stale, not
+  always wrong: a test checks each one against the other books.
+- Two favourites trailed at half-time (anecdotes, not a test). Liverpool, 72% before kickoff,
+  were 0-1 down to Crystal Palace, with Betfair at 2.64 (38% to win). Brighton, about 50%,
+  were 0-1 down at Tottenham, with Betfair at 4.4 (23%). Phase 1's base rates for a favourite
+  one goal down at half-time are 30.5% (65–75% band) and 18.2% (45–55%), so the market was
+  more generous than history in both.
+
+The two probes spent **20 credits** together.
+
 ### Phase 2 costing (lead brief, 24 Oct; a costed proposal, nothing pre-registered or spent)
 
-**Two probes so far.** The lead's probe (PR #100: 10 Oct 2026, four matches) found in-play h2h
-prices from Pinnacle, DraftKings, Betfair's exchange and four other books, under a minute old
-and following the score. A second, duplicate 10-credit probe (closed PR #101, run 40136975819:
-25 May 2025, all ten final-day matches at half-time) also found in-play prices from eight books
-(Betfair exchange, BetMGM, Bovada, DraftKings, FanDuel, Pinnacle, 888sport, Unibet; about 5
-minutes old). **But Pinnacle's archived in-play quotes in May 2025 did not follow the score**:
-Southampton 0–1 Arsenal had Arsenal at 1.34 at Pinnacle (1.25 before kickoff) against
-1.09–1.15 elsewhere, and Ipswich 0–1 West Ham had West Ham at 2.47 against 1.36–1.47. So
-Pinnacle may only be usable in play recently. Any phase-2 test needs a per-quote check (below)
-and should not lean on Pinnacle for 2022–2025.
+**Prices to use.** Both probes (above) found in-play prices at Betfair's exchange, the US books
+and Pinnacle, but Pinnacle's archived quote was sometimes stale (May 2025). The test therefore
+checks every Pinnacle quote against the median of the other books and falls back to Betfair's
+exchange when it disagrees (the quote check below).
 
 **Planner** (`lab/comeback_plan.py`, `odds-check.yml` `task=comeback-plan`; football-data
 only, no key). A kickoff slot is one league's matches that kicked off together. One historical
@@ -1375,7 +1416,10 @@ credits a season. Not proposed.
 **What the pre-registered test would be** (to be written and committed before any purchase):
 - *Quote check:* a book's quote counts only if it was updated after kickoff and at most 5
   minutes before the snapshot, and its implied chance for the trailing favourite is below the
-  same book's pre-match price. Matches with no passing quote are counted and dropped.
+  same book's pre-match price. A Pinnacle quote also has to sit within a set tolerance of the
+  other passing books' median implied chance (the tolerance is fixed at pre-registration),
+  else Betfair's exchange is the fair price for that match. Matches with no passing quote are
+  counted and dropped.
 - *Primary: bet the trailing favourite at the in-play price.* $1 flat per match at DraftKings'
   passing in-play price (the owner's book), with Betfair's exchange back price (less 2%
   commission on wins) as a second line. ROI with a match-resampled 95% range, overall and by
