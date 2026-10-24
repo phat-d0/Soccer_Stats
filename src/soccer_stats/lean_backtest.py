@@ -32,6 +32,7 @@ import pandas as pd
 from soccer_stats import bands as bd
 from soccer_stats import calibration as cal
 from soccer_stats import match_calibration as mc
+from soccer_stats import sizing as sz
 from soccer_stats import trades as tr
 from soccer_stats.data import PIN_CLOSE, PIN_EARLY
 from soccer_stats.odds import devig_shin
@@ -522,6 +523,7 @@ def build(
     by_league = {code: summary(b)["lean"] for code, b in early}
     calib = pooled_calibration(reports, pooled, SERIES, "p_bet", [c for c, _ in early])
     claimed = {code: bd.with_claimed(b, "p_bet") for code, b in zip(reports, all_bets, strict=True)}
+    by_code = dict(zip(reports, all_bets, strict=True))
     band_cuts = bd.cuts(bd.with_claimed(pooled, "p_bet"))
     return {
         "generated_at": now.isoformat(timespec="seconds"),
@@ -551,12 +553,14 @@ def build(
                 "name": (names or {}).get(code, code),
                 **saved(rep),
                 **({} if rep.get("error") else bd.blocks(claimed[code], band_cuts, ("z",))),
+                **({} if rep.get("error") else {"sizing": sizing(by_code[code], rep)}),
             }
             for code, rep in reports.items()
         },
         "all": {
             **summary(pooled),
             **bd.blocks(bd.with_claimed(pooled, "p_bet"), band_cuts, ("z",)),
+            "sizing": sizing(pooled, {}),
             "calibration": calib,
             "leagues": [code for code, _ in early],
             "by_league": by_league,
@@ -570,6 +574,17 @@ def build(
     }
 
 
+def sizing(b: pd.DataFrame, rep: dict) -> dict:
+    """Flat $10 vs quarter Kelly on the blend's p_bet over every bet in time order
+    (sizing.backtest_sizing; decided 4 days before kickoff, at the close for a `kind:
+    "close"` league), {error} if it fails."""
+    lead = pd.Timedelta(0) if rep.get("kind") == CLOSE_KIND else sz.BACKTEST_LEAD
+    try:
+        return sz.backtest_sizing(b, "p_bet", "blend", lead=lead)
+    except Exception as exc:  # noqa: BLE001  display only
+        return {"error": type(exc).__name__}
+
+
 # ---------- what publish shows (paper.run -> portfolio.strategy_backtests.lean) ----------
 
 APP_BETS = 200  # compact rows in data.json (newest first); every aggregate stays
@@ -581,13 +596,15 @@ MISSING_NOTE = (
 
 def app_section(found: dict | None, max_bets: int = APP_BETS) -> dict:
     """data.json's portfolio.strategy_backtests.lean: the file with its bets trimmed to the
-    newest `max_bets` (`bets_shown`, `bets_total`), `available` True; without a file,
-    {available: False, note}."""
+    newest `max_bets` (`bets_shown`, `bets_total`) and each league's sizing curves to
+    sizing.APP_LEAGUE_CURVE points, `available` True; without a file, {available: False,
+    note}."""
     if not isinstance(found, dict) or found.get("kind") != "lean_backtest":
         return {"available": False, "note": MISSING_NOTE}
     rows = found.get("bets") or []
     return {
         **{k: v for k, v in found.items() if k != "bets"},
+        "leagues": sz.app_curves(found.get("leagues")),
         "available": True,
         "bets": rows[:max_bets],
         "bets_shown": min(len(rows), max_bets),

@@ -38,7 +38,9 @@ from soccer_stats import calibration as cal
 from soccer_stats import edge12_backtest as e12b
 from soccer_stats import equations as eq
 from soccer_stats import lean_backtest as lb
+from soccer_stats import match_calibration as mc
 from soccer_stats import odds_log as ol
+from soccer_stats import sizing as sz
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
@@ -70,6 +72,9 @@ UPDATE_FIELDS = {
     "result_source",
     "result_check",
     "check_score",
+    # Kelly sizing (24 Oct): a Model 12% trade's blend chance for its side, once.
+    "p_blend",
+    "p_blend_from",
 }
 FOOTBALL_DATA = "football-data"
 
@@ -369,6 +374,9 @@ def update_ledger(
                 p_source="model" if raw else ("blend" if c.get("p_bet") else "model"),
                 strategy="edge12",
             )
+            # The blend's chance for the side (Kelly sizing; the 12% trades on the raw p).
+            pb = (c.get("p_bet") or {}).get(t["market"]) if t["market"] in tr.LEAN_MARKETS else None
+            t.update(p_blend=round(float(pb), 4) if pb is not None else None, p_blend_from="open")
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
             quoted = c.get("odds_updated") or fetched
@@ -393,6 +401,9 @@ def update_ledger(
         for t in ledger.values():
             if t["source"] == "live":
                 ev = _lean_driver_update(t, odds_log, (lean or {}).get("coef"), now)
+                if ev:
+                    events.append(ev)
+                ev = _blend_update(t, odds_log, (lean or {}).get("coef"), now)
                 if ev:
                     events.append(ev)
 
@@ -559,6 +570,38 @@ def _lean_driver_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> 
     if zm is None:
         return None
     return _update(t, now, z_market=round(zm, 3), driver=tr.lean_driver(zm), driver_from="odds_log")
+
+
+def _blend_update(t: dict, log: pd.DataFrame, coef, now: pd.Timestamp) -> dict | None:
+    """For a Model 12% trade opened before trades recorded `p_blend` (Kelly sizing, 24 Oct):
+    an update event with the blend's chance for its side at open time, from the logged
+    DraftKings quote it opened on (_entry_quote): that row's own p_bet ("odds_log") or,
+    when the row has none, the league's current blend coefficients on the row's fair price
+    and model chances ("recomputed", as _lean_driver_update does). A totals trade gets
+    p_blend None ("not_h2h"). None when the quote isn't there yet (it tries again)."""
+    if "p_blend" in t or tr.strategy_of(t) != "edge12" or t.get("bet_type") not in (None, "match"):
+        return None
+    if t["market"] not in tr.LEAN_MARKETS:
+        return _update(t, now, p_blend=None, p_blend_from="not_h2h")
+    row = _entry_quote(t, log)
+    if not row:
+        return None
+    pb = row.get("p_bet") if isinstance(row.get("p_bet"), dict) else {}
+    v = pb.get(t["market"])
+    if v is not None and np.isfinite(float(v)):
+        return _update(t, now, p_blend=round(float(v), 4), p_blend_from="odds_log")
+    fair, p = row.get("fair"), row.get("p")
+    if not coef or not isinstance(fair, dict) or not isinstance(p, dict):
+        return None
+    mk = [fair.get(m) for m in tr.LEAN_MARKETS]
+    md = [p.get(m) for m in tr.LEAN_MARKETS]
+    if any(x is None for x in mk + md):
+        return None
+    out = mc.apply(coef, [mk], [md])[0]
+    v = float(out[tr.LEAN_MARKETS.index(t["market"])])
+    if not np.isfinite(v):
+        return None
+    return _update(t, now, p_blend=round(v, 4), p_blend_from="recomputed")
 
 
 def _fresh(fetched: str | None, now: pd.Timestamp) -> bool:
@@ -1097,6 +1140,7 @@ def strategy_section(
         "by_league": leagues,
         "calibration": _safe_calibration(mine),
         "by_odds_band": _safe_odds_bands(mine, clv_field, now),
+        "sizing": _safe_sizing(mine, rule),
         "odds_bands": {"clv_field": clv_field, "note": LIVE_BAND_NOTE},
         "trade_ids": [t["id"] for t in sec["trades"]],
     }
@@ -1196,6 +1240,14 @@ def live_odds_bands(
         )
         out.append(row)
     return out
+
+
+def _safe_sizing(trades: list[dict], rule: dict | None) -> dict:
+    """sizing.live_sizing for display only: a failure costs this block, never the section."""
+    try:
+        return sz.live_sizing(trades, rule)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__, "note": sz.NOTE}
 
 
 def _safe_odds_bands(trades: list[dict], clv_field: str, now=None) -> list[dict] | dict:
