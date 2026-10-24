@@ -1337,3 +1337,78 @@ by ESPN's goal minutes):
   minutes) already say which kickoff slots had a favourite behind at half-time, so a test need
   only buy those slots' half-time snapshots (10 credits each), not every slot. The live 1-credit
   check (25 Oct) shows whether live in-play prices come back the same way.
+
+## Draw no bet (owner, 24 Oct; pre-registered 2026-10-24, before any code or run)
+
+**Owner's question.** Instead of the 3-way moneyline, bet draw no bet (DNB): back home or away,
+stake refunded on a draw. The hope: a higher hit rate, and a binary result that is easier to
+predict and to monitor. Test both live match rules as DNB on history, beside the same rules on
+1X2, at 0 credits.
+
+**What is already known (disclosed).** DNB is the Asian handicap at line 0. Round 2 (`docs/edge.md`,
+Premier League, Pinnacle's AH from 2019/20, the main line only) found model CLV at 12% of −2.0% on
+AH against −4.2% on 1X2, and a blend CLV of −0.2% to +0.8% at 2–8% edges with no range above 0.
+The Model 12% filters and price-band tests (above) used the same model chances and seasons as this
+test. The model overrates the side it likes in every price band, and that is a home-vs-away error,
+which DNB keeps. So I expect both DNB rules' CLV below 0, DNB 12% less negative than 1X2 12%.
+
+**Data** (as the Model 12% filters and the Lean backtest, `soccer-stats backtest-lean`):
+- Model chances: `backtest.walk_forward` (weekly Dixon-Coles refits on the 730 days before each
+  window, from 2019-07-01, burn-in 2 seasons, xG weight 0.7 in E0, SP1, D1, I1, F1, goals only in
+  E1, E2, E3). No look-ahead.
+- Leagues: the eight live domestic leagues. The Champions League is left out (no early prices).
+- Seasons: 2019/20–2024/25, in each league only the seasons where Pinnacle's own early and close
+  1X2 both cover at least 90% of played matches (`lean_backtest.coverage`). 2025/26 and later are
+  dropped before any bet is made.
+- The bet is decided at Pinnacle's **early** price (football-data PSH/PSD/PSA), as in
+  `lean_backtest`; training for any fit uses matches played before the block's decision day.
+
+**The DNB price (fixed now).**
+- **Primary, synthetic from 1X2:** DNB decimal price on a side = its 1X2 price × (1 − 1/draw price),
+  from Pinnacle's early quoted prices (margin kept). That is the price you get by backing the side
+  and covering the draw at the same book, so it can be built live from DraftKings' h2h with no new
+  market. Break-even = 1/price.
+- **Fair DNB chance** (early and close) = Shin-fair p_side / (p_home + p_away) from the 1X2 prices.
+- **Check, real AH 0:** where football-data's Pinnacle Asian handicap line is 0 (AHh = 0 early,
+  AHCh = 0 close; PAHH/PAHA, PCAHH/PCAHA), the real DNB price. Descriptive only: the synthetic's
+  margin against AH 0's, the gap between their fair chances, and both rules rescored at the AH-0
+  price on those matches (a biased subset: only close matches have line 0).
+
+**The chances (no new fit, no new parameter).**
+- Model DNB: q = p_side / (p_home + p_away) from the model's walk-forward 1X2.
+- Blend DNB: the same renormalisation of the Lean backtest's own walk-forward 1X2 blend
+  (`lean_backtest.walk_forward`: refitted every 28 days on earlier matches, Pinnacle's close,
+  at least 300 rows).
+- σ_DNB for each fit: the sd (ddof 0) of (blend DNB − fair DNB at the close), home side, over that
+  fit's own training rows (the away side is its mirror).
+
+**The rules (fixed now).** One bet per match, $1.
+- **DNB 12%:** edge = q_model × DNB price − 1 (the edge per stake that isn't refunded); the side
+  with the larger edge if it is at least 12% (minus 1e-9); home first on a tie.
+- **DNB Lean:** z = (q_blend − 1/DNB price) / σ_DNB per side; the higher z if it is at least 1;
+  "strong" at 2.
+- **Baselines on the same scored matches:** 1X2 Model 12% (`lab/edge12_filters` baseline) and 1X2
+  Lean (`lean_backtest.bets`, all odds).
+- Settlement: a win pays price − 1, a draw returns the stake (0), a loss costs 1.
+
+**Measured** (per league, per season, pooled over the eight leagues; ranges resample matches,
+2,000 draws):
+- bets, won / drawn (refunded) / lost, hit rate = won / (won + lost) against break-even;
+- ROI per $1 staked with its 95% range;
+- CLV = entry DNB price × Pinnacle's fair DNB close − 1 (per stake not refunded), with its 95%
+  range, and the same per $1 staked (× the close's no-draw chance);
+- monitoring: the sd of profit per bet, and bets needed for a 5% edge to show at 95% =
+  (1.96 × sd / 0.05)², for each DNB rule beside its 1X2 baseline;
+- odds bands (≤ 1.50, 1.50–2.00, 2.00–3.00, 3.00–5.00, > 5.00): bets, ROI, CLV;
+- calibration (descriptive): on every scored match without a draw, the home side's model, blend and
+  fair price DNB chance against what happened (`calibration.reliability`), and each rule's bets.
+
+**Pass rule (fixed now).** A DNB rule passes if its pooled CLV range at 97.5% (two rules) is
+entirely above 0. A pass goes to the owner for a live DNB paper track at DraftKings (synthetic from
+its h2h). If neither passes, nothing changes live. The owner may still choose a DNB paper track for
+easier monitoring, but not as an edge. Lower variance on its own is not a pass: a strategy that
+loses with less noise still loses. Everything else is descriptive.
+
+**Run:** `backfill.yml` input `dnb_backtest` (`soccer-stats backtest-dnb`), 0 credits, no key;
+from a branch it prints and keeps a 7-day artifact, from the default branch it writes data-log
+`backtest/dnb_backtest.json`.
