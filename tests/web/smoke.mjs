@@ -622,7 +622,7 @@ const STEPS = [
     const chip = await p.locator('#view button[data-trade$="|shadow"] .chip-shadow').first().innerText();
     if (chip !== "Shadow: no trade opened (outside the odds range)") throw new Error(`shadow chip: ${chip}`);
     const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
-    for (const w of ["Before the rule,", "backcast", "Live rule (backcast)", "Descriptive only:", "Judged from", "Live rule", "All odds (old rule)", "odds range was picked after seeing the first", "the old code opened in that window", "How this comparison works", "minus all odds (old rule)"]) {
+    for (const w of ["Before the rule,", "backcast", "Live rule (backcast)", "Cut (outside the range)", "Descriptive only:", "Judged from", "Live rule", "All odds (old rule)", "odds range was picked after seeing the first", "the old code opened in that window", "How this comparison works", "minus all odds (old rule)"]) {
       if (!box.includes(w)) throw new Error(`old-rule box lacks "${w}": ${box}`);
     }
     if (box.includes("60%")) throw new Error("old-rule box talks about the 60% cut");
