@@ -616,7 +616,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v57) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v58) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -652,10 +652,20 @@ the owner's baseball app, so the balance can drop without any run here.
   `WEAK_CORNER_FIT` note for SP1, D1, E1; `UNTESTED_CORNER_FIT` note for E2, E3, where model (f) was never tested; `NO_DK_CORNERS` E1, E2, E3 get "DraftKings lists no team corners in …"); Player shots (Premier League; player trades are off).
   Cards with `no_model` (UCL clubs no league covers) show "No model chance: odds only"
   (`noModelHtml`).
-- **Portfolio**: switcher (localStorage `pfId`; retired Player shots behind a link), status and
-  note, competition filter, Live / Backtest, then "Paper strategies" (`strategyList`; Moneyline
-  Lean then Model 12%, selection `pfStrat`; Team corners Pinnacle then DraftKings, selection
-  `pfStratCorners`). Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
+- **Portfolio** (drill-down lists since v58, owner, 24 Oct; `state.pfLevel` "home" /
+  "portfolio" / "strategy", in memory only, `pfLevelOn`): the top level (`pfHomeHtml`) lists one
+  row per portfolio (name, status pill, its strategies, live profit of all of them together,
+  settled and open counts) with retired Player shots behind a link; Anytime goalscorer is hidden
+  (`PF_HIDDEN`). A portfolio (`pfFolderHtml`, `data-pfid`) shows crumbs ("‹ Portfolio"), its
+  name, status and note, the competition filter and one row per strategy (`strategyFolders`,
+  `data-pfstrat`: live profit and record, a "Backtest:" line from `backtestHeadline`; shadow
+  variants "↳ …" under their parent, no backtest line). A strategy (`pfStrategyHtml`) shows crumbs
+  "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status · rule (variants: "Shadow filter
+  of …"), the competition filter and Live paper / Backtest / Model (a variant's Backtest and
+  Model are its parent's, with a note). A portfolio with one strategy (Player shots) opens
+  straight on its views. Tapping the Portfolio tab again goes back to the top; the match sheet's
+  corners link opens the Team corners list. Selections stay in `pfId`, `pfStrat` (Moneyline)
+  and `pfStratCorners`. Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
   the filters (`tradeStats`), the <200-settled caveat, paper.py's ROI range only when its summary
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
   over time" (`curveChart`: scrubbable, see below), "Bankroll: flat $10 vs ¼ Kelly" (owner, 24
@@ -681,8 +691,8 @@ the owner's baseball app, so the balance can drop without any run here.
   with the odds range). Shadow-filter variants (owner, 23 Oct; any live strategy
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60` and Lean's
   `lean_all_odds`): an
-  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; Live only,
-  Backtest and Model show the parent), its own trades and tiles via `trade_ids`, one box
+  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; its Backtest
+  and Model show the parent's), its own trades and tiles via `trade_ids`, one box
   (`sinceDefinedHtml`) with a descriptive "Whole period, from <first trade>" part on top
   (the variant's and parent's full summaries, and the CLV difference kept minus all computed
   in the app from the trades' `clv_pinnacle`, won or lost with a value (as the summaries), with n; "includes the

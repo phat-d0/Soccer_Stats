@@ -57,6 +57,13 @@ const tab = (name) => async (p) => { await p.click(`.tabbar button[data-tab="${n
 const click = (sel) => async (p) => { await p.click(sel); };
 const sheet = async (p) => { await p.waitForSelector("#sheet:not([hidden])"); };
 const closeSheet = async (p) => { await p.click(".sheet-close"); };
+// Portfolio folders (owner, 24 Oct): the tab opens on one folder per portfolio, then one per
+// strategy. pfUp goes back to the open portfolio's strategy folders, pfHome to the top;
+// pfOpenPf / pfOpenStrat open a portfolio or one of its strategies from wherever we are.
+const pfUp = async (p) => { if (await p.locator('[data-pfnav="portfolio"]').count()) await p.click('[data-pfnav="portfolio"]'); };
+const pfHome = async (p) => { if (await p.locator('[data-pfnav="home"]').count()) await p.click('[data-pfnav="home"]'); };
+const pfOpenPf = async (p, id) => { await pfHome(p); await p.click(`button[data-pfid="${id}"]`); };
+const pfOpenStrat = async (p, key) => { await pfUp(p); await p.click(`button[data-pfstrat="${key}"]`); };
 // Every chart scrubs (owner, 23 Oct): for the chart `sel` (a [data-scrub] wrapper), a mouse
 // hover and a finger drag each land on the stop under the pointer, with the readout line
 // equal to the chart's own readout for that stop (and only that stop's marks highlighted);
@@ -568,19 +575,29 @@ const STEPS = [
   ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   ["portfolio-live", async (p) => {
     await closeSheet(p); await tab("portfolio")(p);
-    const on = await p.locator('button[data-pfstrat].on').innerText();
-    if (!on.includes("Blend Lean")) throw new Error(`default strategy: ${on}`);
+    // The top level: one folder per portfolio, Anytime goalscorer hidden (owner, 24 Oct).
+    const folders = await p.locator("#view button[data-pfid]:not(.linkish)").evaluateAll((els) => els.map((e) => e.dataset.pfid));
+    if (folders.join(",") !== "moneyline,corners") throw new Error(`portfolio folders: ${folders.join(",")}`);
+    if (!(await p.locator('#view button.linkish[data-pfid="player_shots"]').count())) throw new Error("retired link missing");
+    await p.click('button[data-pfid="moneyline"]');
+    // Moneyline's folders: one per strategy, the old rule filed under Lean.
+    const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
+    if (strats.join(",") !== "lean,lean_all_odds,edge12") throw new Error(`strategy folders: ${strats.join(",")}`);
+    // The strategy folders: Lean's row carries its own settled record and its backtest.
+    const leanRow = await p.locator('button[data-pfstrat="lean"]').innerText();
+    if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow) || !leanRow.includes("Backtest:")) throw new Error(`Lean row: ${leanRow}`);
+    await p.click('button[data-pfstrat="lean"]');
+    const on = await p.locator(".pf-title").innerText();
+    if (!on.includes("Blend Lean")) throw new Error(`opened strategy: ${on}`);
+    if ((await p.locator(".crumbs").innerText()).replace(/\s+/g, " ") !== "‹ Portfolio › Moneyline") throw new Error("crumbs");
     const text = await p.textContent("#view");
-    for (const want of ["Paper strategies", "Model 12% (your live test)", "Profit, settled", "Record", "Avg edge", "Profit over time", "Open · ", "Settled · ", "Blend Lean (1σ+). A $10", "baseball app's Lean tier", "not from the model", "Wolves v Everton", "until a few hundred, results are mostly luck"]) {
+    for (const want of ["Profit, settled", "Record", "Avg edge", "Profit over time", "Open · ", "Settled · ", "Blend Lean (1σ+). A $10", "baseball app's Lean tier", "not from the model", "Wolves v Everton", "until a few hundred, results are mostly luck"]) {
       if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
     }
     if (text.includes("Nott'm Forest v Arsenal")) throw new Error("a 12% trade shows under Blend Lean");
     // Every trade row under Lean is a Lean trade (its id ends "|lean").
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     if (!ids.length || ids.some((id) => !id.endsWith("|lean"))) throw new Error(`non-Lean rows under Lean: ${ids.join(", ")}`);
-    // The strategy list: Lean's row carries its own settled record, 12% its own.
-    const leanRow = await p.locator('button[data-pfstrat="lean"]').innerText();
-    if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow)) throw new Error(`Lean row: ${leanRow}`);
     // Profit over time: before any pointer, the readout is the latest settled day.
     const readout = await p.textContent("#cv-readout");
     // (Lean has its old-rule variant since 24 Oct, so its chart is the overlay.)
@@ -647,11 +664,15 @@ const STEPS = [
   // Blend Lean's odds range (owner, 24 Oct): the rule on Lean's row and rule box; the old
   // rule (all odds) as an indented variant that adds the shadow entries, with the overlay.
   ["portfolio-lean-old-rule", async (p) => {
+    await pfUp(p);
     const row = (await p.locator('button[data-pfstrat="lean"]').innerText()).replace(/\s+/g, " ");
     if (!row.includes("1σ+ · −200 to +200")) throw new Error(`Lean row: ${row}`);
-    if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
     const next = await p.locator('button[data-pfstrat="lean"] + button').getAttribute("data-pfstrat");
     if (next !== "lean_all_odds") throw new Error(`row under Lean: ${next}`);
+    const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
+    if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips") || vrow.includes("Backtest:")) throw new Error(`old-rule row: ${vrow}`);
+    await pfOpenStrat(p, "lean");
+    if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
     // The new rule's line is backcast from Lean's first trade: both lines start there, the
     // rule date is marked, and Lean's view says the early part is a backcast.
     const bc = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "lean").backcast);
@@ -660,10 +681,8 @@ const STEPS = [
     const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
     const want0 = await p.evaluate((d) => dayName(String(d).slice(0, 10)), bc.lean_started);
     if (!origin.startsWith(`${want0} · first trade opened`)) throw new Error(`overlay origin ${origin} vs lean_started ${want0}`);
-    const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
-    if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips")) throw new Error(`old-rule row: ${vrow}`);
     if ((await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|").indexOf("Live rule") < 0) throw new Error("overlay legend lacks the live rule");
-    await p.click('button[data-pfstrat="lean_all_odds"]');
+    await pfOpenStrat(p, "lean_all_odds");
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     const want = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "lean_all_odds").trade_ids);
     if (!ids.some((id) => id.endsWith("|shadow")) || ids.some((id) => !want.includes(id))) throw new Error(`old-rule trades: ${ids.join(", ")}`);
@@ -678,13 +697,13 @@ const STEPS = [
     if (!text.includes("Blend Lean, all odds (old rule).") || !text.includes("Odds range since")) throw new Error("old-rule rule note");
     await scrubCheck(p, "[data-scrub='cv']");
     await p.locator(".band-share").first().scrollIntoViewIfNeeded();
-    await p.click('button[data-pfstrat="lean"]');
+    await pfOpenStrat(p, "lean");
   }],
   // Arsenal v Leeds's Strong Lean trade (+650) is outside the odds range, so it sits in the
   // old rule's line, not the live rule's (owner, 24 Oct).
   ["portfolio-live-lean-trade", async (p) => {
-    await p.click('button[data-pfstrat="lean_all_odds"]');
-    if (await p.locator('button[data-pfstrat="lean"].on').count()) throw new Error("old rule not selected");
+    await pfOpenStrat(p, "lean_all_odds");
+    if (!(await p.locator(".pf-title").innerText()).includes("all odds (old rule)")) throw new Error("old rule not opened");
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const kl = await p.textContent("#sheet-body .kelly-line");
     if (!/^(¼ Kelly stake: \$[\d,.]+|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
@@ -694,7 +713,7 @@ const STEPS = [
   // Trade states (owner, 18 Oct): kicked off under ~2 h 15 min ago = "In play"; a finished
   // match still open waits in its own "Awaiting result" group, between Open and Settled.
   ["portfolio-live-states", async (p) => {
-    await closeSheet(p); await p.click('button[data-pfstrat="lean"]');
+    await closeSheet(p); await pfOpenStrat(p, "lean");
     const text = await p.textContent("#view");
     for (const want of ["Awaiting result · 1", "These matches have finished. Results usually come in within a few hours of full time, and each trade then settles automatically.", "Their close and CLV are final", "finished, awaiting result (not in profit yet)"]) {
       if (!text.includes(want)) throw new Error(`Lean live lacks "${want}"`);
@@ -785,7 +804,8 @@ const STEPS = [
   // The strategy rows' backtest headlines follow the competition chip (owner, 21 Oct), and
   // both strategies have a per-league backtest (Model 12%'s edge12_backtest.json).
   ["portfolio-backtest-headlines", async (p) => {
-    const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .vals`).innerText()).replace(/\s+/g, " ");
+    await pfUp(p);
+    const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
     const want = {
       "": ["bets · at Pinnacle", "bets · at Pinnacle"],
       E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
@@ -806,7 +826,7 @@ const STEPS = [
   }],
   // The Champions League: Lean has no bets (the file's note says why), coverage by book.
   ["portfolio-backtest-ucl-lean", async (p) => {
-    await p.click('button[data-pfstrat="lean"]');
+    await pfOpenStrat(p, "lean");
     const text = await p.textContent("#view");
     if (!text.includes("300") || (await p.locator("#view .tiles").count())) throw new Error("UCL Lean should show the file's note, not tiles");
     if (text.includes("Where the bets sit on the odds") || (await p.locator("#view .band-row").count())) throw new Error("UCL Lean has no bets: no band charts");
@@ -816,7 +836,7 @@ const STEPS = [
     for (const w of ["DK", "PIN", "Bet on"]) if (!cov.includes(w)) throw new Error(`UCL coverage lacks ${w}`);
   }],
   ["portfolio-backtest-ucl-edge12", async (p) => {
-    await p.click('button[data-pfstrat="edge12"]');
+    await pfOpenStrat(p, "edge12");
     const text = await p.textContent("#view");
     if (!text.includes("mostly measures the gap between the two books") || !(await p.locator("#view .tiles").count())) throw new Error("UCL Model 12% backtest");
     if (!text.includes("Pinnacle's close at the same moment")) throw new Error("UCL bands' close note");
@@ -830,15 +850,15 @@ const STEPS = [
     if (!text.includes("League One") || !(await p.locator("#view .bet-row").count())) throw new Error("League One Model 12% backtest");
   }],
   ["portfolio-backtest-e3-lean", async (p) => {
-    await p.click('.chip[data-league="E3"]'); await p.click('button[data-pfstrat="lean"]');
+    await p.click('.chip[data-league="E3"]'); await pfOpenStrat(p, "lean");
     if (!(await p.locator("#view .tiles").count())) throw new Error("League Two Lean backtest tiles");
     await bandsCheck(p, "lean", "E3");
     await sizingCheck(p, "bz-lean-E3", () => state.data.portfolio.strategy_backtests.lean.leagues.E3.sizing);
   }],
-  ["portfolio-backtest-e3-edge12", async (p) => { await p.click('button[data-pfstrat="edge12"]'); await bandsCheck(p, "edge12", "E3"); }],
+  ["portfolio-backtest-e3-edge12", async (p) => { await pfOpenStrat(p, "edge12"); await bandsCheck(p, "edge12", "E3"); }],
   // Model 12% under All: the per-league replay with its range plots and readout.
   ["portfolio-backtest-edge12-all", async (p) => {
-    await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
+    await p.click('.chip[data-league=""]'); await pfOpenStrat(p, "edge12");
     const text = await p.textContent("#view");
     for (const w of ["In the replay at Pinnacle's prices Model 12%", "Return by league", "Bets, newest first", "Champions League is priced at DraftKings' close"]) {
       if (!text.includes(w)) throw new Error(`12% All backtest lacks "${w}"`);
@@ -861,10 +881,10 @@ const STEPS = [
     await bandsCheck(p, "edge12", "E0");
     await sizingCheck(p, "bz-edge12-E0", () => state.data.portfolio.strategy_backtests.edge12.leagues.E0.sizing);
   }],
-  ["portfolio-backtest-e0-lean", async (p) => { await p.click('button[data-pfstrat="lean"]'); await bandsCheck(p, "lean", "E0"); }],
+  ["portfolio-backtest-e0-lean", async (p) => { await pfOpenStrat(p, "lean"); await bandsCheck(p, "lean", "E0"); }],
   // Model view (owner, 22 Oct): each strategy's equation, fitted numbers and calibration.
   ["portfolio-model-lean", async (p) => {
-    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="lean"]');
+    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await pfOpenStrat(p, "lean");
     const text = await p.textContent("#view");
     for (const w of ["score_k", "Blend Lean (blend of price and model)", "Match model (Dixon-Coles)", "Fitted per competition", "The blend's shape, Premier League", "Lined up with results: every outcome", "Lined up with results: live paper trades"]) {
       if (!text.includes(w)) throw new Error(`Lean model view lacks "${w}"`);
@@ -911,7 +931,7 @@ const STEPS = [
     if (!text.includes("No Blend Lean bets in this backtest for Champions League") || !text.includes("DraftKings' close")) throw new Error("UCL Lean model view");
   }],
   ["portfolio-model-edge12-ucl", async (p) => {
-    await p.click('button[data-pfstrat="edge12"]');
+    await pfOpenStrat(p, "edge12");
     const text = await p.textContent("#view");
     if (!text.includes("Fitted for Champions League") || !text.includes("Ridge") || text.includes("The blend's shape")) throw new Error("UCL 12% model view");
   }],
@@ -925,13 +945,13 @@ const STEPS = [
   }],
   ["portfolio-live-edge12", async (p) => {
     await p.click('button[data-pf="live"]');
-    await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="edge12"]');
+    await p.click('.chip[data-league=""]'); await pfOpenStrat(p, "edge12");
     const text = await p.textContent("#view");
     if (!text.includes("Your live test: fixed 12%") || text.includes("Wolves v Everton")) throw new Error("12% strategy view");
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     if (!ids.length || ids.some((id) => id.endsWith("|lean"))) throw new Error(`a Lean trade shows under 12%: ${ids.join(", ")}`);
-    const on = await p.locator('button[data-pfstrat].on').innerText();
-    if (!on.includes("Model 12%") || !on.includes("12%+")) throw new Error(`12% row: ${on}`);
+    const on = await p.locator(".pf-title").innerText() + " " + await p.locator(".pf-sub").innerText();
+    if (!on.includes("Model 12%") || !on.includes("12%+")) throw new Error(`12% heading: ${on}`);
     const avg = await p.locator(".tile", { hasText: "Avg edge" }).locator(".value").innerText();
     if (!avg.endsWith("%")) throw new Error(`12% avg edge should be a %: ${avg}`);
     if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
@@ -962,21 +982,34 @@ const STEPS = [
   }, true],
   ["portfolio-live-trade", async (p) => { await closeSheet(p); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   // The DraftKings backtest's own trades: Model 12% under the Premier League.
-  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await p.click('button[data-pfstrat="edge12"]'); await p.click("details.fold > summary"); }],
+  ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await pfOpenStrat(p, "edge12"); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  // An empty portfolio (in testing): its plain-English state, live and backtest.
-  ["portfolio-goalscorer", async (p) => { await closeSheet(p); await p.click('button[data-pfid="goalscorer"]'); }],
-  ["portfolio-goalscorer-live", click('button[data-pf="live"]')],
-  // A retired portfolio, reached from the "Retired" link: its history, read-only.
-  ["portfolio-retired-live", click('button.linkish[data-pfid="player_shots"]')],
+  // Anytime goalscorer is hidden while paused (owner, 24 Oct): no folder for it at the top.
+  ["portfolio-top", async (p) => {
+    // Tapping the Portfolio tab again goes back to the top level.
+    await closeSheet(p); await tab("portfolio")(p);
+    if (await p.locator(".crumbs").count()) throw new Error("the Portfolio tab didn't go back to the top");
+    if (await p.locator('#view button[data-pfid="goalscorer"]').count()) throw new Error("goalscorer folder should be hidden");
+    const text = await p.textContent("#view");
+    for (const w of ["Moneyline", "Team corners", "2 strategies:", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
+  }],
+  // A retired portfolio, reached from the "Retired" link: its history, read-only. It has one
+  // strategy, so it opens straight on its views.
+  ["portfolio-retired-live", async (p) => {
+    await p.click('button.linkish[data-pfid="player_shots"]'); await p.click('button[data-pf="live"]');
+    if ((await p.locator(".crumbs").innerText()).trim() !== "‹ Portfolio") throw new Error("retired crumbs");
+  }],
   ["portfolio-retired-backtest", click('button[data-pf="backtest"]')],
   ["portfolio-retired-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   // Team corners (in testing): live paper with Pinnacle CLV and a push, a league chip, the
   // trade sheet, then the research backtest (no money tiles) with a range-plot readout.
   ["portfolio-corners", async (p) => {
-    await closeSheet(p); await p.click('button[data-pfid="corners"]'); await p.click('button[data-pf="live"]');
+    await closeSheet(p); await pfOpenPf(p, "corners");
+    const list = await p.textContent("#view");
+    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "↳ below 60%", "research only"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
+    await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
-    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Profit over time"]) {
+    for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Profit over time"]) {
       if (!text.includes(want)) throw new Error(`Team corners lacks "${want}"`);
     }
     if (await p.locator('#view button[data-trade$="|dk"]').count()) throw new Error("a DraftKings trade shows under the Pinnacle track");
@@ -989,7 +1022,7 @@ const STEPS = [
   // second line, a one-sided close without DraftKings CLV; Moneyline's selection untouched.
   ["portfolio-corners-dk", async (p) => {
     const before = await p.evaluate(() => localStorage.getItem("pfStrat"));
-    await p.click('button[data-pfstrat="draftkings"]');
+    await pfOpenStrat(p, "draftkings");
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     if (ids.length !== 3 || ids.some((id) => !id.endsWith("|dk"))) throw new Error(`DraftKings track lists: ${ids.join(", ")}`);
     const text = await p.textContent("#view");
@@ -1005,15 +1038,17 @@ const STEPS = [
       if (!text.includes(want)) throw new Error(`DraftKings corner trade sheet lacks "${want}"`);
     }
   }, true],
-  ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await p.click('button[data-pfstrat="pinnacle"]'); }],
+  ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await pfOpenStrat(p, "pinnacle"); }],
   // Shadow-filter variant (owner, 23 Oct): "↳ below 60%" indented under its parent, and
   // both curves on one chart (parent solid, variant dashed) with a legend, the "filter set"
   // marker and a readout giving both totals and their difference on the same day.
   ["portfolio-corners-overlay", async (p) => {
+    await pfUp(p);
     const next = await p.locator('button[data-pfstrat="pinnacle"] + button').getAttribute("data-pfstrat");
     if (next !== "pinnacle_below60") throw new Error(`row under the Pinnacle track: ${next}`);
     const row = (await p.locator('button[data-pfstrat="pinnacle_below60"]').innerText()).replace(/\s+/g, " ");
     if (!row.includes("↳ below 60%") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
+    await pfOpenStrat(p, "pinnacle");
     if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2 || await p.locator("[data-scrub='cv'] path.line.ser.dash").count() !== 1) throw new Error("overlay curves");
     const mark = await p.locator("[data-scrub='cv'] .filter-lab").textContent();
@@ -1034,7 +1069,7 @@ const STEPS = [
   }],
   // The variant selected: its own trades and tiles, and the "Judged from" box.
   ["portfolio-corners-variant", async (p) => {
-    await p.click('button[data-pfstrat="pinnacle_below60"]');
+    await pfOpenStrat(p, "pinnacle_below60");
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     const mine = await p.evaluate(() => pfById("corners").live.strategies.find((s) => s.key === "pinnacle_below60").trade_ids);
     if (!ids.length || ids.some((id) => !mine.includes(id))) throw new Error(`variant lists: ${ids.join(", ")}`);
@@ -1061,13 +1096,13 @@ const STEPS = [
   // The DraftKings track's variant: judged on Pinnacle's close too, DraftKings' own close
   // shown as descriptive only.
   ["portfolio-corners-dk-variant", async (p) => {
-    await p.click('button[data-pfstrat="draftkings_below60"]');
+    await pfOpenStrat(p, "draftkings_below60");
     const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
     const judged = box.indexOf("The judged measure, CLV against Pinnacle's close"), desc = box.indexOf("Descriptive only, CLV against DraftKings' close");
     if (judged < 0 || desc < judged) throw new Error(`DraftKings variant box: ${box}`);
     if (!/kept of \d+ trades? with a close, from \d+ match/.test(box)) throw new Error(`DraftKings variant counts: ${box}`);
   }],
-  ["portfolio-corners-pin-back", click('button[data-pfstrat="pinnacle"]')],
+  ["portfolio-corners-pin-back", async (p) => { await pfOpenStrat(p, "pinnacle"); }],
   ["portfolio-corners-awaiting", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("corners awaiting group");
@@ -1090,7 +1125,7 @@ const STEPS = [
     await p.click("details.mk-fold > summary");
   }],
   ["portfolio-corners-model", async (p) => {
-    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="pinnacle"]');
+    await p.click('button[data-pf="model"]'); await p.click('.chip[data-league=""]'); await pfOpenStrat(p, "pinnacle");
     const text = await p.textContent("#view");
     for (const w of ["Team corners model (f)", "Lined up with results: every logged line", "Pinnacle's fair price", "Lined up with results: live paper trades"]) {
       if (!text.includes(w)) throw new Error(`corners model view lacks "${w}"`);
@@ -1109,19 +1144,19 @@ const STEPS = [
     if (!/^Expected [0-9.]+ corners: over 3\.5 \d+%, over 4\.5 \d+%, over 5\.5 \d+%\.$/.test(sr)) throw new Error(`corner shape readout: ${sr}`);
   }],
   ["portfolio-corners-model-dk", async (p) => {
-    await p.click('button[data-pfstrat="draftkings"]'); await p.click('.chip[data-league="E0"]');
+    await pfOpenStrat(p, "draftkings"); await p.click('.chip[data-league="E0"]');
     const text = await p.textContent("#view");
     for (const w of ["DraftKings' fair price", "Fitted for Premier League", "Spread (NB2 α)"]) {
       if (!text.includes(w)) throw new Error(`DraftKings corners model view lacks "${w}"`);
     }
-    await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
+    await pfOpenStrat(p, "pinnacle"); await p.click('button[data-pf="live"]');
   }],
   ["record-markets-corners-link", async (p) => {
     await tab("record")(p); await p.click('button[data-recbet="markets"]');
     await p.click('button[data-goto-pf="corners"]');
     if (!(await p.textContent("#view")).includes("Team corners")) throw new Error("corners link didn't open the portfolio");
   }],
-  ["portfolio-moneyline", async (p) => { await p.click('button[data-pfid="moneyline"]'); }],
+  ["portfolio-moneyline", async (p) => { await pfOpenPf(p, "moneyline"); }],
   // Matches after kickoff (the clock moved past Arsenal v Leeds, 10 Oct 11:30 UTC): the
   // card says "In play", then "Finished"; its open trades read "In play" / "Awaiting
   // result" with the close, and no new pick shows.

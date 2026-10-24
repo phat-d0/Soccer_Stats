@@ -19,6 +19,7 @@ const state = {
   pfSeason: "",
   pfShown: 15,
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
+  pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
   pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the first, Pinnacle)
   pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
@@ -38,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v57";
+const APP_VERSION = "v58";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -734,7 +735,7 @@ function leaguesPresent() {
   // On Moneyline's Backtest and Model, also every competition the per-league backtests cover (League
   // One between matchdays, the Champions League), so each can be chosen there.
   const sb = state.data.portfolio?.strategy_backtests || {};
-  const bt = state.tab === "portfolio" && (state.pfView === "backtest" || state.pfView === "model") && pfCurrent()?.id === "moneyline"
+  const bt = state.tab === "portfolio" && (state.pfView === "backtest" || state.pfView === "model" || pfLevelOn() === "portfolio") && pfCurrent()?.id === "moneyline"
     ? [sb.lean, sb.edge12].flatMap((b) => (b?.available ? Object.keys(b.leagues || {}) : [])) : [];
   const codes = new Set([...(state.data.fixtures || []).map(fxLeague), ...(state.data.leagues || []).filter((l) => l.fixtures > 0).map((l) => l.code), ...[...(ml?.live?.trades || []), ...(ml?.backtest?.trades || []), ...(co?.live?.trades || [])].map(tLeague), ...bt]);
   const order = LEAGUES.map(([k]) => k);
@@ -2733,8 +2734,7 @@ function pfClassic(topIn) {
       <span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>
       <span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span>
     </div>`;
-  const retiredLinks = retired.length ? `
-    <div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : "";
+  const retiredLinks = "";
   const toggle = `
     <div class="segmented small-seg" role="group" aria-label="Which trades">
       ${[["live", "Live paper"], ["backtest", "Backtest"]].map(([k, l]) => `<button data-pf="${k}" class="${state.pfView === k ? "on" : ""}" aria-pressed="${state.pfView === k}">${l}</button>`).join("")}
@@ -3284,35 +3284,6 @@ function backtestHeadline(cur, x, lg = "") {
   const sm = bt?.summary;
   return sm ? { v: signedPct(sm.roi), cls: signCls(sm.roi), sub: `${(sm.trades || 0).toLocaleString()} bets · DraftKings` } : null;
 }
-function strategyList(cur, strats, sel, lg, backtest) {
-  const rows = strats.map((x) => {
-    const on = x.key === sel.key;
-    const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
-    const status = cur.status === "retired" ? "Retired · keeps its record"
-      : cur.status === "testing" && !m.open && !m.n ? "In testing"
-      : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`;
-    const rule = ruleText(x);
-    const variant = !!x.variantOf;
-    let right;
-    if (backtest) {
-      const h = backtestHeadline(cur, x, lg);
-      right = h ? `<b class="${h.cls}">${h.v}</b><small>${esc(h.sub)}</small>` : `<b class="muted">–</b><small>no backtest</small>`;
-    } else {
-      right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
-        ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
-        : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
-    }
-    const attrs = strats.length > 1 ? ` data-pfstrat="${esc(x.key)}" aria-pressed="${on}"` : ` aria-current="true"`;
-    return `
-      <button class="row-btn strat${variant ? " variant" : ""}${on ? " on" : ""}${cur.status === "retired" ? " retired" : ""}"${attrs}${variant ? ` aria-label="${esc(x.label)}"` : ""}>
-        <span class="who">${variant
-          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">${x.st?.adds === "shadow" ? "Adds the picks the rule now skips" : "Filtered"}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
-          : `<b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span>`}</span>
-        <span class="vals">${right}</span>
-      </button>`;
-  }).join("");
-  return `<div class="card list">${rows}</div>`;
-}
 // The bet in words: "Barcelona to win", "Draw", "Valencia over 4.5 corners".
 function betName(t) {
   if (isCorner(t) || isPlayer(t)) return tradeLabel(t);
@@ -3780,7 +3751,8 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const vNote = x.variantOf ? x.st?.note || x.st?.filter?.note : "";
   const rules = `<div class="explain live-test rule-note">${vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
-  const title = `<div class="section-title nocase">${esc(x.label)}${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>`;
+  // The page heading already names the strategy; only a chosen competition needs saying.
+  const title = lg ? `<div class="section-title nocase">${esc(leagueName(lg))} only</div>` : "";
   if (!trades.length) {
     const empty = drv ? `No ${DRIVER_NAME[drv].toLowerCase()} Lean trades yet.`
       : lean ? `No Blend Lean trades yet. One opens when a side's blended chance beats DraftKings' break-even by 1σ.${x.rule?.source === "none" && x.rule?.note ? ` ${esc(x.rule.note)}` : ""}`
@@ -3838,7 +3810,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const judged = x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
   // Blend Lean's line is the new rule backcast from its first trade (owner, 24 Oct).
   const bc = x.st?.backcast;
-  const backcast = bc?.applied ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is the indented row below.</p>` : "";
+  const backcast = bc?.applied ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is its own ↳ folder under Moneyline.</p>` : "";
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
   const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
@@ -3863,22 +3835,87 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${pfBreakdowns(set.breakdowns || {})}
     ${rules}`;
 }
-function viewPortfolio() {
-  const all = portfolios();
+// Portfolio as drill-down lists (owner, 24 Oct): the tab opens on one row per portfolio, a
+// portfolio opens on one row per strategy (shadow filters filed under their parent), and
+// a strategy opens on its Live paper / Backtest / Model views. state.pfLevel = "home",
+// "portfolio" or "strategy"; the Portfolio tab button, tapped again, goes back to the top.
+// Anytime goalscorer is hidden while nobody is working on it (owner, 24 Oct).
+const PF_HIDDEN = new Set(["goalscorer"]);
+const CHEV = `<span class="chev" aria-hidden="true">›</span>`;
+const pfMulti = (cur) => pfStrategies(cur).length > 1;
+// The level on screen: a hidden portfolio, or a strategy level for a portfolio with one
+// strategy's folder, falls back sensibly.
+function pfLevelOn() {
+  const lv = state.pfLevel || "home";
+  if (lv === "home") return "home";
   const cur = pfCurrent();
-  const active = all.filter((p) => p.status !== "retired");
-  const retired = all.filter((p) => p.status === "retired" && p.id !== cur.id);
-  const switcher = active.length > 1 || cur.status === "retired" ? `
-    <div class="segmented" role="group" aria-label="Portfolio">
-      ${active.map((p) => `<button data-pfid="${esc(p.id)}" class="${p.id === cur.id ? "on" : ""}" aria-pressed="${p.id === cur.id}">${esc(p.name)}</button>`).join("")}
-    </div>` : "";
-  const head = `
-    <div class="pf-head">
-      <span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>
-      <span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span>
-    </div>`;
-  const retiredLinks = retired.length ? `
-    <div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : "";
+  if (!cur || PF_HIDDEN.has(cur.id)) return "home";
+  return lv === "portfolio" && !pfMulti(cur) ? "strategy" : lv;
+}
+// "Portfolio › Moneyline ›": each step goes back up a level.
+function pfCrumbs(cur, toPortfolio) {
+  const steps = [`<button class="crumb" data-pfnav="home">${toPortfolio ? "Portfolio" : "‹ Portfolio"}</button>`];
+  if (toPortfolio) steps.push(`<button class="crumb" data-pfnav="portfolio">${esc(cur.name)}</button>`);
+  return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
+}
+const pfPill = (cur) => `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`;
+function pfHomeHtml() {
+  const all = portfolios();
+  const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id));
+  const retired = all.filter((p) => p.status === "retired");
+  const rows = shown.map((p) => {
+    const names = pfStrategies(p).filter((x) => !x.variantOf).map((x) => x.label);
+    const m = tradeStats(p.live?.trades || []);
+    const right = m.n
+      ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
+      : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
+    return `
+      <button class="row-btn folder" data-pfid="${esc(p.id)}">
+        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}</span></span>
+        <span class="vals">${right}</span>${CHEV}
+      </button>`;
+  }).join("");
+  return `
+    <div class="section-title">Portfolios</div>
+    <div class="card list folders">${rows}</div>
+    <p class="note">Each portfolio holds that market's paper strategies. Profit is all its strategies together, in every competition, $10 a trade. Paper trades: no money is staked.</p>
+    ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
+}
+// One folder per strategy: its live record, and its backtest headline underneath.
+function strategyFolders(cur, strats, lg) {
+  const rows = strats.map((x) => {
+    const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
+    const status = cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`;
+    const rule = ruleText(x);
+    const variant = !!x.variantOf;
+    const right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
+      ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
+      : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
+    const h = variant ? null : backtestHeadline(cur, x, lg);
+    const bt = variant ? "" : `<span class="bt">Backtest: ${h ? `<b class="${h.cls}">${h.v}</b> · ${esc(h.sub)}` : "none"}</span>`;
+    return `
+      <button class="row-btn folder strat${variant ? " variant" : ""}" data-pfstrat="${esc(x.key)}"${variant ? ` aria-label="${esc(x.label)}"` : ""}>
+        <span class="who">${variant
+          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">${x.st?.adds === "shadow" ? "Adds the picks the rule now skips" : "Filtered"}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
+          : `<b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span>`}${bt}</span>
+        <span class="vals">${right}</span>${CHEV}
+      </button>`;
+  }).join("");
+  return `<div class="card list folders">${rows}</div>`;
+}
+function pfFolderHtml(cur, strats) {
+  const lg = leagueOn();
+  return `
+    ${pfCrumbs(cur, false)}
+    <h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2>
+    <div class="pf-head"><span>${esc(cur.note || "")}</span></div>
+    ${leagueFilter()}
+    <div class="section-title">Strategies</div>
+    ${strategyFolders(cur, strats, lg)}
+    <p class="note">Open a strategy for its live paper trades, its backtest and its model. Shadow filters (↳) place no bets of their own: each tracks part of its parent's picks${strats.some((x) => x.st?.adds === "shadow") ? ", or the picks a rule now skips" : ""}.</p>`;
+}
+function pfStrategyHtml(cur, allStrats) {
+  const multi = allStrats.length > 1;
   // Moneyline and Team corners have a third view: each strategy's model and its calibration.
   const hasModel = cur.id === "moneyline" || cur.id === "corners";
   const views = [["live", "Live paper"], ["backtest", "Backtest"], ...(hasModel ? [["model", "Model"]] : [])];
@@ -3887,21 +3924,32 @@ function viewPortfolio() {
     <div class="segmented small-seg" role="group" aria-label="Which view">
       ${views.map(([k, l]) => `<button data-pf="${k}" class="${view === k ? "on" : ""}" aria-pressed="${view === k}">${l}</button>`).join("")}
     </div>`;
-  const backtest = view === "backtest";
-  const allStrats = pfStrategies(cur);
-  // Variants have no backtest or model of their own: those views list the parents only
-  // and show the selected variant's parent.
-  const strats = view === "live" ? allStrats : allStrats.filter((x) => !x.variantOf);
-  const sel = pfParent(allStrats, pfSelected(allStrats, cur));
-  const live = view === "live" ? pfSelected(allStrats, cur) : sel;
-  const research = backtest && cur.backtest?.kind === "research";
+  const x = pfSelected(allStrats, cur);
+  // Variants have no backtest or model of their own: those views show the parent's.
+  const parent = pfParent(allStrats, x);
+  const research = view === "backtest" && cur.backtest?.kind === "research";
   const byComp = cur.id === "moneyline" || cur.id === "corners";
   const lg = byComp && !research ? leagueOn() : "";
-  const list = `<div class="section-title">${backtest ? "Strategies, tested on past prices" : "Paper strategies"}</div>${strategyList(cur, strats, live, lg, backtest)}`;
-  const top = `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${list}`;
-  if (view === "model") return `${top}${modelViewHtml(cur, sel, lg)}${retiredLinks}`;
-  if (!backtest) return `${top}${liveStrategyHtml(cur, live, lg, allStrats)}${retiredLinks}`;
-  return pfClassic(top);
+  const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
+  const rule = ruleText(x);
+  const sub = x.variantOf
+    ? `Shadow filter of ${esc(parent.label)}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
+    : multi ? `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}` : "";
+  const head = multi
+    ? `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(x.label)}</h2>${sub ? `<div class="pf-sub">${sub}</div>` : ""}`
+    : `${pfCrumbs(cur, false)}<h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2><div class="pf-head"><span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span></div>`;
+  const parentNote = x.variantOf && view !== "live" ? `<p class="note">A shadow filter has no ${view === "model" ? "model" : "backtest"} of its own: this is ${esc(parent.label)}'s.</p>` : "";
+  const top = `${head}${byComp && !research ? leagueFilter() : ""}${toggle}${parentNote}`;
+  if (view === "model") return `${top}${modelViewHtml(cur, parent, lg)}`;
+  if (view === "backtest") return pfClassic(top);
+  return `${top}${liveStrategyHtml(cur, x, lg, allStrats)}`;
+}
+function viewPortfolio() {
+  const level = pfLevelOn();
+  if (level === "home") return pfHomeHtml();
+  const cur = pfCurrent();
+  const allStrats = pfStrategies(cur);
+  return level === "portfolio" ? pfFolderHtml(cur, allStrats) : pfStrategyHtml(cur, allStrats);
 }
 
 // Who prices the player shot lines (FanDuel; match odds come from DraftKings).
@@ -4083,7 +4131,13 @@ document.addEventListener("click", (ev) => {
   const t = ev.target.closest("button, [data-close]");
   if (!t) return;
   if (t.dataset.tab) {
+    // The Portfolio tab, tapped again, goes back to its folders.
+    if (t.dataset.tab === "portfolio" && state.tab === "portfolio") state.pfLevel = "home";
     setTab(t.dataset.tab);
+  } else if (t.dataset.pfnav) {
+    state.pfLevel = t.dataset.pfnav; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    render();
+    window.scrollTo(0, 0);
   } else if (t.dataset.edge !== undefined) {
     state.exploreEdge = t.dataset.edge === "reset" ? null : Number(t.dataset.edge);
     render();
@@ -4099,14 +4153,15 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfstrat) {
     if (pfCurrent()?.id === "corners") { state.pfStratCorners = t.dataset.pfstrat; store.set("pfStratCorners", state.pfStratCorners); }
     else { state.pfStrat = t.dataset.pfstrat; store.set("pfStrat", state.pfStrat); }
-    state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    state.pfLevel = "strategy"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     render();
+    window.scrollTo(0, 0);
   } else if (t.dataset.recbet) {
     state.recBet = t.dataset.recbet;
     render();
 
   } else if (t.dataset.gotoPf) {
-    state.pfId = t.dataset.gotoPf; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    state.pfId = t.dataset.gotoPf; state.pfLevel = "portfolio"; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     store.set("pfId", state.pfId);
     setTab("portfolio");
 
@@ -4122,7 +4177,7 @@ document.addEventListener("click", (ev) => {
     store.set("league", state.league);
     render();
   } else if (t.dataset.pfid) {
-    state.pfId = t.dataset.pfid; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    state.pfId = t.dataset.pfid; state.pfLevel = "portfolio"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     store.set("pfId", state.pfId);
     render();
     window.scrollTo(0, 0);

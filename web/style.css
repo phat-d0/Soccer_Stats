@@ -856,3 +856,24 @@ details.drv-fold { margin-top: 10px; }
 .sizing-frame { margin-top: 0; }
 .bank-card .chart.overlay svg { max-width: 460px; margin: 0 auto; }
 .kelly-line { margin-top: 10px; }
+/* Portfolio drill-down (owner, 24 Oct): portfolios, then strategies, then a strategy's views. */
+.row-btn.folder { grid-template-columns: 1fr auto auto; gap: 2px 10px; padding: 12px 0; }
+.row-btn.folder .vmark { color: var(--text-muted); font-weight: 400; }
+.row-btn.folder .who .pill { margin-left: 4px; vertical-align: 1px; }
+.row-btn.folder .bt { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: normal; }
+.row-btn.folder .bt b { font-weight: 600; }
+.row-btn.folder .chev { color: var(--text-muted); font-size: 20px; line-height: 1; }
+.card.list .row-btn.folder.variant { padding-left: 22px; }
+.row-btn.folder.variant .who b { font-weight: 500; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 6px 0 2px; font-size: 14px; }
+.crumbs .crumb { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--accent); cursor: pointer; }
+.crumbs .crumb-back { color: var(--accent); font-size: 18px; line-height: 1; }
+.crumbs .crumb-sep { color: var(--text-muted); }
+.pf-title { font-size: 20px; font-weight: 700; margin: 2px 0 2px; line-height: 1.25; }
+.pf-title .pill { font-size: 11px; vertical-align: 3px; margin-left: 4px; }
+.pf-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.pf-title + .pf-head { margin-top: 2px; }
+.pf-sub + .chips, .pf-title + .chips, .pf-head + .chips { margin-top: 10px; }
+.pf-sub + .segmented, .pf-title + .segmented { margin-top: 10px; }
+.row-btn.folder .who .pill { white-space: nowrap; }
+.row-btn.folder .meta { white-space: normal; }
