@@ -38,7 +38,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v55";
+const APP_VERSION = "v56";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2474,7 +2474,7 @@ function strategyBacktestHtml(bt, lg = "", key = "lean", opts = {}) {
     ${head}
     ${lbTiles(m)}
     ${close ? `<p class="note">${esc(part.note || "")}</p>` : ""}`;
-  const bands = backtestBandsHtml(bt, part, key, lg);
+  const bands = `${sizingHtml(`bz-${key}-${lg || "all"}`, part.sizing)}${backtestBandsHtml(bt, part, key, lg)}`;
   if (opts.brief) return `${top}${bands}${lbSeasons(part.by_season, key)}${lg ? lbLeagueDetails(part) : ""}`;
   const by = m.by_driver || {};
   const dnote = bt.rule?.driver_note || driverNote();
@@ -3476,30 +3476,35 @@ function curveChart(curve, start) {
 // series holding its total on days it didn't move. One scrub point per day; the readout
 // gives every series that day and each variant's difference from the first.
 const SERIES_CLS = ["s0", "s1", "s2", "s3"];
-function overlayCurveChart(series, definedAt, start, markLabel = "filter set (judged from here)") {
+// opts (owner, 24 Oct, the Kelly bankroll chart): id (scrub id, default "cv"), base (the
+// origin value, default $0), axis(v) / end(v) labels, readout(series, rows, i), aria.
+function overlayCurveChart(series, definedAt, start, markLabel = "filter set (judged from here)", opts = {}) {
+  const base = opts.base ?? 0;
+  const axis = opts.axis || ((v) => usd(v));
+  const endText = opts.end || ((v) => usd(v, Math.abs(v) < 10 ? 2 : 0));
   const days = [...new Set(series.flatMap((o) => o.curve.map((c) => c.date)))].sort();
   if (!days.length) return "";
   start = start || days[0];
   // Stop 0 is the $0 origin (the first trade opened), then one stop per settled day.
   const rows = series.map((o) => {
     const at = new Map(o.curve.map((c) => [c.date, c]));
-    let cum = 0;
-    return [{ date: start, cum: 0, origin: true }, ...days.map((d) => { const c = at.get(d); if (c) cum = c.cum; return { date: d, cum, day: c || null }; })];
+    let cum = base;
+    return [{ date: start, cum: base, origin: true }, ...days.map((d) => { const c = at.get(d); if (c) cum = c.cum; return { date: d, cum, day: c || null }; })];
   });
-  const W = 320, H = 190, L = 44, R = 58, T = 16, B = 22;
+  const W = 320, H = 190, L = opts.base ? 50 : 44, R = 58, T = 16, B = 22;
   const ys = rows.flat().map((c) => c.cum);
-  const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+  const lo = Math.min(base, ...ys), hi = Math.max(base, ...ys);
   const span = hi - lo || 1;
   const sx = (i) => L + (i / days.length) * (W - L - R); // index 0 = start ($0), day k at k + 1
   const sy = (v) => T + (1 - (v - lo) / span) * (H - T - B);
-  const ticks = [lo, hi].filter((v) => Math.abs(v) > span * 0.12);
-  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${usd(v)}</text>`).join("");
+  const ticks = [lo, hi].filter((v) => Math.abs(v - base) > span * 0.12);
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${L - 4}" y="${sy(v) + 3}" text-anchor="end">${axis(v)}</text>`).join("");
   const paths = rows.map((r, k) => `<path class="line ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" d="${r.map((c, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(c.cum).toFixed(1)}`).join(" ")}"/>`).join("");
   // End labels, nudged apart when two totals sit close together.
   const ends = rows.map((r, k) => ({ k, v: r[r.length - 1].cum, y: sy(r[r.length - 1].cum) })).sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
   const last = days.length;
-  const endLabels = ends.map((e) => `<circle class="dot ser ${SERIES_CLS[e.k % 4]}" cx="${sx(last)}" cy="${sy(e.v)}" r="4"/><text class="end ser ${SERIES_CLS[e.k % 4]}" x="${sx(last) + 8}" y="${e.y + 4}">${usd(e.v, Math.abs(e.v) < 10 ? 2 : 0)}</text>`).join("");
+  const endLabels = ends.map((e) => `<circle class="dot ser ${SERIES_CLS[e.k % 4]}" cx="${sx(last)}" cy="${sy(e.v)}" r="4"/><text class="end ser ${SERIES_CLS[e.k % 4]}" x="${sx(last) + 8}" y="${e.y + 4}">${endText(e.v)}</text>`).join("");
   // The filter marker sits between the last day before it and the first day on or after it.
   let marker = "";
   if (definedAt) {
@@ -3509,33 +3514,104 @@ function overlayCurveChart(series, definedAt, start, markLabel = "filter set (ju
     const anchor = mx > (L + W - R) / 2 ? "end" : "start";
     marker = `<line class="filter-mark" x1="${mx}" x2="${mx}" y1="${T - 6}" y2="${H - B}"/><text class="filter-lab" x="${mx + (anchor === "end" ? -4 : 4)}" y="${T - 6}" text-anchor="${anchor}">${esc(markLabel)}</text>`;
   }
-  const id = "cv";
+  const id = opts.id || "cv", rid = `${id}-readout`;
+  const readout = opts.readout || overlayReadout;
   scrubCharts[id] = {
-    readoutId: "cv-readout",
+    readoutId: rid,
     xs: rows[0].map((_, i) => sx(i)),
     points: (i) => rows.map((r) => ({ x: sx(i), y: sy(r[i].cum) })),
-    readout: (i) => overlayReadout(series, rows, i),
+    readout: (i) => readout(series, rows, i),
     data: rows[0].map((c) => c.date),
   };
   const legend = series.map((o, k) => `<span class="lg-item"><svg class="lg-sw" viewBox="0 0 22 8" aria-hidden="true"><line class="ser ${SERIES_CLS[k % 4]}${k ? " dash" : ""}" x1="1" x2="21" y1="4" y2="4"/></svg>${esc(o.name)}${o.label ? `<span class="muted"> · ${esc(o.label)}</span>` : ""}</span>`).join("");
   return `
     <div class="curve-legend">${legend}</div>
-    <div class="chart curve overlay scrub" ${scrubAttrs(id, last + 1, "Profit over time, every version: drag or use the arrow keys to move along the lines")}>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settled paper profit by day: ${esc(series.map((o, k) => `${o.name} ${usd(rows[k][last].cum, 2)}`).join(", "))}">
+    <div class="chart curve overlay scrub" ${scrubAttrs(id, last + 1, opts.aria || "Profit over time, every version: drag or use the arrow keys to move along the lines")}>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria ? `${opts.aria}: ` : "Settled paper profit by day: ")}${esc(series.map((o, k) => `${o.name} ${endText(rows[k][last].cum)}`).join(", "))}">
         <g class="grid">${grid}</g>
-        <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(0)}" y2="${sy(0)}"/>
-        <text class="xlab" x="${L - 4}" y="${sy(0) + 3}" text-anchor="end">$0</text>
+        <line class="zero" x1="${L}" x2="${W - R}" y1="${sy(base)}" y2="${sy(base)}"/>
+        <text class="xlab" x="${L - 4}" y="${sy(base) + 3}" text-anchor="end">${axis(base)}</text>
         ${marker}
         ${paths}
         ${endLabels}
-        <text class="xlab" x="${L}" y="${H - 6}">${esc(monthDay(`${start}T12:00:00Z`))}</text>
-        <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc(monthDay(`${days[last - 1]}T12:00:00Z`))}</text>
+        <text class="xlab" x="${L}" y="${H - 6}">${esc((opts.dateLabel || ((d) => monthDay(`${d}T12:00:00Z`)))(start))}</text>
+        <text class="xlab" x="${sx(last)}" y="${H - 6}" text-anchor="end">${esc((opts.dateLabel || ((d) => monthDay(`${d}T12:00:00Z`)))(days[last - 1]))}</text>
         <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
         ${rows.map((_, k) => `<circle class="cdot ser ${SERIES_CLS[k % 4]}" r="4.5" cx="0" cy="0" style="display:none"/>`).join("")}
         ${scrubPad(W, H)}
       </svg>
-      <div class="eb-readout" id="cv-readout" aria-live="polite">${overlayReadout(series, rows, last)}</div>
+      <div class="eb-readout" id="${rid}" aria-live="polite">${readout(series, rows, last)}</div>
     </div>`;
+}
+// ---------- Kelly sizing beside the flat $10 record (owner, 24 Oct; paper/backtest `sizing`) ----------
+// sizing = {flat, kelly, kelly_raw? (Model 12%), blend_from?}; each block {bankroll_start,
+// bankroll_now, profit, max_drawdown, max_drawdown_pct, bets, bets_settled, bets_staked,
+// bets_zero_stake, bets_no_chance?, median_stake, curve [{date, bankroll}], stakes? (live
+// Kelly: {trade id: stake}), p_note?, note, label?}. Flat isn't held to the bankroll (it keeps
+// staking $10 below $0, so its P/L equals the record); Kelly can't go below $0.
+const bankUsd = (v, d = 0) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+const SIZING_LINES = [["flat", "Flat $10"], ["kelly", "¼ Kelly"], ["kelly_raw", "Kelly on the raw model (over-confident)"]];
+const sizingName = (k, b) => (k === "kelly_raw" ? b?.label || SIZING_LINES[2][1] : SIZING_LINES.find(([kk]) => kk === k)?.[1] || k);
+// "would have gone broke (fell $X below the $1,000 start)" for flat once it passes $0;
+// "bust" for Kelly at about $0; else the drawdown as a share of the peak and in dollars.
+function drawdownText(k, b) {
+  const start = b.bankroll_start ?? 1000;
+  const low = Math.min(b.bankroll_now, ...(b.curve || []).map((c) => c.bankroll));
+  if (k === "flat" && (b.bankroll_now <= 0 || (b.max_drawdown_pct ?? 0) > 1)) return `would have gone broke (fell ${bankUsd(start - low)} below the ${bankUsd(start)} start)`;
+  if (k !== "flat" && b.bankroll_now < 1) return "bust";
+  return `${pct(b.max_drawdown_pct, 1)} (${bankUsd(b.max_drawdown, 0)})`;
+}
+// A backtest runs over seasons, so its dates carry the year.
+const dayYear = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const longSpan = (dates) => dates.length > 1 && Date.parse(dates[dates.length - 1]) - Date.parse(dates[0]) > 300 * 864e5;
+function sizingReadout(series, rows, i) {
+  const parts = series.map((o, k) => `${esc(o.name)} <b>${bankUsd(rows[k][i].cum, 2)}</b>`);
+  const dates = rows[0].map((r) => r.date);
+  return `<b>${esc(longSpan(dates) ? dayYear(rows[0][i].date) : dayName(rows[0][i].date))}</b>${rows[0][i].origin ? " · start" : ""} · ${parts.join(" · ")}`;
+}
+// The bankroll chart and tiles for one sizing block (live strategy or backtest part).
+function sizingHtml(id, sz, where = "") {
+  if (!sz) return "";
+  if (sz.error) return `<div class="section-title">Bankroll: flat $10 vs ¼ Kelly</div><p class="note">The Kelly comparison couldn't be worked out this time (${esc(sz.error)}).</p>`;
+  const lines = SIZING_LINES.map(([k]) => [k, sz[k]]).filter(([, b]) => b && Array.isArray(b.curve));
+  if (!lines.length || !lines.some(([, b]) => b.bets)) return "";
+  const series = lines.map(([k, b]) => ({ name: sizingName(k, b), curve: b.curve.map((c) => ({ date: c.date, cum: c.bankroll })) }));
+  const first = series.flatMap((o) => o.curve.map((c) => c.date)).sort()[0];
+  const chart = series.some((o) => o.curve.length)
+    ? overlayCurveChart(series, null, first, "", { id, base: lines[0][1].bankroll_start ?? 1000, axis: (v) => bankUsd(v), end: (v) => bankUsd(v), readout: sizingReadout, aria: "Bankroll by day, flat $10 against quarter Kelly", dateLabel: longSpan(series.flatMap((o) => o.curve.map((c) => c.date)).sort()) ? (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" }) : null })
+    : `<p class="muted">The bankroll moves once a trade settles.</p>`;
+  const f = sz.flat || {}, k = sz.kelly || {};
+  const raw = sz.kelly_raw;
+  const tile = (label, value, sub, cls = "") => `<div class="tile"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="sub">${sub}</div></div>`;
+  const kBust = drawdownText("kelly", k) === "bust";
+  const tiles = `<div class="tiles pf-tiles sizing-tiles">
+      ${tile("Bankroll now, ¼ Kelly", kBust ? "bust" : bankUsd(k.bankroll_now, 2), `flat $10: ${bankUsd(f.bankroll_now, 2)}`)}
+      ${tile("Profit, ¼ Kelly", usd(k.profit, 2), `flat $10: ${usd(f.profit, 2)}`, signCls(k.profit))}
+      ${tile("Max drawdown, ¼ Kelly", kBust ? "bust" : pct(k.max_drawdown_pct, 1), `flat $10: ${drawdownText("flat", f)}`)}
+      ${tile("Bets staked", `${num(k.bets_staked)} of ${num(k.bets)}`, `${num(k.bets_zero_stake)} with no stake${k.bets_no_chance ? ` · ${num(k.bets_no_chance)} with no chance to size on` : ""}`)}
+    </div>`;
+  const rawLine = raw ? `<p class="note"><b>${esc(sizingName("kelly_raw", raw))}:</b> bankroll ${drawdownText("kelly_raw", raw) === "bust" ? "<b>bust</b>" : `${bankUsd(raw.bankroll_now, 2)}, max drawdown ${drawdownText("kelly_raw", raw)}`}, ${num(raw.bets_staked)} of ${num(raw.bets)} bets staked.</p>` : "";
+  const notes = [k.p_note, raw?.p_note, k.note || f.note].filter(Boolean);
+  return `
+    <div class="section-title">Bankroll: flat $10 vs ¼ Kelly${where ? ` <span class="muted nocase">· ${esc(where)}</span>` : ""}</div>
+    <p class="note sizing-frame">Flat $10 is the record. Kelly is shown for comparison and only helps once a strategy beats the closing price.</p>
+    <div class="card bank-card">${chart}</div>
+    ${tiles}
+    ${rawLine}
+    ${notes.length ? `<details class="fold mk-fold"><summary>How Kelly is sized here</summary>${notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</details>` : ""}`;
+}
+// A trade's quarter-Kelly stake: from whichever live strategy's sizing holds its id.
+function kellyStakeLine(t) {
+  for (const p of portfolios()) {
+    for (const st of p.live?.strategies || []) {
+      const stakes = st.sizing?.kelly?.stakes;
+      if (stakes && Object.hasOwn(stakes, t.id)) {
+        const v = stakes[t.id];
+        return v > 0 ? `¼ Kelly stake: ${bankUsd(v, 2)}` : `Kelly: no stake (no edge on the ${st.sizing.kelly.p_source === "model_f" ? "model (f) chance" : "calibrated chance"})`;
+      }
+    }
+  }
+  return "";
 }
 // "Sat 18 Oct · All +$23.40 · Below 60% +$31.10 (difference +$7.70)"; at the origin
 // "Thu, Oct 9 · first trade opened · All $0.00 · Below 60% $0.00".
@@ -3771,7 +3847,8 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${judged}
     ${drvPanel}
     <div class="section-title">Profit over time</div>
-    <div class="card">${chart}</div>
+    <div class="card pf-curve">${chart}</div>
+    ${sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "")}
     ${liveOddsBandsHtml(cur, x, lg, drv)}
     <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk` : ""}</div>
     ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
@@ -3960,6 +4037,7 @@ function tradeHtml(t) {
       <div class="card" style="padding:8px 14px;margin-top:10px">
         <table class="kv"><tbody>${rows}</tbody></table>
       </div>
+      ${t.source === "live" && kellyStakeLine(t) ? `<p class="note kelly-line">${esc(kellyStakeLine(t))}. Shown for comparison only: flat $10 is the record.</p>` : ""}
     </div>`;
 }
 

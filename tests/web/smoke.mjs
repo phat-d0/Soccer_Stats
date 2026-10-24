@@ -123,6 +123,39 @@ async function liveBandsCheck(p, pfId, key, lg) {
   if (beside && !text.includes("In the backtest")) throw new Error(`${id}: comparison table`);
   await scrubCheck(p, `[data-scrub="${id}"]`);
 }
+// Kelly beside flat $10 (owner, 24 Oct): the chart `id` draws one line per sizing block from
+// $1,000, its readout gives each line's bankroll that day, the tiles carry the data's numbers
+// (with "would have gone broke" / "bust" where they apply), and it scrubs.
+async function sizingCheck(p, id, getSizing) {
+  const sz = await p.evaluate(getSizing);
+  const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+  for (const w of ["Bankroll: flat $10 vs ¼ Kelly", "Flat $10 is the record. Kelly is shown for comparison and only helps once a strategy beats the closing price.", "How Kelly is sized here"]) if (!text.includes(w)) throw new Error(`${id} lacks "${w}"`);
+  const lines = ["flat", "kelly", "kelly_raw"].filter((k) => sz[k]?.curve);
+  if ((await p.locator(`[data-scrub="${id}"] path.line.ser`).count()) !== lines.length) throw new Error(`${id}: ${lines.length} lines expected`);
+  const tiles = (await p.locator(`[data-scrub="${id}"]`).locator("xpath=ancestor::div[contains(@class,'bank-card')]/following-sibling::div[contains(@class,'sizing-tiles')][1]").innerText()).replace(/\s+/g, " ");
+  const want = await p.evaluate((sz) => ({ k: drawdownText("kelly", sz.kelly) === "bust" ? "bust" : bankUsd(sz.kelly.bankroll_now, 2), f: bankUsd(sz.flat.bankroll_now, 2), dd: drawdownText("flat", sz.flat) }), sz);
+  for (const w of [want.k, `flat $10: ${want.f}`, `flat $10: ${want.dd}`]) if (!tiles.includes(w)) throw new Error(`${id} tiles lack "${w}": ${tiles}`);
+  if (sz.flat.bankroll_now <= 0 && !tiles.includes("would have gone broke (fell $")) throw new Error(`${id}: flat went broke but the tiles don't say so`);
+  if (/\d{3,}\.\d%/.test(tiles)) throw new Error(`${id}: a drawdown over 100% shown as a percentage: ${tiles}`);
+  // Each readout stop names every line's bankroll on that day.
+  const bad = await p.evaluate(([id, sz]) => {
+    const sc = scrubCharts[id];
+    const keys = ["flat", "kelly", "kelly_raw"].filter((k) => sz[k]?.curve);
+    const out = [];
+    sc.data.forEach((d, i) => {
+      if (!i) return;
+      const r = plain(sc.readout(i));
+      keys.forEach((k) => {
+        const c = [...sz[k].curve].reverse().find((x) => x.date <= d);
+        const v = c ? c.bankroll : sz[k].bankroll_start;
+        if (!r.includes(bankUsd(v, 2))) out.push(`${d} ${k} ${bankUsd(v, 2)} not in "${r}"`);
+      });
+    });
+    return out.slice(0, 3);
+  }, [id, sz]);
+  if (bad.length) throw new Error(`${id} readouts: ${bad.join(" | ")}`);
+  await scrubCheck(p, `[data-scrub="${id}"]`);
+}
 async function scrubCheck(p, sel) {
   const wrap = p.locator(sel).first();
   await wrap.scrollIntoViewIfNeeded();
@@ -595,7 +628,10 @@ const STEPS = [
     await p.mouse.wheel(0, 400);
     await p.waitForFunction((y0) => window.scrollY !== y0, before, { timeout: 3000 });
   }],
-  ["portfolio-live-bands", async (p) => { await liveBandsCheck(p, "moneyline", "lean", ""); }],
+  ["portfolio-live-bands", async (p) => {
+    await liveBandsCheck(p, "moneyline", "lean", "");
+    await sizingCheck(p, "kz-lean", () => pfById("moneyline").live.strategies.find((s) => s.key === "lean").sizing);
+  }],
   // Blend Lean's odds range (owner, 24 Oct): the rule on Lean's row and rule box; the old
   // rule (all odds) as an indented variant that adds the shadow entries, with the overlay.
   ["portfolio-lean-old-rule", async (p) => {
@@ -614,7 +650,7 @@ const STEPS = [
     if (!origin.startsWith(`${want0} · first trade opened`)) throw new Error(`overlay origin ${origin} vs lean_started ${want0}`);
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
     if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips")) throw new Error(`old-rule row: ${vrow}`);
-    if ((await p.locator(".curve-legend .lg-item").allInnerTexts()).join("|").indexOf("Live rule") < 0) throw new Error("overlay legend lacks the live rule");
+    if ((await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|").indexOf("Live rule") < 0) throw new Error("overlay legend lacks the live rule");
     await p.click('button[data-pfstrat="lean_all_odds"]');
     const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
     const want = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "lean_all_odds").trade_ids);
@@ -638,6 +674,8 @@ const STEPS = [
     await p.click('button[data-pfstrat="lean_all_odds"]');
     if (await p.locator('button[data-pfstrat="lean"].on').count()) throw new Error("old rule not selected");
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
+    const kl = await p.textContent("#sheet-body .kelly-line");
+    if (!/^(¼ Kelly stake: \$[\d,.]+|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
     const text = await p.textContent("#sheet-body");
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
   }, true],
@@ -719,6 +757,7 @@ const STEPS = [
     if (!(await p.textContent("#rc-readout-lbroi")).includes("bets")) throw new Error("ROI readout");
     await scrubCheck(p, "[data-scrub='lbroi']");
     await bandsCheck(p, "lean", "");
+    await sizingCheck(p, "bz-lean-all", () => state.data.portfolio.strategy_backtests.lean.all.sizing);
   }],
   ["portfolio-lean-backtest-model", async (p) => {
     await p.click('button[data-pfdriver="model"]');
@@ -759,6 +798,7 @@ const STEPS = [
     const text = await p.textContent("#view");
     if (!text.includes("300") || (await p.locator("#view .tiles").count())) throw new Error("UCL Lean should show the file's note, not tiles");
     if (text.includes("Where the bets sit on the odds") || (await p.locator("#view .band-row").count())) throw new Error("UCL Lean has no bets: no band charts");
+    if (text.includes("Bankroll: flat $10 vs ¼ Kelly")) throw new Error("UCL Lean has no bets: no Kelly chart");
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
     const cov = await p.locator("details.mk-fold[open] table").innerText();
     for (const w of ["DK", "PIN", "Bet on"]) if (!cov.includes(w)) throw new Error(`UCL coverage lacks ${w}`);
@@ -769,6 +809,7 @@ const STEPS = [
     if (!text.includes("mostly measures the gap between the two books") || !(await p.locator("#view .tiles").count())) throw new Error("UCL Model 12% backtest");
     if (!text.includes("Pinnacle's close at the same moment")) throw new Error("UCL bands' close note");
     await bandsCheck(p, "edge12", "UCL");
+    await sizingCheck(p, "bz-edge12-UCL", () => state.data.portfolio.strategy_backtests.edge12.leagues.UCL.sizing);
     await p.click("details.mk-fold:has(summary:text('Seasons and fits')) > summary");
   }],
   ["portfolio-backtest-e2-edge12", async (p) => {
@@ -780,6 +821,7 @@ const STEPS = [
     await p.click('.chip[data-league="E3"]'); await p.click('button[data-pfstrat="lean"]');
     if (!(await p.locator("#view .tiles").count())) throw new Error("League Two Lean backtest tiles");
     await bandsCheck(p, "lean", "E3");
+    await sizingCheck(p, "bz-lean-E3", () => state.data.portfolio.strategy_backtests.lean.leagues.E3.sizing);
   }],
   ["portfolio-backtest-e3-edge12", async (p) => { await p.click('button[data-pfstrat="edge12"]'); await bandsCheck(p, "edge12", "E3"); }],
   // Model 12% under All: the per-league replay with its range plots and readout.
@@ -792,6 +834,10 @@ const STEPS = [
     await p.click('.rc-row[data-rc="edge12roi"][data-rcrow="0"]');
     if (!(await p.textContent("#rc-readout-edge12roi")).includes("bets")) throw new Error("12% ROI readout");
     await bandsCheck(p, "edge12", "");
+    // Pooled Model 12%: flat $10 falls far below $0 and Kelly on the raw model is bust.
+    await sizingCheck(p, "bz-edge12-all", () => state.data.portfolio.strategy_backtests.edge12.all.sizing);
+    const t = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!t.includes("would have gone broke (fell $") || !/Kelly on the raw model \(over-confident\): bankroll bust/.test(t)) throw new Error("12% pooled broke / bust wording");
   }],
   // Under the Premier League: the DraftKings backtest, then the Pinnacle replay, both labelled.
   ["portfolio-backtest-edge12-e0", async (p) => {
@@ -801,6 +847,7 @@ const STEPS = [
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
     await bandsCheck(p, "edge12", "E0");
+    await sizingCheck(p, "bz-edge12-E0", () => state.data.portfolio.strategy_backtests.edge12.leagues.E0.sizing);
   }],
   ["portfolio-backtest-e0-lean", async (p) => { await p.click('button[data-pfstrat="lean"]'); await bandsCheck(p, "lean", "E0"); }],
   // Model view (owner, 22 Oct): each strategy's equation, fitted numbers and calibration.
@@ -878,7 +925,11 @@ const STEPS = [
     if (!(await p.locator(".chart.curve").count())) throw new Error("no profit chart for the 12% test");
     if (!text.includes("95% range on ROI")) throw new Error("12% live lacks paper.py's ROI range");
   }],
-  ["portfolio-live-edge12-bands", async (p) => { await liveBandsCheck(p, "moneyline", "edge12", ""); }],
+  ["portfolio-live-edge12-bands", async (p) => {
+    await liveBandsCheck(p, "moneyline", "edge12", "");
+    await sizingCheck(p, "kz-edge12", () => pfById("moneyline").live.strategies.find((s) => s.key === "edge12").sizing);
+    if (!(await p.textContent("#view")).includes("Kelly on the raw model (over-confident):")) throw new Error("Model 12% lacks the raw-model Kelly line");
+  }],
   ["portfolio-live-edge12-states", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("12% awaiting group");
@@ -918,7 +969,10 @@ const STEPS = [
     }
     if (await p.locator('#view button[data-trade$="|dk"]').count()) throw new Error("a DraftKings trade shows under the Pinnacle track");
   }],
-  ["portfolio-corners-bands", async (p) => { await liveBandsCheck(p, "corners", "pinnacle"); }],
+  ["portfolio-corners-bands", async (p) => {
+    await liveBandsCheck(p, "corners", "pinnacle");
+    await sizingCheck(p, "kz-pinnacle", () => pfById("corners").live.strategies.find((s) => s.key === "pinnacle").sizing);
+  }],
   // The DraftKings track: its own trades, CLV vs DraftKings' close with Pinnacle's as a
   // second line, a one-sided close without DraftKings CLV; Moneyline's selection untouched.
   ["portfolio-corners-dk", async (p) => {
@@ -948,7 +1002,7 @@ const STEPS = [
     if (next !== "pinnacle_below60") throw new Error(`row under the Pinnacle track: ${next}`);
     const row = (await p.locator('button[data-pfstrat="pinnacle_below60"]').innerText()).replace(/\s+/g, " ");
     if (!row.includes("↳ below 60%") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
-    if (await p.locator(".curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
+    if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2 || await p.locator("[data-scrub='cv'] path.line.ser.dash").count() !== 1) throw new Error("overlay curves");
     const mark = await p.locator("[data-scrub='cv'] .filter-lab").textContent();
     if (mark !== "filter set (judged from here)") throw new Error(`filter marker: ${mark}`);

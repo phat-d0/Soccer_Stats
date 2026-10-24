@@ -852,3 +852,7 @@ details.drv-fold { margin-top: 10px; }
 .judged-tab th:first-child { width: 24%; white-space: normal; line-height: 1.25; }
 .judged-tab td { white-space: nowrap; }
 .judged-tab th, .judged-tab td { padding-left: 2px; padding-right: 2px; }
+/* Kelly sizing beside the flat record (owner, 24 Oct). */
+.sizing-frame { margin-top: 0; }
+.bank-card .chart.overlay svg { max-width: 460px; margin: 0 auto; }
+.kelly-line { margin-top: 10px; }
