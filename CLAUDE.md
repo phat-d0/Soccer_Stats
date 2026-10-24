@@ -594,7 +594,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v55) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v56) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -636,7 +636,18 @@ the owner's baseball app, so the balance can drop without any run here.
   `pfStratCorners`). Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
   the filters (`tradeStats`), the <200-settled caveat, paper.py's ROI range only when its summary
   covers exactly the trades shown, Lean's driver panel (`by_driver`, filter `pfDriver`), "Profit
-  over time" (`curveChart`: scrubbable, see below), "Where the bets sit on the odds" (owner, 24
+  over time" (`curveChart`: scrubbable, see below), "Bankroll: flat $10 vs ¼ Kelly" (owner, 24
+  Oct; `sizingHtml(id, sizing)` on the strategy's `sizing`, scrub id `kz-<key>`; the same on
+  Backtest from the part's `sizing`, `bz-<key>-<lg|all>`, beside the bands: the framing line
+  "Flat $10 is the record. Kelly is shown for comparison and only helps once a strategy beats
+  the closing price."; `overlayCurveChart` with `opts` {id, base 1000, axis/end `bankUsd`,
+  `sizingReadout}` drawing flat, ¼ Kelly and, for Model 12%, `kelly_raw` ("Kelly on the raw
+  model (over-confident)") from each block's `curve`; tiles for ¼ Kelly with flat beside it
+  (bankroll now, profit, max drawdown, bets staked / no stake / no chance); `drawdownText`:
+  flat past $0 or `max_drawdown_pct` > 1 reads "would have gone broke (fell $X below the
+  $1,000 start)", Kelly under $1 "bust"; `p_note` and `note` folded; the trade sheet's
+  `kellyStakeLine` from `sizing.kelly.stakes[id]`: "¼ Kelly stake: $x" or "Kelly: no stake
+  (no edge on the calibrated chance)"), "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
   `odds_bands.clv_field`; the ROI table; on Moneyline a table beside the same strategy's
