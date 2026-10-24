@@ -715,6 +715,35 @@ Results:
   edge in either league against Pinnacle. The owner decides whether to switch them on
   (`live=True` in `leagues.py` plus a `fit-match-blends` refit).
 
+### 24 Oct: Pinnacle now lists team corners in both, switched on
+
+- **Check.** `odds-check.yml` run 40088231180 (`task=markets`, `leagues=E2,E3`, `cap=4`,
+  24 Oct 11:01 UTC, about 30 minutes before the 11:30 kickoffs) spent **4 credits**
+  (19,339 → 19,335). Pinnacle's discovery list now includes `alternate_team_totals_corners`
+  in both leagues (League One: Huddersfield v Wigan; League Two: Bristol Rovers v Swindon);
+  the 11 Oct probe (run 38179178621) didn't list it. DraftKings still lists only h2h and
+  h2h_3_way there. All 48 team names still map (0 unmatched).
+- **Listed, not priced.** The capped run's odds call asked for h2h only, so no corner prices
+  were seen: the market is listed, not yet seen priced.
+- **Decision.** The owner pre-approved (20 Oct) switching the corner test on if Pinnacle
+  listed it, with the corner cap raised from 550 to 750: both are in `corners_live.LEAGUES`
+  from 24 Oct, at Pinnacle only (`PINNACLE_ONLY`: the call asks `bookmakers=pinnacle`, so no
+  DraftKings corner call and no DraftKings corner trade there).
+- **Cost.** `backfill.yml` run 40089304166 (`estimate_month` 2026-10,2026-11,2026-12, no
+  key): 674 / 638 / 716 credits for the eight corner leagues, average 676 against the 750
+  cap. League One 92 / 86 / 122, League Two 98 / 96 / 120 (an upper bound: GitHub throttles
+  scheduled runs). December is the tight month: 716 of 750.
+- **Model (f).** The same run fitted it on the cached football-data files: League One 1,102
+  matches with corner counts in the 730-day window (21 Oct 2024–21 Oct 2026), League Two
+  1,104 (the minimum is 300); league means 5.4 home and 4.6 away (League One), 5.4 and 4.4
+  (League Two). Model (f) was never tested in either league (the bake-offs ran on the top
+  five and the Championship), so their live record is the only check.
+- **Empty calls.** If Pinnacle lists the market but returns no lines, each look still costs
+  1 credit: at the estimate's pace about 180-240 a month for both leagues. So a league whose
+  last six answered calls logged no rows now pauses for 7 days and then looks once more
+  (`corners_live.paused_leagues`, shown in the publish log line), which keeps an unpriced
+  listing to about 10 credits a league in its first month and 4-5 a month after.
+
 ## European cups: cost estimate (12 Oct)
 
 Owner's request (12 Oct, lead session): cost out the Champions League (UCL), Europa League

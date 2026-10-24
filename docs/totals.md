@@ -1237,6 +1237,21 @@ whatever sample exists then: both tracks, the filtered and full sets' trades, CL
 since `defined_at`, the primary difference and its range. No live change follows from it
 unless the owner decides one after that review. No other cut-off is tried on these trades.
 
+### League One and League Two added at Pinnacle (24 Oct; owner pre-approved 20 Oct)
+
+Pinnacle's discovery listed `alternate_team_totals_corners` in League One and League Two on
+24 Oct (`odds-check.yml` run 40088231180, 4 credits; DraftKings lists only h2h there; details
+in docs/leagues.md "League One and League Two check"). Both join the live corner test with
+the same model (f), the same fixed 12% rule and the same paper strategy and below-60% shadow,
+at Pinnacle only: `corners_live.LEAGUES` has eight leagues, `PINNACLE_ONLY` = E2, E3. The
+corner cap is 750 a month (550 until 24 Oct); estimate 674 / 638 / 716 for Oct / Nov / Dec
+(average 676; `backfill.yml` run 40089304166). Settlement is unchanged: football-data's HC/AC
+first, else ESPN's `wonCorners` (eng.3, eng.4). Model (f) fits on 1,102 and 1,104 matches
+but was never tested in these leagues, so it carries no backtest there. **Listed is not
+priced**: the first snapshots may come back with no lines, which the call record shows as
+0-row calls at 1 credit each; after six in a row a league pauses for 7 days
+(`corners_live.paused_leagues`).
+
 ## Historical corner prices probe (owner-approved 50-credit cap, 11 Oct; probe only, no backtest)
 
 The question: do The Odds API's historical endpoints carry Pinnacle's team-corner prices
