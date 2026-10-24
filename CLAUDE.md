@@ -84,6 +84,13 @@ settlement runs after them.
   bets, ROI −2.2% (−7.5% to +2.9%), CLV −3.1% (−3.4% to −2.8%); the branch run in
   `docs/leagues.md` had 2,629 bets, ROI −2.3%. UCL Lean: 0 bets (only one block reaches the
   300-row minimum).
+- Favourites coming back from behind (owner, 24 Oct; phase 1, free data): a gap against a fair
+  time-scaled model with no game state. Favourites behind at half-time win 19.7% vs 14.0%
+  (2,166 matches, eight leagues), after conceding first 28.8% vs 24.5% (2,174, five
+  leagues); 5 of 18 pre-registered tests above 0, most clearly 45–65% favourites. About a
+  third is the second half's higher scoring rate and trailing underdogs show a smaller
+  version, so it may already be in in-play prices; phase 2 (in-play prices, ≥10 credits to
+  probe) is the owner's call (`docs/lab.md` "Favourites coming back from behind").
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -514,7 +521,8 @@ the owner's baseball app, so the balance can drop without any run here.
   leagues); benchmark = Poisson means from Pinnacle's closing 1X2 and O/U 2.5, remaining goals
   scaled by minutes left / 90. 18 tests on the win residual (99.722%), 2017/18–2024/25, 2025/26
   dropped first. `odds-check.yml` `task=comebacks-fetch` with `league` (downloads and caches
-  `comebacks-<league>-`, counts only) and `task=comebacks` (the analysis).
+  `comebacks-<league>-`, counts only) and `task=comebacks` (the analysis; its restore paths
+  must match the fetch's save paths).
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
