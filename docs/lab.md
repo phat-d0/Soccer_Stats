@@ -1309,3 +1309,35 @@ does carry in-play prices, a phase-2 test needs a snapshot at half-time of each 
 slot. All eight leagues and seasons would be thousands of slots (tens of thousands of
 credits); a realistic design is one league over recent seasons, about 300 slots and 3,000
 credits (rough estimate; `estimate`-style replay before any spend).
+
+### Phase 2 probe: do historical snapshots carry in-play prices? (owner-approved, 2026-10-24)
+
+The owner approved one 10-credit historical snapshot (`odds-check.yml` `task=inplay-probe`,
+`cap=10`, run 40136975819; `lab/inplay_probe.py`). Premier League h2h, ten books in one call,
+asked for 2025-05-25 15:55 UTC, when all ten final-day matches (kicked off 15:00 UTC) were at
+half-time. Cost 10 credits (19,114 → 19,104).
+
+- **Yes, in-play prices are there.** The snapshot (15:50:37 UTC; snapshots every 5 minutes) listed
+  all 10 started matches, each quoted after kickoff by 8 books: Betfair exchange, BetMGM, Bovada,
+  DraftKings, FanDuel, Pinnacle, 888sport, Unibet. William Hill and Marathonbet quoted none.
+  Most quotes were 4.6 minutes old, FanDuel's 8.7.
+- **Pinnacle's in-play quotes on this API are not usable.** They disagree with the half-time
+  score where every other book agrees: Southampton 0–1 Arsenal had Arsenal at 1.34 at Pinnacle
+  (1.25 before kickoff) against 1.09–1.15 elsewhere; Ipswich 0–1 West Ham had West Ham at 2.47
+  (2.23 before kickoff) against 1.36–1.47 elsewhere. Phase 2 would read the exchange (Betfair,
+  near margin-free) and the US books, not Pinnacle. Bovada was off in one match too.
+- **Two trailing favourites in the snapshot** (anecdotes, not a test): Liverpool (72% before
+  kickoff) 0–1 down to Crystal Palace, Betfair 2.64 = 38% to win; Brighton (about 50%) 0–1
+  down at Tottenham, Betfair 4.4 = 23%. The historical base rates for a favourite one goal down
+  at half-time are 30.5% (65–75% band, 266 matches) and 18.2% (45–55%, 1,315 matches). In both
+  cases the market was more generous to the favourite than history, which is the wrong way
+  for the idea. Two matches prove nothing.
+
+**What a phase-2 test would cost.** One snapshot at a kickoff slot's half-time covers every
+match in that slot, at 10 credits. football-data already gives each match's half-time score,
+so only slots holding a favourite that trails at half-time need buying: the Premier League
+had 94 such matches in 2023/24 and 2024/25 (451 kickoff slots in all), so at most 94 snapshots,
+about 940 credits. The five big leagues over the same two seasons would be roughly 450
+matches, about 4,500 credits at most. Either sample gives a wide ROI range (a trailing
+favourite wins about one time in five). Pre-registration and the owner's approval come
+first; nothing more is spent.
