@@ -100,6 +100,37 @@ def season_plan(league: str, year: int, raw_dir: Path = RAW_DIR) -> dict:
     }
 
 
+def slot_list(league: str, year: int, raw_dir: Path = RAW_DIR) -> list[dict]:
+    """The slots to buy for one league-season: kickoff, the snapshot time to request and
+    each trailing favourite in it (teams, side, Pinnacle's fair pre-match chance, the
+    half-time score). Half-time only: nothing about how the match ended."""
+    t = trailing(load_season(league, year, raw_dir))
+    t = t[t["kickoff"].notna()].sort_values(["kickoff", "home"])
+    out = []
+    for ko, g in t.groupby("kickoff"):
+        out.append(
+            {
+                "league": league,
+                "sport": LEAGUES[league].odds_sport,
+                "kickoff": ko.strftime("%Y-%m-%dT%H:%MZ"),
+                "request_at": (ko + pd.Timedelta(minutes=SNAPSHOT_AFTER)).strftime(
+                    "%Y-%m-%dT%H:%MZ"
+                ),
+                "matches": [
+                    {
+                        "home": r.home,
+                        "away": r.away,
+                        "favourite": "home" if r.fav_home else "away",
+                        "p_fav": round(float(r.p_fav), 4),
+                        "ht": [int(r.hthg), int(r.htag)],
+                    }
+                    for r in g.itertuples()
+                ],
+            }
+        )
+    return out
+
+
 def plan(leagues=cb.LEAGUES_B, years=YEARS, raw_dir: Path = RAW_DIR) -> list[dict]:
     rows = []
     for lg in leagues:

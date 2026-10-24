@@ -1557,3 +1557,95 @@ other more than the price does, and DNB keeps exactly that, so it loses to Pinna
 much per dollar as the 1X2 rules. The synthetic DNB we could build from DraftKings' h2h also pays
 about 1.7 points more margin than a real DNB market. The noise falls by about a third, not enough
 to justify a new track by itself. Nothing changes live. No handover.
+
+### Phase 2, step 2: design B pre-registration (owner-approved 24 Oct, hard cap 1,920 credits; registered 2026-10-24 before any fetch code is written or run)
+
+The owner approved design B at a hard cap of 1,920 credits. The +30-credit lower-league check
+was not approved and is not part of this test. Everything below is frozen before any paid
+call. Nothing here changes anything live: **a pass only justifies proposing design C to the
+owner.**
+
+**Sample (frozen).**
+- The file `src/soccer_stats/lab/comeback_b_slots.json` (SHA-256 starting `893afb5fce500de6`),
+  written by `lab.comeback_plan.slot_list` from football-data's 2024/25 files.
+- Contents: 192 kickoff slots holding 210 trailing favourites in the top five leagues, 2024/25:
+  - E0: 41 slots, 50 matches;
+  - SP1: 36 slots, 36 matches;
+  - D1: 35 slots, 41 matches;
+  - I1: 41 slots, 42 matches;
+  - F1: 39 slots, 41 matches.
+- A trailing favourite is phase 1's: the side with the larger Shin-fair chance at Pinnacle's
+  close, at least 45%, behind at half-time by football-data's HTHG/HTAG, by any margin.
+- The file holds half-time scores only, nothing about how a match ended. 2025/26 is not
+  touched.
+
+**Purchase.**
+- One historical bulk h2h snapshot per slot, requested at the file's `request_at`, which is
+  kickoff + 55 minutes.
+- Ten named books, which count as one region and cost about 10 credits a snapshot: pinnacle,
+  draftkings, betfair_ex_eu, betfair_ex_uk, fanduel, betmgm, unibet_eu, sport888, bovada and
+  paddypower.
+- Spending rules:
+  - every call goes through `CappedBudget` with cap 1,920 and keeps the 3,000-credit reserve
+    on the freshest balance;
+  - the first call is budgeted at 20 credits, and the run stops if any call costs more than 10;
+  - an HTTP or network error stops every call;
+  - a slot whose body is cached, or whose call record shows an answered call, is never bought
+    again.
+- A dry run (cap 0) comes first. The fetch never reads match outcomes.
+
+**Matching a snapshot to a match.**
+- The snapshot's timestamp must fall 48–62 minutes after the slot's kickoff (the half-time
+  break); otherwise the whole slot is unusable.
+- An event is a match when both Odds API team names map to the football-data names, via
+  `odds_feed._team` against that league's 2024/25 teams, and its `commence_time` is within 30
+  minutes of football-data's kickoff.
+- Unmatched trailing favourites are counted and dropped.
+
+**Quote check (per book, per match).** A book's h2h quote passes when all of these hold:
+1. It has all three prices.
+2. Its `last_update` (the market's, else the book's) is after the event's `commence_time`.
+3. It was updated at most 5 minutes before the snapshot's timestamp.
+4. Its margin-normalised chance for the trailing favourite is below that team's fair pre-match
+   chance at Pinnacle's close. The price must have moved against the side that is behind.
+
+Pinnacle has one more check. Its normalised chance for the trailing favourite must be within
+**0.05** (absolute) of the median of the other passing books' normalised chances, and at least
+two other books must pass. A Pinnacle quote failing this isn't used.
+
+**Primary test: bet the trailing favourite in play at DraftKings.**
+- A usable match is one whose DraftKings quote passes the quote check.
+- $1 flat on the favourite to win at DraftKings' in-play decimal price. A win pays odds − 1;
+  a draw or a loss costs 1. The final result is football-data's FTHG/FTAG.
+- ROI is the mean profit per match. Its 95% range comes from resampling matches (percentile,
+  2,000 draws, seed 0).
+- **Pass:** at least 100 usable matches and the ROI range entirely above 0.
+- **Fail:** fewer than 100 usable matches ("inconclusive"), or a range that reaches 0. A range
+  entirely below 0 is reported as "the in-play price over-prices the comeback".
+
+**Second line (descriptive, not part of the verdict).** The same bet at Betfair's exchange back
+price, `betfair_ex_eu` then `betfair_ex_uk`, whichever passes the quote check first. A win pays
+(odds − 1) × 0.98, i.e. after a 2% commission on winnings. ROI with the same range.
+
+**Secondary (descriptive).**
+1. **Realized vs market-implied win rate.**
+   - The market's fair chance is Pinnacle's Shin-fair chance when Pinnacle passes both
+     checks. Otherwise it is Betfair's normalised chance when Betfair passes. Otherwise there
+     is none, and the match is counted out of this measure.
+   - Report realized − mean fair, with the same resampled range, overall and by phase 1's four
+     bands.
+2. **Does the phase-1 model add anything beyond the in-play price?**
+   - The model is phase 1's time-scaled Poisson: pre-match means from Pinnacle's closing 1X2
+     and over/under 2.5 (`team_totals.implied_means`), conditioned on the half-time score.
+     45 minutes are left, with the second half's measured 55.5% share of goals (remaining
+     means λ × 0.555).
+   - Fit a logistic regression: logit P(win) = a + b·logit(market fair) + c·logit(model).
+   - Report c with a resampled 95% range. "Adds information" means c's range is entirely
+     above 0.
+
+**Running it.**
+- After the fetch, the analysis (`task=comebacks2`, no key) reads only the cached bodies, the
+  frozen slot list and football-data. It is run once.
+- Any bug found afterwards is fixed, rerun and disclosed, with both runs named, as in phase 1.
+- Every count is reported: slots bought, unusable slots, unmatched matches, and quotes failing
+  each check by book.

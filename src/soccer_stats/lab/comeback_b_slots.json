@@ -1,0 +1,3643 @@
+{
+ "design": "B: top five leagues, 2024/25",
+ "generated_by": "lab.comeback_plan.slot_list",
+ "snapshot_after_minutes": 55,
+ "slots": [
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-14T14:00Z",
+   "request_at": "2024-09-14T14:55Z",
+   "matches": [
+    {
+     "home": "Crystal Palace",
+     "away": "Leicester",
+     "favourite": "home",
+     "p_fav": 0.5862,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-14T16:30Z",
+   "request_at": "2024-09-14T17:25Z",
+   "matches": [
+    {
+     "home": "Aston Villa",
+     "away": "Everton",
+     "favourite": "home",
+     "p_fav": 0.5837,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-15T15:30Z",
+   "request_at": "2024-09-15T16:25Z",
+   "matches": [
+    {
+     "home": "Wolves",
+     "away": "Newcastle",
+     "favourite": "away",
+     "p_fav": 0.4724,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-21T14:00Z",
+   "request_at": "2024-09-21T14:55Z",
+   "matches": [
+    {
+     "home": "Aston Villa",
+     "away": "Wolves",
+     "favourite": "home",
+     "p_fav": 0.5869,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Leicester",
+     "away": "Everton",
+     "favourite": "home",
+     "p_fav": 0.4647,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-22T15:30Z",
+   "request_at": "2024-09-22T16:25Z",
+   "matches": [
+    {
+     "home": "Man City",
+     "away": "Arsenal",
+     "favourite": "home",
+     "p_fav": 0.5412,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-09-29T15:30Z",
+   "request_at": "2024-09-29T16:25Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "Tottenham",
+     "favourite": "home",
+     "p_fav": 0.4591,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-10-05T14:00Z",
+   "request_at": "2024-10-05T14:55Z",
+   "matches": [
+    {
+     "home": "Leicester",
+     "away": "Bournemouth",
+     "favourite": "away",
+     "p_fav": 0.4847,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-10-19T14:00Z",
+   "request_at": "2024-10-19T14:55Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "Brentford",
+     "favourite": "home",
+     "p_fav": 0.5874,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Newcastle",
+     "away": "Brighton",
+     "favourite": "home",
+     "p_fav": 0.5595,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-10-27T14:00Z",
+   "request_at": "2024-10-27T14:55Z",
+   "matches": [
+    {
+     "home": "Crystal Palace",
+     "away": "Tottenham",
+     "favourite": "away",
+     "p_fav": 0.5018,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-02T12:30Z",
+   "request_at": "2024-11-02T13:25Z",
+   "matches": [
+    {
+     "home": "Newcastle",
+     "away": "Arsenal",
+     "favourite": "away",
+     "p_fav": 0.4992,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-02T15:00Z",
+   "request_at": "2024-11-02T15:55Z",
+   "matches": [
+    {
+     "home": "Bournemouth",
+     "away": "Man City",
+     "favourite": "away",
+     "p_fav": 0.6284,
+     "ht": [
+      1,
+      0
+     ]
+    },
+    {
+     "home": "Liverpool",
+     "away": "Brighton",
+     "favourite": "home",
+     "p_fav": 0.7207,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-03T14:00Z",
+   "request_at": "2024-11-03T14:55Z",
+   "matches": [
+    {
+     "home": "Tottenham",
+     "away": "Aston Villa",
+     "favourite": "home",
+     "p_fav": 0.4919,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-04T20:00Z",
+   "request_at": "2024-11-04T20:55Z",
+   "matches": [
+    {
+     "home": "Fulham",
+     "away": "Brentford",
+     "favourite": "home",
+     "p_fav": 0.4843,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-10T14:00Z",
+   "request_at": "2024-11-10T14:55Z",
+   "matches": [
+    {
+     "home": "Tottenham",
+     "away": "Ipswich",
+     "favourite": "home",
+     "p_fav": 0.7776,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-23T15:00Z",
+   "request_at": "2024-11-23T15:55Z",
+   "matches": [
+    {
+     "home": "Aston Villa",
+     "away": "Crystal Palace",
+     "favourite": "home",
+     "p_fav": 0.5592,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-23T17:30Z",
+   "request_at": "2024-11-23T18:25Z",
+   "matches": [
+    {
+     "home": "Man City",
+     "away": "Tottenham",
+     "favourite": "home",
+     "p_fav": 0.6807,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-11-25T20:00Z",
+   "request_at": "2024-11-25T20:55Z",
+   "matches": [
+    {
+     "home": "Newcastle",
+     "away": "West Ham",
+     "favourite": "home",
+     "p_fav": 0.6544,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-04T19:30Z",
+   "request_at": "2024-12-04T20:25Z",
+   "matches": [
+    {
+     "home": "Newcastle",
+     "away": "Liverpool",
+     "favourite": "away",
+     "p_fav": 0.4794,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-08T14:00Z",
+   "request_at": "2024-12-08T14:55Z",
+   "matches": [
+    {
+     "home": "Fulham",
+     "away": "Arsenal",
+     "favourite": "away",
+     "p_fav": 0.5979,
+     "ht": [
+      1,
+      0
+     ]
+    },
+    {
+     "home": "Ipswich",
+     "away": "Bournemouth",
+     "favourite": "away",
+     "p_fav": 0.5017,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-14T15:00Z",
+   "request_at": "2024-12-14T15:55Z",
+   "matches": [
+    {
+     "home": "Liverpool",
+     "away": "Fulham",
+     "favourite": "home",
+     "p_fav": 0.7567,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Wolves",
+     "away": "Ipswich",
+     "favourite": "home",
+     "p_fav": 0.4894,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-15T14:00Z",
+   "request_at": "2024-12-15T14:55Z",
+   "matches": [
+    {
+     "home": "Brighton",
+     "away": "Crystal Palace",
+     "favourite": "home",
+     "p_fav": 0.5093,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-22T14:00Z",
+   "request_at": "2024-12-22T14:55Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "Bournemouth",
+     "favourite": "home",
+     "p_fav": 0.5204,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2024-12-30T19:45Z",
+   "request_at": "2024-12-30T20:40Z",
+   "matches": [
+    {
+     "home": "Ipswich",
+     "away": "Chelsea",
+     "favourite": "away",
+     "p_fav": 0.699,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-01-05T14:00Z",
+   "request_at": "2025-01-05T14:55Z",
+   "matches": [
+    {
+     "home": "Fulham",
+     "away": "Ipswich",
+     "favourite": "home",
+     "p_fav": 0.617,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-01-14T20:00Z",
+   "request_at": "2025-01-14T20:55Z",
+   "matches": [
+    {
+     "home": "Nott'm Forest",
+     "away": "Liverpool",
+     "favourite": "away",
+     "p_fav": 0.6071,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-01-16T20:00Z",
+   "request_at": "2025-01-16T20:55Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "Southampton",
+     "favourite": "home",
+     "p_fav": 0.762,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-01-18T12:30Z",
+   "request_at": "2025-01-18T13:25Z",
+   "matches": [
+    {
+     "home": "Newcastle",
+     "away": "Bournemouth",
+     "favourite": "home",
+     "p_fav": 0.5905,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-01-25T15:00Z",
+   "request_at": "2025-01-25T15:55Z",
+   "matches": [
+    {
+     "home": "Brighton",
+     "away": "Everton",
+     "favourite": "home",
+     "p_fav": 0.5629,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-02-02T14:00Z",
+   "request_at": "2025-02-02T14:55Z",
+   "matches": [
+    {
+     "home": "Brentford",
+     "away": "Tottenham",
+     "favourite": "home",
+     "p_fav": 0.4964,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-02-03T20:00Z",
+   "request_at": "2025-02-03T20:55Z",
+   "matches": [
+    {
+     "home": "Chelsea",
+     "away": "West Ham",
+     "favourite": "home",
+     "p_fav": 0.7604,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-02-15T17:30Z",
+   "request_at": "2025-02-15T18:25Z",
+   "matches": [
+    {
+     "home": "Crystal Palace",
+     "away": "Everton",
+     "favourite": "home",
+     "p_fav": 0.4894,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-02-19T19:30Z",
+   "request_at": "2025-02-19T20:25Z",
+   "matches": [
+    {
+     "home": "Aston Villa",
+     "away": "Liverpool",
+     "favourite": "away",
+     "p_fav": 0.52,
+     "ht": [
+      2,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-02-22T15:00Z",
+   "request_at": "2025-02-22T15:55Z",
+   "matches": [
+    {
+     "home": "Arsenal",
+     "away": "West Ham",
+     "favourite": "home",
+     "p_fav": 0.7639,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Bournemouth",
+     "away": "Wolves",
+     "favourite": "home",
+     "p_fav": 0.5906,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Fulham",
+     "away": "Crystal Palace",
+     "favourite": "home",
+     "p_fav": 0.4659,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-03-08T15:00Z",
+   "request_at": "2025-03-08T15:55Z",
+   "matches": [
+    {
+     "home": "Liverpool",
+     "away": "Southampton",
+     "favourite": "home",
+     "p_fav": 0.8885,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-03-09T16:30Z",
+   "request_at": "2025-03-09T17:25Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "Arsenal",
+     "favourite": "away",
+     "p_fav": 0.5507,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-04-02T18:45Z",
+   "request_at": "2025-04-02T19:40Z",
+   "matches": [
+    {
+     "home": "Bournemouth",
+     "away": "Ipswich",
+     "favourite": "home",
+     "p_fav": 0.7005,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Southampton",
+     "away": "Crystal Palace",
+     "favourite": "away",
+     "p_fav": 0.6013,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-04-06T13:00Z",
+   "request_at": "2025-04-06T13:55Z",
+   "matches": [
+    {
+     "home": "Fulham",
+     "away": "Liverpool",
+     "favourite": "away",
+     "p_fav": 0.5041,
+     "ht": [
+      3,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-04-13T13:00Z",
+   "request_at": "2025-04-13T13:55Z",
+   "matches": [
+    {
+     "home": "Chelsea",
+     "away": "Ipswich",
+     "favourite": "home",
+     "p_fav": 0.8112,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-04-26T14:00Z",
+   "request_at": "2025-04-26T14:55Z",
+   "matches": [
+    {
+     "home": "Southampton",
+     "away": "Fulham",
+     "favourite": "away",
+     "p_fav": 0.5813,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-05-11T13:15Z",
+   "request_at": "2025-05-11T14:10Z",
+   "matches": [
+    {
+     "home": "Man United",
+     "away": "West Ham",
+     "favourite": "home",
+     "p_fav": 0.4824,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2025-05-25T15:00Z",
+   "request_at": "2025-05-25T15:55Z",
+   "matches": [
+    {
+     "home": "Liverpool",
+     "away": "Crystal Palace",
+     "favourite": "home",
+     "p_fav": 0.7117,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Tottenham",
+     "away": "Brighton",
+     "favourite": "away",
+     "p_fav": 0.5102,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-08-16T17:00Z",
+   "request_at": "2024-08-16T17:55Z",
+   "matches": [
+    {
+     "home": "Celta",
+     "away": "Alaves",
+     "favourite": "home",
+     "p_fav": 0.4549,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-08-17T17:00Z",
+   "request_at": "2024-08-17T17:55Z",
+   "matches": [
+    {
+     "home": "Osasuna",
+     "away": "Leganes",
+     "favourite": "home",
+     "p_fav": 0.5207,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-08-26T19:30Z",
+   "request_at": "2024-08-26T20:25Z",
+   "matches": [
+    {
+     "home": "Villarreal",
+     "away": "Celta",
+     "favourite": "home",
+     "p_fav": 0.5827,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-08-27T19:30Z",
+   "request_at": "2024-08-27T20:25Z",
+   "matches": [
+    {
+     "home": "Vallecano",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.5793,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-08-29T19:30Z",
+   "request_at": "2024-08-29T20:25Z",
+   "matches": [
+    {
+     "home": "Las Palmas",
+     "away": "Real Madrid",
+     "favourite": "away",
+     "p_fav": 0.7381,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-09-16T19:00Z",
+   "request_at": "2024-09-16T19:55Z",
+   "matches": [
+    {
+     "home": "Vallecano",
+     "away": "Osasuna",
+     "favourite": "home",
+     "p_fav": 0.453,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-09-22T19:00Z",
+   "request_at": "2024-09-22T19:55Z",
+   "matches": [
+    {
+     "home": "Vallecano",
+     "away": "Ath Madrid",
+     "favourite": "away",
+     "p_fav": 0.5663,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-09-28T19:00Z",
+   "request_at": "2024-09-28T19:55Z",
+   "matches": [
+    {
+     "home": "Osasuna",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.544,
+     "ht": [
+      2,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-10-20T14:15Z",
+   "request_at": "2024-10-20T15:10Z",
+   "matches": [
+    {
+     "home": "Ath Madrid",
+     "away": "Leganes",
+     "favourite": "home",
+     "p_fav": 0.6959,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-10-27T15:15Z",
+   "request_at": "2024-10-27T16:10Z",
+   "matches": [
+    {
+     "home": "Getafe",
+     "away": "Valencia",
+     "favourite": "home",
+     "p_fav": 0.4571,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-10-27T20:00Z",
+   "request_at": "2024-10-27T20:55Z",
+   "matches": [
+    {
+     "home": "Sociedad",
+     "away": "Osasuna",
+     "favourite": "home",
+     "p_fav": 0.5974,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-11-08T20:00Z",
+   "request_at": "2024-11-08T20:55Z",
+   "matches": [
+    {
+     "home": "Vallecano",
+     "away": "Las Palmas",
+     "favourite": "home",
+     "p_fav": 0.5175,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-11-10T20:00Z",
+   "request_at": "2024-11-10T20:55Z",
+   "matches": [
+    {
+     "home": "Sociedad",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.5079,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-11-23T15:15Z",
+   "request_at": "2024-11-23T16:10Z",
+   "matches": [
+    {
+     "home": "Ath Madrid",
+     "away": "Alaves",
+     "favourite": "home",
+     "p_fav": 0.6716,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-12-08T20:00Z",
+   "request_at": "2024-12-08T20:55Z",
+   "matches": [
+    {
+     "home": "Ath Madrid",
+     "away": "Sevilla",
+     "favourite": "home",
+     "p_fav": 0.7114,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-12-15T17:30Z",
+   "request_at": "2024-12-15T18:25Z",
+   "matches": [
+    {
+     "home": "Villarreal",
+     "away": "Betis",
+     "favourite": "home",
+     "p_fav": 0.5064,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-12-15T20:00Z",
+   "request_at": "2024-12-15T20:55Z",
+   "matches": [
+    {
+     "home": "Barcelona",
+     "away": "Leganes",
+     "favourite": "home",
+     "p_fav": 0.885,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2024-12-22T13:00Z",
+   "request_at": "2024-12-22T13:55Z",
+   "matches": [
+    {
+     "home": "Valencia",
+     "away": "Alaves",
+     "favourite": "home",
+     "p_fav": 0.462,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-01-03T20:00Z",
+   "request_at": "2025-01-03T20:55Z",
+   "matches": [
+    {
+     "home": "Valencia",
+     "away": "Real Madrid",
+     "favourite": "away",
+     "p_fav": 0.6807,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-01-25T15:15Z",
+   "request_at": "2025-01-25T16:10Z",
+   "matches": [
+    {
+     "home": "Ath Madrid",
+     "away": "Villarreal",
+     "favourite": "home",
+     "p_fav": 0.4791,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-01-25T17:30Z",
+   "request_at": "2025-01-25T18:25Z",
+   "matches": [
+    {
+     "home": "Sevilla",
+     "away": "Espanol",
+     "favourite": "home",
+     "p_fav": 0.5477,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-02-08T20:00Z",
+   "request_at": "2025-02-08T20:55Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Ath Madrid",
+     "favourite": "home",
+     "p_fav": 0.4949,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-02-14T20:00Z",
+   "request_at": "2025-02-14T20:55Z",
+   "matches": [
+    {
+     "home": "Girona",
+     "away": "Getafe",
+     "favourite": "home",
+     "p_fav": 0.5039,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-03-16T13:00Z",
+   "request_at": "2025-03-16T13:55Z",
+   "matches": [
+    {
+     "home": "Leganes",
+     "away": "Betis",
+     "favourite": "away",
+     "p_fav": 0.4726,
+     "ht": [
+      2,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-03-29T17:30Z",
+   "request_at": "2025-03-29T18:25Z",
+   "matches": [
+    {
+     "home": "Alaves",
+     "away": "Vallecano",
+     "favourite": "home",
+     "p_fav": 0.4593,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-03-29T20:00Z",
+   "request_at": "2025-03-29T20:55Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Leganes",
+     "favourite": "home",
+     "p_fav": 0.8159,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-04T19:00Z",
+   "request_at": "2025-04-04T19:55Z",
+   "matches": [
+    {
+     "home": "Vallecano",
+     "away": "Espanol",
+     "favourite": "home",
+     "p_fav": 0.5837,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-05T14:15Z",
+   "request_at": "2025-04-05T15:10Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Valencia",
+     "favourite": "home",
+     "p_fav": 0.7695,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-12T12:00Z",
+   "request_at": "2025-04-12T12:55Z",
+   "matches": [
+    {
+     "home": "Sociedad",
+     "away": "Mallorca",
+     "favourite": "home",
+     "p_fav": 0.4755,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-12T16:30Z",
+   "request_at": "2025-04-12T17:25Z",
+   "matches": [
+    {
+     "home": "Celta",
+     "away": "Espanol",
+     "favourite": "home",
+     "p_fav": 0.5905,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-13T19:00Z",
+   "request_at": "2025-04-13T19:55Z",
+   "matches": [
+    {
+     "home": "Ath Bilbao",
+     "away": "Vallecano",
+     "favourite": "home",
+     "p_fav": 0.5297,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-04-22T17:00Z",
+   "request_at": "2025-04-22T17:55Z",
+   "matches": [
+    {
+     "home": "Valencia",
+     "away": "Espanol",
+     "favourite": "home",
+     "p_fav": 0.4749,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-05-03T19:00Z",
+   "request_at": "2025-05-03T19:55Z",
+   "matches": [
+    {
+     "home": "Valladolid",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.7307,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-05-14T19:30Z",
+   "request_at": "2025-05-14T20:25Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Mallorca",
+     "favourite": "home",
+     "p_fav": 0.682,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-05-15T17:00Z",
+   "request_at": "2025-05-15T17:55Z",
+   "matches": [
+    {
+     "home": "Osasuna",
+     "away": "Ath Madrid",
+     "favourite": "away",
+     "p_fav": 0.4507,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-05-18T17:00Z",
+   "request_at": "2025-05-18T17:55Z",
+   "matches": [
+    {
+     "home": "Celta",
+     "away": "Vallecano",
+     "favourite": "home",
+     "p_fav": 0.507,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-09-14T13:30Z",
+   "request_at": "2024-09-14T14:25Z",
+   "matches": [
+    {
+     "home": "Freiburg",
+     "away": "Bochum",
+     "favourite": "home",
+     "p_fav": 0.6199,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-09-22T13:30Z",
+   "request_at": "2024-09-22T14:25Z",
+   "matches": [
+    {
+     "home": "Leverkusen",
+     "away": "Wolfsburg",
+     "favourite": "home",
+     "p_fav": 0.7702,
+     "ht": [
+      2,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-09-27T18:30Z",
+   "request_at": "2024-09-27T19:25Z",
+   "matches": [
+    {
+     "home": "Dortmund",
+     "away": "Bochum",
+     "favourite": "home",
+     "p_fav": 0.816,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-09-28T13:30Z",
+   "request_at": "2024-09-28T14:25Z",
+   "matches": [
+    {
+     "home": "Freiburg",
+     "away": "St Pauli",
+     "favourite": "home",
+     "p_fav": 0.6128,
+     "ht": [
+      0,
+      2
+     ]
+    },
+    {
+     "home": "Mainz",
+     "away": "Heidenheim",
+     "favourite": "home",
+     "p_fav": 0.5264,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-10-05T13:30Z",
+   "request_at": "2024-10-05T14:25Z",
+   "matches": [
+    {
+     "home": "Union Berlin",
+     "away": "Dortmund",
+     "favourite": "away",
+     "p_fav": 0.4749,
+     "ht": [
+      2,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-10-05T16:30Z",
+   "request_at": "2024-10-05T17:25Z",
+   "matches": [
+    {
+     "home": "St Pauli",
+     "away": "Mainz",
+     "favourite": "home",
+     "p_fav": 0.4505,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-10-06T17:30Z",
+   "request_at": "2024-10-06T18:25Z",
+   "matches": [
+    {
+     "home": "Stuttgart",
+     "away": "Hoffenheim",
+     "favourite": "home",
+     "p_fav": 0.7431,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-10-26T13:30Z",
+   "request_at": "2024-10-26T14:25Z",
+   "matches": [
+    {
+     "home": "RB Leipzig",
+     "away": "Freiburg",
+     "favourite": "home",
+     "p_fav": 0.5354,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-11-02T14:30Z",
+   "request_at": "2024-11-02T15:25Z",
+   "matches": [
+    {
+     "home": "Hoffenheim",
+     "away": "St Pauli",
+     "favourite": "home",
+     "p_fav": 0.5174,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Wolfsburg",
+     "away": "Augsburg",
+     "favourite": "home",
+     "p_fav": 0.4662,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-11-09T14:30Z",
+   "request_at": "2024-11-09T15:25Z",
+   "matches": [
+    {
+     "home": "Mainz",
+     "away": "Dortmund",
+     "favourite": "away",
+     "p_fav": 0.4874,
+     "ht": [
+      2,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-11-10T16:30Z",
+   "request_at": "2024-11-10T17:25Z",
+   "matches": [
+    {
+     "home": "Stuttgart",
+     "away": "Ein Frankfurt",
+     "favourite": "home",
+     "p_fav": 0.5482,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-11-30T14:30Z",
+   "request_at": "2024-11-30T15:25Z",
+   "matches": [
+    {
+     "home": "RB Leipzig",
+     "away": "Wolfsburg",
+     "favourite": "home",
+     "p_fav": 0.5466,
+     "ht": [
+      0,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-11-30T17:30Z",
+   "request_at": "2024-11-30T18:25Z",
+   "matches": [
+    {
+     "home": "Dortmund",
+     "away": "Bayern Munich",
+     "favourite": "away",
+     "p_fav": 0.5659,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-12-06T19:30Z",
+   "request_at": "2024-12-06T20:25Z",
+   "matches": [
+    {
+     "home": "Stuttgart",
+     "away": "Union Berlin",
+     "favourite": "home",
+     "p_fav": 0.5071,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-12-08T14:30Z",
+   "request_at": "2024-12-08T15:25Z",
+   "matches": [
+    {
+     "home": "Wolfsburg",
+     "away": "Mainz",
+     "favourite": "home",
+     "p_fav": 0.4592,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-12-14T14:30Z",
+   "request_at": "2024-12-14T15:25Z",
+   "matches": [
+    {
+     "home": "Mainz",
+     "away": "Bayern Munich",
+     "favourite": "away",
+     "p_fav": 0.6408,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2024-12-21T14:30Z",
+   "request_at": "2024-12-21T15:25Z",
+   "matches": [
+    {
+     "home": "Ein Frankfurt",
+     "away": "Mainz",
+     "favourite": "home",
+     "p_fav": 0.4654,
+     "ht": [
+      0,
+      2
+     ]
+    },
+    {
+     "home": "Stuttgart",
+     "away": "St Pauli",
+     "favourite": "home",
+     "p_fav": 0.672,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-01-14T17:30Z",
+   "request_at": "2025-01-14T18:25Z",
+   "matches": [
+    {
+     "home": "Holstein Kiel",
+     "away": "Dortmund",
+     "favourite": "away",
+     "p_fav": 0.6637,
+     "ht": [
+      3,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-01-15T19:30Z",
+   "request_at": "2025-01-15T20:25Z",
+   "matches": [
+    {
+     "home": "Stuttgart",
+     "away": "RB Leipzig",
+     "favourite": "home",
+     "p_fav": 0.4864,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-01-19T16:30Z",
+   "request_at": "2025-01-19T17:25Z",
+   "matches": [
+    {
+     "home": "Werder Bremen",
+     "away": "Augsburg",
+     "favourite": "home",
+     "p_fav": 0.5123,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-01-24T19:30Z",
+   "request_at": "2025-01-24T20:25Z",
+   "matches": [
+    {
+     "home": "Wolfsburg",
+     "away": "Holstein Kiel",
+     "favourite": "home",
+     "p_fav": 0.664,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-02-01T14:30Z",
+   "request_at": "2025-02-01T15:25Z",
+   "matches": [
+    {
+     "home": "Stuttgart",
+     "away": "M'gladbach",
+     "favourite": "home",
+     "p_fav": 0.5835,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-02-15T14:30Z",
+   "request_at": "2025-02-15T15:25Z",
+   "matches": [
+    {
+     "home": "Bochum",
+     "away": "Dortmund",
+     "favourite": "away",
+     "p_fav": 0.6234,
+     "ht": [
+      2,
+      0
+     ]
+    },
+    {
+     "home": "Union Berlin",
+     "away": "M'gladbach",
+     "favourite": "home",
+     "p_fav": 0.4525,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-02-16T14:30Z",
+   "request_at": "2025-02-16T15:25Z",
+   "matches": [
+    {
+     "home": "Werder Bremen",
+     "away": "Hoffenheim",
+     "favourite": "home",
+     "p_fav": 0.5214,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-02-23T14:30Z",
+   "request_at": "2025-02-23T15:25Z",
+   "matches": [
+    {
+     "home": "RB Leipzig",
+     "away": "Heidenheim",
+     "favourite": "home",
+     "p_fav": 0.7498,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-03-02T14:30Z",
+   "request_at": "2025-03-02T15:25Z",
+   "matches": [
+    {
+     "home": "Union Berlin",
+     "away": "Holstein Kiel",
+     "favourite": "home",
+     "p_fav": 0.6236,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-03-08T14:30Z",
+   "request_at": "2025-03-08T15:25Z",
+   "matches": [
+    {
+     "home": "Dortmund",
+     "away": "Augsburg",
+     "favourite": "home",
+     "p_fav": 0.6945,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Leverkusen",
+     "away": "Werder Bremen",
+     "favourite": "home",
+     "p_fav": 0.7382,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Wolfsburg",
+     "away": "St Pauli",
+     "favourite": "home",
+     "p_fav": 0.5285,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-03-29T14:30Z",
+   "request_at": "2025-03-29T15:25Z",
+   "matches": [
+    {
+     "home": "Wolfsburg",
+     "away": "Heidenheim",
+     "favourite": "home",
+     "p_fav": 0.57,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-04-05T13:30Z",
+   "request_at": "2025-04-05T14:25Z",
+   "matches": [
+    {
+     "home": "Mainz",
+     "away": "Holstein Kiel",
+     "favourite": "home",
+     "p_fav": 0.6813,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-04-19T13:30Z",
+   "request_at": "2025-04-19T14:25Z",
+   "matches": [
+    {
+     "home": "RB Leipzig",
+     "away": "Holstein Kiel",
+     "favourite": "home",
+     "p_fav": 0.6627,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-05-03T13:30Z",
+   "request_at": "2025-05-03T14:25Z",
+   "matches": [
+    {
+     "home": "RB Leipzig",
+     "away": "Bayern Munich",
+     "favourite": "away",
+     "p_fav": 0.5698,
+     "ht": [
+      2,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-05-04T13:30Z",
+   "request_at": "2025-05-04T14:25Z",
+   "matches": [
+    {
+     "home": "Augsburg",
+     "away": "Holstein Kiel",
+     "favourite": "home",
+     "p_fav": 0.5471,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-05-10T13:30Z",
+   "request_at": "2025-05-10T14:25Z",
+   "matches": [
+    {
+     "home": "Union Berlin",
+     "away": "Heidenheim",
+     "favourite": "home",
+     "p_fav": 0.4634,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-05-11T15:30Z",
+   "request_at": "2025-05-11T16:25Z",
+   "matches": [
+    {
+     "home": "Ein Frankfurt",
+     "away": "St Pauli",
+     "favourite": "home",
+     "p_fav": 0.6235,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2025-05-17T13:30Z",
+   "request_at": "2025-05-17T14:25Z",
+   "matches": [
+    {
+     "home": "St Pauli",
+     "away": "Bochum",
+     "favourite": "home",
+     "p_fav": 0.5559,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-08-17T18:45Z",
+   "request_at": "2024-08-17T19:40Z",
+   "matches": [
+    {
+     "home": "Milan",
+     "away": "Torino",
+     "favourite": "home",
+     "p_fav": 0.6414,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-08-24T16:30Z",
+   "request_at": "2024-08-24T17:25Z",
+   "matches": [
+    {
+     "home": "Parma",
+     "away": "Milan",
+     "favourite": "away",
+     "p_fav": 0.6046,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-08-25T18:45Z",
+   "request_at": "2024-08-25T19:40Z",
+   "matches": [
+    {
+     "home": "Roma",
+     "away": "Empoli",
+     "favourite": "home",
+     "p_fav": 0.6787,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-08-31T18:45Z",
+   "request_at": "2024-08-31T19:40Z",
+   "matches": [
+    {
+     "home": "Napoli",
+     "away": "Parma",
+     "favourite": "home",
+     "p_fav": 0.6814,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-09-01T16:30Z",
+   "request_at": "2024-09-01T17:25Z",
+   "matches": [
+    {
+     "home": "Fiorentina",
+     "away": "Monza",
+     "favourite": "home",
+     "p_fav": 0.5127,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-09-20T16:30Z",
+   "request_at": "2024-09-20T17:25Z",
+   "matches": [
+    {
+     "home": "Cagliari",
+     "away": "Empoli",
+     "favourite": "home",
+     "p_fav": 0.468,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-09-29T13:00Z",
+   "request_at": "2024-09-29T13:55Z",
+   "matches": [
+    {
+     "home": "Roma",
+     "away": "Venezia",
+     "favourite": "home",
+     "p_fav": 0.6668,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-09-30T18:45Z",
+   "request_at": "2024-09-30T19:40Z",
+   "matches": [
+    {
+     "home": "Parma",
+     "away": "Cagliari",
+     "favourite": "home",
+     "p_fav": 0.4793,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-10-06T18:45Z",
+   "request_at": "2024-10-06T19:40Z",
+   "matches": [
+    {
+     "home": "Fiorentina",
+     "away": "Milan",
+     "favourite": "away",
+     "p_fav": 0.475,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-10-30T19:45Z",
+   "request_at": "2024-10-30T20:40Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Parma",
+     "favourite": "home",
+     "p_fav": 0.6807,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-11-03T17:00Z",
+   "request_at": "2024-11-03T17:55Z",
+   "matches": [
+    {
+     "home": "Verona",
+     "away": "Roma",
+     "favourite": "away",
+     "p_fav": 0.5382,
+     "ht": [
+      2,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-11-10T11:30Z",
+   "request_at": "2024-11-10T12:25Z",
+   "matches": [
+    {
+     "home": "Atalanta",
+     "away": "Udinese",
+     "favourite": "home",
+     "p_fav": 0.672,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-12-01T11:30Z",
+   "request_at": "2024-12-01T12:25Z",
+   "matches": [
+    {
+     "home": "Udinese",
+     "away": "Genoa",
+     "favourite": "home",
+     "p_fav": 0.487,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-12-01T14:00Z",
+   "request_at": "2024-12-01T14:55Z",
+   "matches": [
+    {
+     "home": "Parma",
+     "away": "Lazio",
+     "favourite": "away",
+     "p_fav": 0.5565,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-12-07T17:00Z",
+   "request_at": "2024-12-07T17:55Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Bologna",
+     "favourite": "home",
+     "p_fav": 0.5464,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-12-14T17:00Z",
+   "request_at": "2024-12-14T17:55Z",
+   "matches": [
+    {
+     "home": "Udinese",
+     "away": "Napoli",
+     "favourite": "away",
+     "p_fav": 0.5597,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2024-12-30T19:45Z",
+   "request_at": "2024-12-30T20:40Z",
+   "matches": [
+    {
+     "home": "Bologna",
+     "away": "Verona",
+     "favourite": "home",
+     "p_fav": 0.6324,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-01-11T14:00Z",
+   "request_at": "2025-01-11T14:55Z",
+   "matches": [
+    {
+     "home": "Empoli",
+     "away": "Lecce",
+     "favourite": "home",
+     "p_fav": 0.4724,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-01-13T19:45Z",
+   "request_at": "2025-01-13T20:40Z",
+   "matches": [
+    {
+     "home": "Monza",
+     "away": "Fiorentina",
+     "favourite": "away",
+     "p_fav": 0.502,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-01-19T14:00Z",
+   "request_at": "2025-01-19T14:55Z",
+   "matches": [
+    {
+     "home": "Cagliari",
+     "away": "Lecce",
+     "favourite": "home",
+     "p_fav": 0.4994,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-01-25T14:00Z",
+   "request_at": "2025-01-25T14:55Z",
+   "matches": [
+    {
+     "home": "Como",
+     "away": "Atalanta",
+     "favourite": "away",
+     "p_fav": 0.5045,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-01-26T19:45Z",
+   "request_at": "2025-01-26T20:40Z",
+   "matches": [
+    {
+     "home": "Lazio",
+     "away": "Fiorentina",
+     "favourite": "home",
+     "p_fav": 0.4575,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-02-02T11:30Z",
+   "request_at": "2025-02-02T12:25Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Empoli",
+     "favourite": "home",
+     "p_fav": 0.6966,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-02-02T17:00Z",
+   "request_at": "2025-02-02T17:55Z",
+   "matches": [
+    {
+     "home": "Milan",
+     "away": "Inter",
+     "favourite": "away",
+     "p_fav": 0.5127,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-02-22T14:00Z",
+   "request_at": "2025-02-22T14:55Z",
+   "matches": [
+    {
+     "home": "Parma",
+     "away": "Bologna",
+     "favourite": "away",
+     "p_fav": 0.5468,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-02-22T17:00Z",
+   "request_at": "2025-02-22T17:55Z",
+   "matches": [
+    {
+     "home": "Torino",
+     "away": "Milan",
+     "favourite": "away",
+     "p_fav": 0.5129,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-02T14:00Z",
+   "request_at": "2025-03-02T14:55Z",
+   "matches": [
+    {
+     "home": "Bologna",
+     "away": "Cagliari",
+     "favourite": "home",
+     "p_fav": 0.5646,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Genoa",
+     "away": "Empoli",
+     "favourite": "home",
+     "p_fav": 0.5102,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-02T17:00Z",
+   "request_at": "2025-03-02T17:55Z",
+   "matches": [
+    {
+     "home": "Roma",
+     "away": "Como",
+     "favourite": "home",
+     "p_fav": 0.4912,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-02T19:45Z",
+   "request_at": "2025-03-02T20:40Z",
+   "matches": [
+    {
+     "home": "Milan",
+     "away": "Lazio",
+     "favourite": "home",
+     "p_fav": 0.4506,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-08T17:00Z",
+   "request_at": "2025-03-08T17:55Z",
+   "matches": [
+    {
+     "home": "Lecce",
+     "away": "Milan",
+     "favourite": "away",
+     "p_fav": 0.5295,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-08T19:45Z",
+   "request_at": "2025-03-08T20:40Z",
+   "matches": [
+    {
+     "home": "Inter",
+     "away": "Monza",
+     "favourite": "home",
+     "p_fav": 0.8543,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-15T17:00Z",
+   "request_at": "2025-03-15T17:55Z",
+   "matches": [
+    {
+     "home": "Milan",
+     "away": "Como",
+     "favourite": "home",
+     "p_fav": 0.5382,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-03-30T13:00Z",
+   "request_at": "2025-03-30T13:55Z",
+   "matches": [
+    {
+     "home": "Fiorentina",
+     "away": "Atalanta",
+     "favourite": "away",
+     "p_fav": 0.4721,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-04-05T18:45Z",
+   "request_at": "2025-04-05T19:40Z",
+   "matches": [
+    {
+     "home": "Milan",
+     "away": "Fiorentina",
+     "favourite": "home",
+     "p_fav": 0.5467,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-04-23T16:30Z",
+   "request_at": "2025-04-23T17:25Z",
+   "matches": [
+    {
+     "home": "Parma",
+     "away": "Juventus",
+     "favourite": "away",
+     "p_fav": 0.5663,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-04-27T13:00Z",
+   "request_at": "2025-04-27T13:55Z",
+   "matches": [
+    {
+     "home": "Inter",
+     "away": "Roma",
+     "favourite": "home",
+     "p_fav": 0.5524,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-04-27T18:45Z",
+   "request_at": "2025-04-27T19:40Z",
+   "matches": [
+    {
+     "home": "Atalanta",
+     "away": "Lecce",
+     "favourite": "home",
+     "p_fav": 0.7841,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-04-28T18:45Z",
+   "request_at": "2025-04-28T19:40Z",
+   "matches": [
+    {
+     "home": "Lazio",
+     "away": "Parma",
+     "favourite": "home",
+     "p_fav": 0.7072,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-05-18T18:45Z",
+   "request_at": "2025-05-18T19:40Z",
+   "matches": [
+    {
+     "home": "Monza",
+     "away": "Empoli",
+     "favourite": "away",
+     "p_fav": 0.5617,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-05-24T16:00Z",
+   "request_at": "2025-05-24T16:55Z",
+   "matches": [
+    {
+     "home": "Bologna",
+     "away": "Genoa",
+     "favourite": "home",
+     "p_fav": 0.6592,
+     "ht": [
+      0,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-05-25T18:45Z",
+   "request_at": "2025-05-25T19:40Z",
+   "matches": [
+    {
+     "home": "Lazio",
+     "away": "Lecce",
+     "favourite": "home",
+     "p_fav": 0.6765,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-09-13T18:45Z",
+   "request_at": "2024-09-13T19:40Z",
+   "matches": [
+    {
+     "home": "St Etienne",
+     "away": "Lille",
+     "favourite": "away",
+     "p_fav": 0.5641,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-09-21T19:00Z",
+   "request_at": "2024-09-21T19:55Z",
+   "matches": [
+    {
+     "home": "Reims",
+     "away": "Paris SG",
+     "favourite": "away",
+     "p_fav": 0.6949,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-09-22T15:00Z",
+   "request_at": "2024-09-22T15:55Z",
+   "matches": [
+    {
+     "home": "Montpellier",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.4753,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-10-05T17:00Z",
+   "request_at": "2024-10-05T17:55Z",
+   "matches": [
+    {
+     "home": "Lille",
+     "away": "Toulouse",
+     "favourite": "home",
+     "p_fav": 0.5473,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-10-06T18:45Z",
+   "request_at": "2024-10-06T19:40Z",
+   "matches": [
+    {
+     "home": "Nice",
+     "away": "Paris SG",
+     "favourite": "away",
+     "p_fav": 0.608,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-10-20T15:00Z",
+   "request_at": "2024-10-20T15:55Z",
+   "matches": [
+    {
+     "home": "Toulouse",
+     "away": "Angers",
+     "favourite": "home",
+     "p_fav": 0.6587,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-10-26T17:00Z",
+   "request_at": "2024-10-26T17:55Z",
+   "matches": [
+    {
+     "home": "Reims",
+     "away": "Brest",
+     "favourite": "home",
+     "p_fav": 0.5151,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-01T18:00Z",
+   "request_at": "2024-11-01T18:55Z",
+   "matches": [
+    {
+     "home": "Monaco",
+     "away": "Angers",
+     "favourite": "home",
+     "p_fav": 0.7759,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-03T16:00Z",
+   "request_at": "2024-11-03T16:55Z",
+   "matches": [
+    {
+     "home": "Auxerre",
+     "away": "Rennes",
+     "favourite": "away",
+     "p_fav": 0.4567,
+     "ht": [
+      2,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-08T19:45Z",
+   "request_at": "2024-11-08T20:40Z",
+   "matches": [
+    {
+     "home": "Marseille",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.6764,
+     "ht": [
+      0,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-09T16:00Z",
+   "request_at": "2024-11-09T16:55Z",
+   "matches": [
+    {
+     "home": "Strasbourg",
+     "away": "Monaco",
+     "favourite": "away",
+     "p_fav": 0.4989,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-24T16:00Z",
+   "request_at": "2024-11-24T16:55Z",
+   "matches": [
+    {
+     "home": "Nantes",
+     "away": "Le Havre",
+     "favourite": "home",
+     "p_fav": 0.5037,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2024-11-24T19:45Z",
+   "request_at": "2024-11-24T20:40Z",
+   "matches": [
+    {
+     "home": "Nice",
+     "away": "Strasbourg",
+     "favourite": "home",
+     "p_fav": 0.5408,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-10T18:00Z",
+   "request_at": "2025-01-10T18:55Z",
+   "matches": [
+    {
+     "home": "Nantes",
+     "away": "Monaco",
+     "favourite": "away",
+     "p_fav": 0.4551,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-11T16:00Z",
+   "request_at": "2025-01-11T16:55Z",
+   "matches": [
+    {
+     "home": "Brest",
+     "away": "Lyon",
+     "favourite": "away",
+     "p_fav": 0.459,
+     "ht": [
+      2,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-12T16:15Z",
+   "request_at": "2025-01-12T17:10Z",
+   "matches": [
+    {
+     "home": "Montpellier",
+     "away": "Angers",
+     "favourite": "home",
+     "p_fav": 0.4677,
+     "ht": [
+      0,
+      1
+     ]
+    },
+    {
+     "home": "Toulouse",
+     "away": "Strasbourg",
+     "favourite": "home",
+     "p_fav": 0.4872,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-17T20:05Z",
+   "request_at": "2025-01-17T21:00Z",
+   "matches": [
+    {
+     "home": "Lille",
+     "away": "Nice",
+     "favourite": "home",
+     "p_fav": 0.4968,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-18T16:00Z",
+   "request_at": "2025-01-18T16:55Z",
+   "matches": [
+    {
+     "home": "Lens",
+     "away": "Paris SG",
+     "favourite": "away",
+     "p_fav": 0.5073,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-18T18:00Z",
+   "request_at": "2025-01-18T18:55Z",
+   "matches": [
+    {
+     "home": "Rennes",
+     "away": "Brest",
+     "favourite": "home",
+     "p_fav": 0.4816,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-01-19T19:45Z",
+   "request_at": "2025-01-19T20:40Z",
+   "matches": [
+    {
+     "home": "Marseille",
+     "away": "Strasbourg",
+     "favourite": "home",
+     "p_fav": 0.6092,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-02-01T18:00Z",
+   "request_at": "2025-02-01T18:55Z",
+   "matches": [
+    {
+     "home": "Monaco",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.7111,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-02-08T18:00Z",
+   "request_at": "2025-02-08T18:55Z",
+   "matches": [
+    {
+     "home": "Lille",
+     "away": "Le Havre",
+     "favourite": "home",
+     "p_fav": 0.7907,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-02-14T19:45Z",
+   "request_at": "2025-02-14T20:40Z",
+   "matches": [
+    {
+     "home": "Brest",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.4545,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-02-16T16:15Z",
+   "request_at": "2025-02-16T17:10Z",
+   "matches": [
+    {
+     "home": "Reims",
+     "away": "Angers",
+     "favourite": "home",
+     "p_fav": 0.5017,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-02-22T20:05Z",
+   "request_at": "2025-02-22T21:00Z",
+   "matches": [
+    {
+     "home": "Auxerre",
+     "away": "Marseille",
+     "favourite": "away",
+     "p_fav": 0.6227,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-03-16T14:00Z",
+   "request_at": "2025-03-16T14:55Z",
+   "matches": [
+    {
+     "home": "Lyon",
+     "away": "Le Havre",
+     "favourite": "home",
+     "p_fav": 0.7736,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-03-29T16:00Z",
+   "request_at": "2025-03-29T16:55Z",
+   "matches": [
+    {
+     "home": "Reims",
+     "away": "Marseille",
+     "favourite": "away",
+     "p_fav": 0.5864,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-03-29T20:05Z",
+   "request_at": "2025-03-29T21:00Z",
+   "matches": [
+    {
+     "home": "Monaco",
+     "away": "Nice",
+     "favourite": "home",
+     "p_fav": 0.5101,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-03-30T13:00Z",
+   "request_at": "2025-03-30T13:55Z",
+   "matches": [
+    {
+     "home": "Toulouse",
+     "away": "Brest",
+     "favourite": "home",
+     "p_fav": 0.48,
+     "ht": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-04T18:45Z",
+   "request_at": "2025-04-04T19:40Z",
+   "matches": [
+    {
+     "home": "Nice",
+     "away": "Nantes",
+     "favourite": "home",
+     "p_fav": 0.652,
+     "ht": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-05T17:00Z",
+   "request_at": "2025-04-05T17:55Z",
+   "matches": [
+    {
+     "home": "Brest",
+     "away": "Monaco",
+     "favourite": "away",
+     "p_fav": 0.5416,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-11T18:45Z",
+   "request_at": "2025-04-11T19:40Z",
+   "matches": [
+    {
+     "home": "Lens",
+     "away": "Reims",
+     "favourite": "home",
+     "p_fav": 0.609,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-20T15:15Z",
+   "request_at": "2025-04-20T16:10Z",
+   "matches": [
+    {
+     "home": "Reims",
+     "away": "Toulouse",
+     "favourite": "away",
+     "p_fav": 0.4894,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-20T18:45Z",
+   "request_at": "2025-04-20T19:40Z",
+   "matches": [
+    {
+     "home": "St Etienne",
+     "away": "Lyon",
+     "favourite": "away",
+     "p_fav": 0.5974,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-26T17:00Z",
+   "request_at": "2025-04-26T17:55Z",
+   "matches": [
+    {
+     "home": "Le Havre",
+     "away": "Monaco",
+     "favourite": "away",
+     "p_fav": 0.7059,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-04-27T15:15Z",
+   "request_at": "2025-04-27T16:10Z",
+   "matches": [
+    {
+     "home": "Lens",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.6191,
+     "ht": [
+      0,
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-05-04T15:15Z",
+   "request_at": "2025-05-04T16:10Z",
+   "matches": [
+    {
+     "home": "Lyon",
+     "away": "Lens",
+     "favourite": "home",
+     "p_fav": 0.6805,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-05-10T19:00Z",
+   "request_at": "2025-05-10T19:55Z",
+   "matches": [
+    {
+     "home": "Brest",
+     "away": "Lille",
+     "favourite": "away",
+     "p_fav": 0.5765,
+     "ht": [
+      1,
+      0
+     ]
+    },
+    {
+     "home": "Rennes",
+     "away": "Nice",
+     "favourite": "away",
+     "p_fav": 0.4529,
+     "ht": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-05-17T19:00Z",
+   "request_at": "2025-05-17T19:55Z",
+   "matches": [
+    {
+     "home": "Paris SG",
+     "away": "Auxerre",
+     "favourite": "home",
+     "p_fav": 0.8676,
+     "ht": [
+      0,
+      1
+     ]
+    }
+   ]
+  }
+ ]
+}
