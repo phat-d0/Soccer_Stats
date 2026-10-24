@@ -1124,3 +1124,80 @@ looser on favourites loses *less* than the flat 12% (R* −10.7% vs −13.1% ROI
 vs −5.4%). But no band at any threshold beats Pinnacle's close: even the model's
 favourites win less often than the price implies. Taking fewer bets trims the losses;
 it doesn't find a winning subset. No live change; the paper tests run as they are.
+
+## Favourites coming back from behind (owner, 24 Oct; pre-registered 2026-10-24, before any code or data is loaded)
+
+**Owner's idea.** Back the pre-match favourite in play after it falls behind, on the bet that
+favourites come back more often than the in-play price allows. Phase 1 (this test) uses free
+data only and asks the necessary first question: do favourites come back more often than a
+fair, time-scaled in-play model expects? If they don't, a market priced like that model
+already prices the comeback and phase 2 (in-play prices, credits) isn't worth buying.
+0 credits, no key, no live change. Descriptive research: nothing here opens a trade.
+
+**Matches and seasons.** Development 2017/18–2024/25 (start years 2017–2024), the window of
+the other lab work. Every match from 1 July 2025 is dropped before anything is computed;
+2025/26 stays a possible holdout (`lab.harness.Holdout`, locked). Leagues: E0, SP1, D1, I1,
+F1 (both events) and E1, E2, E3 (event B only, see below). Played matches only.
+
+**The favourite.** Pinnacle's own closing 1X2 from football-data (PSCH/PSCD/PSCA; never the
+average or Bet365 fallback), margin removed with Shin. The favourite is the side (home or
+away) with the larger fair win chance. Strength bands by that chance: **45–55%, 55–65%,
+65–75%, 75%+**. Matches whose favourite is under 45%, or without Pinnacle's close, are left
+out (counted).
+
+**Events** (each match can enter both; within an event, a match counts once):
+- **Event A, conceded first:** the first goal of the match is scored by the underdog (an own
+  goal counts for the side credited with it). Goal minutes from Understat's per-match shot
+  data (`getMatchData`, result "Goal" or "OwnGoal", with its minute), E0, SP1, D1, I1, F1
+  only. Understat's own-goal side convention is taken as the one that rebuilds
+  football-data's final score in more matches; any match whose rebuilt final score differs
+  from football-data's FTHG/FTAG is dropped and counted (a data check, not an outcome
+  read). The Championship, League One and League Two have no Understat data; ESPN's
+  historical summaries for 2017–2024 would be about 13,000 requests with unknown coverage,
+  so event A leaves them out in phase 1 (stated in the report). First-goal minute bands:
+  **0–30, 30–60, 60+** (Understat's minute; stoppage time counts in its band).
+- **Event B, behind at half-time:** football-data's HTHG/HTAG, all eight leagues. Any
+  deficit; the 1-goal and 2+-goal splits are reported beside it (descriptive).
+
+**Outcomes after each event:** the favourite's final win, draw and loss rates, and "avoided
+defeat" (win or draw), with 95% ranges from resampling matches.
+
+**Benchmark: a fair time-scaled in-play model.**
+- Pre-match goal means (favourite λf, underdog λu): independent Poisson means fitted by least
+  squares to Pinnacle's margin-free closing 1X2 **and** closing over/under 2.5 (PC>2.5/PC<2.5,
+  Shin), the same fit as `team_totals.implied_means`. The total needs the over/under price
+  (the h2h alone can't pin it: round 13). Matches without Pinnacle's closing over/under get no
+  benchmark and are counted; the benchmark is reported only for league-seasons where it
+  covers at least 90% of the event's matches (the coverage table says which).
+- Remaining goals: each side's goals after the event are Poisson with mean λ × (minutes left /
+  90), minutes left = 90 − event minute (event A: the first goal's minute, capped to 0–90;
+  event B: 45). A uniform scoring rate is the stated simplification; real goal rates rise
+  late in matches, so this model, if anything, leans toward more late goals being needed.
+  The favourite wins if its remaining goals exceed the underdog's by more than the deficit;
+  draws if by exactly the deficit.
+- Per match: predicted P(win), P(draw), P(avoid defeat) given the score at the event.
+
+**Tests (the family).** Primary measure: realized − predicted favourite **win** rate
+(per-match residual y − p, averaged), with a match-resampled range. Cells: event A × 4
+strength bands × 3 minute bands (12) and event B × 4 strength bands (4), plus each event
+pooled over bands (2): **18 tests, 99.722% ranges** (Bonferroni). "Avoided defeat" and draw
+residuals are reported at the same level, descriptive. Calibration per event: a logistic
+slope and intercept of the outcome on logit(predicted P(win)), pooled (descriptive; 1 =
+perfectly scaled). Per-league tables at 95%, descriptive.
+
+**Verdict rule.**
+- **Gap found** if any of the 18 win residual ranges is entirely above 0: favourites win more
+  often than the fair model says in that cell. That is the condition for proposing phase 2.
+- **Below the model** if ranges sit entirely below 0 (favourites come back less often than the
+  model; backing them in play at fair-model prices would lose).
+- Otherwise **no gap shown.** Phase 1 can't say whether real in-play prices already include
+  any gap; only phase 2 can.
+
+**Phase 2 note (not run; owner's decision, credits).** The Odds API's historical snapshots
+cost about 10 credits per region and market, so a ≤5-credit probe can't fetch one; a live
+`/odds` call during a match (1 credit) can show whether in-play prices are returned at all.
+Costed in the report only if phase 1 finds a gap.
+
+**Code.** `lab/comebacks.py`; `odds-check.yml` `task=comebacks-fetch` with `league`
+(downloads and caches one league's Understat match files, prints counts only, never
+outcomes) and `task=comebacks` (the analysis, all leagues pooled).
