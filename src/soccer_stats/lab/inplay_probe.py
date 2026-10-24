@@ -47,10 +47,41 @@ def _int(h, k):
         return None
 
 
-def espn_live(league: str, get=requests.get) -> list[dict]:
-    """Today's ESPN scoreboard: home, away, score, clock and state per match (free)."""
+def _minute(display: str) -> int | None:
+    """ESPN's goal clock ("34'", "45'+2'") as the minute it counts in (45 for 45'+2)."""
+    digits = ""
+    for ch in str(display or ""):
+        if not ch.isdigit():
+            break
+        digits += ch
+    return int(digits) if digits else None
+
+
+def score_at(goals: list[tuple[str, int]], minute: int | None) -> str | None:
+    """'h-a' after `minute` from (side, minute) goal events; None without a minute."""
+    if minute is None:
+        return None
+    h = sum(1 for side, m in goals if side == "home" and m <= minute)
+    a = sum(1 for side, m in goals if side == "away" and m <= minute)
+    return f"{h}-{a}"
+
+
+def match_minute(elapsed: float) -> int:
+    """The match minute about `elapsed` minutes after kickoff: the clock stops at 45 over
+    half-time (taken as minutes 47-64 after kickoff), then runs 17 minutes behind."""
+    if elapsed <= 47:
+        return max(0, int(elapsed))
+    if elapsed <= 64:
+        return 45
+    return min(90, int(elapsed - 17))
+
+
+def espn_live(league: str, get=requests.get, date: str | None = None) -> list[dict]:
+    """ESPN's scoreboard (today, or `date` YYYYMMDD): home, away, score, clock and state
+    per match, plus each goal's side and minute (free)."""
     try:
-        r = get(ESPN_BASE.format(slug=SLUGS[league]) + "/scoreboard", timeout=15)
+        params = {"dates": date} if date else None
+        r = get(ESPN_BASE.format(slug=SLUGS[league]) + "/scoreboard", params=params, timeout=15)
         body = r.json() if r.status_code == 200 else {}
     except Exception:  # noqa: BLE001  the scores are context, not the question
         return []
@@ -59,6 +90,15 @@ def espn_live(league: str, get=requests.get) -> list[dict]:
         comp = (e.get("competitions") or [{}])[0]
         sides = {c.get("homeAway"): c for c in comp.get("competitors") or []}
         st = (e.get("status") or {}).get("type") or {}
+        ids = {str(((sides.get(k) or {}).get("team") or {}).get("id")): k for k in ("home", "away")}
+        goals = [
+            (
+                ids.get(str((d.get("team") or {}).get("id"))),
+                _minute((d.get("clock") or {}).get("displayValue")),
+            )
+            for d in comp.get("details") or []
+            if d.get("scoringPlay")
+        ]
         out.append(
             {
                 "home": ((sides.get("home") or {}).get("team") or {}).get("displayName"),
@@ -67,6 +107,7 @@ def espn_live(league: str, get=requests.get) -> list[dict]:
                 "clock": (e.get("status") or {}).get("displayClock"),
                 "state": st.get("state"),
                 "detail": st.get("shortDetail"),
+                "goals": [(side, m) for side, m in goals if side and m is not None],
             }
         )
     return out
@@ -176,17 +217,85 @@ def run(league: str, cap: int, api_key: str, get=requests.get) -> dict:
     return res
 
 
+HIST_URL = "https://api.the-odds-api.com/v4/historical/sports/{sport}/odds"
+HIST_COST = 10  # historical: 10 credits per region and market
+
+
+def run_historical(league: str, at: str, cap: int, api_key: str, get=requests.get) -> dict:
+    """One historical h2h snapshot at `at` (ISO, UTC), when matches were in play: do
+    started events come back with prices, and how fresh were they then? A free events
+    list reads the balance first; the call needs cap >= 10 and the 3,000 reserve kept."""
+    sport = SPORTS[league]
+    res = {"league": league, "sport": sport, "cap": cap, "spent": 0, "at": at, "log": []}
+    if not api_key:
+        res["stop"] = "no ODDS_API_KEY"
+        return res
+    r = get(EVENTS_URL.format(sport=sport), params={"apiKey": api_key}, timeout=20)
+    left = _int(r.headers, "x-requests-remaining")
+    res["log"].append(f"events (balance check): HTTP {r.status_code}, credits left {left}")
+    res["credits_before"] = left
+    if cap < HIST_COST or (left is not None and left - HIST_COST < RESERVE):
+        res["stop"] = f"cap {cap} or the {RESERVE}-credit reserve stops the call (left {left})"
+        return res
+    r = get(
+        HIST_URL.format(sport=sport),
+        params={
+            "apiKey": api_key,
+            "date": at,
+            "bookmakers": BOOKS,
+            "markets": "h2h",
+            "oddsFormat": "decimal",
+            "dateFormat": "iso",
+        },
+        timeout=30,
+    )
+    cost = _int(r.headers, "x-requests-last")
+    res["spent"] = HIST_COST if cost is None else cost
+    res["credits_after"] = _int(r.headers, "x-requests-remaining")
+    res["log"].append(
+        f"historical odds: HTTP {r.status_code}, cost {cost}, credits left {res['credits_after']}"
+    )
+    if r.status_code != 200:
+        res["stop"] = f"historical call HTTP {r.status_code}"
+        return res
+    body = r.json()
+    snap = _ts(body.get("timestamp") or at)
+    res["snapshot"] = body.get("timestamp")
+    live = espn_live(league, get, date=f"{snap:%Y%m%d}")
+    res["matches"] = summarise(body.get("data") or [], snap, live)
+    for m in res["matches"]:
+        e = m.get("espn")
+        if m["started"] and e:
+            minute = match_minute(m["minutes_since_kickoff"])
+            m["match_minute"] = minute
+            m["score_then"] = score_at([tuple(g) for g in e.get("goals") or []], minute)
+            m["final"] = e.get("score")
+    inplay = [m for m in res["matches"] if m["started"]]
+    priced = [m for m in inplay if m["books"]]
+    ages = [b["age_min"] for m in priced for b in m["books"] if b["age_min"] is not None]
+    res["verdict"] = (
+        f"snapshot {res['snapshot']}: {len(priced)} of {len(inplay)} started matches came back "
+        f"with h2h prices ({len(res['matches'])} events in the snapshot); "
+        + (f"book updates {min(ages):.1f}-{max(ages):.1f} min old" if ages else "no in-play prices")
+    )
+    return res
+
+
 def main(argv=None) -> None:
     import os
 
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--league", default="E2")
     ap.add_argument("--cap", type=int, default=0)
+    ap.add_argument("--at", help="historical snapshot time (ISO, UTC); blank = live")
     ap.add_argument("--json")
     a = ap.parse_args(argv)
     key = os.environ.get("ODDS_API_KEY", "")
     try:
-        res = run(a.league, a.cap, key)
+        if a.at:
+            res = run_historical(a.league, a.at, a.cap, key)
+        else:
+            res = run(a.league, a.cap, key)
     except Exception as exc:  # noqa: BLE001  never print a URL (it holds the key)
         res = {
             "league": a.league,
@@ -206,6 +315,11 @@ def main(argv=None) -> None:
             f"{m['home']} v {m['away']}: {'IN PLAY' if m['started'] else 'pre-match'} "
             f"{m['minutes_since_kickoff']} min after kickoff; "
             f"ESPN {e.get('score', '?')} {e.get('detail', '')}"
+            + (
+                f"; score then {m['score_then']} (minute ~{m['match_minute']})"
+                if "score_then" in m
+                else ""
+            )
         )
         for b in m["books"]:
             print(
