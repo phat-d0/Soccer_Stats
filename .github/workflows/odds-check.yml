@@ -78,9 +78,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
@@ -235,7 +235,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe') && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -282,6 +282,9 @@ jobs:
                 --finalist "$FINALISTS" --tests "$T" --json out/corners2.json ;;
             comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
             comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
+            inplay-probe)  # comebacks phase 2 step 1: one live h2h call during play (1 credit)
+              uv run python -m soccer_stats.lab.inplay_probe --league "$LEAGUE" --cap "$CAP" \
+                --json out/inplay.json ;;
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
             cup-corner-coverage) uv run soccer-stats cup-corners --coverage-only \
                      --json out/cup_corner_coverage.json ;;
