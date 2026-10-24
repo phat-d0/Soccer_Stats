@@ -90,6 +90,13 @@ settlement runs after them.
   bets, ROI −2.2% (−7.5% to +2.9%), CLV −3.1% (−3.4% to −2.8%); the branch run in
   `docs/leagues.md` had 2,629 bets, ROI −2.3%. UCL Lean: 0 bets (only one block reaches the
   300-row minimum).
+- Favourites coming back from behind (owner, 24 Oct; phase 1, free data): a gap against a fair
+  time-scaled model with no game state. Favourites behind at half-time win 19.7% vs 14.0%
+  (2,166 matches, eight leagues), after conceding first 28.8% vs 24.5% (2,174, five
+  leagues); 5 of 18 pre-registered tests above 0, most clearly 45–65% favourites. About a
+  third is the second half's higher scoring rate and trailing underdogs show a smaller
+  version, so it may already be in in-play prices; phase 2 (in-play prices, ≥10 credits to
+  probe) is the owner's call (`docs/lab.md` "Favourites coming back from behind").
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -160,7 +167,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`. | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`. | 0 except the capped tasks |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web`: Playwright Chromium (cached) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
@@ -546,6 +553,15 @@ the owner's baseball app, so the balance can drop without any run here.
   (`league_levels()`). Every level is null today.
 - `lab/edge12_filters.py` (CLI `backtest-edge12-filters`) and `lab/band_edges.py` (CLI
   `backtest-band-edges`): the Model 12% rule research; neither passed.
+- `lab/comebacks.py` (owner, 24 Oct; `docs/lab.md` "Favourites coming back from behind"; 0 credits):
+  phase 1 of the in-play comeback idea. Favourites from Pinnacle's closing 1X2 (bands 45–55,
+  55–65, 65–75, 75%+); event A = the underdog scores first (Understat goal minutes, E0, SP1, D1,
+  I1, F1; minute bands 0–30, 30–60, 60+), event B = behind at half-time (football-data, eight
+  leagues); benchmark = Poisson means from Pinnacle's closing 1X2 and O/U 2.5, remaining goals
+  scaled by minutes left / 90. 18 tests on the win residual (99.722%), 2017/18–2024/25, 2025/26
+  dropped first. `odds-check.yml` `task=comebacks-fetch` with `league` (downloads and caches
+  `comebacks-<league>-`, counts only) and `task=comebacks` (the analysis; its restore paths
+  must match the fetch's save paths).
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
