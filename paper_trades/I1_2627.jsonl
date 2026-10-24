@@ -411,3 +411,16 @@
 {"type":"update","id":"I1|2627|Udinese|Milan|lean","at":"2026-10-24T07:59:54+00:00","close_odds":1.65,"close_prices":{"home":4.8,"draw":3.8,"away":1.65},"close_fetched_at":"2026-10-24T07:58:47+00:00","close_minutes_before":2146.2,"clv_dk":-0.07330233002876918,"beat_close_dk":false}
 {"type":"update","id":"I1|2627|Roma|Cagliari","at":"2026-10-24T07:59:54+00:00","close_odds":8.5,"close_prices":{"home":1.32,"draw":4.6,"away":8.5},"close_fetched_at":"2026-10-24T07:58:47+00:00","close_minutes_before":5026.2,"clv_dk":-0.2117650228904019,"beat_close_dk":false}
 {"type":"update","id":"I1|2627|Frosinone|Lecce","at":"2026-10-24T07:59:54+00:00","close_odds":1.87,"close_prices":{"home":1.87,"draw":3.6,"away":3.6},"close_fetched_at":"2026-10-24T07:58:47+00:00","close_minutes_before":7771.2,"clv_dk":-0.04322392578382417,"beat_close_dk":false}
+{"type":"update","id":"I1|2627|Genoa|Fiorentina","at":"2026-10-24T08:33:18+00:00","p_blend":0.2328,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"I1|2627|Bologna|Inter","at":"2026-10-24T08:33:18+00:00","p_blend":0.1186,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"I1|2627|Milan|Atalanta","at":"2026-10-24T08:33:18+00:00","p_blend":0.2054,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"I1|2627|Monza|Cagliari","at":"2026-10-24T08:33:18+00:00","p_blend":0.2393,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"I1|2627|Sassuolo|Milan","at":"2026-10-24T08:33:18+00:00","p_blend":0.1652,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Como|Sassuolo","at":"2026-10-24T08:33:18+00:00","p_blend":0.0943,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Venezia|Napoli","at":"2026-10-24T08:33:18+00:00","p_blend":0.5333,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Udinese|Milan","at":"2026-10-24T08:33:18+00:00","p_blend":0.1398,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Lazio|Parma","at":"2026-10-24T08:33:18+00:00","p_blend":0.0994,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Milan|Bologna","at":"2026-10-24T08:33:18+00:00","p_blend":0.1406,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Fiorentina|Atalanta","at":"2026-10-24T08:33:18+00:00","p_blend":0.293,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Roma|Cagliari","at":"2026-10-24T08:33:18+00:00","p_blend":0.0662,"p_blend_from":"odds_log"}
+{"type":"update","id":"I1|2627|Frosinone|Lecce","at":"2026-10-24T08:33:18+00:00","p_blend":0.4398,"p_blend_from":"odds_log"}

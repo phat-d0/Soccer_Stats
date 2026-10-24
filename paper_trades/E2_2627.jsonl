@@ -353,3 +353,26 @@
 {"type":"update","id":"E2|2627|Notts County|Stockport","at":"2026-10-24T07:59:54+00:00","close_odds":5.5,"close_prices":{"home":5.5,"draw":4.1,"away":1.59},"close_fetched_at":"2026-10-24T07:59:25+00:00","close_minutes_before":360.6,"clv_dk":-0.0875048605490697,"beat_close_dk":false}
 {"type":"update","id":"E2|2627|Bromley|Peterboro","at":"2026-10-24T07:59:54+00:00","close_odds":2.0,"close_prices":{"home":3.15,"draw":4.1,"away":2.0},"close_fetched_at":"2026-10-24T07:59:25+00:00","close_minutes_before":360.6,"clv_dk":0.00244321244447554,"beat_close_dk":true}
 {"type":"update","id":"E2|2627|Stevenage|Milton Keynes Dons","at":"2026-10-24T07:59:54+00:00","close_odds":2.0,"close_prices":{"home":2.0,"draw":3.4,"away":3.8},"close_fetched_at":"2026-10-24T07:59:25+00:00","close_minutes_before":360.6,"clv_dk":-0.01837110115077678,"beat_close_dk":false}
+{"type":"update","id":"E2|2627|Mansfield|Oxford","at":"2026-10-24T08:33:18+00:00","p_blend":0.3461,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Milton Keynes Dons|Luton","at":"2026-10-24T08:33:18+00:00","p_blend":0.4811,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Bradford|Stevenage","at":"2026-10-24T08:33:18+00:00","p_blend":0.2655,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Leicester|Doncaster","at":"2026-10-24T08:33:18+00:00","p_blend":0.2724,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Plymouth|Huddersfield","at":"2026-10-24T08:33:18+00:00","p_blend":0.3539,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Peterboro|Burton","at":"2026-10-24T08:33:18+00:00","p_blend":0.2743,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Barnsley|Cambridge","at":"2026-10-24T08:33:18+00:00","p_blend":0.3544,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Wigan|Reading","at":"2026-10-24T08:33:18+00:00","p_blend":0.2198,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Blackpool|Milton Keynes Dons","at":"2026-10-24T08:33:18+00:00","p_blend":0.4088,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Bromley|Leicester","at":"2026-10-24T08:33:18+00:00","p_blend":0.2182,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Cambridge|Wycombe","at":"2026-10-24T08:33:18+00:00","p_blend":0.3403,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Oxford|Wigan","at":"2026-10-24T08:33:18+00:00","p_blend":0.5278,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Reading|Leyton Orient","at":"2026-10-24T08:33:18+00:00","p_blend":0.1714,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Huddersfield|Peterboro","at":"2026-10-24T08:33:18+00:00","p_blend":0.1906,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Burton|Bradford","at":"2026-10-24T08:33:18+00:00","p_blend":0.1985,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Luton|Barnsley","at":"2026-10-24T08:33:18+00:00","p_blend":0.1556,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Huddersfield|Wigan","at":"2026-10-24T08:33:18+00:00","p_blend":0.127,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Luton|Leicester","at":"2026-10-24T08:33:18+00:00","p_blend":0.4501,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Oxford|Bradford","at":"2026-10-24T08:33:18+00:00","p_blend":0.3582,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Cambridge|Plymouth","at":"2026-10-24T08:33:18+00:00","p_blend":0.3825,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Notts County|Stockport","at":"2026-10-24T08:33:18+00:00","p_blend":0.1529,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Bromley|Peterboro","at":"2026-10-24T08:33:18+00:00","p_blend":0.489,"p_blend_from":"odds_log"}
+{"type":"update","id":"E2|2627|Stevenage|Milton Keynes Dons","at":"2026-10-24T08:33:18+00:00","p_blend":0.4722,"p_blend_from":"odds_log"}

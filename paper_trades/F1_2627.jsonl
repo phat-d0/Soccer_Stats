@@ -662,3 +662,25 @@
 {"type":"update","id":"F1|2627|Lorient|Brest","at":"2026-10-24T05:38:28+00:00","close_odds":2.55,"close_prices":{"home":2.55,"draw":3.45,"away":2.6},"close_fetched_at":"2026-10-24T05:37:00+00:00","close_minutes_before":10928.0,"clv_dk":-0.05817228080053727,"beat_close_dk":false}
 {"type":"update","id":"F1|2627|Marseille|Le Havre|lean","at":"2026-10-24T05:38:28+00:00","close_odds":5.0,"close_prices":{"home":1.57,"draw":4.6,"away":5.0},"close_fetched_at":"2026-10-24T05:37:00+00:00","close_minutes_before":2078.0,"clv_dk":-0.08047460642031024,"beat_close_dk":false}
 {"type":"update","id":"F1|2627|Monaco|Lille","at":"2026-10-24T05:38:28+00:00","close_odds":3.75,"close_prices":{"home":2.05,"draw":3.4,"away":3.75},"close_fetched_at":"2026-10-24T05:37:00+00:00","close_minutes_before":1943.0,"clv_dk":-0.0570126169461076,"beat_close_dk":false}
+{"type":"update","id":"F1|2627|Monaco|Toulouse","at":"2026-10-24T08:33:18+00:00","p_blend":0.1935,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"F1|2627|Lorient|Paris FC","at":"2026-10-24T08:33:18+00:00","p_blend":0.2354,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"F1|2627|Rennes|Auxerre","at":"2026-10-24T08:33:18+00:00","p_blend":0.1362,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"F1|2627|Strasbourg|Paris SG","at":"2026-10-24T08:33:18+00:00","p_blend":0.1367,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"F1|2627|Angers|Marseille","at":"2026-10-24T08:33:18+00:00","p_blend":0.4411,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"F1|2627|Lorient|Monaco","at":"2026-10-24T08:33:18+00:00","p_blend":0.2385,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Le Mans|Toulouse","at":"2026-10-24T08:33:18+00:00","p_blend":0.31,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Troyes|Lens","at":"2026-10-24T08:33:18+00:00","p_blend":0.5107,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Toulouse|Troyes","at":"2026-10-24T08:33:18+00:00","p_blend":0.5342,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Lens|Paris FC","at":"2026-10-24T08:33:18+00:00","p_blend":0.4346,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Auxerre|Le Mans","at":"2026-10-24T08:33:18+00:00","p_blend":0.2868,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Angers|Lorient","at":"2026-10-24T08:33:18+00:00","p_blend":0.3364,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Lille|Brest","at":"2026-10-24T08:33:18+00:00","p_blend":0.4602,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Paris FC|Rennes","at":"2026-10-24T08:33:18+00:00","p_blend":0.3913,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Lyon|Nice","at":"2026-10-24T08:33:18+00:00","p_blend":0.472,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Rennes|Strasbourg","at":"2026-10-24T08:33:18+00:00","p_blend":0.2168,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Le Havre|Paris SG","at":"2026-10-24T08:33:18+00:00","p_blend":0.0852,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Nice|Rennes","at":"2026-10-24T08:33:18+00:00","p_blend":0.3263,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Troyes|Le Mans","at":"2026-10-24T08:33:18+00:00","p_blend":0.2719,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Lorient|Brest","at":"2026-10-24T08:33:18+00:00","p_blend":0.3474,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Monaco|Lille","at":"2026-10-24T08:33:18+00:00","p_blend":0.2559,"p_blend_from":"odds_log"}
+{"type":"update","id":"F1|2627|Brest|Nice","at":"2026-10-24T08:33:18+00:00","p_blend":0.3833,"p_blend_from":"odds_log"}

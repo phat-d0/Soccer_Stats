@@ -1025,3 +1025,29 @@
 {"type":"update","id":"SP1|2627|Celta|Betis","at":"2026-10-24T07:59:54+00:00","close_odds":3.05,"close_prices":{"home":3.05,"draw":3.55,"away":2.3},"close_fetched_at":"2026-10-24T07:59:28+00:00","close_minutes_before":1875.5,"clv_dk":-0.10708168132795393,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Ath Bilbao|Getafe","at":"2026-10-24T07:59:54+00:00","close_odds":4.0,"close_prices":{"home":1.59,"draw":4.0,"away":6.0},"close_fetched_at":"2026-10-24T07:59:28+00:00","close_minutes_before":1740.5,"clv_dk":-0.06837360566911432,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Santander|Espanol","at":"2026-10-24T07:59:54+00:00","close_odds":2.9,"close_prices":{"home":2.35,"draw":3.6,"away":2.9},"close_fetched_at":"2026-10-24T07:59:28+00:00","close_minutes_before":375.5,"clv_dk":-0.046395327775104245,"beat_close_dk":false}
+{"type":"update","id":"SP1|2627|Alaves|Ath Madrid","at":"2026-10-24T08:33:18+00:00","p_blend":0.199,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Barcelona|Getafe","at":"2026-10-24T08:33:18+00:00","p_blend":0.02,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Real Madrid|Villarreal","at":"2026-10-24T08:33:18+00:00","p_blend":0.1205,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Sociedad|La Coruna","at":"2026-10-24T08:33:18+00:00","p_blend":0.1537,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Betis|Osasuna","at":"2026-10-24T08:33:18+00:00","p_blend":0.1359,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Santander|Valencia","at":"2026-10-24T08:33:18+00:00","p_blend":0.3277,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Levante|Sevilla","at":"2026-10-24T08:33:18+00:00","p_blend":0.354,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|La Coruna|Levante","at":"2026-10-24T08:33:18+00:00","p_blend":0.2737,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Espanol|Ath Madrid","at":"2026-10-24T08:33:18+00:00","p_blend":0.1939,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Betis|Barcelona","at":"2026-10-24T08:33:18+00:00","p_blend":0.1243,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Valencia|Ath Bilbao","at":"2026-10-24T08:33:18+00:00","p_blend":0.2434,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"SP1|2627|Elche|Celta","at":"2026-10-24T08:33:18+00:00","p_blend":0.32,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Levante|Ath Bilbao","at":"2026-10-24T08:33:18+00:00","p_blend":0.246,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Alaves|Malaga","at":"2026-10-24T08:33:18+00:00","p_blend":0.5628,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Ath Madrid|La Coruna","at":"2026-10-24T08:33:18+00:00","p_blend":0.0503,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Sociedad|Levante","at":"2026-10-24T08:33:18+00:00","p_blend":0.2069,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Barcelona|Real Madrid","at":"2026-10-24T08:33:18+00:00","p_blend":0.17,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Sevilla|Osasuna","at":"2026-10-24T08:33:18+00:00","p_blend":0.2226,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Osasuna|Santander","at":"2026-10-24T08:33:18+00:00","p_blend":0.5141,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Malaga|Sociedad","at":"2026-10-24T08:33:18+00:00","p_blend":0.4564,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Real Madrid|Sevilla","at":"2026-10-24T08:33:18+00:00","p_blend":0.0478,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Levante|Ath Madrid","at":"2026-10-24T08:33:18+00:00","p_blend":0.1414,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Barcelona|Alaves","at":"2026-10-24T08:33:18+00:00","p_blend":0.0236,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Celta|Betis","at":"2026-10-24T08:33:18+00:00","p_blend":0.3239,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Getafe","at":"2026-10-24T08:33:18+00:00","p_blend":0.2319,"p_blend_from":"odds_log"}
+{"type":"update","id":"SP1|2627|Santander|Espanol","at":"2026-10-24T08:33:18+00:00","p_blend":0.34,"p_blend_from":"odds_log"}

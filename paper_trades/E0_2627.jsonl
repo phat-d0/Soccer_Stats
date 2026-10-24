@@ -950,3 +950,18 @@
 {"type":"update","id":"E0|2627|Tottenham|Crystal Palace","at":"2026-10-24T07:59:54+00:00","close_odds":4.9,"close_prices":{"home":1.62,"draw":4.3,"away":4.9},"close_fetched_at":"2026-10-24T07:58:42+00:00","close_minutes_before":10651.3,"clv_dk":-0.0973110061370106,"beat_close_dk":false}
 {"type":"update","id":"E0|2627|Chelsea|Man United","at":"2026-10-24T07:59:54+00:00","close_odds":3.8,"close_prices":{"home":1.83,"draw":3.95,"away":3.8},"close_fetched_at":"2026-10-24T07:58:42+00:00","close_minutes_before":10351.3,"clv_dk":-0.13514965935015355,"beat_close_dk":false}
 {"type":"update","id":"E0|2627|Arsenal|Everton","at":"2026-10-24T07:59:54+00:00","close_odds":7.5,"close_prices":{"home":1.43,"draw":4.5,"away":7.5},"close_fetched_at":"2026-10-24T07:58:42+00:00","close_minutes_before":361.3,"clv_dk":0.0036888004630917237,"beat_close_dk":true}
+{"type":"update","id":"E0|2627|Crystal Palace|Nott'm Forest","at":"2026-10-24T08:33:18+00:00","p_blend":0.3524,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Nott'm Forest|Arsenal","at":"2026-10-24T08:33:18+00:00","p_blend":0.1497,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Ipswich|Nott'm Forest","at":"2026-10-24T08:33:18+00:00","p_blend":0.3823,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Aston Villa|Man City","at":"2026-10-24T08:33:18+00:00","p_blend":0.1976,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Fulham|Hull","at":"2026-10-24T08:33:18+00:00","p_blend":0.1818,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Tottenham|Coventry","at":"2026-10-24T08:33:18+00:00","p_blend":0.1386,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Bournemouth|Sunderland","at":"2026-10-24T08:33:18+00:00","p_blend":0.4762,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Everton|Chelsea","at":"2026-10-24T08:33:18+00:00","p_blend":0.2941,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Crystal Palace|Newcastle","at":"2026-10-24T08:33:18+00:00","p_blend":0.3327,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Hull|Brentford","at":"2026-10-24T08:33:18+00:00","p_blend":0.2047,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Man United|Bournemouth","at":"2026-10-24T08:33:18+00:00","p_blend":0.2276,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Hull|Ipswich","at":"2026-10-24T08:33:18+00:00","p_blend":0.3575,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Tottenham|Crystal Palace","at":"2026-10-24T08:33:18+00:00","p_blend":0.1764,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Chelsea|Man United","at":"2026-10-24T08:33:18+00:00","p_blend":0.2517,"p_blend_from":"odds_log"}
+{"type":"update","id":"E0|2627|Arsenal|Everton","at":"2026-10-24T08:33:18+00:00","p_blend":0.0979,"p_blend_from":"odds_log"}

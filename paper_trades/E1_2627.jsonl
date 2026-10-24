@@ -494,3 +494,30 @@
 {"type":"update","id":"E1|2627|Preston|West Brom|lean","at":"2026-10-24T07:59:54+00:00","close_odds":3.6,"close_prices":{"home":3.6,"draw":3.55,"away":2.05},"close_fetched_at":"2026-10-24T07:58:45+00:00","close_minutes_before":361.2,"clv_dk":-0.02746313883849727,"beat_close_dk":false}
 {"type":"update","id":"E1|2627|Portsmouth|Millwall","at":"2026-10-24T07:59:54+00:00","close_odds":2.8,"close_prices":{"home":2.55,"draw":3.35,"away":2.8},"close_fetched_at":"2026-10-24T07:58:45+00:00","close_minutes_before":211.2,"clv_dk":0.023334442523714083,"beat_close_dk":true}
 {"type":"update","id":"E1|2627|Wolves|Watford","at":"2026-10-24T07:59:54+00:00","close_odds":8.0,"close_prices":{"home":1.38,"draw":5.0,"away":8.0},"close_fetched_at":"2026-10-24T07:58:45+00:00","close_minutes_before":361.2,"clv_dk":-0.10979411602614608,"beat_close_dk":false}
+{"type":"update","id":"E1|2627|Blackburn|Cardiff","at":"2026-10-24T08:33:18+00:00","p_blend":0.3489,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Bolton|Stoke","at":"2026-10-24T08:33:18+00:00","p_blend":0.363,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Derby|Wrexham","at":"2026-10-24T08:33:18+00:00","p_blend":0.3395,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Middlesbrough|Wolves","at":"2026-10-24T08:33:18+00:00","p_blend":0.3033,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Sheffield United|Lincoln","at":"2026-10-24T08:33:18+00:00","p_blend":0.2725,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Watford|Burnley","at":"2026-10-24T08:33:18+00:00","p_blend":0.3698,"p_blend_from":"approx_current_fit"}
+{"type":"update","id":"E1|2627|Burnley|Charlton","at":"2026-10-24T08:33:18+00:00","p_blend":0.2288,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Cardiff|Watford","at":"2026-10-24T08:33:18+00:00","p_blend":0.2191,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Millwall|Swansea","at":"2026-10-24T08:33:18+00:00","p_blend":0.3937,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Birmingham|Preston","at":"2026-10-24T08:33:18+00:00","p_blend":0.2194,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Stoke|Middlesbrough","at":"2026-10-24T08:33:18+00:00","p_blend":0.236,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|QPR|Derby","at":"2026-10-24T08:33:18+00:00","p_blend":0.2232,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Norwich|Southampton","at":"2026-10-24T08:33:18+00:00","p_blend":0.3447,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Portsmouth|Sheffield United","at":"2026-10-24T08:33:18+00:00","p_blend":0.3025,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|West Brom|Blackburn","at":"2026-10-24T08:33:18+00:00","p_blend":0.2531,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Burnley|Wolves","at":"2026-10-24T08:33:18+00:00","p_blend":0.3467,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Bristol City|Sheffield United","at":"2026-10-24T08:33:18+00:00","p_blend":0.276,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Derby|Stoke","at":"2026-10-24T08:33:18+00:00","p_blend":0.387,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Norwich|Portsmouth","at":"2026-10-24T08:33:18+00:00","p_blend":0.1993,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Swansea|West Ham","at":"2026-10-24T08:33:18+00:00","p_blend":0.4343,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Millwall|Lincoln","at":"2026-10-24T08:33:18+00:00","p_blend":0.5486,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Wrexham|Preston","at":"2026-10-24T08:33:18+00:00","p_blend":0.1719,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Bolton|Middlesbrough","at":"2026-10-24T08:33:18+00:00","p_blend":0.242,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Lincoln|Burnley","at":"2026-10-24T08:33:18+00:00","p_blend":0.4057,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Preston|West Brom","at":"2026-10-24T08:33:18+00:00","p_blend":0.2806,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Portsmouth|Millwall","at":"2026-10-24T08:33:18+00:00","p_blend":0.3188,"p_blend_from":"odds_log"}
+{"type":"update","id":"E1|2627|Wolves|Watford","at":"2026-10-24T08:33:18+00:00","p_blend":0.1239,"p_blend_from":"odds_log"}

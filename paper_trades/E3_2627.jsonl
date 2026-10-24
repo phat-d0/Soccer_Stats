@@ -256,3 +256,24 @@
 {"type":"update","id":"E3|2627|Northampton|Colchester|lean","at":"2026-10-24T07:59:54+00:00","close_odds":2.05,"close_prices":{"home":2.05,"draw":3.35,"away":3.75},"close_fetched_at":"2026-10-24T07:59:26+00:00","close_minutes_before":210.6,"clv_dk":-0.039839927015912324,"beat_close_dk":false}
 {"type":"update","id":"E3|2627|Barnet|Oldham","at":"2026-10-24T07:59:54+00:00","close_odds":4.6,"close_prices":{"home":1.71,"draw":3.95,"away":4.6},"close_fetched_at":"2026-10-24T07:59:26+00:00","close_minutes_before":360.6,"clv_dk":-0.11659446687825281,"beat_close_dk":false}
 {"type":"update","id":"E3|2627|Rochdale|Accrington","at":"2026-10-24T07:59:54+00:00","close_odds":2.8,"close_prices":{"home":2.8,"draw":3.45,"away":2.45},"close_fetched_at":"2026-10-24T07:59:26+00:00","close_minutes_before":360.6,"clv_dk":-0.0517061883858243,"beat_close_dk":false}
+{"type":"update","id":"E3|2627|Fleetwood Town|Rotherham","at":"2026-10-24T08:33:18+00:00","p_blend":0.3994,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Colchester|Exeter","at":"2026-10-24T08:33:18+00:00","p_blend":0.2339,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Grimsby|Northampton","at":"2026-10-24T08:33:18+00:00","p_blend":0.2282,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Salford|Crawley Town","at":"2026-10-24T08:33:18+00:00","p_blend":0.185,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Tranmere|Barnet","at":"2026-10-24T08:33:18+00:00","p_blend":0.4216,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Newport County|York","at":"2026-10-24T08:33:18+00:00","p_blend":0.4327,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Port Vale|Chesterfield","at":"2026-10-24T08:33:18+00:00","p_blend":0.3157,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Barnet|Swindon","at":"2026-10-24T08:33:18+00:00","p_blend":0.1768,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Chesterfield|Colchester","at":"2026-10-24T08:33:18+00:00","p_blend":0.1889,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Crawley Town|Shrewsbury","at":"2026-10-24T08:33:18+00:00","p_blend":0.3358,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Exeter|Crewe","at":"2026-10-24T08:33:18+00:00","p_blend":0.2672,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Northampton|Tranmere","at":"2026-10-24T08:33:18+00:00","p_blend":0.2547,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Cheltenham|Fleetwood Town","at":"2026-10-24T08:33:18+00:00","p_blend":0.3048,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Bristol Rvs|Swindon","at":"2026-10-24T08:33:18+00:00","p_blend":0.1732,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Cheltenham|Newport County","at":"2026-10-24T08:33:18+00:00","p_blend":0.3605,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Northampton|Colchester","at":"2026-10-24T08:33:18+00:00","p_blend":0.2503,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Chesterfield|Crewe","at":"2026-10-24T08:33:18+00:00","p_blend":0.196,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Exeter|Fleetwood Town","at":"2026-10-24T08:33:18+00:00","p_blend":0.2515,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Walsall|Salford","at":"2026-10-24T08:33:18+00:00","p_blend":0.2984,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Barnet|Oldham","at":"2026-10-24T08:33:18+00:00","p_blend":0.2208,"p_blend_from":"odds_log"}
+{"type":"update","id":"E3|2627|Rochdale|Accrington","at":"2026-10-24T08:33:18+00:00","p_blend":0.3374,"p_blend_from":"odds_log"}
