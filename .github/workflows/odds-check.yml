@@ -25,6 +25,9 @@
 #            downloaded and cached (comebacks-<league>-); prints counts only, never outcomes.
 #   comebacks: favourites coming back from behind (docs/lab.md, 24 Oct): eight leagues
 #            pooled from the cached files, against a fair time-scaled Poisson model.
+#   inplay-probe: comeback phase 2's probe (owner, 24 Oct): one historical Premier League
+#            h2h snapshot at the 2024/25 final day's half-time (~10 credits, `cap`); says
+#            whether started matches carry fresh in-play prices. Prints counts and prices.
 #   corner-coverage: 2025/26 corner-count coverage in all six leagues (counts only).
 #   cup-corner-coverage: the cup corners model's coverage count (docs/totals.md "Cup corners
 #            model"): football-data HC/AC per file, ESPN cup summaries with corner counts,
@@ -78,12 +81,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, inplay-probe, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, inplay-probe, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn]
         default: coverage
       cap:
-        description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / markets / corner-history / inplay-probe: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -235,7 +238,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe') && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -282,6 +285,8 @@ jobs:
                 --finalist "$FINALISTS" --tests "$T" --json out/corners2.json ;;
             comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
             comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
+            inplay-probe) uv run python -m soccer_stats.lab.inplay_probe --cap "$CAP" \
+                     --json out/inplay_probe.json ;;  # one historical snapshot, ~10 credits
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
             cup-corner-coverage) uv run soccer-stats cup-corners --coverage-only \
                      --json out/cup_corner_coverage.json ;;
