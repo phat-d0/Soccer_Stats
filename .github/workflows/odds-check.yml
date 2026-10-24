@@ -25,6 +25,11 @@
 #            downloaded and cached (comebacks-<league>-); prints counts only, never outcomes.
 #   comebacks: favourites coming back from behind (docs/lab.md, 24 Oct): eight leagues
 #            pooled from the cached files, against a fair time-scaled Poisson model.
+#   comeback-fetch: comeback phase 2, design B (docs/lab.md "Phase 2, step 2"; owner cap
+#            1,920): one historical h2h snapshot per frozen slot (lab/comeback_b_slots.json)
+#            at ten books, ~10 credits each; `cap` (0 = dry run). Bodies and the call record
+#            go to the comeback-odds-* cache (saved even on failure) and a 7-day artifact.
+#   comebacks2: the design-B analysis on the cached bodies and football-data; no key.
 #   comeback-plan: phase 2's free planner: kickoff slots where a favourite trailed at
 #            half-time, eight leagues 2022/23-2025/26, costed at one historical snapshot
 #            per slot; designs A-D (docs/lab.md). football-data only, no key.
@@ -81,12 +86,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
-        description: "props / goalscorer / markets / corner-history: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -146,6 +151,14 @@ jobs:
           path: data/raw
           key: understat-${{ inputs.league }}-none
           restore-keys: understat-${{ inputs.league }}-
+      # Comeback phase 2 (design B): the bought half-time snapshots and their call record.
+      # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' }}
+        with:
+          path: data/raw/comeback_odds
+          key: comeback-odds-none
+          restore-keys: comeback-odds-
       # Favourite comebacks: each league's Understat goal files have their own prefix too.
       # The paths must match the save step exactly, or the cache version differs and misses.
       - uses: actions/cache/restore@v4
@@ -238,7 +251,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch') && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -286,6 +299,13 @@ jobs:
             comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
             comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
             comeback-plan) uv run python -m soccer_stats.lab.comeback_plan --json out/comeback_plan.json ;;
+            comeback-fetch)  # design B: one historical snapshot per frozen slot, ~10 credits each
+              status=0
+              mkdir -p data/raw/comeback_odds  # the save step always has a folder to save
+              uv run python -m soccer_stats.lab.comeback_fetch --cap "$CAP" || status=$?
+              mkdir -p out && cp -r data/raw/comeback_odds out/ 2>/dev/null || true
+              exit $status ;;
+            comebacks2) uv run python -m soccer_stats.lab.comebacks2 --json out/comebacks2.json ;;
             inplay-probe)  # comebacks phase 2 step 1: one live h2h call during play (1 credit)
               # hist_dates set to ONE ISO time = a historical snapshot (10 credits); the default
               # (a comma list, for props) or "live" = a live call now (1 credit)
@@ -368,6 +388,12 @@ jobs:
             data/raw/cups/corners
             data/raw/cups/espn
           key: cup-corners-${{ github.run_id }}
+      # Comeback phase 2: the bought snapshots, saved even when the fetch fails (paid data).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'comeback-fetch' }}
+        with:
+          path: data/raw/comeback_odds
+          key: comeback-odds-${{ github.run_id }}
       # Favourite comebacks: one league's Understat files (match goals and season lists).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'comebacks-fetch' }}
