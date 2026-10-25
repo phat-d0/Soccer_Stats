@@ -31,7 +31,6 @@ from soccer_stats.lab import comebacks as cb
 from soccer_stats.lab.comeback_plan import load_season
 from soccer_stats.odds_feed import _team
 
-YEAR = 2024
 SNAP_MIN, SNAP_MAX = 48, 62  # the snapshot must fall in the half-time break
 KICKOFF_TOL = 30  # minutes between football-data's kickoff and the event's
 STALE_MIN = 5  # a quote updated longer before the snapshot than this fails
@@ -53,6 +52,12 @@ def _ts(x) -> pd.Timestamp | None:
     if pd.isna(t):
         return None
     return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+
+
+def season_of(kickoff) -> int:
+    """football-data's season start year for a kickoff (seasons start in July)."""
+    t = _ts(kickoff)
+    return t.year if t.month >= 7 else t.year - 1
 
 
 def find_event(events: list[dict], home: str, away: str, kickoff, known: set[str]):
@@ -122,12 +127,18 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
     counts = {"slots": len(slots), "slots_missing": 0, "slots_off_half_time": 0}
     counts["matches"] = sum(len(s["matches"]) for s in slots)
     counts["unmatched"] = 0
+    counts["slots_not_priced"] = counts["matches_not_priced"] = 0
+    guard = cf.read_guard(cache_dir)  # league-seasons the fetch stopped buying
     fails = {}
     rows = []
     for s in slots:
         path = cf.body_path(cache_dir, s)
         if not path.exists():
-            counts["slots_missing"] += 1
+            if guard.get(cf.guard_key(s), {}).get("blocked"):
+                counts["slots_not_priced"] += 1
+                counts["matches_not_priced"] += len(s["matches"])
+            else:
+                counts["slots_missing"] += 1
             continue
         body = json.loads(path.read_text())
         snap = _ts(body.get("timestamp"))
@@ -136,14 +147,19 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
         if mins is None or not SNAP_MIN <= mins <= SNAP_MAX:
             counts["slots_off_half_time"] += 1
             continue
-        lg = fd[fd["league"] == s["league"]]
+        season = season_of(s["kickoff"])
+        lg = fd[(fd["league"] == s["league"]) & (fd["season_start"] == season)]
         known = set(lg["home"]) | set(lg["away"])
         for m in s["matches"]:
             ev = find_event(body.get("data") or [], m["home"], m["away"], ko, known)
             if ev is None:
                 counts["unmatched"] += 1
                 continue
-            r = lg[(lg["home"] == m["home"]) & (lg["away"] == m["away"])].iloc[0]
+            hit = lg[(lg["home"] == m["home"]) & (lg["away"] == m["away"])]
+            if hit.empty:
+                counts["unmatched"] += 1
+                continue
+            r = hit.iloc[0]
             side, p_pre = m["favourite"], float(m["p_fav"])
             commence = _ts(ev["commence_time"])
             books = {}
@@ -186,6 +202,7 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
             rows.append(
                 {
                     "league": s["league"],
+                    "season": season,
                     "home": m["home"],
                     "away": m["away"],
                     "band": cb.band_name(*next(b for b in cb.BANDS if b[0] <= p_pre < b[1])),
@@ -324,11 +341,19 @@ def analyse(rows: list[dict], counts: dict) -> dict:
             for lo, hi in cb.BANDS
         },
         "blend_weight": blend_weight(rows),
+        "primary_by_league": {
+            lg: roi([r for r in rows if r["league"] == lg], "dk_odds")
+            for lg in sorted({r["league"] for r in rows})
+        },
+        "primary_by_season": {
+            f"{y}/{str(y + 1)[-2:]}": roi([r for r in rows if r["season"] == y], "dk_odds")
+            for y in sorted({r["season"] for r in rows})
+        },
         "verdict": verdict(primary),
     }
 
 
-def report(res: dict) -> str:
+def report(res: dict, title: str = "design B") -> str:
     c = res["counts"]
 
     def rng(v):
@@ -336,9 +361,11 @@ def report(res: dict) -> str:
 
     p, b, g = res["primary_draftkings"], res["second_line_betfair"], res["implied_gap"]
     lines = [
-        "== Comeback phase 2, design B ==",
-        f"  slots {c['slots']} (missing {c['slots_missing']}, off half-time "
-        f"{c['slots_off_half_time']}); matches {c['matches']}, unmatched {c['unmatched']}, "
+        f"== Comeback phase 2, {title} ==",
+        f"  slots {c['slots']} (missing {c['slots_missing']}, not priced "
+        f"{c.get('slots_not_priced', 0)} with {c.get('matches_not_priced', 0)} matches, "
+        f"off half-time {c['slots_off_half_time']}); matches {c['matches']}, "
+        f"unmatched {c['unmatched']}, "
         f"rows {res['rows']}",
         f"  quote-check fails by book: {json.dumps(c['fails_by_book'])}",
         f"  PRIMARY DraftKings: {p['matches']} bets, won {p['wins']}"
@@ -363,26 +390,58 @@ def report(res: dict) -> str:
             f"({rng(g['gap_ci95'])}); Pinnacle fair on {g['from_pinnacle']} of {g['matches']}"
         )
     lines.append(f"  blend weight: {json.dumps(res['blend_weight'])}")
+    for key, label in (("primary_by_league", "league"), ("primary_by_season", "season")):
+        for k, x in res.get(key, {}).items():
+            if x["matches"]:
+                lines.append(
+                    f"    by {label} (descriptive) {k}: {x['matches']} bets, "
+                    f"ROI {x['roi']:+.1%} ({rng(x['roi_ci95'])})"
+                )
     lines.append(f"VERDICT: {res['verdict']}")
     return "\n".join(lines)
+
+
+def load_fd(slots: list[dict]) -> pd.DataFrame:
+    """football-data favourites for every league-season the slots touch."""
+    pairs = sorted({(s["league"], season_of(s["kickoff"])) for s in slots})
+    return pd.concat([cb.favourites(load_season(lg, y)) for lg, y in pairs], ignore_index=True)
 
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cache-dir", default="", help="the fetch's bodies (default raw dir)")
+    p.add_argument("--slots", default="B", help="design B or C (C is judged; B stays apart)")
     p.add_argument("--json", default="")
     args = p.parse_args(argv)
     cache_dir = Path(args.cache_dir) if args.cache_dir else Path(RAW_DIR) / cf.CACHE
-    slots = cf.load_slots()
-    leagues = sorted({s["league"] for s in slots})
-    fd = pd.concat([cb.favourites(load_season(lg, YEAR)) for lg in leagues], ignore_index=True)
+    design = args.slots.upper()
+    slots = cf.load_slots(cf.slots_path(design))
+    b_slots = cf.load_slots(cf.slots_path("B")) if design == "C" else []
+    fd = load_fd(slots + b_slots)
     rows, counts = match_rows(slots, cache_dir, fd)
     res = analyse(rows, counts)
-    print(report(res))
-    print("COMEBACKS2_JSON " + json.dumps(res))
+    print(report(res, f"design {design}" + (" (C minus B, judged)" if design == "C" else "")))
+    out = {**res}
+    if design == "C":  # B was looked at already: descriptive only, never in the verdict
+        b_rows, b_counts = match_rows(b_slots, cache_dir, fd)
+        res_b = analyse(b_rows, b_counts)
+        res_pool = analyse(rows + b_rows, counts)
+        for name, r in (("B alone", res_b), ("C+B pooled", res_pool)):
+            x = r["primary_draftkings"]
+            if x["matches"]:
+                lo, hi = x["roi_ci95"]
+                print(
+                    f"  descriptive, {name}: {x['matches']} bets, won {x['wins']}, "
+                    f"ROI {x['roi']:+.1%} ({lo:+.1%} to {hi:+.1%})"
+                )
+        out["descriptive_b"] = {k: v for k, v in res_b.items() if k != "verdict"}
+        out["descriptive_pooled"] = {
+            k: v for k, v in res_pool.items() if k not in ("verdict", "counts")
+        }
+    print("COMEBACKS2_JSON " + json.dumps(out))
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.json).write_text(json.dumps({**res, "detail": rows}, indent=1, default=str))
+        Path(args.json).write_text(json.dumps({**out, "detail": rows}, indent=1, default=str))
 
 
 if __name__ == "__main__":

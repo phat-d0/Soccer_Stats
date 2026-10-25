@@ -131,3 +131,29 @@ def test_verdict_rules():
     assert c2.verdict({"matches": 150, "roi_ci95": [0.01, 0.2]}).startswith("pass")
     assert c2.verdict({"matches": 150, "roi_ci95": [-0.2, -0.01]}).startswith("fail: the in-play")
     assert c2.verdict({"matches": 150, "roi_ci95": [-0.1, 0.1]}) == "fail: ROI range includes 0"
+
+
+def test_season_join_picks_the_right_season(tmp_path):
+    # The same pairing a season earlier, with a different result: the slot's season must win.
+    old = fd().copy()
+    old["season_start"] = 2023
+    old["fthg"], old["ftag"] = [0, 0], [3, 3]
+    write(tmp_path, body())
+    rows, _ = c2.match_rows([SLOT], tmp_path, pd.concat([old, fd()], ignore_index=True))
+    assert rows[0]["season"] == 2024 and rows[0]["won"] == 1
+
+
+def test_guarded_league_counts_as_not_priced(tmp_path):
+    slot = {**SLOT, "league": "E2", "sport": "soccer_england_league1"}
+    (tmp_path / cf.GUARD_FILE).write_text(json.dumps({"E2 2024/25": {"blocked": True}}))
+    rows, counts = c2.match_rows([slot], tmp_path, fd())
+    assert rows == [] and counts["slots_not_priced"] == 1 and counts["matches_not_priced"] == 2
+    assert counts["slots_missing"] == 0
+
+
+def test_by_league_and_season_tables(tmp_path):
+    write(tmp_path, body())
+    rows, counts = c2.match_rows([SLOT], tmp_path, fd())
+    res = c2.analyse(rows, counts)
+    assert res["primary_by_league"]["E0"]["matches"] == 1
+    assert res["primary_by_season"]["2024/25"]["matches"] == 1
