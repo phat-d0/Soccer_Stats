@@ -3944,6 +3944,12 @@ function strategyFolders(cur, strats, lg) {
   }).join("");
   return `<div class="card list folders">${rows}</div>`;
 }
+// The folder note on an "under N% to win" line, from its filter and defined_at.
+function cutNote(x) {
+  if (!x) return "";
+  const cut = pct(x.st.filter.max), edge = ruleText(x).replace("+", "");
+  return ` "Under ${cut} to win" lines are cut from the archived ${edge ? `${edge} ` : ""}tracks: the same paper trades, keeping only the bets model (f) gives under a ${cut} chance to win (a push, the stake back, is left out of that chance).${x.st?.defined_at ? ` Judged from ${monthDay(x.st.defined_at)} on closing line value against Pinnacle.` : ""}`;
+}
 function pfFolderHtml(cur, strats) {
   const lg = leagueOn();
   return `
@@ -3953,7 +3959,7 @@ function pfFolderHtml(cur, strats) {
     ${leagueFilter()}
     <div class="section-title">Strategies</div>
     ${strategyFolders(cur, strats.filter((x) => !archivedStrat(x)), lg)}
-    <p class="note">Open a strategy for its live paper trades, its backtest and its model.${strats.some((x) => x.variantOf && !archivedStrat(x) && isNum(x.st?.filter?.max)) ? ` "Under 60% to win" lines are cut from the archived 12% tracks: the same paper trades, keeping only the bets model (f) gives under a 60% chance to win (a push, the stake back, is left out of that chance). Judged from 23 Oct on closing line value against Pinnacle.` : ""}</p>
+    <p class="note">Open a strategy for its live paper trades, its backtest and its model.${cutNote(strats.find((x) => x.variantOf && !archivedStrat(x) && isNum(x.st?.filter?.max)))}</p>
     ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">${strats.some((x) => x.st?.adds === "shadow") ? "Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets." : "Kept out of the main list: these tracks still log every pick at their rule, and the lines above are cut from them."}</p>` : ""}`;
 }
 function pfStrategyHtml(cur, allStrats) {
@@ -3974,7 +3980,7 @@ function pfStrategyHtml(cur, allStrats) {
   const lg = byComp && !research ? leagueOn() : "";
   const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
   const rule = ruleText(x);
-  const sub = archivedStrat(x)
+  const sub = x.st?.adds === "shadow"
     ? `Archived: the rule until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"}, tracked with no bets beside ${esc(parent.label)}`
     : archivedTrack(x)
     ? `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}: still logs every pick; the under-60% line is cut from it`
@@ -3990,7 +3996,7 @@ function pfStrategyHtml(cur, allStrats) {
   const leanBt = view === "backtest" && parent.key === "lean" ? btPart(state.data.portfolio?.strategy_backtests?.lean, "lean", lg) : null;
   const range = parent.rule?.odds_range;
   const inRange = leanBt && range ? leanRangeBt(leanBt.part, range) : null;
-  const parentNote = archivedStrat(x) && view === "backtest"
+  const parentNote = x.st?.adds === "shadow" && view === "backtest"
     ? `<p class="note">This replay is the old rule: Blend Lean at every price, the same replay ${esc(parent.label)} is measured against.</p>`
     : x.variantOf && view !== "live" ? `<p class="note">A shadow test has no ${view === "model" ? "model" : "backtest"} of its own: this is ${esc(parent.label)}'s.</p>`
     : x.key === "lean" && inRange?.bets ? `<p class="note lean-range-bt">This replay is the old rule, at every price. Inside the ${rangeWords(range)} range it placed ${inRange.bets.toLocaleString()} bets, ROI ${signedPct(inRange.roi)}: the ${range[0].toFixed(2)}–2.00 and 2.00–${range[1].toFixed(2)} rows under "Where the bets sit on the odds".</p>` : "";

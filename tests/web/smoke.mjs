@@ -1018,7 +1018,7 @@ const STEPS = [
   ["portfolio-corners", async (p) => {
     await closeSheet(p); await pfOpenPf(p, "corners");
     const list = await p.textContent("#view");
-    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Model (f) vs Pinnacle: 12% edge, under 60% to win", "Only the 12%-edge picks model (f) gives under a 60% chance to win", "Archived Oct 25 · still logs every 12%-edge pick", "research only"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
+    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Model (f) vs Pinnacle: 12% edge, under 60% to win", "Only the 12%-edge picks model (f) gives under a 60% chance to win", "Archived Oct 25 · still logs every 12%-edge pick", "research only", "Judged from Sep 20 on closing line value"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
     // The owner archived the two plain 12% tracks (25 Oct): the under-60% lines lead, the
     // tracks they are cut from sit in the Archive list.
     const order = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
@@ -1132,7 +1132,13 @@ const STEPS = [
     if (!text.includes("a push (stake back)") || !text.includes("CLV vs Pinnacle's close")) throw new Error("push trade sheet");
   }, true],
   ["portfolio-corners-backtest", async (p) => {
-    await closeSheet(p); await p.click('button[data-pf="backtest"]');
+    // An archived corner track (owner, 25 Oct) has its own subtitle, and its backtest view
+    // carries none of Lean's old-rule wording.
+    await closeSheet(p); await pfOpenStrat(p, "pinnacle");
+    const sub = await p.locator(".pf-sub").innerText();
+    if (sub !== "Archived Oct 25: still logs every pick; the under-60% line is cut from it") throw new Error(`archived track subtitle: ${sub}`);
+    await p.click('button[data-pf="backtest"]');
+    if (/Blend Lean|old rule/.test(await p.textContent("#view"))) throw new Error("archived corner track's backtest talks about Lean's old rule");
     await p.click('.rc-row[data-rc="pfco"][data-rcrow="0"]');
     const text = await p.textContent("#view");
     for (const want of ["No money tiles", "finalist", "February"]) if (!text.includes(want)) throw new Error(`research backtest lacks "${want}"`);
