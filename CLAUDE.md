@@ -661,7 +661,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v58) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v59) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -703,11 +703,20 @@ the owner's baseball app, so the balance can drop without any run here.
   settled and open counts) with retired Player shots behind a link; Anytime goalscorer is hidden
   (`PF_HIDDEN`). A portfolio (`pfFolderHtml`, `data-pfid`) shows crumbs ("‹ Portfolio"), its
   name, status and note, the competition filter and one row per strategy (`strategyFolders`,
-  `data-pfstrat`: live profit and record, a "Backtest:" line from `backtestHeadline`; shadow
-  variants "↳ …" under their parent, no backtest line). A strategy (`pfStrategyHtml`) shows crumbs
-  "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status · rule (variants: "Shadow filter
-  of …"), the competition filter and Live paper / Backtest / Model (a variant's Backtest and
-  Model are its parent's, with a note). A portfolio with one strategy (Player shots) opens
+  `data-pfstrat`: full name, `stratMeta`, live profit and record, a "Backtest:" line from
+  `backtestHeadline`). Since v59 (owner, 25 Oct) every strategy is its own row, none filed
+  under another: a shadow test (corners' "…, below 60%") follows its parent, reads "Shadow test
+  · places no bets · judged from …" and has no backtest line; an archived old rule
+  (`archivedStrat`: `adds: "shadow"`, today Lean's all-odds rule) sits in an "Archive" list
+  below, reads "Old rule, until …" and carries the whole Lean replay as its backtest. Lean's
+  replay is the old rule (every price), so the new rule's row shows `leanRangeBt`: the replay's
+  `by_odds_band` rows inside its `odds_range` (1.50–2.00 and 2.00–3.00), pooled ROI per $1
+  weighted by bets ("Backtest: −1.8% · 1,345 bets, −200 to +200 · at Pinnacle"), and Lean's
+  Backtest view notes the same. The top level adds "· 2 shadow tests · 1 archived". A strategy
+  (`pfStrategyHtml`) shows crumbs "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status ·
+  rule ("Shadow test of …" / "Archived: the rule until …"), the competition filter and Live
+  paper / Backtest / Model (a shadow test's or archived rule's Backtest and Model are its
+  parent's, with a note). A portfolio with one strategy (Player shots) opens
   straight on its views. Tapping the Portfolio tab again goes back to the top; the match sheet's
   corners link opens the Team corners list. Selections stay in `pfId`, `pfStrat` (Moneyline)
   and `pfStratCorners`. Live (`liveStrategyHtml`): tiles counted from the strategy's own trades after
@@ -736,7 +745,7 @@ the owner's baseball app, so the balance can drop without any run here.
   with the odds range). Shadow-filter variants (owner, 23 Oct; any live strategy
   with `variant_of`, today the corners' `pinnacle_below60` / `draftkings_below60` and Lean's
   `lean_all_odds`): an
-  indented "↳ below 60%" row under the parent (`pfStrategies` files it there; its Backtest
+  own row right after the parent (`pfStrategies` orders it there; its Backtest
   and Model show the parent's), its own trades and tiles via `trade_ids`, one box
   (`sinceDefinedHtml`) with a descriptive "Whole period, from <first trade>" part on top
   (the variant's and parent's full summaries, and the CLV difference kept minus all computed
@@ -750,7 +759,7 @@ the owner's baseball app, so the balance can drop without any run here.
   A variant with `adds: "shadow"` (Blend Lean, all odds (old rule), 24 Oct) is a superset: its
   `trade_ids` resolve against the live `trades` and `shadow_trades` together
   (`strategyLiveSet`), shadow rows carry "Shadow: no trade opened (outside the odds range)"
-  (`shadowChip`), the row reads "↳ all odds (old rule) · Adds the picks the rule now skips", the
+  (`shadowChip`), the row sits in the Archive list ("Old rule, until …"), the
   live rule is the kept side ("Live rule" vs "All odds (old rule)"; the cut is "the odds
   range"; `old_code` trades are noted), notes come from the variant's `note` (or its
   `filter.note`) and its rule note precedes the parent's. Lean's own line is the new rule

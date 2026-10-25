@@ -582,7 +582,10 @@ const STEPS = [
     await p.click('button[data-pfid="moneyline"]');
     // Moneyline's folders: one per strategy, the old rule filed under Lean.
     const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (strats.join(",") !== "lean,lean_all_odds,edge12") throw new Error(`strategy folders: ${strats.join(",")}`);
+    // Each strategy is its own row (owner, 25 Oct); the old rule sits in the Archive list.
+    if (strats.join(",") !== "lean,edge12,lean_all_odds") throw new Error(`strategy folders: ${strats.join(",")}`);
+    const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
+    if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
     const leanRow = await p.locator('button[data-pfstrat="lean"]').innerText();
     if (!/1σ\+/.test(leanRow) || !/2–1/.test(leanRow) || !leanRow.includes("Backtest:")) throw new Error(`Lean row: ${leanRow}`);
@@ -667,10 +670,19 @@ const STEPS = [
     await pfUp(p);
     const row = (await p.locator('button[data-pfstrat="lean"]').innerText()).replace(/\s+/g, " ");
     if (!row.includes("1σ+ · −200 to +200")) throw new Error(`Lean row: ${row}`);
-    const next = await p.locator('button[data-pfstrat="lean"] + button').getAttribute("data-pfstrat");
-    if (next !== "lean_all_odds") throw new Error(`row under Lean: ${next}`);
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
-    if (!vrow.includes("↳ all odds (old rule)") || !vrow.includes("Adds the picks the rule now skips") || vrow.includes("Backtest:")) throw new Error(`old-rule row: ${vrow}`);
+    if (!vrow.includes("Blend Lean, all odds (old rule)") || !vrow.includes("Old rule, until") || vrow.includes("↳")) throw new Error(`old-rule row: ${vrow}`);
+    // The new rule's backtest is the replay's bands inside its range, pooled; the archived
+    // old rule keeps the whole replay (every price).
+    const btWant = await p.evaluate(() => {
+      const part = state.data.portfolio.strategy_backtests.lean.all;
+      const b = part.by_odds_band.filter((x) => x.lo === 1.5 || x.lo === 2);
+      const bets = b.reduce((a, x) => a + x.bets, 0);
+      return { bets, roi: signedPct(b.reduce((a, x) => a + x.roi * x.bets, 0) / bets), all: signedPct(part.lean.roi) };
+    });
+    const bt = (await p.locator('button[data-pfstrat="lean"] .bt').innerText()).replace(/\s+/g, " ");
+    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
+    if (!vrow.includes(`Backtest: ${btWant.all}`)) throw new Error(`old-rule backtest: ${vrow}`);
     await pfOpenStrat(p, "lean");
     if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
     // The new rule's line is backcast from Lean's first trade: both lines start there, the
@@ -781,7 +793,7 @@ const STEPS = [
   ["portfolio-lean-backtest", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
     const text = await p.textContent("#view");
-    for (const want of ["In the replay at Pinnacle's prices Lean", "Return by league", "Lean and Strong", "Market-driven and model-driven", "Bets, newest first", "units"]) {
+    for (const want of ["This replay is the old rule, at every price. Inside the −200 to +200 range it placed", "In the replay at Pinnacle's prices Lean", "Return by league", "Lean and Strong", "Market-driven and model-driven", "Bets, newest first", "units"]) {
       if (!text.includes(want)) throw new Error(`Lean backtest lacks "${want}"`);
     }
     await p.click('.rc-row[data-rc="lbroi"][data-rcrow="0"]');
@@ -807,12 +819,12 @@ const STEPS = [
     await pfUp(p);
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
     const want = {
-      "": ["bets · at Pinnacle", "bets · at Pinnacle"],
+      "": ["bets, −200 to +200 · at Pinnacle", "bets · at Pinnacle"],
       E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
       SP1: ["La Liga at Pinnacle", "La Liga at Pinnacle"],
       E2: ["League One at Pinnacle", "League One at Pinnacle"],
       E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
-      UCL: ["0 bets · Champions League at DraftKings' close", "Champions League at DraftKings' close"],
+      UCL: ["0 bets, −200 to +200 · Champions League at DraftKings' close", "Champions League at DraftKings' close"],
     };
     const seen = {};
     for (const [lg, [lean, e12]] of Object.entries(want)) {
@@ -1006,7 +1018,7 @@ const STEPS = [
   ["portfolio-corners", async (p) => {
     await closeSheet(p); await pfOpenPf(p, "corners");
     const list = await p.textContent("#view");
-    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "↳ below 60%", "research only"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
+    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Model (f) 12% vs Pinnacle, below 60%", "Shadow test · places no bets", "research only"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
     await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
     for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Profit over time"]) {
@@ -1039,7 +1051,7 @@ const STEPS = [
     }
   }, true],
   ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await pfOpenStrat(p, "pinnacle"); }],
-  // Shadow-filter variant (owner, 23 Oct): "↳ below 60%" indented under its parent, and
+  // Shadow test (owner, 23 Oct): "…, below 60%" as its own row right after its parent, and
   // both curves on one chart (parent solid, variant dashed) with a legend, the "filter set"
   // marker and a readout giving both totals and their difference on the same day.
   ["portfolio-corners-overlay", async (p) => {
@@ -1047,7 +1059,7 @@ const STEPS = [
     const next = await p.locator('button[data-pfstrat="pinnacle"] + button').getAttribute("data-pfstrat");
     if (next !== "pinnacle_below60") throw new Error(`row under the Pinnacle track: ${next}`);
     const row = (await p.locator('button[data-pfstrat="pinnacle_below60"]').innerText()).replace(/\s+/g, " ");
-    if (!row.includes("↳ below 60%") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
+    if (!row.includes("Model (f) 12% vs Pinnacle, below 60%") || row.includes("↳") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
     await pfOpenStrat(p, "pinnacle");
     if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2 || await p.locator("[data-scrub='cv'] path.line.ser.dash").count() !== 1) throw new Error("overlay curves");
