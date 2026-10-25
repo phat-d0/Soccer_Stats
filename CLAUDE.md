@@ -114,6 +114,12 @@ settlement runs after them.
   (descriptive) 930 bets, −18.2% (−30.0% to −5.1%). **Closed: no edge at the half-time
   price.** A new idea (laying the favourite included) needs its own pre-registration on
   unused seasons and the owner's approval (`docs/lab.md` "Phase 2, step 3: result").
+  ESPN goal timelines (owner, 25 Oct; exploratory, 0 credits; runs 40176002361, 40184239564;
+  `docs/lab.md` "Goal timelines: results"): 15,838 favourites joined (98.3%); the underdog
+  scores first in 31.4%; the favourite then wins 25.9% vs the score-blind model's 22.1% (+4.1
+  pts, +2.8 to +5.4), a roughly flat +3 to +6 pts at every minute (the model's known
+  shortfall, which the half-time market already covers). A priced trail-first test would cost
+  about 18,820 credits (1,882 snapshots); recommended not to buy.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model

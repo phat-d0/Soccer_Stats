@@ -1950,3 +1950,120 @@ minute or band that looks good becomes a **new** pre-registration on fresh seaso
    opening goal. The wall clock is kickoff + minute, plus 17 minutes for a second-half goal.
    Goals in one league and 5-minute bucket share a snapshot. Counts are per league and season
    for 2022/23–2024/25, beside the half-time design's slots.
+
+### Goal timelines: results (2026-10-25; exploratory, 0 credits)
+
+**Runs.**
+- Fetch: run 40176002361 (`task=timelines-fetch`). 6,636 scoreboard requests, 0 failed, no stop
+  on the time budget. Every football-data match day for the eight leagues, 2017/18–2024/25, is
+  in the cache `espn-timelines-40176002361`.
+- Analysis: run 40184239564 (`task=timelines`). It is descriptive, like everything below.
+
+**Join.**
+- 16,109 favourites (Pinnacle's close ≥ 45%). **15,838 joined (98.3%)**.
+- 30 were dropped because ESPN's goals didn't rebuild football-data's 90-minute or half-time
+  score: E1–E3 22, D1 4, SP1 2, F1 2.
+- 241 had no ESPN event, all from club names the join does not map yet:
+  - D1 2023/24 50 and 2024/25 47 (two or three promoted clubs);
+  - F1 16–23 in every season but 2022/23 and 2023/24 (one club);
+  - I1 2017/18 21.
+  These are whole clubs missing, mostly small promoted sides. The by-league lines for D1 and F1
+  lean slightly towards the other clubs. Mapping them is a free fix for a later run.
+- The fair-model benchmark needs Pinnacle's close and O/U 2.5 in a season with ≥ 90%
+  coverage (phase 1's rule). 3,789 of the 4,980 trail-first matches are benchmarked.
+
+**Reading the residuals.** Every residual is realized minus phase 1's time-scaled Poisson model.
+That model spreads goals evenly over 90 minutes and knows nothing about the score. Phase 1
+showed it under-counts second-half goals, so a positive residual is expected. Design C then
+showed the in-play market already prices comebacks above this model, and above what happened.
+A positive residual here is therefore **not** an edge against any price.
+
+**1. Trail first (the headline).** The underdog scored the opening goal in **4,980 of 15,838
+matches (31.4%)**.
+
+| First goal | Matches (benchmarked) | Fav. won | Drew | Model's win | Win − model (95%) | Avoided defeat − model |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0–15 | 1,709 (1,345) | 34.4% | 26.6% | 30.8% | +3.4 (+1.0 to +5.9) | +6.0 (+3.5 to +8.6) |
+| 15–30 | 1,215 (907) | 29.6% | 27.6% | 25.0% | +4.9 (+1.8 to +7.6) | +4.9 (+1.7 to +8.1) |
+| 30–45 | 923 (678) | 24.5% | 27.5% | 19.1% | +6.1 (+2.9 to +9.2) | +4.7 (+1.1 to +8.6) |
+| 45–60 | 545 (402) | 16.3% | 30.3% | 12.4% | +3.8 (+0.4 to +7.4) | +7.6 (+2.5 to +12.4) |
+| 60–75 | 334 (258) | 8.4% | 23.1% | 5.7% | +3.3 (−0.1 to +6.8) | +4.0 (−1.5 to +10.1) |
+| 75+ | 254 (199) | 0.4% | 16.1% | 1.0% | −0.4 (−1.1 to +0.7) | +6.1 (+1.1 to +11.1) |
+| All | 4,980 (3,789) | 25.9% | 26.6% | 22.1% | **+4.1 (+2.8 to +5.4)** | +5.6 (+4.0 to +7.1) |
+
+- The gap against the model is about the same size from the 1st minute to the 75th, +3 to +6
+  points. There is no minute where it opens up. That looks like the benchmark's known
+  shortfall, not a timing pocket.
+
+| Favourite (pre-match) | Trail first | Fav. won | Model's win | Win − model (95%) |
+| --- | --- | --- | --- | --- |
+| 45–55% | 2,774 | 20.5% | 17.3% | +3.7 (+2.1 to +5.4) |
+| 55–65% | 1,384 | 27.7% | 23.5% | +5.3 (+2.6 to +7.9) |
+| 65–75% | 544 | 36.2% | 32.7% | +2.6 (−1.9 to +7.2) |
+| 75%+ | 278 | 51.1% | 44.6% | +4.6 (−2.2 to +11.5) |
+
+| League | Trail first | Fav. won | Model's win | Win − model (95%) |
+| --- | --- | --- | --- | --- |
+| E0 | 653 | 32.3% | 25.8% | +7.5 (+3.9 to +11.5) |
+| I1 | 579 | 32.1% | 24.0% | +7.1 (+2.9 to +11.3) |
+| SP1 | 571 | 26.4% | 21.9% | +5.8 (+1.9 to +9.9) |
+| F1 | 513 | 25.9% | 22.4% | +3.2 (−1.0 to +7.3) |
+| D1 | 462 | 26.4% | 26.6% | −1.6 (−5.8 to +2.8) |
+| E1 | 767 | 22.9% | 19.6% | +3.6 (+0.4 to +7.1) |
+| E2 | 767 | 24.6% | 20.2% | +5.9 (+2.5 to +9.1) |
+| E3 | 668 | 18.6% | 18.5% | −0.5 (−3.8 to +2.8) |
+
+**2. What happens next (first goal before half-time, 3,847 matches).**
+
+| At half-time | Share | Fav. won (95%) | Drew | Lost |
+| --- | --- | --- | --- | --- |
+| Still behind | 70.1% (2,697) | 19.2% (17.8 to 20.7) | 25.9% | 54.9% |
+| Level | 22.1% (850) | 48.4% (45.2 to 51.6) | 35.5% | 16.1% |
+| Ahead | 7.8% (300) | 81.3% (77.0 to 85.7) | 14.7% | 4.0% |
+
+- A favourite that falls behind before half-time is still behind at the break 70% of the
+  time. The 30% that are level or ahead by then never appear in a half-time snapshot. Those are
+  the matches the trail-first framing adds.
+
+**3. Behind at a given minute** (share of all 15,838 matches where the favourite is behind).
+
+| Minute | Behind | One down: won, model, win − model (95%) | Two+ down: won, model, win − model (95%) |
+| --- | --- | --- | --- |
+| 15' | 9.9% | 32.7%, 28.4%, +4.2 (+1.7 to +6.9) (1,485) | 14.1%, 9.6%, +4.1 (−3.7 to +13.3) (78) |
+| 30' | 15.0% | 28.2%, 22.4%, +5.3 (+3.1 to +7.4) (2,098) | 11.8%, 7.5%, +6.8 (+2.4 to +11.8) (272) |
+| 45' | 17.9% | 22.2%, 16.2%, +5.9 (+4.0 to +7.8) (2,314) | 7.1%, 3.9%, +5.5 (+2.7 to +8.5) (520) |
+| 60' | 18.8% | 13.8%, 9.4%, +4.5 (+2.8 to +6.1) (2,247) | 3.9%, 1.5%, +2.9 (+1.3 to +4.9) (725) |
+| 75' | 18.8% | 6.9%, 3.1%, +4.1 (+2.8 to +5.3) (2,097) | 0.5%, 0.2%, +0.2 (−0.2 to +0.8) (886) |
+
+- One goal down, the favourite's win rate drops from 33% at 15' to 7% at 75'. By favourite
+  band, one down at 45': 18.1% (45–55%), 23.4% (55–65%), 30.5% (65–75%), 41.2% (75%+).
+- One down at 45' (22.2% won, model 16.2%) is close to phase 1's half-time result (19.7% vs
+  14.0%, any deficit), now from ESPN's timelines. On design C's priced half-time matches the market said 21.3% and 17.0% happened.
+
+**4. Timing of trail first, E1–E3 included.** The underdog scores first in 28–34% of
+favourites' matches in every league: I1 28.5%, SP1 29.5%, D1 29.9%, E0 30.9%, F1 31.2%, E2
+33.0%, E1 33.8%, E3 33.9%. The median opening-goal minute is 22–27, and 32–41% of trail-first goals
+(34% pooled) come in the first 15 minutes. E1–E3 have slightly more trail-first matches, and E1
+and E3 slightly later first goals (medians 27 and 26, against 22–25 in the top five).
+
+**5. Cost of a priced trail-first test** (one snapshot about 5 minutes after each opening goal,
+shared within a league's 5-minute bucket; eight leagues, 2022/23–2024/25).
+- **1,942 trail-first matches need 1,882 snapshots, about 18,820 credits.** The half-time design
+  needed 901 slots for B and C together. Opening goals rarely share a 5-minute bucket, so almost
+  every match is its own snapshot.
+- The top five alone: 1,046 matches, 1,036 snapshots, about 10,360 credits.
+- Per league-season: 45–118 matches, 450–1,110 credits.
+- The balance is 11,066 credits.
+
+**What this says.**
+- Favourites that fall behind come back more often than an even-rate, score-blind model says,
+  at every minute and in most leagues, by a fairly constant 3–6 points. That is consistent with
+  phase 1, and with the market already knowing it: at half-time the market priced these
+  comebacks above both the model and the outcome (design C).
+- There is no minute band where the gap grows. That would have been the case for buying
+  earlier-in-the-match prices.
+- **Recommendation: don't buy a trail-first price test.** It would cost about twice design C,
+  more than the current balance, to test a gap that the half-time prices already showed the
+  market covers.
+- If the owner still wants it, it would need a new pre-registration on seasons not used here
+  (2025/26 onward) and the owner's approval. Nothing here is a test.
