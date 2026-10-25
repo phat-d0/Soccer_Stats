@@ -106,7 +106,14 @@ settlement runs after them.
   +7.3% (−19.2% to +34.3%); Betfair after 2% +14.9% (−13.7% to +45.5%); won 27.8% vs the
   market's 24.5% (+3.3 pts, −2.7 to +9.2); the phase-1 model adds nothing beyond the price
   (c 0.30, −0.58 to +1.19). Bands are descriptive only (45–55% +29.9%, −15.4% to +78.2%).
-  Design C (9,010 credits) is the owner's call (`docs/lab.md` "Phase 2, step 2: result").
+  Design C (owner-approved; eight leagues 2022/23–2024/25 minus B, pre-registered; fetch run
+  40176031079, 6,070 credits, guard blocked E0, F1 and D1 2022/23 = 115 matches not priced;
+  analysis 40176653428): **fail**, the in-play price over-prices the comeback. 732 bets, 123
+  won, ROI −25.1% (−38.3% to −10.2%); Betfair after 2% −18.1% (−34.6% to −0.1%); won 17.0% vs
+  the market's 21.3% (−4.3 pts, −6.9 to −1.6); c 0.54 (−0.05 to +1.23). C+B pooled
+  (descriptive) 930 bets, −18.2% (−30.0% to −5.1%). **Closed: no edge at the half-time
+  price.** A new idea (laying the favourite included) needs its own pre-registration on
+  unused seasons and the owner's approval (`docs/lab.md` "Phase 2, step 3: result").
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -115,7 +122,8 @@ settlement runs after them.
 **Live paper record** (publish of 20 Oct 08:14 UTC; changes daily, so read the publish log or
 the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
 
-**Credits:** 17,163 left on 25 Oct (after the 1,920-credit comeback design B fetch, run
+**Credits:** 11,066 left on 25 Oct (after the 6,070-credit comeback design C fetch, run
+40176031079, from 17,136); 17,163 earlier on 25 Oct (after the 1,920-credit design B fetch, run
 40144988040, from 19,083); 19,104 on 24 Oct (after two 10-credit historical in-play probes, runs
 40136522857 and 40136975819; 19,335 after the 4-credit League One/Two corner check, run 40088231180); about 19,800 on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
 ~2,476 (with League One/Two and UCL ~86), team totals ~682, corners ~471 (up to ~676 with League One/Two). The key is shared with
