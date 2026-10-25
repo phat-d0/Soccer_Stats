@@ -128,7 +128,8 @@ settlement runs after them.
 **Live paper record** (publish of 20 Oct 08:14 UTC; changes daily, so read the publish log or
 the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
 
-**Credits:** 11,066 left on 25 Oct (after the 6,070-credit comeback design C fetch, run
+**Credits:** 10,978 left on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
+40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
 40176031079, from 17,136); 17,163 earlier on 25 Oct (after the 1,920-credit design B fetch, run
 40144988040, from 19,083); 19,104 on 24 Oct (after two 10-credit historical in-play probes, runs
 40136522857 and 40136975819; 19,335 after the 4-credit League One/Two corner check, run 40088231180); about 19,800 on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
@@ -608,7 +609,9 @@ the owner's baseball app, so the balance can drop without any run here.
   archive keeps in-play prices (four Premier League matches at half-time, Pinnacle,
   DraftKings and Betfair among the books; `docs/lab.md` "Phase 2, step 1"). A second
   snapshot (run 40136975819, 10 credits, 25 May 2025) agreed, except that Pinnacle's quote was
-  sometimes stale.
+  sometimes stale. Live (25 Oct, run 40204253352, 1 credit): four Premier League matches at
+  half-time priced live by 8–9 books, 0.2–1.4 min old, prices matching the score (`docs/lab.md`
+  "Phase 2, step 1b").
 - `lab/comeback_plan.py` (lead brief, 24 Oct; free, football-data only): phase 2's planner. Kickoff
   slots (one league's matches kicked off together) holding a favourite that trailed at half-time,
   2022/23–2025/26, eight leagues; one historical snapshot per slot requested at kickoff +

@@ -1357,6 +1357,20 @@ duplicate probe from the research session, closed PR #101). Premier League, aske
 
 The two probes spent **20 credits** together.
 
+### Phase 2, step 1b: live in-play prices come through (25 Oct, owner-approved 1 credit)
+
+One live `/odds` call (`task=inplay-probe`, `league=E0`, `cap=1`; run 40204253352, **1 credit**,
+10,979 → 10,978) at 14:52 UTC, half-time of four Premier League matches that kicked off at
+14:00. All four came back with live h2h prices from 8–9 books (Pinnacle, DraftKings,
+Betfair's exchange, FanDuel, BetMGM, Betway, Unibet, Paddy Power), updated 0.2–1.4 minutes
+before the call, and the prices matched ESPN's half-time scores: Manchester United 0-2
+Bournemouth had United at 16–23.8 and Bournemouth at 1.14–1.17 (a trailing favourite, priced
+live); Liverpool 2-0 Brighton had Liverpool at 1.08–1.13; Hull 1-0 Brentford and Crystal
+Palace 0-0 Newcastle priced as such. Sky Bet's Manchester United line (2.9 / 2.7 / 2.7) was
+stale, a reminder that some books lag in play. So live in-play betting at DraftKings' price is
+possible from this API; with design C closed (the half-time price over-prices the comeback),
+there is no live strategy to run on it.
+
 ### Phase 2 costing (lead brief, 24 Oct; a costed proposal, nothing pre-registered or spent)
 
 **Prices to use.** Both probes (above) found in-play prices at Betfair's exchange, the US books
