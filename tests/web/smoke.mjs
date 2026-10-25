@@ -1018,7 +1018,12 @@ const STEPS = [
   ["portfolio-corners", async (p) => {
     await closeSheet(p); await pfOpenPf(p, "corners");
     const list = await p.textContent("#view");
-    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Model (f) 12% vs Pinnacle, below 60%", "Shadow test · places no bets", "research only"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
+    for (const want of ["Model (f) 12% vs Pinnacle", "Model (f) 12% vs DraftKings", "Model (f) vs Pinnacle: 12% edge, under 60% to win", "Only the 12%-edge picks model (f) gives under a 60% chance to win", "Archived Oct 25 · still logs every 12%-edge pick", "research only", "Judged from Sep 20 on closing line value"]) if (!list.includes(want)) throw new Error(`Team corners list lacks "${want}"`);
+    // The owner archived the two plain 12% tracks (25 Oct): the under-60% lines lead, the
+    // tracks they are cut from sit in the Archive list.
+    const order = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
+    if (order.join(",") !== "pinnacle_below60,draftkings_below60,pinnacle,draftkings") throw new Error(`corner rows: ${order.join(",")}`);
+    if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="pinnacle"]').count())) throw new Error("the Pinnacle track isn't archived");
     await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
     for (const want of ["over 4.5 corners", "Push", "Pinnacle's close", "Live test: fixed 12% on model (f)", "Model (f) 12% vs Pinnacle", "Profit over time"]) {
@@ -1051,15 +1056,13 @@ const STEPS = [
     }
   }, true],
   ["portfolio-corners-pin-again", async (p) => { await closeSheet(p); await pfOpenStrat(p, "pinnacle"); }],
-  // Shadow test (owner, 23 Oct): "…, below 60%" as its own row right after its parent, and
+  // The under-60% line (owner, 23 Oct; renamed 25 Oct): its own row, and
   // both curves on one chart (parent solid, variant dashed) with a legend, the "filter set"
   // marker and a readout giving both totals and their difference on the same day.
   ["portfolio-corners-overlay", async (p) => {
     await pfUp(p);
-    const next = await p.locator('button[data-pfstrat="pinnacle"] + button').getAttribute("data-pfstrat");
-    if (next !== "pinnacle_below60") throw new Error(`row under the Pinnacle track: ${next}`);
     const row = (await p.locator('button[data-pfstrat="pinnacle_below60"]').innerText()).replace(/\s+/g, " ");
-    if (!row.includes("Model (f) 12% vs Pinnacle, below 60%") || row.includes("↳") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
+    if (!row.includes("Model (f) vs Pinnacle: 12% edge, under 60% to win") || row.includes("↳") || !/[+−-]\$\d/.test(row) || !/\d+–\d+ · [+−]\d/.test(row)) throw new Error(`variant row: ${row}`);
     await pfOpenStrat(p, "pinnacle");
     if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("overlay legend");
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2 || await p.locator("[data-scrub='cv'] path.line.ser.dash").count() !== 1) throw new Error("overlay curves");
@@ -1072,11 +1075,11 @@ const STEPS = [
     await p.locator("[data-scrub='cv'] svg").dispatchEvent("pointerup", { pointerType: "touch", pointerId: 9, bubbles: true });
     const o = (await p.textContent("#cv-readout")).replace(/\s+/g, " ");
     const first = await p.evaluate(() => dayName(firstOpened(stratSet(pfById("corners").live, pfById("corners").live.strategies.find((x) => x.key === "pinnacle")).trades)));
-    if (o !== `${first} · first trade opened · All $0.00 · Below 60% $0.00`) throw new Error(`overlay origin readout: ${o}`);
+    if (o !== `${first} · first trade opened · All $0.00 · Under 60% to win $0.00`) throw new Error(`overlay origin readout: ${o}`);
     await p.locator("[data-scrub='cv']").focus(); await p.keyboard.press("Home"); await p.keyboard.press("ArrowRight");
     const r = (await p.textContent("#cv-readout")).replace(/\s+/g, " ");
     const want = await p.evaluate(() => plain(scrubCharts.cv.readout(1)));
-    if (r !== want || !/ · All [+−]?\$[\d.]+ · Below 60% [+−]?\$[\d.]+ \(difference [+−]?\$[\d.]+\)$/.test(r)) throw new Error(`overlay readout: ${r}`);
+    if (r !== want || !/ · All [+−]?\$[\d.]+ · Under 60% to win [+−]?\$[\d.]+ \(difference [+−]?\$[\d.]+\)$/.test(r)) throw new Error(`overlay readout: ${r}`);
     await p.keyboard.press("End");
   }],
   // The variant selected: its own trades and tiles, and the "Judged from" box.
@@ -1086,7 +1089,7 @@ const STEPS = [
     const mine = await p.evaluate(() => pfById("corners").live.strategies.find((s) => s.key === "pinnacle_below60").trade_ids);
     if (!ids.length || ids.some((id) => !mine.includes(id))) throw new Error(`variant lists: ${ids.join(", ")}`);
     const box = (await p.textContent(".card.judged")).replace(/\s+/g, " ");
-    for (const want of ["Judged from", "Below 60%", "All", "The judged measure, CLV against Pinnacle's close", "a difference of", "95% range", "Not enough trades yet", "was picked after seeing the first", "only trades opened from"]) {
+    for (const want of ["Judged from", "Under 60% to win", "All", "The judged measure, CLV against Pinnacle's close", "a difference of", "95% range", "Not enough trades yet", "was picked after seeing the first", "only trades opened from"]) {
       if (!box.includes(want)) throw new Error(`Judged-from box lacks "${want}": ${box}`);
     }
     if (await p.locator("[data-scrub='cv'] path.line.ser").count() !== 2) throw new Error("variant view lacks the overlay");
@@ -1098,7 +1101,7 @@ const STEPS = [
     const want = await p.evaluate(() => {
       const ss = pfById("corners").live.strategies;
       const row = (label, s) => [label, String(s.trades), String(s.settled), usd(s.profit, 2), signedPct(s.roi), signedPct(s.clv_pinnacle)];
-      return [row("Below 60%", ss.find((x) => x.key === "pinnacle_below60").summary), row("All", ss.find((x) => x.key === "pinnacle").summary)];
+      return [row("Under 60% to win", ss.find((x) => x.key === "pinnacle_below60").summary), row("All", ss.find((x) => x.key === "pinnacle").summary)];
     });
     if (JSON.stringify(rows) !== JSON.stringify(want)) throw new Error(`whole-period rows ${JSON.stringify(rows)} vs ${JSON.stringify(want)}`);
     // Its CLV difference's two means are the table's CLV column.
@@ -1129,7 +1132,13 @@ const STEPS = [
     if (!text.includes("a push (stake back)") || !text.includes("CLV vs Pinnacle's close")) throw new Error("push trade sheet");
   }, true],
   ["portfolio-corners-backtest", async (p) => {
-    await closeSheet(p); await p.click('button[data-pf="backtest"]');
+    // An archived corner track (owner, 25 Oct) has its own subtitle, and its backtest view
+    // carries none of Lean's old-rule wording.
+    await closeSheet(p); await pfOpenStrat(p, "pinnacle");
+    const sub = await p.locator(".pf-sub").innerText();
+    if (sub !== "Archived Oct 25: still logs every pick; the under-60% line is cut from it") throw new Error(`archived track subtitle: ${sub}`);
+    await p.click('button[data-pf="backtest"]');
+    if (/Blend Lean|old rule/.test(await p.textContent("#view"))) throw new Error("archived corner track's backtest talks about Lean's old rule");
     await p.click('.rc-row[data-rc="pfco"][data-rcrow="0"]');
     const text = await p.textContent("#view");
     for (const want of ["No money tiles", "finalist", "February"]) if (!text.includes(want)) throw new Error(`research backtest lacks "${want}"`);

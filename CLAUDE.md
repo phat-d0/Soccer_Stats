@@ -699,7 +699,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v59) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v60) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -750,7 +750,14 @@ the owner's baseball app, so the balance can drop without any run here.
   replay is the old rule (every price), so the new rule's row shows `leanRangeBt`: the replay's
   `by_odds_band` rows inside its `odds_range` (1.50–2.00 and 2.00–3.00), pooled ROI per $1
   weighted by bets ("Backtest: −1.8% · 1,345 bets, −200 to +200 · at Pinnacle"), and Lean's
-  Backtest view notes the same. The top level adds "· 2 shadow tests · 1 archived". A strategy
+  Backtest view notes the same. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
+  archived too (`PF_ARCHIVED` {corners: pinnacle, draftkings}, `archivedTrack`: "Archived Oct
+  25 · still logs every 12%-edge pick"; data and ledgers unchanged), so Team corners' main list
+  is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
+  "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
+  gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
+  legends, readouts and the judged box). The top level lists the active strategies and
+  "· N archived". A strategy
   (`pfStrategyHtml`) shows crumbs "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status ·
   rule ("Shadow test of …" / "Archived: the rule until …"), the competition filter and Live
   paper / Backtest / Model (a shadow test's or archived rule's Backtest and Model are its
