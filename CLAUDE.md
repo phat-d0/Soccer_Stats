@@ -97,17 +97,16 @@ settlement runs after them.
   DNB Lean 1,995 bets, CLV −4.2% (−4.8% to −3.7%), −3.2% per $ (1X2 Lean: −3.1%), ROI −4.2%. Hit
   rate 31% vs 27% (the rule still bets underdogs, average DNB odds 3.90); a third fewer bets
   needed to see a 5% edge. No live change.
-- Favourites coming back from behind (owner, 24 Oct; phase 1, free data): a gap against a fair
-  time-scaled model with no game state. Favourites behind at half-time win 19.7% vs 14.0%
-  (2,166 matches, eight leagues), after conceding first 28.8% vs 24.5% (2,174, five
-  leagues); 5 of 18 pre-registered tests above 0, most clearly 45–65% favourites. About a
-  third is the second half's higher scoring rate and trailing underdogs show a smaller
-  version, so it may already be in in-play prices. Phase 2 is costed, not bought: buying only
-  the slots with a trailing favourite costs 1,460 credits (Premier League, four seasons) to
-  9,010 (eight leagues, three seasons, enough to detect a 3.8-point gap); Pinnacle's archived
-  in-play quote was sometimes stale (May 2025), so a test checks it against the other books'
-  median and falls back to Betfair's exchange. The
-  owner decides (`docs/lab.md` "Phase 2 costing").
+- Favourites coming back from behind (owner, 24 Oct). Phase 1, free data: a gap against a fair
+  time-scaled model with no game state (favourites behind at half-time win 19.7% vs 14.0%,
+  2,166 matches; after conceding first 28.8% vs 24.5%; 5 of 18 tests above 0), about a third
+  of it the second half's higher scoring rate. Phase 2, design B (owner-approved, 1,920
+  credits; top five, 2024/25, pre-registered; fetch run 40144988040, analysis 40145295663):
+  **fail**. $1 on the trailing favourite at DraftKings' in-play price: 198 bets, 55 won, ROI
+  +7.3% (−19.2% to +34.3%); Betfair after 2% +14.9% (−13.7% to +45.5%); won 27.8% vs the
+  market's 24.5% (+3.3 pts, −2.7 to +9.2); the phase-1 model adds nothing beyond the price
+  (c 0.30, −0.58 to +1.19). Bands are descriptive only (45–55% +29.9%, −15.4% to +78.2%).
+  Design C (9,010 credits) is the owner's call (`docs/lab.md` "Phase 2, step 2: result").
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -116,7 +115,8 @@ settlement runs after them.
 **Live paper record** (publish of 20 Oct 08:14 UTC; changes daily, so read the publish log or
 the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
 
-**Credits:** 19,104 left on 24 Oct (after two 10-credit historical in-play probes, runs
+**Credits:** 17,163 left on 25 Oct (after the 1,920-credit comeback design B fetch, run
+40144988040, from 19,083); 19,104 on 24 Oct (after two 10-credit historical in-play probes, runs
 40136522857 and 40136975819; 19,335 after the 4-credit League One/Two corner check, run 40088231180); about 19,800 on 20 Oct. Live spend about 3,630 a month: DraftKings h2h
 ~2,476 (with League One/Two and UCL ~86), team totals ~682, corners ~471 (up to ~676 with League One/Two). The key is shared with
 the owner's baseball app, so the balance can drop without any run here.

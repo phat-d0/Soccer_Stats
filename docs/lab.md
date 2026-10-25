@@ -1649,3 +1649,63 @@ price, `betfair_ex_eu` then `betfair_ex_uk`, whichever passes the quote check fi
 - Any bug found afterwards is fixed, rerun and disclosed, with both runs named, as in phase 1.
 - Every count is reported: slots bought, unusable slots, unmatched matches, and quotes failing
   each check by book.
+
+### Phase 2, step 2: result (2026-10-25; run once)
+
+**Runs.**
+- Fetch: run 40144988040, from the default branch at cap 1,920. It bought 192 of 192
+  snapshots at exactly 10 credits each, **1,920 credits** (19,083 → 17,163), with no stop.
+  The bodies are in the cache `comeback-odds-40144988040` and that run's 7-day artifact.
+- Analysis: run 40145295663, `task=comebacks2`, no key, run once.
+
+**Counts.**
+- Every slot's snapshot fell inside the half-time window: 0 missing, 0 off half-time.
+- 12 of the 210 trailing favourites had no matching event, which leaves **198 usable
+  matches**.
+- DraftKings and Betfair passed the quote check on all 198.
+- Pinnacle failed it 91 times: 66 off the other books' median by more than 0.05, 20 stale,
+  4 not quoted, 1 not moved. Its fair price was used on 107 matches and Betfair's on the other
+  91.
+- Other books' failures: FanDuel stale 13; Bovada stale 3 and not moved 7; Paddy Power stale 1.
+
+**Primary: $1 on the trailing favourite at DraftKings' in-play price.**
+- 198 bets, 55 won (27.8%), average odds 5.48 (break-even 25.0%).
+- **ROI +7.3% (95%: −19.2% to +34.3%)**.
+
+**Verdict (pre-registered rule): fail, because the ROI range includes 0.** Design B does not
+justify design C. Nothing changes live.
+
+**Second line (descriptive): Betfair's exchange back price after 2% commission.** 198 bets,
+average odds 6.17, ROI +14.9% (−13.7% to +45.5%). This range also includes 0.
+
+**Secondary (descriptive).**
+- **Realized vs market-implied:** won 27.8% against the market's fair 24.5%, a gap of
+  **+3.3 points (−2.7 to +9.2)**. It points the same way as phase 1's gap (+3.8 points
+  against the corrected model), but the range includes 0.
+- **Blend weight of the phase-1 model beside the in-play price:** c = 0.30 (−0.58 to +1.19)
+  on 196 matches, with b = 0.67 on the market. The model adds nothing detectable beyond the
+  price.
+
+**By band (descriptive only, not a test).** Four bands of a fail, none a pass criterion; a
+band can't be picked after the fact.
+
+| Favourite | Bets | Won | Avg odds | DraftKings ROI (95%) | Realized − implied |
+| --- | --- | --- | --- | --- | --- |
+| 45–55% | 99 | 25 | 6.72 | +29.9% (−15.4% to +78.2%) | +7.2 pts (−0.9 to +15.7) |
+| 55–65% | 45 | 10 | 4.87 | −25.6% (−67.6% to +18.5%) | −3.3 pts (−14.8 to +9.2) |
+| 65–75% | 37 | 12 | 4.22 | −12.5% (−53.2% to +28.4%) | −0.3 pts (−14.5 to +13.8) |
+| 75%+ | 17 | 8 | 2.63 | +5.7% (−49.8% to +62.8%) | +6.2 pts (−16.8 to +28.8) |
+
+**Reading it.**
+- In 2024/25 these favourites won 27.8% of the time from behind at half-time, above phase 1's
+  long-run 19.5% (eight leagues, 2017/18–2024/25). One season of 198 matches carries a range
+  of about ±6 points, and the in-play market priced them at 24.5%.
+- The market didn't leave a gap this test could find: the point estimates are positive, and
+  every range includes 0.
+- Detecting a gap of about 3 points needs the roughly 870 matches of design C (9,010
+  credits).
+- 45–55% favourites look best, but that is the kind of after-the-fact cut the pre-registration
+  rules out. Testing it would need a new pre-registration on fresh data (another season, or
+  design C's other seasons), judged on that band alone.
+- Whether to spend more is the owner's call. This test spent its full 1,920 credits and stops
+  here.
