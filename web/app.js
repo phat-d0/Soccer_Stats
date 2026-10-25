@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v58";
+const APP_VERSION = "v59";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3260,12 +3260,29 @@ function btHead(hit, lg) {
   if (!hit.m.bets) return NO_BT(`0 bets · ${where}`);
   return { v: signedPct(hit.m.roi), cls: signCls(hit.m.roi), sub: `${hit.m.bets.toLocaleString()} bets · ${where}` };
 }
+// Lean's backtest replays the rule at every price (the old rule). The new rule's odds range
+// (1.50 to 3.00) is exactly the replay's 1.50–2.00 and 2.00–3.00 bands, so its own figure is
+// those bands pooled: ROI per $1, weighted by bets. Null when the bands don't tile the range.
+function leanRangeBt(part, range) {
+  const bands = (part?.by_odds_band || []).filter((b) => b.lo != null && b.hi != null && b.lo >= range[0] - 1e-9 && b.hi <= range[1] + 1e-9);
+  if (!bands.length || Math.abs(bands[0].lo - range[0]) > 1e-9 || Math.abs(bands[bands.length - 1].hi - range[1]) > 1e-9) return null;
+  const bets = bands.reduce((a, b) => a + (b.bets || 0), 0);
+  if (!bets) return { bets: 0, roi: null };
+  return { bets, roi: bands.reduce((a, b) => a + (b.roi || 0) * (b.bets || 0), 0) / bets };
+}
+const archivedStrat = (x) => x.st?.adds === "shadow"; // an old rule kept for comparison
 function backtestHeadline(cur, x, lg = "") {
   const sb = state.data.portfolio?.strategy_backtests || {};
-  if (x.key === "lean") {
+  if (x.key === "lean" || (archivedStrat(x) && x.variantOf === "lean")) {
     if (!sb.lean?.available) return null;
     const hit = btPart(sb.lean, "lean", lg);
-    return hit ? btHead(hit, lg) : NO_BT("no backtest for this competition");
+    if (!hit) return NO_BT("no backtest for this competition");
+    const range = x.key === "lean" ? x.rule?.odds_range : null;
+    const inRange = range ? leanRangeBt(hit.part, range) : null;
+    if (!inRange) return btHead(hit, lg);
+    const where = `${lg ? `${leagueName(lg)} ` : ""}${btWhere(hit.part)}`;
+    if (!inRange.bets) return NO_BT(`0 bets, ${rangeWords(range)} · ${where}`);
+    return { v: signedPct(inRange.roi), cls: signCls(inRange.roi), sub: `${inRange.bets.toLocaleString()} bets, ${rangeWords(range)} · ${where}` };
   }
   const bt = cur.backtest;
   if (bt?.kind === "research") return { v: "–", cls: "muted", sub: "research only" };
@@ -3864,14 +3881,17 @@ function pfHomeHtml() {
   const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id));
   const retired = all.filter((p) => p.status === "retired");
   const rows = shown.map((p) => {
-    const names = pfStrategies(p).filter((x) => !x.variantOf).map((x) => x.label);
+    const st = pfStrategies(p);
+    const names = st.filter((x) => !x.variantOf).map((x) => x.label);
+    const tests = st.filter((x) => x.variantOf && !archivedStrat(x)).length, old = st.filter(archivedStrat).length;
+    const extra = [tests ? `${tests} shadow test${tests === 1 ? "" : "s"}` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
     const m = tradeStats(p.live?.trades || []);
     const right = m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     return `
       <button class="row-btn folder" data-pfid="${esc(p.id)}">
-        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}</span></span>
+        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}${extra ? ` · ${extra}` : ""}</span></span>
         <span class="vals">${right}</span>${CHEV}
       </button>`;
   }).join("");
@@ -3881,23 +3901,27 @@ function pfHomeHtml() {
     <p class="note">Each portfolio holds that market's paper strategies. Profit is all its strategies together, in every competition, $10 a trade. Paper trades: no money is staked.</p>
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
 }
-// One folder per strategy: its live record, and its backtest headline underneath.
+// One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
+// record, and its backtest headline underneath. A shadow test (corners' "below 60%") says so;
+// an archived old rule (Lean's all odds) has the replay at every price as its backtest.
+function stratMeta(cur, x, m) {
+  if (archivedStrat(x)) return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
+  if (x.variantOf) return `Shadow test · places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
+  const rule = ruleText(x);
+  return `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}`;
+}
 function strategyFolders(cur, strats, lg) {
   const rows = strats.map((x) => {
     const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
-    const status = cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`;
-    const rule = ruleText(x);
-    const variant = !!x.variantOf;
     const right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
-    const h = variant ? null : backtestHeadline(cur, x, lg);
-    const bt = variant ? "" : `<span class="bt">Backtest: ${h ? `<b class="${h.cls}">${h.v}</b> · ${esc(h.sub)}` : "none"}</span>`;
+    // Shadow tests have no backtest of their own; an archived rule has its replay.
+    const h = x.variantOf && !archivedStrat(x) ? null : backtestHeadline(cur, x, lg);
+    const bt = x.variantOf && !archivedStrat(x) ? "" : `<span class="bt">Backtest: ${h ? `<b class="${h.cls}">${h.v}</b> · ${esc(h.sub)}` : "none"}</span>`;
     return `
-      <button class="row-btn folder strat${variant ? " variant" : ""}" data-pfstrat="${esc(x.key)}"${variant ? ` aria-label="${esc(x.label)}"` : ""}>
-        <span class="who">${variant
-          ? `<b><span class="vmark" aria-hidden="true">↳</span> ${esc(variantShort(x, strats.find((p) => p.key === x.variantOf)).toLowerCase())}</b><span class="meta">${x.st?.adds === "shadow" ? "Adds the picks the rule now skips" : "Filtered"}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}</span>`
-          : `<b>${esc(x.label)}</b><span class="meta">${status}${rule ? ` · ${rule}` : ""}</span>`}${bt}</span>
+      <button class="row-btn folder strat${archivedStrat(x) ? " archived" : ""}" data-pfstrat="${esc(x.key)}">
+        <span class="who"><b>${esc(x.label)}</b><span class="meta">${stratMeta(cur, x, m)}</span>${bt}</span>
         <span class="vals">${right}</span>${CHEV}
       </button>`;
   }).join("");
@@ -3911,8 +3935,9 @@ function pfFolderHtml(cur, strats) {
     <div class="pf-head"><span>${esc(cur.note || "")}</span></div>
     ${leagueFilter()}
     <div class="section-title">Strategies</div>
-    ${strategyFolders(cur, strats, lg)}
-    <p class="note">Open a strategy for its live paper trades, its backtest and its model. Shadow filters (↳) place no bets of their own: each tracks part of its parent's picks${strats.some((x) => x.st?.adds === "shadow") ? ", or the picks a rule now skips" : ""}.</p>`;
+    ${strategyFolders(cur, strats.filter((x) => !archivedStrat(x)), lg)}
+    <p class="note">Open a strategy for its live paper trades, its backtest and its model.${strats.some((x) => x.variantOf && !archivedStrat(x)) ? " A shadow test places no bets of its own: it follows the picks of the strategy it is named after that pass its filter, so the two can be compared." : ""}</p>
+    ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets.</p>` : ""}`;
 }
 function pfStrategyHtml(cur, allStrats) {
   const multi = allStrats.length > 1;
@@ -3932,13 +3957,22 @@ function pfStrategyHtml(cur, allStrats) {
   const lg = byComp && !research ? leagueOn() : "";
   const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
   const rule = ruleText(x);
-  const sub = x.variantOf
-    ? `Shadow filter of ${esc(parent.label)}${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
+  const sub = archivedStrat(x)
+    ? `Archived: the rule until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"}, tracked with no bets beside ${esc(parent.label)}`
+    : x.variantOf
+    ? `Shadow test of ${esc(parent.label)}: places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
     : multi ? `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}` : "";
   const head = multi
     ? `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(x.label)}</h2>${sub ? `<div class="pf-sub">${sub}</div>` : ""}`
     : `${pfCrumbs(cur, false)}<h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2><div class="pf-head"><span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span></div>`;
-  const parentNote = x.variantOf && view !== "live" ? `<p class="note">A shadow filter has no ${view === "model" ? "model" : "backtest"} of its own: this is ${esc(parent.label)}'s.</p>` : "";
+  // Lean's replay is the old rule (every price); the new rule's own figure is its range's bands.
+  const leanBt = view === "backtest" && parent.key === "lean" ? btPart(state.data.portfolio?.strategy_backtests?.lean, "lean", lg) : null;
+  const range = parent.rule?.odds_range;
+  const inRange = leanBt && range ? leanRangeBt(leanBt.part, range) : null;
+  const parentNote = archivedStrat(x) && view === "backtest"
+    ? `<p class="note">This replay is the old rule: Blend Lean at every price, the same replay ${esc(parent.label)} is measured against.</p>`
+    : x.variantOf && view !== "live" ? `<p class="note">A shadow test has no ${view === "model" ? "model" : "backtest"} of its own: this is ${esc(parent.label)}'s.</p>`
+    : x.key === "lean" && inRange?.bets ? `<p class="note lean-range-bt">This replay is the old rule, at every price. Inside the ${rangeWords(range)} range it placed ${inRange.bets.toLocaleString()} bets, ROI ${signedPct(inRange.roi)}: the ${range[0].toFixed(2)}–2.00 and 2.00–${range[1].toFixed(2)} rows under "Where the bets sit on the odds".</p>` : "";
   const top = `${head}${byComp && !research ? leagueFilter() : ""}${toggle}${parentNote}`;
   if (view === "model") return `${top}${modelViewHtml(cur, parent, lg)}`;
   if (view === "backtest") return pfClassic(top);
