@@ -1783,3 +1783,14 @@ test to the owner; nothing here changes anything live.
   - B alone;
   - C+B pooled.
 - Run once. Any bug found afterwards is fixed, rerun and disclosed with both runs named.
+
+**Amendment, 2026-10-25, before any design-C purchase (lead review of PR #110).**
+- The empty-data guard applies to **every league-season**, not only to E1–E3. Archived in-play
+  prices are verified only from 2024/25 on (design B and the two probes), and about two-thirds
+  of C is the top five's 2022/23 and 2023/24.
+- The rule is otherwise the same. If a league-season's first 3 bought snapshots, oldest first,
+  include none with a started event freshly priced by DraftKings or Betfair, no more of that
+  league-season is bought, and its matches count as **not priced** (excluded and reported).
+- This changes what is bought, not how a match is judged.
+- If whole seasons turn out unpriced, the judged sample shrinks below the power figures above;
+  the pass rule stays the same.

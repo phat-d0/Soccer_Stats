@@ -128,13 +128,13 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
     counts["matches"] = sum(len(s["matches"]) for s in slots)
     counts["unmatched"] = 0
     counts["slots_not_priced"] = counts["matches_not_priced"] = 0
-    guard = cf.read_guard(cache_dir)  # lower leagues the fetch stopped buying
+    guard = cf.read_guard(cache_dir)  # league-seasons the fetch stopped buying
     fails = {}
     rows = []
     for s in slots:
         path = cf.body_path(cache_dir, s)
         if not path.exists():
-            if guard.get(s["league"], {}).get("blocked"):
+            if guard.get(cf.guard_key(s), {}).get("blocked"):
                 counts["slots_not_priced"] += 1
                 counts["matches_not_priced"] += len(s["matches"])
             else:

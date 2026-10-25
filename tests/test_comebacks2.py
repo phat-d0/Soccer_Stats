@@ -145,7 +145,7 @@ def test_season_join_picks_the_right_season(tmp_path):
 
 def test_guarded_league_counts_as_not_priced(tmp_path):
     slot = {**SLOT, "league": "E2", "sport": "soccer_england_league1"}
-    (tmp_path / cf.GUARD_FILE).write_text(json.dumps({"E2": {"blocked": True}}))
+    (tmp_path / cf.GUARD_FILE).write_text(json.dumps({"E2 2024/25": {"blocked": True}}))
     rows, counts = c2.match_rows([slot], tmp_path, fd())
     assert rows == [] and counts["slots_not_priced"] == 1 and counts["matches_not_priced"] == 2
     assert counts["slots_missing"] == 0

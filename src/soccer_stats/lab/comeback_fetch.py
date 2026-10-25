@@ -12,9 +12,10 @@ Spending rules:
 - a slot is never bought twice: its body in the cache, or an answered call in the call
   record, skips it.
 
-Lower-league guard (design C): in `GUARDED` leagues, if a league's first `GUARD_FIRST` bought
-snapshots include none with a started event freshly priced by DraftKings or Betfair, the
-league is recorded in `guard.json` and no more of it is bought (its matches: "not priced").
+Empty-data guard (design C, every league-season; amended before any purchase, see docs/lab.md
+"step 3"): if a league-season's first `GUARD_FIRST` bought snapshots include none with a
+started event freshly priced by DraftKings or Betfair, that league-season is recorded in
+`guard.json` and no more of it is bought (its matches: "not priced").
 
 cap 0 (or no key) is a dry run: the slots still to buy and the estimate, no paid call. The
 key is redacted from every message. This reads only the slot list, never how a match ended.
@@ -51,7 +52,6 @@ BOOKS = (
     "bovada",
     "paddypower",
 )
-GUARDED = ("E1", "E2", "E3")
 GUARD_FIRST = 3  # a guarded league's first snapshots that must show in-play prices
 GUARD_BOOKS = ("draftkings", "betfair_ex_eu", "betfair_ex_uk")
 GUARD_FILE = "guard.json"
@@ -100,6 +100,13 @@ def snapshot_priced(body: dict) -> bool:
                     if (snap - upd).total_seconds() <= FRESH_MINUTES * 60:
                         return True
     return False
+
+
+def guard_key(slot: dict) -> str:
+    """The guard's unit: league and season, e.g. "E0 2022/23" (seasons start in July)."""
+    t = pd.Timestamp(slot["kickoff"])
+    y = t.year if t.month >= 7 else t.year - 1
+    return f"{slot['league']} {y}/{str(y + 1)[-2:]}"
 
 
 def read_guard(cache_dir: Path) -> dict:
@@ -159,16 +166,16 @@ def run(
     pending = sorted(
         (s for s in slots if not held(cache_dir, s, answered)), key=lambda s: s["request_at"]
     )
-    # The guard's evidence so far: each guarded league's held snapshots, oldest first.
+    # The guard's evidence so far: each league-season's held snapshots, oldest first.
     checks: dict[str, list[bool]] = {}
     for s in sorted(slots, key=lambda s: s["request_at"]):
-        if s["league"] in GUARDED and body_path(cache_dir, s).exists():
+        if body_path(cache_dir, s).exists():
             body = json.loads(body_path(cache_dir, s).read_text())
-            checks.setdefault(s["league"], []).append(snapshot_priced(body))
+            checks.setdefault(guard_key(s), []).append(snapshot_priced(body))
     guard = read_guard(cache_dir)
 
-    def blocked(lg: str) -> bool:
-        first = checks.get(lg, [])[:GUARD_FIRST]
+    def blocked(key: str) -> bool:
+        first = checks.get(key, [])[:GUARD_FIRST]
         return len(first) == GUARD_FIRST and not any(first)
 
     budget = CappedBudget(max(int(cap), 0))
@@ -198,9 +205,9 @@ def run(
     res["left_before"] = budget.left
     budget.log.append(f"Credits left before the run: {budget.left}")
     for s in pending:
-        lg = s["league"]
-        if lg in GUARDED and blocked(lg):
-            res["not_priced"][lg] = res["not_priced"].get(lg, 0) + 1
+        key = guard_key(s)
+        if blocked(key):
+            res["not_priced"][key] = res["not_priced"].get(key, 0) + 1
             continue
         estimate = FIRST_ESTIMATE if res["bought"] == 0 else HIST_COST
         params = {
@@ -233,17 +240,16 @@ def run(
             row["snapshot"] = body.get("timestamp")
             row["events"] = len(body.get("data") or [])
             res["bought"] += 1
-            if lg in GUARDED:
-                checks.setdefault(lg, []).append(snapshot_priced(body))
-                if blocked(lg) and lg not in guard:
-                    guard[lg] = {
-                        "blocked": True,
-                        "first_snapshots": GUARD_FIRST,
-                        "at": iso(pd.Timestamp.now(tz="UTC")),
-                        "note": "no started event freshly priced by DraftKings or Betfair",
-                    }
-                    _write_guard(cache_dir, guard)
-                    budget.log.append(f"Guard: {lg} unpriced in its first {GUARD_FIRST} snapshots")
+            checks.setdefault(key, []).append(snapshot_priced(body))
+            if blocked(key) and key not in guard:
+                guard[key] = {
+                    "blocked": True,
+                    "first_snapshots": GUARD_FIRST,
+                    "at": iso(pd.Timestamp.now(tz="UTC")),
+                    "note": "no started event freshly priced by DraftKings or Betfair",
+                }
+                _write_guard(cache_dir, guard)
+                budget.log.append(f"Guard: {key} unpriced in its first {GUARD_FIRST} snapshots")
         _append_call(cache_dir, row)
         res["spent"] = budget.spent
         if info.get("stop"):

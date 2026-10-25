@@ -31,6 +31,17 @@ def slots(n, sport="soccer_epl"):
     ]
 
 
+def priced_body(date):
+    """A snapshot with one started event freshly priced by DraftKings (passes the guard)."""
+    snap = pd.Timestamp(date)
+    upd = (snap - pd.Timedelta(minutes=2)).isoformat()
+    ev = {
+        "commence_time": (snap - pd.Timedelta(minutes=55)).isoformat(),
+        "bookmakers": [{"key": "draftkings", "markets": [{"key": "h2h", "last_update": upd}]}],
+    }
+    return {"timestamp": date, "data": [ev]}
+
+
 def fake(balance=20000, cost=10, status=200):
     state = {"left": balance, "calls": 0}
 
@@ -39,11 +50,7 @@ def fake(balance=20000, cost=10, status=200):
             return Resp([], headers={"x-requests-remaining": str(state["left"])})
         state["calls"] += 1
         state["left"] -= cost
-        body = (
-            {"timestamp": params["date"], "data": []}
-            if status == 200
-            else {"message": f"bad {KEY}"}
-        )
+        body = priced_body(params["date"]) if status == 200 else {"message": f"bad {KEY}"}
         return Resp(
             body,
             status,
@@ -122,8 +129,9 @@ def lower_slots(n, league="E2", sport="soccer_england_league1"):
     ]
 
 
-def priced_get(priced: bool):
-    """Snapshots whose one started event has a DraftKings quote that is fresh or stale."""
+def priced_get(priced):
+    """Snapshots whose one started event has a DraftKings quote that is fresh or stale;
+    `priced` is a bool or a function of the snapshot time."""
     state = {"calls": 0, "left": 20000}
 
     def get(url, params=None, timeout=None):
@@ -132,7 +140,8 @@ def priced_get(priced: bool):
         state["calls"] += 1
         state["left"] -= 10
         snap = pd.Timestamp(params["date"])
-        upd = snap - pd.Timedelta(minutes=2 if priced else 50)
+        fresh = priced(snap) if callable(priced) else priced
+        upd = snap - pd.Timedelta(minutes=2 if fresh else 50)
         ev = {
             "commence_time": (snap - pd.Timedelta(minutes=55)).isoformat(),
             "bookmakers": [
@@ -152,12 +161,12 @@ def test_guard_stops_an_unpriced_lower_league_after_three(tmp_path):
     get, state = priced_get(priced=False)
     s = lower_slots(6) + slots(2)  # E2 slots plus two top-five ones, interleaved in time
     res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=s, get=get)
-    assert res["not_priced"] == {"E2": 3}
+    assert res["not_priced"] == {"E2 2024/25": 3}
     assert state["calls"] == 3 + 2  # three E2 snapshots, then only the top-five slots
-    assert cf.read_guard(tmp_path)["E2"]["blocked"]
+    assert cf.read_guard(tmp_path)["E2 2024/25"]["blocked"]
     # a restart reaches the same decision from the held bodies and buys nothing new
     res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=s, get=get)
-    assert state["calls"] == 5 and res["not_priced"] == {"E2": 3}
+    assert state["calls"] == 5 and res["not_priced"] == {"E2 2024/25": 3}
 
 
 def test_guard_lets_a_priced_lower_league_through(tmp_path):
@@ -166,10 +175,26 @@ def test_guard_lets_a_priced_lower_league_through(tmp_path):
     assert state["calls"] == 6 and res["not_priced"] == {} and cf.read_guard(tmp_path) == {}
 
 
-def test_top_five_is_never_guarded(tmp_path):
-    get, state = priced_get(priced=False)
-    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=slots(6), get=get)
-    assert state["calls"] == 6 and res["not_priced"] == {}
+def season_slots(year, n):
+    return [
+        {
+            **s,
+            "kickoff": s["kickoff"].replace("2024-09", f"{year}-09"),
+            "request_at": s["request_at"].replace("2024-09", f"{year}-09"),
+        }
+        for s in slots(n)
+    ]
+
+
+def test_guard_is_per_league_season_in_the_top_five_too(tmp_path):
+    # E0 2022/23 carries no in-play prices, E0 2023/24 does: only the first season stops.
+    get, state = priced_get(priced=lambda snap: snap.year >= 2023)
+    s = season_slots(2022, 6) + season_slots(2023, 4)
+    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=s, get=get)
+    assert res["not_priced"] == {"E0 2022/23": 3}
+    assert state["calls"] == 3 + 4
+    assert set(cf.read_guard(tmp_path)) == {"E0 2022/23"}
+    assert cf.guard_key(s[0]) == "E0 2022/23" and cf.guard_key(s[-1]) == "E0 2023/24"
 
 
 def test_design_c_is_c_minus_b():

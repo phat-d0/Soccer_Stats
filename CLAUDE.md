@@ -617,10 +617,10 @@ the owner's baseball app, so the balance can drop without any run here.
   "Phase 2, step 3", commit dca429e): the judged sample `lab/comeback_c_slots.json` = design C's
   slots minus B's (709 slots, 902 trailing favourites, eight leagues 2022/23–2024/25, ~7,090
   credits); B is descriptive only. `comeback_fetch --slots C` (`odds-check.yml` `design=C`) buys
-  in time order with the lower-league guard: in `GUARDED` E1–E3, if a league's first
-  `GUARD_FIRST` 3 snapshots have no started event freshly priced by DraftKings or Betfair
-  (`snapshot_priced`), it stops buying that league and writes `guard.json` (its matches count as
-  not priced). `comebacks2 --slots C` joins by league and season (`season_of`), counts
+  in time order with the empty-data guard on every league-season (`guard_key`, e.g. "E0
+  2022/23"; amended before any purchase): if its first `GUARD_FIRST` 3 snapshots have no started
+  event freshly priced by DraftKings or Betfair (`snapshot_priced`), it stops buying that
+  league-season and writes `guard.json` (its matches count as not priced). `comebacks2 --slots C` joins by league and season (`season_of`), counts
   not-priced slots, judges C minus B and prints B alone and C+B pooled as descriptive lines,
   with per-league and per-season tables.
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
