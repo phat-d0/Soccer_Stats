@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v59";
+const APP_VERSION = "v60";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3186,11 +3186,20 @@ function pfStrategies(cur) {
   if (st.length) {
     // Shadow-filter variants (variant_of) sit directly under their parent, whatever order
     // they arrive in; a variant whose parent is missing is dropped.
-    const row = (x) => ({ key: x.key, label: x.label, st: x, rule: x.rule, variantOf: x.variant_of || null });
+    const row = (x) => ({ key: x.key, label: stratLabel(x), st: x, rule: x.rule, variantOf: x.variant_of || null });
     return st.filter((x) => !x.variant_of).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]);
   }
   const label = cur.id === "corners" ? "Model (f) 12% vs Pinnacle" : cur.name;
   return [{ key: cur.id, label, st: null, rule: cur.live?.rule || (cur.id === "moneyline" ? state.data.portfolio?.rule : null) }];
+}
+// A filtered corner line named for what its cut is of (owner, 25 Oct): "Model (f) vs Pinnacle:
+// 12% edge, under 60% to win" = the track's 12%-edge picks that model (f) gives under a 60%
+// chance to win (pushes aside). Anything else keeps paper.py's label.
+const BOOK_LABEL = { pinnacle: "Pinnacle", draftkings: "DraftKings" };
+function stratLabel(x) {
+  const f = x.filter, book = BOOK_LABEL[x.rule?.book];
+  if (x.variant_of && f?.field === "p_no_push" && isNum(f.max) && book && isNum(x.rule?.threshold)) return `Model (f) vs ${book}: ${pct(x.rule.threshold)} edge, under ${pct(f.max)} to win`;
+  return x.label;
 }
 // Each portfolio keeps its own selection (Moneyline: Lean / 12%; Team corners: the book).
 const pfStratKey = (cur) => (cur?.id === "corners" ? state.pfStratCorners : state.pfStrat);
@@ -3201,7 +3210,7 @@ const pfVariants = (strats, x) => strats.filter((v) => v.variantOf === x.key);
 // "Below 60%" from the variant's filter (else the part of its label after the parent's).
 function variantShort(x, parent) {
   const f = x.st?.filter;
-  if (f && isNum(f.max)) return `Below ${pct(f.max)}`;
+  if (f && isNum(f.max)) return `Under ${pct(f.max)} to win`;
   if (f && isNum(f.min)) return `${pct(f.min)} and up`;
   const base = parent ? parent.label.replace(/\s*\(.*\)\s*$/, "") : "";
   const rest = base && x.label.startsWith(base) ? x.label.slice(base.length).replace(/^[,\s·]+/, "") : x.label;
@@ -3270,7 +3279,12 @@ function leanRangeBt(part, range) {
   if (!bets) return { bets: 0, roi: null };
   return { bets, roi: bands.reduce((a, b) => a + (b.roi || 0) * (b.bets || 0), 0) / bets };
 }
-const archivedStrat = (x) => x.st?.adds === "shadow"; // an old rule kept for comparison
+// Archived: an old rule kept for comparison (adds "shadow": Lean's all odds), or a whole track
+// the owner moved out of the main list (25 Oct: corners' two plain 12% tracks; they still log
+// every pick, and the under-60% lines are cut from them).
+const PF_ARCHIVED = { corners: { keys: ["pinnacle", "draftkings"], since: "2026-10-25" } };
+const archivedTrack = (x) => !x.variantOf && Object.values(PF_ARCHIVED).some((a) => a.keys.includes(x.key));
+const archivedStrat = (x) => x.st?.adds === "shadow" || archivedTrack(x);
 function backtestHeadline(cur, x, lg = "") {
   const sb = state.data.portfolio?.strategy_backtests || {};
   if (x.key === "lean" || (archivedStrat(x) && x.variantOf === "lean")) {
@@ -3882,9 +3896,9 @@ function pfHomeHtml() {
   const retired = all.filter((p) => p.status === "retired");
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
-    const names = st.filter((x) => !x.variantOf).map((x) => x.label);
-    const tests = st.filter((x) => x.variantOf && !archivedStrat(x)).length, old = st.filter(archivedStrat).length;
-    const extra = [tests ? `${tests} shadow test${tests === 1 ? "" : "s"}` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
+    const names = st.filter((x) => !archivedStrat(x)).map((x) => x.label);
+    const old = st.filter(archivedStrat).length;
+    const extra = old ? `${old} archived` : "";
     const m = tradeStats(p.live?.trades || []);
     const right = m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
@@ -3905,7 +3919,10 @@ function pfHomeHtml() {
 // record, and its backtest headline underneath. A shadow test (corners' "below 60%") says so;
 // an archived old rule (Lean's all odds) has the replay at every price as its backtest.
 function stratMeta(cur, x, m) {
-  if (archivedStrat(x)) return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
+  if (x.st?.adds === "shadow") return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
+  if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick`;
+  const f = x.st?.filter;
+  if (x.variantOf && f && isNum(f.max)) return `Only the ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}picks model (f) gives under a ${pct(f.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   if (x.variantOf) return `Shadow test · places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   const rule = ruleText(x);
   return `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}`;
@@ -3936,8 +3953,8 @@ function pfFolderHtml(cur, strats) {
     ${leagueFilter()}
     <div class="section-title">Strategies</div>
     ${strategyFolders(cur, strats.filter((x) => !archivedStrat(x)), lg)}
-    <p class="note">Open a strategy for its live paper trades, its backtest and its model.${strats.some((x) => x.variantOf && !archivedStrat(x)) ? " A shadow test places no bets of its own: it follows the picks of the strategy it is named after that pass its filter, so the two can be compared." : ""}</p>
-    ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets.</p>` : ""}`;
+    <p class="note">Open a strategy for its live paper trades, its backtest and its model.${strats.some((x) => x.variantOf && !archivedStrat(x) && isNum(x.st?.filter?.max)) ? ` "Under 60% to win" lines are cut from the archived 12% tracks: the same paper trades, keeping only the bets model (f) gives under a 60% chance to win (a push, the stake back, is left out of that chance). Judged from 23 Oct on closing line value against Pinnacle.` : ""}</p>
+    ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">${strats.some((x) => x.st?.adds === "shadow") ? "Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets." : "Kept out of the main list: these tracks still log every pick at their rule, and the lines above are cut from them."}</p>` : ""}`;
 }
 function pfStrategyHtml(cur, allStrats) {
   const multi = allStrats.length > 1;
@@ -3959,6 +3976,10 @@ function pfStrategyHtml(cur, allStrats) {
   const rule = ruleText(x);
   const sub = archivedStrat(x)
     ? `Archived: the rule until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"}, tracked with no bets beside ${esc(parent.label)}`
+    : archivedTrack(x)
+    ? `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}: still logs every pick; the under-60% line is cut from it`
+    : x.variantOf && isNum(x.st?.filter?.max)
+    ? `${esc(parent.label)}'s picks that model (f) gives under a ${pct(x.st.filter.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
     : x.variantOf
     ? `Shadow test of ${esc(parent.label)}: places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
     : multi ? `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}` : "";
