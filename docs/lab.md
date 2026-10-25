@@ -1709,3 +1709,77 @@ band can't be picked after the fact.
   design C's other seasons), judged on that band alone.
 - Whether to spend more is the owner's call. This test spent its full 1,920 credits and stops
   here.
+
+### Phase 2, step 3: design C pre-registration (owner-approved 25 Oct, budget 9,010 credits; registered 2026-10-25 before any design-C code is written or run)
+
+The owner approved design C (eight leagues, 2022/23–2024/25), with a total budget of 9,010
+credits, including the 1,920 already spent on B. This is a **confirmatory test on prices not
+yet seen**. Design B's rules carry over unchanged. A pass only justifies proposing a live paper
+test to the owner; nothing here changes anything live.
+
+**Sample (frozen).**
+- The file `src/soccer_stats/lab/comeback_c_slots.json` (SHA-256 starting `b6210148a963dc84`)
+  holds design C's slots minus every slot bought in design B (`comeback_b_slots.json`): **709
+  slots holding 902 trailing favourites**, written by `comeback_plan.slot_list` and sorted by
+  request time.
+- B's 198 usable matches have been looked at, so they are out of the judged sample. They
+  appear only as a descriptive line and in a descriptive pooled C+B line.
+
+| League | 2022/23 slots, matches | 2023/24 | 2024/25 |
+| --- | --- | --- | --- |
+| E0 | 46, 51 | 37, 44 | in B |
+| SP1 | 34, 35 | 44, 44 | in B |
+| D1 | 23, 28 | 29, 33 | in B |
+| I1 | 35, 36 | 34, 34 | in B |
+| F1 | 42, 45 | 31, 32 | in B |
+| E1 | 37, 46 | 37, 57 | 43, 57 |
+| E2 | 36, 50 | 40, 59 | 41, 69 |
+| E3 | 36, 52 | 42, 70 | 42, 60 |
+
+- Disclosure: phase 1 used these seasons' half-time and full-time scores (its development
+  window was 2017/18–2024/25), so the aggregate comeback rates of these matches were seen
+  then. Their in-play prices, which this test is about, have never been seen.
+
+**Power.**
+- With all 902 matches usable, the test detects a gap of **3.7 points** (realized minus
+  implied, two-sided 5%, 80% power, at a win rate near 20%).
+- At B's usable rate (94%, about 850 matches) it detects 3.8 points, about the ~870 matches
+  needed for phase 1's corrected 3.8-point gap. That is just short.
+- If the lower leagues (E1–E3) turn out unpriced, only the top five's 382 matches remain.
+  That detects 5.7 points, under-powered for a 3.8-point gap. The pass rule stays the same
+  either way.
+
+**Purchase.**
+- Same as B: one historical bulk h2h snapshot per slot at `request_at` (kickoff + 55 min), at
+  the same ten books (one region, about 10 credits). Expected cost **7,090 credits** (709 × 10).
+- Same spending rules: `CappedBudget` with the 3,000 reserve; the first call budgeted at 20;
+  stop on any call over 10 or on any HTTP/network error; never buy a slot twice; dry run first.
+- Snapshots before late 2022 may be 10 minutes apart. A slot whose returned snapshot falls
+  outside the 48–62-minute window is counted as off half-time and never re-bought.
+- **Lower-league guard (E1, E2, E3).** Slots are bought in time order. A guarded league's
+  snapshot is "priced" when at least one event in it had started and has a DraftKings or
+  Betfair (`betfair_ex_eu`/`betfair_ex_uk`) h2h quote updated after kickoff and at most 5
+  minutes before the snapshot.
+  - If a league's first 3 bought snapshots include none that is priced, the fetch buys no more
+    of that league and records it in `guard.json`.
+  - That league's remaining matches count as **not priced**: excluded and reported, not
+    failures.
+  - The guard never applies to the top five.
+
+**Analysis.**
+- Same quote check, Pinnacle median tolerance 0.05 with the Betfair fallback, 48–62-minute
+  window and event matching as B.
+- Matches are joined to football-data by league, season, home and away.
+- **Primary:** $1 on the trailing favourite at DraftKings' passing in-play price, ROI with a
+  match-resampled 95% range (2,000 draws, seed 0), on **C minus B only**.
+  - **Pass:** at least 100 usable matches and the range entirely above 0.
+  - **Fail:** otherwise. A range entirely below 0 reads "the in-play price over-prices the
+    comeback".
+- Descriptive, none of it part of the verdict:
+  - Betfair after 2%;
+  - realized minus implied, overall and by band;
+  - the phase-1 model's blend weight c;
+  - per-league and per-season tables;
+  - B alone;
+  - C+B pooled.
+- Run once. Any bug found afterwards is fixed, rerun and disclosed with both runs named.
