@@ -1794,3 +1794,116 @@ test to the owner; nothing here changes anything live.
 - This changes what is bought, not how a match is judged.
 - If whole seasons turn out unpriced, the judged sample shrinks below the power figures above;
   the pass rule stays the same.
+
+### Phase 2, step 3: result (2026-10-25; run once)
+
+**Runs.**
+- Fetch: run 40176031079, from the default branch at cap 7,090. It bought **607 snapshots**
+  at exactly 10 credits each, **6,070 credits** (17,136 → 11,066), with no stop. The bodies are
+  in the cache `comeback-odds-40176031079` and that run's 7-day artifact.
+- Analysis: run 40176653428, `task=comebacks2` with `design=C`, no key, run once.
+- Comeback spend in all: 1,920 (B) + 6,070 (C) = 7,990 of the approved 9,010, plus the two
+  10-credit probes.
+
+**The guard (amendment of 2026-10-25).** Three league-seasons showed no started event freshly
+priced by DraftKings or Betfair in their first 3 snapshots, so no more of them was bought:
+
+| League-season | Slots in C | Bought (unpriced) | Slots skipped |
+| --- | --- | --- | --- |
+| E0 2022/23 | 46 | 3 | 43 |
+| F1 2022/23 | 42 | 3 | 39 |
+| D1 2022/23 | 23 | 3 | 20 |
+
+- 102 slots holding **115 matches** count as not priced (excluded and reported). The guard
+  cost 90 credits on the 9 unpriced snapshots and saved about 1,020.
+- Every other league-season was priced, including SP1 and I1 2022/23 and all three lower
+  leagues in every season.
+
+**Counts.**
+- 709 slots: 0 missing, 0 off half-time, 102 not priced (115 matches).
+- 902 trailing favourites − 115 not priced − 27 with no matching event = **760 usable rows**.
+- Quote-check failures by book: DraftKings 28 (25 stale, 3 not quoted); Pinnacle 234 (152 off
+  the other books' median by more than 0.05, 57 stale, 24 not quoted, 1 not moved); Betfair UK
+  5 (2 stale, 3 not moved); Betfair EU 2 (not moved); FanDuel 36, BetMGM 27, Paddy Power 25,
+  Bovada 19 stale (Bovada also 3 not moved).
+- Pinnacle's fair price was used on 526 matches and Betfair's on 174 (700 with a fair price).
+
+**Primary: $1 on the trailing favourite at DraftKings' in-play price, C minus B.**
+- 732 bets, 123 won (16.8%), average odds 6.71 (break-even 20.9%).
+- **ROI −25.1% (95%: −38.3% to −10.2%)**.
+
+**Verdict (pre-registered rule): fail. The range is entirely below 0, so it reads "the in-play
+price over-prices the comeback".** Nothing changes live. The comeback idea is closed: there
+is no edge in backing the trailing favourite at the half-time price.
+
+**Second line (descriptive): Betfair's exchange back price after 2% commission.** 602 bets,
+109 won, average odds 8.22, ROI −18.1% (−34.6% to −0.1%).
+
+**Secondary (descriptive).**
+- **Realized vs market-implied:** won 17.0% against the market's fair 21.3% on 700 matches,
+  a gap of **−4.3 points (−6.9 to −1.6)**. Phase 1's gap (+3.8 points) was against a model
+  with no game state. The in-play market prices comebacks well above that model, and above
+  what happened.
+- **Blend weight of the phase-1 model beside the in-play price:** c = 0.54 (−0.05 to +1.23)
+  on 698 matches (a 0.14, b 0.64). The range includes 0.
+
+**By band (descriptive only, not a test).**
+
+| Favourite | Bets | Won | Avg odds | Break-even | DraftKings ROI (95%) | Realized − implied (matches) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 45–55% | 423 | 55 | 7.97 | 16.6% | −29.0% (−47.9% to −9.2%) | −3.6 pts (−6.7 to −0.2; 406) |
+| 55–65% | 216 | 41 | 5.69 | 23.2% | −17.0% (−42.1% to +10.5%) | −4.4 pts (−9.8 to +0.7; 204) |
+| 65–75% | 71 | 13 | 3.69 | 31.7% | −49.8% (−73.7% to −23.2%) | −15.8 pts (−23.5 to −7.0; 68) |
+| 75%+ | 22 | 14 | 2.32 | 45.7% | +51.3% (−3.3% to +113.7%) | +17.9 pts (−2.8 to +37.9; 22) |
+
+**By league (descriptive only).**
+
+| League | Bets | Won | Win rate | Break-even | Avg odds | DraftKings ROI (95%) |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 44 | 17 | 38.6% | 30.1% | 4.78 | +49.2% (−20.7% to +139.2%) |
+| SP1 | 77 | 20 | 26.0% | 24.3% | 5.57 | +9.4% (−36.7% to +65.2%) |
+| D1 | 33 | 8 | 24.2% | 22.6% | 6.62 | −13.8% (−65.3% to +45.8%) |
+| I1 | 57 | 9 | 15.8% | 20.6% | 6.86 | −39.0% (−74.0% to +3.4%) |
+| F1 | 32 | 1 | 3.1% | 21.7% | 6.55 | −87.5% (−100.0% to −62.5%) |
+| E1 | 144 | 26 | 18.1% | 20.7% | 6.55 | −19.5% (−46.8% to +11.9%) |
+| E2 | 171 | 25 | 14.6% | 20.0% | 6.70 | −22.5% (−52.9% to +10.6%) |
+| E3 | 174 | 17 | 9.8% | 17.8% | 7.85 | −52.3% (−72.9% to −28.5%) |
+
+- The top five (243 bets) come to −10.7% and the three lower leagues (489 bets) to −32.2%,
+  bet-weighted from the rows above (no ranges).
+- The top five's C bets are 2022/23 and 2023/24 only, minus the three guarded league-seasons.
+
+**By season (descriptive only).**
+
+| Season | Bets | Won | Win rate | Break-even | DraftKings ROI (95%) |
+| --- | --- | --- | --- | --- | --- |
+| 2022/23 | 186 | 23 | 12.4% | 19.4% | −35.9% (−61.1% to −7.2%) |
+| 2023/24 | 364 | 69 | 19.0% | 22.4% | −26.3% (−43.4% to −7.7%) |
+| 2024/25 | 182 | 31 | 17.0% | 19.5% | −11.5% (−42.2% to +20.2%) |
+
+(2024/25 in C is the lower leagues only; the top five's 2024/25 is design B.)
+
+**B alone and C+B pooled (descriptive).**
+- B alone (2024/25, top five): 198 bets, 55 won, ROI +7.3% (−19.2% to +34.3%), as reported in
+  step 2.
+- C+B pooled: 930 bets, 178 won (19.1%, break-even 21.8%), ROI **−18.2% (−30.0% to −5.1%)**.
+  - Betfair after 2%: 800 bets, −10.0% (−24.6% to +5.3%).
+  - Realized − implied: −2.6 points (−5.2 to −0.1) on 898 matches.
+  - c = 0.53 (+0.02 to +1.10) on 894 matches.
+  - Pooled bands: 45–55% −17.8% (522 bets); 55–65% −18.5% (261); 65–75% −37.0% (108); 75%+
+    +31.4% (39).
+
+**Reading it.**
+- Over the 732 judged bets, trailing favourites won 16.8% of the time. DraftKings priced them
+  at a break-even of 20.9% and the margin-free market at 21.3%. Backing them lost a quarter of
+  the stake.
+- Design B's positive season was not a pattern. Its best-looking band (45–55%, +29.9% in B)
+  is −29.0% in C, the after-the-fact cut the pre-registration ruled out.
+- The model's blend weight c is positive in both C (0.54) and the pooled data, with the pooled
+  range just above 0. That is descriptive and it does not make a bet: the price and the model
+  together still sit above what happened.
+- The losses are biggest in the lower leagues (E3 −52.3%) and in France (1 win in 32), and
+  the only positive bands are tiny (75%+, 22 bets). None of these are tests.
+- Any new idea from these tables, laying the trailing favourite included, needs its own
+  pre-registration on seasons not used here (2025/26 or later), and nothing is bought without
+  the owner. The ESPN goal-timeline study (written up in its own section) stays descriptive.
