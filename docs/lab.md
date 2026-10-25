@@ -1907,3 +1907,46 @@ is no edge in backing the trailing favourite at the half-time price.
 - Any new idea from these tables, laying the trailing favourite included, needs its own
   pre-registration on seasons not used here (2025/26 or later), and nothing is bought without
   the owner. The ESPN goal-timeline study (written up in its own section) stays descriptive.
+
+## Goal timelines from ESPN (owner, 25 Oct; exploratory, free; method written before any data is fetched)
+
+**Why.** Phase 1 only saw the score at half-time (football-data) and the first goal in the five
+Understat leagues. The owner wants to know when in a match a favourite trails and how often it
+comes back from each scoreline and minute. The headline is **trail first**: the underdog
+scores the opening goal at any minute, including the matches where the favourite equalises
+before half-time and so never appears in a half-time snapshot.
+
+**Order rule.** Design C's pre-registration (commit dca429e) landed before any timeline was
+fetched. Nothing here changes C's frozen rules or re-reads C. Everything is exploratory: a
+minute or band that looks good becomes a **new** pre-registration on fresh seasons.
+
+**Data.** `lab/timelines.py`.
+- **Fetch** (`odds-check.yml` `task=timelines-fetch`, no key, counts only): ESPN's site
+  scoreboard, one call per league and date, only on football-data's match days. It covers the
+  eight leagues in `espn_news.SLUGS` (eng.1–eng.4, esp.1, ger.1, ita.1, fra.1), 2017/18 to
+  2024/25, with 2025/26 dropped first.
+  - Each day is reduced to the events' teams, ids, status, score and scoring plays (clock and
+    team), and cached for good in `espn-timelines-*`.
+  - At most 2 requests a second, retries on 5xx and network errors only, and a time budget
+    per run. It resumes from the cache.
+- **Join:** by league, season, both names (`espn_news.team_name`) and date, a day either
+  side. The 90-minute and half-time scores rebuilt from ESPN's goals must equal
+  football-data's, or the match is dropped and counted. Match rates are reported per league
+  and season.
+- **Favourites and fair means:** as in phase 1, from Pinnacle's closing 1X2 and over/under
+  2.5. The benchmark is phase 1's time-scaled Poisson with a uniform scoring rate, which
+  under-counts second-half goals (phase 1's exploratory check), so residuals lean positive.
+
+**What it reports**, with match-resampled 95% ranges throughout:
+1. **Trail first.** Realized win/draw/loss against the fair model from the opening goal's
+   minute. Minute bands are 0–15, 15–30, 30–45 (first-half stoppage time included), 45–60,
+   60–75 and 75+, reported by favourite band and by league.
+2. **What happens next.** For trail-first matches where the first goal came before
+   half-time: the share still behind, level or ahead at half-time, and how each group ends.
+3. **Behind at a given minute.** At 15, 30, 45, 60 and 75: how often the favourite is behind,
+   and the win/draw rate one down and two or more down against the model, by band.
+4. **The timing curve of trail first per league, E1–E3 included** (Understat lacked them).
+5. **Cost of a priced trail-first test.** One historical snapshot about 5 minutes after each
+   opening goal. The wall clock is kickoff + minute, plus 17 minutes for a second-half goal.
+   Goals in one league and 5-minute bucket share a snapshot. Counts are per league and season
+   for 2022/23–2024/25, beside the half-time design's slots.
