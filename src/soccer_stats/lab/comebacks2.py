@@ -203,8 +203,11 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
                 {
                     "league": s["league"],
                     "season": season,
+                    "kickoff": s["kickoff"],
                     "home": m["home"],
                     "away": m["away"],
+                    "favourite": side,
+                    "ht": [int(m["ht"][0]), int(m["ht"][1])],
                     "band": cb.band_name(*next(b for b in cb.BANDS if b[0] <= p_pre < b[1])),
                     "deficit": deficit,
                     "won": int(fav_ft > dog_ft),
