@@ -12,7 +12,7 @@ superseded results are in `docs/history.md`; research write-ups are in `docs/lab
 Portfolio Scope" (https://claude.ai/code/artifact/ff86c3e7-f90b-47a9-8474-28c7c7266e1d),
 section "Status and next steps".
 
-## Current state (21 Oct 2026)
+## Current state (26 Oct 2026)
 
 Every team reads this first, from `origin/claude/soccer-stats-scaffold` (see "Before every
 task" under Agent team). If something here looks wrong, tell the lead.
@@ -25,7 +25,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 
 **Match strategies (Moneyline portfolio), both paper, $10, one trade per match each:**
 - **Blend Lean (1σ+)**: `p_bet` from each league's fit in data-log `backtest/match_blends.json`
-  (every live league, UCL included: σ 0.0475 on 302 rows; fits dated 13 Oct). Trades when
+  (every live league, UCL included: σ 0.0475 on 302 rows; refit 26 Oct, backfill run 40294857542,
+  to add `sigma_dnb`: same rows as the 13 Oct fits, coefficients within 0.0002, UCL's within 0.0024). Trades when
   z = (p_bet − 1/DraftKings' price)/σ ≥ 1; "strong" at z ≥ 2. Most Lean picks come from the
   blend's price weight b > 1 sharpening the price, not from the model; each pick's `driver`
   ("market"/"model") says which (`docs/history.md`, round 14 "Blend Lean beside the 12% test").
@@ -43,8 +44,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   without the draw; Lean's needs `sigma_dnb` in `match_blends.json` and keeps the 1.50–3.00 range
   on the DNB price. A draw refunds the stake. The tracks have their own ledger
   (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals.
-- The Matches tab shows Lean only; Portfolio → Moneyline lists Blend Lean and its draw no bet
-  track, with Model 12% and its track in the Archive.
+- The Matches tab shows Lean only. Portfolio → Moneyline lists Blend Lean and its draw no bet
+  track; Model 12%, its track and Lean's old rule sit in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
   at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
@@ -64,6 +65,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   beside the track (`pinnacle_below60`, `draftkings_below60`). No bets of its own. Judged only on
   trades opened from 23 Oct 08:39 UTC (`trades.SHADOW_DEFINED_AT`), on the matched CLV difference
   vs Pinnacle's close, at the 8 Dec review; no live change unless the owner decides then.
+- In the app (v60, owner, 25 Oct) the two under-60% lines are the main corner strategies and the
+  plain 12% tracks sit in the Archive; every ledger is unchanged.
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -129,15 +132,19 @@ settlement runs after them.
   pts, +2.8 to +5.4), a roughly flat +3 to +6 pts at every minute (the model's known
   shortfall, which the half-time market already covers). A priced trail-first test would cost
   about 18,820 credits (1,882 snapshots); recommended not to buy.
+  The whole study is in the app as the closed portfolio "Comeback bets" (v61, PRs #115/#116).
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
   (`docs/lab.md` "Price-band edge rule", step 1, and the "Model 12% filters" verdict).
 
-**Live paper record** (publish of 20 Oct 08:14 UTC; changes daily, so read the publish log or
-the app): Blend Lean 18 trades (13 settled), Model 12% 139 (88 settled), corners 54 (all settled).
+**Live paper record** (publish of 26 Oct 08:52 UTC; changes daily, so read the publish log or
+the app): Blend Lean (new rule) 7 trades (7 settled), all odds (old rule) 22 (20 settled), Model
+12% 196 (161 settled), Model 12% draw no bet 25 (all open), Lean draw no bet 0; corners 135 (134
+settled).
 
-**Credits:** 10,978 left on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
+**Credits:** 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
+10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
 40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
 40176031079, from 17,136); 17,163 earlier on 25 Oct (after the 1,920-credit design B fetch, run
 40144988040, from 19,083); 19,104 on 24 Oct (after two 10-credit historical in-play probes, runs
@@ -165,6 +172,9 @@ the owner's baseball app, so the balance can drop without any run here.
   finalist (f)); `odds-check.yml` `task=corners2`, `finalists=f`, `cap=3`, a logged `reason`.
 
 **Open decisions with the owner:**
+- Heavy favourites (75%+) trailing at half-time (26 Oct; `docs/lab.md` "Heavy favourites", PR
+  #117): post-hoc band, 39 bets. Options put to the owner: drop it (recommended), a live log
+  (~30 credits a season), or the 890-credit test (~72 bets, 53% power at +12 points). No spend.
 - A weekly cache-touch job so GitHub doesn't evict the paid caches (offered, no answer yet).
 - Logging Champions League corner prices only, without a model (offered; recommended no for now).
 
