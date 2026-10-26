@@ -750,6 +750,11 @@ const STEPS = [
     for (const w of ["2–1", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
       if (!text.includes(w)) throw new Error(`DNB view lacks "${w}"`);
     }
+    // The track leads with its own note, ahead of the tiles; the parent's rule comes last (lead, 26 Oct).
+    const first = (await p.locator("#view .explain").first().innerText()).replace(/\s+/g, " ");
+    if (!first.startsWith("Model 12%, draw no bet. Model 12%'s rule on draw no bet")) throw new Error(`first box: ${first}`);
+    if (text.indexOf("Model 12%'s rule on draw no bet") > text.indexOf("Profit, settled")) throw new Error("the DNB note comes after the tiles");
+    if (text.indexOf("Owner's live test") >= 0 && text.indexOf("Owner's live test") < text.indexOf("Profit, settled")) throw new Error("the parent's note leads the DNB page");
     // The comparison's CLV per $ is paper_dnb's, for both lines.
     const per = await p.evaluate(() => { const c = pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").compare.clv_per_dollar.clv_dk; return [signedPct(c.track.mean), signedPct(c.parent.mean)]; });
     const box = (await p.textContent(".dnb-compare")).replace(/\s+/g, " ");

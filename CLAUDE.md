@@ -817,8 +817,9 @@ the owner's baseball app, so the balance can drop without any run here.
   `defined_at`, no marker; the parent's own chart leaves the track out. `dnbCompareHtml` replaces
   the judged box: "Compared with <parent>, since <date> · descriptive" from `compare` (trades,
   settled + refunded, profit, ROI, CLV per $ vs DraftKings; Pinnacle's per $ in a line; not a
-  like-for-like cut). Rule box: the track's `note` (the empty-state sentence and "(shown as a
-  push)" stripped), then "The parent's rule, …". Backtest and Model show the parent's with a
+  like-for-like cut). The page leads with the track's own `note` (`dnbHead`, above the
+  tiles; the empty-state sentence and "(shown as a push)" stripped; Moneyline's section note is
+  not shown on a track), and the rule box at the foot holds "The parent's rule, …". Backtest and Model show the parent's with a
   note. `lean_dnb` with `rule.source: "none"` says it starts after the refit that adds
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,

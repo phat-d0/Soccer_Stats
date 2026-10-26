@@ -2354,7 +2354,7 @@ const isMoneylineFixed = (pf) => pf?.id === "moneyline" && fixedRule();
 function stratSet(set, st) {
   const ids = st.trade_ids ? new Set(st.trade_ids) : null;
   const trades = (set.trades || []).filter((t) => (ids ? ids.has(t.id) : stratOf(t) === st.key));
-  return { ...set, trades, summary: st.summary || { trades: trades.length }, breakdowns: st.breakdowns || {}, by_league: st.by_league || null, rule: st.rule, note: st.key === "lean" ? null : set.note };
+  return { ...set, trades, summary: st.summary || { trades: trades.length }, breakdowns: st.breakdowns || {}, by_league: st.by_league || null, rule: st.rule, note: st.key === "lean" || st.adds === "dnb" ? null : set.note };
 }
 // ---------- Blend Lean backtest (portfolio.strategy_backtests.lean; lean_backtest.py) ----------
 // A replay at Pinnacle's early prices from football-data, $1 a bet (units), CLV against
@@ -3835,7 +3835,9 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ? String(x.st?.note || "").replace(/^No [^:]*trades yet:.*?\.\s+(?=[A-Z])/, "").replace(" (shown as a push)", "")
     : x.st?.note || x.st?.filter?.note;
   const dnb = isDnbStrat(x);
-  const rules = `<div class="explain live-test rule-note">${vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>${dnb ? `<b>The parent's rule, ${esc(ruleParent.label)}:</b> ` : ""}` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. ${dnb ? "Draw = stake back (the bet is refunded); void" : "Void"} = stake back.</p>`;
+  // A draw no bet track leads with its own note (lead, 26 Oct); its parent's rule stays below.
+  const dnbHead = dnb && vNote ? `<div class="explain live-test dnb-note"><b>${esc(x.label)}.</b> ${esc(vNote)}</div>` : "";
+  const rules = `<div class="explain live-test rule-note">${dnb ? `<b>The parent's rule, ${esc(ruleParent.label)}:</b> ` : vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. ${dnb ? "Draw = stake back (the bet is refunded); void" : "Void"} = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
   // The page heading already names the strategy; only a chosen competition needs saying.
   const title = lg ? `<div class="section-title nocase">${esc(leagueName(lg))} only</div>` : "";
@@ -3847,7 +3849,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
       : cur.status === "testing" ? "No trades yet. They start once this strategy passes its tests."
       : cur.status === "retired" ? "No live trades: this strategy was retired before any opened. Its testing history is under Backtest."
       : "No paper trades yet.";
-    return `${title}${banner}${drvPanel}<div class="empty">${empty}</div>${rules}`;
+    return `${title}${banner}${dnbHead}${drvPanel}<div class="empty">${empty}</div>${rules}`;
   }
   const avg = leanLike && m.avgZ != null ? sigmaText(m.avgZ) : signedPct(m.avgEdge);
   // Unsettled trades split by kickoff: upcoming and in play stay "Open"; a finished match
@@ -3909,6 +3911,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   return `
     ${title}
     ${banner}
+    ${dnbHead}
     ${tiles}
     ${dnbRoi}
     ${caveat}
