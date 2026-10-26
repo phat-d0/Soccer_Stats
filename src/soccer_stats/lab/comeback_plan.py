@@ -60,6 +60,9 @@ def load_season(league: str, year: int, raw_dir: Path = RAW_DIR) -> pd.DataFrame
     df["kickoff"] = (
         local.dt.tz_localize(UK, ambiguous="NaT", nonexistent="NaT").dt.tz_convert("UTC").values
     )
+    # The market average's close, for matches Pinnacle's close is missing from.
+    for col, src in (("ah", "AvgCH"), ("ad", "AvgCD"), ("aa", "AvgCA")):
+        df[col] = cb._num(played, src).to_numpy()
     return df
 
 
