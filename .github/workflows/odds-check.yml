@@ -32,6 +32,8 @@
 #            `design` B or C (C = C minus B, docs/lab.md "step 3"; E1-E3 guarded: a league
 #            whose first 3 snapshots carry no fresh DraftKings/Betfair quote stops).
 #   comebacks2: the analysis (`design`) on the cached bodies and football-data; no key.
+#   heavy-favourites: free scope of a 75%+ favourite test (football-data only, no key):
+#            trailing at half-time per league-season, kickoff slots, credits, bets needed.
 #   comeback-research: the app's frozen comeback summary (lab/comeback_research.json) rebuilt
 #            from the same cached bodies (C judged, B and C+B descriptive); no key. Prints
 #            COMEBACK_RESEARCH_JSON and fails unless runs 40176653428 and 40145295663 reproduce.
@@ -95,9 +97,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch: most credits to spend (0 = dry run)"
@@ -322,6 +324,8 @@ jobs:
             comebacks-fetch) uv run python -m soccer_stats.lab.comebacks --fetch "$LEAGUE" ;;  # counts only
             comebacks) uv run python -m soccer_stats.lab.comebacks --json out/comebacks.json ;;
             comeback-plan) uv run python -m soccer_stats.lab.comeback_plan --json out/comeback_plan.json ;;
+            heavy-favourites) uv run python -m soccer_stats.lab.heavy_favourites \
+                     --json out/heavy_favourites.json ;;
             comeback-fetch)  # design B: one historical snapshot per frozen slot, ~10 credits each
               status=0
               mkdir -p data/raw/comeback_odds  # the save step always has a folder to save
