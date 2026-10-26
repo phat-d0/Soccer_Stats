@@ -738,7 +738,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v61) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v62) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -796,7 +796,27 @@ the owner's baseball app, so the balance can drop without any run here.
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
   legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". **Comeback bets** (lead brief, 26 Oct; `CB_ID`, data `comeback_research`):
+  "· N archived". **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
+  `edge12_dnb` (`adds: "dnb"`, `isDnbStrat`) each get their own row right after their parent in
+  the main list (not the Archive), meta "Tracked beside the record · places no bets of its own ·
+  a draw returns the stake" and, in place of a backtest line, the 24 Oct backtest's sentence from
+  the rule note (`dnbBacktestText`); the top-level Moneyline row counts them ("2 draw no bet
+  tracks") instead of naming them. Their trades resolve against `live.dnb_trades`
+  (`strategyLiveSet`; `allTrades` too, for the sheet). A refunded draw (`isDraw`: void + push)
+  reads "Draw · stake back" in rows and "Draw: stake back" in the sheet; `tradeStats.draws`;
+  tiles say "(not refunded)" and "CLV … per stake not refunded", with a note that ROI counts only
+  bets not refunded. "Profit over time" overlays only the parent ("1X2 (the record)", solid,
+  its trades opened since the track's `defined_at`) and "Draw no bet" (dashed), both from
+  `defined_at`, no marker; the parent's own chart leaves the track out. `dnbCompareHtml` replaces
+  the judged box: "Compared with <parent>, since <date> · descriptive" from `compare` (trades,
+  settled + refunded, profit, ROI, CLV per $ vs DraftKings; Pinnacle's per $ in a line; not a
+  like-for-like cut). Rule box: the track's `note` (the empty-state sentence and "(shown as a
+  push)" stripped), then "The parent's rule, …". Backtest and Model show the parent's with a
+  note. `lean_dnb` with `rule.source: "none"` says it starts after the refit that adds
+  `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
+  1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
+  `clv_pinnacle_staked`). The fixture adds five synthetic `edge12_dnb` trades (`DNB_TRADES`: two
+  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Comeback bets** (lead brief, 26 Oct; `CB_ID`, data `comeback_research`):
   a closed research portfolio, never traded. Its top-level row shows a "Closed: no edge" pill
   and design C's headline ("−25.1% · 732 bets · per $1"; `cbHeadline`, never live profit);
   its list (`cbFolderHtml`, no chips) has one row, "$1 on the trailing favourite at half-time"
