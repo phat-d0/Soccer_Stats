@@ -2081,3 +2081,136 @@ shared within a league's 5-minute bucket; eight leagues, 2022/23–2024/25).
   market covers.
 - If the owner still wants it, it would need a new pre-registration on seasons not used here
   (2025/26 onward) and the owner's approval. Nothing here is a test.
+
+## Heavy favourites (75%+) trailing at half-time: free scope and DRAFT pre-registration (owner via the lead, 26 Oct)
+
+**Why this exists.** In design C's 75%+ band, 22 bets won 14 (64%, against the market's
+46%), ROI +51% (−3% to +114%). In B's 75%+ band, 17 bets won 8 (47% vs 41%), +5.7%. Pooled,
+39 bets won 22, +31% (−5% to +73%). The band was picked **after** the results were seen, out
+of four bands, on 39 bets, so it is a new hypothesis. It can only be tested on data that
+neither B nor C used. Nothing here is a test, and nothing is bought.
+
+**Scope run.** `lab/heavy_favourites.py` (`odds-check.yml` `task=heavy-favourites`; run
+40289687098, football-data only, no key, 0 credits).
+- **Favourite:** the Shin-fair pre-match chance from Pinnacle's close, else the market
+  average's close (`AvgCH/D/A`).
+- **Trailing:** behind at half-time on football-data's score.
+- **Slots:** one league's trailing heavy favourites with the same kickoff (UK `Time` →
+  UTC), one historical snapshot each at kickoff + 55 min, 10 credits.
+
+**1a. The eight live leagues, 2025/26 and 2026/27 to date** (data B and C never used).
+
+| League | Heavy favourites, 25/26 + 26/27 | Trailing at half-time | Slots | Credits |
+| --- | --- | --- | --- | --- |
+| E0 | 16 + 4 | 0 + 1 | 1 | 10 |
+| SP1 | 30 + 12 | 2 + 0 | 2 | 20 |
+| D1 | 25 + 7 | 1 + 1 | 2 | 20 |
+| I1 | 17 + 6 | 3 + 0 | 3 | 30 |
+| F1 | 24 + 2 | 2 + 0 | 2 | 20 |
+| E1 | 13 + 0 | 1 + 0 | 1 | 10 |
+| E2 | 1 + 1 | 0 | 0 | 0 |
+| E3 | 0 | 0 | 0 | 0 |
+| **Total** | **158** | **11** (10 one goal down) | **11** | **110** |
+
+- Pinnacle's close is in football-data's 2025/26 files for only 30–55% of matches per
+  league, and in none of 2026/27 so far. So 95 of the 158 favourites, and 4 of the 11
+  trailing, are priced from the market average's close.
+
+**1b. Other football-data leagues with an Odds API sport key, 2022/23–2025/26.**
+
+| League (sport key, to confirm free) | Heavy favourites | Trailing | Slots | Credits | By season, 22/23 · 23/24 · 24/25 · 25/26 |
+| --- | --- | --- | --- | --- | --- |
+| N1 Eredivisie (`soccer_netherlands_eredivisie`) | 191 | 20 | 20 | 200 | 6 · 7 · 5 · 2 |
+| SC0 Scottish Premiership (`soccer_spl`) | 158 | 16 | 16 | 160 | 6 · 5 · 4 · 1 |
+| P1 Primeira Liga (`soccer_portugal_primeira_liga`) | 225 | 15 | 15 | 150 | 6 · 4 · 3 · 2 |
+| G1 Greek Super League (`soccer_greece_super_league`) | 146 | 12 | 12 | 120 | 3 · 5 · 3 · 1 |
+| T1 Turkish Super Lig (`soccer_turkey_super_league`) | 99 | 11 | 11 | 110 | 1 · 4 · 3 · 3 |
+| B1 Belgian Pro League (`soccer_belgium_first_div`) | 51 | 2 | 2 | 20 | 0 · 2 · 0 · 0 |
+| D2, I2, SP2, F2 (second tiers) | 21 | 2 | 2 | 20 | 0 · 1 · 1 · 0 |
+| **Total** | **891** | **78** (70 one down) | **78** | **780** | 22 · 28 · 19 · 9 |
+
+- Pinnacle's close prices every match through 2024/25. In 2025/26 the average's close fills
+  in, for 97 of the 891 favourites and 3 of the 78 trailing.
+- T1 2022/23 has 29 matches with no price at all.
+- football-data's "extra" leagues (Austria, Switzerland, the Nordics and others) carry no
+  half-time score, so they can't be counted for free and are left out.
+- Archive coverage is the real unknown:
+  - C's guard found the top five's 2022/23 in-play archive empty for E0, F1 and D1 (but
+    priced for SP1 and I1).
+  - Nobody has checked whether DraftKings quotes Greek, Turkish, Scottish or Belgian matches
+    in play at all. Betfair more likely does.
+  - Expect part of 1b to come back "not priced".
+
+**Everything together: 89 trailing heavy favourites in 89 slots, 890 credits.** At C's usable
+rate (81% of trailing favourites became DraftKings bets) that is **about 72 bets**. A heavy
+favourite trails at half-time in about 8.5% of its matches (89 of 1,049). That is why the
+counts are small: a 75%+ favourite rarely trails.
+
+**2. Power.** The gap is the realized win rate minus the market's fair chance (about 46% in
+this band), with a two-sided 95% range.
+
+| True gap | Bets for the range to exclude 0 at 80% power | Where the expected range just touches 0 (50% power) | With ~72 bets |
+| --- | --- | --- | --- |
+| +12 points (what was seen) | 136 | 67 | about a 53% chance the range excludes 0 |
+| +6 points (a likely shrunk value) | 542 | 266 | about a 17% chance |
+
+- With ~72 bets, the smallest gap found 80% of the time is about 16 points.
+- An ROI test at these odds (about 2.3) needs about the same numbers.
+- Neither 1a, 1b, nor both together reach the 80%-power size for +12. For +6 it would take
+  every trailing heavy favourite in these leagues for five to six seasons.
+- Going forward: about 9 a season come from the eight leagues and about 20 from the six
+  other top divisions, so about 24 usable bets a season. Reaching 136 would take more than
+  five seasons.
+
+**3. DRAFT pre-registration. Not approved, not to be bought.** It is written down so the rule
+exists before any price is seen. The scope above says a purchase would most likely end
+"inconclusive".
+- **Rule:** $1 on the favourite priced 75%+ before kickoff (Shin-fair, Pinnacle's close,
+  else the market average's close) that trails at half-time, at DraftKings' in-play price
+  from the historical snapshot at kickoff + 55 min. The quote checks are C's, unchanged:
+  48–62 min window, updated after kickoff, at most 5 min old, moved against the favourite.
+  Betfair after 2% is the second line.
+- **Sample:** a frozen slot list written from this scope, never from results:
+  - the eight leagues in 2025/26 and in 2026/27 up to the freeze date;
+  - N1, SC0, P1, G1, T1, B1 and the four second tiers, 2022/23–2025/26;
+  - nothing B or C used.
+  89 slots, 890 credits as of 26 Oct.
+- **Guard:** C's, on every league-season. If the first 3 bought snapshots, oldest first, show
+  no started event freshly priced by DraftKings or Betfair, buying stops for that
+  league-season and its matches count as not priced.
+- **Pass rule:** at least `MIN_MATCHES` 60 usable DraftKings bets **and** the ROI 95% range
+  (2,000 match resamples, seed 0) entirely above 0. "Fail" is the range including or below 0.
+  Under 60 usable is "inconclusive", and nothing changes either way.
+  - Why 60: it is just under the 67 bets at which a true +12-point gap's expected range
+    reaches 0. Below that, even a real effect of the size seen can't show.
+  - C used 100. Lowering the bar here is a concession to the sample's size, and is stated
+    as one.
+- **Secondary (descriptive):** realized minus implied, Betfair, and per league and season.
+  No further band cuts.
+- **Cap:** 900 credits (89 slots at 10, plus the first call budgeted at 20), with the 3,000
+  reserve. Run once, by the lead, only after the owner approves the spend.
+
+**4. Why it might be real, and why it might not.**
+- **Might be real:** an in-play price has to move fast on the score, and a goal down at
+  half-time is the loudest thing on the screen. For a side that was 75%+ before kickoff, the
+  gap in quality is still there in the second half (more shots, more possession, a deeper
+  bench). If the market leans on the score more than on that gap, the comeback of a truly
+  dominant side would be underpriced, while ordinary favourites (45–65%), whose edge is
+  thinner, would not be. That is the pattern in C's bands.
+- **Might not be real:**
+  - It is the best of four bands, chosen after the results.
+  - It rests on 39 bets, and its range already touches 0.
+  - The same move has already failed once: B's 45–55% band was +29.9% on 99 bets, and the
+    same band in C was −29.0% on 423.
+  - C's 65–75% band, right next door, was −49.8%. A real "dominant side" effect should
+    strengthen gradually with the favourite's chance, not jump from −50% to +51% at 75%.
+- **The honest prior:** most of the +51% is noise. The free counts say any priced test would
+  be under-powered for a realistic gap.
+
+**Recommendation.** Don't buy now. If the owner wants to keep the idea alive cheaply, the next
+step would be a forward live log, which is not a test:
+- in the leagues above, when a 75%+ favourite trails at half-time (ESPN's free scoreboard),
+  one live `/odds` call for that league, 1 credit, records DraftKings' and Betfair's price;
+- about 30 matches a season, about 30 credits;
+- it would be judged later under a rule frozen before it starts.
+That needs a design and the owner's approval of its own.
