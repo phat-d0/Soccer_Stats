@@ -35,8 +35,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   the old rule is tracked as a shadow ("Blend Lean, all odds (old rule)"; `docs/leagues.md`
   "Blend Lean odds range").
 - **Model 12%**: `trades.PAPER_RULE = "fixed_raw"`, the raw model's chance at a 12% edge
-  against DraftKings' quoted price. The owner's live test. Archived in the app since v63 (owner,
-  26 Oct: CLV below 0 in every league's backtest); it still opens and settles its paper trades.
+  against DraftKings' quoted price. The owner's live test. Archived in the app (owner, 26 Oct):
+  CLV is below 0 in every league's backtest. It still opens paper trades and logs everything
+  (ledgers unchanged), with its draw no bet track; both sit in Portfolio → Moneyline's Archive.
 - **Draw no bet tracks** (owner, 26 Oct; `paper_dnb.py`, `docs/leagues.md` "Draw no bet tracks"):
   `lean_dnb` beside Blend Lean and `edge12_dnb` beside Model 12%, descriptive. The 1X2 trades
   stay the record. Price = DraftKings' h2h, side × (1 − 1/draw) (0 credits); chance = the parent's
@@ -750,7 +751,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v62) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v63) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -808,7 +809,14 @@ the owner's baseball app, so the balance can drop without any run here.
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
   legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
+  "· N archived". Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
+  (`PF_ARCHIVED.moneyline` {keys: edge12, since, note}; its ledger and paper trades unchanged),
+  and a draw no bet track goes to the Archive with its parent (`archivedTrack` takes a
+  DNB track's `variant_of`), so Moneyline's main list is Blend Lean and Lean's draw no bet track;
+  the Archive note joins the old-rule sentence and the portfolio's `PF_ARCHIVED` note. The
+  top-level row's profit counts only active strategies (`activeTrades`: non-archived, non-DNB
+  sections' trades, each once; every trade when a portfolio has no sections), and the note says
+  so. **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
   `edge12_dnb` (`adds: "dnb"`, `isDnbStrat`) each get their own row right after their parent in
   the main list (not the Archive), meta "Tracked beside the record · places no bets of its own ·
   a draw returns the stake" and, in place of a backtest line, the 24 Oct backtest's sentence from
@@ -822,8 +830,9 @@ the owner's baseball app, so the balance can drop without any run here.
   `defined_at`, no marker; the parent's own chart leaves the track out. `dnbCompareHtml` replaces
   the judged box: "Compared with <parent>, since <date> · descriptive" from `compare` (trades,
   settled + refunded, profit, ROI, CLV per $ vs DraftKings; Pinnacle's per $ in a line; not a
-  like-for-like cut). Rule box: the track's `note` (the empty-state sentence and "(shown as a
-  push)" stripped), then "The parent's rule, …". Backtest and Model show the parent's with a
+  like-for-like cut). The page leads with the track's own `note` (`dnbHead`, above the
+  tiles; the empty-state sentence and "(shown as a push)" stripped; Moneyline's section note is
+  not shown on a track), and the rule box at the foot holds "The parent's rule, …". Backtest and Model show the parent's with a
   note. `lean_dnb` with `rule.source: "none"` says it starts after the refit that adds
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
