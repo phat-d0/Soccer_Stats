@@ -358,6 +358,7 @@ def build(src: Path, out: Path) -> dict:
     add_team_total_prices(data)
     add_espn_team_news(data)
     add_markets_research(data)
+    add_comeback_research(data)
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
@@ -841,6 +842,12 @@ def add_markets_research(data: dict) -> None:
             "\n".join(json.dumps(r) for r in rows) + "\n"
         )
         data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
+
+
+# Portfolio > Comeback bets: Research lab's committed result (lab/comeback_research.json,
+# PR #115) through publish.comeback_research, every bet kept (the fixture stays under 1.5 MB).
+def add_comeback_research(data: dict) -> None:
+    data["comeback_research"] = _clean(pub.comeback_research())
 
 
 # Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture

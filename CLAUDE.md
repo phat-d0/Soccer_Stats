@@ -450,9 +450,10 @@ the owner's baseball app, so the balance can drop without any run here.
     line; exact whole line = push, `status: "void"`, `push: true`).
   - Players: `player_picks` (best line per player and market, ≤ 4 a match); `PLAYER_PAPER_TRADES
     = False` (published as `players_status.paper_trades`).
-  - Portfolios: `PORTFOLIOS` registry (`id`, `name`, `status` live/testing/retired, `note`,
-    `backtest` stem): `moneyline` (live, `dk`), `goalscorer` (testing), `corners` (testing),
-    `player_shots` (retired). `portfolio_of(trade)`.
+  - Portfolios: `PORTFOLIOS` registry (`id`, `name`, `status` live/testing/retired/closed,
+    `note`, `backtest` stem): `moneyline` (live, `dk`), `goalscorer` (testing), `corners`
+    (testing), `player_shots` (retired), `comebacks` (closed: research finished without ever
+    trading, 26 Oct; no ledger, its section stays empty). `portfolio_of(trade)`.
   - `summarize` (adds `close_early`: closes taken over 60 min before kickoff), settlement, `clv`.
 - `paper.py`: the live ledgers and `data.json` → `portfolio`.
   - Leagues in play (`leagues_in_play`): E0, every league with fixtures this build, and every
@@ -691,6 +692,8 @@ the owner's baseball app, so the balance can drop without any run here.
     default branch, then `add_quotes` per book; each step in its own try), `team_news` (ESPN, not
     the top-level FPL `team_news` dict) and `news` (FPL absences, E0, applied to the model).
   - `markets_research` (`lab/markets_research.json` + `team_total_progress`, counts only).
+  - `comeback_research` (`comeback_research()`: Research lab's `lab/comeback_research.json`
+    passed through for Portfolio → Comeback bets; None when missing; its own try).
   - Every optional step is wrapped so it can't stop the build.
 - `cli.py`: `soccer-stats` commands (publish, log-odds, log-news, log-team-news, log-team-totals,
   log-corners, log-cup-odds, paper, close-plan, estimate-credits, estimate-team-totals,
@@ -705,7 +708,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v60) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v61) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -763,7 +766,24 @@ the owner's baseball app, so the balance can drop without any run here.
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
   legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". A strategy
+  "· N archived". **Comeback bets** (lead brief, 26 Oct; `CB_ID`, data `comeback_research`):
+  a closed research portfolio, never traded. Its top-level row shows a "Closed: no edge" pill
+  and design C's headline ("−25.1% · 732 bets · per $1"; `cbHeadline`, never live profit);
+  its list (`cbFolderHtml`, no chips) has one row, "$1 on the trailing favourite at half-time"
+  (`comeback_ht`), whose page (`cbStrategyHtml`) has Result and Why in place of Live / Backtest
+  / Model (other portfolios fall back to Live paper). Result (`cbResultHtml`): verdict, "No live
+  trades", tiles (bets, won vs the price with the gap, return per $1 and range, cost in
+  credits), Betfair after 2%, profit over time at $1 a bet (`cbProfitChart`, scrub id `cbcv`: C
+  judged solid, B and the two together dashed, from `bets`), return by league and season
+  (`rangeChart` `cblg`/`cbse`), won vs the in-play price by pre-match favourite band
+  (`cbRowsChart` `cbband`: Wilson ranges), the judged bets folded (50, then 100 more per "Show
+  more", `state.cbShown`). Why (`cbWhyHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
+  (`cbmin`), the conclusion, and run ids and pre-registration commits under "How this was
+  measured". The minute chart and its totals use the matches with a fair benchmark
+  (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). The "Won" tile and the Why text use the like-for-like pair
+  on the bets with a fair price (`cbPair`: implied + gap on `implied_matches`, "17.0% vs 21.3%
+  … on the 700 bets with a fair price"); the per-league, season and band rows mix every bet's
+  win rate with the priced bets' chance, and a note under them says so. A strategy
   (`pfStrategyHtml`) shows crumbs "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status ·
   rule ("Shadow test of …" / "Archived: the rule until …"), the competition filter and Live
   paper / Backtest / Model (a shadow test's or archived rule's Backtest and Model are its
@@ -914,7 +934,7 @@ the owner's baseball app, so the balance can drop without any run here.
   `match_blends.json` for the blend's numbers) and gives the corners live section a synthetic
   `quote_calibration` (the fixture logs no quotes); synthetic blocks (`add_lean_strategy`, `add_corners`,
   `add_champions_league`, `STARTED_OPEN`, `add_second_league`) cover states the real data lacks.
-- Smoke test: `node tests/web/smoke.mjs [--shots DIR]` visits every tab, view and sheet at 390px
+- Smoke test (its `closeSheet` is a no-op when no sheet is open): `node tests/web/smoke.mjs [--shots DIR]` visits every tab, view and sheet at 390px
   light and dark and at 1280px; fails on console errors, horizontal scroll, or "undefined", "NaN"
   or "${" in the text. `tests/test_web_smoke.py` runs it under pytest (skips without node or
   Chromium at `/opt/pw-browsers/chromium` or `CHROMIUM`).

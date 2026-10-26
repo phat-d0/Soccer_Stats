@@ -434,6 +434,20 @@ def team_total_progress(dirs, results: pd.DataFrame) -> dict:
     return out
 
 
+COMEBACK_RESEARCH_FILE = Path(__file__).parent / "lab" / "comeback_research.json"
+
+
+def comeback_research(path: Path = COMEBACK_RESEARCH_FILE) -> dict | None:
+    """Portfolio "Comeback bets" (closed research): the committed result file
+    (lab/comeback_research.json, Research lab) passed through as is. None if it is
+    missing or unreadable. Never raises."""
+    try:
+        data = json.loads(Path(path).read_text())
+    except Exception:  # noqa: BLE001
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def markets_research(dirs=(), results=None, path: Path = MARKETS_RESEARCH_FILE) -> dict | None:
     """Record > Goals & corners: the committed research numbers (lab/markets_research.json)
     plus the live team-total test's progress. None if the file is missing or unreadable;
@@ -1237,6 +1251,13 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
     add_corners(data)
+    try:  # Portfolio > Comeback bets: the closed research result (a file read only)
+        data["comeback_research"] = _clean(comeback_research())
+        cr = data["comeback_research"]
+        print(f"Comeback research: {'file missing' if cr is None else cr.get('verdict')}")
+    except Exception as exc:  # noqa: BLE001
+        data["comeback_research"] = None
+        print(f"Comeback research: failed ({type(exc).__name__})")
     try:  # Record > Goals & corners: research numbers plus the live test's progress
         state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
         try:
