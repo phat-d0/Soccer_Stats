@@ -29,7 +29,7 @@ def trade(i, bet_type="match", market="home", profit=10.0, status="won", **kw):
 
 def test_registry_ids_unique_and_statuses_known():
     assert len(tr.PORTFOLIO_IDS) == len(set(tr.PORTFOLIO_IDS))
-    assert {p["status"] for p in tr.PORTFOLIOS} <= {"live", "testing", "retired"}
+    assert {p["status"] for p in tr.PORTFOLIOS} <= {"live", "testing", "retired", "closed"}
     assert all(p["note"] and p["name"] and p["backtest"] for p in tr.PORTFOLIOS)
 
 
@@ -148,3 +148,25 @@ def test_by_league_splits_summaries_and_adds_up():
     )
     assert set(ml["backtest"]["by_league"]) == {"E0", "SP1"}  # passed-through file too
     assert paper.by_league([trade(1), trade(2)]) is None  # one league: no split
+
+
+def test_closed_research_portfolio_has_no_ledger_and_no_trades():
+    # Comeback bets (26 Oct): research that finished without trading; any trade list
+    # leaves it empty, and its section is the plain empty one.
+    pfs = paper.portfolios_section({"error": None, "note": None}, [trade(1), trade(2)], {})
+    cb = next(p for p in pfs if p["id"] == "comebacks")
+    assert cb["status"] == "closed" and "never traded" in cb["note"]
+    assert cb["live"]["trades"] == [] and cb["live"]["summary"]["trades"] == 0
+    assert cb["backtest"] is None
+
+
+def test_comeback_research_passes_the_file_through(tmp_path):
+    from soccer_stats import publish
+
+    assert publish.comeback_research(tmp_path / "missing.json") is None
+    bad = tmp_path / "bad.json"
+    bad.write_text("[1, 2]")
+    assert publish.comeback_research(bad) is None
+    ok = tmp_path / "ok.json"
+    ok.write_text(json.dumps({"verdict": "fail", "designs": {"C": {"bets": 732}}}))
+    assert publish.comeback_research(ok) == {"verdict": "fail", "designs": {"C": {"bets": 732}}}

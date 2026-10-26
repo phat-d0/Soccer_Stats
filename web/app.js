@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v60";
+const APP_VERSION = "v61";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2112,7 +2112,7 @@ function pfSet() {
 const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.live?.shadow_trades || []), ...(p.backtest?.trades || [])]);
 // A shadow entry (Blend Lean's old rule): what the old rule would have bet; never real P/L.
 const shadowChip = (t) => (t.shadow ? `<span class="chip-shadow">Shadow: no trade opened${t.excluded_by === "odds_range" ? " (outside the odds range)" : ""}</span>` : "");
-const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired" };
+const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired", closed: "Closed" };
 
 // Current DraftKings price for an open trade: the latest price in data.json, else the
 // last one the ledger saw, else the entry price.
@@ -3182,6 +3182,7 @@ function modelViewHtml(cur, x, lg) {
 // strategy's tiles, the caveat, profit over time, open and settled trades, the folded
 // extras and the rule note. Backtest keeps its own views under the same list.
 function pfStrategies(cur) {
+  if (cur.id === CB_ID) return [cbStrat()];
   const st = cur.id === "moneyline" || cur.id === "corners" ? cur.live?.strategies || [] : [];
   if (st.length) {
     // Shadow-filter variants (variant_of) sit directly under their parent, whatever order
@@ -3873,7 +3874,8 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
 // Anytime goalscorer is hidden while nobody is working on it (owner, 24 Oct).
 const PF_HIDDEN = new Set(["goalscorer"]);
 const CHEV = `<span class="chev" aria-hidden="true">›</span>`;
-const pfMulti = (cur) => pfStrategies(cur).length > 1;
+// Comeback bets keeps its one-row list (the lead's brief), like the multi-strategy portfolios.
+const pfMulti = (cur) => cur.id === CB_ID || pfStrategies(cur).length > 1;
 // The level on screen: a hidden portfolio, or a strategy level for a portfolio with one
 // strategy's folder, falls back sensibly.
 function pfLevelOn() {
@@ -3889,7 +3891,7 @@ function pfCrumbs(cur, toPortfolio) {
   if (toPortfolio) steps.push(`<button class="crumb" data-pfnav="portfolio">${esc(cur.name)}</button>`);
   return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
 }
-const pfPill = (cur) => `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`;
+const pfPill = (cur) => `<span class="pill st-${esc(cur.status)}">${esc(cur.status === "closed" && cbData()?.verdict === "fail" ? "Closed: no edge" : PF_STATUS[cur.status] || cur.status)}</span>`;
 function pfHomeHtml() {
   const all = portfolios();
   const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id));
@@ -3900,19 +3902,20 @@ function pfHomeHtml() {
     const old = st.filter(archivedStrat).length;
     const extra = old ? `${old} archived` : "";
     const m = tradeStats(p.live?.trades || []);
-    const right = m.n
+    const cbHead = p.id === CB_ID ? cbHeadline() : null;
+    const right = cbHead ? cbHead.right : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     return `
       <button class="row-btn folder" data-pfid="${esc(p.id)}">
-        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}${extra ? ` · ${extra}` : ""}</span></span>
+        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${cbHead ? cbHead.meta : `${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}${extra ? ` · ${extra}` : ""}`}</span></span>
         <span class="vals">${right}</span>${CHEV}
       </button>`;
   }).join("");
   return `
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
-    <p class="note">Each portfolio holds that market's paper strategies. Profit is all its strategies together, in every competition, $10 a trade. Paper trades: no money is staked.</p>
+    <p class="note">Each portfolio holds that market's paper strategies. Profit is all its strategies together, in every competition, $10 a trade. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
 }
 // One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
@@ -3951,6 +3954,7 @@ function cutNote(x) {
   return ` "Under ${cut} to win" lines are cut from the archived ${edge ? `${edge} ` : ""}tracks: the same paper trades, keeping only the bets model (f) gives under a ${cut} chance to win (a push, the stake back, is left out of that chance).${x.st?.defined_at ? ` Judged from ${monthDay(x.st.defined_at)} on closing line value against Pinnacle.` : ""}`;
 }
 function pfFolderHtml(cur, strats) {
+  if (cur.id === CB_ID) return cbFolderHtml(cur);
   const lg = leagueOn();
   return `
     ${pfCrumbs(cur, false)}
@@ -3963,11 +3967,12 @@ function pfFolderHtml(cur, strats) {
     ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">${strats.some((x) => x.st?.adds === "shadow") ? "Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets." : "Kept out of the main list: these tracks still log every pick at their rule, and the lines above are cut from them."}</p>` : ""}`;
 }
 function pfStrategyHtml(cur, allStrats) {
+  if (cur.id === CB_ID) return cbStrategyHtml(cur);
   const multi = allStrats.length > 1;
   // Moneyline and Team corners have a third view: each strategy's model and its calibration.
   const hasModel = cur.id === "moneyline" || cur.id === "corners";
   const views = [["live", "Live paper"], ["backtest", "Backtest"], ...(hasModel ? [["model", "Model"]] : [])];
-  const view = state.pfView === "model" && !hasModel ? "live" : state.pfView;
+  const view = views.some(([k]) => k === state.pfView) ? state.pfView : "live";
   const toggle = `
     <div class="segmented small-seg" role="group" aria-label="Which view">
       ${views.map(([k, l]) => `<button data-pf="${k}" class="${view === k ? "on" : ""}" aria-pressed="${view === k}">${l}</button>`).join("")}
@@ -4011,6 +4016,188 @@ function viewPortfolio() {
   const cur = pfCurrent();
   const allStrats = pfStrategies(cur);
   return level === "portfolio" ? pfFolderHtml(cur, allStrats) : pfStrategyHtml(cur, allStrats);
+}
+
+// ---------- Portfolio "Comeback bets": closed research, never traded (lead brief, 26 Oct) ----------
+// data.comeback_research (Research lab's lab/comeback_research.json, passed through by
+// publish): {verdict, verdict_text, closed_at, cost, runs, preregistered, designs: {C (judged),
+// B, pooled (descriptive)}, bets [{date, lg, home, away, fav, ht, odds, implied, won, design}],
+// phase1, timelines, notes}. Chances 0–1, ROI per $1, ranges [lo, hi]. Its one strategy has
+// two views in place of Live / Backtest / Model: Result and Why.
+const CB_ID = "comebacks";
+const cbData = () => state.data?.comeback_research || null;
+const cbStrat = () => ({ key: "comeback_ht", label: "$1 on the trailing favourite at half-time", st: null, rule: null });
+const cbPts = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)}` : "–"); // points of chance
+const cbOdds = (d) => (isNum(d) ? `${american(d)} (${d.toFixed(2)})` : "–");
+const cbDate = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const cbMonth = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
+// Wilson 95% range for a share won of n.
+function wilson(p, n) {
+  if (!isNum(p) || !n) return [null, null];
+  const z = 1.96, d = 1 + (z * z) / n, c = (p + (z * z) / (2 * n)) / d, h = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+  return [Math.max(0, c - h), Math.min(1, c + h)];
+}
+// The top-level row and the strategy row: the judged design's headline, never live profit.
+function cbHeadline() {
+  const c = cbData()?.designs?.C;
+  if (!c) return { right: `<b class="muted">–</b><small>no result in this update</small>`, meta: "Research, never traded" };
+  return {
+    right: `<b class="${signCls(c.roi)}">${signedPct(c.roi)}</b><small>${num(c.bets)} bets · per $1</small>`,
+    meta: `Research, closed ${cbData().closed_at ? monthDay(`${cbData().closed_at}T12:00:00Z`) : ""} · never traded`,
+  };
+}
+function cbFolderHtml(cur) {
+  const h = cbHeadline(), cr = cbData();
+  const row = `
+    <button class="row-btn folder strat" data-pfstrat="${cbStrat().key}">
+      <span class="who"><b>${esc(cbStrat().label)}</b><span class="meta">Bought test, judged on design C · ${cr?.designs?.C ? `${num(cr.designs.C.wins)} of ${num(cr.designs.C.bets)} won` : "no result yet"}</span><span class="bt">Result: ${cr?.verdict === "fail" ? "no edge" : esc(cr?.verdict || "–")}</span></span>
+      <span class="vals">${h.right}</span>${CHEV}
+    </button>`;
+  return `
+    ${pfCrumbs(cur, false)}
+    <h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2>
+    <div class="pf-head"><span>${esc(cur.note || "")}</span></div>
+    <div class="section-title">Strategy</div>
+    <div class="card list folders">${row}</div>
+    <p class="note">Open it for the result (what the test found, in dollars per $1 bet) and why (the free research that led to it, and what it means).</p>`;
+}
+function cbStrategyHtml(cur) {
+  const views = [["result", "Result"], ["why", "Why"]];
+  const view = views.some(([k]) => k === state.pfView) ? state.pfView : "result";
+  const toggle = `
+    <div class="segmented small-seg" role="group" aria-label="Which view">
+      ${views.map(([k, l]) => `<button data-pf="${k}" class="${view === k ? "on" : ""}" aria-pressed="${view === k}">${l}</button>`).join("")}
+    </div>`;
+  const cr = cbData();
+  const head = `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(cbStrat().label)}</h2><div class="pf-sub">Closed${cr?.closed_at ? ` ${monthDay(`${cr.closed_at}T12:00:00Z`)}` : ""}: no edge found, never traded</div>`;
+  if (!cr || !cr.designs?.C) return `${head}${toggle}<div class="empty">The comeback research result isn't in this update. It comes back with the next site update.</div>`;
+  return `${head}${toggle}${view === "why" ? cbWhyHtml(cr) : cbResultHtml(cr)}`;
+}
+// Rows of "how often it won" (dot and Wilson range) against a reference chance (tick: the
+// market's price or the score-blind model's), blue where it won at least as often.
+// refRead: the reference in the readout, unescaped app text ("the in-play price's").
+function cbRowsChart(id, rows, refName, refRead) {
+  rows = rows.filter((r) => isNum(r.won) && r.n);
+  if (!rows.length) return "";
+  const rr = rows.map((r) => ({ ...r, ci: r.ci || wilson(r.won, r.n) }));
+  const vals = rr.flatMap((r) => [r.ref, r.ci[0], r.ci[1]]).filter(isNum);
+  const lo = Math.max(0, Math.floor((Math.min(...vals) - 0.02) * 10) / 10), hi = Math.min(1, Math.ceil((Math.max(...vals) + 0.02) * 10) / 10);
+  const x = (v) => ((v - lo) / (hi - lo || 1)) * 100;
+  const step = hi - lo > 0.5 ? 0.2 : 0.1;
+  const ticks = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
+  const body = rr.map((r, i) => {
+    const tone = r.won >= r.ref ? "pos" : "neg";
+    return `<div class="eb-row rc-row" data-stop="${i}" data-rcrow="${i}" data-rc="${id}">
+      <span class="eb-label">${esc(r.label)}<span class="meta">${num(r.n)} ${r.unit || "matches"}</span></span>
+      <span class="eb-plot"><span class="eb-range ${tone}" style="left:${x(r.ci[0])}%;width:${Math.max(0.5, x(r.ci[1]) - x(r.ci[0]))}%"></span><span class="eb-dot imp" style="left:${x(r.ref)}%"></span><span class="eb-dot real ${tone}" style="left:${x(r.won)}%"></span></span>
+    </div>`;
+  }).join("");
+  const read = (r) => `<b>${esc(r.label)}</b>, ${num(r.n)} ${r.unit || "matches"}: won ${pct(r.won, 1)} (range ${pct(r.ci[0], 0)} to ${pct(r.ci[1], 0)}) against ${refRead} ${pct(r.ref, 1)}${r.extra ? `; ${r.extra}` : ""}.`;
+  scrubCharts[id] = { n: rr.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => read(rr[i]) };
+  const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${pct(v)}</span>`).join("")}</span></div>`;
+  return `<div class="card eb-card scrub-rows" ${scrubAttrs(id, rr.length, "Point at or drag across the rows, or use the arrow keys")}>
+    <div class="eb-legend"><span><i class="eb-key imp"></i>${esc(refName)}</span><span><i class="eb-key real pos"></i>Won (range)</span></div>
+    ${body}${axis}
+    <div class="eb-readout" id="rc-readout-${id}" aria-live="polite">${read(rr[0])}</div>
+  </div>`;
+}
+const CB_SERIES = [["C", "Design C (judged)"], ["B", "Design B (first look)"], ["pooled", "C and B together"]];
+// Profit over time at $1 a bet, one line per design (C solid, B and the two together dashed).
+function cbProfitChart(cr) {
+  const bets = (cr.bets || []).filter((b) => b.date && isNum(b.odds));
+  if (!bets.length) return "";
+  const series = CB_SERIES.map(([k, name]) => {
+    const mine = bets.filter((b) => k === "pooled" || b.design === k);
+    const byDay = new Map();
+    let cum = 0;
+    for (const b of mine) {
+      cum += b.won ? b.odds - 1 : -1;
+      const d = byDay.get(b.date) || { date: b.date, n: 0, won: 0 };
+      d.n += 1; d.won += b.won ? 1 : 0; d.cum = cum;
+      byDay.set(b.date, d);
+    }
+    return { name, curve: [...byDay.values()] };
+  }).filter((s) => s.curve.length);
+  const readout = (ser, rows, i) => {
+    const d = rows[0][i].date;
+    const parts = ser.map((o, k) => `${esc(o.name)} ${usd(rows[k][i].cum, 2)}`);
+    return `${rows[0][i].origin ? "Before the first bet" : esc(cbDate(d))} · ${parts.join(" · ")}`;
+  };
+  return overlayCurveChart(series, null, bets[0].date, "", { id: "cbcv", readout, dateLabel: cbMonth, aria: "Profit over time at $1 a bet, design C judged, B and both together descriptive" });
+}
+function cbRange(id, rows, label) {
+  return rangeChart(id, rows.map((g) => ({
+    label: label(g), sub: `${num(g.bets)} bets`, v: g.roi, lo: g.roi_ci95?.[0], hi: g.roi_ci95?.[1],
+    readout: `<b>${esc(label(g))}</b>: ${num(g.bets)} bets, ${num(g.wins)} won (${pct(g.win_rate, 1)} vs the price's ${pct(g.implied, 1)}); ROI ${signedPct(g.roi)}${rngText(g.roi_ci95)} per $1.`,
+  })), (v) => signedPct(v, 0));
+}
+function cbResultHtml(cr) {
+  const c = cr.designs.C, b = cr.designs.B, all = cr.designs.pooled;
+  const cost = cr.cost || {};
+  const tile = (label, value, sub, cls = "") => `<div class="tile"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="sub">${sub}</div></div>`;
+  const tiles = `<div class="tiles pf-tiles">
+    ${tile("Bets (design C)", num(c.bets), `${num(c.wins)} won · $1 each`)}
+    ${tile("Won", pct(c.win_rate, 1), `vs ${pct(c.implied, 1)} the price implied: ${cbPts(c.gap ?? c.win_rate - c.implied)} points${c.gap_ci95 ? ` (${cbPts(c.gap_ci95[0])} to ${cbPts(c.gap_ci95[1])})` : ""}`, signCls(c.win_rate - c.implied))}
+    ${tile("Return per $1", signedPct(c.roi), c.roi_ci95 ? `95% range ${signedPct(c.roi_ci95[0])} to ${signedPct(c.roi_ci95[1])}` : "", signCls(c.roi))}
+    ${tile("Cost in credits", num(cost.total), [cost.design_c ? `C ${num(cost.design_c)}` : "", cost.design_b ? `B ${num(cost.design_b)}` : "", cost.probes ? `probes ${num(cost.probes)}` : ""].filter(Boolean).join(" · "))}
+  </div>`;
+  const others = [b, all].filter(Boolean).map((d) => `<li>${esc(d.label)}: ${num(d.bets)} bets, ${num(d.wins)} won, ${signedPct(d.roi)}${rngText(d.roi_ci95)} per $1 (descriptive).</li>`).join("");
+  const bands = cbRowsChart("cbband", (c.by_band || []).map((g) => ({
+    label: `${pctRange(g.lo, g.hi)} favourite`, n: g.bets, unit: "bets", won: g.win_rate, ref: g.implied,
+    extra: `ROI ${signedPct(g.roi)}${rngText(g.roi_ci95)} per $1`,
+  })), "In-play price's chance", "the in-play price's");
+  const shown = state.cbShown || 50;
+  const judged = (cr.bets || []).filter((x) => x.design === "C").slice().reverse();
+  const betRows = judged.slice(0, shown).map((x) => `<tr><td>${esc(cbDate(x.date))}</td><td>${esc(leagueShort(x.lg))}</td><td>${esc(x.home)} v ${esc(x.away)}<span class="meta">${esc(x.fav === "home" ? x.home : x.away)} behind ${esc(x.ht || "")} at half-time</span></td><td class="num">${cbOdds(x.odds)}</td><td>${x.won ? '<b class="pos-text">Won</b>' : "Lost"}</td></tr>`).join("");
+  return `
+    <div class="verdict neg">${esc(cr.verdict_text || "No edge.")}</div>
+    <p class="note">No live trades: this idea was tested on bought historical in-play prices and closed without ever opening a paper trade. The numbers below are that test, $1 a bet.</p>
+    ${tiles}
+    <p class="note">At Betfair's exchange after its 2% commission instead: ${signedPct(c.betfair_roi)}${rngText(c.betfair_roi_ci95)} per $1.${isNum(c.not_priced) && c.not_priced ? ` ${num(c.not_priced)} matches had no fresh in-play price and aren't counted.` : ""}</p>
+    <div class="section-title">Profit over time ($1 a bet)</div>
+    <div class="card pf-curve">${cbProfitChart(cr)}</div>
+    <p class="note">Design C is the judged test, pre-registered before its prices were bought. Design B (the first look) and the two together are shown for description only.</p>
+    <ul class="slopes">${others}</ul>
+    <div class="section-title">Return by league (design C)</div>
+    ${cbRange("cblg", c.by_league || [], (g) => leagueName(g.code))}
+    <div class="section-title">Return by season (design C)</div>
+    ${cbRange("cbse", c.by_season || [], (g) => g.season)}
+    <div class="section-title">Won vs the price, by how big a favourite</div>
+    ${bands}
+    <p class="note">Rows group the trailing favourites by their chance of winning before kickoff. Blue: they won at least as often as the in-play price implied; red: less. Each row is a few hundred bets at most, so the ranges are wide and one row can land either side by chance; the judged answer is the whole test above.</p>
+    <details class="fold mk-fold cb-bets"${state.cbShown ? " open" : ""}><summary>The ${num(judged.length)} judged bets, newest first</summary>
+      <div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>Date</th><th>Lg</th><th>Match</th><th>Odds</th><th>Result</th></tr></thead><tbody>${betRows}</tbody></table></div>
+      ${judged.length > shown ? `<button class="more" data-cbmore="1">Show more (${num(judged.length - shown)} left)</button>` : ""}
+    </details>`;
+}
+function cbWhyHtml(cr) {
+  const p1 = cr.phase1 || {}, tl = cr.timelines || {};
+  const p1rows = [
+    p1.ht_behind && { label: "Behind at half-time", n: p1.ht_behind.matches, won: p1.ht_behind.won, ref: p1.ht_behind.model },
+    p1.conceded_first && { label: "Conceded first", n: p1.conceded_first.matches, won: p1.conceded_first.won, ref: p1.conceded_first.model },
+  ].filter(Boolean);
+  const minRows = (tl.by_minute || []).map((m) => ({ label: `${m.lo}–${m.hi} min`, n: m.matches, won: m.won, ref: m.model }));
+  const runs = cr.runs || {};
+  const runList = Object.entries(runs).map(([k, v]) => `${esc(k.replace(/_/g, " "))} ${esc(Array.isArray(v) ? v.join(", ") : v)}`).join("; ");
+  const pre = cr.preregistered || {};
+  return `
+    <div class="section-title">1. The idea, from free data</div>
+    <p class="note">${p1.ht_behind ? `Favourites that were behind at half-time went on to win ${pct(p1.ht_behind.won, 1)} of ${num(p1.ht_behind.matches)} matches, where a fair model that ignores the score expected ${pct(p1.ht_behind.model, 1)}.` : ""}${isNum(p1.tests) ? ` ${p1.tests_above_zero} of ${p1.tests} pre-registered checks came out above zero.` : ""}</p>
+    ${cbRowsChart("cbp1", p1rows, "Score-blind model", "the score-blind model's")}
+    <div class="section-title">2. When the underdog scores first, by minute</div>
+    <p class="note">${isNum(tl.matches) ? `${num(tl.matches)} matches with the favourite known before kickoff (${pct(tl.joined_share, 1)} joined to the results). The underdog scored first in ${pct(tl.trail_first_share, 1)} of them; the favourite then won ${pct(tl.won, 1)} against the model's ${pct(tl.model, 1)}${tl.gap_ci95 ? ` (${cbPts(tl.gap)} points, range ${cbPts(tl.gap_ci95[0])} to ${cbPts(tl.gap_ci95[1])})` : ""}.` : ""} ${esc(tl.note || "")}</p>
+    ${cbRowsChart("cbmin", minRows, "Score-blind model", "the score-blind model's")}
+    <div class="section-title">3. What it means</div>
+    <div class="verdict neg">The in-play price already covers the comeback, and overrates it.</div>
+    <p class="note">The free data compared comebacks with a model that ignores the score, so the gap it found is that model's blind spot, not the market's. The bookmakers' in-play price already expects favourites to fight back, and in the judged test it expected too much: trailing favourites won ${pct(cr.designs.C.win_rate, 1)} of the time against the ${pct(cr.designs.C.implied, 1)} the price implied. Backing them lost money at DraftKings and at Betfair's exchange.${isNum(tl.priced_test_cost) ? ` A priced test of "the underdog scored first" would cost about ${num(tl.priced_test_cost)} credits and isn't recommended.` : ""}</p>
+    <details class="fold mk-fold"><summary>How this was measured</summary>
+      ${cr.question ? `<p class="note"><b>Question.</b> ${esc(cr.question)}</p>` : ""}
+      ${cr.rule ? `<p class="note"><b>Rule.</b> ${esc(cr.rule)}</p>` : ""}
+      ${[p1.note, ...(cr.notes || [])].filter(Boolean).map((n) => `<p class="note">${esc(n)}</p>`).join("")}
+      ${pre.c || pre.b ? `<p class="note"><b>Pre-registered</b> before any prices were bought: design C in commit ${esc(pre.c || "–")}, design B in commit ${esc(pre.b || "–")}.</p>` : ""}
+      ${runList ? `<p class="note small-note">Runs: ${runList}.</p>` : ""}
+    </details>`;
 }
 
 // Who prices the player shot lines (FanDuel; match odds come from DraftKings).
@@ -4207,6 +4394,9 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.pfdriver !== undefined) {
     state.pfDriver = t.dataset.pfdriver; state.pfShown = 15; state.lbShown = 20;
+    render();
+  } else if (t.dataset.cbmore !== undefined) {
+    state.cbShown = (state.cbShown || 50) + 100;
     render();
   } else if (t.dataset.lbmore !== undefined) {
     state.lbShown += 20;

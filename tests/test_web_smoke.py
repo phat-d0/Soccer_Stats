@@ -30,6 +30,12 @@ def test_fixture_is_complete():
     assert pfs["moneyline"]["live"]["trades"] and pfs["moneyline"]["backtest"]["trades"]
     assert pfs["goalscorer"]["live"]["summary"]["trades"] == 0  # the empty state
     assert pfs["player_shots"]["status"] == "retired" and pfs["player_shots"]["backtest"]
+    # Comeback bets (26 Oct): a closed research portfolio, its result passed through publish
+    assert pfs["comebacks"]["status"] == "closed" and pfs["comebacks"]["live"]["trades"] == []
+    cr = data["comeback_research"]
+    assert cr["verdict"] == "fail" and cr["designs"]["C"]["bets"] == len(
+        [b for b in cr["bets"] if b["design"] == "C"]
+    )
     ml = pfs["moneyline"]["backtest"]
     assert ml["edge_threshold"]["min_edge"] is None and ml["edge_threshold"]["by_bucket"] == []
     assert ml["edge_threshold_pinnacle"]["by_bucket"]  # the chart's fallback pool

@@ -358,6 +358,7 @@ def build(src: Path, out: Path) -> dict:
     add_team_total_prices(data)
     add_espn_team_news(data)
     add_markets_research(data)
+    add_comeback_research(data)
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
@@ -841,6 +842,19 @@ def add_markets_research(data: dict) -> None:
             "\n".join(json.dumps(r) for r in rows) + "\n"
         )
         data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
+
+
+# Portfolio > Comeback bets: Research lab's committed result through
+# publish.comeback_research once it lands, else the stand-in with the same shape
+# (tests/web/comeback_stub.py: the real headline numbers, a synthetic bet list).
+def add_comeback_research(data: dict) -> None:
+    real = pub.comeback_research()
+    if real is None:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from comeback_stub import stub
+
+        real = stub()
+    data["comeback_research"] = _clean(real)
 
 
 # Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture

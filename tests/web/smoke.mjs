@@ -56,7 +56,8 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 const tab = (name) => async (p) => { await p.click(`.tabbar button[data-tab="${name}"]`); };
 const click = (sel) => async (p) => { await p.click(sel); };
 const sheet = async (p) => { await p.waitForSelector("#sheet:not([hidden])"); };
-const closeSheet = async (p) => { await p.click(".sheet-close"); };
+// (a no-op when no sheet is open, so a step can follow one that already closed it)
+const closeSheet = async (p) => { if (await p.locator("#sheet:not([hidden])").count()) await p.click(".sheet-close"); };
 // Portfolio folders (owner, 24 Oct): the tab opens on one folder per portfolio, then one per
 // strategy. pfUp goes back to the open portfolio's strategy folders, pfHome to the top;
 // pfOpenPf / pfOpenStrat open a portfolio or one of its strategies from wherever we are.
@@ -577,7 +578,7 @@ const STEPS = [
     await closeSheet(p); await tab("portfolio")(p);
     // The top level: one folder per portfolio, Anytime goalscorer hidden (owner, 24 Oct).
     const folders = await p.locator("#view button[data-pfid]:not(.linkish)").evaluateAll((els) => els.map((e) => e.dataset.pfid));
-    if (folders.join(",") !== "moneyline,corners") throw new Error(`portfolio folders: ${folders.join(",")}`);
+    if (folders.join(",") !== "moneyline,corners,comebacks") throw new Error(`portfolio folders: ${folders.join(",")}`);
     if (!(await p.locator('#view button.linkish[data-pfid="player_shots"]').count())) throw new Error("retired link missing");
     await p.click('button[data-pfid="moneyline"]');
     // Moneyline's folders: one per strategy, the old rule filed under Lean.
@@ -1013,6 +1014,68 @@ const STEPS = [
   }],
   ["portfolio-retired-backtest", click('button[data-pf="backtest"]')],
   ["portfolio-retired-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
+  // Comeback bets (lead brief, 26 Oct): a closed research portfolio, never traded. A normal
+  // top-level row with its headline (not live profit), one strategy row, then Result and Why.
+  ["portfolio-comebacks", async (p) => {
+    await closeSheet(p); await pfHome(p);
+    const row = (await p.locator('button[data-pfid="comebacks"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Comeback bets", "Closed: no edge", "−25.1%", "732 bets", "never traded"]) if (!row.includes(w)) throw new Error(`comebacks row lacks "${w}": ${row}`);
+    if (await p.locator('button.linkish[data-pfid="comebacks"]').count()) throw new Error("comebacks shouldn't sit behind the retired link");
+    await p.click('button[data-pfid="comebacks"]');
+    const list = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
+    if (list.join(",") !== "comeback_ht") throw new Error(`comebacks strategies: ${list}`);
+    if (await p.locator("#view .chips").count()) throw new Error("comebacks needs no competition chips");
+  }],
+  ["portfolio-comebacks-result", async (p) => {
+    await p.click('button[data-pfstrat="comeback_ht"]');
+    const views = await p.locator("#view .segmented button").allInnerTexts();
+    if (views.join(",") !== "Result,Why") throw new Error(`comebacks views: ${views}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["No edge.", "No live trades", "732", "123 won", "17.0%", "vs 21.3% the price implied", "−25.1%", "95% range −38.3% to −10.2%", "8,011", "Betfair's exchange after its 2% commission instead: −18.1%", "Design B: top five", "+7.3%", "−18.2%", "Return by league (design C)", "Return by season (design C)", "Won vs the price, by how big a favourite"]) {
+      if (!text.includes(w)) throw new Error(`comeback result lacks "${w}"`);
+    }
+    // The profit chart: three lines (C judged solid, B and both together dashed), a readout
+    // naming each, ending on the judged total.
+    if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 3) throw new Error("comeback profit lines");
+    const end = await p.evaluate(() => {
+      const c = state.data.comeback_research.bets.filter((b) => b.design === "C");
+      return usd(c.reduce((a, b) => a + (b.won ? b.odds - 1 : -1), 0), 2);
+    });
+    const ro = await p.textContent("#cbcv-readout");
+    if (!ro.includes(`Design C (judged) ${end}`) || !ro.includes("Design B (first look)")) throw new Error(`comeback readout: ${ro} (want C ${end})`);
+    await scrubCheck(p, "[data-scrub='cbcv']");
+    await p.click('.rc-row[data-rc="cblg"][data-rcrow="0"]');
+    if (!(await p.textContent("#rc-readout-cblg")).includes("bets")) throw new Error("league readout");
+    await scrubCheck(p, "[data-scrub='cbband']");
+  }],
+  ["portfolio-comebacks-bets", async (p) => {
+    await p.click("details.cb-bets > summary");
+    const n = await p.locator(".cb-table tbody tr").count();
+    if (n !== 50) throw new Error(`comeback bet list shows ${n}, want 50`);
+    const first = await p.locator(".cb-table tbody tr").first().innerText();
+    if (!/[+−]\d+ \(\d+\.\d\d\)/.test(first) || !/behind .* at half-time/.test(first)) throw new Error(`bet row: ${first}`);
+    await p.click("button[data-cbmore]");
+    if ((await p.locator(".cb-table tbody tr").count()) !== 150 || !(await p.locator("details.cb-bets[open]").count())) throw new Error("show more");
+  }],
+  ["portfolio-comebacks-why", async (p) => {
+    await p.click('button[data-pf="why"]');
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["The idea, from free data", "19.7% of 2,166 matches", "expected 14.0%", "5 of 18", "When the underdog scores first, by minute", "15,838 matches", "The in-play price already covers the comeback, and overrates it.", "17.0% of the time against the 21.3%", "18,820 credits", "How this was measured"]) {
+      if (!text.includes(w)) throw new Error(`comeback why lacks "${w}"`);
+    }
+    await p.click("details.mk-fold:has(summary:text('How this was measured')) > summary");
+    const how = await p.locator("details.mk-fold[open]").last().innerText();
+    for (const w of ["dca429e", "e4b3f8b", "40176031079"]) if (!how.includes(w)) throw new Error(`how-measured lacks ${w}`);
+    // (centred first: scrolled to the top edge, its first row would sit under the sticky bar)
+    await p.locator("[data-scrub='cbmin']").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await scrubCheck(p, "[data-scrub='cbmin']");
+    if ((await p.locator("[data-scrub='cbp1'] .rc-row").count()) !== 2) throw new Error("phase 1 rows");
+  }],
+  // Leaving Comeback bets: another portfolio's views come back on Live paper.
+  ["portfolio-comebacks-leave", async (p) => {
+    await pfOpenPf(p, "moneyline"); await p.click('button[data-pfstrat="edge12"]');
+    if (!(await p.locator('button[data-pf="live"].on').count())) throw new Error("Moneyline should fall back to Live paper after Comeback bets");
+  }],
   // Team corners (in testing): live paper with Pinnacle CLV and a push, a league chip, the
   // trade sheet, then the research backtest (no money tiles) with a range-plot readout.
   ["portfolio-corners", async (p) => {

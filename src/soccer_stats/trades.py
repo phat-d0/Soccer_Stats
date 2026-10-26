@@ -388,7 +388,8 @@ def select_trades(
 
 
 # The portfolios the app shows, one per strategy. Adding a strategy is one entry here:
-# id, display name, status ("live", "testing" or "retired"), a plain-English note, and
+# id, display name, status ("live", "testing", "retired", or "closed" for research that
+# finished without ever trading), a plain-English note, and
 # the stem of its backtest file on data-log (backtest/<league>_<backtest>.json).
 PORTFOLIOS = [
     {
@@ -429,6 +430,16 @@ PORTFOLIOS = [
         "note": "Retired on 6 Oct 2026: no player shot rule made money in testing, because "
         "FanDuel's over-only lines carry too big a margin. Kept for its history.",
         "backtest": "players",
+    },
+    {
+        "id": "comebacks",
+        "name": "Comeback bets",
+        "status": "closed",
+        "note": "Research, closed 25 Oct 2026, never traded: backing the pre-match favourite "
+        "when it is behind at half-time, at the in-play price. The bought test found no edge "
+        "(the price already expects the comeback and overrates it), so nothing was ever "
+        "paper-traded. Its result and the reasoning are kept here.",
+        "backtest": "comebacks",
     },
 ]
 PORTFOLIO_IDS = [p["id"] for p in PORTFOLIOS]

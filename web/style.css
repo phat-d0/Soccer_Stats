@@ -877,3 +877,7 @@ details.drv-fold { margin-top: 10px; }
 .pf-sub + .segmented, .pf-title + .segmented { margin-top: 10px; }
 .row-btn.folder .who .pill { white-space: nowrap; }
 .row-btn.folder .meta { white-space: normal; }
+/* Comeback bets (26 Oct): a closed research portfolio's pill, and its bet list. */
+.pill.st-closed { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--neg); }
+.cb-table td .meta { display: block; font-size: 11px; color: var(--text-muted); }
+.cb-table td.num { white-space: nowrap; }
