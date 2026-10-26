@@ -7,7 +7,7 @@ football-data, so every design number is recomputed the frozen way; `EXPECTED` h
 published numbers of runs 40176653428 (C) and 40145295663 (B), and the build reports whether
 they reproduce. Phase 1 and the timelines are copied verbatim from docs/lab.md (their runs
 are named). `odds-check.yml` `task=comeback-research` prints `COMEBACK_RESEARCH_JSON`; the
-committed file is that line, unchanged.
+committed file holds that line, with each bet on one line.
 """
 
 from __future__ import annotations
