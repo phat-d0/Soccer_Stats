@@ -585,7 +585,8 @@ const STEPS = [
     const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
     // Each strategy is its own row (owner, 25 Oct); the old rule sits in the Archive list.
     // Each draw no bet track sits right after its parent in the main list (owner, 26 Oct).
-    if (strats.join(",") !== "lean,lean_dnb,edge12,edge12_dnb,lean_all_odds") throw new Error(`strategy folders: ${strats.join(",")}`);
+    // Model 12% and its draw no bet track are archived (owner, 26 Oct), after the old Lean rule.
+    if (strats.join(",") !== "lean,lean_dnb,lean_all_odds,edge12,edge12_dnb") throw new Error(`strategy folders: ${strats.join(",")}`);
     const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
     if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
@@ -719,11 +720,22 @@ const STEPS = [
   ["portfolio-dnb", async (p) => {
     await pfUp(p);
     const row = (await p.locator('button[data-pfstrat="edge12_dnb"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Model 12%, draw no bet", "Tracked beside the record · places no bets of its own · a draw returns the stake", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
-    if (await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="edge12_dnb"]').count()) throw new Error("the DNB track is in the Archive");
+    for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
+    const leanRow = (await p.locator('button[data-pfstrat="lean_dnb"]').innerText()).replace(/\s+/g, " ");
+    if (!leanRow.includes("Tracked beside the record · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
+    // Model 12% and its track sit in the Archive (owner, 26 Oct); Lean's track stays in the main list.
+    for (const k of ["edge12", "edge12_dnb"]) if (!(await p.locator(`.section-title:has-text("Archive") + .card button[data-pfstrat="${k}"]`).count())) throw new Error(`${k} isn't in the Archive`);
+    if (await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_dnb"]').count()) throw new Error("Lean's DNB track is in the Archive");
+    const e12 = (await p.locator('button[data-pfstrat="edge12"]').innerText()).replace(/\s+/g, " ");
+    if (!e12.includes("Archived Oct 26 · still logs every 12%-edge pick") || !e12.includes("Backtest:")) throw new Error(`Model 12% row: ${e12}`);
+    const arch = (await p.locator('.section-title:has-text("Archive") + .card + .note').innerText()).replace(/\s+/g, " ");
+    if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("2 draw no bet tracks") || home.includes("Model 12%, draw no bet")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 3 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    // The headline counts the active strategies only: Lean's new-rule trades.
+    const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
+    if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
     await p.click('button[data-pfid="moneyline"]');
     await p.click('button[data-pfstrat="edge12_dnb"]');
     if ((await p.locator(".pf-title").innerText()) !== "Model 12%, draw no bet") throw new Error("DNB track not opened");

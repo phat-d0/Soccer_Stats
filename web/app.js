@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v62";
+const APP_VERSION = "v63";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3293,9 +3293,16 @@ function leanRangeBt(part, range) {
 }
 // Archived: an old rule kept for comparison (adds "shadow": Lean's all odds), or a whole track
 // the owner moved out of the main list (25 Oct: corners' two plain 12% tracks; they still log
-// every pick, and the under-60% lines are cut from them).
-const PF_ARCHIVED = { corners: { keys: ["pinnacle", "draftkings"], since: "2026-10-25" } };
-const archivedTrack = (x) => !x.variantOf && Object.values(PF_ARCHIVED).some((a) => a.keys.includes(x.key));
+// every pick, and the under-60% lines are cut from them. 26 Oct: Moneyline's Model 12%, no
+// edge so far; it still opens its paper trades). A draw no bet track goes with its parent.
+const PF_ARCHIVED = {
+  corners: { keys: ["pinnacle", "draftkings"], since: "2026-10-25", note: "these tracks still log every pick at their rule, and the lines above are cut from them." },
+  moneyline: { keys: ["edge12"], since: "2026-10-26", note: "Model 12% still opens a paper trade at every 12%-edge pick, with its draw no bet track beside it, so its record keeps growing; it left the main list because it hasn't shown an edge (its closing line value is below zero in every league's backtest)." },
+};
+const archivedTrack = (x) => {
+  const key = isDnbStrat(x) ? x.variantOf : x.variantOf ? null : x.key;
+  return !!key && Object.values(PF_ARCHIVED).some((a) => a.keys.includes(key));
+};
 const archivedStrat = (x) => x.st?.adds === "shadow" || archivedTrack(x);
 function backtestHeadline(cur, x, lg = "") {
   const sb = state.data.portfolio?.strategy_backtests || {};
@@ -3946,6 +3953,15 @@ function pfCrumbs(cur, toPortfolio) {
   return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
 }
 const pfPill = (cur) => `<span class="pill st-${esc(cur.status)}">${esc(cur.status === "closed" && cbData()?.verdict === "fail" ? "Closed: no edge" : PF_STATUS[cur.status] || cur.status)}</span>`;
+// A portfolio's headline counts its active strategies only (the 1X2 ones: draw no bet tracks
+// and archived rules are left out), each trade once; without strategy sections, every trade.
+function activeTrades(p, st) {
+  const active = st.filter((x) => x.st && !archivedStrat(x) && !isDnbStrat(x));
+  if (!active.length) return p.live?.trades || [];
+  const byId = new Map();
+  for (const x of active) for (const t of strategyLiveSet(p, x, "").trades || []) byId.set(t.id, t);
+  return [...byId.values()];
+}
 function pfHomeHtml() {
   const all = portfolios();
   const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id));
@@ -3953,9 +3969,9 @@ function pfHomeHtml() {
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
     const names = st.filter((x) => !archivedStrat(x) && !isDnbStrat(x)).map((x) => x.label);
-    const old = st.filter(archivedStrat).length, dnb = st.filter(isDnbStrat).length;
+    const old = st.filter(archivedStrat).length, dnb = st.filter((x) => isDnbStrat(x) && !archivedStrat(x)).length;
     const extra = [dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
-    const m = tradeStats(p.live?.trades || []);
+    const m = tradeStats(activeTrades(p, st));
     const cbHead = p.id === CB_ID ? cbHeadline() : null;
     const right = cbHead ? cbHead.right : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
@@ -3969,7 +3985,7 @@ function pfHomeHtml() {
   return `
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
-    <p class="note">Each portfolio holds that market's paper strategies. Profit is all its strategies together, in every competition, $10 a trade. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
+    <p class="note">Each portfolio holds that market's paper strategies. Profit is its active strategies together (archived ones and draw no bet tracks left out), in every competition, $10 a trade. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
 }
 // One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
@@ -3977,8 +3993,8 @@ function pfHomeHtml() {
 // an archived old rule (Lean's all odds) has the replay at every price as its backtest.
 function stratMeta(cur, x, m) {
   if (x.st?.adds === "shadow") return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
+  if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick${isDnbStrat(x) ? ", draw no bet" : ""}`;
   if (isDnbStrat(x)) return "Tracked beside the record · places no bets of its own · a draw returns the stake";
-  if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick`;
   const f = x.st?.filter;
   if (x.variantOf && f && isNum(f.max)) return `Only the ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}picks model (f) gives under a ${pct(f.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   if (x.variantOf) return `Shadow test · places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
@@ -4026,7 +4042,7 @@ function pfFolderHtml(cur, strats) {
     <div class="section-title">Strategies</div>
     ${strategyFolders(cur, strats.filter((x) => !archivedStrat(x)), lg)}
     <p class="note">Open a strategy for its live paper trades, its backtest and its model.${cutNote(strats.find((x) => x.variantOf && !archivedStrat(x) && isNum(x.st?.filter?.max)))}</p>
-    ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">${strats.some((x) => x.st?.adds === "shadow") ? "Old rules, still tracked on the picks they would have made so the current rule can be compared with them. They place no bets." : "Kept out of the main list: these tracks still log every pick at their rule, and the lines above are cut from them."}</p>` : ""}`;
+    ${strats.some(archivedStrat) ? `<div class="section-title">Archive</div>${strategyFolders(cur, strats.filter(archivedStrat), lg)}<p class="note">${[strats.some((x) => x.st?.adds === "shadow") ? "Old rules are still tracked on the picks they would have made, so the current rule can be compared with them; they place no bets." : "", strats.some(archivedTrack) && PF_ARCHIVED[cur.id]?.note ? `Kept out of the main list since ${monthDay(PF_ARCHIVED[cur.id].since)}: ${PF_ARCHIVED[cur.id].note}` : ""].filter(Boolean).join(" ")}</p>` : ""}`;
 }
 function pfStrategyHtml(cur, allStrats) {
   if (cur.id === CB_ID) return cbStrategyHtml(cur);
@@ -4052,7 +4068,8 @@ function pfStrategyHtml(cur, allStrats) {
     : x.st?.adds === "shadow"
     ? `Archived: the rule until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"}, tracked with no bets beside ${esc(parent.label)}`
     : archivedTrack(x)
-    ? `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}: still logs every pick; the under-60% line is cut from it`
+    ? cur.id === "corners" ? `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}: still logs every pick; the under-60% line is cut from it`
+      : `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}${rule ? ` · ${rule}` : ""} · still logs every pick, out of the main list`
     : x.variantOf && isNum(x.st?.filter?.max)
     ? `${esc(parent.label)}'s picks that model (f) gives under a ${pct(x.st.filter.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
     : x.variantOf

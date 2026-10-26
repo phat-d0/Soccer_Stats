@@ -738,7 +738,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v62) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v63) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -796,7 +796,14 @@ the owner's baseball app, so the balance can drop without any run here.
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
   legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
+  "· N archived". Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
+  (`PF_ARCHIVED.moneyline` {keys: edge12, since, note}; its ledger and paper trades unchanged),
+  and a draw no bet track goes to the Archive with its parent (`archivedTrack` takes a
+  DNB track's `variant_of`), so Moneyline's main list is Blend Lean and Lean's draw no bet track;
+  the Archive note joins the old-rule sentence and the portfolio's `PF_ARCHIVED` note. The
+  top-level row's profit counts only active strategies (`activeTrades`: non-archived, non-DNB
+  sections' trades, each once; every trade when a portfolio has no sections), and the note says
+  so. **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
   `edge12_dnb` (`adds: "dnb"`, `isDnbStrat`) each get their own row right after their parent in
   the main list (not the Archive), meta "Tracked beside the record · places no bets of its own ·
   a draw returns the stake" and, in place of a backtest line, the 24 Oct backtest's sentence from
