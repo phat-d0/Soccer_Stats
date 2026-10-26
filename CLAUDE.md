@@ -34,14 +34,17 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   the old rule is tracked as a shadow ("Blend Lean, all odds (old rule)"; `docs/leagues.md`
   "Blend Lean odds range").
 - **Model 12%**: `trades.PAPER_RULE = "fixed_raw"`, the raw model's chance at a 12% edge
-  against DraftKings' quoted price. The owner's live test.
+  against DraftKings' quoted price. The owner's live test. Archived in the app (owner, 26 Oct):
+  CLV is below 0 in every league's backtest. It still opens paper trades and logs everything
+  (ledgers unchanged), with its draw no bet track; both sit in Portfolio → Moneyline's Archive.
 - **Draw no bet tracks** (owner, 26 Oct; `paper_dnb.py`, `docs/leagues.md` "Draw no bet tracks"):
   `lean_dnb` beside Blend Lean and `edge12_dnb` beside Model 12%, descriptive. The 1X2 trades
   stay the record. Price = DraftKings' h2h, side × (1 − 1/draw) (0 credits); chance = the parent's
   without the draw; Lean's needs `sigma_dnb` in `match_blends.json` and keeps the 1.50–3.00 range
   on the DNB price. A draw refunds the stake. The tracks have their own ledger
   (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals.
-- The Matches tab shows Lean only; Portfolio → Moneyline shows both.
+- The Matches tab shows Lean only; Portfolio → Moneyline lists Blend Lean and its draw no bet
+  track, with Model 12% and its track in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
   at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
