@@ -4028,6 +4028,15 @@ const CB_ID = "comebacks";
 const cbData = () => state.data?.comeback_research || null;
 const cbStrat = () => ({ key: "comeback_ht", label: "$1 on the trailing favourite at half-time", st: null, rule: null });
 const cbPts = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)}` : "–"); // points of chance
+// The like-for-like pair (lead, 26 Oct): the price's chance and the gap are on the bets with
+// a fair price (`implied_matches`), so the win rate beside them is implied + gap on those same
+// bets, not the rate on every bet. {won, implied, gap, gap_ci95, priced} or null.
+function cbPair(d) {
+  if (!d || !isNum(d.implied)) return null;
+  const gap = isNum(d.gap) ? d.gap : d.win_rate - d.implied;
+  return { won: d.implied + gap, implied: d.implied, gap, gap_ci95: d.gap_ci95, priced: d.implied_matches };
+}
+const cbPricedText = (pr) => (isNum(pr?.priced) ? `, on the ${num(pr.priced)} bets with a fair price` : "");
 const cbOdds = (d) => (isNum(d) ? `${american(d)} (${d.toFixed(2)})` : "–");
 const cbDate = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const cbMonth = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
@@ -4135,10 +4144,11 @@ function cbRange(id, rows, label) {
 function cbResultHtml(cr) {
   const c = cr.designs.C, b = cr.designs.B, all = cr.designs.pooled;
   const cost = cr.cost || {};
+  const pair = cbPair(c);
   const tile = (label, value, sub, cls = "") => `<div class="tile"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="sub">${sub}</div></div>`;
   const tiles = `<div class="tiles pf-tiles">
     ${tile("Bets (design C)", num(c.bets), `${num(c.wins)} won · $1 each`)}
-    ${tile("Won", pct(c.win_rate, 1), `vs ${pct(c.implied, 1)} the price implied: ${cbPts(c.gap ?? c.win_rate - c.implied)} points${c.gap_ci95 ? ` (${cbPts(c.gap_ci95[0])} to ${cbPts(c.gap_ci95[1])})` : ""}`, signCls(c.win_rate - c.implied))}
+    ${pair ? tile("Won", pct(pair.won, 1), `vs ${pct(pair.implied, 1)} the price implied${cbPricedText(pair)}: ${cbPts(pair.gap)} points${pair.gap_ci95 ? ` (${cbPts(pair.gap_ci95[0])} to ${cbPts(pair.gap_ci95[1])})` : ""}`, signCls(pair.gap)) : tile("Won", pct(c.win_rate, 1), "no fair price to compare")}
     ${tile("Return per $1", signedPct(c.roi), c.roi_ci95 ? `95% range ${signedPct(c.roi_ci95[0])} to ${signedPct(c.roi_ci95[1])}` : "", signCls(c.roi))}
     ${tile("Cost in credits", num(cost.total), [cost.design_c ? `C ${num(cost.design_c)}` : "", cost.design_b ? `B ${num(cost.design_b)}` : "", cost.probes ? `probes ${num(cost.probes)}` : ""].filter(Boolean).join(" · "))}
   </div>`;
@@ -4163,6 +4173,7 @@ function cbResultHtml(cr) {
     ${cbRange("cblg", c.by_league || [], (g) => leagueName(g.code))}
     <div class="section-title">Return by season (design C)</div>
     ${cbRange("cbse", c.by_season || [], (g) => g.season)}
+    <p class="note cb-mix-note">In these rows and the ones below, the win rate counts every bet, but the price's chance only the bets with a fair price${isNum(c.implied_matches) ? ` (${num(c.implied_matches)} of ${num(c.bets)} overall)` : ""}, so the two can differ slightly from a like-for-like comparison.</p>
     <div class="section-title">Won vs the price, by how big a favourite</div>
     ${bands}
     <p class="note">Rows group the trailing favourites by their chance of winning before kickoff. Blue: they won at least as often as the in-play price implied; red: less. Each row is a few hundred bets at most, so the ranges are wide and one row can land either side by chance; the judged answer is the whole test above.</p>
@@ -4191,7 +4202,7 @@ function cbWhyHtml(cr) {
     ${cbRowsChart("cbmin", minRows, "Score-blind model", "the score-blind model's")}
     <div class="section-title">3. What it means</div>
     <div class="verdict neg">The in-play price already covers the comeback, and overrates it.</div>
-    <p class="note">The free data compared comebacks with a model that ignores the score, so the gap it found is that model's blind spot, not the market's. The bookmakers' in-play price already expects favourites to fight back, and in the judged test it expected too much: trailing favourites won ${pct(cr.designs.C.win_rate, 1)} of the time against the ${pct(cr.designs.C.implied, 1)} the price implied. Backing them lost money at DraftKings and at Betfair's exchange.${isNum(tl.priced_test_cost) ? ` A priced test of "the underdog scored first" would cost about ${num(tl.priced_test_cost)} credits and isn't recommended.` : ""}</p>
+    <p class="note">The free data compared comebacks with a model that ignores the score, so the gap it found is that model's blind spot, not the market's. The bookmakers' in-play price already expects favourites to fight back, and in the judged test it expected too much: trailing favourites won ${pct(cbPair(cr.designs.C)?.won ?? cr.designs.C.win_rate, 1)} of the time against the ${pct(cr.designs.C.implied, 1)} the price implied${cbPricedText(cbPair(cr.designs.C))}. Backing them lost money at DraftKings and at Betfair's exchange.${isNum(tl.priced_test_cost) ? ` A priced test of "the underdog scored first" would cost about ${num(tl.priced_test_cost)} credits and isn't recommended.` : ""}</p>
     <details class="fold mk-fold"><summary>How this was measured</summary>
       ${cr.question ? `<p class="note"><b>Question.</b> ${esc(cr.question)}</p>` : ""}
       ${cr.rule ? `<p class="note"><b>Rule.</b> ${esc(cr.rule)}</p>` : ""}

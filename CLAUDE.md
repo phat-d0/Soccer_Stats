@@ -780,7 +780,10 @@ the owner's baseball app, so the balance can drop without any run here.
   more", `state.cbShown`). Why (`cbWhyHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
   (`cbmin`), the conclusion, and run ids and pre-registration commits under "How this was
   measured". The minute chart and its totals use the matches with a fair benchmark
-  (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). A strategy
+  (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). The "Won" tile and the Why text use the like-for-like pair
+  on the bets with a fair price (`cbPair`: implied + gap on `implied_matches`, "17.0% vs 21.3%
+  … on the 700 bets with a fair price"); the per-league, season and band rows mix every bet's
+  win rate with the priced bets' chance, and a note under them says so. A strategy
   (`pfStrategyHtml`) shows crumbs "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status ·
   rule ("Shadow test of …" / "Archived: the rule until …"), the competition filter and Live
   paper / Backtest / Model (a shadow test's or archived rule's Backtest and Model are its
