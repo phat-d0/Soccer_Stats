@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v61";
+const APP_VERSION = "v62";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -193,6 +193,7 @@ const isCorner = (t) => t.bet_type === "corners";
 const cornerLabel = (t) => `${t.team || (t.team_side === "away" ? t.away : t.home)} ${t.side} ${Number(t.line)} corners`;
 function tradeLabel(t) {
   if (isCorner(t)) return cornerLabel(t);
+  if (isDnb(t)) return `${PICK_LABEL[t.market] || t.market}, draw no bet`;
   return t.bet_type === "player" ? `${t.player} ${lineLabel(t).toLowerCase()}` : PICK_LABEL[t.market] || t.market;
 }
 // A trade row's first line: the bet for player and corner trades, the match otherwise (HTML).
@@ -208,6 +209,13 @@ const isDkCorner = (t) => isCorner(t) && cornerBook(t) === "draftkings";
 // Closing line value: a corner trade against its own book's close (DraftKings' is None when
 // that close was one-sided), match bets against DraftKings'.
 const tradeClv = (t) => (isCorner(t) && !isDkCorner(t) ? t.clv_pinnacle : t.clv_dk);
+// Draw no bet (owner, 26 Oct; paper_dnb): tracks beside each match strategy, home or away
+// only, a draw refunds the stake (status "void", push). Their trades are Moneyline's
+// `dnb_trades`, never in its `trades` or summary; the 1X2 trades stay the record.
+const isDnb = (t) => t.bet_type === "dnb";
+const isDnbStrat = (x) => x?.st?.adds === "dnb";
+const isDraw = (t) => isDnb(t) && t.status === "void" && !!t.push;
+const DNB_STRAT_LABEL = { lean_dnb: "Blend Lean, draw no bet", edge12_dnb: "Model 12%, draw no bet" };
 const tradeBeat = (t) => (isCorner(t) && !isDkCorner(t) ? t.beat_close_pinnacle : t.beat_close_dk);
 const closeWho = (t) => (isCorner(t) ? `${BOOK_POSS[cornerBook(t)]} close` : "Close");
 // Where an unsettled trade stands, from its kickoff and the clock: "upcoming" (kickoff
@@ -2109,7 +2117,7 @@ function pfSet() {
   return p ? p[state.pfView === "backtest" ? "backtest" : "live"] : null;
 }
 // Every trade in every portfolio, live and backtest (for the trade sheet).
-const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.live?.shadow_trades || []), ...(p.backtest?.trades || [])]);
+const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.live?.shadow_trades || []), ...(p.live?.dnb_trades || []), ...(p.backtest?.trades || [])]);
 // A shadow entry (Blend Lean's old rule): what the old rule would have bet; never real P/L.
 const shadowChip = (t) => (t.shadow ? `<span class="chip-shadow">Shadow: no trade opened${t.excluded_by === "odds_range" ? " (outside the odds range)" : ""}</span>` : "");
 const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired", closed: "Closed" };
@@ -3222,7 +3230,9 @@ function strategyLiveSet(cur, x, lg, drv = "") {
   // A variant that adds shadow entries (Blend Lean's old rule) resolves its trade_ids
   // against the live trades and `shadow_trades` together (paper keeps shadows apart).
   const live = cur.live || {};
-  const pool = x.st?.adds === "shadow" ? { ...live, trades: [...(live.trades || []), ...(live.shadow_trades || [])] } : live;
+  // A draw no bet track's trades are their own (`dnb_trades`).
+  const pool = x.st?.adds === "shadow" ? { ...live, trades: [...(live.trades || []), ...(live.shadow_trades || [])] }
+    : isDnbStrat(x) ? { ...live, trades: live.dnb_trades || [] } : live;
   let set = x.st ? stratSet(pool, x.st) : { ...live, trades: live.trades || [] };
   if (lg) set = leagueSet(set, lg);
   if (drv && x.st) set = driverSet(set, x.st, drv, lg);
@@ -3239,6 +3249,7 @@ function tradeStats(trades) {
   const staked = settled.reduce((a, t) => a + (t.stake || 0), 0);
   return {
     won: won.length, lost: lost.length, void: voids.length, open: open.length, n: settled.length,
+    draws: voids.filter(isDraw).length,
     profit, staked, roi: staked ? profit / staked : null,
     atRisk: open.reduce((a, t) => a + (t.stake || 0), 0),
     clv: meanOf(settled.map(tradeClv).filter(isNum)),
@@ -3319,6 +3330,7 @@ function backtestHeadline(cur, x, lg = "") {
 // The bet in words: "Barcelona to win", "Draw", "Valencia over 4.5 corners".
 function betName(t) {
   if (isCorner(t) || isPlayer(t)) return tradeLabel(t);
+  if (isDnb(t)) return `${t.market === "home" ? t.home : t.away}, draw no bet`;
   if (t.market === "home") return `${t.home} to win`;
   if (t.market === "away") return `${t.away} to win`;
   return PICK_LABEL[t.market] || t.market;
@@ -3339,7 +3351,7 @@ function pfTradeRow(t) {
   const right = open
     ? `<b>$${Number(t.stake).toFixed(0)}</b><small>to win $${(t.stake * (dec - 1)).toFixed(2)}</small>`
     : t.status === "void"
-      ? `<b>${t.push ? "Push" : "Void"}</b><small>stake back</small>`
+      ? `<b>${isDraw(t) ? "Draw" : t.push ? "Push" : "Void"}</b><small>stake back</small>`
       : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(t.profit, 2)}</b><small>${t.status}</small>`;
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
@@ -3724,6 +3736,36 @@ function sinceDefinedHtml(cur, x, parent, lg) {
       ${x.st?.filter?.note || x.st?.note ? `<details class="fold"><summary>How this ${shadow ? "comparison" : "filter"} works</summary><p class="note">${esc(x.st.filter?.note || x.st.note)}</p></details>` : ""}
     </div>`;
 }
+// A draw no bet track beside its parent (paper_dnb `compare`, descriptive): each one's trades
+// opened since the track started, their records and CLV per $ staked against DraftKings' and
+// Pinnacle's close (a DNB bet's CLV × the close's chance of no draw, so the two compare).
+function dnbCompareHtml(x, parent, lg) {
+  const c = x.st?.compare;
+  if (!c) return "";
+  const per = c.clv_per_dollar || {};
+  const cell = (f, side) => {
+    const v = per[f]?.[side];
+    return v && isNum(v.mean) ? signedPct(v.mean) : "–";
+  };
+  const line = (label, part, side) => {
+    const s = part?.summary;
+    if (!part?.trades || !s) return `<tr><th>${esc(label)}</th><td>0</td><td colspan="4" class="muted">none yet</td></tr>`;
+    const refunds = side === "track" && s.void ? `<span class="meta">+${s.void} back</span>` : "";
+    return `<tr><th>${esc(label)}</th><td>${part.trades}</td><td>${s.settled ?? 0}${refunds}</td><td class="${signCls(s.profit || 0)}">${usd(s.profit || 0, 2)}</td><td>${s.settled ? signedPct(s.roi) : "–"}</td><td>${cell("clv_dk", side)}</td></tr>`;
+  };
+  const pin = ["track", "parent"].every((k) => isNum(per.clv_pinnacle?.[k]?.mean))
+    ? `<p class="note">Against Pinnacle's close, per $: draw no bet ${signedPct(per.clv_pinnacle.track.mean)} (${per.clv_pinnacle.track.trades}) vs 1X2 ${signedPct(per.clv_pinnacle.parent.mean)} (${per.clv_pinnacle.parent.trades}), on the settled trades football-data has priced.</p>` : "";
+  return `
+    <div class="card judged dnb-compare">
+      <div class="judged-head">Compared with ${esc(parent.label)}, since ${esc(dayName(String(c.since).slice(0, 10)))} <span class="muted">· descriptive${lg ? " · every competition" : ""}</span></div>
+      <table class="judged-tab"><thead><tr><th></th><th>Trades</th><th>Settled</th><th>Profit</th><th>ROI</th><th>CLV per $</th></tr></thead>
+        <tbody>${line("Draw no bet", c.track, "track")}${line("1X2 (the record)", c.parent, "parent")}</tbody></table>
+      <p class="note">CLV per $ is against DraftKings' close, per dollar staked (a refunded draw's stake included, "back" above), so the two lines compare${["track", "parent"].every((k) => per.clv_dk?.[k]) ? `; on ${per.clv_dk.track.trades} and ${per.clv_dk.parent.trades} settled trades with a close` : ""}. ROI is per stake not refunded on the draw no bet line.</p>
+      ${pin}
+      <p class="note"><b>Descriptive only:</b> the two bet different sides and at different prices, so this is not a like-for-like cut of the same bets.</p>
+      ${c.note ? `<details class="fold"><summary>How this comparison works</summary><p class="note">${esc(c.note)}</p></details>` : ""}
+    </div>`;
+}
 // Live paper by odds band (owner, 24 Oct; paper.live_odds_bands): the backtest's odds chart
 // on the strategy's live trades, the ROI table, and each band beside the same band in that
 // strategy's backtest (Moneyline only: corners have no priced backtest).
@@ -3780,13 +3822,19 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     : set.error ? `<div class="banner">${esc(set.error)}</div>` : set.note && cur.status === "live" ? `<p class="note">${esc(set.note)}</p>` : "";
   // A variant shows its own note, then its parent's rule.
   const ruleParent = x.variantOf ? pfParent(strats, x) : x;
-  const vNote = x.variantOf ? x.st?.note || x.st?.filter?.note : "";
-  const rules = `<div class="explain live-test rule-note">${vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. Void = stake back.</p>`;
+  // A draw no bet track's note: the empty-state sentence is said once (below), and the app
+  // shows a refunded draw as "Draw", not a push.
+  const vNote = !x.variantOf ? "" : isDnbStrat(x)
+    ? String(x.st?.note || "").replace(/^No [^:]*trades yet:.*?\.\s+(?=[A-Z])/, "").replace(" (shown as a push)", "")
+    : x.st?.note || x.st?.filter?.note;
+  const dnb = isDnbStrat(x);
+  const rules = `<div class="explain live-test rule-note">${vNote ? `<b>${esc(x.label)}.</b> ${esc(vNote)}<br><br>${dnb ? `<b>The parent's rule, ${esc(ruleParent.label)}:</b> ` : ""}` : ""}${liveRuleNote(cur, ruleParent)}</div><p class="note">${cur.id === "moneyline" ? `${oddsAge() || "Odds: DraftKings."} ` : ""}Paper trades: no money is staked. ${dnb ? "Draw = stake back (the bet is refunded); void" : "Void"} = stake back.</p>`;
   const drvPanel = lean ? `<details class="fold drv-fold"${drv ? " open" : ""}><summary>What carried each pick${drv ? ` <span class="muted">(showing ${esc(DRIVER_NAME[drv].toLowerCase())})</span>` : ""}</summary>${leanDriverPanel(x.st, lg)}</details>` : "";
   // The page heading already names the strategy; only a chosen competition needs saying.
   const title = lg ? `<div class="section-title nocase">${esc(leagueName(lg))} only</div>` : "";
   if (!trades.length) {
     const empty = drv ? `No ${DRIVER_NAME[drv].toLowerCase()} Lean trades yet.`
+      : dnb ? `No ${esc(x.label)} trades yet.${x.rule?.source === "none" ? " The blend's fits don't carry a σ for draw no bet yet, so this rule can't measure a pick; trades start after the next refit." : ` One opens when ${esc(ruleParent.label)}'s rule, on the draw no bet price, picks a side.`}`
       : lean ? `No Blend Lean trades yet. One opens when a side's blended chance beats DraftKings' break-even by 1σ.${x.rule?.source === "none" && x.rule?.note ? ` ${esc(x.rule.note)}` : ""}`
       : cur.id === "corners" ? `No corner trades ${dkCorners ? "at DraftKings " : ""}yet. One opens when a team's corner line shows a 12% edge against ${book} price.`
       : cur.status === "testing" ? "No trades yet. They start once this strategy passes its tests."
@@ -3802,14 +3850,15 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const openRisk = open.reduce((a, t) => a + (t.stake || 0), 0);
   const tiles = `
     <div class="tiles pf-tiles">
-      <div class="tile"><div class="label">Profit, settled</div><div class="value ${m.n ? signCls(m.profit) : ""}">${m.n ? usd(m.profit, 2) : "–"}</div><div class="sub">${m.n ? `on $${m.staked.toFixed(0)} staked · ${signedPct(m.roi)}` : "nothing settled yet"}</div></div>
-      <div class="tile"><div class="label">Record</div><div class="value">${m.won}–${m.lost}</div><div class="sub">${m.void} void${m.clv != null ? ` · CLV ${signedPct(m.clv)}` : ""}</div></div>
+      <div class="tile"><div class="label">Profit, settled</div><div class="value ${m.n ? signCls(m.profit) : ""}">${m.n ? usd(m.profit, 2) : "–"}</div><div class="sub">${m.n ? `on $${m.staked.toFixed(0)} staked${dnb ? " (not refunded)" : ""} · ${signedPct(m.roi)}` : "nothing settled yet"}</div></div>
+      <div class="tile"><div class="label">Record</div><div class="value">${m.won}–${m.lost}</div><div class="sub">${dnb ? `${m.draws} draw${m.draws === 1 ? "" : "s"}, stake back${m.void - m.draws ? ` · ${m.void - m.draws} void` : ""}` : `${m.void} void`}${m.clv != null ? ` · CLV ${signedPct(m.clv)}${dnb ? " per stake not refunded" : ""}` : ""}</div></div>
       <div class="tile"><div class="label">Open</div><div class="value">${m.open}</div><div class="sub">$${m.atRisk.toFixed(0)} at risk${awaiting.length ? ` · ${awaiting.length} finished, awaiting result (not in profit yet)` : ""}</div></div>
       <div class="tile"><div class="label">Avg edge</div><div class="value">${avg}</div><div class="sub">when placed${leanLike ? " (σ above break-even)" : ""}</div></div>
     </div>`;
   // Closes taken over an hour before kickoff (throttled scheduled builds): approximate CLV.
   const early = trades.filter((t) => !isPlayer(t) && !isCorner(t) && (t.status === "won" || t.status === "lost") && tradeClv(t) != null && closeApprox(t)).length;
   const earlyText = early ? ` ${early} close${early > 1 ? "s were" : " was"} taken more than an hour before kickoff, so ${early > 1 ? "their" : "its"} CLV is approximate.` : "";
+  const dnbRoi = dnb && (m.n || m.draws) ? `<p class="note dnb-roi">ROI counts only the bets that weren't refunded: a draw returns the stake, so it adds nothing to profit or to the amount staked. CLV here is per stake not refunded; per $ staked (a draw's stake included) it is in the comparison below.</p>` : "";
   const caveat = m.n < 200 || early ? `<p class="note">${m.n < 200 ? `${m.n ? `Only ${m.n} settled so far` : "Nothing settled yet"}; until a few hundred, results are mostly luck. Closing line value (CLV, against ${book} close) is the faster sign of an edge.` : ""}${earlyText}</p>` : "";
   // paper.py's 95% range on ROI, shown only when its summary covers exactly these trades
   // (a competition plus a driver has no summary of its own).
@@ -3819,27 +3868,31 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const curve = settledCurve(trades);
   // A parent with variants, or a variant: every one of them on one chart, parent solid.
   const parent = pfParent(strats, x);
-  const family = [parent, ...pfVariants(strats, parent)];
+  // A draw no bet track overlays only its parent, both from the day the track started (the
+  // parent's line counts its trades opened since then); the parent's own chart leaves it out.
+  const family = dnb ? [parent, x] : [parent, ...pfVariants(strats, parent).filter((v) => !isDnbStrat(v))];
+  const dnbFrom = dnb && x.st?.defined_at ? String(x.st.defined_at) : null;
+  const sinceDnb = (ts) => (dnbFrom ? ts.filter((t) => t.opened_at && new Date(t.opened_at) >= new Date(dnbFrom)) : ts);
   // A filter's parent is "All"; with a shadow variant (more trades) the parent is the live rule.
-  const parentName = family.slice(1).some((v) => v.st?.adds === "shadow") ? "Live rule" : "All";
+  const parentName = dnb ? "1X2 (the record)" : family.slice(1).some((v) => v.st?.adds === "shadow") ? "Live rule" : "All";
   const overlay = family.length > 1
     ? family.map((s, k) => ({
-      name: k ? variantShort(s, parent) : parentName,
+      name: k ? (dnb ? "Draw no bet" : variantShort(s, parent)) : parentName,
       label: k ? "" : s.label,
-      curve: settledCurve(s === x ? trades : strategyLiveSet(cur, s, lg).trades || []),
+      curve: settledCurve(s === x ? trades : sinceDnb(strategyLiveSet(cur, s, lg).trades || [])),
     }))
     : null;
-  const definedAt = family.map((s) => s.st?.defined_at).find(Boolean) || null;
+  const definedAt = dnb ? null : family.map((s) => s.st?.defined_at).find(Boolean) || null;
   // The origin is the first trade opened: the parent's (every version starts there) or this set's.
   // Both lines start together: at the backcast's lean_started (Blend Lean's first trade,
   // owner 24 Oct) or else the first trade any version opened.
   const famStart = () => family.map((s) => firstOpened(strategyLiveSet(cur, s, lg).trades || [])).filter(Boolean).sort()[0];
   const bcStart = parent.st?.backcast?.lean_started ? String(parent.st.backcast.lean_started).slice(0, 10) : null;
-  const start = overlay ? [bcStart, famStart()].filter(Boolean).sort()[0] : firstOpened(trades, curve);
+  const start = dnbFrom ? dnbFrom.slice(0, 10) : overlay ? [bcStart, famStart()].filter(Boolean).sort()[0] : firstOpened(trades, curve);
   const markLabel = family.slice(1).some((v) => v.st?.adds === "shadow") ? "rule set (judged from here)" : "filter set (judged from here)";
   const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt, start, markLabel)
     : curve.length ? curveChart(curve, start) : `<p class="muted">The chart starts when the first trade settles.</p>`;
-  const judged = x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
+  const judged = dnb ? dnbCompareHtml(x, parent, lg) : x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
   // Blend Lean's line is the new rule backcast from its first trade (owner, 24 Oct).
   const bc = x.st?.backcast;
   const backcast = bc?.applied ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is its own ↳ folder under Moneyline.</p>` : "";
@@ -3850,6 +3903,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${title}
     ${banner}
     ${tiles}
+    ${dnbRoi}
     ${caveat}
     ${ci}
     ${backcast}
@@ -3898,9 +3952,9 @@ function pfHomeHtml() {
   const retired = all.filter((p) => p.status === "retired");
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
-    const names = st.filter((x) => !archivedStrat(x)).map((x) => x.label);
-    const old = st.filter(archivedStrat).length;
-    const extra = old ? `${old} archived` : "";
+    const names = st.filter((x) => !archivedStrat(x) && !isDnbStrat(x)).map((x) => x.label);
+    const old = st.filter(archivedStrat).length, dnb = st.filter(isDnbStrat).length;
+    const extra = [dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
     const m = tradeStats(p.live?.trades || []);
     const cbHead = p.id === CB_ID ? cbHeadline() : null;
     const right = cbHead ? cbHead.right : m.n
@@ -3923,12 +3977,18 @@ function pfHomeHtml() {
 // an archived old rule (Lean's all odds) has the replay at every price as its backtest.
 function stratMeta(cur, x, m) {
   if (x.st?.adds === "shadow") return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
+  if (isDnbStrat(x)) return "Tracked beside the record · places no bets of its own · a draw returns the stake";
   if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick`;
   const f = x.st?.filter;
   if (x.variantOf && f && isNum(f.max)) return `Only the ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}picks model (f) gives under a ${pct(f.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   if (x.variantOf) return `Shadow test · places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   const rule = ruleText(x);
   return `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}`;
+}
+// "Backtest, 24 Oct: no edge; …" from the sentence in the track's rule note (paper_dnb).
+function dnbBacktestText(x) {
+  const m = String(x.st?.note || x.rule?.note || "").match(/The (\d+ \w+) backtest found ([^.]*)\./);
+  return m ? `Backtest, ${m[1]}: ${m[2].replace(/:\s*/, "; ")}` : "";
 }
 function strategyFolders(cur, strats, lg) {
   const rows = strats.map((x) => {
@@ -3937,8 +3997,10 @@ function strategyFolders(cur, strats, lg) {
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     // Shadow tests have no backtest of their own; an archived rule has its replay.
+    // A draw no bet track quotes the 24 Oct backtest's finding from its rule note.
     const h = x.variantOf && !archivedStrat(x) ? null : backtestHeadline(cur, x, lg);
-    const bt = x.variantOf && !archivedStrat(x) ? "" : `<span class="bt">Backtest: ${h ? `<b class="${h.cls}">${h.v}</b> · ${esc(h.sub)}` : "none"}</span>`;
+    const dnbBt = isDnbStrat(x) ? dnbBacktestText(x) : "";
+    const bt = dnbBt ? `<span class="bt">${esc(dnbBt)}</span>` : x.variantOf && !archivedStrat(x) ? "" : `<span class="bt">Backtest: ${h ? `<b class="${h.cls}">${h.v}</b> · ${esc(h.sub)}` : "none"}</span>`;
     return `
       <button class="row-btn folder strat${archivedStrat(x) ? " archived" : ""}" data-pfstrat="${esc(x.key)}">
         <span class="who"><b>${esc(x.label)}</b><span class="meta">${stratMeta(cur, x, m)}</span>${bt}</span>
@@ -3985,7 +4047,9 @@ function pfStrategyHtml(cur, allStrats) {
   const lg = byComp && !research ? leagueOn() : "";
   const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
   const rule = ruleText(x);
-  const sub = x.st?.adds === "shadow"
+  const sub = isDnbStrat(x)
+    ? `Draw no bet beside ${esc(parent.label)} · tracked beside the record, places no bets of its own`
+    : x.st?.adds === "shadow"
     ? `Archived: the rule until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"}, tracked with no bets beside ${esc(parent.label)}`
     : archivedTrack(x)
     ? `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)}: still logs every pick; the under-60% line is cut from it`
@@ -4003,6 +4067,7 @@ function pfStrategyHtml(cur, allStrats) {
   const inRange = leanBt && range ? leanRangeBt(leanBt.part, range) : null;
   const parentNote = x.st?.adds === "shadow" && view === "backtest"
     ? `<p class="note">This replay is the old rule: Blend Lean at every price, the same replay ${esc(parent.label)} is measured against.</p>`
+    : isDnbStrat(x) && view !== "live" ? `<p class="note">The draw no bet track has no ${view === "model" ? "model" : "backtest"} of its own here: this is ${esc(parent.label)}'s, on 1X2.${view === "backtest" && dnbBacktestText(x) ? ` ${esc(dnbBacktestText(x))}.` : ""}</p>`
     : x.variantOf && view !== "live" ? `<p class="note">A shadow test has no ${view === "model" ? "model" : "backtest"} of its own: this is ${esc(parent.label)}'s.</p>`
     : x.key === "lean" && inRange?.bets ? `<p class="note lean-range-bt">This replay is the old rule, at every price. Inside the ${rangeWords(range)} range it placed ${inRange.bets.toLocaleString()} bets, ROI ${signedPct(inRange.roi)}: the ${range[0].toFixed(2)}–2.00 and 2.00–${range[1].toFixed(2)} rows under "Where the bets sit on the odds".</p>` : "";
   const top = `${head}${byComp && !research ? leagueFilter() : ""}${toggle}${parentNote}`;
@@ -4284,38 +4349,41 @@ const TRADE_FIELDS = [
   ["Match", (t) => `${t.home} v ${t.away}`],
   ["Kickoff", (t) => kickoffText(t.kickoff)],
   ["Pick", (t) => tradeLabel(t)],
-  ["Strategy", (t) => (isLean(t) ? "Blend Lean (1σ+)" : "Model 12% (your live test)"), (t) => !isPlayer(t) && !isCorner(t) && t.source === "live" && (leanOn() || !!t.strategy)],
+  ["Strategy", (t) => (isDnb(t) ? `${DNB_STRAT_LABEL[t.strategy] || "Draw no bet"} (tracked beside the record)` : isLean(t) ? "Blend Lean (1σ+)" : "Model 12% (your live test)"), (t) => !isPlayer(t) && !isCorner(t) && t.source === "live" && (leanOn() || !!t.strategy)],
   ["Player", (t) => `${t.player} (${t.team || "?"}${t.position ? `, ${t.position}` : ""})`, "player"],
   ["Result", (t) => (t.actual != null ? `${countWord(t.market, t.actual)}${t.started != null ? (t.started ? ", started" : ", came on") : ""}` : "–"), "player"],
   ["Result", (t) => (t.actual != null ? `${t.team} had ${t.actual} corners${t.push ? ": exactly the line, a push (stake back)" : ""}` : "–"), "corners"],
   ["Model's expected corners", (t) => (t.model_mean != null ? `${t.team} ${Number(t.model_mean).toFixed(1)}` : "–"), "corners"],
   ["Entry odds", (t) => `${american(t.odds)} (${t.odds.toFixed(2)})`],
+  ["Built from DraftKings' 1X2", (t) => `home ${priceBoth(t.entry_prices?.home)} · draw ${priceBoth(t.entry_prices?.draw)} · away ${priceBoth(t.entry_prices?.away)}: side × (1 − 1/draw)`, (t) => isDnb(t) && !!t.entry_prices],
   ["Odds fetched", (t) => (t.odds_fetched_at ? kickoffText(t.odds_fetched_at) : "–")],
   ["Opened", (t) => `${kickoffText(t.opened_at)} (${hoursText(t.hours_to_kickoff)} before kickoff)`],
-  [(t) => (isLean(t) || (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4) ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
+  [(t) => (isDnb(t) ? `${t.strategy === "lean_dnb" ? "Blend" : "Model"} chance, draw taken out` : isLean(t) || (isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4) ? "Chance used (blend)" : "Model chance"), (t) => pct(t.model_p, 1)],
   ["Raw model chance", (t) => pct(t.p_model, 1), (t) => isLean(t) && t.p_model != null],
   ["Break-even at entry", (t) => pct(1 / t.odds, 1), isLean],
   ["What carried it", (t) => `${DRIVER_NAME[driverOf(t) || "unknown"]}${t.z_market != null ? ` (${sigmaText(t.z_market)} without the model's term)` : ""}${t.driver_from === "odds_log" ? "; worked out later from the logged price" : ""}`, isLean],
   ["Above break-even", (t) => `${sigmaText(t.z)} (${tierName(t)}${t.sigma != null ? `; σ = ${ptsText(t.sigma)}` : ""})`, (t) => isLean(t) && t.z != null],
   ["Raw model chance", (t) => pct(t.model_p_base, 1), (t) => isPlayer(t) && t.model_p_base != null && Math.abs(t.model_p_base - t.model_p) > 1e-4],
   ["Push chance", (t) => pct(t.p_push, 1), (t) => isCorner(t) && t.p_push > 0],
-  ["Without team news", (t) => pct(t.model_p_base, 1), (t) => !isPlayer(t) && !isCorner(t) && !isLean(t)],
+  ["Without team news", (t) => pct(t.model_p_base, 1), (t) => !isPlayer(t) && !isCorner(t) && !isLean(t) && !isDnb(t)],
   ["Team news applied", (t) => (t.news_applied ? "Yes" : "No"), "match"],
   ["Edge at entry", (t) => signedPct(t.edge)],
   ["Threshold", (t) => (isLean(t) ? `+${Number(t.threshold).toFixed(0)}σ` : pct(t.threshold))],
-  ["Rule", (t) => (isCorner(t) ? `Fixed edge, model (f) vs ${BOOK_NAME[cornerBook(t)]} (live test)` : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : t.rule === "lean_1sigma" ? "Blend 1σ+ above the price's break-even" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
+  ["Rule", (t) => (isDnb(t) ? (t.strategy === "lean_dnb" ? "Draw no bet: blend 1σ+ above the price's break-even" : "Draw no bet: fixed edge, model alone") : isCorner(t) ? `Fixed edge, model (f) vs ${BOOK_NAME[cornerBook(t)]} (live test)` : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : t.rule === "lean_1sigma" ? "Blend 1σ+ above the price's break-even" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
   [(t) => (tradePhase(t) === "upcoming" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
   [(t) => (tradePhase(t) === "upcoming" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
   ["Bookmaker", (t) => (isCorner(t) ? BOOK_NAME[cornerBook(t)] : ({ pinnacle: "Pinnacle", draftkings: "DraftKings", fanduel: "FanDuel" })[t.bookmaker] || t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings"))],
   [(t) => `${tradePhase(t) === "upcoming" ? "Latest" : "Closing"} over / under`, (t) => `${american(t.close_prices?.over)} / ${american(t.close_prices?.under)}`, (t) => isCorner(t) && !!t.close_prices],
   ["Book implied chance", (t) => (t.implied != null ? pct(t.implied, 1) : "–")],
-  [(t) => (isPlayer(t) ? "Price move to close" : tradePhase(t) === "upcoming" ? "CLV so far" : isCorner(t) ? `CLV vs ${closeWho(t)}` : "CLV vs DraftKings"), (t) => (isDkCorner(t) && t.clv_dk == null && t.close_prices && (t.close_prices.over == null || t.close_prices.under == null) ? "– (one-sided close)" : signedPct(tradeClv(t)))],
+  [(t) => (isPlayer(t) ? "Price move to close" : tradePhase(t) === "upcoming" ? "CLV so far" : isCorner(t) ? `CLV vs ${closeWho(t)}` : isDnb(t) ? "CLV vs DraftKings (per stake not refunded)" : "CLV vs DraftKings"), (t) => (isDkCorner(t) && t.clv_dk == null && t.close_prices && (t.close_prices.over == null || t.close_prices.under == null) ? "– (one-sided close)" : signedPct(tradeClv(t)))],
   ["Beat the close", (t) => { const b = tradeBeat(t), c = tradeClv(t); return b == null ? (c == null || tradePhase(t) === "upcoming" ? "–" : c > 0 ? "Yes" : "No") : b ? "Yes" : "No"; }, (t) => !isPlayer(t)],
+  ["CLV per $ vs DraftKings", (t) => signedPct(t.clv_dk_staked), (t) => isDnb(t) && tradePhase(t) !== "upcoming"],
   ["CLV vs Pinnacle", (t) => signedPct(t.clv_pinnacle), "match"],
+  ["CLV per $ vs Pinnacle", (t) => signedPct(t.clv_pinnacle_staked), isDnb],
   ["CLV vs Pinnacle's close", (t) => signedPct(t.clv_pinnacle), isDkCorner],
   ["Pinnacle's close, over / under", (t) => (t.pinnacle_close_prices ? `${american(t.pinnacle_close_prices.over)} / ${american(t.pinnacle_close_prices.under)}` : "not quoted at this line"), isDkCorner],
-  ["Status", (t) => (t.status === "open" ? `Open · ${PHASE_LABEL[tradePhase(t)]}` : t.status[0].toUpperCase() + t.status.slice(1))],
+  ["Status", (t) => (t.status === "open" ? `Open · ${PHASE_LABEL[tradePhase(t)]}` : isDraw(t) ? "Draw: stake back" : t.status[0].toUpperCase() + t.status.slice(1))],
   ["Score", (t) => t.score || "–", (t) => !isPlayer(t)],
   ["Profit", (t) => (t.profit == null ? "–" : usd(t.profit, 2))],
   ["Season", (t) => seasonName(t.season)],
@@ -4333,7 +4401,7 @@ function tradeStateLine(t) {
   if (ph === "upcoming") text = m == null ? "" : `Kicks off in ${hoursText(-m / 60)}. Prices are still moving: the odds and CLV below are the latest logged.`;
   else if (ph === "inplay") text = `Kicked off ${hoursText(m / 60)} ago. Prices after kickoff aren't logged, so the close and CLV below are final. It settles after full time.`;
   else if (ph === "awaiting") text = `Kicked off ${hoursText(m / 60)} ago. ${AWAIT_NOTE} The close and CLV below are final.`;
-  else text = t.status === "void" ? (t.push ? "A push: stake back." : "Void: stake back.") : `${t.status === "won" ? "Won" : "Lost"}${t.profit != null ? ` ${usd(t.profit, 2)}` : ""}.`;
+  else text = t.status === "void" ? (isDraw(t) ? "A draw: stake back." : t.push ? "A push: stake back." : "Void: stake back.") : `${t.status === "won" ? "Won" : "Lost"}${t.profit != null ? ` ${usd(t.profit, 2)}` : ""}.`;
   const label = ph === "settled" ? "Settled" : PHASE_LABEL[ph];
   return `<p class="trade-state"><b class="phase-tag ${ph}">${label}</b>${text ? ` ${esc(text)}` : ""}</p>`;
 }

@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 from conftest import simulate_league  # noqa: E402
 
 from soccer_stats import corners_live, paper  # noqa: E402
+from soccer_stats import paper_dnb as pdnb  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
 from soccer_stats import publish as pub  # noqa: E402
 from soccer_stats import trades as tr  # noqa: E402
@@ -1219,6 +1220,60 @@ LEAN_SHADOWS = [
 ]
 
 
+# The draw no bet tracks (owner, 26 Oct; paper_dnb): their real start (tr.DNB_FROM) is after
+# the fixture's NOW, so it moves to 27 Sep (paper_dnb reads it at call time). Model 12%'s
+# track gets synthetic trades: a win, a loss, a draw (stake back), a second league's win and
+# one open; Lean's track has none (no sigma_dnb in the fits, as live until the refit).
+# league, home, away, kickoff, market, entry 1X2, the model's chance without the draw, the
+# close 1X2 (DraftKings), Pinnacle's close 1X2, score (None = open)
+FIXTURE_DNB_FROM = "2026-09-27T00:00:00+00:00"
+tr.DNB_FROM = FIXTURE_DNB_FROM
+DNB_TRADES = [
+    ("E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "home", (1.9, 3.6, 4.2), 0.84)
+    + ((1.85, 3.7, 4.4), (1.86, 3.75, 4.5), "2-0"),
+    ("E0", "West Ham", "Arsenal", "2026-09-29T19:00:00Z", "home", (4.5, 3.9, 1.75), 0.42)
+    + ((4.8, 4.0, 1.7), (4.9, 4.1, 1.72), "0-2"),
+    ("E0", "Leeds", "Crystal Palace", "2026-10-03T14:00:00Z", "away", (2.6, 3.3, 2.8), 0.6)
+    + ((2.6, 3.2, 2.75), (2.62, 3.25, 2.8), "1-1"),
+    ("SP1", "Villarreal", "Girona", "2026-10-04T19:00:00Z", "home", (1.95, 3.5, 3.9), 0.82)
+    + ((1.9, 3.6, 4.1), (1.92, 3.6, 4.2), "3-1"),
+    ("E0", "Man United", "Brighton", "2026-10-08T14:00:00Z", "home", (2.2, 3.5, 3.2), 0.74)
+    + ((2.2, 3.5, 3.2), None, None),
+]
+
+
+def dnb_trades(rules: dict) -> list[dict]:
+    """The synthetic Model 12% draw no bet trades, through paper_dnb's own record and close."""
+    ref = {"commit": "synthetic", "xg_weight": 0.7, "matches_fit": 800}
+    out = []
+    for lg, home, away, ko, market, entry, q, close, pin, score in DNB_TRADES:
+        kick = pd.Timestamp(ko)
+        other = "away" if market == "home" else "home"
+        c = {"home": home, "away": away, "odds": dict(zip(tr.LEAN_MARKETS, entry, strict=True))}
+        c["p"] = {market: 0.75 * q, other: 0.75 * (1 - q), "draw": 0.25}
+        c["p_bet"] = {market: 0.75 * (q - 0.12), other: 0.75 * (1.12 - q), "draw": 0.25}
+        o = tr.dnb_odds(c["odds"][market], c["odds"]["draw"])
+        pick = {"market": market, "odds": o, "model_p": q, "edge": q * o - 1, "z": None}
+        rule = tr.dnb_rule(rules[lg], "edge12_dnb")
+        opened = kick - pd.Timedelta(hours=30)
+        fetched = (opened - pd.Timedelta(minutes=20)).isoformat()
+        t = pdnb.new_trade(c, pick, "edge12_dnb", rule, kick, opened, fetched, lg, ref)
+        quoted = (kick - pd.Timedelta(minutes=10)).isoformat()
+        t.update(
+            pdnb._close_fields(
+                t, dict(zip(tr.LEAN_MARKETS, close, strict=True)), quoted, kick.isoformat()
+            )
+        )
+        if score:
+            h, a = (int(v) for v in score.split("-"))
+            t.update(tr.settle_dnb(t, h, a), result_source="football-data")
+            t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+            c_pin = tr.dnb_clv(t["odds"], market, dict(zip(tr.LEAN_MARKETS, pin, strict=True)))
+            t.update(clv_pinnacle=c_pin[0], clv_pinnacle_staked=c_pin[1])
+        out.append(t)
+    return out
+
+
 def add_lean_strategy(data: dict) -> None:
     pub.add_lean(data, SYNTHETIC_BLENDS)
     codes = list(data["portfolio"]["rules"])
@@ -1332,6 +1387,19 @@ def add_lean_strategy(data: dict) -> None:
         paper.match_strategies(leans, rule),
         now=NOW,
         shadow_trades=shadows,
+        dnb_trades=dnb_trades(data["portfolio"]["rules"]),
+        dnb_rules={
+            track: pdnb.overview(
+                {
+                    lg: tr.dnb_rule(
+                        leans[lg] if track == "lean_dnb" else data["portfolio"]["rules"][lg], track
+                    )
+                    for lg in codes
+                },
+                track,
+            )
+            for track in tr.DNB_TRACKS.values()
+        },
     )
 
 

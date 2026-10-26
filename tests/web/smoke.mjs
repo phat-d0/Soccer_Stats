@@ -584,7 +584,8 @@ const STEPS = [
     // Moneyline's folders: one per strategy, the old rule filed under Lean.
     const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
     // Each strategy is its own row (owner, 25 Oct); the old rule sits in the Archive list.
-    if (strats.join(",") !== "lean,edge12,lean_all_odds") throw new Error(`strategy folders: ${strats.join(",")}`);
+    // Each draw no bet track sits right after its parent in the main list (owner, 26 Oct).
+    if (strats.join(",") !== "lean,lean_dnb,edge12,edge12_dnb,lean_all_odds") throw new Error(`strategy folders: ${strats.join(",")}`);
     const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
     if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
@@ -710,6 +711,73 @@ const STEPS = [
     if (!text.includes("Blend Lean, all odds (old rule).") || !text.includes("Odds range since")) throw new Error("old-rule rule note");
     await scrubCheck(p, "[data-scrub='cv']");
     await p.locator(".band-share").first().scrollIntoViewIfNeeded();
+    await pfOpenStrat(p, "lean");
+  }],
+  // Draw no bet tracks (owner, 26 Oct; paper_dnb): their own rows after each parent, their
+  // own trades from `dnb_trades`, a draw shown as "Draw: stake back", ROI on bets not
+  // refunded, the descriptive comparison with the parent, the parent overlaid on the chart.
+  ["portfolio-dnb", async (p) => {
+    await pfUp(p);
+    const row = (await p.locator('button[data-pfstrat="edge12_dnb"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Model 12%, draw no bet", "Tracked beside the record · places no bets of its own · a draw returns the stake", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
+    if (await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="edge12_dnb"]').count()) throw new Error("the DNB track is in the Archive");
+    await pfHome(p);
+    const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
+    if (!home.includes("2 draw no bet tracks") || home.includes("Model 12%, draw no bet")) throw new Error(`Moneyline row: ${home}`);
+    await p.click('button[data-pfid="moneyline"]');
+    await p.click('button[data-pfstrat="edge12_dnb"]');
+    if ((await p.locator(".pf-title").innerText()) !== "Model 12%, draw no bet") throw new Error("DNB track not opened");
+    const ids = await p.locator("#view button[data-trade]").evaluateAll((els) => els.map((e) => e.dataset.trade));
+    const want = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").trade_ids);
+    if (ids.length !== want.length || ids.some((id) => !id.endsWith("|dnb") || !want.includes(id))) throw new Error(`DNB trades: ${ids.join(", ")}`);
+    const draw = (await p.locator('button[data-trade="E0|2627|Leeds|Crystal Palace|dnb"]').innerText()).replace(/\s+/g, " ");
+    if (!draw.includes("Crystal Palace, draw no bet") || !draw.includes("Draw stake back") || /Lost|−\$10/.test(draw)) throw new Error(`draw row: ${draw}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    const m = await p.evaluate(() => tradeStats(strategyLiveSet(pfCurrent(), pfSelected(pfStrategies(pfCurrent())), "").trades));
+    if (m.won !== 2 || m.lost !== 1 || m.draws !== 1 || m.open !== 1) throw new Error(`DNB stats: ${JSON.stringify(m)}`);
+    for (const w of ["2–1", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
+      if (!text.includes(w)) throw new Error(`DNB view lacks "${w}"`);
+    }
+    // The comparison's CLV per $ is paper_dnb's, for both lines.
+    const per = await p.evaluate(() => { const c = pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").compare.clv_per_dollar.clv_dk; return [signedPct(c.track.mean), signedPct(c.parent.mean)]; });
+    const box = (await p.textContent(".dnb-compare")).replace(/\s+/g, " ");
+    if (!per.every((v) => box.includes(v))) throw new Error(`compare box lacks ${per}: ${box}`);
+    // Profit over time: the parent solid (since the track started) and draw no bet dashed.
+    const legend = (await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|");
+    if (!legend.startsWith("1X2 (the record)") || !legend.includes("Draw no bet")) throw new Error(`DNB legend: ${legend}`);
+    if (await p.locator("[data-scrub='cv'] .filter-lab").count()) throw new Error("DNB chart has a filter marker");
+    const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
+    const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").defined_at).slice(0, 10)));
+    if (!origin.startsWith(start)) throw new Error(`DNB overlay origin ${origin} vs ${start}`);
+    await scrubCheck(p, "[data-scrub='cv']");
+    // The parent's own chart leaves the draw no bet line out.
+    await pfOpenStrat(p, "edge12");
+    if ((await p.locator(".pf-curve .curve-legend").count())) throw new Error("Model 12% chart overlays its DNB track");
+    await pfOpenStrat(p, "edge12_dnb");
+  }],
+  ["portfolio-dnb-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Leeds|Crystal Palace|dnb"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["A draw: stake back.", "Away, draw no bet", "Model 12%, draw no bet (tracked beside the record)", "Built from DraftKings' 1X2", "side × (1 − 1/draw)", "Model chance, draw taken out", "Draw no bet: fixed edge, model alone", "CLV vs DraftKings (per stake not refunded)", "CLV per $ vs DraftKings", "CLV per $ vs Pinnacle", "Draw: stake back"]) {
+      if (!text.includes(w)) throw new Error(`DNB trade sheet lacks "${w}"`);
+    }
+    if (text.includes("Without team news")) throw new Error("DNB sheet shows the team-news row");
+  }, true],
+  ["portfolio-dnb-backtest", async (p) => {
+    await closeSheet(p); await p.click('button[data-pf="backtest"]');
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!text.includes("The draw no bet track has no backtest of its own here: this is Model 12% (your live test)'s, on 1X2. Backtest, 24 Oct: no edge;")) throw new Error("DNB backtest note");
+    await p.click('button[data-pf="model"]');
+    if (!(await p.textContent("#view")).includes("The draw no bet track has no model of its own here")) throw new Error("DNB model note");
+    await p.click('button[data-pf="live"]');
+  }],
+  // Lean's track has no trades until the blend fits carry sigma_dnb (the overview's source "none").
+  ["portfolio-dnb-lean-empty", async (p) => {
+    await pfOpenStrat(p, "lean_dnb");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["No Blend Lean, draw no bet trades yet. The blend's fits don't carry a σ for draw no bet yet", "Blend Lean, draw no bet. Blend Lean's rule on draw no bet", "applies to the DNB price", "The parent's rule, Blend Lean (new rule):"]) {
+      if (!text.includes(w)) throw new Error(`Lean DNB view lacks "${w}"`);
+    }
     await pfOpenStrat(p, "lean");
   }],
   // Arsenal v Leeds's Strong Lean trade (+650) is outside the odds range, so it sits in the
