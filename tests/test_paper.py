@@ -133,7 +133,8 @@ def test_run_fails_safe_and_fills_portfolio(tmp_path):
     good.mkdir()
     (good / "backtest").mkdir()
     (good / "backtest" / "E0_dk.json").write_text(json.dumps({"summary": {"trades": 3}}))
-    assert paper.run(data, good, None, now=NOW) == 1
+    # The 12% trade, plus its draw no bet track's (own ledger, out of the record).
+    assert paper.run(data, good, None, now=NOW) == 2
     live = data["portfolio"]["live"]
     assert live["error"] is None and live["summary"]["open"] == 1
     assert data["portfolio"]["backtest"]["summary"]["trades"] == 3
@@ -207,7 +208,7 @@ def test_run_uses_the_backtest_level_and_says_why(tmp_path, monkeypatch):
 
     bt.write_text(json.dumps({"summary": {}}))  # older file: the fixed 12%
     data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
-    assert paper.run(data, tmp_path, None, now=NOW) == 1
+    assert paper.run(data, tmp_path, None, now=NOW) == 2  # plus its draw no bet track's
     assert data["portfolio"]["rule"]["threshold_source"] == "default"
     led = paper.load_ledger(tmp_path)
     assert led["E0|2627|Arsenal|Leeds"]["threshold"] == tr.PAPER_EDGE

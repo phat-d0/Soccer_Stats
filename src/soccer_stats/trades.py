@@ -300,8 +300,8 @@ def lean_pick(
 
 def lean_rule(blends: dict | None, league: str) -> dict:
     """The Lean rule for one league: {key, rule, min_z, strong_z, p_source, stake, sigma,
-    coef, matches, source, note, fit_made_at, odds_range, odds_range_from, odds_range_note,
-    rule_version}. `blends` is data.json's `match_blends` (publish.add_lean); no
+    sigma_dnb, coef, matches, source, note, fit_made_at, odds_range, odds_range_from,
+    odds_range_note, rule_version}. `blends` is data.json's `match_blends` (publish.add_lean); no
     file or no fit for the league = sigma None, so no Lean picks, and the note says why."""
     entry = ((blends or {}).get("leagues") or {}).get(league) or {}
     sd = entry.get("sigma")
@@ -323,6 +323,10 @@ def lean_rule(blends: dict | None, league: str) -> dict:
         "p_source": "blend",
         "stake": STAKE,
         "sigma": float(sd) if ok else None,
+        # The draw no bet track's unit (match_calibration.sigma_dnb); None = no DNB picks.
+        "sigma_dnb": float(entry["sigma_dnb"])
+        if ok and _ok(entry.get("sigma_dnb")) and entry["sigma_dnb"] > 0
+        else None,
         "coef": entry.get("coef") if ok else None,  # for the driver test (market_side_z)
         "matches": entry.get("matches"),
         "source": "match_blends" if ok else "none",
@@ -334,6 +338,170 @@ def lean_rule(blends: dict | None, league: str) -> dict:
         "odds_range_from": LEAN_RANGE_FROM,
         "odds_range_note": LEAN_RANGE_NOTE,
         "rule_version": LEAN_RULE_VERSION,
+    }
+
+
+# ---------- draw no bet tracks (owner, 26 Oct; docs/leagues.md "Draw no bet tracks") ----------
+
+# Each match strategy gets a draw no bet (DNB) track beside it: back home or away, the stake
+# refunded on a draw. Paper only and descriptive: the 1X2 trades stay the record. The 24 Oct
+# backtest (docs/lab.md "Draw no bet") found no edge either way (CLV per $ about the same as
+# 1X2), with fewer losing streaks. The DNB price is built from DraftKings' h2h (back the side,
+# cover the draw: side x (1 - 1/draw)), so no new market is fetched; the margin-free DNB
+# chance is the Shin 1X2 chance with the draw taken out. The chances are the parent's own
+# (the raw model for Model 12%, the blend for Lean), with the draw taken out.
+DNB_SIDES = ("home", "away")
+DNB_SUFFIX = "|dnb"  # a DNB trade's id: the parent trade's id plus this
+DNB_FROM = "2026-10-26T08:23:00+00:00"  # the commit that adds the tracks
+DNB_TRACKS = {"lean": "lean_dnb", "edge12": "edge12_dnb"}  # parent strategy -> its track
+DNB_LABELS = {"lean_dnb": "Blend Lean, draw no bet", "edge12_dnb": "Model 12%, draw no bet"}
+DNB_RULE_NAMES = {"lean_dnb": "dnb_lean_1sigma", "edge12_dnb": "dnb_fixed_raw"}
+DNB_NOTE = (
+    "Draw no bet, tracked beside the 1X2 trades (owner, 26 Oct), which stay the record: home or "
+    "away only, and a draw refunds the stake (shown as a push). The price is built from "
+    "DraftKings' 1X2 prices (back the side and cover the draw: side x (1 - 1/draw)); "
+    "DraftKings' own draw no bet price may carry a bigger margin. ROI counts only bets that "
+    "weren't refunded. The 24 Oct backtest found no edge: it loses to the closing price about "
+    "as much per dollar as 1X2, with less swing."
+)
+DNB_LEAN_NOTE = (
+    "Blend Lean's rule on draw no bet: the blend's chance with the draw taken out, at least 1 "
+    "sigma above the DNB price's break-even (sigma for draw no bet, per league). The odds range "
+    "(decimal 1.50 to 3.00) applies to the DNB price."
+)
+DNB_EDGE12_NOTE = (
+    "Model 12%'s rule on draw no bet: the model's chance with the draw taken out, at least a "
+    "12% edge at the DNB price (edge per stake not refunded)."
+)
+
+
+def dnb_odds(odds_side, odds_draw) -> float | None:
+    """The DNB decimal price from a 1X2 book: back the side and cover the draw so a draw
+    returns the whole stake, side x (1 - 1/draw); None without both prices above 1."""
+    if not (_ok(odds_side) and _ok(odds_draw)) or odds_side <= 1 or odds_draw <= 1:
+        return None
+    return float(odds_side) * (1 - 1 / float(odds_draw))
+
+
+def fair_dnb(prices) -> dict | None:
+    """{home, away, draw}: the Shin-fair 1X2 chances of (home, draw, away) prices, home and
+    away with the draw taken out (they sum to 1); `draw` is the fair draw chance."""
+    vals = list(prices)
+    if len(vals) != 3 or not all(_ok(v) and v > 1 for v in vals):
+        return None
+    f = devig_shin(np.array(vals, dtype=float))
+    s = f[0] + f[2]
+    return {"home": float(f[0] / s), "away": float(f[2] / s), "draw": float(f[1])}
+
+
+def without_draw(p: dict | None) -> dict | None:
+    """{home, away} = p_side / (p_home + p_away), or None."""
+    h, a = (p or {}).get("home"), (p or {}).get("away")
+    if not (_ok(h) and _ok(a)) or h + a <= 0:
+        return None
+    return {"home": float(h) / (h + a), "away": float(a) / (h + a)}
+
+
+def dnb_prices(odds: dict | None) -> dict | None:
+    """{home, away}: a 1X2 book's DNB prices (dnb_odds), or None unless both are priced."""
+    o = odds or {}
+    out = {s: dnb_odds(o.get(s), o.get("draw")) for s in DNB_SIDES}
+    return out if all(v is not None for v in out.values()) else None
+
+
+def dnb_pick_12(q: dict | None, odds: dict | None, threshold: float = PAPER_EDGE) -> dict | None:
+    """DNB 12%: the side with the larger edge q x DNB price - 1, if at least `threshold`
+    (and above 0); home first on a tie. {market, odds, model_p, edge, z: None}."""
+    best = None
+    for s in DNB_SIDES:
+        p, o = (q or {}).get(s), (odds or {}).get(s)
+        if not (_ok(p) and _ok(o)) or o <= 1:
+            continue
+        e = float(p) * float(o) - 1
+        if e >= threshold - EPS and e > 0 and (best is None or e > best["edge"]):
+            best = {"market": s, "odds": float(o), "model_p": float(p), "edge": e, "z": None}
+    return best
+
+
+def dnb_pick_lean(
+    qb: dict | None, odds: dict | None, sigma: float | None, min_z: float = LEAN_Z
+) -> dict | None:
+    """DNB Lean: the side with the higher z = (q_blend - 1/DNB price) / sigma, if at least
+    `min_z`; home first on a tie. {market, odds, model_p, edge, z}."""
+    if not _ok(sigma) or sigma <= 0:
+        return None
+    best = None
+    for s in DNB_SIDES:
+        p, o = (qb or {}).get(s), (odds or {}).get(s)
+        if not (_ok(p) and _ok(o)) or o <= 1:
+            continue
+        z = (float(p) - 1 / float(o)) / float(sigma)
+        if z >= min_z - EPS and (best is None or z > best["z"]):
+            best = {"market": s, "odds": float(o), "model_p": float(p), "edge": p * o - 1, "z": z}
+    return best
+
+
+def settle_dnb(trade: dict, home_goals, away_goals, void: bool = False) -> dict:
+    """Settlement for a DNB trade: a draw refunds the stake (status "void", push True, as
+    a corner push), else won or lost as the 1X2 side; no score or `void`: void."""
+    if void or home_goals is None or away_goals is None:
+        return {"status": "void", "score": None, "push": False, "profit": 0.0}
+    h, a = int(home_goals), int(away_goals)
+    score = f"{h}-{a}"
+    if h == a:
+        return {"status": "void", "score": score, "push": True, "profit": 0.0}
+    w = won(trade["market"], h, a)
+    return {
+        "status": "won" if w else "lost",
+        "score": score,
+        "push": False,
+        "profit": round(trade["stake"] * (trade["odds"] - 1), 2) if w else -trade["stake"],
+    }
+
+
+def dnb_clv(entry_odds: float, market: str, close: dict | None) -> tuple[float, float] | None:
+    """(CLV, CLV per $ staked) of a DNB bet against a closing 1X2 book (home/draw/away):
+    entry DNB odds x the close's fair DNB chance - 1, per stake not refunded, and the same
+    x the close's no-draw chance. None without a full close."""
+    c = close or {}
+    f = fair_dnb([c.get(m) for m in LEAN_MARKETS])
+    if f is None or market not in DNB_SIDES:
+        return None
+    v = float(entry_odds) * f[market] - 1
+    return v, v * (1 - f["draw"])
+
+
+def dnb_rule(parent: dict | None, track: str) -> dict:
+    """A DNB track's rule from its parent's: Lean's (lean_rule, one league) gives min_z, the
+    league's sigma_dnb as `sigma` and the odds range on the DNB price; Model 12%'s
+    (paper_threshold) its threshold and p_source. Both add key, rule, variant_of, adds
+    "dnb", stake, defined_at and the note."""
+    parent = parent or {}
+    base = {
+        "key": track,
+        "rule": DNB_RULE_NAMES[track],
+        "variant_of": "lean" if track == "lean_dnb" else "edge12",
+        "adds": "dnb",
+        "stake": STAKE,
+        "defined_at": DNB_FROM,
+        "price": "DraftKings' 1X2: side x (1 - 1/draw)",
+    }
+    if track == "lean_dnb":
+        sd = parent.get("sigma_dnb")
+        return {
+            **base,
+            "min_z": parent.get("min_z", LEAN_Z),
+            "p_source": "blend",
+            "sigma": sd if _ok(sd) and sd > 0 else None,
+            "odds_range": list(LEAN_ODDS_RANGE),
+            "odds_range_on": "dnb_price",
+            "note": DNB_LEAN_NOTE + " " + DNB_NOTE,
+        }
+    return {
+        **base,
+        "threshold": parent.get("threshold"),
+        "p_source": parent.get("p_source") or "model",
+        "note": DNB_EDGE12_NOTE + " " + DNB_NOTE,
     }
 
 

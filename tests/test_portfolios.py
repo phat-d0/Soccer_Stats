@@ -119,7 +119,7 @@ def test_run_fills_portfolios(tmp_path):
     (tmp_path / "backtest").mkdir()
     (tmp_path / "backtest" / "E0_dk.json").write_text(json.dumps({"summary": {"trades": 3}}))
     data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
-    assert paper.run(data, tmp_path, None, now=NOW) == 1
+    assert paper.run(data, tmp_path, None, now=NOW) == 2  # plus its draw no bet track's
     pfs = {p["id"]: p for p in data["portfolio"]["portfolios"]}
     assert pfs["moneyline"]["live"]["summary"]["open"] == 1
     assert pfs["moneyline"]["backtest"]["summary"]["trades"] == 3

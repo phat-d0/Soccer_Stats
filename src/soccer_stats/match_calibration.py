@@ -294,12 +294,30 @@ def live_fit(train: pd.DataFrame, group: str, min_rows: int = MIN_ROWS) -> dict:
 # ---------- per-league h2h blends (fit-match-blends; the Lean strategy) ----------
 
 
+def sigma_dnb(coef: list[float] | None, market, model) -> float | None:
+    """sigma() for draw no bet (owner, 24 Oct; dnb_backtest): the sd (ddof 0) of the
+    blend's home chance with the draw taken out, p_home / (p_home + p_away), minus the
+    price's, on the rows the coefficients were fitted on (the away side is its mirror).
+    None without coefficients or rows."""
+    if coef is None:
+        return None
+    mk = np.atleast_2d(np.asarray(market, dtype=float))
+    if not mk.size:
+        return None
+    b = apply(coef, mk, model)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        gap = b[:, 0] / (b[:, 0] + b[:, 2]) - mk[:, 0] / (mk[:, 0] + mk[:, 2])
+    gap = gap[np.isfinite(gap)]
+    return float(gap.std(ddof=0)) if len(gap) else None
+
+
 def league_fit(rows: pd.DataFrame, fit_date, min_rows: int = MIN_ROWS) -> dict:
     """The live h2h blend for one league from its training rows (training_rows output).
 
     Only matches played before `fit_date` are used (no look-ahead): the coefficients, the
     tier unit `sigma` (sd of p_blend - p_book, pooled over home/draw/away, p_book =
-    Pinnacle's margin-free close) and the date range. Also an out-of-sample check: the
+    Pinnacle's margin-free close), `sigma_dnb` (the same for the draw no bet chance,
+    sigma_dnb) and the date range. Also an out-of-sample check: the
     same blend walk-forward (refit every REFIT on earlier matches only), log loss of the
     model, the blend and Pinnacle on the matches it covers.
     """
@@ -310,6 +328,7 @@ def league_fit(rows: pd.DataFrame, fit_date, min_rows: int = MIN_ROWS) -> dict:
     out = {
         "coef": None,
         "sigma": None,
+        "sigma_dnb": None,
         "matches": len(rows),
         "fit_from": None,
         "fit_to": None,
@@ -324,6 +343,8 @@ def league_fit(rows: pd.DataFrame, fit_date, min_rows: int = MIN_ROWS) -> dict:
     out["coef"] = coef
     sd = sigma(coef, rows[mk_cols], rows[p_cols])
     out["sigma"] = None if sd is None else round(sd, 5)
+    sd = sigma_dnb(coef, rows[mk_cols], rows[p_cols])  # the draw no bet track's unit
+    out["sigma_dnb"] = None if sd is None else round(sd, 5)
     blended, fits = walk_forward(rows, rows, "h2h", min_rows=min_rows)
     ok = blended[list(H2H)].notna().all(axis=1).to_numpy()
     if ok.any():

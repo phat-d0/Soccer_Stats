@@ -188,7 +188,7 @@ def test_fixed_raw_opens_every_live_league_on_the_raw_chance(tmp_path, monkeypat
 
     log = _null_levels(tmp_path, monkeypatch)
     d = _six_league_data()
-    assert paper.run(d, log, None, now=NOW) == 6
+    assert paper.run(d, log, None, now=NOW) == 12  # six trades and their draw no bet ones
     for lg, (h, a) in CLUBS.items():
         led = paper.load_ledger(log, lg)
         assert list(led) == [f"{lg}|2627|{h}|{a}"]  # each league into its own ledger file
@@ -321,7 +321,8 @@ def test_fixed_raw_keeps_the_kickoff_freshness_and_odds_gates(tmp_path, monkeypa
     by["E1"]["low_data"] = True
     # A second card for the E0 match (same names) still opens one trade.
     d["fixtures"].append(dict(by["E0"]))
-    assert paper.run(d, log, None, now=NOW) == 1
+    # The draw no bet track keeps the same gates: E0's trade and its DNB one only.
+    assert paper.run(d, log, None, now=NOW) == 2
     assert list(paper.load_ledger(log, "E0")) == ["E0|2627|Arsenal|Leeds"]
     for lg in SIX[1:]:
         assert paper.load_ledger(log, lg) == {}

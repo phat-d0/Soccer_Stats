@@ -725,7 +725,16 @@ def match_blends(path: str | None = None) -> dict | None:
     return {**d, "leagues": leagues} if leagues else None
 
 
-LEAN_CARD_KEYS = ("coef", "sigma", "matches", "fit_from", "fit_to", "fit_date", "refit")
+LEAN_CARD_KEYS = (
+    "coef",
+    "sigma",
+    "sigma_dnb",
+    "matches",
+    "fit_from",
+    "fit_to",
+    "fit_date",
+    "refit",
+)
 
 
 def add_lean(data: dict, blends: dict | None) -> int:

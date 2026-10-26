@@ -896,7 +896,8 @@ def cmd_fit_match_blends(args: argparse.Namespace) -> None:
                 + (
                     entry["error"]
                     if entry.get("error")
-                    else f"coef {entry['coef']}, sigma {entry['sigma']}, {entry['matches']} "
+                    else f"coef {entry['coef']}, sigma {entry['sigma']}, sigma DNB "
+                    f"{entry.get('sigma_dnb')}, {entry['matches']} "
                     f"matches {entry['fit_from']} to {entry['fit_to']} (fit date "
                     f"{entry['fit_date']}; {entry.get('fit_rows')} fit rows, minimum "
                     f"{entry.get('min_rows')})"
@@ -930,7 +931,8 @@ def cmd_fit_match_blends(args: argparse.Namespace) -> None:
             + (
                 entry["error"]
                 if entry.get("error")
-                else f"coef {entry['coef']}, sigma {entry['sigma']}, {entry['matches']} matches "
+                else f"coef {entry['coef']}, sigma {entry['sigma']}, sigma DNB "
+                f"{entry.get('sigma_dnb')}, {entry['matches']} matches "
                 f"{entry['fit_from']} to {entry['fit_to']} (fit date {entry['fit_date']}, "
                 f"xG weight {entry['xg_weight']})"
             )

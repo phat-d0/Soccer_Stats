@@ -349,16 +349,18 @@ def test_strategies_listed_lean_first(tmp_path):
         "portfolio": {},
         "match_blends": blends,
     }
-    assert paper.run(data, tmp_path, None, now=NOW) == 2
+    # Lean, Model 12% and Model 12%'s draw no bet track (no sigma_dnb here: no Lean DNB).
+    assert paper.run(data, tmp_path, None, now=NOW) == 3
     assert data["portfolio"]["strategy_order"] == ["lean", "edge12"]
     rules = data["portfolio"]["rules"]["E0"]
     assert rules["sigma"] == SIGMA and rules["lean"]["rule"] == "lean_1sigma"
     assert rules["threshold"] == 0.12 and rules["rule"] == "fixed_raw"  # the 12% test stays
     ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
     sts = ml["live"]["strategies"]
-    # The old rule's shadow variant sits right after Lean (owner, 24 Oct).
-    assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "edge12"]
-    sts = [sts[0], sts[2]]
+    # The old rule's shadow variant sits right after Lean (owner, 24 Oct), then each
+    # strategy's draw no bet track (owner, 26 Oct).
+    assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "lean_dnb", "edge12", "edge12_dnb"]
+    sts = [next(s for s in sts if s["key"] == k) for k in ("lean", "edge12")]
     assert sts[0]["label"] == "Blend Lean (new rule)" and sts[1]["label"].startswith("Model 12%")
     assert sts[0]["trade_ids"] == ["E0|2627|Arsenal|Leeds|lean"]
     assert sts[1]["trade_ids"] == ["E0|2627|Arsenal|Leeds"]

@@ -127,13 +127,19 @@ def run(tmp_path, fixtures, now=NOW, res=None):
 
 def test_paper_run_keeps_shadows_out_of_the_real_record_and_settles_them(tmp_path):
     written, data, ml = run(tmp_path, [card(p_bet=P_BET_OUT, odds=ODDS_IN)])
-    assert written == 2  # the 12% trade and the shadow entry
+    assert written == 3  # the 12% trade, the shadow entry and the 12% draw no bet one
     live = ml["live"]
     assert [t["id"] for t in live["trades"]] == ["E0|2627|Arsenal|Leeds"]
     assert live["summary"]["trades"] == 1 and data["portfolio"]["live"]["summary"]["trades"] == 1
     assert [t["id"] for t in live["shadow_trades"]] == [SHADOW_ID]
     sts = {s["key"]: s for s in live["strategies"]}
-    assert [s["key"] for s in live["strategies"]] == ["lean", "lean_all_odds", "edge12"]
+    assert [s["key"] for s in live["strategies"]] == [
+        "lean",
+        "lean_all_odds",
+        "lean_dnb",
+        "edge12",
+        "edge12_dnb",
+    ]
     assert sts["lean"]["summary"]["trades"] == 0
     old = sts["lean_all_odds"]
     assert old["trade_ids"] == [SHADOW_ID] and old["summary"]["trades"] == 1
@@ -144,7 +150,7 @@ def test_paper_run_keeps_shadows_out_of_the_real_record_and_settles_them(tmp_pat
     assert run(tmp_path, [card(p_bet=P_BET_OUT, odds=ODDS_IN)])[0] == 0
     # Settled by the same code as a trade (draw 1-1: the shadow won), in its own file.
     written, data, ml = run(tmp_path, [], now=LATER, res=draw_result())
-    assert written == 2
+    assert written == 3  # with the draw no bet trade, refunded on the draw
     s = paper.load_lean_shadow(tmp_path, "E0")[SHADOW_ID]
     assert s["status"] == "won" and s["profit"] == pytest.approx(40.0)
     assert s["clv_pinnacle"] is not None
