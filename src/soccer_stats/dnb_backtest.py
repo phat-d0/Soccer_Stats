@@ -92,31 +92,10 @@ def _num(x) -> float | None:
 # ---------- prices ----------
 
 
-def dnb_odds(odds_side: float, odds_draw: float) -> float | None:
-    """The synthetic DNB decimal price: back the side and cover the draw so a draw returns
-    the whole stake. side x (1 - 1/draw); None without both prices above 1."""
-    s, d = _num(odds_side), _num(odds_draw)
-    if s is None or d is None or s <= 1 or d <= 1:
-        return None
-    return s * (1 - 1 / d)
-
-
-def fair_dnb(prices) -> dict | None:
-    """{home, away}: Shin-fair 1X2 (home, draw, away) with the draw taken out."""
-    vals = [_num(p) for p in prices]
-    if any(v is None or v <= 1 for v in vals):
-        return None
-    f = devig_shin(np.array(vals, dtype=float))
-    s = f[0] + f[2]
-    return {"home": float(f[0] / s), "away": float(f[2] / s), "draw": float(f[1])}
-
-
-def without_draw(p: dict) -> dict | None:
-    """{home, away} = p_side / (p_home + p_away), or None."""
-    h, a = _num(p.get("home")), _num(p.get("away"))
-    if h is None or a is None or h + a <= 0:
-        return None
-    return {"home": h / (h + a), "away": a / (h + a)}
+# The DNB maths and rules live in trades.py (the live tracks use the same functions).
+dnb_odds = tr.dnb_odds
+fair_dnb = tr.fair_dnb
+without_draw = tr.without_draw
 
 
 def ah_prices(raw: pd.DataFrame) -> pd.DataFrame:
@@ -165,8 +144,9 @@ def candidates(scored: pd.DataFrame) -> pd.DataFrame:
 
 
 def sigma_dnb(train: pd.DataFrame, fits: list[dict]) -> dict[str, float]:
-    """fit start (ISO date) -> sigma_DNB: the sd (ddof 0) of the blend's DNB home chance
-    minus the fair DNB (Pinnacle's close) over that fit's own training rows."""
+    """fit start (ISO date) -> sigma_DNB (match_calibration.sigma_dnb): the sd (ddof 0) of
+    the blend's DNB home chance minus the fair DNB (Pinnacle's close) over that fit's own
+    training rows."""
     if train.empty or not fits:
         return {}
     mk, pc = [f"mkt_{m}" for m in lb.H2H], [f"p_{m}" for m in lb.H2H]
@@ -174,48 +154,29 @@ def sigma_dnb(train: pd.DataFrame, fits: list[dict]) -> dict[str, float]:
     out = {}
     for f in fits:
         rows = train[tdate < pd.Timestamp(f["from"])]
-        b = mc.apply(f["coef"], rows[mk], rows[pc])
-        m = rows[mk].to_numpy(dtype=float)
-        qb = b[:, 0] / (b[:, 0] + b[:, 2])
-        qm = m[:, 0] / (m[:, 0] + m[:, 2])
-        gap = (qb - qm)[np.isfinite(qb - qm)]
-        if len(gap):
-            out[f["from"]] = float(gap.std(ddof=0))
+        sd = mc.sigma_dnb(f["coef"], rows[mk], rows[pc])
+        if sd is not None:
+            out[f["from"]] = sd
     return out
 
 
 # ---------- rules ----------
 
 
+def _as_bet(pk: dict | None) -> dict | None:
+    return None if pk is None else {**pk, "p": pk["model_p"]}
+
+
 def pick_12(q: dict, odds: dict, threshold: float = THRESHOLD) -> dict | None:
-    """DNB 12%: the side with the larger edge q x price - 1, if at least `threshold`;
-    home first on a tie."""
-    best = None
-    for s in SIDES:
-        p, o = _num(q.get(s)), _num(odds.get(s))
-        if p is None or o is None or o <= 1:
-            continue
-        e = p * o - 1
-        if e >= threshold - EPS and e > 0 and (best is None or e > best["edge"]):
-            best = {"market": s, "odds": o, "p": p, "edge": e, "z": None}
-    return best
+    """DNB 12% (trades.dnb_pick_12): the side with the larger edge q x price - 1, if at
+    least `threshold`; home first on a tie."""
+    return _as_bet(tr.dnb_pick_12(q, {s: _num(odds.get(s)) for s in SIDES}, threshold))
 
 
 def pick_lean(qb: dict, odds: dict, sigma: float | None, min_z: float = tr.LEAN_Z) -> dict | None:
-    """DNB Lean: the side with the higher z = (q_blend - 1/price) / sigma, if at least
-    `min_z`; home first on a tie."""
-    sd = _num(sigma)
-    if sd is None or sd <= 0:
-        return None
-    best = None
-    for s in SIDES:
-        p, o = _num(qb.get(s)), _num(odds.get(s))
-        if p is None or o is None or o <= 1:
-            continue
-        z = (p - 1 / o) / sd
-        if z >= min_z - EPS and (best is None or z > best["z"]):
-            best = {"market": s, "odds": o, "p": p, "edge": p * o - 1, "z": z}
-    return best
+    """DNB Lean (trades.dnb_pick_lean): the side with the higher z = (q_blend - 1/price) /
+    sigma, if at least `min_z`; home first on a tie."""
+    return _as_bet(tr.dnb_pick_lean(qb, {s: _num(odds.get(s)) for s in SIDES}, _num(sigma), min_z))
 
 
 def result(market: str, home_goals: int, away_goals: int) -> str:

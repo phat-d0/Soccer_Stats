@@ -407,6 +407,44 @@ mostly "don't bet", which is why it loses far less than flat; Kelly on the raw m
 more of the bankroll in seven of the eight domestic leagues (all but the Bundesliga), the
 over-betting the principle warns about. Flat $10 stays the record.
 
+## Draw no bet tracks (26 Oct, owner; 0 credits)
+
+The owner asked for every moneyline bet to be draw no bet (DNB) "unless you found evidence to
+not do that, or maybe track both". The 24 Oct backtest (`docs/lab.md` "Draw no bet", run
+40140494754) is that evidence. DNB lost to Pinnacle's close about as much per dollar as 1X2:
+−4.8% vs −4.6% for Model 12%, −3.2% vs −3.1% for Lean. It won more often and swung less. So both
+are tracked: **the 1X2 trades stay the record**, and each match strategy gets a DNB paper track
+beside it. The tracks are descriptive, and nothing changes live unless the owner decides.
+
+**Rules** (`paper_dnb.py`, `trades.dnb_*`):
+
+| | Model 12%, draw no bet (`edge12_dnb`) | Blend Lean, draw no bet (`lean_dnb`) |
+| --- | --- | --- |
+| Chance | the raw model's, without the draw: p_side / (p_home + p_away) | the blend's `p_bet`, without the draw |
+| Rule | edge = chance × DNB price − 1 ≥ 12% (per stake not refunded) | z = (chance − 1/DNB price) / σ_DNB ≥ 1 |
+| Odds range | none | 1.50–3.00, on the **DNB** price; no other side is tried |
+| σ | – | `sigma_dnb` per league in `match_blends.json` (`fit-match-blends`); none = no trades |
+
+- **Price:** DraftKings' h2h that is already fetched (no new market, 0 credits). DNB = side ×
+  (1 − 1/draw): back the side and cover the draw at the same book. DraftKings' own DNB price may
+  carry a bigger margin than this synthetic one. A check of its real DNB price would cost a credit
+  or two and needs the owner's OK.
+- **Gates:** the same as the parent: DraftKings odds at most 3 h old, before kickoff, not
+  `low_data`, all three prices quoted. $10, one trade per match and track, chosen independently of
+  the parent's pick.
+- **Settlement:** a draw refunds the stake (`status: "void"`, `push: true`), so ROI counts only bets
+  that weren't refunded.
+- **CLV:** against DraftKings' DNB close (the last logged h2h before kickoff, margin removed with
+  Shin), and against Pinnacle's DNB close once football-data has the match. Each is also given per
+  $ staked (`clv_dk_staked`, `clv_pinnacle_staked`: × the close's no-draw chance), which compares
+  directly with the parent's CLV.
+- **Ledger:** the tracks keep their own ledger (`paper_trades/<code>_dnb_<season>.jsonl`), out of
+  `load_ledger`, the record summaries and Moneyline's combined totals.
+- **In data.json:** each track is a section in Moneyline's `live.strategies`, after its parent and
+  that parent's other variants (`variant_of`, `adds: "dnb"`, `compare`). The trades are in the live
+  section's `dnb_trades`.
+- **No backcast** from the odds log yet (optional in the brief; descriptive at best).
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

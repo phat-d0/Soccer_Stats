@@ -196,7 +196,7 @@ def test_league_one_and_two_open_paper_trades_under_the_fixed_rule(tmp_path, mon
         "portfolio": {},
     }
     assert paper.leagues_in_play(d) == ["E0", "E2", "E3"]
-    assert paper.run(d, tmp_path, None, now=NOW) == 2
+    assert paper.run(d, tmp_path, None, now=NOW) == 4  # each with its draw no bet track
     t2 = paper.load_ledger(tmp_path, "E2")["E2|2627|Peterboro|AFC Wimbledon"]
     t3 = paper.load_ledger(tmp_path, "E3")["E3|2627|Bristol Rvs|Walsall"]
     for t in (t2, t3):
@@ -222,7 +222,7 @@ def test_a_league_without_fixtures_this_build_keeps_its_trades(tmp_path, monkeyp
         "leagues": [{"code": c, "fixtures": int(c == "E2")} for c in lgs.live_codes()],
         "portfolio": {},
     }
-    assert paper.run(d, tmp_path, None, now=NOW) == 1
+    assert paper.run(d, tmp_path, None, now=NOW) == 2  # the trade and its draw no bet one
     later = {
         "fixtures": [],
         "odds_source": src(),
@@ -587,7 +587,8 @@ def test_second_league_flows_through_paper_without_trading(tmp_path, monkeypatch
     monkeypatch.setattr(tr, "PAPER_RULE", "learned")
     d = _two_league_data({"league": "SP1", **src()})
     assert paper.leagues_in_play(d) == ["E0", "SP1"]
-    assert paper.run(d, tmp_path, None, now=NOW) == 1  # the E0 trade only (12% fallback)
+    # The E0 trade only (12% fallback), and its draw no bet track's.
+    assert paper.run(d, tmp_path, None, now=NOW) == 2
     led = {}
     for lg in ("E0", "SP1"):
         led.update(paper.load_ledger(tmp_path, lg))
@@ -601,7 +602,7 @@ def test_second_league_flows_through_paper_without_trading(tmp_path, monkeypatch
     level = {"summary": {}, "edge_threshold": {"min_edge": 0.05, "note": None}}
     (tmp_path / "backtest" / "SP1_dk.json").write_text(json.dumps(level))
     d = _two_league_data({"league": "SP1", **src()})
-    assert paper.run(d, tmp_path, None, now=NOW) == 1
+    assert paper.run(d, tmp_path, None, now=NOW) == 2  # with its draw no bet track's
     assert (tmp_path / "paper_trades" / "SP1_2627.jsonl").exists()
     t = paper.load_ledger(tmp_path, "SP1")["SP1|2627|Real Madrid|Getafe"]
     assert t["league"] == "SP1" and t["threshold"] == 0.05

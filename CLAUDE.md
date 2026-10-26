@@ -35,6 +35,12 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   "Blend Lean odds range").
 - **Model 12%**: `trades.PAPER_RULE = "fixed_raw"`, the raw model's chance at a 12% edge
   against DraftKings' quoted price. The owner's live test.
+- **Draw no bet tracks** (owner, 26 Oct; `paper_dnb.py`, `docs/leagues.md` "Draw no bet tracks"):
+  `lean_dnb` beside Blend Lean and `edge12_dnb` beside Model 12%, descriptive. The 1X2 trades
+  stay the record. Price = DraftKings' h2h, side × (1 − 1/draw) (0 credits); chance = the parent's
+  without the draw; Lean's needs `sigma_dnb` in `match_blends.json` and keeps the 1.50–3.00 range
+  on the DNB price. A draw refunds the stake. The tracks have their own ledger
+  (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals.
 - The Matches tab shows Lean only; Portfolio → Moneyline shows both.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
@@ -274,6 +280,25 @@ the owner's baseball app, so the balance can drop without any run here.
   baselines `x12`, `x_lean`; a draw refunds. Metrics add won/drawn/lost, `hit_rate`, `clv` per
   stake not refunded and `clv_staked`, `profit_sd`, `bets_for_5pct`; `ah0` = the real Pinnacle AH 0
   check; `verdict` = pooled CLV 97.5% range above 0. Log line `DNB_BACKTEST_JSON`. Not in the app.
+- `paper_dnb.py` (owner, 26 Oct; `docs/leagues.md` "Draw no bet tracks"): the live DNB tracks
+  beside the match strategies. `trades.py` holds the maths and rules (`dnb_odds`, `dnb_prices`,
+  `fair_dnb`, `without_draw`, `dnb_pick_12`, `dnb_pick_lean`, `settle_dnb`, which pushes on a draw,
+  `dnb_clv` giving (CLV, CLV per $), `dnb_rule(parent, track)`, `DNB_TRACKS`, `DNB_LABELS`,
+  `DNB_FROM`, `DNB_SUFFIX` "|dnb"); `dnb_backtest` uses the same functions.
+  - `update_ledger(ledger, cards, odds_source, results, now, league, rules, ref, odds_log=,
+    espn=)`: the parent's gates; ids are the parent id plus "|dnb"; `bet_type: "dnb"`,
+    `strategy` = the track, `variant_of`, `entry_prices`, `p_model`, `p_blend` (Kelly), and for
+    Lean `z`, `sigma`, `p_bet`, `odds_range`.
+  - The close comes from the odds log (`clv_dk`, `clv_dk_staked`); settlement gives
+    `clv_pinnacle` and `clv_pinnacle_staked`, plus `_fd_check` for ESPN settlements.
+  - `section` = `strategy_section` plus `variant_of`, `adds: "dnb"`, `filter` None, `defined_at`,
+    `note`, `dnb_trades` and `compare` (`{since, descriptive, track, parent, clv_per_dollar:
+    {clv_dk, clv_pinnacle: {track, parent}}, note}`).
+  - `paper.run` → `_run_dnb` (a failure costs only the tracks); `portfolios_section` puts each
+    track after its parent's sections and adds `live.dnb_trades`; `awaiting_results` includes
+    the tracks.
+  - `match_calibration.sigma_dnb` gives `league_fit`'s `sigma_dnb`; `publish.LEAN_CARD_KEYS`
+    and `trades.lean_rule` carry it.
 - Calibration in both files (owner, 22 Oct): each league report and `all` carry `calibration =
   {all_outcomes: {model, blend (Lean file only), price}, bets, note}`. `all_outcomes` scores every
   outcome (home/draw/away) of every scored match (Lean: matches with a blend fit; Model 12%: every

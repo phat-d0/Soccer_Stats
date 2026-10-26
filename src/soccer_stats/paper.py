@@ -40,6 +40,7 @@ from soccer_stats import equations as eq
 from soccer_stats import lean_backtest as lb
 from soccer_stats import match_calibration as mc
 from soccer_stats import odds_log as ol
+from soccer_stats import paper_dnb as pdnb
 from soccer_stats import sizing as sz
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
@@ -84,9 +85,10 @@ def ledger_dir(log_dir: Path) -> Path:
 
 
 def _is_match_ledger(path: Path, league: str) -> bool:
-    """A league's match ledger file, not its corners ledger or Lean shadow file."""
+    """A league's match ledger file, not its corners ledger, Lean shadow or draw no bet
+    file."""
     name = path.name
-    return not (name.startswith(f"{league}_corners_") or name.startswith(f"{league}_lean_shadow_"))
+    return not name.startswith((f"{league}_corners_", f"{league}_lean_shadow_", f"{league}_dnb_"))
 
 
 def load_ledger(log_dir: Path, league: str = "E0") -> dict[str, dict]:
@@ -94,7 +96,7 @@ def load_ledger(log_dir: Path, league: str = "E0") -> dict[str, dict]:
     paths = [
         p
         for p in sorted(ledger_dir(log_dir).glob(f"{league}_*.jsonl"))
-        if _is_match_ledger(p, league)  # corners and Lean shadows have their own files
+        if _is_match_ledger(p, league)  # corners, Lean shadows and DNB have their own files
     ]
     return _fold(paths, UPDATE_FIELDS)
 
@@ -1707,6 +1709,8 @@ def portfolios_section(
     strategies: list[dict] | None = None,
     now: pd.Timestamp | None = None,
     shadow_trades: list[dict] | None = None,
+    dnb_trades: list[dict] | None = None,
+    dnb_rules: dict[str, dict] | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1724,7 +1728,10 @@ def portfolios_section(
     trades keep every Lean trade. `shadow_trades` (Blend Lean's
     shadow entries) go on Moneyline's live section as `shadow_trades`, never in its
     `trades` or summary, and add the "all odds (old rule)" variant right after Lean
-    (lean_shadow_section).
+    (lean_shadow_section). `dnb_trades` (the draw no bet tracks, paper_dnb) go on it as
+    `dnb_trades`, also never in its `trades` or summary, and each track
+    (tr.DNB_TRACKS) follows its parent's sections (paper_dnb.section, rule from
+    `dnb_rules`: track -> paper_dnb.overview).
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1770,7 +1777,19 @@ def portfolios_section(
                     section["strategies"].append(
                         _safe_shadow_section(mine, shadow_trades or [], st["rule"], now)
                     )
+                track = tr.DNB_TRACKS.get(st["key"])
+                if track and dnb_rules and track in dnb_rules:
+                    parent = (
+                        new_rule_trades(mine)
+                        if st["key"] == "lean"
+                        else [t for t in mine if tr.strategy_of(t) == st["key"]]
+                    )
+                    own = [t for t in dnb_trades or [] if t.get("strategy") == track]
+                    section["strategies"].append(
+                        pdnb.safe_section(track, own, parent, dnb_rules[track], now)
+                    )
             section["shadow_trades"] = portfolio_section(shadow_trades or [])["trades"]
+            section["dnb_trades"] = portfolio_section(dnb_trades or [])["trades"]
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
@@ -1895,6 +1914,15 @@ def run(
     for lg in codes:
         rules[lg] = {**rules[lg], "sigma": leans[lg]["sigma"], "lean": leans[lg]}
     rule = rules[league]
+    # The draw no bet tracks beside each match strategy (owner, 26 Oct; paper_dnb).
+    dnb_rules = {
+        lg: {
+            tr.DNB_TRACKS["lean"]: tr.dnb_rule(leans[lg], tr.DNB_TRACKS["lean"]),
+            tr.DNB_TRACKS["edge12"]: tr.dnb_rule(rules[lg], tr.DNB_TRACKS["edge12"]),
+        }
+        for lg in codes
+    }
+    dnb_trades: list[dict] = []
     portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
@@ -1970,6 +1998,13 @@ def run(
             written = append_events(log_dir, events, league)
             live_trades = list(ledger.values())
             shadow_trades = list(shadows.values())
+            try:  # the draw no bet tracks: their own ledger, never the match record
+                n, dnb_trades = _run_dnb(
+                    data, log_dir, codes, league, now, results, espn_results, dnb_rules
+                )
+                written += n
+            except Exception as exc:  # noqa: BLE001  never costs the match ledger
+                print(f"Draw no bet tracks not updated ({type(exc).__name__}: {exc})")
             live.update(portfolio_section(live_trades), note=note)
             try:  # the corners portfolio: its own ledger, rows and results
                 n, corner_trades = _run_corners(
@@ -2040,8 +2075,46 @@ def run(
         match_strategies(leans, rule),
         now=now,
         shadow_trades=shadow_trades,
+        dnb_trades=dnb_trades,
+        dnb_rules={
+            track: pdnb.overview({lg: r[track] for lg, r in dnb_rules.items()}, track)
+            for track in tr.DNB_TRACKS.values()
+        },
     )
     return written
+
+
+def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[int, list[dict]]:
+    """Update the draw no bet ledger in every league in play (paper_dnb.update_ledger on
+    the same cards, odds, odds log and results as the match trades); returns (events
+    written, every DNB trade)."""
+    ref = model_ref(data)
+    events: list[dict] = []
+    trades: list[dict] = []
+    for lg in codes:
+        ledger = pdnb.load_ledger(log_dir, lg)
+        cards = [c for c in data.get("fixtures", []) if (c.get("league") or primary) == lg]
+        res = results
+        if res is not None and "league" in res and not res.empty:
+            res = res[res["league"] == lg]
+        log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
+        events += pdnb.update_ledger(
+            ledger,
+            cards,
+            ol.source_for(data, lg, primary),
+            res,
+            now,
+            lg,
+            rules[lg],
+            ref,
+            odds_log=log,
+            espn=_league_rows(espn, lg),
+        )
+        trades += list(ledger.values())
+    n = pdnb.append_events(log_dir, events)
+    opened = sum(1 for e in events if e.get("type") == "open")
+    print(f"Draw no bet tracks: {len(trades)} trades, {opened} opened this update")
+    return n, trades
 
 
 def _league_rows(df: pd.DataFrame | None, league: str) -> pd.DataFrame | None:
@@ -2066,6 +2139,7 @@ def awaiting_results(
         books = (
             ("match", load_ledger(log_dir, lg)),
             ("match", load_lean_shadow(log_dir, lg)),
+            ("match", pdnb.load_ledger(log_dir, lg)),
             ("corners", load_corner_ledger(log_dir, lg)),
         )
         for kind, ledger in books:
