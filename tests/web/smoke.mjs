@@ -1031,7 +1031,8 @@ const STEPS = [
     const views = await p.locator("#view .segmented button").allInnerTexts();
     if (views.join(",") !== "Result,Why") throw new Error(`comebacks views: ${views}`);
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No edge.", "No live trades", "732", "123 won", "17.0%", "vs 21.3% the price implied", "−25.1%", "95% range −38.3% to −10.2%", "8,011", "Betfair's exchange after its 2% commission instead: −18.1%", "Design B: top five", "+7.3%", "−18.2%", "Return by league (design C)", "Return by season (design C)", "Won vs the price, by how big a favourite"]) {
+    const vt = await p.evaluate(() => state.data.comeback_research.verdict_text);
+    for (const w of [vt, "No live trades", "732", "123 won", "16.8%", "vs 21.3% the price implied", "−25.1%", "95% range −38.3% to −10.2%", "8,011", "Betfair's exchange after its 2% commission instead: −18.1%", "Design B: top five", "+7.3%", "−18.2%", "Return by league (design C)", "Return by season (design C)", "Won vs the price, by how big a favourite"]) {
       if (!text.includes(w)) throw new Error(`comeback result lacks "${w}"`);
     }
     // The profit chart: three lines (C judged solid, B and both together dashed), a readout
@@ -1060,7 +1061,7 @@ const STEPS = [
   ["portfolio-comebacks-why", async (p) => {
     await p.click('button[data-pf="why"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["The idea, from free data", "19.7% of 2,166 matches", "expected 14.0%", "5 of 18", "When the underdog scores first, by minute", "15,838 matches", "The in-play price already covers the comeback, and overrates it.", "17.0% of the time against the 21.3%", "18,820 credits", "How this was measured"]) {
+    for (const w of ["The idea, from free data", "19.7% of 2,166 matches", "expected 14.0%", "5 of 18", "When the underdog scores first, by minute", "15,838 matches", "on the 3,789 matches with a fair benchmark", "75+ min", "The in-play price already covers the comeback, and overrates it.", "16.8% of the time against the 21.3%", "18,820 credits", "How this was measured"]) {
       if (!text.includes(w)) throw new Error(`comeback why lacks "${w}"`);
     }
     await p.click("details.mk-fold:has(summary:text('How this was measured')) > summary");

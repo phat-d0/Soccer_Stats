@@ -4144,7 +4144,7 @@ function cbResultHtml(cr) {
   </div>`;
   const others = [b, all].filter(Boolean).map((d) => `<li>${esc(d.label)}: ${num(d.bets)} bets, ${num(d.wins)} won, ${signedPct(d.roi)}${rngText(d.roi_ci95)} per $1 (descriptive).</li>`).join("");
   const bands = cbRowsChart("cbband", (c.by_band || []).map((g) => ({
-    label: `${pctRange(g.lo, g.hi)} favourite`, n: g.bets, unit: "bets", won: g.win_rate, ref: g.implied,
+    label: g.hi >= 1 ? `${pct(g.lo)}+ favourite` : `${pctRange(g.lo, g.hi)} favourite`, n: g.bets, unit: "bets", won: g.win_rate, ref: g.implied,
     extra: `ROI ${signedPct(g.roi)}${rngText(g.roi_ci95)} per $1`,
   })), "In-play price's chance", "the in-play price's");
   const shown = state.cbShown || 50;
@@ -4177,7 +4177,8 @@ function cbWhyHtml(cr) {
     p1.ht_behind && { label: "Behind at half-time", n: p1.ht_behind.matches, won: p1.ht_behind.won, ref: p1.ht_behind.model },
     p1.conceded_first && { label: "Conceded first", n: p1.conceded_first.matches, won: p1.conceded_first.won, ref: p1.conceded_first.model },
   ].filter(Boolean);
-  const minRows = (tl.by_minute || []).map((m) => ({ label: `${m.lo}–${m.hi} min`, n: m.matches, won: m.won, ref: m.model }));
+  // Per minute band on its benchmarked matches (those with a fair pre-match price), as the totals.
+  const minRows = (tl.by_minute || []).map((m) => ({ label: `${(m.label || `${m.lo}–${m.hi}`).replace("-", "–")} min`, n: m.benchmarked ?? m.matches, won: m.won, ref: m.model }));
   const runs = cr.runs || {};
   const runList = Object.entries(runs).map(([k, v]) => `${esc(k.replace(/_/g, " "))} ${esc(Array.isArray(v) ? v.join(", ") : v)}`).join("; ");
   const pre = cr.preregistered || {};
@@ -4186,7 +4187,7 @@ function cbWhyHtml(cr) {
     <p class="note">${p1.ht_behind ? `Favourites that were behind at half-time went on to win ${pct(p1.ht_behind.won, 1)} of ${num(p1.ht_behind.matches)} matches, where a fair model that ignores the score expected ${pct(p1.ht_behind.model, 1)}.` : ""}${isNum(p1.tests) ? ` ${p1.tests_above_zero} of ${p1.tests} pre-registered checks came out above zero.` : ""}</p>
     ${cbRowsChart("cbp1", p1rows, "Score-blind model", "the score-blind model's")}
     <div class="section-title">2. When the underdog scores first, by minute</div>
-    <p class="note">${isNum(tl.matches) ? `${num(tl.matches)} matches with the favourite known before kickoff (${pct(tl.joined_share, 1)} joined to the results). The underdog scored first in ${pct(tl.trail_first_share, 1)} of them; the favourite then won ${pct(tl.won, 1)} against the model's ${pct(tl.model, 1)}${tl.gap_ci95 ? ` (${cbPts(tl.gap)} points, range ${cbPts(tl.gap_ci95[0])} to ${cbPts(tl.gap_ci95[1])})` : ""}.` : ""} ${esc(tl.note || "")}</p>
+    <p class="note">${isNum(tl.matches) ? `${num(tl.matches)} matches with the favourite known before kickoff (${pct(tl.joined_share, 1)} joined to the results). The underdog scored first in ${pct(tl.trail_first_share, 1)} of them${isNum(tl.trail_first) ? ` (${num(tl.trail_first)})` : ""}; the favourite then won ${pct(tl.won, 1)} against the model's ${pct(tl.model, 1)}${isNum(tl.benchmarked) ? `, on the ${num(tl.benchmarked)} matches with a fair benchmark` : ""}${tl.gap_ci95 ? ` (${cbPts(tl.gap)} points, range ${cbPts(tl.gap_ci95[0])} to ${cbPts(tl.gap_ci95[1])})` : ""}.` : ""} ${esc(tl.note || "")}</p>
     ${cbRowsChart("cbmin", minRows, "Score-blind model", "the score-blind model's")}
     <div class="section-title">3. What it means</div>
     <div class="verdict neg">The in-play price already covers the comeback, and overrates it.</div>

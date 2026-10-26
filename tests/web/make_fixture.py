@@ -844,17 +844,10 @@ def add_markets_research(data: dict) -> None:
         data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
 
 
-# Portfolio > Comeback bets: Research lab's committed result through
-# publish.comeback_research once it lands, else the stand-in with the same shape
-# (tests/web/comeback_stub.py: the real headline numbers, a synthetic bet list).
+# Portfolio > Comeback bets: Research lab's committed result (lab/comeback_research.json,
+# PR #115) through publish.comeback_research, every bet kept (the fixture stays under 1.5 MB).
 def add_comeback_research(data: dict) -> None:
-    real = pub.comeback_research()
-    if real is None:
-        sys.path.insert(0, str(Path(__file__).parent))
-        from comeback_stub import stub
-
-        real = stub()
-    data["comeback_research"] = _clean(real)
+    data["comeback_research"] = _clean(pub.comeback_research())
 
 
 # Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture

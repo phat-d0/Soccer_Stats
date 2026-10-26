@@ -779,8 +779,8 @@ the owner's baseball app, so the balance can drop without any run here.
   (`cbRowsChart` `cbband`: Wilson ranges), the judged bets folded (50, then 100 more per "Show
   more", `state.cbShown`). Why (`cbWhyHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
   (`cbmin`), the conclusion, and run ids and pre-registration commits under "How this was
-  measured". Until Research lab's file lands the fixture uses `tests/web/comeback_stub.py` (the
-  real headline numbers, a synthetic bet list). A strategy
+  measured". The minute chart and its totals use the matches with a fair benchmark
+  (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). A strategy
   (`pfStrategyHtml`) shows crumbs "‹ Portfolio › Moneyline" (`data-pfnav`), its name and status ·
   rule ("Shadow test of …" / "Archived: the rule until …"), the competition filter and Live
   paper / Backtest / Model (a shadow test's or archived rule's Backtest and Model are its
