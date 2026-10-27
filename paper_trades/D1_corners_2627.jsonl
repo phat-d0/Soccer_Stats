@@ -51,3 +51,16 @@
 {"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|6.5|dk","at":"2026-10-25T18:30:41+00:00","status":"won","actual":6,"push":false,"profit":6.7,"score":"5-6 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|5.5","at":"2026-10-25T18:30:41+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"5-6 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|5.5|dk","at":"2026-10-25T18:30:41+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"5-6 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
+{"type":"update","id":"D1|2627|FC Koln|Schalke 04|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-5 corners"}
+{"type":"update","id":"D1|2627|Paderborn|Hamburg|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-3 corners"}
+{"type":"update","id":"D1|2627|Paderborn|Hamburg|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-3 corners"}
+{"type":"update","id":"D1|2627|Dortmund|Ein Frankfurt|corners|home|6.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"13-1 corners"}
+{"type":"update","id":"D1|2627|Dortmund|Ein Frankfurt|corners|home|6.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"13-1 corners"}
+{"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|6.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|6.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"D1|2627|Augsburg|Union Berlin|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-1 corners"}
+{"type":"update","id":"D1|2627|Mainz|Werder Bremen|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"mismatch","check_score":"6-6 corners"}
+{"type":"update","id":"D1|2627|Augsburg|Union Berlin|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-1 corners"}
+{"type":"update","id":"D1|2627|FC Koln|Schalke 04|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-5 corners"}
+{"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"D1|2627|Freiburg|Bayern Munich|corners|away|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}

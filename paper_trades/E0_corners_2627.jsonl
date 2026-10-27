@@ -58,3 +58,15 @@
 {"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|5.5|dk","at":"2026-10-25T18:30:41+00:00","status":"won","actual":4,"push":false,"profit":6.2,"score":"4-5 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|4.5","at":"2026-10-25T18:30:41+00:00","status":"won","actual":4,"push":false,"profit":10.1,"score":"4-5 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|4.5|dk","at":"2026-10-25T18:30:41+00:00","status":"won","actual":4,"push":false,"profit":11.0,"score":"4-5 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
+{"type":"update","id":"E0|2627|Hull|Brentford|corners|away|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"E0|2627|Hull|Brentford|corners|home|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"E0|2627|Man United|Bournemouth|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Brentford|corners|away|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"E0|2627|Hull|Brentford|corners|home|4.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-6 corners"}
+{"type":"update","id":"E0|2627|Man United|Bournemouth|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"5-4 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-5 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-5 corners"}
+{"type":"update","id":"E0|2627|Chelsea|Tottenham|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"E0|2627|Liverpool|Brighton|corners|away|4.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-2 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-5 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Leeds|corners|home|4.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-5 corners"}

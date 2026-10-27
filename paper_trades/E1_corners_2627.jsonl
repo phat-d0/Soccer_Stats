@@ -60,3 +60,12 @@
 {"type":"update","id":"E1|2627|Cardiff|Birmingham|corners|home|5.5","at":"2026-10-24T16:15:32+00:00","status":"won","actual":3,"push":false,"profit":9.0,"score":"3-3 corners","settled_at":"2026-10-24T16:15:32+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Lincoln|Burnley|corners|away|4.5","at":"2026-10-24T16:15:32+00:00","status":"won","actual":5,"push":false,"profit":7.5,"score":"2-5 corners","settled_at":"2026-10-24T16:15:32+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Lincoln|Burnley|corners|home|4.5","at":"2026-10-24T16:15:32+00:00","status":"won","actual":2,"push":false,"profit":9.3,"score":"2-5 corners","settled_at":"2026-10-24T16:15:32+00:00","result_source":"espn"}
+{"type":"update","id":"E1|2627|Bolton|Middlesbrough|corners|away|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-12 corners"}
+{"type":"update","id":"E1|2627|Bolton|Middlesbrough|corners|home|3.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-12 corners"}
+{"type":"update","id":"E1|2627|Charlton|Norwich|corners|away|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"3-7 corners"}
+{"type":"update","id":"E1|2627|Sheffield United|Derby|corners|away|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"7-7 corners"}
+{"type":"update","id":"E1|2627|Sheffield United|Derby|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"7-7 corners"}
+{"type":"update","id":"E1|2627|Blackburn|Wrexham|corners|away|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"7-9 corners"}
+{"type":"update","id":"E1|2627|Cardiff|Birmingham|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"3-3 corners"}
+{"type":"update","id":"E1|2627|Lincoln|Burnley|corners|away|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-5 corners"}
+{"type":"update","id":"E1|2627|Lincoln|Burnley|corners|home|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-5 corners"}

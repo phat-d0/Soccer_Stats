@@ -1313,3 +1313,12 @@
 {"type":"update","id":"SP1|2627|Sociedad|Vallecano","at":"2026-10-26T19:45:44+00:00","close_odds":3.85,"close_prices":{"home":1.83,"draw":3.75,"away":3.85},"close_fetched_at":"2026-10-26T19:45:21+00:00","close_minutes_before":18494.7,"clv_dk":-0.0868294723693398,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Valencia|Real Madrid","at":"2026-10-26T19:45:44+00:00","close_odds":6.0,"close_prices":{"home":6.0,"draw":4.9,"away":1.43},"close_fetched_at":"2026-10-26T19:45:21+00:00","close_minutes_before":18494.7,"clv_dk":-0.04710907023279698,"beat_close_dk":false}
 {"type":"update","id":"SP1|2627|Sevilla|Osasuna","at":"2026-10-26T22:16:05+00:00","status":"lost","score":"2-0","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-10-26T22:16:05+00:00","result_source":"espn"}
+{"type":"update","id":"SP1|2627|Alaves|Malaga","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":0.08088544872033876}
+{"type":"update","id":"SP1|2627|Ath Madrid|La Coruna","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"1-0","clv_pinnacle":-0.061700742700274036}
+{"type":"update","id":"SP1|2627|Sociedad|Levante","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-1","clv_pinnacle":-0.2736686107587961}
+{"type":"update","id":"SP1|2627|Barcelona|Real Madrid","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"1-2","clv_pinnacle":0.14471934189692193}
+{"type":"update","id":"SP1|2627|Sevilla|Osasuna","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-0","clv_pinnacle":-0.10286229431710359}
+{"type":"update","id":"SP1|2627|Alaves|Malaga|lean","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":0.06287069124166633}
+{"type":"update","id":"SP1|2627|Celta|Betis","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"0-0","clv_pinnacle":0.027657314770943797}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Getafe","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-0","clv_pinnacle":-0.08648649070003112}
+{"type":"update","id":"SP1|2627|Santander|Espanol","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"2-1","clv_pinnacle":-0.06138665986987091}

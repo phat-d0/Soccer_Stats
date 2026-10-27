@@ -56,3 +56,17 @@
 {"type":"update","id":"F1|2627|Rennes|Strasbourg|corners|away|3.5|dk","at":"2026-10-25T18:30:41+00:00","status":"lost","actual":5,"push":false,"profit":-10.0,"score":"2-5 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Toulouse|Troyes|corners|away|3.5|dk","at":"2026-10-25T18:30:41+00:00","status":"lost","actual":2,"push":false,"profit":-10.0,"score":"4-2 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Toulouse|Troyes|corners|home|5.5|dk","at":"2026-10-25T18:30:41+00:00","status":"won","actual":4,"push":false,"profit":6.7,"score":"4-2 corners","settled_at":"2026-10-25T18:30:41+00:00","result_source":"espn"}
+{"type":"update","id":"F1|2627|Lens|Paris FC|corners|away|3.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-1 corners"}
+{"type":"update","id":"F1|2627|Angers|Lorient|corners|away|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-7 corners"}
+{"type":"update","id":"F1|2627|Marseille|Le Havre|corners|away|3.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-3 corners"}
+{"type":"update","id":"F1|2627|Angers|Lorient|corners|away|4.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-7 corners"}
+{"type":"update","id":"F1|2627|Marseille|Le Havre|corners|away|3.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-3 corners"}
+{"type":"update","id":"F1|2627|Lens|Paris FC|corners|away|3.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-1 corners"}
+{"type":"update","id":"F1|2627|Lens|Paris FC|corners|home|5.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-1 corners"}
+{"type":"update","id":"F1|2627|Lens|Paris FC|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"6-1 corners"}
+{"type":"update","id":"F1|2627|Rennes|Strasbourg|corners|away|3.5","at":"2026-10-27T10:25:19+00:00","result_check":"mismatch","check_score":"2-4 corners"}
+{"type":"update","id":"F1|2627|Toulouse|Troyes|corners|away|3.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-2 corners"}
+{"type":"update","id":"F1|2627|Toulouse|Troyes|corners|home|4.5","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-2 corners"}
+{"type":"update","id":"F1|2627|Rennes|Strasbourg|corners|away|3.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"mismatch","check_score":"2-4 corners"}
+{"type":"update","id":"F1|2627|Toulouse|Troyes|corners|away|3.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-2 corners"}
+{"type":"update","id":"F1|2627|Toulouse|Troyes|corners|home|5.5|dk","at":"2026-10-27T10:25:19+00:00","result_check":"ok","check_score":"4-2 corners"}
