@@ -221,3 +221,19 @@ def test_coverage_note_names_partial_seasons():
     assert "Championship 2022/23 (no DraftKings history bought yet)" in note
     assert "Pinnacle's close on 44% of those" in note and "Premier League" not in note
     assert dpb.coverage_note({"E0": leagues["E0"]}) == dpb.COVERAGE_NOTE
+
+
+def test_bundesliga_ligue_1_and_championship_feed_names_land_on_football_data():
+    from soccer_stats.odds_feed import _team
+
+    known = {"Darmstadt", "St Pauli", "St Etienne", "West Brom", "West Ham"}
+    for feed, ours in {
+        "SV Darmstadt 98": "Darmstadt",
+        "FC St. Pauli": "St Pauli",
+        "St. Pauli": "St Pauli",
+        "Saint Etienne": "St Etienne",
+        "Saint-Etienne": "St Etienne",
+        "West Bromwich": "West Brom",
+        "West Bromwich Albion": "West Brom",
+    }.items():
+        assert _team(feed, known) == ours
