@@ -6,6 +6,7 @@ import pytest
 
 from soccer_stats.lab import cashout_test as ct
 from soccer_stats.lab import comeback_fetch as cf
+from soccer_stats.lab import comebacks2 as c2
 
 KO = "2024-09-14T14:00Z"
 
@@ -143,3 +144,19 @@ def test_growth_drawdown_and_the_verdict_rule():
     assert v["decisions"] == 320 and v["verdict"] in ("pass", "fail")
     few = ct.analyse(pos[:100], {"positions": 100})
     assert few["verdict"]["verdict"] == "inconclusive"
+
+
+def test_a_pair_meeting_twice_at_the_same_ground_gets_its_own_result():
+    lg = pd.DataFrame(
+        {
+            "home": ["Celtic", "Celtic", "Hearts"],
+            "away": ["Hearts", "Hearts", "Celtic"],
+            "kickoff": pd.to_datetime(["2024-09-01 14:00", "2025-03-01 15:00", "2024-12-01 15:00"]),
+            "fthg": [3, 0, 1],
+            "ftag": [0, 1, 1],
+        }
+    )
+    assert c2.result_row(lg, "Celtic", "Hearts", "2025-03-01T15:00Z")["ftag"] == 1
+    assert c2.result_row(lg, "Celtic", "Hearts", "2024-09-01T14:00Z")["fthg"] == 3
+    assert c2.result_row(lg, "Hearts", "Celtic", "2099-01-01T00:00Z")["fthg"] == 1  # one meeting
+    assert c2.result_row(lg, "Celtic", "Hearts", "2026-01-01T15:00Z") is None

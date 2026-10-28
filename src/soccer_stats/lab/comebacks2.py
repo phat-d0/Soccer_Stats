@@ -75,6 +75,16 @@ def find_event(events: list[dict], home: str, away: str, kickoff, known: set[str
     return None
 
 
+def result_row(lg: pd.DataFrame, home: str, away: str, kickoff: str):
+    """football-data's row for one match: by the teams, and by the kickoff too when the pair
+    meets more than once at the same ground in a season (SC0, B1's and G1's play-offs).
+    None when there is no such row."""
+    hit = lg[(lg["home"] == home) & (lg["away"] == away)]
+    if len(hit) > 1:
+        hit = hit[pd.to_datetime(hit["kickoff"]).dt.strftime("%Y-%m-%dT%H:%MZ") == kickoff]
+    return None if hit.empty else hit.iloc[0]
+
+
 def quote(ev: dict, book: str) -> dict | None:
     """A book's h2h prices as {home, draw, away} plus its last update, or None if unlisted."""
     for b in ev.get("bookmakers") or []:
@@ -155,11 +165,10 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
             if ev is None:
                 counts["unmatched"] += 1
                 continue
-            hit = lg[(lg["home"] == m["home"]) & (lg["away"] == m["away"])]
-            if hit.empty:
+            r = result_row(lg, m["home"], m["away"], s["kickoff"])
+            if r is None:
                 counts["unmatched"] += 1
                 continue
-            r = hit.iloc[0]
             side, p_pre = m["favourite"], float(m["p_fav"])
             commence = _ts(ev["commence_time"])
             books = {}
