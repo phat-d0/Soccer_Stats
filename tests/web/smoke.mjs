@@ -1268,6 +1268,9 @@ const STEPS = [
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["Inconclusive", "Closed Oct 27: inconclusive, too few usable bets to decide either way; never traded", "Inconclusive: 24 usable bets, under the 136 the test needs to decide.", "No live trades: the test ended with too few usable bets"]) if (!text.includes(w)) throw new Error(`inconclusive study lacks "${w}"`);
     if (text.indexOf("Inconclusive: 24 usable bets") > text.indexOf("No live trades")) throw new Error("the verdict text should lead the result");
+    // The research studies' extra leagues and cups read as names (lead, 28 Oct); unknown codes stay as they are.
+    const names = await p.evaluate(() => [leagueName("AUT"), leagueShort("AUT"), leagueName("FAC"), leagueName("EFL"), leagueName("UECL"), leagueName("SP2"), leagueName("E0"), leagueName("ZZZ")].join("|"));
+    if (names !== "Austrian Bundesliga|Austria|FA Cup|League Cup|Conference League|Segunda División|Premier League|ZZZ") throw new Error(`competition names: ${names}`);
   }],
   ["portfolio-study-pass", async (p) => {
     await pfUp(p); await p.click('button[data-pfstrat="fixture_pass"]');

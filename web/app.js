@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v69";
+const APP_VERSION = "v70";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -723,10 +723,26 @@ function closeSheet() {
 
 // ---------- competitions (football-data league codes) ----------
 const LEAGUES = [["E0", "Premier League", "Premier"], ["SP1", "La Liga", "La Liga"], ["D1", "Bundesliga", "Bundesliga"], ["I1", "Serie A", "Serie A"], ["F1", "Ligue 1", "Ligue 1"], ["E1", "Championship", "Championship"], ["E2", "League One", "League One"], ["E3", "League Two", "League Two"], ["UCL", "Champions League", "Champions Lg"]];
-const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || c;
+// Competitions the research studies use beyond the live ones (Research's in-play and cash-out
+// samples, lead 28 Oct; inplay_events.COMPETITIONS): code → [name, short]. Unknown codes show as is.
+const EXTRA_COMPETITIONS = {
+  FAC: ["FA Cup", "FA Cup"], EFL: ["League Cup", "League Cup"], EFLC: ["League Cup", "League Cup"],
+  CDR: ["Copa del Rey", "Copa del Rey"], DFBP: ["DFB-Pokal", "DFB-Pokal"], CI: ["Coppa Italia", "Coppa Italia"],
+  CDF: ["Coupe de France", "Coupe de France"], UEL: ["Europa League", "Europa Lg"], UECL: ["Conference League", "Conference Lg"],
+  N1: ["Eredivisie", "Eredivisie"], P1: ["Primeira Liga", "Primeira Liga"], SC0: ["Scottish Premiership", "Scotland"],
+  B1: ["Belgian Pro League", "Belgium"], T1: ["Turkish Super Lig", "Turkey"], G1: ["Greek Super League", "Greece"],
+  D2: ["2. Bundesliga", "2. Bundesliga"], I2: ["Serie B", "Serie B"], SP2: ["Segunda División", "Segunda"], F2: ["Ligue 2", "Ligue 2"],
+  AUT: ["Austrian Bundesliga", "Austria"], SWZ: ["Swiss Super League", "Switzerland"], DNK: ["Danish Superliga", "Denmark"],
+  NOR: ["Eliteserien (Norway)", "Norway"], SWE: ["Allsvenskan (Sweden)", "Sweden"], POL: ["Ekstraklasa (Poland)", "Poland"],
+  FIN: ["Veikkausliiga (Finland)", "Finland"], IRL: ["League of Ireland", "Ireland"], RUS: ["Russian Premier League", "Russia"],
+  JPN: ["J1 League (Japan)", "Japan"], CHN: ["Chinese Super League", "China"], USA: ["MLS (USA)", "MLS"],
+  MEX: ["Liga MX (Mexico)", "Mexico"], BRA: ["Brasileirão (Brazil)", "Brazil"], ARG: ["Argentine Primera División", "Argentina"],
+  ROU: ["Liga I (Romania)", "Romania"],
+};
+const leagueName = (c) => state.data?.leagues?.find((l) => l.code === c)?.name || LEAGUES.find(([k]) => k === c)?.[1] || EXTRA_COMPETITIONS[c]?.[0] || c;
 // "the Premier League", "the Championship", "the Bundesliga", but "La Liga", "Serie A", "Ligue 1", "League One".
 const theLeague = (c) => (["E0", "E1", "D1", "UCL"].includes(c) ? `the ${leagueName(c)}` : leagueName(c));
-const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || leagueName(c);
+const leagueShort = (c) => LEAGUES.find(([k]) => k === c)?.[2] || EXTRA_COMPETITIONS[c]?.[1] || leagueName(c);
 const fxLeague = (fx) => fx.league || "E0"; // older data: Premier League only
 // Understat's xG covers these; elsewhere (the Championship) the model runs on goals only,
 // so a card's expected goals aren't labelled "xG".

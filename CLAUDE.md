@@ -1054,7 +1054,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v69) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v70) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1069,7 +1069,9 @@ the owner's baseball app, so the balance can drop without any run here.
   Premier League backtest (`dkSweepHtml`), Player shots to the retired portfolio's Backtest
   (`playerBacktestHtml`), and its minimum-edge panels were dropped (a one-line note stays).
 - Competition filter (`leagueFilter`, localStorage `league`): chips for every league with fixtures
-  or trades (on Moneyline → Backtest also every league in the backtest files); `LEAGUES` names;
+  or trades (on Moneyline → Backtest also every league in the backtest files); `LEAGUES` names,
+  then `EXTRA_COMPETITIONS` (v70: the research studies' cups and extra leagues, FAC … ROU, as
+  `inplay_events.COMPETITIONS`, [name, short]; any other code shows as is);
   "xG" only in Understat leagues (`XG_LEAGUES`), else "exp. goals".
 - **Matches** (with `portfolio.strategy_order` containing `lean`, `leanOn()`): cards show only the
   Lean badge (`leanPick(fx)` = the card's `lean_pick`; "Strong · 2.6σ: Away @ +650 · Market-driven",
