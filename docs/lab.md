@@ -2688,6 +2688,58 @@ The judged sample is **H ∪ H2**, under the amendment's rule:
 3. **Not:** lowering the 136 or widening the 75% band after seeing H2's counts. The 136 is
    what the amendment fixed before H was bought.
 
+### Design HF: the forward live sample, pre-registration (28 Oct; written before any of its outcomes exists)
+
+The lead approved (28 Oct) Moneyline extending the live half-time snapshots (`inplay.yml`) to
+more competitions: the domestic cups, the Europa League and Conference League, football-data's
+ten extra divisions and `heavy_more`'s sixteen leagues. That costs about 1,100–1,400 credits a
+month. This section fixes how that forward data will be judged, before any of it is read. It is
+a **separate sample**: never pooled with H ∪ H2, and never used to change H's or H2's verdict.
+
+- **Competitions:**
+  - every competition `inplay.yml` snapshots, from the day each one's first live snapshot is
+    logged (its own start date);
+  - the live leagues already snapshotted since 28 Oct count from 28 Oct.
+- **Data:**
+  - the in-play log (`odds_log/<code>_inplay_<YYYY-MM>.jsonl` on data-log, ESPN's score per
+    row), and the pre-match every-book log for the favourite's price;
+  - Moneyline will name the new competitions' files when they land. A commit adds them here
+    **before** any outcome is read.
+- **Favourite:**
+  - the side whose Shin-fair chance is at least **0.75**, from Pinnacle's last pre-kickoff
+    h2h quote in the logs;
+  - else DraftKings' last pre-kickoff quote, where Pinnacle has none;
+  - the source is recorded per match.
+- **Trailing at half-time:** the favourite is behind on ESPN's half-time score. The in-play
+  row's own score at the snapshot must agree. A row where they disagree is left out and
+  counted.
+- **Bet:** $1 on the trailing favourite at DraftKings' price in the first in-play snapshot
+  (kickoff + 55 min), passing C's quote checks:
+  - the snapshot 48–62 minutes after kickoff;
+  - the quote updated after kickoff;
+  - at most 5 minutes old;
+  - moved against the favourite.
+
+  Betfair after 2% is the second line where it is logged.
+- **Result:** ESPN's 90-minute score (extra time and penalties never count). Football-data's
+  result is the check where it has the match.
+- **When it is judged.** Usable bets (rows passing the checks, counted without any result)
+  are counted at each monthly review. The outcome is read **once**:
+  - when the count first reaches **136**; or
+  - on **31 May 2028**, whichever comes first.
+
+  No result is looked at before then.
+- **Pass:** at least 136 usable DraftKings bets **and** the ROI range per $1 entirely above 0
+  (match-resampled, 2,000 draws, seed 0).
+- **Fail:** at least 136 usable and the range includes 0 or sits below it.
+- **Inconclusive:** under 136 on 31 May 2028.
+- Per-competition lines are descriptive only. Nothing changes live in any case. A pass only
+  justifies proposing a live paper track to the owner.
+- **Expected pace:** about 24 usable bets a season from the cups, UEFA and the extra leagues
+  (the scope's figure), plus the live leagues' share (about 9 a season). At roughly 33 a
+  season, 136 would take about four seasons. 31 May 2028 is likely to end "inconclusive"
+  unless the coverage turns out wider than estimated.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,
