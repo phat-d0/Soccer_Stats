@@ -339,7 +339,11 @@ the owner's baseball app, so the balance can drop without any run here.
     (the same rules on the same matches at Pinnacle's early price).
   - `build_files`: `lean_backtest.build` / `edge12_backtest.build` relabelled, plus `book`,
     `verdict` (pooled CLV range above 0; Lean `live_rule` and `all_odds`) and
-    `coverage_note`.
+    `coverage_note` (`coverage_note(leagues)`: the fixed text plus each scored season
+    under `PARTIAL_BELOW` 90%, by name, from `partial_coverage`: DraftKings priced under 90%
+    of matches, or Pinnacle's close on under 90% of those; also saved as
+    `partial_coverage` [{league, name, season, priced, pinnacle}]). A partial season counts
+    only the matches priced: nothing drops a season for low coverage.
   - Output: data-log `backtest/lean_backtest_dk.json`, `edge12_backtest_dk.json`, via
     `backfill.yml` `dk_price_backtest`, published as
     `portfolio.strategy_backtests.lean_dk` / `.edge12_dk` (`paper._dk_section`). Log line
