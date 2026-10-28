@@ -787,7 +787,7 @@ const STEPS = [
     const legend = (await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|");
     if (!legend.startsWith("1X2 (the record)") || !legend.includes("Draw no bet")) throw new Error(`DNB legend: ${legend}`);
     // Both lines start at the backcast's start, marked where the track was set.
-    const mark = (await p.locator("[data-scrub='cv'] .filter-lab").allInnerTexts()).join(" ");
+    const mark = (await p.locator("[data-scrub='cv'] .filter-lab").evaluateAll((els) => els.map((e) => e.textContent))).join(" ");
     if (!mark.includes("rule set (judged from here)")) throw new Error(`DNB chart marker: ${mark}`);
     const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
     const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").backcast.started).slice(0, 10)));
