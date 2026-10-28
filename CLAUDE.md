@@ -143,7 +143,9 @@ the app): Blend Lean (new rule) 7 trades (7 settled), all odds (old rule) 22 (20
 12% 196 (161 settled), Model 12% draw no bet 25 (all open), Lean draw no bet 0; corners 135 (134
 settled).
 
-**Credits:** 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
+**Credits:** 4,938,760 left on 28 Oct 05:50 UTC: the owner upgraded the plan (~5M a month) and
+said "don't skimp on data" (28 Oct). Live spend (~4k a month) is now negligible; caps sized for
+the old plan are being raised (Moneyline). Before the upgrade: 10,931 on 25 Oct 17:38 UTC;
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
 40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
 40176031079, from 17,136); 17,163 earlier on 25 Oct (after the 1,920-credit design B fetch, run
@@ -175,7 +177,8 @@ the owner's baseball app, so the balance can drop without any run here.
 - Heavy favourites (75%+) trailing at half-time (26 Oct; `docs/lab.md` "Heavy favourites", PR
   #117): post-hoc band, 39 bets. Options put to the owner: drop it (recommended), a live log
   (~30 credits a season), or the 890-credit test (~72 bets, 53% power at +12 points). No spend.
-- A weekly cache-touch job so GitHub doesn't evict the paid caches (offered, no answer yet).
+- Paid odds archive and weekly cache keep-alive: approved by the owner 28 Oct, being built
+  (Moneyline).
 - Logging Champions League corner prices only, without a model (offered; recommended no for now).
 
 ## Branches and where things run
@@ -221,7 +224,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 ## The Odds API
 
-- Repo secret `ODDS_API_KEY`, 100K-credit plan, **shared with the owner's baseball app**.
+- Repo secret `ODDS_API_KEY`, ~5M-credit plan since 28 Oct (was 100K), **shared with the owner's baseball app**.
   Read the balance from the publish log ("credits left") or a backfill log. Never print the
   key or write it into logs, data, the ledger or commits. Only the lead sets credit caps;
   the default cap is 0.
@@ -1062,9 +1065,10 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 **Owner preferences:**
 - Plain English, no branch names in parentheses in session titles or summaries.
 - Session titles follow "Soccer team: <Role>", like the baseball team.
-- One shared Odds API key on the 100K plan (the owner decided against two keys on cost).
-  Baseball usage is small in its post-season, which ends late October.
-- Credit caps are 0 unless the owner approves a spend.
+- One shared Odds API key, upgraded 28 Oct to ~5M credits a month (owner: "don't skimp on
+  data"). Baseball usage is small in its post-season, which ends late October.
+- Credit caps are still set by the lead (0 by default in code), but data spend is now approved
+  generously: estimate first, pre-register any research purchase, keep the 3,000 reserve.
 
 **Open threads:**
 - Player shots are parked (owner, 9 Oct): no new work or spend; the free display and weekly
