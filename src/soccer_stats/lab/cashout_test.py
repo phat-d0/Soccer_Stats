@@ -134,11 +134,11 @@ def build(slot_file: Path, cache_dir: Path, fd: pd.DataFrame) -> tuple[list[dict
             if not any(q["found"] for q in quotes.values()):
                 counts["unmatched"] += 1
                 continue
-            hit = lg[(lg["home"] == m["home"]) & (lg["away"] == m["away"])]
-            if hit.empty:
+            hit = c2.result_row(lg, m["home"], m["away"], s["kickoff"])
+            if hit is None:
                 counts["no_result"] += 1
                 continue
-            r = hit.iloc[0].to_dict()
+            r = hit.to_dict()
             hg, ag = int(r["fthg"]), int(r["ftag"])
             ht = None
             if np.isfinite(r.get("hthg", np.nan)) and np.isfinite(r.get("htag", np.nan)):

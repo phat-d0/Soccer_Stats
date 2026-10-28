@@ -133,6 +133,13 @@ settlement runs after them.
   shortfall, which the half-time market already covers). A priced trail-first test would cost
   about 18,820 credits (1,882 snapshots); recommended not to buy.
   The whole study is in the app as the closed portfolio "Comeback bets" (v61, PRs #115/#116).
+- Cash-out test (owner, 28 Oct; design X, 150,910 credits; `docs/lab.md` "Cash-out test: result",
+  rerun 40709968765 after a result-join fix): **fail**. Cash out a 4.0+ underdog at a 50% in-play
+  chance with a 5% fee, 2% stakes: 570 decisions, growth vs holding +0.00020 a bet (−0.00022 to
+  +0.00062). The in-play price overrates a leading underdog a little (55%+ at half-time: 65% won
+  vs 72%), which a free cash-out uses and a 5% fee cancels. Holding lost −25.3% per $1, but the
+  sample left out B/C/H's matches (underdogs leading at half-time), so the hold level is biased
+  low; with B and C's put back −17.0%. App file `lab/cashout_research.json`.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -820,7 +827,21 @@ the owner's baseball app, so the balance can drop without any run here.
   cash out at T 0.40/0.50/0.60 and margins 0/5/10%, and a half-time Kelly partial; growth
   log(1 + s × profit) at stakes 1/2/5% with its difference from holding, drawdowns, q's
   calibration; `verdict` = the one primary (5%, T 0.50, 2%, 4.0+, ≥ 300 decisions).
-  `odds-check.yml` `task=cashout-test`, log line `CASHOUT_TEST_JSON`.
+  `odds-check.yml` `task=cashout-test`, log line `CASHOUT_TEST_JSON`. Run 40706645115, rerun
+  40709968765 after the result-join fix (`comebacks2.result_row`: teams plus kickoff when a pair
+  meets twice at a ground, SC0/B1/G1): fail.
+- `lab/cashout_research.py` (lead brief, 28 Oct; no key): the app file `lab/cashout_research.json`
+  in the shape the app's research studies read (`kind: "cashout"`, `primary_rule`, `test_verdict`,
+  `designs` = `analyse_band` dicts plus `role`, `label`, `by_league`, `by_season`: `primary` judged,
+  `band_3_4`, `put_back` (B and C's matches back, half-time only, already read), `frozen_ht`,
+  `season_2025` descriptive; `curves` (hold vs cash at 2%, $1,000, ≤ 200 points), `bets` (the judged
+  rule's cash-outs), `why`, `notes`), rebuilt from `cashout_test`; fails unless the analysis run
+  reproduces (`EXPECTED`). `odds-check.yml` `task=cashout-research` prints `CASHOUT_RESEARCH_JSON`
+  (no bets) and the file as `CASHOUT_RESEARCH_B64` chunks with its SHA-256.
+- `lab/cashout_check.py` (lead, 28 Oct; read-only, no key, H never joined to a result): checks on
+  the cash-out hold line (football-data alone on every frozen match, the result join, unmatched
+  matches, the matches B/C bought). `odds-check.yml` `task=cashout-check`, log line
+  `CASHOUT_CHECK_JSON` (run 40708947532).
 - `lab/strategy_search.py` (owner via the lead, 28 Oct; `docs/lab.md` "Strategy search with a
   locked holdout"; no key): every arm (a base of the raw model's best edge ≥ t, Lean's best z ≥ k
   on 1X2/DNB or every side; 1X2, DNB, AH and O/U 2.5 at Pinnacle's early price; none, one or two
