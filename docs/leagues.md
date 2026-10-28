@@ -734,6 +734,51 @@ Nothing trades on it.
 - **Only the default branch** gets the key and writes to data-log. A run anywhere else reads and
   prints, and buys nothing.
 
+### Odds-only competitions (28 Oct, lead-approved; about 1,100 credits a month more)
+
+Research's 75%+ heavy-favourite idea needs in-play prices from more competitions, going
+forward (H2's forward sample). The same snapshots now also cover 34 odds-only competitions
+(`inplay_events.COMPETITIONS`):
+
+- the six domestic cups: FA Cup, EFL Cup, Copa del Rey, DFB-Pokal, Coppa Italia, Coupe de
+  France;
+- the Europa League and Conference League;
+- the ten football-data leagues the archive prices in play beyond our eight: N1, P1, SC0, B1,
+  T1, G1, D2, I2, SP2, F2;
+- heavy_more's sixteen: Austria, Switzerland, Denmark, Norway, Sweden, Poland, Romania,
+  Finland, Ireland, Russia, Japan, China, USA, Mexico, Brazil, Argentina.
+
+They are odds only: no model, no paper trades, no cards in the app. The team names are the
+feed's own; there is no football-data mapping, and Research's H2 joins them itself.
+
+- **Kickoffs, 0 credits.** We fetch none of their pre-match odds.
+  - publish.yml's data-log step runs `log-inplay-events`. It asks the free sports list which
+    keys are in season, then each in-season competition's free `/events` list, at most every
+    3 hours.
+  - New (event, kickoff) pairs go to `odds_log/<code>_events_<YYYY-MM>.jsonl`, by kickoff
+    month.
+  - Each competition's ask, or its "inactive" status, goes to
+    `odds_log/inplay_events_calls_<YYYY-MM>.jsonl`.
+  - Every call's `x-requests-last` is checked: a list that bills stops the step.
+- **Planning.** `close_runs.plan` gets those kickoffs as `inplay_ks`. They get the +58 and +78
+  minute in-play runs and keep the planner going, but never a publish close or settlement run.
+- **Snapshots.** These are `inplay_log.run` as for the live leagues: the free events check,
+  then one `/odds` call per league, 1 credit. ESPN's score and clock come from each
+  competition's own slug.
+- **Empty pause** (corners' rule). Our ten books may not price minor leagues in play. If an
+  odds-only competition's last 6 answered calls for a kind (`inplay55` or `inplay75`) logged no
+  rows, over 2 or more kickoff days, that league-kind makes no call for 7 days after the last
+  one (`inplay_log.paused`). The run's summary lists the paused ones.
+- **Cost.** About 1,100 credits a month on average and about 1,400 at peak (modelled,
+  ±30%):
+  - cups about 60;
+  - UEFA cups about 30;
+  - the ten football-data leagues about 420;
+  - heavy_more's sixteen about 590.
+
+  The monthly guard `MONTHLY_CAP` is now 3,000. The real spend per competition is read from
+  `inplay_calls_*`, and the first month's is reported in the weekly line.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

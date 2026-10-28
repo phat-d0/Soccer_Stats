@@ -58,9 +58,15 @@ WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml"} | dict.fromkeys(IN
 
 def kickoffs(log_dir) -> list[pd.Timestamp]:
     """Every distinct kickoff in data-log's odds_log files (the DraftKings log lists each
-    priced match, the team-total and corner logs the matches they snapshot)."""
+    priced match, the team-total and corner logs the matches they snapshot). The odds-only
+    competitions' events files are left out: they get in-play runs only (inplay_kickoffs)."""
+    from soccer_stats.inplay_events import EVENTS_RE
+
     d = Path(log_dir)
-    rows = _read_jsonl(sorted(d.glob("*.jsonl"))) if d.is_dir() else []
+    files = (
+        [p for p in sorted(d.glob("*.jsonl")) if not EVENTS_RE.match(p.name)] if d.is_dir() else []
+    )
+    rows = _read_jsonl(files)
     out = set()
     for r in rows:
         k = r.get("kickoff") if isinstance(r, dict) else None
@@ -73,14 +79,24 @@ def kickoffs(log_dir) -> list[pd.Timestamp]:
     return sorted(out)
 
 
-def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
+def inplay_kickoffs(log_dir) -> list[pd.Timestamp]:
+    """The odds-only competitions' kickoffs (inplay_events): in-play runs only, never a
+    close or settlement run."""
+    from soccer_stats.inplay_events import kickoffs as event_kickoffs
+
+    d = Path(log_dir)
+    return sorted({k for ks in event_kickoffs(d).values() for k in ks}) if d.is_dir() else []
+
+
+def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=()) -> dict:
     """The dispatch times for kickoffs whose close falls in the next `horizon_hours`.
 
     Greedy over sorted kickoffs: a dispatch at the first uncovered kickoff minus
     LEAD_MINUTES (or now, if the planner started late) covers every kickoff up to
     SPAN_MINUTES after that one. `continue` says whether a later kickoff is due within
     CONTINUE_HOURS, so the workflow starts the next planner run itself instead of waiting
-    for a throttled cron.
+    for a throttled cron. `inplay_ks` (the odds-only competitions' kickoffs) get in-play
+    runs and keep the planner going, but no close or settlement run.
     """
     now = _ts(now)
     end = now + pd.Timedelta(hours=horizon_hours)
@@ -88,6 +104,7 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
     span = pd.Timedelta(minutes=SPAN_MINUTES)
     soon = now + pd.Timedelta(minutes=MIN_LEFT_MINUTES)
     ks = sorted({_ts(k) for k in ks})
+    every = sorted(set(ks) | {_ts(k) for k in inplay_ks})
     due = [k for k in ks if k >= soon and k - lead < end]
     dispatch = []
     i = 0
@@ -111,7 +128,7 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
     # snapshot time falls in this window (a late planner still sends one INPLAY_LATE late).
     for kind, minutes in INPLAY.items():
         after = pd.Timedelta(minutes=minutes) + INPLAY_SHIFT
-        live = [k for k in ks if now - INPLAY_LATE <= k + after < end]
+        live = [k for k in every if now - INPLAY_LATE <= k + after < end]
         i = 0
         while i < len(live):
             first = live[i]
@@ -119,7 +136,7 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
             i += len(covered)
             dispatch.append({"at": max(first + after, now), "kickoffs": covered, "kind": kind})
     dispatch.sort(key=lambda d: d["at"])
-    later = [k for k in ks if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
+    later = [k for k in every if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
     # A cluster whose settlement falls after this window hands over to the next planner too.
     unsettled = [k for k in ks if end <= k + SETTLE_AFTER and k - lead < end]
     return {

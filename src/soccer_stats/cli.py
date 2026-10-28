@@ -388,6 +388,23 @@ def cmd_log_cup_odds(args: argparse.Namespace) -> None:
     print(f"Cup odds log: {rows} new rows, {calls} new calls")
 
 
+def cmd_log_inplay_events(args: argparse.Namespace) -> None:
+    """The odds-only in-play competitions' free events lists (publish.yml's data-log step):
+    new kickoffs into data-log's odds_log/, read by close_runs and inplay_log."""
+    import os
+
+    from soccer_stats import inplay_events
+
+    key = os.environ.get("ODDS_API_KEY", "")
+    try:
+        res = inplay_events.fetch(Path(args.log_dir), key)
+    except Exception as exc:  # noqa: BLE001  never print a URL (it holds the key)
+        res = {"asked": 0, "inactive": 0, "events": 0, "new": 0, "credits": 0}
+        res["stop"] = type(exc).__name__
+    line = inplay_events.summary_line(res)
+    print(line.replace(key, "***") if key else line)
+
+
 def cmd_log_inplay(args: argparse.Namespace) -> None:
     """Half-time in-play snapshots (inplay.yml): one live h2h call per league with a
     kickoff in a snapshot window, logged to data-log's odds_log/ with ESPN's score."""
@@ -416,7 +433,12 @@ def cmd_close_plan(args: argparse.Namespace) -> None:
     from soccer_stats import close_runs
 
     now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
-    p = close_runs.plan(close_runs.kickoffs(args.log_dir), now, args.horizon_hours)
+    p = close_runs.plan(
+        close_runs.kickoffs(args.log_dir),
+        now,
+        args.horizon_hours,
+        inplay_ks=close_runs.inplay_kickoffs(args.log_dir),
+    )
     print(close_runs.describe(p))
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -3084,6 +3106,13 @@ def main(argv: list[str] | None = None) -> None:
     lip.add_argument("--log-dir", required=True, help="data-log's odds_log files (read)")
     lip.add_argument("--pending", required=True, help="folder for the new rows and calls")
     lip.set_defaults(func=cmd_log_inplay)
+
+    lie = sub.add_parser(
+        "log-inplay-events",
+        help="free events lists of the odds-only in-play competitions (0 credits)",
+    )
+    lie.add_argument("--log-dir", required=True, help="data-log's odds_log folder (read, append)")
+    lie.set_defaults(func=cmd_log_inplay_events)
 
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
