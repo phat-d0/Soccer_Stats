@@ -864,6 +864,16 @@ the owner's baseball app, so the balance can drop without any run here.
   `task=prematch-coverage` with `design`; run it on `team/research` (where `heavy-espn-*` is
   saved). Log lines `PREMATCH_COVERAGE_JSON`, `PREMATCH_TRAILING_JSON`. H2P (run 40750915981):
   359 of 911 snapshots held events; 722 of 1,686 matches priced, 697 of them FA Cup or EFL Cup.
+  H2U (run 40753094483, 3,800 credits): 380 of 419 snapshots held events; 1,250 of 1,481 matches
+  priced with the held UCL closes. `trailing` also returns `trailing_list` (the matches).
+- `lab/h2_slots.py` (lead, 28 Oct; free, no key): design H2's slot list (`docs/lab.md` "Design
+  H2"): the 75%+ favourites trailing at half-time from H2P, H2U (with the held UCL closes) and
+  `heavy_more`'s extra leagues (`extra_league` now lists `trailing_list`; its KeyError in a
+  season without a heavy favourite is fixed), one snapshot per slot at kickoff + 55 min, guard
+  on, nothing used by B, C, H or X. `odds-check.yml` `task=h2-slots` (run it on
+  `team/research`), log lines `H2_SLOTS_SHA256`, `H2_SLOTS_JSON`. The frozen file is
+  `lab/comeback_h2_slots.json` (70 slots, 700 credits, SHA aeadf289…, run 40755843673), bought
+  by `comeback_fetch --slots H2` (cap 1,000) from the default branch after the plan merges.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's

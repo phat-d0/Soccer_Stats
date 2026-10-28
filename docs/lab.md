@@ -2611,82 +2611,99 @@ in H2's own pre-registration.
   full 1X2 (else DraftKings') is at least 0.75. The half-time score comes from the ESPN days
   that chose the slots. No final score was read.
 
-### Design H2: DRAFT pre-registration (28 Oct; not approved, nothing bought)
+### Design H2: final pre-registration (frozen 2026-10-28, before any H2 in-play snapshot is bought)
 
-H2 is the second sample for the 75%+ idea (see "Design H amendment"). It is written here before
-any H2 in-play price is seen. The slot list will be frozen with its SHA-256 in the commit that
-finalises this section.
+The lead approved H2 on 28 Oct: the sample, the pass rule unchanged, and the in-play purchase
+up to 1,000 credits with C's guard, bought only after this plan is merged. Nothing here changes
+after an H2 price is seen. H's outcomes are still unread.
 
-**Sample: trailing 75%+ favourites at half-time, not in B, C or H.**
-- **Domestic cups:** the H2P priced matches, **13**.
-- **UEFA cups:** the H2U priced matches plus the held Champions League closes, **19**.
-- **`heavy_more`'s extra leagues:**
-  - Football-data's closing prices (Pinnacle's, else the average's), with ESPN's half-time
-    score, 2022/23 to date: **30** (run 40744037363).
-  - China 13, Norway 6, Mexico 4, Austria 2, Switzerland 1, Sweden 1, Romania 1, USA 1,
-    Brazil 1; Denmark and Ireland 0.
-  - **Five more leagues failed** with a `KeyError` (Poland, Finland, Russia, Japan,
-    Argentina). The fix goes in with this pre-registration, and their counts get added
-    before the freeze.
-- `heavy_more`'s "earlier seasons" (SP1, I1, D2, SP2 in 2020/21–2021/22) are already in H, so
-  they are not counted again.
-- **About 62 trailing favourites today**, plus whatever the five fixed leagues add.
-  - The extra leagues have been averaging about 3 each over five seasons. Five more would add
-    perhaps 10 to 15.
-  - Russia is likely to add none after 2022.
-- **2026/27** counts up to the freeze date.
+**Hypothesis.** H's, unchanged: a favourite priced 75%+ before kickoff that trails at
+half-time wins more often than DraftKings' in-play price implies, enough to make a profit
+backing it.
 
-**Purchase (to be approved).**
-- One historical h2h snapshot per slot at kickoff + 55 min, at the same ten books, 10 credits.
-- About 62–80 slots, so **about 620–800 credits**.
-- C's guard on every league-season (first 3 snapshots with no started event freshly priced by
-  DraftKings or Betfair: stop that league-season and count it "not priced").
-- Same spending rules as H: the default branch, a dry run first, the 3,000 reserve.
+**Sample (frozen).** `src/soccer_stats/lab/comeback_h2_slots.json`, SHA-256
+`aeadf2893841fba2791d7f50d5dbab158380851ade80c312d6a885e114b841e0` (32,928 bytes).
+- **Built by:** `lab/h2_slots.py` (`odds-check.yml` `task=h2-slots`, run 40755843673, on
+  `team/research` where `heavy-espn-*` is saved). The file was rebuilt byte for byte from
+  the run's log.
+- **What it reads:** pre-match prices and half-time scores only. The extra leagues' join to
+  ESPN matches records by their 90-minute score, as `heavy_more` always has. It keeps nothing
+  of that score and reads no result.
+- **Kickoffs:** before 28 Oct 2026 00:00 UTC.
+- **70 slots holding 70 trailing 75%+ favourites, one match per slot:**
+  - **Domestic cups** (H2P's bought pre-match prices): FA Cup 9, EFL Cup 4.
+  - **UEFA cups** (H2U's bought prices and the held Champions League closes): Champions League 8
+    (4 of them from the held closes), Europa League 6, Conference League 5.
+  - **Extra leagues** (football-data's Pinnacle close, else the average's; ESPN half-time):
+    China 13, Russia 7, Norway 6, Mexico 4, Austria 2, Argentina 1, Brazil 1, Romania 1,
+    Sweden 1, Switzerland 1, USA 1.
+- **Favourite:** Shin-fair chance ≥ 0.75.
+  - Cups: from the pre-match snapshot at kickoff − 5 min (Pinnacle's full 1X2, else
+    DraftKings').
+  - Held UCL closes: the bought close (Pinnacle, else DraftKings).
+  - Extra leagues: football-data's close.
+  - The file records the price source per match (`price`).
+- **The KeyError fix** (with this plan): `heavy_more.extra_league` failed in a season without
+  a heavy favourite. Fixed, the five leagues add Russia 7 and Argentina 1. Poland and Finland
+  add none because ESPN joins none of their matches (0 joined), so their half-time state is
+  unknown. Japan has no trailing heavy favourite.
+- **Nothing overlaps B, C, H or X** (other competitions; a test checks it).
 
-**Analysis and pass rule.** H's, unchanged:
-- the same quote checks;
-- $1 on the trailing favourite at DraftKings' passing in-play price;
-- ROI per $1 with a match-resampled 95% range (2,000 draws, seed 0).
+**Purchase.**
+- `comeback_fetch --slots H2` (`odds-check.yml` `task=comeback-fetch`, `design=H2`), from the
+  default branch only, after this plan is merged.
+- One historical bulk h2h snapshot per slot at kickoff + 55 min, ten books, 10 credits.
+- **Estimate 700 credits; cap 1,000** (the lead's approval). A dry run first (done locally:
+  70 to buy, about 700).
+- **C's guard on every league-season** (`"guard": true`): if its first 3 snapshots show no
+  started event freshly priced by DraftKings or Betfair, no more is bought and its matches
+  count as **not priced**. A league-season with fewer than 3 slots is bought in full.
+  - Russia (7) is likely unpriced in play by DraftKings; the guard limits it to about 70
+    credits.
+- Same spending rules as C and H: the 3,000 reserve, the first call budgeted at 20, a stop
+  on a call over 10 credits or any HTTP or network error, never buying a slot twice.
+- Spend and balance are reported after the run.
 
-The judged sample is **H ∪ H2**, under the amendment's rule:
-- **Pass:** at least **136** usable DraftKings bets **and** the ROI range entirely above 0.
-- **Fail:** at least 136 usable and the range includes 0 or sits below it.
-- **Inconclusive:** under 136 usable bets.
-- **Caveat, stated up front:** cups and minor leagues may behave differently from H's leagues.
-  Per-sample lines (H, the cups, the extra leagues) are descriptive only.
+**Analysis (run once, after H2 is bought; no key).**
+- **H's quote checks, unchanged:**
+  - the 48–62-minute window;
+  - updated after kickoff;
+  - at most 5 minutes old;
+  - moved against the favourite;
+  - Pinnacle within 0.05 of the other books' median, else Betfair for the fair chance.
+- **Matching the in-play event:** by both names (`prematch_coverage.same_team`) and the
+  kickoff ±30 min, either way round.
+- **Results** (90 minutes only; extra time and penalties never count):
+  - cups and UEFA: ESPN's 90-minute score for the file's `espn_id`;
+  - extra leagues: football-data's extra file (`HG`, `AG`) by league, season, teams and date.
+  - The code that reads them extends `comebacks2` for these sources. It is written, tested
+    and merged **before** the one analysis run, and it changes nothing in the rule.
+- **Judged sample: H ∪ H2.**
+  - **Pass:** at least **136** usable DraftKings bets **and** the ROI range per $1 entirely
+    above 0 (match-resampled, 2,000 draws, seed 0).
+  - **Fail:** at least 136 usable and the range includes 0 or sits below it. A range entirely
+    below 0 reads "the in-play price over-prices the comeback".
+  - **Inconclusive:** under 136 usable bets. This is stated plainly, and no other rule is
+    substituted.
+- **Caveat, stated up front:** cups and minor leagues may behave differently from H's
+  leagues. The per-sample lines (H; the cups; the extra leagues) are descriptive only.
+- **Secondary (descriptive):** H's list, plus the cups against the leagues.
+- Nothing changes live in any case. A pass only justifies proposing a live paper track to the
+  owner.
 
 **Size and power, stated before buying.**
-- **Usable bets expected.** H: about 83 (its pre-purchase estimate: 103 trailing favourites at
-  C's 81% usable rate). H2 at the same 81%: 62 × 0.81 ≈ **50**, plus about 8–12 from the five
-  fixed leagues.
-  - **At C's rate, H ∪ H2 ≈ 133–145 usable bets: right at the 136 line.**
-  - If DraftKings prices cups and minor leagues in play less often than C's leagues (say 60%),
-    H2 gives about 37–46 and **H ∪ H2 ≈ 120–129: short of 136.**
-  - The three 2021/22 matches may not be priced in play at all.
-- **Power** (two-sided 95% range on the win-rate gap, about 46% fair chance):
-
-| Usable bets | True gap +12 points (what was seen) | True gap +6 points |
-| --- | --- | --- |
-| 83 (H alone) | 59% | 19% |
-| 120 | 75% | 26% |
-| 133 | 79% | 28% |
-| 136 | 80% | 29% |
-| 145 | 82% | 30% |
-
-- **Plainly:** H ∪ H2 is unlikely to clear 136 with any margin, and may fall short. Even at
-  136, a true +6-point gap would show a range above 0 less than a third of the time.
-
-**If H ∪ H2 falls short of 136, the honest choices:**
-1. **Judge H alone on 30 Nov 2026** under its own rule (at least 100 usable bets). With about
-   83 usable, the verdict would most likely be "inconclusive".
-2. **Add a live log going forward.**
-   - `inplay.yml` already snapshots half-time prices for the live leagues.
-   - Extending it to the cups, UEFA and the extra leagues would add about 24 usable bets a
-     season (the scope's figure). That means about two seasons to cover the gap.
-   - The live rows would be judged as a pre-registered forward sample, never mixed into the
-     historical verdict after the fact.
-3. **Not:** lowering the 136 or widening the 75% band after seeing H2's counts. The 136 is
-   what the amendment fixed before H was bought.
+- **H:** about 83 usable (its pre-purchase estimate).
+- **H2:**
+  - at C's 81% usable rate, 70 × 0.81 ≈ **57**;
+  - leaving Russia out as likely unpriced, 63 × 0.81 ≈ 51;
+  - at 60% (DraftKings pricing cups and minor leagues in play less often), about 38–42.
+- **H ∪ H2 ≈ 134–140 at C's rate (right at the 136 line), about 121–125 at 60% (short).**
+- **Power** (two-sided 95% range on the win-rate gap, about 46% fair chance): 83 → 59%,
+  120 → 75%, 136 → 80%, 140 → 81% for a true +12-point gap. Under a third at every size for
+  +6 points.
+- **Plainly:** H ∪ H2 may fall short of 136. If it does, the verdict is "inconclusive" under
+  this rule. The forward live sample (design HF below) is the separate, pre-registered way to
+  get more data.
 
 ### Design HF: the forward live sample, pre-registration (28 Oct; written before any of its outcomes exists)
 
