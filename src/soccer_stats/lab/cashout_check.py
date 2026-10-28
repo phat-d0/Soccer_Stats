@@ -198,7 +198,7 @@ def run(cache_dir: Path) -> dict:
         d["league"], d["season"] = lg, y
         rows.append(d)
     u = pd.concat(rows, ignore_index=True)
-    trip = list(zip(u["league"], u["kickoff"], u["home"]))
+    trip = list(zip(u["league"], u["kickoff"], u["home"], strict=True))
     u["in_bc"] = [t in bc for t in trip]
     u["in_h"] = [t in h for t in trip]
     u["in_x"] = key(u).isin(set(key(x)))
