@@ -50,6 +50,9 @@
 #   comeback-research: the app's frozen comeback summary (lab/comeback_research.json) rebuilt
 #            from the same cached bodies (C judged, B and C+B descriptive); no key. Prints
 #            COMEBACK_RESEARCH_JSON and fails unless runs 40176653428 and 40145295663 reproduce.
+#   cashout-research: the app's frozen cash-out summary (lab/cashout_research.json) rebuilt
+#            from the same cached bodies; no key. Prints the file in base64 chunks with its
+#            SHA-256 and fails unless run 40706645115 reproduces.
 #   timelines-fetch: ESPN goal timelines (docs/lab.md "Goal timelines from ESPN"; free, no
 #            key): scoreboards on football-data's match days, eight leagues 2017/18-2024/25,
 #            cached for good (espn-timelines-*), resumable, <= 2 requests a second; counts only.
@@ -119,9 +122,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -241,7 +244,7 @@ jobs:
         with:
           name: archive-probe
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' }}
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' }}
         with:
           path: data/raw/comeback_odds
           key: comeback-odds-none
@@ -250,7 +253,7 @@ jobs:
       # Paid odds: if the cache missed, rebuild it from the permanent archive before
       # anything can buy (docs/caches.md).
       - name: Rebuild the paid comeback-odds cache from the archive if it missed
-        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' }}
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' }}
         uses: ./.github/actions/paid-archive-restore
         with:
           name: comeback-odds
@@ -428,6 +431,8 @@ jobs:
                      --slots-out out/comeback_h_slots.json ;;
             cashout-test) uv run python -m soccer_stats.lab.cashout_test \
                      --json out/cashout_test.json ;;
+            cashout-research) uv run python -m soccer_stats.lab.cashout_research \
+                     --json out/cashout_research.json ;;
             cashout-plan) uv run python -m soccer_stats.lab.cashout_plan \
                      --b64 --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
