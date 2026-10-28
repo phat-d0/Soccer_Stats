@@ -161,6 +161,13 @@ jobs:
           path: data/raw/player_odds_history
           key: player-odds-history-none
           restore-keys: player-odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid player-odds-history cache from the archive if it missed
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: player-odds-history
       # Restore only (goal-league saves its own league prefix): the paid caches are never saved.
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task != 'coverage' && inputs.task != 'props' && inputs.task != 'goal-league' }}
@@ -199,12 +206,25 @@ jobs:
           path: data/raw/archive_probe
           key: archive-probe-none
           restore-keys: archive-probe-
+      - name: Rebuild the paid archive-probe cache from the archive if it missed
+        if: ${{ inputs.task == 'archive-probe' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: archive-probe
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' }}
         with:
           path: data/raw/comeback_odds
           key: comeback-odds-none
           restore-keys: comeback-odds-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid comeback-odds cache from the archive if it missed
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: comeback-odds
       # Favourite comebacks: each league's Understat goal files have their own prefix too.
       # The paths must match the save step exactly, or the cache version differs and misses.
       - uses: actions/cache/restore@v4
