@@ -2819,6 +2819,21 @@ locked holdout (football-data 2024/25 onward). This test reads their in-play pri
 results for the cash-out question only. The strategy search's exit arms use the comeback
 sample from before 2024/25, so that holdout stays unread for pre-match strategies.
 
+**Analysis code (28 Oct, `lab/cashout_test.py`, `odds-check.yml` `task=cashout-test`).** It
+was written while the purchase was still running and before any outcome was read. It runs
+once. It pins down these points the text above left open:
+- **Which matches count:** a match counts when its event is found in at least one of its two
+  snapshots.
+  - A match whose league-season the guard blocked is "not priced".
+  - A match found in neither snapshot is "unmatched".
+  - Both are left out and counted.
+- **At a moment where the event is missing or DraftKings' quote fails, no cash-out is
+  offered.** The bet holds.
+- **The Kelly partial** treats a stake s as a bankroll of 1/s per $1 entry, as in the
+  free study (`cashout.kelly_hold`).
+- **The DraftKings early-price entry is left out.** Moneyline's historical DraftKings file
+  is not built for these leagues and seasons.
+
 **App file.** The finished test ships `lab/cashout_research.json`, pass or fail, in the same
 shape as `lab/comeback_research.json` (title, question, rule, verdict, verdict_text, cost,
 runs, preregistered, designs with by-band tables, a bets list for the curve, notes).
