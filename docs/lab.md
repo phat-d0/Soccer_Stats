@@ -2733,6 +2733,45 @@ backing it.
   - The verdict uses at least 136 usable bets and the ROI range above 0.
   - It writes the app file `lab/heavy_favourites_research.json`.
 
+### Heavy favourites H ∪ H2: result (28 Oct; `odds-check.yml` `task=heavy-analysis` run 40764816980, 0 credits, no key; run once)
+
+- **H2 purchase, finished.** After the amendment the resumed run (40764374925, cap 970) bought
+  65 snapshots for 650 credits (balance 4,499,109 → 4,498,109) and stopped cleanly. With the
+  first run, H2 bought 68 snapshots for **680 credits**. Not priced: one match, Romania
+  2022/23 (sport key unknown to the API). The guard blocked nothing.
+- **Verdict: inconclusive.** 114 usable bets, under the 136 the rule needs. As
+  pre-registered, no other rule is put in its place.
+- **H and H2 together (judged):** 173 matches, 114 bets, 47 won (41.2%). On the bets with a
+  fair price the gap to the price is +0.6 points (−8.0 to +9.6). ROI per $1 at DraftKings'
+  in-play price is −5.2% (−28.2% to +18.8%); at Betfair after 2%, +2.1% (99 bets).
+- **Descriptive lines only:**
+
+  | Sample | Bets | Won | ROI per $1 (95% range) |
+  | --- | --- | --- | --- |
+  | H (league matches) | 67 | 28 | −12.0% (−39.4% to +16.5%) |
+  | H2 (cups and extra leagues) | 47 | 19 | +4.6% (−33.3% to +47.9%) |
+  | Cups | 20 | 8 | −6.4% (−57.1% to +49.1%) |
+  | Leagues (H and H2) | 94 | 39 | −4.9% (−29.7% to +22.5%) |
+
+- **Where the matches went:**
+  - 27 matches were unmatched in the feed (23 in H, 4 in H2).
+  - 9 slots fell outside the half-time window (3 in H, 6 in H2).
+  - 1 match was not priced.
+  - The rest failed C's quote checks.
+- **Plainly:** no sign of an edge. The pooled win rate sits on the in-play price, and the range
+  is wide either way. More data comes only from design HF's forward live sample, read at 136
+  usable bets or on 31 May 2030.
+- **App file:** `lab/heavy_favourites_research.json`.
+  - The run printed `HEAVY_RESEARCH_SHA256` 879ebe1a…. The committed file (SHA 2bcfc5d0…)
+    changes no number or bet. It differs only in display fields:
+    - `cost`: H2's in-play cost of 680 (unknown to the code before the purchase finished),
+      the total of 9,070, and readable cost labels;
+    - `runs.h2_fetch`: both purchase runs;
+    - each design's `series` (the chart legend; the app otherwise fell back to the comeback
+      study's "C and B together");
+    - true minus signs in `verdict_text`.
+  - `heavy_analysis.py` now writes the same fields, so a rebuild gives the committed file.
+
 ### Design HF: the forward live sample, pre-registration (28 Oct; written before any of its outcomes exists)
 
 The lead approved (28 Oct) Moneyline extending the live half-time snapshots (`inplay.yml`) to

@@ -1296,7 +1296,11 @@ def add_research_studies(data: dict) -> None:
         _trim_cashout(real)
     else:
         synthetic.insert(1, _cashout_study())
-    data["research_studies"] = studies + synthetic
+    # A synthetic study replaces a committed one with its id (the heavy-favourite study,
+    # committed 28 Oct, keeps its pending stand-in here: the smoke test checks the plan view on
+    # it and the real file has no room under 1.5 MB; the inconclusive stand-in covers its state).
+    ids = {x["id"] for x in synthetic}
+    data["research_studies"] = [x for x in studies if x["id"] not in ids] + synthetic
 
 
 # Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture
