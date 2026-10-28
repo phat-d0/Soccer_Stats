@@ -163,9 +163,9 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       design:
-        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test)"
+        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues)"
         type: choice
-        options: [B, C, H, X, H2P, H2U]
+        options: [B, C, H, X, H2P, H2U, H2]
         default: B
       leagues:
         description: "markets / espn: comma-separated leagues, e.g. E2,E3 (blank = the six; markets also prints team names vs football-data's clubs, espn reads 21 days)"
