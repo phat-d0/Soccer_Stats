@@ -14,6 +14,11 @@ def closes(p):
     return [d for d in p["dispatch"] if d["kind"] == "close"]
 
 
+def publishes(p):
+    """The publish runs (closes and settlements), without the in-play snapshots."""
+    return [d for d in p["dispatch"] if d["kind"] not in cr.INPLAY]
+
+
 def test_one_run_per_cluster_of_kickoffs():
     now = T("2026-10-17 10:00")
     ks = [
@@ -23,14 +28,14 @@ def test_one_run_per_cluster_of_kickoffs():
         T("2026-10-17 15:30"),
     ]
     p = cr.plan(ks, now)
-    assert [d["at"] for d in p["dispatch"]] == [T("2026-10-17 13:45"), T("2026-10-17 15:15")]
-    assert p["dispatch"][0]["kickoffs"] == [T("2026-10-17 14:00"), T("2026-10-17 14:05")]
+    assert [d["at"] for d in publishes(p)] == [T("2026-10-17 13:45"), T("2026-10-17 15:15")]
+    assert publishes(p)[0]["kickoffs"] == [T("2026-10-17 14:00"), T("2026-10-17 14:05")]
 
 
 def test_kickoffs_too_far_apart_get_their_own_run():
     now = T("2026-10-17 10:00")
     p = cr.plan([T("2026-10-17 14:00"), T("2026-10-17 14:13")], now)
-    assert [d["at"] for d in p["dispatch"]] == [T("2026-10-17 13:45"), T("2026-10-17 13:58")]
+    assert [d["at"] for d in publishes(p)] == [T("2026-10-17 13:45"), T("2026-10-17 13:58")]
 
 
 def test_every_covered_kickoff_gets_a_close_from_the_dispatched_run():
@@ -43,7 +48,7 @@ def test_every_covered_kickoff_gets_a_close_from_the_dispatched_run():
         T("2026-10-17 12:00"),
         T("2026-10-17 13:30"),
     ]
-    for d in cr.plan(ks, now)["dispatch"]:
+    for d in closes(cr.plan(ks, now)):
         for delay in (0, 3, 6):
             for k in d["kickoffs"]:
                 assert due_snapshot(k, d["at"] + pd.Timedelta(minutes=delay), runs=[]) == "close"
@@ -115,7 +120,8 @@ def test_a_settlement_run_after_each_cluster_of_kickoffs():
     assert [d["at"] for d in p["dispatch"]] == sorted(d["at"] for d in p["dispatch"])
     assert p["continue"] is False  # nothing left for a later planner
     j = cr.to_json(p)
-    assert [d["kind"] for d in j["dispatch"]] == ["settle", "close", "settle"]
+    kinds = [d["kind"] for d in j["dispatch"] if d["kind"] not in cr.INPLAY]
+    assert kinds == ["settle", "close", "settle"]
     assert "settle kickoffs 14:00, 14:05" in cr.describe(p)
     # A settlement already past is skipped (the scheduled runs have it).
     late = cr.plan([T("2026-10-17 09:00")], now)
@@ -126,7 +132,7 @@ def test_a_close_run_just_after_full_time_does_the_settling():
     now = T("2026-10-17 12:00")
     # 13:00 settles at 15:15; the 15:30 kickoff's close run at 15:15 covers it.
     p = cr.plan([T("2026-10-17 13:00"), T("2026-10-17 15:30")], now)
-    assert [(d["at"], d["kind"]) for d in p["dispatch"]] == [
+    assert [(d["at"], d["kind"]) for d in publishes(p)] == [
         (T("2026-10-17 12:45"), "close"),
         (T("2026-10-17 15:15"), "close"),
     ]
@@ -143,3 +149,43 @@ def test_cli_writes_the_plan(tmp_path, capsys):
     main(["close-plan", "--log-dir", str(logs), "--out", str(out), "--now", "2026-10-17T10:00Z"])
     assert json.loads(out.read_text())["dispatch"][0]["kickoffs"] == ["2026-10-17T14:00+00:00"]
     assert "publish at 2026-10-17 13:45 UTC" in capsys.readouterr().out
+
+
+def test_in_play_snapshots_at_55_and_75_minutes_per_cluster():
+    """Lead brief 2 (28 Oct): inplay.yml at each cluster's first kickoff + 55 and + 75
+    minutes (+ INPLAY_SHIFT), so the call lands inside inplay_log's window for every
+    kickoff of the cluster."""
+    from soccer_stats import inplay_log as il
+
+    now = T("2026-10-17 12:00")
+    ks = [T("2026-10-17 14:00"), T("2026-10-17 14:12"), T("2026-10-17 16:30")]
+    p = cr.plan(ks, now)
+    inplay = [d for d in p["dispatch"] if d["kind"] in cr.INPLAY]
+    assert [(d["at"], d["kind"]) for d in inplay] == [
+        (T("2026-10-17 14:58"), "inplay55"),
+        (T("2026-10-17 15:18"), "inplay75"),
+        (T("2026-10-17 17:28"), "inplay55"),
+    ]  # 16:30's +75 (17:48) falls after the window: the next planner's
+    assert inplay[0]["kickoffs"] == [T("2026-10-17 14:00"), T("2026-10-17 14:12")]
+    for d in inplay:
+        for delay in (1, 3):
+            at = d["at"] + pd.Timedelta(minutes=delay)
+            for k in d["kickoffs"]:
+                assert il.kind_of((at - k) / pd.Timedelta(minutes=1)) == d["kind"]
+    j = cr.to_json(p)
+    assert {d["workflow"] for d in j["dispatch"] if d["kind"] in cr.INPLAY} == {"inplay.yml"}
+    assert {d["workflow"] for d in j["dispatch"] if d["kind"] not in cr.INPLAY} == {"publish.yml"}
+    assert "in-play snapshot at 2026-10-17 14:58 UTC (+55 min) for kickoffs 14:00, 14:12" in (
+        cr.describe(p)
+    )
+    # A planner starting late still sends one within INPLAY_LATE; later, none.
+    assert [
+        d["at"]
+        for d in cr.plan([T("2026-10-17 14:00")], T("2026-10-17 15:02"))["dispatch"]
+        if d["kind"] == "inplay55"
+    ] == [T("2026-10-17 15:02")]
+    assert not [
+        d
+        for d in cr.plan([T("2026-10-17 14:00")], T("2026-10-17 15:05"))["dispatch"]
+        if d["kind"] == "inplay55"
+    ]

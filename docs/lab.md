@@ -2586,6 +2586,109 @@ ran, and the results will follow below it with run ids.
 - a plain-English summary for the owner: what was tried, what the best looked like, how
   likely that was luck, and what the holdout said.
 
+**Implementation notes (28 Oct, written with the code and before the full run;
+`lab/strategy_search.py`).** These pin down choices the design left open. None was picked
+from a result. The only run before this note was a two-league smoke test (E1 and E2, 200
+draws) to check the code works; it is not a result.
+- **Refits:** the model refits weekly (`backtest.walk_forward`, as every backtest here); the
+  blend and σ every 28 days (`lean_backtest.walk_forward`).
+- **Lean bases** exist only for 1X2 and draw no bet, the markets with a fitted blend. AH and
+  over/under have the edge and every-side bases.
+- **Filters:**
+  - "Strength gap" = |model home chance − model away chance|, cut at the window's quintiles;
+  - "Weekend" = Saturday or Sunday;
+  - "Shared kickoff" = another match in the league kicks off at the same date and time
+    (football-data's `Time`);
+  - "Favourite" = the side with the highest margin-free early chance in its market;
+  - edge and z quintiles are cut per market;
+  - driver = "market" when z with the model's term removed reaches 1.
+- **Every side** bets every side of every match, so its arms hedge within a match. They
+  still count as arms.
+- **The reality check's universe** is the arms that could be finalists: those with at least
+  300 bets. A 2-bet arm can't be a finalist, so it can't set the bar. The same check over
+  every arm is printed beside it.
+  - Each arm gets an adjusted p: the share of draws whose recentred maximum reaches its
+    mean. A finalist needs p < 0.05. For the best arm this is White's p.
+  - The no-skill null's share of arms above 0 is measured on the same draws.
+- **Sizing** runs on the finalists and the ten best arms by the CLV range's lower end, not
+  on all of them. Kelly needs the blend's chance, so AH and over/under get flat and the
+  stop rule only.
+- **Exits:** the exploratory exit arms are the "Cash-out" section's numbers on the spent
+  comeback sample. They are quoted, not rerun.
+- **Holdout scoring** is written only if a finalist appears. It then reads the holdout once,
+  after a logged `Holdout.unlock(reason)`, with the window's frozen cuts. With no finalist,
+  no code ever reads 2024/25 onward.
+
+### Strategy search: results (2026-10-28; `odds-check.yml` `task=strategy-search` run 40646880618, 0 credits, no key; the holdout was never read)
+
+The first full run (40646100195, the same code without the app file) found the same best
+arms and the same verdict. One arm sat on the 300-bet line between the two runs (4,542 vs
+4,541 eligible), and the best arm's p moved from 0.946 to 0.944, so a few model chances
+differed slightly between the two runs' inputs. The numbers below are from 40646880618,
+which wrote the app file.
+
+**Data.**
+- Eight leagues, 2019/20 to 2023/24 (every season passed the 90% coverage rule): 16,283
+  matches.
+- About 96,000 priced sides across 1X2, draw no bet, Asian handicap and over/under 2.5.
+- xG weight 0.7 in the five Understat leagues; goals only in E1, E2 and E3.
+
+**What was tried.**
+- **11,857 arms:** 11,203 decided at the early price and 654 line-movement arms at the
+  close.
+- 2,897 were empty and 4,771 had under 100 bets.
+- 4,541 arms had 300+ bets with a CLV (the finalist universe); 5,266 had 300+ bets for ROI.
+
+**The market as a whole** (every side, no filter; per $1, 95% ranges):
+
+| Market | Bets | ROI | CLV |
+| --- | --- | --- | --- |
+| 1X2 | 48,849 | −3.6% (−4.4% to −2.9%) | −3.5% (−3.6% to −3.5%) |
+| Draw no bet | 32,548 | −3.5% (−4.3% to −2.8%) | −4.7% (−4.8% to −4.7%) |
+| Asian handicap | 32,566 | −2.2% (−2.3% to −2.1%) | −2.4% (−2.5% to −2.4%) |
+| Over/under 2.5 | 32,458 | −3.7% (−3.9% to −3.4%) | −3.5% (−3.5% to −3.4%) |
+
+**The best arms, and whether they beat luck.**
+- **Best by CLV** (300+ bets): Asian handicap, the model's edge ≥ 0%, Premier League,
+  price 2.00–3.00. 537 bets, 320 with a closing CLV.
+  - CLV +1.32% (+0.83% to +1.81%); ROI +4.4% (−3.1% to +12.4%).
+  - **Reality-check p = 0.944.** A search with no skill, over the same arms and draws,
+    finds a best arm at least that good 94% of the time. The null's maximum reaches +2.7%
+    CLV in 5% of draws.
+  - Over every arm, including tiny ones, the p is 0.82.
+- **Best by ROI** (300+ bets): 1X2, the model's edge ≥ 5%, Premier League, the widest
+  strength gaps. 360 bets, ROI +27.1% (−5.0% to +61.0%), CLV −4.6% (−6.2% to −3.2%).
+  Reality-check p = 0.65: noise.
+- **Share of arms beating the close:** 92 of 4,541 arms (2.0%) have CLV above 0. A
+  no-skill search would put about 50% there (95% upper 61%). The prices win almost
+  everywhere.
+- **The one recurring pattern:** Asian handicap sides priced 2.00–3.00 at the early price
+  closed shorter.
+  - All of them: 10,619 bets, CLV +0.58% (+0.45% to +0.69%).
+  - ROI −2.2% (−4.0% to −0.5%).
+  - It fills the top of the CLV table in many filter combinations. The reality check
+    counts it as within luck for the best single arm. It loses money at Pinnacle's own
+    margin. Descriptive only.
+- **Line movement** (ROI only, decided at the close): the best was fading a 4-point move on
+  Asian handicap away sides. 848 bets, ROI +8.5% (+2.2% to +14.8%), reality-check p = 1.0
+  among the 5,266 arms.
+- **Sizing on the top ten CLV arms:** all are Asian handicap, so there is no blend chance
+  for Kelly. Flat profit ran from −$196 to +$23; the 20-unit stop rule cut both the losses
+  and the bets.
+- **Exits:** see "Cash-out". A fair cash-out never changes the average; a real one costs.
+
+**Verdict: no strategy found.** No arm meets the finalist rule (CLV range above 0, 300+
+bets, adjusted p < 0.05). The holdout stays locked and unread. Nothing goes live.
+
+**Plain English for the owner.**
+- We tried 11,857 ways of picking bets from five seasons of data. Every market's sides lose
+  about 2–5% to the closing price on average.
+- The best-looking rules (some showing +27% ROI or a small edge on the close) are what you
+  would expect to find by luck when you look at this many. The check that asks "how good
+  would the best of 11,857 random rules look?" says ours are no better than that.
+- So there is nothing to test on the locked seasons, and we didn't open them. They stay
+  clean for any future idea.
+- App file: `lab/strategy_search_research.json` (the best arm's bets for the curve).
 ## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 151,000 credits; pre-registration frozen with its slot file on 2026-10-28, before any purchase)
 
 **Up front (frozen 2026-10-28).**

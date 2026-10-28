@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 from soccer_stats.lab.inplay_probe import (
@@ -105,9 +106,9 @@ def test_minutes_and_score_at_half_time():
     assert score_at(goals, 45) == "1-1" and score_at(goals, None) is None
 
 
-def test_historical_snapshot_reports_in_play_prices_and_score_then():
+def test_historical_snapshot_reports_in_play_prices_and_score_then(tmp_path):
     calls = []
-    res = run_historical("E0", "2026-10-10T14:55:00Z", 10, "key", _get(calls))
+    res = run_historical("E0", "2026-10-10T14:55:00Z", 10, "key", _get(calls), raw_dir=tmp_path)
     assert res["spent"] == 10 and res["credits_after"] == 19114
     m = res["matches"][0]
     assert m["started"] and m["minutes_since_kickoff"] == 51
@@ -116,12 +117,44 @@ def test_historical_snapshot_reports_in_play_prices_and_score_then():
     assert "1 of 1 started matches came back with h2h prices" in res["verdict"]
 
 
-def test_cap_and_reserve_stop_the_paid_call():
+def test_cap_and_reserve_stop_the_paid_call(tmp_path):
     calls = []
-    res = run_historical("E0", "2026-10-10T14:55:00Z", 9, "key", _get(calls))
+    res = run_historical("E0", "2026-10-10T14:55:00Z", 9, "key", _get(calls), raw_dir=tmp_path)
     assert res["spent"] == 0 and "stop" in res
     assert not any("historical" in u for u in calls)
-    assert run_historical("E0", "x", 10, "", _get([]))["stop"] == "no ODDS_API_KEY"
+    no_key = run_historical("E0", "2026-10-10T14:55:00Z", 10, "", _get([]), raw_dir=tmp_path)
+    assert no_key["stop"] == "no ODDS_API_KEY"
+    assert not list(tmp_path.rglob("*.json"))  # nothing bought, nothing kept
+
+
+def test_a_bought_snapshot_is_kept_and_never_bought_again(tmp_path):
+    calls = []
+    first = run_historical("E0", "2026-10-10T14:55:00Z", 10, "key", _get(calls), raw_dir=tmp_path)
+    kept = tmp_path / "inplay_probe" / "E0" / "hist_20261010T145500Z.json"
+    assert first["kept"] == kept.as_posix() and json.loads(kept.read_text()) == SNAP
+    assert sum("historical" in u for u in calls) == 1
+    again = run_historical("E0", "2026-10-10T14:55:00Z", 10, "key", _get(calls), raw_dir=tmp_path)
+    assert sum("historical" in u for u in calls) == 1 and again["spent"] == 0
+    assert again["matches"] == first["matches"]
+
+
+def test_a_live_answer_is_kept(tmp_path, monkeypatch):
+    import soccer_stats.lab.inplay_probe as ip
+
+    monkeypatch.setattr(ip, "_now", lambda: datetime(2026, 10, 10, 14, 50, tzinfo=UTC))
+    live = SNAP["data"]
+
+    def get(url, params=None, timeout=None):
+        if "espn" in url:
+            return _Resp(200, ESPN, {})
+        if url.endswith("/events"):
+            return _Resp(200, live, {"x-requests-last": "0", "x-requests-remaining": "9000"})
+        return _Resp(200, live, {"x-requests-last": "1", "x-requests-remaining": "8999"})
+
+    res = ip.run("E0", 1, "key", get, raw_dir=tmp_path)
+    kept = tmp_path / "inplay_probe" / "E0" / "live_20261010T145000Z.json"
+    assert res["spent"] == 1 and res["kept"] == kept.as_posix()
+    assert json.loads(kept.read_text()) == live
 
 
 def test_summarise_and_name_match():

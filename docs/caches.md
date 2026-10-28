@@ -16,11 +16,12 @@ snapshots alone were about 8,000).
 
 | Cache (key prefix) | Paths, as saved | What | Saved by |
 | --- | --- | --- | --- |
-| `odds-history-` | `data/raw/odds_history` | DraftKings historical h2h snapshots | `backfill.yml` |
+| `odds-history-` | `data/raw/odds_history` | DraftKings historical h2h snapshots | `backfill.yml`, `odds-check.yml` `dk-history` |
 | `player-odds-history-` | `data/raw/player_odds_history` | FanDuel historical player lines | `players.yml` |
 | `cup-odds-history-` | `data/raw/cup_odds`, `data/raw/cups/espn` | Champions League closes (Pinnacle, DraftKings) | `backfill.yml` `cup_odds` |
 | `comeback-odds-` | `data/raw/comeback_odds` | comeback phase 2 in-play snapshots, designs B and C | `odds-check.yml` `comeback-fetch` |
 | `archive-probe-` | `data/raw/archive_probe` | in-play archive probes, one snapshot per league-season | `odds-check.yml` `archive-probe` |
+| `inplay-probe-` | `data/raw/inplay_probe` | in-play probe answers, live and historical (from 28 Oct) | `odds-check.yml` `inplay-probe` |
 
 **What the first run found** (28 Oct, `caches.yml` dry run 40640065501, before any archive):
 
@@ -48,11 +49,17 @@ snapshots alone were about 8,000).
 - **Present:** the `comebacks-<league>-` caches (13–18 MB each), `cup-espn-` (6.9 MB) and
   `espn-timelines-` (1.4 MB).
 
-Some paid data was never cached:
+Until 28 Oct some paid data was never cached:
 - The goalscorer probe and pilot (`odds-check.yml` `goalscorer`) write under
-  `data/raw/player_odds_history`, but `odds-check.yml` only restores that cache and never saves it.
-  Their bodies lasted one run, plus whatever artifact the task uploaded.
-- The in-play probes (`inplay-probe`) print their results and keep nothing.
+  `data/raw/player_odds_history`, but `odds-check.yml` only restored that cache and never saved it.
+  Their bodies lasted one run, plus whatever artifact the task uploaded. Now a paid `goalscorer`
+  run saves `player-odds-history-`.
+- The in-play probes (`inplay-probe`) printed their results and kept nothing. Now every answer they
+  buy is kept under `data/raw/inplay_probe/<league>/` (`live_<time>.json`, `hist_<time>.json`) in the
+  paid cache `inplay-probe-`. A historical snapshot already held is read back instead of bought.
+- `backfill.yml`'s DraftKings history and `players.yml`'s FanDuel lines were saved by the combined
+  `actions/cache` step, which saves only when the job succeeds, so a run that failed after buying
+  lost what it bought. Both now save with an explicit save step under `always()`.
 
 **Free** (kept alive only): `raw-data-` (`data/raw`), `cup-espn-`, `cup-corners-`,
 `espn-timelines-`, `heavy-espn-`, `understat-SP1/D1/I1/F1-`, `comebacks-E0/SP1/D1/I1/F1-`. CI keeps `playwright-…`
@@ -61,6 +68,49 @@ and setup-uv's own caches in use itself.
 The `usage` job prints every cache's size and when it was last used, plus the total against the
 10 GB limit. A cache's size is only known from a run of `caches.yml`, because the cloud sandbox
 can't read GitHub's cache list.
+
+## Bought data can't be left out (owner, 28 Oct: "save the api data permanently")
+
+Three tests in `tests/test_cache_archive.py` make the rule hard to forget:
+
+- **A cache saved where the key is must be paid or declared free.** Every cache-saving step in a
+  job that can receive `ODDS_API_KEY` saves either a cache in `cache_archive.PAID` (with its exact
+  paths and a keep-alive row) or one in `cache_archive.FREE`, where each prefix carries the reason it
+  holds nothing bought. A new fetcher that saves its bodies under a new cache fails CI until someone
+  registers that cache as paid or says why it is free.
+- **A paid cache restored where the key is gets saved, even on failure.** A key-holding job that
+  restores a paid cache must save it with an explicit `actions/cache/save` step under `always()`,
+  because a fetcher may write bought files into the restored folder (the goalscorer pilot did).
+- **A paid run archives right away.** A workflow whose key-holding job saves a paid cache has an
+  `archive` job that `needs` it and runs `gh workflow run caches.yml -f archive=true`. Today these are
+  `backfill.yml`, `players.yml` and `odds-check.yml`. The job runs only on the default branch and
+  only for a paid run (`max_credits`/`cap` not 0, not a dry run), even when the buying job failed.
+  It starts after the buying job's cache saves, so a purchase reaches the release within minutes,
+  not at the next twice-weekly run. Caches saved on another branch are invisible to `caches.yml`,
+  so paid fetches run from the default branch (lead, 28 Oct).
+
+What the tests can't see: a fetcher that writes bodies outside any saved folder. The convention is
+that every paid fetcher writes under one of `PAID`'s paths, as each one does today.
+
+## Live data is on data-log, not in caches
+
+Everything the scheduled build buys live is parsed into data-log, which is permanent git history:
+
+- DraftKings h2h (and, from PR #125, every book in the call): `odds_log/`.
+- Team totals and the match totals: `odds_log/<code>_team_totals_*`.
+- Team corners: `odds_log/<code>_corners_*`.
+- Their call records.
+- The half-time in-play snapshots, when they start: `odds_log/<code>_inplay_*`.
+- Paper ledgers, team news and the bought Champions League closes (`odds_history/UCL_closes.jsonl`).
+
+The raw live answers sit only in the free `raw-data-` cache, but every price in them is already in
+those logs.
+
+**One exception: the live FanDuel player lines.** `publish.py` fetches them near kickoff (E0;
+`player_odds.fetch_live`, `data/raw/player_odds/<league>/`). They go into `data.json` and the
+`raw-data-` cache, but not to data-log. Player shots are parked and no player paper trade opens, so
+nothing reads them later. Their history lasts only as long as the cache. Logging them to data-log
+is the player-props team's call.
 
 ## How it works (`.github/workflows/caches.yml`)
 
@@ -84,7 +134,7 @@ can't read GitHub's cache list.
 - **One job does both.** The keep-alive already restores the paid caches, so it also
   refreshes the archive (uploading only on a change). There is no separate archive schedule.
 - **Fallback on a miss** (`.github/actions/paid-archive-restore`). It runs right after every step
-  that restores a paid cache: 8 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
+  that restores a paid cache: 11 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
   - If any archived path has fewer files on disk than the archive holds, it downloads that cache's
     assets, checks every sha256 against the manifest, and extracts the missing files. Files already
     on disk are kept.
@@ -99,4 +149,4 @@ can't read GitHub's cache list.
 
 Tests: `tests/test_cache_archive.py` covers the manifest and checksum code, a real tar + zstd
 round trip, every cache step in the workflows being kept alive with its exact paths, the paid
-registry matching the workflow, and a fallback after every paid restore.
+registry matching the workflow, a fallback after every paid restore, and the three rules above.
