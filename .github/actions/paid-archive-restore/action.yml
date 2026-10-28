@@ -1,0 +1,70 @@
+# Rebuilds a paid odds cache from the permanent archive when the cache missed (lead brief,
+# 28 Oct; docs/caches.md). Runs right after every step that restores a paid cache and before
+# anything that could buy: if any archived path has fewer files on disk than the archive
+# holds, it downloads that cache's release assets (tag paid-odds-archive), checks every
+# sha256 against data-log's archive/manifest.json and extracts the missing files (files
+# already on disk are kept). A bad checksum fails the job; no manifest yet = nothing to do.
+# Needs: actions/checkout first (it runs src/soccer_stats/cache_archive.py with plain python3).
+name: Paid odds archive fallback
+description: Fill a missed paid-odds cache back in from the permanent archive
+inputs:
+  name:
+    description: "The paid cache (cache_archive.PAID): odds-history, player-odds-history, cup-odds-history or comeback-odds"
+    required: true
+  archive-dir:
+    description: "Test only: a local folder with manifest.json and the assets, in place of data-log and the release"
+    required: false
+    default: ""
+  token:
+    description: "Token for gh release download"
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        ARCHIVE_DIR: ${{ inputs.archive-dir }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        tool=src/soccer_stats/cache_archive.py
+        tmp="$RUNNER_TEMP/paid-archive-$NAME"
+        rm -rf "$tmp" && mkdir -p "$tmp"
+        if [ -n "$ARCHIVE_DIR" ]; then
+          manifest="$ARCHIVE_DIR/manifest.json"
+        else
+          manifest="$tmp/manifest.json"
+          ok=""
+          for attempt in 1 2 3; do
+            if git fetch --depth=1 -q origin data-log; then ok=1; break; fi
+            sleep $((attempt * 5))
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::$NAME: couldn't read data-log for the archive manifest; stopping before anything can buy"
+            exit 1
+          fi
+          if ! git show FETCH_HEAD:archive/manifest.json > "$manifest" 2>/dev/null; then
+            echo "$NAME: no archive manifest on data-log yet, nothing to fall back on"
+            exit 0
+          fi
+        fi
+        python3 "$tool" missing --manifest "$manifest" --name "$NAME" --parts-out "$tmp/parts.txt"
+        [ -s "$tmp/parts.txt" ] || exit 0
+        echo "::warning::$NAME: the cache is missing archived files; restoring them from the archive"
+        while read -r asset; do
+          if [ -n "$ARCHIVE_DIR" ]; then
+            cp "$ARCHIVE_DIR/$asset" "$tmp/"
+          else
+            gh release download paid-odds-archive -R "$GITHUB_REPOSITORY" -p "$asset" -D "$tmp" --clobber
+          fi
+        done < "$tmp/parts.txt"
+        python3 "$tool" verify --manifest "$manifest" --dir "$tmp" --names "$NAME"
+        (while read -r asset; do cat "$tmp/$asset"; done < "$tmp/parts.txt") | tar --zstd -x --skip-old-files -f -
+        python3 "$tool" missing --manifest "$manifest" --name "$NAME" --parts-out "$tmp/still.txt"
+        if [ -s "$tmp/still.txt" ]; then
+          echo "::error::$NAME: files still missing after the archive restore; stopping before anything can buy"
+          exit 1
+        fi
+        rm -rf "$tmp"

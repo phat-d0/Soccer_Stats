@@ -57,6 +57,13 @@ jobs:
           key: player-odds-history-${{ github.run_id }}
           restore-keys: player-odds-history-
 
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid player-odds-history cache from the archive if it missed
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: player-odds-history
+
       - name: Download historical player odds
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.odds_seasons != '' }}
         env:
