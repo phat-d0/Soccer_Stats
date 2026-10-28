@@ -673,6 +673,7 @@ def cmd_backfill(args: argparse.Namespace) -> None:
         markets="h2h" if ten else "h2h,totals",
         cost_per_snapshot=oh.TEN_BOOKS_COST if ten else oh.COST_PER_SNAPSHOT,
         guard_first=args.guard,
+        max_call_cost=oh.TEN_BOOKS_COST if ten else None,
     )
     for line in rep.lines():
         print(line)
@@ -3087,7 +3088,8 @@ def main(argv: list[str] | None = None) -> None:
         choices=["draftkings", "ten"],
         default="draftkings",
         help="draftkings: DraftKings h2h and totals (the original E0 run); ten: h2h at the "
-        "live call's ten books, football-data's kickoffs (the multi-league backfill)",
+        "live call's ten books, football-data's kickoffs (the multi-league backfill; a call "
+        "billed over 10 credits stops the run)",
     )
     bf.add_argument(
         "--guard",

@@ -163,13 +163,15 @@ def backfill(
     markets: str = "h2h,totals",
     cost_per_snapshot: int = COST_PER_SNAPSHOT,
     guard_first: int = 0,
+    max_call_cost: int | None = None,
 ) -> BackfillReport:
     """Download the snapshots that aren't cached yet, within the credit limits.
 
     `books`/`markets`/`cost_per_snapshot`: the original E0 run asked DraftKings alone for
     h2h and totals (20 credits); the multi-league backfill asks TEN_BOOKS for h2h
     (TEN_BOOKS_COST). With `guard_first`, a season whose first `guard_first` snapshots
-    hold no DraftKings price buys nothing more."""
+    hold no DraftKings price buys nothing more. With `max_call_cost`, a call billed more
+    than that stops the run (its snapshot is kept)."""
     times = sorted({pd.Timestamp(t) for t in snapshot_times})
     todo = [t for t in times if not snapshot_path(league, t, raw_dir).exists()]
     rep = BackfillReport(planned=len(times), cached=len(times) - len(todo))
@@ -241,6 +243,9 @@ def backfill(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(snap, separators=(",", ":")))
         rep.fetched += 1
+        if max_call_cost is not None and spent > max_call_cost:
+            rep.stopped = f"a call cost {spent} credits, over {max_call_cost}"
+            break
         _guard(rep, seen, season, snapshot_counts(snap)["draftkings"], guard_first)
     _tally(rep, times, league, raw_dir)
     return rep

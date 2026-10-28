@@ -1,6 +1,11 @@
 # Downloads historical DraftKings odds and runs the DraftKings backtest. Run by hand only
 # (Actions -> "Backfill DraftKings odds" -> Run workflow); never on a schedule.
 # The historical endpoint needs a paid Odds API plan. Start with a dry run.
+# books=ten (lead brief 2, 28 Oct; docs/leagues.md "DraftKings history"): the multi-league
+# backfill for one `league` and its `seasons`: h2h at the live call's ten books, a 48 h
+# look plus the close, a season stopped after 3 snapshots without DraftKings, a call
+# billed over 10 credits stops the run. Bodies go to the paid odds-history-* cache; no
+# backtest runs (E0_dk.json is left alone). Paid runs from the default branch only.
 # match_markets: research only. Runs `soccer-stats match-markets` on football-data
 # (Asian handicap, O/U 2.5 and 1X2 vs Pinnacle, plus the xG signal test): no API key,
 # no download from The Odds API, no push; results in the log and a 7-day artifact.
@@ -41,8 +46,16 @@ on:
         description: "Most credits this run may spend"
         default: "0"
       keep_credits:
-        description: "Never let credits left fall below this (keeps live refreshes going)"
-        default: "1500"
+        description: "Never let credits left fall below this (the shared 3,000 reserve)"
+        default: "3000"
+      league:
+        description: "Historical odds download: which league (E0, SP1, D1, I1, F1, E1, E2, E3)"
+        default: "E0"
+      books:
+        description: "Historical odds download: draftkings = DraftKings h2h and totals (the original E0 run, then backtest-dk); ten = h2h at the live call's ten books, 48 h look plus the close, 3-snapshot DraftKings guard, stop on a call over 10 (lead brief 2), no backtest"
+        type: choice
+        options: [draftkings, ten]
+        default: draftkings
       dry_run:
         description: "Dry run: print snapshots and credits, spend nothing"
         type: boolean
@@ -541,9 +554,14 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           uv sync --frozen
-          uv run soccer-stats backfill-odds --seasons "${{ inputs.seasons }}" \
+          if [ "${{ inputs.books }}" = "ten" ]; then
+            LOOKS="--looks 48 --books ten --guard 3"
+          else
+            LOOKS=""
+          fi
+          uv run soccer-stats backfill-odds --league "${{ inputs.league }}" --seasons "${{ inputs.seasons }}" \
             --max-credits "${{ inputs.max_credits }}" --keep-credits "${{ inputs.keep_credits }}" \
-            ${{ inputs.dry_run && '--dry-run' || '' }}
+            $LOOKS ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - uses: actions/cache/save@v4
         if: ${{ always() && !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
@@ -551,8 +569,9 @@ jobs:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
 
+      # The ten-book backfill only buys; the backtests at DraftKings' prices come later.
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ inputs.books != 'ten' && inputs.league == 'E0' && !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

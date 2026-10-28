@@ -232,3 +232,17 @@ def test_a_snapshot_billed_less_never_loosens_the_cap(tmp_path):
         cost_per_snapshot=10,
     )
     assert rep.fetched == 1 and rep.credits_used == 5 and "max-credits" in rep.stopped
+
+
+def test_a_call_billed_over_the_limit_stops_the_run(tmp_path):
+    times = [ts("2025-09-13 11:00") + pd.Timedelta(hours=i) for i in range(3)]
+    rep = oh.backfill(
+        times,
+        max_credits=1000,
+        api_key="k",
+        raw_dir=tmp_path,
+        get=lambda *a, **k: Resp(snap_body(), cost=20),
+        cost_per_snapshot=10,
+        max_call_cost=10,
+    )
+    assert rep.fetched == 1 and rep.credits_used == 20 and "over 10" in rep.stopped
