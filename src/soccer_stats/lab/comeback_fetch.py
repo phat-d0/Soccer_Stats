@@ -40,6 +40,7 @@ SLOT_FILES = {
     "B": "comeback_b_slots.json",
     "C": "comeback_c_slots.json",
     "H": "comeback_h_slots.json",  # heavy favourites (75%+), docs/lab.md
+    "X": "cashout_slots.json",  # the cash-out test (cashout_plan), docs/lab.md
 }
 SLOTS_FILE = Path(__file__).with_name(SLOT_FILES["B"])
 CACHE = "comeback_odds"  # under RAW_DIR; the Actions cache `comeback-odds-*` holds it
@@ -290,7 +291,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
     p.add_argument("--cache-dir", default="", help="bodies and call record (default raw dir)")
-    p.add_argument("--slots", default="B", help="design B, C or H, or a slot file")
+    p.add_argument("--slots", default="B", help="design B, C, H or X (the cash-out test), or a slot file")
     args = p.parse_args(argv)
     res = run(
         cap=args.cap,

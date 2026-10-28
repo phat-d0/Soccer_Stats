@@ -2581,3 +2581,112 @@ ran, and the results will follow below it with run ids.
 - results in this section with run ids;
 - a plain-English summary for the owner: what was tried, what the best looked like, how
   likely that was luck, and what the holdout said.
+
+## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 50,000 credits; DRAFT pre-registration, frozen with its slot file before any purchase)
+
+**The owner's question.** "Cash out when the heavy underdog is breaking even (50-50 odds from a
+steep underdog) or even winning; the trade-off risk is what we have to find." The free check
+above answered it only for underdogs already leading at half-time, on design C's spent data.
+This test buys a clean sample covering every score state and two moments.
+
+**Hypothesis.** Cashing out a heavy-underdog bet once its in-play chance reaches 50%, at a
+realistic 5% cash-out margin, raises long-run bankroll growth compared with holding to the
+end.
+
+**What we expect, stated before buying.**
+- A fair in-play price makes cashing out a martingale, so it leaves the average return where
+  it was.
+- At a 5% margin the cash-out costs about 5% of the position's value each time. At small
+  stakes, growth tracks the average return, so the expected verdict is **fail**.
+- Cashing out can only win if the in-play price undervalues the leading underdog (the
+  under-40% hint above) by more than the margin, or if stakes are large enough that cutting
+  the spread outweighs the fee.
+
+**Sample (frozen in `src/soccer_stats/lab/cashout_slots.json`; built by `lab/cashout_plan.py`,
+`odds-check.yml` `task=cashout-plan`).**
+- **Matches:** every played match whose underdog is quoted at least 3.0 at the pre-match close.
+  - The price is Pinnacle's close, else the market average's close (`price` marks which).
+  - **Primary band: 4.0 and up.** 3.0–4.0 is reported beside it.
+  - Only kickoff times and closing prices are read: no half-time or full-time score.
+- **League-seasons:** every one where the archive prices in-play matches:
+  - E0, F1, D1: 2023/24 onward;
+  - E1, E2, E3: 2022/23 onward;
+  - SP1: 2020/21 onward;
+  - I1, D2, SP2: 2021/22 onward;
+  - N1, P1, SC0, B1, T1, G1, I2, F2: 2022/23 onward;
+  - each through 2026/27 to date (files of the day the list is frozen).
+- **Excluded:**
+  - every match bought by design B or C (spent);
+  - every design H match. H's outcomes stay unread until H is judged, so they can't enter
+    another test first.
+- **Budget trim (lead's rule):** over 50,000 credits, whole league-seasons are dropped, oldest
+  season first, until the estimate fits. The dropped list is printed and frozen with the file.
+
+**Purchase.**
+- `comeback_fetch --slots X` (`odds-check.yml` `task=comeback-fetch`, `design=X`), run **from
+  the default branch only**, so the bodies land in `comeback-odds-*` (in `cache_archive.PAID`).
+- One historical bulk h2h snapshot per league kickoff slot at **kickoff + 55 min** (half-time)
+  and **kickoff + 85 min** (about the 70th minute), whatever the score. Each snapshot is shared
+  by every match in its slot, at the ten books (one region, 10 credits).
+- A snapshot already held for B, C or H (same sport and time) is reused, never bought again.
+- C's spending rules:
+  - `CappedBudget` with the 3,000 reserve;
+  - the first call budgeted at 20;
+  - stop on a call over 10 credits or on any HTTP or network error;
+  - a dry run first;
+  - **cap = the frozen estimate, at most 50,000.** A call never costs more than 10, so the
+    estimate is an upper bound.
+- **Guard:** C's, per league-season. If its first 3 snapshots show no started event freshly
+  priced by DraftKings or Betfair, no more of it is bought and its matches count as **not
+  priced**.
+
+**Position and rules (per $1, in kickoff order).**
+- **Entry:** $1 on the underdog at its quoted pre-match close (Pinnacle's, else the average's).
+  Descriptive: the same at DraftKings' early price where Moneyline's historical file has it.
+- **In-play chance q** at each snapshot: DraftKings' h2h, Shin-fair. The quote must pass C's
+  checks:
+  - inside a 48–62 minute window at half-time, 78–92 at the 70th;
+  - updated after kickoff and at most 5 minutes old.
+  No passing quote at a moment = no cash-out offered then (the bet holds).
+- **Hold:** the actual result (entry odds − 1, or −1).
+- **Cash-out rule T at margin m:**
+  - at half-time, if q ≥ T, cash out for entry odds × q × (1 − m);
+  - otherwise at the 70th minute, if q ≥ T, the same;
+  - otherwise hold.
+  - T ∈ {**0.50** primary, 0.40, 0.60}; m ∈ {0, **0.05** primary, 0.10}.
+- **Partial cash-out to the Kelly stake (secondary, half-time only):**
+  - keep the share of the position that quarter Kelly supports at DraftKings' live price,
+    on the phase-1 model's in-play chance (Pinnacle's 1X2 and over/under 2.5 close, the
+    half-time score, 45 minutes left);
+  - cash out the rest at margin m.
+  - Half-time only, because football-data has no 70th-minute score.
+
+**Measures (each with a match-resampled 95% range, 2,000 draws, seed 0).**
+- Per $1: mean profit, sd, and hold − rule.
+- The worst peak-to-trough drawdown of a bankroll staking a fixed 1%, 2% or 5% of itself on
+  each bet in kickoff order.
+- **Long-run growth:** the mean of log(1 + s × profit per $1) per bet, at stake s of 1%, 2%
+  and 5%, for hold and for each rule, and the difference (rule − hold).
+- Calibration of q: won vs implied, by band of q (<40%, 40–55%, 55%+) and by moment.
+- Per league, per season and per moment (descriptive).
+
+**Pass rule (one primary).**
+- **Pass:** at the 5% margin, rule T = 0.50, stake 2%, the growth difference (cash-out −
+  hold) has its 95% range entirely above 0, on **at least 300 qualifying cash-out
+  decisions** in the primary band (4.0+). A qualifying decision is a bet the rule cashed out
+  on a passing quote.
+- **Fail:** at least 300 decisions and the range includes 0 or sits below it. Below 0 reads
+  "cashing out lowers growth".
+- **Inconclusive:** under 300 decisions.
+- Every other cell (T, m, stake, band, Kelly partial) is descriptive.
+- A pass only justifies proposing a live paper cash-out track to the owner. Nothing changes
+  live in any case.
+
+**Holdout note.** The sample's 2024/25 and later seasons sit inside the strategy search's
+locked holdout (football-data 2024/25 onward). This test reads their in-play prices and
+results for the cash-out question only. The strategy search's exit arms use the comeback
+sample from before 2024/25, so that holdout stays unread for pre-match strategies.
+
+**App file.** The finished test ships `lab/cashout_research.json`, pass or fail, in the same
+shape as `lab/comeback_research.json` (title, question, rule, verdict, verdict_text, cost,
+runs, preregistered, designs with by-band tables, a bets list for the curve, notes).

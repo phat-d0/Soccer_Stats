@@ -36,6 +36,9 @@
 #            on the same cached snapshots; exploratory, no key.
 #   heavy-slots: design H's frozen slot list (75%+ favourites trailing at half-time on every
 #            priced league-season, none in B or C); football-data only, no key.
+#   cashout-plan: the cash-out test's sample (heavy underdogs, every score state, snapshots at
+#            kickoff + 55 and + 85 min, B/C/H matches out, trimmed oldest first to the budget);
+#            football-data only, no key; the slot file goes to the artifact.
 #   heavy-more: free counts for the 75%+ idea beyond heavy-favourites: domestic and UEFA
 #            cups (ESPN half-times and odds), football-data's extra leagues, earlier seasons.
 #   archive-probe: in-play archive probes (owner-approved 28 Oct): one historical snapshot per
@@ -105,9 +108,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe: most credits to spend (0 = dry run)"
@@ -139,7 +142,7 @@ on:
       design:
         description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+)"
         type: choice
-        options: [B, C, H]
+        options: [B, C, H, X]
         default: B
       leagues:
         description: "markets / espn: comma-separated leagues, e.g. E2,E3 (blank = the six; markets also prints team names vs football-data's clubs, espn reads 21 days)"
@@ -382,6 +385,8 @@ jobs:
             cashout) uv run python -m soccer_stats.lab.cashout --json out/cashout.json ;;
             heavy-slots) uv run python -m soccer_stats.lab.heavy_favourites \
                      --slots-out out/comeback_h_slots.json ;;
+            cashout-plan) uv run python -m soccer_stats.lab.cashout_plan \
+                     --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
               mkdir -p data/raw/heavy_espn  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json ;;
