@@ -494,7 +494,70 @@ The rules, from `odds_history.backfill`:
 
 The run prints each season's events and how many DraftKings and Pinnacle priced, plus a
 `BACKFILL_ODDS_JSON` line. No backtest runs in it, so `E0_dk.json` stays as it is. The
-backtests at DraftKings' prices are re-run afterwards, and what changed is recorded here.
+backtests at DraftKings' prices are re-run afterwards (method below), and what changed is recorded here.
+
+### Backtests at DraftKings' prices: method (written 28 Oct, before any run)
+
+The lead asked for this on 28 Oct, and it is fixed here before the code runs. The question is
+what the two live match strategies would have done at DraftKings' own prices, the book they
+trade at, with CLV measured against Pinnacle's close taken from the same snapshot. The
+Pinnacle backtests (`lean_backtest.json`, `edge12_backtest.json`) answer the same question at
+Pinnacle's early price, a sharper and different book.
+
+- **Matches.** Every match of a league's seasons that are both:
+  - scored by the Pinnacle backtests (football-data's Pinnacle early and close cover at least
+    90% of the matches, `lean_backtest.coverage`); and
+  - bought in the DraftKings history.
+
+  That means 2020/21–2024/25, or 2021/22–2024/25 for F1 and E3, less any season the
+  Pinnacle backtests leave out.
+
+  A match is a candidate when DraftKings priced its full 1X2 in the 48 h look snapshot
+  (`odds_history.price_at` at kickoff − 48 h, the price updated no more than 6 h before).
+  Matches are joined on football-data's names and kickoff day.
+- **Model.** The same walk-forward model chances the Pinnacle backtests use
+  (`backtest.walk_forward`, xG weight 0.7 where Understat has xG, else goals only, from
+  2022-07-01 with 2 seasons of burn-in). This is the same `_early_preds` call. Seasons before
+  the model's first prediction have no candidates.
+- **Entry.** DraftKings' quoted decimal price at the 48 h look. The break-even is 1/decimal,
+  margin kept, as live.
+- **Model 12%.** `trades.best_pick` on the raw model chance at 12% against that price, one
+  pick per match, $1. This is exactly the live rule.
+- **Blend Lean.** The live rule, `trades.lean_pick` at 1σ, "strong" at 2σ, $1, one pick per
+  match:
+  - The blend is `match_calibration.fit` on Pinnacle's margin-free close beside the model's
+    walk-forward chance, refitted every 28 days on matches played before the block. The block
+    is set by the look time, kickoff − 48 h. σ comes from each fit's own rows. This is
+    `lean_backtest.walk_forward`, as the live fit.
+  - The blend is fed DraftKings' Shin-fair look price, as `publish.add_lean` feeds the card's
+    `implied`.
+  - The driver is the blend with the model term removed.
+  - Two lines are reported: the live rule, inside `trades.LEAN_ODDS_RANGE` (1.50 < odds ≤
+    3.00), and the old rule at every price.
+- **Close and CLV.** The close is the snapshot just before kickoff (`price_at` at kickoff, the
+  price updated no more than 6 h before).
+  - The judged CLV is entry odds × Pinnacle's Shin-fair close − 1, from Pinnacle's prices in
+    that same close snapshot. A bet without Pinnacle there has no CLV and is counted as
+    `clv_missing`. There is no fallback to football-data.
+  - CLV against DraftKings' own close is reported beside it, descriptive, as live `clv_dk`.
+- **Same matches at Pinnacle.** The same two rules on the same candidate matches at
+  football-data's Pinnacle early price, with CLV against football-data's Pinnacle close. This
+  shows what changes with the book, not with the sample.
+- **Reported per league, then pooled once all eight are in:**
+  - bets, win rate vs break-even, ROI per $1 with a match-resampled 95% range (2,000 draws,
+    seed 0);
+  - CLV vs Pinnacle's close with its range, CLV vs DraftKings' close, beat-the-close share;
+  - per season, per tier and driver (Lean), and per odds band (`bands.ODDS_BANDS`);
+  - DraftKings' coverage per season: candidates out of the season's matches, at the look and
+    at the close.
+- **Verdict.** A rule shows an edge at DraftKings when the 97.5% end of its pooled CLV range
+  vs Pinnacle's close is above 0. This is the same pass rule as the DNB and Pinnacle
+  backtests. ROI is reported, not judged: its ranges are wide. Per-league numbers are
+  descriptive.
+- **Where it runs.** `backfill.yml` input `dk_price_backtest` with `league`, from the cached
+  `odds-history-` bodies. It uses no key and no credits. Each run adds or replaces its
+  league's entry in data-log `backtest/dk_price_backtest.json`. It runs once per league as
+  the bodies land.
 
 ## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
 
