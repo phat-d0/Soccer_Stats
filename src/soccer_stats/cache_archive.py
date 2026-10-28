@@ -58,6 +58,25 @@ PAID = {
         "paths": ["data/raw/comeback_odds"],
         "what": "comeback phase 2 in-play snapshots, designs B and C (odds-check.yml)",
     },
+    "inplay-probe": {
+        "prefix": "inplay-probe-",
+        "paths": ["data/raw/inplay_probe"],
+        "what": "in-play probe answers, live and historical (odds-check.yml inplay-probe)",
+    },
+}
+
+# Caches a job holding ODDS_API_KEY saves that hold no bought data: prefix (fnmatch, as
+# the workflow's key with ${{ inputs.league }} as *) -> why it is free. A cache saved in a
+# key-holding job must be in PAID or here (tests/test_cache_archive.py), so a new fetcher
+# can't save bought bodies into a cache nobody archives without someone saying so here.
+FREE = {
+    "raw-data-": "football-data, Understat and FPL downloads, plus the live odds answers "
+    "whose parsed rows publish.yml logs on data-log (odds_log/)",
+    "cup-espn-": "ESPN's UEFA cup calendars and results (free)",
+    "cup-corners-": "ESPN cup match summaries for the cup corner research (free)",
+    "espn-timelines-": "ESPN goal timelines (free)",
+    "understat-*-": "Understat downloads for one league (free)",
+    "comebacks-*-": "Understat match files for the comeback research (free)",
 }
 
 

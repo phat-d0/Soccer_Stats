@@ -160,7 +160,7 @@ jobs:
         uses: ./.github/actions/paid-archive-restore
         with:
           name: player-odds-history
-      # Restore only (goal-league saves its own league prefix): the paid caches are never saved.
+      # Restore only (goal-league saves its own league prefix).
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task != 'coverage' && inputs.task != 'props' && inputs.task != 'goal-league' }}
         with:
@@ -182,6 +182,21 @@ jobs:
           path: data/raw/espn_timelines
           key: espn-timelines-none
           restore-keys: espn-timelines-
+      # In-play probes: every answer bought (live and historical), kept for good.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'inplay-probe' }}
+        with:
+          path: data/raw/inplay_probe
+          key: inplay-probe-none
+          restore-keys: inplay-probe-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid inplay-probe cache from the archive if it missed
+        if: ${{ inputs.task == 'inplay-probe' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: inplay-probe
       # Comeback phase 2 (design B): the bought half-time snapshots and their call record.
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
       - uses: actions/cache/restore@v4
@@ -360,6 +375,7 @@ jobs:
               # hist_dates set to ONE ISO time = a historical snapshot (10 credits); the default
               # (a comma list, for props) or "live" = a live call now (1 credit)
               case "$HIST_DATES" in *,*|live|"") AT="" ;; *) AT="--at $HIST_DATES" ;; esac
+              mkdir -p data/raw/inplay_probe  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.inplay_probe --league "$LEAGUE" --cap "$CAP" $AT \
                 --json out/inplay.json ;;
             corner-coverage) uv run python -m soccer_stats.edge.corner_recal --coverage-only ;;
@@ -444,6 +460,19 @@ jobs:
         with:
           path: data/raw/espn_timelines
           key: espn-timelines-${{ github.run_id }}
+      # In-play probes: the bought answers, saved even when the run fails (paid data).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'inplay-probe' && inputs.cap != '0' }}
+        with:
+          path: data/raw/inplay_probe
+          key: inplay-probe-${{ github.run_id }}
+      # The goalscorer probe and pilot write their bought lines into the restored
+      # player-odds-history folder: saved so they outlive the run (paid data).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'goalscorer' && inputs.cap != '0' }}
+        with:
+          path: data/raw/player_odds_history
+          key: player-odds-history-${{ github.run_id }}
       # Comeback phase 2: the bought snapshots, saved even when the fetch fails (paid data).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'comeback-fetch' }}
@@ -471,3 +500,21 @@ jobs:
           path: out/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Archive right after a purchase (owner, 28 Oct: "save the api data permanently"): a
+  # paid run on the default branch dispatches caches.yml once this job's caches are saved
+  # (a job that needs it starts after its post-job cache saves), so a bought snapshot reaches the
+  # release within minutes, not at the next twice-weekly run (docs/caches.md). Caches
+  # saved on another branch are invisible to caches.yml: paid fetches run from the
+  # default branch.
+  archive:
+    needs: check
+    if: ${{ always() && github.ref_name == github.event.repository.default_branch && inputs.cap != '0' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write # dispatch caches.yml
+    steps:
+      - name: Dispatch the paid-odds archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run caches.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f archive=true

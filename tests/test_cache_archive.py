@@ -261,4 +261,103 @@ def test_every_paid_restore_is_followed_by_the_archive_fallback():
         assert nxt["with"]["name"] == paid[prefix]
         assert nxt.get("if") == s.get("if"), f"{wf} {job}: the fallback's condition differs"
         found += 1
-    assert found == 8
+    assert found == 9
+
+
+# ---------- bought data can't be left out of the archive ----------
+
+
+def _key_jobs():
+    """(workflow, parsed workflow, job name, job) for every job that can receive the key."""
+    for f in sorted(WORKFLOWS.glob("*.yml")):
+        wf = yaml.safe_load(f.read_text())
+        for jn, job in (wf["jobs"] or {}).items():
+            if "secrets.ODDS_API_KEY" in json.dumps(job):
+                yield f.name, wf, jn, job
+
+
+def _saves(s: dict) -> bool:
+    u = s.get("uses", "")
+    return "actions/cache" in u and "/restore@" not in u
+
+
+def _match(prefix: str, names) -> list[str]:
+    return [n for n in names if fnmatch.fnmatchcase(prefix, n) or fnmatch.fnmatchcase(n, prefix)]
+
+
+def test_a_cache_saved_where_the_key_is_must_be_paid_or_declared_free():
+    """Owner, 28 Oct: bought data is never cache-only. Any cache a key-holding job saves is
+    either in cache_archive.PAID (archived, kept alive, rebuilt on a miss) or in
+    cache_archive.FREE with the reason it holds nothing bought."""
+    paid = {s["prefix"]: s for s in ca.PAID.values()}
+    kept = {e["prefix"] for e in _keepalive()}
+    assert not set(paid) & set(ca.FREE)
+    seen = 0
+    for wf, _w, jn, job in _key_jobs():
+        for s in job.get("steps") or []:
+            if not _saves(s):
+                continue
+            prefix = _prefix(s["with"])
+            seen += 1
+            if prefix in paid:
+                assert _paths(s["with"]["path"]) == paid[prefix]["paths"], f"{wf} {jn}: {prefix}"
+                assert _match(prefix, kept), f"{prefix} isn't in caches.yml's keep-alive"
+                continue
+            assert _match(prefix, ca.FREE), (
+                f"{wf} {jn} saves the cache {prefix} where ODDS_API_KEY is in reach: add it to "
+                "cache_archive.PAID (and caches.yml's matrices) if it can hold bought data, "
+                "else to cache_archive.FREE with the reason it holds none"
+            )
+    assert seen >= 10
+    for prefix in ca.FREE:
+        assert _match(prefix, kept), f"free cache {prefix} isn't in caches.yml's keep-alive"
+
+
+def test_a_key_holding_job_saves_every_paid_cache_it_restores_even_on_failure():
+    """A paid folder restored where the key is may receive bought files (the goalscorer
+    pilot writes into player-odds-history), so the job saves it, with always(): a cache
+    saved only on success loses what a failed run bought."""
+    paid = {s["prefix"] for s in ca.PAID.values()}
+    for wf, _w, jn, job in _key_jobs():
+        steps = job.get("steps") or []
+        restored = {
+            _prefix(s["with"])
+            for s in steps
+            if "actions/cache" in s.get("uses", "") and _prefix(s["with"]) in paid
+        }
+        for prefix in restored:
+            saves = [s for s in steps if _saves(s) and _prefix(s["with"]) == prefix]
+            assert saves, f"{wf} {jn}: restores the paid {prefix} but never saves it"
+            for s in saves:
+                assert s["uses"].startswith("actions/cache/save@"), (
+                    f"{wf} {jn}: {prefix} must be saved by an explicit save step (the combined "
+                    "action saves only when the job succeeds)"
+                )
+                assert "always()" in str(s.get("if", "")), (
+                    f"{wf} {jn}: {prefix} save lacks always()"
+                )
+
+
+def test_a_workflow_that_saves_paid_data_archives_it_right_away():
+    """A paid run ends by dispatching caches.yml (archive on) from a job that needs the
+    buying job, so its post-job saves are done and the purchase is in the release within
+    minutes, not at the next twice-weekly run."""
+    paid = {s["prefix"] for s in ca.PAID.values()}
+    found = 0
+    for wf, w, jn, job in _key_jobs():
+        if not any(_saves(s) and _prefix(s["with"]) in paid for s in job.get("steps") or []):
+            continue
+        archivers = [
+            j
+            for j in w["jobs"].values()
+            if jn in ([j.get("needs")] if isinstance(j.get("needs"), str) else j.get("needs") or [])
+            and any("gh workflow run caches.yml" in str(s.get("run", "")) for s in j["steps"])
+        ]
+        assert archivers, f"{wf}: {jn} saves paid data but no job dispatches caches.yml after it"
+        a = archivers[0]
+        assert "always()" in a["if"] and "default_branch" in a["if"]
+        assert a["permissions"] == {"actions": "write"}
+        run = next(s for s in a["steps"] if "caches.yml" in str(s.get("run", "")))
+        assert "archive=true" in run["run"]
+        found += 1
+    assert found == 3  # backfill.yml, players.yml, odds-check.yml

@@ -51,7 +51,8 @@ jobs:
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
-      - uses: actions/cache@v4
+      # Paid lines: restored here, saved right after the download, even when it fails.
+      - uses: actions/cache/restore@v4
         with:
           path: data/raw/player_odds_history
           key: player-odds-history-${{ github.run_id }}
@@ -72,6 +73,13 @@ jobs:
           uv sync --frozen
           uv run soccer-stats backfill-player-odds --seasons "${{ inputs.odds_seasons }}" \
             --max-credits "${{ inputs.max_credits }}" ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      # Every run (as before), so a copy rebuilt from the archive heals the cache.
+      - uses: actions/cache/save@v4
+        if: ${{ always() }}
+        with:
+          path: data/raw/player_odds_history
+          key: player-odds-history-${{ github.run_id }}
 
       - name: Test the player model and save the result
         env:
@@ -95,3 +103,21 @@ jobs:
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
+
+  # Archive right after a purchase (owner, 28 Oct: "save the api data permanently"): a
+  # paid run on the default branch dispatches caches.yml once this job's caches are saved
+  # (a job that needs it starts after its post-job cache saves), so a bought player line reaches the
+  # release within minutes, not at the next twice-weekly run (docs/caches.md). Caches
+  # saved on another branch are invisible to caches.yml: paid fetches run from the
+  # default branch.
+  archive:
+    needs: players
+    if: ${{ always() && github.ref_name == github.event.repository.default_branch && github.event_name == 'workflow_dispatch' && inputs.odds_seasons != '' && !inputs.dry_run && inputs.max_credits != '0' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write # dispatch caches.yml
+    steps:
+      - name: Dispatch the paid-odds archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run caches.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f archive=true
