@@ -31,3 +31,14 @@ def test_freeze_groups_by_slot_and_leaves_out_used_and_later_kickoffs():
 def test_no_used_design_shares_a_competition_with_h2():
     lgs = {lg for lg, _ in h2.used_slots()}
     assert not lgs & (set(h2.hm.CUPS) | set(h2.hm.EXTRA))
+
+
+def test_every_frozen_slot_file_is_a_workflow_design_choice():
+    import yaml
+
+    from soccer_stats.lab import comeback_fetch as cf
+
+    wf = yaml.safe_load(open(".github/workflows/odds-check.yml"))
+    on = wf.get("on", wf.get(True))
+    options = on["workflow_dispatch"]["inputs"]["design"]["options"]
+    assert set(cf.SLOT_FILES) <= set(options)
