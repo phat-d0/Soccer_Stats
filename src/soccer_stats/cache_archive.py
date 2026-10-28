@@ -3,7 +3,7 @@
 GitHub evicts a cache unused for 7 days (and the least recently used ones past 10 GB), and
 the odds bought with credits live only in caches. Two safeguards (.github/workflows/caches.yml):
 
-* Keep-alive: every week each cache is restored with its exact key prefix and paths (a
+* Keep-alive: twice a week each cache is restored with its exact key prefix and paths (a
   restore counts as a use), its hit or miss and size logged.
 * Archive: each paid cache (PAID) packed as a deterministic tar + zstd into the GitHub
   Release `paid-odds-archive` (assets up to 2 GB, split into parts above PART_BYTES), with a

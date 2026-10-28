@@ -63,7 +63,9 @@ can't read GitHub's cache list.
 
 ## How it works (`.github/workflows/caches.yml`)
 
-- **Keep-alive** runs every Monday at 04:23 UTC, and on dispatch. It restores each cache under its
+- **Keep-alive** runs on Mondays and Thursdays at 04:23 UTC, and on dispatch. Twice a week gives
+  a margin against the 7-day eviction when a scheduled run starts late or is dropped; the free
+  caches have no archive to fall back on. It restores each cache under its
   exact key prefix and paths, since a restore counts as a use. It logs hit or miss, files and size.
   A paid cache that missed raises a warning: the archive covers it.
 - **Archive.** Each paid cache is packed as a deterministic tar + zstd (sorted names, fixed times
@@ -78,7 +80,7 @@ can't read GitHub's cache list.
     file's path, size and sha256, so a re-run with the same files replaces nothing. A cache that
     missed or is empty never replaces its asset.
   - **Verify:** the `verify` job downloads every asset back and checks its sha256.
-- **One job does both.** The weekly keep-alive already restores the paid caches, so it also
+- **One job does both.** The keep-alive already restores the paid caches, so it also
   refreshes the archive (uploading only on a change). There is no separate archive schedule.
 - **Fallback on a miss** (`.github/actions/paid-archive-restore`). It runs right after every step
   that restores a paid cache: 8 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.

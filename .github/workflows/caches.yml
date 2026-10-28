@@ -2,7 +2,7 @@
 # 0 credits: no job here gets ODDS_API_KEY.
 #
 # GitHub evicts a cache unused for 7 days (and the least recently used ones past 10 GB), and
-# the odds bought with credits live only in caches. Every week (and on dispatch):
+# the odds bought with credits live only in caches. Twice a week (and on dispatch):
 # - keepalive: restores every cache with its exact key prefix and paths (a restore counts as
 #   a use), logging hit or miss, files and size; a paid cache that missed is a warning (the
 #   archive covers it: .github/actions/paid-archive-restore);
@@ -21,7 +21,8 @@ name: Caches keep-alive and paid-odds archive
 
 on:
   schedule:
-    - cron: "23 4 * * 1" # Mondays 04:23 UTC
+    - cron: "23 4 * * 1,4" # Mondays and Thursdays 04:23 UTC: a late or dropped run still
+      # leaves a margin against the 7-day eviction (the free caches have no archive)
   workflow_dispatch:
     inputs:
       archive:
