@@ -760,6 +760,13 @@ the owner's baseball app, so the balance can drop without any run here.
   `close`, `dk_prices`, `model_draw`): entry at Pinnacle's close, cash-out at DraftKings' margin-free
   in-play chance × (1 − m), `MARGINS` 0/5/10%, a quarter-Kelly partial line; by design, entry band and
   half-time chance. `odds-check.yml` `task=cashout`, log line `CASHOUT_JSON`; `docs/lab.md` "Cash-out".
+- `lab/cashout_plan.py` (owner via the lead, 28 Oct; `docs/lab.md` "Cash-out test"; free): the
+  cash-out test's frozen sample `lab/cashout_slots.json` (design X, SHA-256 2c5738d8…): every match
+  with an underdog quoted 3.0+ at the close (4.0+ primary), 2024/25 onward in the 18 leagues the
+  archive prices in play, B/C/H matches left out, snapshots at kickoff + 55 and + 85 min shared per
+  slot (`requests_for`); `--b64` prints the file gzipped in base64 with its SHA-256 (the sandbox
+  can't download artifacts). `odds-check.yml` `task=cashout-plan`. Bought by `comeback_fetch
+  --slots X`, which takes `--minutes` (the workflow gives 120) and resumes on the next run.
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`

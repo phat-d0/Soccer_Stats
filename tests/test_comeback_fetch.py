@@ -204,3 +204,14 @@ def test_design_c_is_c_minus_b():
     assert not {(s["league"], s["kickoff"]) for s in c} & {(s["league"], s["kickoff"]) for s in b}
     assert [s["request_at"] for s in c] == sorted(s["request_at"] for s in c)
     assert len(c) * cf.HIST_COST == 7090
+
+
+def test_a_time_budget_stops_cleanly_and_the_next_run_resumes(tmp_path, monkeypatch):
+    get, state = fake()
+    clock = iter(range(0, 10_000, 30))  # each check of the clock moves 30 seconds on
+    monkeypatch.setattr(cf.time, "monotonic", lambda: next(clock))
+    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=slots(10), get=get, minutes=2)
+    assert res["out_of_time"] and 0 < res["bought"] < 10 and "time budget" in res["stopped"]
+    first = res["bought"]
+    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=slots(10), get=get)
+    assert res["held"] == first and res["bought"] == 10 - first and state["calls"] == 10
