@@ -836,7 +836,11 @@ the owner's baseball app, so the balance can drop without any run here.
   no score kept). `--prematch-out` prints `CUP_PREMATCH_SHA256` and `CUP_PREMATCH_JSON`.
   `odds-check.yml` `task=heavy-more`, log line `HEAVY_MORE_JSON`. The frozen file is
   `lab/h2_cup_prematch_slots.json` (911 snapshots, 9,110 credits, SHA 97976174…, run 40723506826;
-  `docs/lab.md` "Design H2P"), bought by `comeback_fetch --slots H2P` from the default branch.
+  `docs/lab.md` "Design H2P"), bought by `comeback_fetch --slots H2P` from the default branch
+  (run 40744814233: 911 snapshots; 3,590 credits by the cost headers). `--uefa-out` builds design
+  H2U the same way for the UEFA cups (`UEFA`), leaving out the held Champions League closes
+  (`HELD_UCL`, 2024/25 and 2025/26). The frozen file is `lab/h2_uefa_prematch_slots.json` (419
+  snapshots, 4,190 credits, SHA ce759ff6…, run 40744037363), bought by `--slots H2U`.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's
