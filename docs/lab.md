@@ -2922,6 +2922,16 @@ underdog 4.0+) made 570 qualifying decisions. Its growth difference against hold
 - **By season (4.0+, decisions):** 2024/25 190, 2025/26 307, 2026/27 to date 73. By league the
   difference ranges from SC0 +0.0022 to D2 −0.0014 (descriptive).
 
+**Descriptive extras (app file, run 40710797271; already read, not judged).**
+- **With B and C's matches put back, half-time only** (they have no 70th-minute snapshot;
+  279 of the 290 found in their snapshots): 5,680 positions at 4.0+, hold −15.2% (−20.4% to
+  −9.6%). Cash out at 50%, 5% fee: 386 decisions, growth difference +0.00025 (−0.00005 to
+  +0.00057). The in-play price at half-time, 55%+: 66.7% won vs 71.6% implied.
+- **The frozen sample at half-time only** (to compare): 272 decisions, +0.00029 (+0.00002 to
+  +0.00056). This is a cell nobody pre-registered, so its range just above 0 is not a pass.
+- **2025/26 alone** (no B or C match left out; design H's 18 are): 2,343 positions, hold −18.6%
+  (−26.3% to −10.5%); the judged rule +0.00045 (−0.00020 to +0.00118) on 307 decisions.
+
 **Plain English for the owner.**
 - First, why holding looks so bad. To avoid buying any match twice, the sample left out the
   matches earlier tests had bought. Those were mostly heavy underdogs leading at half-time,
