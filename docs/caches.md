@@ -16,7 +16,7 @@ snapshots alone were about 8,000).
 
 | Cache (key prefix) | Paths, as saved | What | Saved by |
 | --- | --- | --- | --- |
-| `odds-history-` | `data/raw/odds_history` | DraftKings historical h2h snapshots | `backfill.yml` |
+| `odds-history-` | `data/raw/odds_history` | DraftKings historical h2h snapshots | `backfill.yml`, `odds-check.yml` `dk-history` |
 | `player-odds-history-` | `data/raw/player_odds_history` | FanDuel historical player lines | `players.yml` |
 | `cup-odds-history-` | `data/raw/cup_odds`, `data/raw/cups/espn` | Champions League closes (Pinnacle, DraftKings) | `backfill.yml` `cup_odds` |
 | `comeback-odds-` | `data/raw/comeback_odds` | comeback phase 2 in-play snapshots, designs B and C | `odds-check.yml` `comeback-fetch` |
