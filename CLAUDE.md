@@ -850,7 +850,17 @@ the owner's baseball app, so the balance can drop without any run here.
     `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
     study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
     `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
-    `bets_of`; the app gives it its own view. The file shape is under
+    `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`, still
+    buying on 28 Oct) is `lab/cashout_test.py`'s `analyse` output laid into the same file:
+    `kind: "cashout"`, `primary_rule` {t, m, s} (0.50, 0.05, 0.02), `test_verdict` (its `verdict`
+    dict), `designs.primary` (judged, the 4.0+ band: `analyse_band`'s positions, won, avg_entry,
+    quoted_ht, quoted_m70, `variants` [hold; cash T/m with decisions, at_ht, at_m70; kelly m/s],
+    each with mean, sd, ci95, minus_hold and `growth` {"0.01"|"0.02"|"0.05": {mean, ci95,
+    minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
+    gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
+    growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
+    hold, cash}]} (bankrolls, ≤ 200 points) and `bets` (the judged rule's cash-outs: {date, lg,
+    home, away, odds, won, moment, q, hold, cash}). The file shape is under
     "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
@@ -985,6 +995,16 @@ the owner's baseball app, so the balance can drop without any run here.
   with each rule's p, and the bets (market and side, CLV; result from `profit`). Rule labels are
   put into words by `ruleWords` ("Asian handicap, edge ≥ 0% · Premier League, odds 2–3"). Its row
   reads "None found · of 11,857 rules". The fixture keeps 60 of its bets and 12 rules per list.
+  A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
+  (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
+  vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
+  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
+  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
+  calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
+  league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
+  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
+  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live

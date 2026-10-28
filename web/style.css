@@ -889,3 +889,4 @@ details.drv-fold { margin-top: 10px; }
 .row-btn.folder.study-row .who .pill { margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
 /* A search study's rule tables: each range on its own line under the number. */
 .cb-table td .meta.rng { display: block; white-space: normal; font-size: 11px; }
+.co-grid tr.co-primary td { font-weight: 600; }

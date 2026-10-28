@@ -4143,6 +4143,20 @@ const designShort = (k, d) => d?.short || (k === "pooled" ? "all designs togethe
 // A search study (Research's strategy search, 28 Oct): its judged design counts `arms` (rules
 // tried) and carries best_clv, reality_check, positive_share, by_market, top_clv, top_roi.
 const studySearch = (sd) => { const j = studyJudged(sd); return j && j.d.arms ? j : null; };
+// A cash-out study (lab/cashout_test.py, 28 Oct): the judged design carries `variants` (hold,
+// then a cash-out rule per threshold t and margin m, and Kelly partials), each with growth per
+// stake; the file's `primary_rule` {t, m, s} picks the one the verdict is judged on.
+function studyCashout(sd) {
+  const j = studyJudged(sd);
+  if (!j || !Array.isArray(j.d.variants)) return null;
+  const pr = sd.primary_rule || { t: 0.5, m: 0.05, s: 0.02 };
+  const hold = j.d.variants.find((v) => v.name === "hold");
+  const rule = j.d.variants.find((v) => isNum(v.t) && Math.abs(v.t - pr.t) < 1e-9 && Math.abs(v.m - pr.m) < 1e-9);
+  const sk = isNum(pr.s) ? pr.s.toFixed(2) : "0.02";
+  return { ...j, pr, hold, rule, sk, g: rule?.growth?.[sk] };
+}
+// Log growth a bet, in %: three decimals, four when it is under 0.01% (growth differences are tiny).
+const growthText = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(Math.abs(v * 100) < 0.01 && v !== 0 ? 4 : 3)}%` : "–");
 const pText = (v) => (isNum(v) ? (v >= 0.995 ? "0.99+" : v.toFixed(2)) : "–");
 const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"] };
 const verdictPill = (sd) => { const [t, c] = VERDICT[sd.verdict] || ["Running", "v-run"]; return `<span class="pill ${c}">${t}</span>`; };
@@ -4159,6 +4173,8 @@ function studyHeadline(sd) {
   }
   const when = sd.closed_at ? ` ${studyDay(sd.closed_at)}` : "";
   const meta = [`${sd.verdict === "pass" ? "Passed" : "Closed"}${when}`, sd.verdict === "fail" ? "never traded" : "", studyCost(sd)].filter(Boolean).join(" · ");
+  const co = studyCashout(sd);
+  if (co?.g) return { right: `<b class="${signCls(co.g.minus_hold * 100)}">${growthText(co.g.minus_hold)}</b><small>growth a bet vs holding</small>`, meta };
   if (j?.d.arms) {
     const found = (j.d.finalists || []).length;
     return { right: `<b class="${found ? "pos-text" : "neg-text"}">${found ? `${num(found)} found` : "None found"}</b><small>of ${num(j.d.arms.total)} rules</small>`, meta };
@@ -4169,6 +4185,7 @@ function studyHeadline(sd) {
 function studyRowHtml(x) {
   const sd = x.study, h = studyHeadline(sd), j = studyJudged(sd);
   const bt = sd.verdict === "pending" ? (sd.planned?.note ? esc(sd.planned.note) : "Pre-registered: the result shows here once the prices are in")
+    : studyCashout(sd)?.rule ? `${num(studyCashout(sd).rule.decisions)} cash-outs at ${pct(studyCashout(sd).pr.t)} · cash out ${signedPct(studyCashout(sd).rule.mean)} vs hold ${signedPct(studyCashout(sd).hold?.mean)} per $1 · Result: ${sd.verdict === "fail" ? "no gain" : sd.verdict === "pass" ? "passed" : esc(sd.verdict)}`
     : j?.d.arms ? `Best rule beat the close by ${signedPct(j.d.best_clv?.clv)} · luck check p ${pText(j.d.reality_check?.clv?.p_best)} · Result: ${sd.verdict === "fail" ? "no strategy" : "a finalist"}`
     : `${j ? `Judged on ${esc(j.short)} · ${num(j.d.wins)} of ${num(j.d.bets)} won · ` : ""}Result: ${sd.verdict === "fail" ? "no edge" : sd.verdict === "pass" ? "passed" : esc(sd.verdict || "–")}`;
   return `
@@ -4222,7 +4239,7 @@ function studyPageHtml(cur, sd) {
   const head = `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(studyStrat(sd).label)} ${verdictPill(sd)}</h2><div class="pf-sub">${sub}</div>`;
   if (sd.verdict === "pending") return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studyPlanHtml(sd)}`;
   if (!studyJudged(sd)) return `${head}${toggle}<div class="empty">This study's result isn't in this update. It comes back with the next site update.</div>`;
-  return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studySearch(sd) ? studySearchHtml(sd) : studyResultHtml(sd)}`;
+  return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studyCashout(sd) ? studyCashoutHtml(sd) : studySearch(sd) ? studySearchHtml(sd) : studyResultHtml(sd)}`;
 }
 const cbStrategyHtml = (cur) => {
   const list = studiesFor(CB_ID).map(studyStrat);
@@ -4373,6 +4390,73 @@ function studyBetResult(x) {
   if (x.result_text) return `<b class="${signCls(betProfit(x))}">${esc(x.result_text)}</b>`;
   if (x.won === undefined && isNum(x.profit)) return x.profit > 0 ? `<b class="pos-text">Won ${usd(x.profit, 2)}</b>` : x.profit < 0 ? `Lost ${usd(x.profit, 2)}` : "Push";
   return x.won ? '<b class="pos-text">Won</b>' : "Lost";
+}
+// The cash-out test's Result (lead brief, 28 Oct): the verdict pill and text, tiles (decisions,
+// the growth difference at the primary stake with its range, hold vs cash-out per $1), the two
+// bankrolls over time, the table by threshold and margin, the in-play price's calibration by
+// band, and rows per league and season. Growth is the mean of log(1 + stake × profit) a bet.
+const MOMENT_NAME = { ht: "Half-time", m70: "70th minute" };
+function studyCashoutHtml(sd) {
+  const co = studyCashout(sd), d = co.d, h = co.hold || {}, r = co.rule || {}, g = co.g || {}, pr = co.pr;
+  const tile = (label, value, sub, cls = "") => `<div class="tile"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="sub">${sub}</div></div>`;
+  const ci = (c, f = signedPct) => (c && isNum(c[0]) ? `${f(c[0])} to ${f(c[1])}` : "");
+  const tiles = `<div class="tiles pf-tiles">
+    ${tile("Decisions", num(r.decisions), `cash-outs at ${pct(pr.t)}${isNum(r.at_ht) ? `: ${num(r.at_ht)} at half-time, ${num(r.at_m70)} at the 70th minute` : ""}, of ${num(d.positions)} bets`)}
+    ${tile(`Growth vs holding, ${pct(pr.s)} stake`, growthText(g.minus_hold), g.minus_hold_ci95 ? `a bet; 95% range ${ci(g.minus_hold_ci95, growthText)}` : "a bet", signCls((g.minus_hold || 0) * 100))}
+    ${tile("Hold, per $1", signedPct(h.mean), h.ci95 ? `range ${ci(h.ci95)}` : "", signCls(h.mean))}
+    ${tile(`Cash out at ${pct(pr.t)}, per $1`, signedPct(r.mean), r.minus_hold ? `vs hold ${ci(r.minus_hold)}` : "", signCls(r.mean))}
+  </div>`;
+  const cv = sd.curves || {}, pts = (cv.points || []).filter((p) => p.date && isNum(p.hold) && isNum(p.cash));
+  const base = isNum(cv.start) ? cv.start : 1000;
+  const curve = pts.length ? overlayCurveChart([
+    { name: "Hold to the end", curve: pts.map((p) => ({ date: p.date, cum: p.hold })) },
+    { name: `Cash out at ${pct(pr.t)}`, curve: pts.map((p) => ({ date: p.date, cum: p.cash })) },
+  ], null, pts[0].date, "", {
+    id: "cbcv", base, axis: (v) => bankUsd(v), end: (v) => bankUsd(v), dateLabel: cbMonth,
+    readout: (ser, rows, i) => `${rows[0][i].origin ? "Start" : esc(cbDate(rows[0][i].date))} · ${ser.map((o, k) => `${esc(o.name)} ${bankUsd(rows[k][i].cum, 2)}`).join(" · ")}`,
+    aria: `Bankroll staking ${pct(cv.stake ?? pr.s)} a bet: hold against cash out`,
+  }) : "";
+  const cash = (d.variants || []).filter((v) => isNum(v.t));
+  const gk = (v) => v.growth?.[co.sk] || {};
+  const isPrimary = (v) => Math.abs(v.t - pr.t) < 1e-9 && Math.abs(v.m - pr.m) < 1e-9;
+  const grid = cash.length ? `<div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table co-grid"><thead><tr><th>Cash out at</th><th>Margin</th><th>Decisions</th><th>Per $1</th><th>Growth vs hold</th></tr></thead><tbody>${cash.map((v) => `<tr${isPrimary(v) ? ' class="co-primary"' : ""}><td>${pct(v.t)}${isPrimary(v) ? '<span class="meta">judged</span>' : ""}</td><td>${pct(v.m)}</td><td class="num">${num(v.decisions)}</td><td class="num ${signCls(v.mean)}">${signedPct(v.mean)}<span class="meta rng">${v.minus_hold ? `vs hold ${ci(v.minus_hold)}` : ""}</span></td><td class="num ${signCls((gk(v).minus_hold || 0) * 100)}">${growthText(gk(v).minus_hold)}<span class="meta rng">${ci(gk(v).minus_hold_ci95, growthText)}</span></td></tr>`).join("")}</tbody></table></div>` : "";
+  const kelly = (d.variants || []).filter((v) => isNum(v.s) && !isNum(v.t));
+  const kellyTable = kelly.length ? `<details class="fold mk-fold"><summary>Partial cash-out to the Kelly stake (descriptive)</summary><div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>Margin</th><th>Stake</th><th>Per $1</th><th>Growth vs hold</th></tr></thead><tbody>${kelly.map((v) => `<tr><td>${pct(v.m)}</td><td>${pct(v.s)}</td><td class="num ${signCls(v.mean)}">${signedPct(v.mean)}</td><td class="num">${growthText(v.growth?.[v.s.toFixed(2)]?.minus_hold)}</td></tr>`).join("")}</tbody></table></div><p class="note">Half-time only: keep the share of the bet quarter Kelly supports at the live price and cash out the rest.</p></details>` : "";
+  const cal = cbRowsChart("cbcal", (d.calibration || []).map((c) => ({
+    label: `${MOMENT_NAME[c.moment] || c.moment}, ${c.hi >= 1 ? `${pct(c.lo)}+` : pctRange(c.lo, c.hi)}`, n: c.n, unit: "bets", won: c.won, ref: c.implied,
+    extra: isNum(c.gap) ? `${cbPts(c.gap)} points${c.gap_ci95 ? ` (${cbPts(c.gap_ci95[0])} to ${cbPts(c.gap_ci95[1])})` : ""}` : "",
+  })), "In-play price's chance", "the in-play price's");
+  const rowsTable = (obj, name, label) => {
+    const rows = Object.entries(obj || {});
+    if (!rows.length) return "";
+    return `<div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>${name}</th><th>Bets</th><th>Cash-outs</th><th>Hold</th><th>Cash out</th><th>Growth</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(label(k))}</td><td class="num">${num(x.positions)}</td><td class="num">${num(x.decisions)}</td><td class="num ${signCls(x.hold)}">${signedPct(x.hold)}</td><td class="num ${signCls(x.cash)}">${signedPct(x.cash)}</td><td class="num ${signCls((x.growth_minus_hold || 0) * 100)}">${growthText(x.growth_minus_hold)}</td></tr>`).join("")}</tbody></table></div>`;
+  };
+  const others = Object.entries(sd.designs).filter(([k]) => k !== co.key).map(([, x]) => {
+    const xr = (x.variants || []).find((v) => isNum(v.t) && Math.abs(v.t - pr.t) < 1e-9 && Math.abs(v.m - pr.m) < 1e-9);
+    const xh = (x.variants || []).find((v) => v.name === "hold");
+    return xr ? `<li>${esc(x.label)}: ${num(x.positions)} bets, ${num(xr.decisions)} cash-outs; hold ${signedPct(xh?.mean)}, cash out ${signedPct(xr.mean)} per $1, growth vs hold ${growthText(xr.growth?.[co.sk]?.minus_hold)} a bet (descriptive).</li>` : "";
+  }).join("");
+  const cnt = d.counts || {};
+  const tv = sd.test_verdict || {};
+  const shown = state.cbShown || 50;
+  const bets = (sd.bets || []).slice().reverse();
+  const betRows = bets.slice(0, shown).map((x) => `<tr><td>${esc(cbDate(x.date))}</td><td>${esc(leagueShort(x.lg))}</td><td>${esc(x.home)} v ${esc(x.away)}<span class="meta">${esc(MOMENT_NAME[x.moment] || "")}${isNum(x.q) ? ` at ${pct(x.q)}` : ""}</span></td><td class="num">${cbOdds(x.odds)}</td><td>${x.won ? '<b class="pos-text">Won</b>' : "Lost"}<span class="meta">hold ${usd(x.hold, 2)} · cash ${usd(x.cash, 2)}</span></td></tr>`).join("");
+  return `
+    <div class="verdict ${sd.verdict === "fail" ? "neg" : sd.verdict === "pass" ? "pos" : ""}">${esc(sd.verdict_text || "")}</div>
+    <p class="note">${esc(sd.live_note || "No live trades: this was tested on bought historical in-play prices. A pass would only justify proposing a paper cash-out track; nothing changes live either way.")}</p>
+    ${tiles}
+    <p class="note">The judged test: cash out at ${pct(pr.t)} with a ${pct(pr.m)} cash-out margin, staking ${pct(pr.s)} of the bankroll a bet${isNum(tv.decisions) ? `, on ${num(tv.decisions)} decisions` : ""}. It passes only if the growth difference's range sits above 0 on at least 300 decisions.${isNum(cnt.matches) ? ` ${num(cnt.matches)} matches in the sample${cnt.not_priced ? `; ${num(cnt.not_priced)} had no fresh in-play price` : ""}${cnt.unmatched ? `, ${num(cnt.unmatched)} weren't found in the snapshots` : ""}, and these are left out.` : ""}</p>
+    ${curve ? `<div class="section-title">Bankroll: hold vs cash out (${pct(cv.stake ?? pr.s)} a bet)</div><div class="card pf-curve">${curve}</div><p class="note">Both start at ${bankUsd(base)} and stake ${pct(cv.stake ?? pr.s)} of the bankroll on each bet, in kickoff order.</p>` : ""}
+    ${grid ? `<div class="section-title">By threshold and margin</div>${grid}<p class="note">Growth vs hold is the average gain in log bankroll a bet at a ${pct(pr.s)} stake, with its 95% range; below 0 means cashing out grew the bankroll more slowly than holding. Only the row marked judged decides the verdict; the rest are descriptive.</p>` : ""}
+    ${kellyTable}
+    ${cal ? `<div class="section-title">Is the in-play price right?</div>${cal}<p class="note">Bets grouped by the in-play chance at the moment the rule looked. Blue: the underdog won at least as often as the price implied; red: less. Cashing out can only pay if the price undervalues the leading underdog by more than the margin.</p>` : ""}
+    ${others ? `<ul class="slopes">${others}</ul>` : ""}
+    ${Object.keys(d.by_league || {}).length ? `<div class="section-title">By league</div>${rowsTable(d.by_league, "League", (k) => leagueName(k))}` : ""}
+    ${Object.keys(d.by_season || {}).length ? `<div class="section-title">By season</div>${rowsTable(d.by_season, "Season", (k) => k)}<p class="note">League and season rows use the judged rule and are descriptive.</p>` : ""}
+    ${bets.length ? `<details class="fold mk-fold cb-bets"${state.cbShown ? " open" : ""}><summary>The ${num(bets.length)} cash-outs, newest first</summary>
+      <div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>Date</th><th>Lg</th><th>Match</th><th>Odds</th><th>Result</th></tr></thead><tbody>${betRows}</tbody></table></div>
+      ${bets.length > shown ? `<button class="more" data-cbmore="1">Show more (${num(bets.length - shown)} left)</button>` : ""}
+    </details>` : ""}`;
 }
 // The strategy search's Result (lead brief, 28 Oct): the verdict, how many rules were tried,
 // the best against the luck check (White's reality check), the share of rules beating the close
