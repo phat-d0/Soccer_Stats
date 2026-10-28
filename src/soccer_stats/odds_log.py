@@ -108,24 +108,85 @@ def rows_from_data(data: dict, now: pd.Timestamp, league: str = "E0") -> list[di
     return out
 
 
+BOOKS = "books_"  # the every-book log: <league>_books_<YYYY-MM>.jsonl
+
+
+def book_rows_from_data(data: dict, now: pd.Timestamp, league: str = "E0") -> list[dict]:
+    """Every-book rows (owner, 28 Oct): one per fixture and book in a card's `books` (the
+    same ten-book h2h call as DraftKings' prices, odds_feed.BOOKMAKERS), each book's price
+    quoted before kickoff only: league, home, away, kickoff, market "h2h", book, prices,
+    margin-free `fair` (Shin), fetched_at (the book's last_update, else the download),
+    time_source, downloaded_at, logged_at. Logged apart from DraftKings' own rows so the
+    paper closes read the DraftKings log unchanged."""
+    out = []
+    for c in data.get("fixtures") or []:
+        books = c.get("books")
+        if not c.get("kickoff") or not isinstance(books, dict):
+            continue
+        lg = c.get("league") or league
+        src = source_for(data, lg, league)
+        if src.get("name") != BOOKMAKER:
+            continue
+        downloaded = _iso(src.get("fetched_at"))
+        kickoff = pd.Timestamp(_iso(c["kickoff"]))
+        names = MARKETS["h2h"]
+        for key, q in sorted(books.items()):
+            prices = [(q or {}).get(m) for m in names]
+            if not all(_ok(p) for p in prices):
+                continue
+            quoted = _iso(q.get("last_update")) or downloaded
+            if quoted is None or pd.Timestamp(quoted) >= kickoff:
+                continue
+            fair = devig_shin(np.array(prices, dtype=float))
+            out.append(
+                {
+                    "league": lg,
+                    "home": c["home"],
+                    "away": c["away"],
+                    "kickoff": kickoff.isoformat(timespec="seconds"),
+                    "market": "h2h",
+                    "line": None,
+                    "book": key,
+                    "prices": {m: float(v) for m, v in zip(names, prices, strict=True)},
+                    "fair": {m: round(float(v), 6) for m, v in zip(names, fair, strict=True)},
+                    "fetched_at": quoted,
+                    "time_source": "last_update" if q.get("last_update") else "download",
+                    "downloaded_at": downloaded,
+                    "logged_at": now.isoformat(timespec="seconds"),
+                }
+            )
+    return out
+
+
 def _key(r: dict) -> tuple:
     prices = tuple(sorted((r.get("prices") or {}).items()))
-    return (r["home"], r["away"], r["kickoff"], r["market"], prices, r["fetched_at"])
+    return (
+        r["home"],
+        r["away"],
+        r["kickoff"],
+        r["market"],
+        prices,
+        r["fetched_at"],
+        r.get("book"),
+    )
 
 
-def _read(root: Path, league: str) -> list[dict]:
+def _read(root: Path, league: str, kind: str = "") -> list[dict]:
+    """A league's rows: the DraftKings month files (<league>_<YYYY-MM>.jsonl; the
+    team-total, corner and books logs have their own names), or with kind="books_" the
+    every-book files (<league>_books_<YYYY-MM>.jsonl)."""
     rows = []
-    # Month files only (<league>_<YYYY-MM>.jsonl): <league>_team_totals_* are another log.
-    for path in sorted(log_dir(root).glob(f"{league}_[0-9]*.jsonl")):
+    for path in sorted(log_dir(root).glob(f"{league}_{kind}[0-9]*.jsonl")):
         for line in path.read_text().splitlines():
             if line.strip():
                 rows.append(json.loads(line))
     return rows
 
 
-def append(root: Path, rows: list[dict], league: str = "E0") -> int:
+def append(root: Path, rows: list[dict], league: str = "E0", kind: str = "") -> int:
     """Append rows not already logged to their league's month file (the row's `league`,
-    default `league`); returns how many were written."""
+    default `league`; `kind` "books_" for the every-book log); returns how many were
+    written."""
     if not rows:
         return 0
     seen: dict[str, set] = {}
@@ -134,13 +195,13 @@ def append(root: Path, rows: list[dict], league: str = "E0") -> int:
     for r in rows:
         lg = r.get("league") or league
         if lg not in seen:
-            seen[lg] = {_key(x) for x in _read(root, lg)}
+            seen[lg] = {_key(x) for x in _read(root, lg, kind)}
         k = _key(r)
         if k in seen[lg]:
             continue
         seen[lg].add(k)
         month = pd.Timestamp(r["fetched_at"]).strftime("%Y-%m")
-        by_file.setdefault(d / f"{lg}_{month}.jsonl", []).append(
+        by_file.setdefault(d / f"{lg}_{kind}{month}.jsonl", []).append(
             json.dumps(r, separators=(",", ":"))
         )
     if not by_file:
@@ -152,9 +213,10 @@ def append(root: Path, rows: list[dict], league: str = "E0") -> int:
     return sum(len(v) for v in by_file.values())
 
 
-def load(root: Path, league: str = "E0") -> pd.DataFrame:
-    """Every logged row, oldest quote first, with kickoff and fetched_at as UTC timestamps."""
-    rows = _read(root, league)
+def load(root: Path, league: str = "E0", kind: str = "") -> pd.DataFrame:
+    """Every logged row, oldest quote first, with kickoff and fetched_at as UTC timestamps
+    (`kind` "books_": the every-book log)."""
+    rows = _read(root, league, kind)
     if not rows:
         return pd.DataFrame(
             columns=["home", "away", "kickoff", "market", "prices", "fair", "fetched_at"]
@@ -165,23 +227,31 @@ def load(root: Path, league: str = "E0") -> pd.DataFrame:
     return df.sort_values(["fetched_at", "logged_at"]).reset_index(drop=True)
 
 
-def last_before(log: pd.DataFrame, home: str, away: str, kickoff, market: str) -> dict | None:
+def last_before(
+    log: pd.DataFrame, home: str, away: str, kickoff, market: str, book: str | None = None
+) -> dict | None:
     """The last logged quote for a fixture's market before kickoff, or None.
 
     `market` is "h2h" or "totals". A logged kickoff within KICKOFF_TOLERANCE of the given
-    one counts as the same fixture (kickoff times get corrected).
+    one counts as the same fixture (kickoff times get corrected). `book` picks one book's
+    rows in the every-book log (load(..., kind=BOOKS)).
     """
     if log is None or log.empty:
         return None
     k = pd.Timestamp(kickoff)
     k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
-    m = log[
+    sel = (
         (log["home"] == home)
         & (log["away"] == away)
         & (log["market"] == market)
         & ((log["kickoff"] - k).abs() <= KICKOFF_TOLERANCE)
         & (log["fetched_at"] < k)
-    ]
+    )
+    if book is not None:
+        if "book" not in log:
+            return None
+        sel &= log["book"] == book
+    m = log[sel]
     if m.empty:
         return None
     r = m.iloc[-1].to_dict()

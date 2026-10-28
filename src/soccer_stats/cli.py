@@ -112,9 +112,20 @@ def cmd_log_odds(args: argparse.Namespace) -> None:
     from soccer_stats import odds_log
 
     data = json.loads((Path(args.site) / "data.json").read_text())
-    rows = odds_log.rows_from_data(data, pd.Timestamp.now(tz="UTC"), args.league)
+    now = pd.Timestamp.now(tz="UTC")
+    rows = odds_log.rows_from_data(data, now, args.league)
     n = odds_log.append(Path(args.log_dir), rows, args.league)
     print(f"Odds log: {n} new rows ({len(rows)} priced fixture markets this build)")
+    books = odds_log.book_rows_from_data(data, now, args.league)
+    nb = odds_log.append(Path(args.log_dir), books, args.league, kind=odds_log.BOOKS)
+    counts: dict[str, int] = {}
+    for r in books:
+        counts[r["book"]] = counts.get(r["book"], 0) + 1
+    print(
+        f"Every-book log: {nb} new rows ({len(books)} book prices this build: "
+        + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none")
+        + ")"
+    )
 
 
 def cmd_log_team_totals(args: argparse.Namespace) -> None:
@@ -375,6 +386,26 @@ def cmd_log_cup_odds(args: argparse.Namespace) -> None:
 
     rows, calls = cup_odds.log(Path(args.pending), Path(args.log_dir), args.cup)
     print(f"Cup odds log: {rows} new rows, {calls} new calls")
+
+
+def cmd_log_inplay(args: argparse.Namespace) -> None:
+    """Half-time in-play snapshots (inplay.yml): one live h2h call per league with a
+    kickoff in a snapshot window, logged to data-log's odds_log/ with ESPN's score."""
+    import json
+    import os
+
+    from soccer_stats import inplay_log
+
+    key = os.environ.get("ODDS_API_KEY", "")
+    try:
+        res = inplay_log.run(Path(args.log_dir), key, out_dir=Path(args.pending))
+    except Exception as exc:  # noqa: BLE001  never print a URL (it holds the key)
+        res = {"calls": 0, "credits": 0, "rows": 0, "stop": type(exc).__name__, "log": []}
+    for line in res.get("log") or []:
+        print(" ", line)
+    print(inplay_log.summary_line(res))
+    text = json.dumps(res, default=str)
+    print("INPLAY_LOG_JSON", text.replace(key, "***") if key else text)
 
 
 def cmd_close_plan(args: argparse.Namespace) -> None:
@@ -1536,6 +1567,71 @@ def cmd_backtest_dnb(args: argparse.Namespace) -> None:
         )
     print("DNB_BACKTEST_JSON " + json_dumps(_dnb_brief(out)))
     _write_backtest(out, args, "dnb_backtest.json", "DNB backtest")
+
+
+def cmd_dk_history(args: argparse.Namespace) -> None:
+    """DraftKings' historical pre-match odds (lead brief 2, item 3): with --cap above 0, the
+    coverage probe (one snapshot per league and season, newest first, a league stopping at
+    its first season without DraftKings; ODDS_API_KEY, the 3,000 reserve kept); then the
+    backfill estimate per league and season (football-data kickoffs, no key) for the seasons
+    the probe found DraftKings in, or every season without a probe."""
+    import json
+    import os
+
+    from soccer_stats import dk_history as dh
+    from soccer_stats.data import season_kickoffs
+
+    leagues = args.leagues or list(dh.LEAGUES)
+    covered = {c: list(dh.SEASONS) for c in leagues}
+    out: dict = {}
+    if args.cap > 0:
+        res = dh.probe(args.cap, leagues, api_key=os.environ.get("ODDS_API_KEY", ""))
+        out["probe"] = res
+        print(
+            f"== DraftKings coverage probe: {res['spent']} credits of {args.cap}, "
+            f"credits left {res['credits_left']} =="
+        )
+        for code, rows in res["leagues"].items():
+            for r in rows:
+                if r.get("error"):
+                    print(f"  {code} {r['season']}: {r['error']}")
+                    continue
+                top = ", ".join(f"{k} {v}" for k, v in list(r["books"].items())[:10])
+                print(
+                    f"  {code} {r['season']} ({r['at'][:10]}): {r['events']} events, DraftKings "
+                    f"{r['draftkings']}" + (" (cached)" if r["cached"] else "") + f"; {top}"
+                )
+        if res.get("stopped"):
+            print(f"  Stopped: {res['stopped']}")
+        covered = res["covered"]
+        print("DK_HISTORY_PROBE_JSON " + json_dumps({k: v for k, v in res.items() if k != "log"}))
+    kicks = {}
+    for code in leagues:
+        for year in covered.get(code, []):
+            try:
+                kicks[(code, year)] = list(season_kickoffs(code, year))
+            except Exception as exc:  # noqa: BLE001  one season failing never costs the rest
+                print(f"  {code} {year}: no kickoffs ({type(exc).__name__}: {exc})")
+    est = dh.estimate(kicks)
+    out["estimate"] = est
+    print(
+        f"== Backfill estimate: a {est['looks_hours'][0]:g} h look plus the close, h2h at ten "
+        f"books, {est['cost_per_snapshot']} credits a snapshot =="
+    )
+    for r in est["rows"]:
+        print(
+            f"  {r['league']} {r['season']}: {r['kickoffs']} kickoffs, {r['snapshots']} snapshots, "
+            f"{r['credits']} credits"
+        )
+    for code, b in est["by_league"].items():
+        print(
+            f"  {code}: {b['seasons']} seasons, {b['snapshots']} snapshots, {b['credits']} credits"
+        )
+    print(f"  Total: {est['total']['snapshots']} snapshots, {est['total']['credits']} credits")
+    print("DK_HISTORY_ESTIMATE_JSON " + json_dumps(est))
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(out, default=str))
 
 
 def cmd_backtest_edge12(args: argparse.Namespace) -> None:
@@ -2882,6 +2978,13 @@ def main(argv: list[str] | None = None) -> None:
     lco.add_argument("--log-dir", required=True, help="data-log checkout")
     lco.set_defaults(func=cmd_log_corners)
 
+    lip = sub.add_parser(
+        "log-inplay", help="half-time in-play h2h snapshots (inplay.yml; 1 credit a league)"
+    )
+    lip.add_argument("--log-dir", required=True, help="data-log's odds_log files (read)")
+    lip.add_argument("--pending", required=True, help="folder for the new rows and calls")
+    lip.set_defaults(func=cmd_log_inplay)
+
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
     eco.add_argument(
@@ -3062,6 +3165,15 @@ def main(argv: list[str] | None = None) -> None:
     e12b.add_argument("--json", help="path for the results")
     e12b.add_argument("--log-dir", help="data-log checkout: writes backtest/edge12_backtest.json")
     e12b.set_defaults(func=cmd_backtest_edge12)
+
+    dkh = sub.add_parser(
+        "dk-history",
+        help="DraftKings historical coverage probe (capped) and backfill estimate",
+    )
+    dkh.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
+    dkh.add_argument("--cap", type=int, default=0, help="credits for the probe (0 = estimate only)")
+    dkh.add_argument("--json", help="path for the results")
+    dkh.set_defaults(func=cmd_dk_history)
 
     dnbp = sub.add_parser(
         "backtest-dnb",

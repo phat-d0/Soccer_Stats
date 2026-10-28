@@ -1,0 +1,7333 @@
+{
+ "title": "Strategy search: every rule we could think of, on five seasons",
+ "question": "Study the data we already have to find a strategy (position sizing, when to cash out...) that would have had positive ROI. I know this can be overfitting but we can try first.",
+ "rule": "Every rule tried is counted: the raw model's best side at an edge of 0, 5, 12 or 20%, Blend Lean at z 0.5, 1 or 2, or every side, in 1X2, draw no bet, Asian handicap and over/under 2.5 at Pinnacle's early price, with up to two filters (league, price band, edge or z band, driver, side, favourite, day, kickoff slot, strength gap), plus line-movement rules at the close. A rule passes only if its CLV range is above 0 on 300+ bets and it beats the best a no-skill search would find by luck (p < 0.05). 2024/25 onward is locked away for any finalist.",
+ "verdict": "fail",
+ "verdict_text": "No strategy found. 11,857 rules tried; the best beat the closing price by +1.3% on 320 bets, but a search with no skill finds one that good 94% of the time. Only 2% of the large rules beat the close at all, against about half if prices were beatable by chance.",
+ "closed_at": "2026-10-28",
+ "cost": {
+  "credits": 0,
+  "total": 0
+ },
+ "runs": {
+  "search": "40646880618"
+ },
+ "preregistered": {
+  "design": "76557de",
+  "implementation_notes": "e8e4e81"
+ },
+ "designs": {
+  "search": {
+   "role": "judged",
+   "label": "11,857 rules, eight leagues, 5 seasons (2024/25 onward locked)",
+   "leagues": [
+    "E0",
+    "SP1",
+    "D1",
+    "I1",
+    "F1",
+    "E1",
+    "E2",
+    "E3"
+   ],
+   "seasons": [
+    "2019/20",
+    "2020/21",
+    "2021/22",
+    "2022/23",
+    "2023/24"
+   ],
+   "arms": {
+    "early": 11203,
+    "move": 654,
+    "total": 11857,
+    "empty": 2897,
+    "under_100": 4771,
+    "eligible_clv": 4541,
+    "eligible_roi": 5266
+   },
+   "best_clv": {
+    "label": "ah edge>=0% [league=E0, price=2-3]",
+    "family": "early",
+    "bets": 537,
+    "roi": 0.0437057763338089,
+    "roi_ci95": [
+     -0.03133533522486687,
+     0.12432695925235748
+    ],
+    "clv_bets": 320,
+    "clv": 0.0132353026419878,
+    "clv_ci95": [
+     0.008313007652759552,
+     0.018091309815645218
+    ],
+    "p_clv": 0.9445,
+    "p_roi": 1.0
+   },
+   "best_roi": {
+    "label": "1x2 edge>=5% [league=E0, gap=q5]",
+    "family": "early",
+    "bets": 360,
+    "roi": 0.2705000042915344,
+    "roi_ci95": [
+     -0.04985630139708519,
+     0.6104112267494202
+    ],
+    "clv_bets": 360,
+    "clv": -0.046165600419044495,
+    "clv_ci95": [
+     -0.061547257006168365,
+     -0.031877048313617706
+    ],
+    "p_clv": 1.0,
+    "p_roi": 0.6535
+   },
+   "reality_check": {
+    "clv": {
+     "universe": ">= 300 bets",
+     "p_best": 0.9445,
+     "null_max_95": 0.026744755916297436,
+     "p_best_all_arms": 0.8235
+    },
+    "roi": {
+     "universe": ">= 300 bets, early and movement arms",
+     "p_best": 0.6535,
+     "null_max_95": 0.47408556044101713,
+     "null_max_95_all_arms": 8.325997352600098
+    }
+   },
+   "positive_share": {
+    "clv": {
+     "arms": 4541,
+     "above_0": 92,
+     "share": 0.0203
+    },
+    "roi": {
+     "arms": 5266,
+     "above_0": 781,
+     "share": 0.1483
+    },
+    "null_clv": {
+     "mean": 0.5007,
+     "q95": 0.6093
+    },
+    "null_roi": {
+     "mean": 0.499,
+     "q95": 0.6096
+    }
+   },
+   "by_market": [
+    {
+     "market": "1x2",
+     "label": "1x2 every side",
+     "family": "early",
+     "bets": 48849,
+     "roi": -0.0361550897359848,
+     "roi_ci95": [
+      -0.04351168870925903,
+      -0.02894490398466587
+     ],
+     "clv_bets": 48828,
+     "clv": -0.03538963198661804,
+     "clv_ci95": [
+      -0.03590277582406998,
+      -0.03485994040966034
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "market": "dnb",
+     "label": "dnb every side",
+     "family": "early",
+     "bets": 32548,
+     "roi": -0.035057369619607925,
+     "roi_ci95": [
+      -0.04261473938822746,
+      -0.02759162336587906
+     ],
+     "clv_bets": 32534,
+     "clv": -0.04726770147681236,
+     "clv_ci95": [
+      -0.047864384949207306,
+      -0.04665641486644745
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "market": "ah",
+     "label": "ah every side",
+     "family": "early",
+     "bets": 32566,
+     "roi": -0.022137043997645378,
+     "roi_ci95": [
+      -0.022812947630882263,
+      -0.021459490060806274
+     ],
+     "clv_bets": 21404,
+     "clv": -0.02440766990184784,
+     "clv_ci95": [
+      -0.024523692205548286,
+      -0.0242918711155653
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "market": "ou",
+     "label": "ou every side",
+     "family": "early",
+     "bets": 32458,
+     "roi": -0.036561403423547745,
+     "roi_ci95": [
+      -0.03904009610414505,
+      -0.0340820848941803
+     ],
+     "clv_bets": 32444,
+     "clv": -0.03448013216257095,
+     "clv_ci95": [
+      -0.034669868648052216,
+      -0.03428959101438522
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    }
+   ],
+   "top_clv": [
+    {
+     "label": "ah every side [price=2-3, gap=q5]",
+     "family": "early",
+     "bets": 2062,
+     "roi": -0.04011639580130577,
+     "roi_ci95": [
+      -0.08150383085012436,
+      -0.000583977613132447
+     ],
+     "clv_bets": 1098,
+     "clv": 0.012324756942689419,
+     "clv_ci95": [
+      0.009413310326635838,
+      0.015093086287379265
+     ],
+     "p_clv": 0.973,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [league=D1, price=2-3]",
+     "family": "early",
+     "bets": 971,
+     "roi": -0.028027810156345367,
+     "roi_ci95": [
+      -0.09245821088552475,
+      0.032342202961444855
+     ],
+     "clv_bets": 539,
+     "clv": 0.01309212762862444,
+     "clv_ci95": [
+      0.008963136933743954,
+      0.01725144498050213
+     ],
+     "p_clv": 0.9505,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [league=E0, price=2-3]",
+     "family": "early",
+     "bets": 1247,
+     "roi": 0.004639131482690573,
+     "roi_ci95": [
+      -0.04513655602931976,
+      0.05605163797736168
+     ],
+     "clv_bets": 741,
+     "clv": 0.011913576163351536,
+     "clv_ci95": [
+      0.0085486751049757,
+      0.01525991503149271
+     ],
+     "p_clv": 0.983,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [league=E0, price=2-3]",
+     "family": "early",
+     "bets": 537,
+     "roi": 0.0437057763338089,
+     "roi_ci95": [
+      -0.03133533522486687,
+      0.12432695925235748
+     ],
+     "clv_bets": 320,
+     "clv": 0.0132353026419878,
+     "clv_ci95": [
+      0.008313007652759552,
+      0.018091309815645218
+     ],
+     "p_clv": 0.9445,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [price=2-3, gap=q5]",
+     "family": "early",
+     "bets": 910,
+     "roi": -0.04850000515580177,
+     "roi_ci95": [
+      -0.11069585382938385,
+      0.017726723104715347
+     ],
+     "clv_bets": 485,
+     "clv": 0.012607051990926266,
+     "clv_ci95": [
+      0.008115590550005436,
+      0.016840780153870583
+     ],
+     "p_clv": 0.966,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [price=2-3, gap=q5]",
+     "family": "early",
+     "bets": 683,
+     "roi": -0.04144217073917389,
+     "roi_ci95": [
+      -0.11032386124134064,
+      0.03393665701150894
+     ],
+     "clv_bets": 370,
+     "clv": 0.012203949503600597,
+     "clv_ci95": [
+      0.007035337388515472,
+      0.017192715778946877
+     ],
+     "p_clv": 0.979,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [price=2-3, day=weekend]",
+     "family": "early",
+     "bets": 7424,
+     "roi": -0.0264055784791708,
+     "roi_ci95": [
+      -0.046972956508398056,
+      -0.004988091066479683
+     ],
+     "clv_bets": 4514,
+     "clv": 0.007959245704114437,
+     "clv_ci95": [
+      0.006420826073735952,
+      0.009326470084488392
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [price=2-3, side=ah_home]",
+     "family": "early",
+     "bets": 5618,
+     "roi": -0.03153613582253456,
+     "roi_ci95": [
+      -0.05500684678554535,
+      -0.0071589588187634945
+     ],
+     "clv_bets": 3426,
+     "clv": 0.008028536103665829,
+     "clv_ci95": [
+      0.006376270670443773,
+      0.00960941705852747
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=20% [price=2-3, day=weekend]",
+     "family": "early",
+     "bets": 701,
+     "roi": 0.007253922987729311,
+     "roi_ci95": [
+      -0.06154907867312431,
+      0.0799013078212738
+     ],
+     "clv_bets": 406,
+     "clv": 0.010967861860990524,
+     "clv_ci95": [
+      0.0056050908751785755,
+      0.016219807788729668
+     ],
+     "p_clv": 0.9945,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [price=2-3, slot=lone]",
+     "family": "early",
+     "bets": 1261,
+     "roi": -0.05500000715255737,
+     "roi_ci95": [
+      -0.10231169313192368,
+      -0.0034045386128127575
+     ],
+     "clv_bets": 748,
+     "clv": 0.009115618653595448,
+     "clv_ci95": [
+      0.005529737565666437,
+      0.01259299460798502
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [price=2-3, day=weekend]",
+     "family": "early",
+     "bets": 2454,
+     "roi": -0.04417278245091438,
+     "roi_ci95": [
+      -0.08007676154375076,
+      -0.005802044179290533
+     ],
+     "clv_bets": 1453,
+     "clv": 0.00805243756622076,
+     "clv_ci95": [
+      0.005471610929816961,
+      0.010379043407738209
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [price=2-3, day=weekend]",
+     "family": "early",
+     "bets": 3354,
+     "roi": -0.03982110694050789,
+     "roi_ci95": [
+      -0.07168835401535034,
+      -0.006032254081219435
+     ],
+     "clv_bets": 2007,
+     "clv": 0.007544059306383133,
+     "clv_ci95": [
+      0.005353344604372978,
+      0.009696590714156628
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [price=2-3, slot=lone]",
+     "family": "early",
+     "bets": 4173,
+     "roi": -0.017676735296845436,
+     "roi_ci95": [
+      -0.044600650668144226,
+      0.011639878153800964
+     ],
+     "clv_bets": 2544,
+     "clv": 0.007174329832196236,
+     "clv_ci95": [
+      0.005277308169752359,
+      0.008941796608269215
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [league=F1, price=2-3]",
+     "family": "early",
+     "bets": 532,
+     "roi": -0.07609963417053223,
+     "roi_ci95": [
+      -0.1553443819284439,
+      0.004481621086597443
+     ],
+     "clv_bets": 303,
+     "clv": 0.01055354718118906,
+     "clv_ci95": [
+      0.005251108668744564,
+      0.016028380021452904
+     ],
+     "p_clv": 0.9965,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [league=F1, price=2-3]",
+     "family": "early",
+     "bets": 1171,
+     "roi": -0.04344150424003601,
+     "roi_ci95": [
+      -0.09751490503549576,
+      0.010812112130224705
+     ],
+     "clv_bets": 678,
+     "clv": 0.009067672304809093,
+     "clv_ci95": [
+      0.005169154144823551,
+      0.012664565816521645
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [league=SP1, price=2-3]",
+     "family": "early",
+     "bets": 1301,
+     "roi": -0.04170253500342369,
+     "roi_ci95": [
+      -0.09218108654022217,
+      0.008076737634837627
+     ],
+     "clv_bets": 800,
+     "clv": 0.008395948447287083,
+     "clv_ci95": [
+      0.005006412975490093,
+      0.011602072976529598
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3, slot=lone]",
+     "family": "early",
+     "bets": 686,
+     "roi": -0.00948251411318779,
+     "roi_ci95": [
+      -0.076290562748909,
+      0.06540366262197495
+     ],
+     "clv_bets": 404,
+     "clv": 0.010043546557426453,
+     "clv_ci95": [
+      0.004917061887681484,
+      0.014795391820371151
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [price=2-3, side=ah_home]",
+     "family": "early",
+     "bets": 2482,
+     "roi": -0.043485093861818314,
+     "roi_ci95": [
+      -0.0791584774851799,
+      -0.0063936831429600716
+     ],
+     "clv_bets": 1498,
+     "clv": 0.00713505269959569,
+     "clv_ci95": [
+      0.004692206624895334,
+      0.00958060473203659
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=20% [price=2-3]",
+     "family": "early",
+     "bets": 1012,
+     "roi": 0.011299406178295612,
+     "roi_ci95": [
+      -0.04406330734491348,
+      0.07086306065320969
+     ],
+     "clv_bets": 599,
+     "clv": 0.00884665921330452,
+     "clv_ci95": [
+      0.004690476693212986,
+      0.012893603183329105
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=20% [price=2-3, band=edge q5]",
+     "family": "early",
+     "bets": 1012,
+     "roi": 0.011299406178295612,
+     "roi_ci95": [
+      -0.04406330734491348,
+      0.07086306065320969
+     ],
+     "clv_bets": 599,
+     "clv": 0.00884665921330452,
+     "clv_ci95": [
+      0.004690476693212986,
+      0.012893603183329105
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=20% [price=2-3, fav=dog]",
+     "family": "early",
+     "bets": 1012,
+     "roi": 0.011299406178295612,
+     "roi_ci95": [
+      -0.04406330734491348,
+      0.07086306065320969
+     ],
+     "clv_bets": 599,
+     "clv": 0.00884665921330452,
+     "clv_ci95": [
+      0.004690476693212986,
+      0.012893603183329105
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3, day=weekend]",
+     "family": "early",
+     "bets": 1402,
+     "roi": -0.028042089194059372,
+     "roi_ci95": [
+      -0.07630424946546555,
+      0.02179141715168953
+     ],
+     "clv_bets": 812,
+     "clv": 0.008158550597727299,
+     "clv_ci95": [
+      0.004669184796512127,
+      0.011608222499489784
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [price=2-3]",
+     "family": "early",
+     "bets": 10619,
+     "roi": -0.022270934656262398,
+     "roi_ci95": [
+      -0.0395604707300663,
+      -0.004589041229337454
+     ],
+     "clv_bets": 6496,
+     "clv": 0.005792919546365738,
+     "clv_ci95": [
+      0.004543363116681576,
+      0.0068937200121581554
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah every side [price=2-3, fav=dog]",
+     "family": "early",
+     "bets": 10619,
+     "roi": -0.022270934656262398,
+     "roi_ci95": [
+      -0.0395604707300663,
+      -0.004589041229337454
+     ],
+     "clv_bets": 6496,
+     "clv": 0.005792919546365738,
+     "clv_ci95": [
+      0.004543363116681576,
+      0.0068937200121581554
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=0% [price=2-3, slot=lone]",
+     "family": "early",
+     "bets": 1840,
+     "roi": -0.04641032963991165,
+     "roi_ci95": [
+      -0.08651696145534515,
+      -0.0032752964179962873
+     ],
+     "clv_bets": 1105,
+     "clv": 0.007495730649679899,
+     "clv_ci95": [
+      0.004498438443988562,
+      0.010229877196252346
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [price=2-3, side=ah_home]",
+     "family": "early",
+     "bets": 1798,
+     "roi": -0.032366517931222916,
+     "roi_ci95": [
+      -0.0751769170165062,
+      0.01181116420775652
+     ],
+     "clv_bets": 1074,
+     "clv": 0.007458780892193317,
+     "clv_ci95": [
+      0.0044779605232179165,
+      0.010604673996567726
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3, side=ah_home]",
+     "family": "early",
+     "bets": 1009,
+     "roi": -0.0001982196408789605,
+     "roi_ci95": [
+      -0.05829772725701332,
+      0.05934630706906319
+     ],
+     "clv_bets": 581,
+     "clv": 0.007862868718802929,
+     "clv_ci95": [
+      0.0038424271624535322,
+      0.011815751902759075
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3]",
+     "family": "early",
+     "bets": 2026,
+     "roi": -0.009891411289572716,
+     "roi_ci95": [
+      -0.05029300972819328,
+      0.03163326159119606
+     ],
+     "clv_bets": 1185,
+     "clv": 0.006580708548426628,
+     "clv_ci95": [
+      0.0037680151872336864,
+      0.009376795962452888
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3, band=edge q5]",
+     "family": "early",
+     "bets": 2026,
+     "roi": -0.009891411289572716,
+     "roi_ci95": [
+      -0.05029300972819328,
+      0.03163326159119606
+     ],
+     "clv_bets": 1185,
+     "clv": 0.006580708548426628,
+     "clv_ci95": [
+      0.0037680151872336864,
+      0.009376795962452888
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [price=2-3, fav=dog]",
+     "family": "early",
+     "bets": 2026,
+     "roi": -0.009891411289572716,
+     "roi_ci95": [
+      -0.05029300972819328,
+      0.03163326159119606
+     ],
+     "clv_bets": 1185,
+     "clv": 0.006580708548426628,
+     "clv_ci95": [
+      0.0037680151872336864,
+      0.009376795962452888
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    }
+   ],
+   "top_roi": [
+    {
+     "label": "ah fade move>=4% at the close [side=ah_away]",
+     "family": "move",
+     "bets": 848,
+     "roi": 0.08531250059604645,
+     "roi_ci95": [
+      0.02236063778400421,
+      0.14764223992824554
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [league=E0, fav=dog]",
+     "family": "early",
+     "bets": 345,
+     "roi": 0.11373913288116455,
+     "roi_ci95": [
+      0.020807767286896706,
+      0.21074922382831573
+     ],
+     "clv_bets": 216,
+     "clv": 0.0042463247664272785,
+     "clv_ci95": [
+      -0.002477235859259963,
+      0.010556411929428577
+     ],
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb edge>=12% [slot=shared, gap=q5]",
+     "family": "early",
+     "bets": 596,
+     "roi": 0.2287370264530182,
+     "roi_ci95": [
+      0.019583256915211678,
+      0.45007559657096863
+     ],
+     "clv_bets": 596,
+     "clv": -0.07070779800415039,
+     "clv_ci95": [
+      -0.08235248923301697,
+      -0.05959649756550789
+     ],
+     "p_clv": 1.0,
+     "p_roi": 0.8795
+    },
+    {
+     "label": "1x2 follow move>=4% at the close [price=2-3]",
+     "family": "move",
+     "bets": 866,
+     "roi": 0.07906465977430344,
+     "roi_ci95": [
+      0.0026134534273296595,
+      0.1569756120443344
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=2% at the close [gap=q5]",
+     "family": "move",
+     "bets": 853,
+     "roi": 0.06286049634218216,
+     "roi_ci95": [
+      0.0003598463663365692,
+      0.12418336421251297
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ou follow move>=4% at the close [league=E3]",
+     "family": "move",
+     "bets": 362,
+     "roi": 0.08091159909963608,
+     "roi_ci95": [
+      -0.00011593513772822917,
+      0.16500632464885712
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb follow move>=4% at the close [league=E0]",
+     "family": "move",
+     "bets": 365,
+     "roi": 0.09854821860790253,
+     "roi_ci95": [
+      -0.000654927222058177,
+      0.20414452254772186
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=4% at the close [slot=shared]",
+     "family": "move",
+     "bets": 926,
+     "roi": 0.05480561405420303,
+     "roi_ci95": [
+      -0.0014131084317341447,
+      0.11567378044128418
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=2% at the close [side=ah_away]",
+     "family": "move",
+     "bets": 2501,
+     "roi": 0.03431627154350281,
+     "roi_ci95": [
+      -0.002169474260881543,
+      0.07033282518386841
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ou edge>=5% [price=1.5-2, band=edge q4]",
+     "family": "early",
+     "bets": 767,
+     "roi": 0.058370281010866165,
+     "roi_ci95": [
+      -0.0022309173364192247,
+      0.12084644287824631
+     ],
+     "clv_bets": 766,
+     "clv": -0.02661074511706829,
+     "clv_ci95": [
+      -0.03020876832306385,
+      -0.022825948894023895
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb edge>=0% [league=SP1, fav=fav]",
+     "family": "early",
+     "bets": 427,
+     "roi": 0.0519874133169651,
+     "roi_ci95": [
+      -0.0048462082631886005,
+      0.10900580883026123
+     ],
+     "clv_bets": 427,
+     "clv": -0.023510701954364777,
+     "clv_ci95": [
+      -0.029250137507915497,
+      -0.017191357910633087
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=2% at the close [league=F1]",
+     "family": "move",
+     "bets": 436,
+     "roi": 0.07861238718032837,
+     "roi_ci95": [
+      -0.005667522549629211,
+      0.16717378795146942
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ou every side [league=D1, price=<=1.5]",
+     "family": "early",
+     "bets": 365,
+     "roi": 0.05813698470592499,
+     "roi_ci95": [
+      -0.0059951916337013245,
+      0.12015778571367264
+     ],
+     "clv_bets": 365,
+     "clv": -0.03017125278711319,
+     "clv_ci95": [
+      -0.034390129148960114,
+      -0.02570001594722271
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb every side [league=SP1, fav=fav]",
+     "family": "early",
+     "bets": 1841,
+     "roi": 0.01869838684797287,
+     "roi_ci95": [
+      -0.006018741987645626,
+      0.04469915106892586
+     ],
+     "clv_bets": 1841,
+     "clv": -0.0278093870729208,
+     "clv_ci95": [
+      -0.030264051631093025,
+      -0.02510005049407482
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=1% at the close [side=ah_away]",
+     "family": "move",
+     "bets": 3925,
+     "roi": 0.022336307913064957,
+     "roi_ci95": [
+      -0.007611700799316168,
+      0.051661841571331024
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb edge>=5% [slot=shared, gap=q5]",
+     "family": "early",
+     "bets": 911,
+     "roi": 0.13846811652183533,
+     "roi_ci95": [
+      -0.009831362403929234,
+      0.2882518172264099
+     ],
+     "clv_bets": 911,
+     "clv": -0.06306909769773483,
+     "clv_ci95": [
+      -0.07203245162963867,
+      -0.05450890585780144
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=12% [league=E0, slot=shared]",
+     "family": "early",
+     "bets": 316,
+     "roi": 0.08310126513242722,
+     "roi_ci95": [
+      -0.010513784363865852,
+      0.17979344725608826
+     ],
+     "clv_bets": 193,
+     "clv": -0.018914945423603058,
+     "clv_ci95": [
+      -0.026618411764502525,
+      -0.011029724031686783
+     ],
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb edge>=12% [price=>5, gap=q5]",
+     "family": "early",
+     "bets": 871,
+     "roi": 0.18053533136844635,
+     "roi_ci95": [
+      -0.010882597416639328,
+      0.377798467874527
+     ],
+     "clv_bets": 871,
+     "clv": -0.08629309386014938,
+     "clv_ci95": [
+      -0.09780357033014297,
+      -0.07468707859516144
+     ],
+     "p_clv": 1.0,
+     "p_roi": 0.9935
+    },
+    {
+     "label": "ah edge>=5% [league=SP1, side=ah_home]",
+     "family": "early",
+     "bets": 584,
+     "roi": 0.059417810291051865,
+     "roi_ci95": [
+      -0.011353228241205215,
+      0.1339350789785385
+     ],
+     "clv_bets": 372,
+     "clv": -0.013662376441061497,
+     "clv_ci95": [
+      -0.019155511632561684,
+      -0.00820179283618927
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "dnb lean z>=1 [fav=fav, slot=lone]",
+     "family": "early",
+     "bets": 326,
+     "roi": 0.05686584860086441,
+     "roi_ci95": [
+      -0.011903474107384682,
+      0.11916214227676392
+     ],
+     "clv_bets": 326,
+     "clv": -0.024994496256113052,
+     "clv_ci95": [
+      -0.03144358471035957,
+      -0.018324073404073715
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [league=SP1, fav=fav]",
+     "family": "early",
+     "bets": 491,
+     "roi": 0.05939918011426926,
+     "roi_ci95": [
+      -0.012035391293466091,
+      0.1346202790737152
+     ],
+     "clv_bets": 326,
+     "clv": -0.03893955424427986,
+     "clv_ci95": [
+      -0.04421014338731766,
+      -0.033421047031879425
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "1x2 lean z>=0.5 [slot=shared, gap=q3]",
+     "family": "early",
+     "bets": 828,
+     "roi": 0.09061595052480698,
+     "roi_ci95": [
+      -0.012040427885949612,
+      0.1939336508512497
+     ],
+     "clv_bets": 827,
+     "clv": -0.034893300384283066,
+     "clv_ci95": [
+      -0.04047133028507233,
+      -0.028981206938624382
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "1x2 edge>=12% [price=>5, gap=q5]",
+     "family": "early",
+     "bets": 918,
+     "roi": 0.20393244922161102,
+     "roi_ci95": [
+      -0.012224509380757809,
+      0.43678003549575806
+     ],
+     "clv_bets": 918,
+     "clv": -0.07155527174472809,
+     "clv_ci95": [
+      -0.08168847858905792,
+      -0.061334263533353806
+     ],
+     "p_clv": 1.0,
+     "p_roi": 0.967
+    },
+    {
+     "label": "1x2 lean z>=0.5 [price=1.5-2, side=away]",
+     "family": "early",
+     "bets": 493,
+     "roi": 0.06616632640361786,
+     "roi_ci95": [
+      -0.012964479625225067,
+      0.14370575547218323
+     ],
+     "clv_bets": 493,
+     "clv": -0.02407955378293991,
+     "clv_ci95": [
+      -0.030360283330082893,
+      -0.018020350486040115
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ou edge>=5% [band=edge q4, fav=fav]",
+     "family": "early",
+     "bets": 686,
+     "roi": 0.04816326126456261,
+     "roi_ci95": [
+      -0.013307861983776093,
+      0.11172185838222504
+     ],
+     "clv_bets": 685,
+     "clv": -0.02570340782403946,
+     "clv_ci95": [
+      -0.029486404731869698,
+      -0.02167213149368763
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ou every side [price=<=1.5, day=weekend]",
+     "family": "early",
+     "bets": 876,
+     "roi": 0.026107309386134148,
+     "roi_ci95": [
+      -0.01497331541031599,
+      0.0687868669629097
+     ],
+     "clv_bets": 876,
+     "clv": -0.023049818351864815,
+     "clv_ci95": [
+      -0.02582157403230667,
+      -0.02014918066561222
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [league=SP1, slot=lone]",
+     "family": "early",
+     "bets": 833,
+     "roi": 0.04205881431698799,
+     "roi_ci95": [
+      -0.015153937041759491,
+      0.10375351458787918
+     ],
+     "clv_bets": 550,
+     "clv": -0.019429493695497513,
+     "clv_ci95": [
+      -0.0238498505204916,
+      -0.015231589786708355
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "1x2 lean z>=0.5 [league=I1, driver=market]",
+     "family": "early",
+     "bets": 386,
+     "roi": 0.08015543967485428,
+     "roi_ci95": [
+      -0.015555966645479202,
+      0.17287684977054596
+     ],
+     "clv_bets": 386,
+     "clv": -0.025951221585273743,
+     "clv_ci95": [
+      -0.03333582356572151,
+      -0.01866411790251732
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah fade move>=1% at the close [gap=q5]",
+     "family": "move",
+     "bets": 1324,
+     "roi": 0.034694112837314606,
+     "roi_ci95": [
+      -0.015643570572137833,
+      0.08301399648189545
+     ],
+     "clv_bets": null,
+     "clv": null,
+     "clv_ci95": null,
+     "p_clv": null,
+     "p_roi": 1.0
+    },
+    {
+     "label": "ah edge>=5% [league=SP1]",
+     "family": "early",
+     "bets": 1011,
+     "roi": 0.03395647555589676,
+     "roi_ci95": [
+      -0.016175609081983566,
+      0.08978355675935745
+     ],
+     "clv_bets": 647,
+     "clv": -0.01867997646331787,
+     "clv_ci95": [
+      -0.02288009226322174,
+      -0.014573346823453903
+     ],
+     "p_clv": 1.0,
+     "p_roi": 1.0
+    }
+   ],
+   "finalists": [],
+   "sizing": {
+    "ah every side [price=2-3, gap=q5]": {
+     "flat": {
+      "bets": 2062,
+      "profit": -82.72
+     },
+     "stop_20": {
+      "bets_staked": 1235,
+      "profit": -39.03
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah every side [league=D1, price=2-3]": {
+     "flat": {
+      "bets": 971,
+      "profit": -27.22
+     },
+     "stop_20": {
+      "bets_staked": 971,
+      "profit": -27.22
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah every side [league=E0, price=2-3]": {
+     "flat": {
+      "bets": 1247,
+      "profit": 5.78
+     },
+     "stop_20": {
+      "bets_staked": 965,
+      "profit": -8.01
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah edge>=0% [league=E0, price=2-3]": {
+     "flat": {
+      "bets": 537,
+      "profit": 23.47
+     },
+     "stop_20": {
+      "bets_staked": 537,
+      "profit": 23.47
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah edge>=0% [price=2-3, gap=q5]": {
+     "flat": {
+      "bets": 910,
+      "profit": -44.14
+     },
+     "stop_20": {
+      "bets_staked": 806,
+      "profit": -38.21
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah edge>=5% [price=2-3, gap=q5]": {
+     "flat": {
+      "bets": 683,
+      "profit": -28.31
+     },
+     "stop_20": {
+      "bets_staked": 650,
+      "profit": -34.77
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah every side [price=2-3, day=weekend]": {
+     "flat": {
+      "bets": 7424,
+      "profit": -196.04
+     },
+     "stop_20": {
+      "bets_staked": 2093,
+      "profit": -68.9
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah every side [price=2-3, side=ah_home]": {
+     "flat": {
+      "bets": 5618,
+      "profit": -177.17
+     },
+     "stop_20": {
+      "bets_staked": 1048,
+      "profit": -78.95
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah edge>=20% [price=2-3, day=weekend]": {
+     "flat": {
+      "bets": 701,
+      "profit": 5.08
+     },
+     "stop_20": {
+      "bets_staked": 701,
+      "profit": 5.08
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    },
+    "ah edge>=5% [price=2-3, slot=lone]": {
+     "flat": {
+      "bets": 1261,
+      "profit": -69.36
+     },
+     "stop_20": {
+      "bets_staked": 992,
+      "profit": -37.74
+     },
+     "kelly_quarter": {
+      "note": "no blend chance for this market"
+     },
+     "kelly_half": {
+      "note": "no blend chance for this market"
+     }
+    }
+   }
+  }
+ },
+ "bets_of": "ah edge>=0% [league=E0, price=2-3]",
+ "bets": [
+  {
+   "date": "2019-08-10",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.0126
+  },
+  {
+   "date": "2019-08-11",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-08-11",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 0.52,
+   "clv": 0.094
+  },
+  {
+   "date": "2019-08-24",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.025
+  },
+  {
+   "date": "2019-08-25",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2019-08-31",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 0.56,
+   "clv": null
+  },
+  {
+   "date": "2019-09-01",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-09-14",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 0.535,
+   "clv": -0.0269
+  },
+  {
+   "date": "2019-09-21",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.16,
+   "profit": -0.5,
+   "clv": 0.0267
+  },
+  {
+   "date": "2019-09-28",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.16,
+   "profit": -0.5,
+   "clv": 0.0041
+  },
+  {
+   "date": "2019-09-28",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0303
+  },
+  {
+   "date": "2019-09-28",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.096
+  },
+  {
+   "date": "2019-09-30",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -0.5,
+   "clv": 0.04
+  },
+  {
+   "date": "2019-10-05",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 0.545,
+   "clv": 0.0857
+  },
+  {
+   "date": "2019-10-05",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2019-10-05",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": -1.0,
+   "clv": -0.029
+  },
+  {
+   "date": "2019-10-06",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-10-19",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0377
+  },
+  {
+   "date": "2019-10-19",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": -0.0504
+  },
+  {
+   "date": "2019-10-26",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.505,
+   "clv": 0.0389
+  },
+  {
+   "date": "2019-10-26",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 0.535,
+   "clv": 0.0377
+  },
+  {
+   "date": "2019-11-02",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-11-03",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-11-03",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": 0.0598
+  },
+  {
+   "date": "2019-11-23",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.0277
+  },
+  {
+   "date": "2019-11-23",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": -1.0,
+   "clv": 0.0206
+  },
+  {
+   "date": "2019-11-24",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 0.525,
+   "clv": null
+  },
+  {
+   "date": "2019-11-30",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": -0.0214
+  },
+  {
+   "date": "2019-11-30",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2019-12-01",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2019-12-01",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2019-12-04",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0038
+  },
+  {
+   "date": "2019-12-04",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.515,
+   "clv": -0.0034
+  },
+  {
+   "date": "2019-12-04",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": 0.0598
+  },
+  {
+   "date": "2019-12-05",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-12-07",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0039
+  },
+  {
+   "date": "2019-12-08",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": -0.0574
+  },
+  {
+   "date": "2019-12-08",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0206
+  },
+  {
+   "date": "2019-12-14",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-12-14",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": null
+  },
+  {
+   "date": "2019-12-21",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0264
+  },
+  {
+   "date": "2019-12-21",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": 0.0726
+  },
+  {
+   "date": "2019-12-21",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": -1.0,
+   "clv": 0.0254
+  },
+  {
+   "date": "2019-12-21",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0337
+  },
+  {
+   "date": "2019-12-26",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.0113
+  },
+  {
+   "date": "2019-12-27",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.008
+  },
+  {
+   "date": "2019-12-28",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.0006
+  },
+  {
+   "date": "2019-12-28",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.0645
+  },
+  {
+   "date": "2019-12-28",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2019-12-29",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": 0.006
+  },
+  {
+   "date": "2019-12-29",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0215
+  },
+  {
+   "date": "2020-01-01",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.1154
+  },
+  {
+   "date": "2020-01-01",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": null
+  },
+  {
+   "date": "2020-01-01",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0572
+  },
+  {
+   "date": "2020-01-01",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2020-01-10",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": 0.0626
+  },
+  {
+   "date": "2020-01-11",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": 0.014
+  },
+  {
+   "date": "2020-01-11",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": 0.0916
+  },
+  {
+   "date": "2020-01-11",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": -0.029
+  },
+  {
+   "date": "2020-01-18",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0947
+  },
+  {
+   "date": "2020-01-18",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": 0.0007
+  },
+  {
+   "date": "2020-01-18",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2020-01-18",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -0.5,
+   "clv": -0.0472
+  },
+  {
+   "date": "2020-01-18",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.0622
+  },
+  {
+   "date": "2020-01-19",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": 0.1129
+  },
+  {
+   "date": "2020-01-19",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": -0.0188
+  },
+  {
+   "date": "2020-01-21",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.16,
+   "profit": 1.16,
+   "clv": 0.0349
+  },
+  {
+   "date": "2020-01-21",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2020-01-23",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -0.5,
+   "clv": 0.0201
+  },
+  {
+   "date": "2020-02-01",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 0.0,
+   "clv": -0.001
+  },
+  {
+   "date": "2020-02-08",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 0.515,
+   "clv": 0.0492
+  },
+  {
+   "date": "2020-02-08",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.0005
+  },
+  {
+   "date": "2020-02-17",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.0645
+  },
+  {
+   "date": "2020-02-23",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": -0.0427
+  },
+  {
+   "date": "2020-02-29",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-02-29",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-02-29",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 0.0,
+   "clv": 0.0121
+  },
+  {
+   "date": "2020-03-01",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 0.0,
+   "clv": 0.0913
+  },
+  {
+   "date": "2020-03-07",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0128
+  },
+  {
+   "date": "2020-03-08",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.105
+  },
+  {
+   "date": "2020-03-09",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2020-06-20",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.15,
+   "profit": -1.0,
+   "clv": 0.0526
+  },
+  {
+   "date": "2020-06-20",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.17,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-06-20",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": 0.57,
+   "clv": null
+  },
+  {
+   "date": "2020-06-21",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": -0.0447
+  },
+  {
+   "date": "2020-06-24",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.0197
+  },
+  {
+   "date": "2020-06-24",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -0.5,
+   "clv": -0.0351
+  },
+  {
+   "date": "2020-06-24",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 0.0,
+   "clv": -0.0152
+  },
+  {
+   "date": "2020-06-25",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.18,
+   "profit": 1.18,
+   "clv": null
+  },
+  {
+   "date": "2020-07-01",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": 0.1043
+  },
+  {
+   "date": "2020-07-04",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": 0.0703
+  },
+  {
+   "date": "2020-07-04",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0393
+  },
+  {
+   "date": "2020-07-05",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-06",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-08",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": -0.065
+  },
+  {
+   "date": "2020-07-09",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": 0.0388
+  },
+  {
+   "date": "2020-07-09",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-11",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-15",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0132
+  },
+  {
+   "date": "2020-07-16",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2020-07-16",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-17",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0601
+  },
+  {
+   "date": "2020-07-20",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2020-07-22",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0614
+  },
+  {
+   "date": "2020-07-26",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-07-26",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.0223
+  },
+  {
+   "date": "2020-07-26",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-09-12",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.17,
+   "profit": -1.0,
+   "clv": 0.0397
+  },
+  {
+   "date": "2020-09-14",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-09-20",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-09-26",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": 0.0211
+  },
+  {
+   "date": "2020-10-17",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2020-10-24",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.14,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-10-25",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2020-10-25",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-10-30",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0424
+  },
+  {
+   "date": "2020-10-31",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-11-01",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0095
+  },
+  {
+   "date": "2020-11-01",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.027
+  },
+  {
+   "date": "2020-11-02",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": -0.0184
+  },
+  {
+   "date": "2020-11-06",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2020-11-06",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.018
+  },
+  {
+   "date": "2020-11-07",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 0.56,
+   "clv": null
+  },
+  {
+   "date": "2020-11-08",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": -0.0199
+  },
+  {
+   "date": "2020-11-08",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": -0.0503
+  },
+  {
+   "date": "2020-11-21",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-11-21",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0124
+  },
+  {
+   "date": "2020-11-21",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": 0.0287
+  },
+  {
+   "date": "2020-11-27",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": -0.0246
+  },
+  {
+   "date": "2020-11-28",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.0246
+  },
+  {
+   "date": "2020-11-28",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-11-29",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": -0.0354
+  },
+  {
+   "date": "2020-11-30",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0202
+  },
+  {
+   "date": "2020-12-05",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0539
+  },
+  {
+   "date": "2020-12-05",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-12-06",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": 0.0259
+  },
+  {
+   "date": "2020-12-07",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": null
+  },
+  {
+   "date": "2020-12-12",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-12-13",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": -0.047
+  },
+  {
+   "date": "2020-12-15",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0289
+  },
+  {
+   "date": "2020-12-16",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.15,
+   "profit": 0.0,
+   "clv": -0.0222
+  },
+  {
+   "date": "2020-12-16",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 0.52,
+   "clv": -0.025
+  },
+  {
+   "date": "2020-12-19",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.15,
+   "profit": 1.15,
+   "clv": null
+  },
+  {
+   "date": "2020-12-19",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-12-19",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2020-12-26",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2020-12-27",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 0.54,
+   "clv": 0.0021
+  },
+  {
+   "date": "2020-12-27",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0153
+  },
+  {
+   "date": "2020-12-27",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -0.5,
+   "clv": -0.0185
+  },
+  {
+   "date": "2020-12-28",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2020-12-29",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": -0.0113
+  },
+  {
+   "date": "2020-12-29",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2020-12-30",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2021-01-02",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": -0.0011
+  },
+  {
+   "date": "2021-01-02",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 0.0,
+   "clv": 0.025
+  },
+  {
+   "date": "2021-01-03",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0911
+  },
+  {
+   "date": "2021-01-03",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2021-01-04",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2021-01-12",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.17,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-01-12",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": 1.14,
+   "clv": 0.0533
+  },
+  {
+   "date": "2021-01-16",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-01-16",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.16,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-01-17",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0886
+  },
+  {
+   "date": "2021-01-19",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": -0.0081
+  },
+  {
+   "date": "2021-01-23",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.0246
+  },
+  {
+   "date": "2021-01-26",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-01-26",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2021-01-27",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": -0.0067
+  },
+  {
+   "date": "2021-01-30",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": 0.0389
+  },
+  {
+   "date": "2021-01-31",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0386
+  },
+  {
+   "date": "2021-01-31",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-02-02",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0202
+  },
+  {
+   "date": "2021-02-02",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.0628
+  },
+  {
+   "date": "2021-02-02",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": null
+  },
+  {
+   "date": "2021-02-03",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2021-02-03",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0157
+  },
+  {
+   "date": "2021-02-04",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-02-06",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 0.505,
+   "clv": -0.0107
+  },
+  {
+   "date": "2021-02-06",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2021-02-07",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": 0.069
+  },
+  {
+   "date": "2021-02-07",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 0.53,
+   "clv": 0.03
+  },
+  {
+   "date": "2021-02-07",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": 0.0,
+   "clv": 0.0484
+  },
+  {
+   "date": "2021-02-13",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 0.0,
+   "clv": -0.0208
+  },
+  {
+   "date": "2021-02-13",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2021-02-15",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2021-02-19",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.0109
+  },
+  {
+   "date": "2021-02-20",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-02-20",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-02-21",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-02-23",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.0591
+  },
+  {
+   "date": "2021-02-27",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": null
+  },
+  {
+   "date": "2021-03-03",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-03-04",
+   "lg": "E0",
+   "home": "West Brom",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": 0.56,
+   "clv": null
+  },
+  {
+   "date": "2021-03-06",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0725
+  },
+  {
+   "date": "2021-03-06",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.15,
+   "profit": 1.15,
+   "clv": -0.0472
+  },
+  {
+   "date": "2021-03-06",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-03-07",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": -0.012
+  },
+  {
+   "date": "2021-03-07",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.0645
+  },
+  {
+   "date": "2021-03-13",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": null
+  },
+  {
+   "date": "2021-03-14",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-03-20",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.0594
+  },
+  {
+   "date": "2021-03-21",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2021-04-03",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": 0.0546
+  },
+  {
+   "date": "2021-04-04",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.14,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-04-05",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": 0.0123
+  },
+  {
+   "date": "2021-04-10",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2021-04-11",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0253
+  },
+  {
+   "date": "2021-04-16",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 0.51,
+   "clv": -0.0321
+  },
+  {
+   "date": "2021-04-17",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-04-19",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": null
+  },
+  {
+   "date": "2021-04-20",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": 0.0353
+  },
+  {
+   "date": "2021-04-22",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "West Brom",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2021-04-24",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": null
+  },
+  {
+   "date": "2021-04-25",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-05-01",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": -0.0732
+  },
+  {
+   "date": "2021-05-02",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0003
+  },
+  {
+   "date": "2021-05-02",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": -0.0097
+  },
+  {
+   "date": "2021-05-08",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": -1.0,
+   "clv": -0.0278
+  },
+  {
+   "date": "2021-05-10",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0055
+  },
+  {
+   "date": "2021-05-13",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2021-05-16",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0132
+  },
+  {
+   "date": "2021-05-18",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2021-05-19",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-05-19",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0833
+  },
+  {
+   "date": "2021-05-23",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2021-05-23",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": null
+  },
+  {
+   "date": "2021-08-14",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": 0.1456
+  },
+  {
+   "date": "2021-08-14",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": -0.0303
+  },
+  {
+   "date": "2021-08-14",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": null
+  },
+  {
+   "date": "2021-08-15",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.19,
+   "profit": -1.0,
+   "clv": 0.041
+  },
+  {
+   "date": "2021-08-23",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-08-28",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2021-08-28",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.16,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2021-08-29",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -0.5,
+   "clv": 0.0256
+  },
+  {
+   "date": "2021-09-11",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 0.0,
+   "clv": -0.0486
+  },
+  {
+   "date": "2021-09-17",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": 0.0357
+  },
+  {
+   "date": "2021-09-18",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": 0.0546
+  },
+  {
+   "date": "2021-09-18",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": 0.0863
+  },
+  {
+   "date": "2021-09-25",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": 0.0047
+  },
+  {
+   "date": "2021-09-25",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": null
+  },
+  {
+   "date": "2021-09-26",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2021-10-02",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": 0.0555
+  },
+  {
+   "date": "2021-10-03",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2021-10-03",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -0.5,
+   "clv": 0.0107
+  },
+  {
+   "date": "2021-10-03",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2021-10-03",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": -0.0207
+  },
+  {
+   "date": "2021-10-16",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.505,
+   "clv": -0.0056
+  },
+  {
+   "date": "2021-10-17",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": 0.1178
+  },
+  {
+   "date": "2021-10-18",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2021-10-23",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": 0.0916
+  },
+  {
+   "date": "2021-10-30",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2021-10-30",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.0727
+  },
+  {
+   "date": "2021-10-30",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.0219
+  },
+  {
+   "date": "2021-11-07",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 0.525,
+   "clv": 0.0833
+  },
+  {
+   "date": "2021-11-20",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": -0.0113
+  },
+  {
+   "date": "2021-11-20",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": -0.089
+  },
+  {
+   "date": "2021-11-27",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 0.55,
+   "clv": 0.0201
+  },
+  {
+   "date": "2021-11-28",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2021-11-30",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-11-30",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0589
+  },
+  {
+   "date": "2021-12-01",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-12-02",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.008
+  },
+  {
+   "date": "2021-12-06",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2021-12-11",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": null
+  },
+  {
+   "date": "2021-12-11",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.045
+  },
+  {
+   "date": "2021-12-11",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.0327
+  },
+  {
+   "date": "2021-12-12",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-12-15",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 0.535,
+   "clv": -0.0936
+  },
+  {
+   "date": "2021-12-19",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-12-26",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2021-12-29",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2022-01-01",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.0487
+  },
+  {
+   "date": "2022-01-01",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2022-01-01",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2022-01-11",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": 0.0146
+  },
+  {
+   "date": "2022-01-15",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-01-15",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.14,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2022-01-19",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-01-21",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": -0.012
+  },
+  {
+   "date": "2022-01-22",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": 0.0704
+  },
+  {
+   "date": "2022-01-22",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.17,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-01-23",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": null
+  },
+  {
+   "date": "2022-01-23",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": 0.0021
+  },
+  {
+   "date": "2022-02-08",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": -0.0073
+  },
+  {
+   "date": "2022-02-10",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2022-02-10",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": -0.1036
+  },
+  {
+   "date": "2022-02-12",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": null
+  },
+  {
+   "date": "2022-02-13",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0184
+  },
+  {
+   "date": "2022-02-19",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0153
+  },
+  {
+   "date": "2022-02-19",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2022-02-19",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0786
+  },
+  {
+   "date": "2022-02-23",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": 0.0498
+  },
+  {
+   "date": "2022-02-24",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -0.5,
+   "clv": -0.0047
+  },
+  {
+   "date": "2022-02-26",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.0487
+  },
+  {
+   "date": "2022-02-27",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": 1.14,
+   "clv": 0.0811
+  },
+  {
+   "date": "2022-03-05",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 0.525,
+   "clv": null
+  },
+  {
+   "date": "2022-03-05",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.045
+  },
+  {
+   "date": "2022-03-05",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0094
+  },
+  {
+   "date": "2022-03-05",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2022-03-06",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0002
+  },
+  {
+   "date": "2022-03-12",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-03-13",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 0.0,
+   "clv": -0.0149
+  },
+  {
+   "date": "2022-03-13",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-03-13",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2022-03-13",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-03-17",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": -0.0208
+  },
+  {
+   "date": "2022-03-18",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.03
+  },
+  {
+   "date": "2022-03-19",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": -0.0571
+  },
+  {
+   "date": "2022-04-02",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": 0.0173
+  },
+  {
+   "date": "2022-04-02",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.026
+  },
+  {
+   "date": "2022-04-02",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 0.515,
+   "clv": 0.0549
+  },
+  {
+   "date": "2022-04-02",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": 1.14,
+   "clv": null
+  },
+  {
+   "date": "2022-04-03",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0253
+  },
+  {
+   "date": "2022-04-03",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 0.53,
+   "clv": -0.013
+  },
+  {
+   "date": "2022-04-06",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.18,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-04-09",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": -0.0447
+  },
+  {
+   "date": "2022-04-10",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": null
+  },
+  {
+   "date": "2022-04-10",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": 0.0418
+  },
+  {
+   "date": "2022-04-23",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2022-04-23",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-04-23",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": null
+  },
+  {
+   "date": "2022-04-24",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2022-04-24",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-04-30",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Norwich",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0212
+  },
+  {
+   "date": "2022-05-01",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": 0.0256
+  },
+  {
+   "date": "2022-05-07",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.15,
+   "profit": 1.15,
+   "clv": -0.0166
+  },
+  {
+   "date": "2022-05-07",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": -0.0184
+  },
+  {
+   "date": "2022-05-07",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": -0.0022
+  },
+  {
+   "date": "2022-05-08",
+   "lg": "E0",
+   "home": "Norwich",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0489
+  },
+  {
+   "date": "2022-05-11",
+   "lg": "E0",
+   "home": "Watford",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2022-05-12",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.0436
+  },
+  {
+   "date": "2022-05-15",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2022-05-19",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": -0.0082
+  },
+  {
+   "date": "2022-05-19",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.035
+  },
+  {
+   "date": "2022-05-22",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Watford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": 0.0466
+  },
+  {
+   "date": "2022-05-22",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": null
+  },
+  {
+   "date": "2022-05-22",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-05-22",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.14,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2022-08-05",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": -0.0273
+  },
+  {
+   "date": "2022-08-06",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0486
+  },
+  {
+   "date": "2022-08-13",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-08-13",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -0.5,
+   "clv": -0.0294
+  },
+  {
+   "date": "2022-08-27",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": -0.0097
+  },
+  {
+   "date": "2022-08-27",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.1209
+  },
+  {
+   "date": "2022-08-30",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": -0.024
+  },
+  {
+   "date": "2022-09-03",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2022-09-04",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": 0.0341
+  },
+  {
+   "date": "2022-09-17",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": 0.05
+  },
+  {
+   "date": "2022-09-18",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.19,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-01",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0498
+  },
+  {
+   "date": "2022-10-01",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0469
+  },
+  {
+   "date": "2022-10-08",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.0153
+  },
+  {
+   "date": "2022-10-08",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Leicester",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-09",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2022-10-16",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0119
+  },
+  {
+   "date": "2022-10-16",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-16",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2022-10-16",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": -0.041
+  },
+  {
+   "date": "2022-10-20",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0226
+  },
+  {
+   "date": "2022-10-22",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-22",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-23",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": -0.0447
+  },
+  {
+   "date": "2022-10-23",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-23",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-10-24",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0424
+  },
+  {
+   "date": "2022-10-29",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": 0.0064
+  },
+  {
+   "date": "2022-10-29",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-11-06",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-11-06",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0364
+  },
+  {
+   "date": "2022-11-12",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": 0.0,
+   "clv": 0.0125
+  },
+  {
+   "date": "2022-11-12",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": 0.0338
+  },
+  {
+   "date": "2022-11-12",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": -0.0185
+  },
+  {
+   "date": "2022-11-13",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": -0.0398
+  },
+  {
+   "date": "2022-12-26",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0232
+  },
+  {
+   "date": "2022-12-26",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-12-26",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2022-12-26",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": 0.0309
+  },
+  {
+   "date": "2022-12-31",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-01-03",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.0162
+  },
+  {
+   "date": "2023-01-04",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-01-05",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -0.5,
+   "clv": -0.0025
+  },
+  {
+   "date": "2023-01-15",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-01-15",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2023-01-15",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": -0.0132
+  },
+  {
+   "date": "2023-01-21",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": 0.1125
+  },
+  {
+   "date": "2023-01-21",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": 0.0704
+  },
+  {
+   "date": "2023-01-21",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2023-01-21",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0446
+  },
+  {
+   "date": "2023-02-03",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": 0.0158
+  },
+  {
+   "date": "2023-02-04",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": 0.0069
+  },
+  {
+   "date": "2023-02-11",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.19,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-02-15",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": 0.0705
+  },
+  {
+   "date": "2023-02-18",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2023-02-18",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2023-02-18",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": null
+  },
+  {
+   "date": "2023-02-18",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": -0.0339
+  },
+  {
+   "date": "2023-02-25",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-02-25",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0436
+  },
+  {
+   "date": "2023-02-25",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.14,
+   "profit": 1.14,
+   "clv": -0.0268
+  },
+  {
+   "date": "2023-03-04",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": 0.0298
+  },
+  {
+   "date": "2023-03-05",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 0.0,
+   "clv": 0.107
+  },
+  {
+   "date": "2023-03-05",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2023-03-11",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": -0.048
+  },
+  {
+   "date": "2023-03-12",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -0.5,
+   "clv": -0.0574
+  },
+  {
+   "date": "2023-03-15",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": 0.0155
+  },
+  {
+   "date": "2023-03-17",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -0.5,
+   "clv": 0.0384
+  },
+  {
+   "date": "2023-03-19",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.0259
+  },
+  {
+   "date": "2023-04-01",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2023-04-01",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": -0.03
+  },
+  {
+   "date": "2023-04-01",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-01",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": null
+  },
+  {
+   "date": "2023-04-01",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-02",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0157
+  },
+  {
+   "date": "2023-04-05",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-04-05",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.03
+  },
+  {
+   "date": "2023-04-08",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": 0.0754
+  },
+  {
+   "date": "2023-04-08",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-09",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": null
+  },
+  {
+   "date": "2023-04-15",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0098
+  },
+  {
+   "date": "2023-04-15",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": 0.0902
+  },
+  {
+   "date": "2023-04-15",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-22",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Leeds",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": -0.0037
+  },
+  {
+   "date": "2023-04-22",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": -0.0207
+  },
+  {
+   "date": "2023-04-23",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": 0.0238
+  },
+  {
+   "date": "2023-04-27",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-27",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2023-04-30",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 0.0,
+   "clv": -0.0246
+  },
+  {
+   "date": "2023-05-01",
+   "lg": "E0",
+   "home": "Leicester",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0256
+  },
+  {
+   "date": "2023-05-04",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": null
+  },
+  {
+   "date": "2023-05-07",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": null
+  },
+  {
+   "date": "2023-05-08",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Southampton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-05-13",
+   "lg": "E0",
+   "home": "Southampton",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.0188
+  },
+  {
+   "date": "2023-05-14",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0624
+  },
+  {
+   "date": "2023-05-20",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2023-05-20",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": -0.0178
+  },
+  {
+   "date": "2023-05-24",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-05-28",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2023-05-28",
+   "lg": "E0",
+   "home": "Leeds",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0377
+  },
+  {
+   "date": "2023-05-28",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2023-08-12",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": -0.0056
+  },
+  {
+   "date": "2023-08-13",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -0.5,
+   "clv": 0.0589
+  },
+  {
+   "date": "2023-08-13",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": 0.052
+  },
+  {
+   "date": "2023-08-19",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": 0.0757
+  },
+  {
+   "date": "2023-08-26",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0517
+  },
+  {
+   "date": "2023-08-26",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2023-08-26",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0863
+  },
+  {
+   "date": "2023-08-27",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.0205
+  },
+  {
+   "date": "2023-09-02",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.0162
+  },
+  {
+   "date": "2023-09-02",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": null
+  },
+  {
+   "date": "2023-09-03",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0014
+  },
+  {
+   "date": "2023-09-16",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 0.0,
+   "clv": 0.0839
+  },
+  {
+   "date": "2023-09-17",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": 0.0256
+  },
+  {
+   "date": "2023-09-23",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-09-23",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-09-24",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": null
+  },
+  {
+   "date": "2023-10-03",
+   "lg": "E0",
+   "home": "Luton",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": -0.0179
+  },
+  {
+   "date": "2023-10-07",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 1.12,
+   "clv": 0.1234
+  },
+  {
+   "date": "2023-10-07",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-10-08",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Man City",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": -0.047
+  },
+  {
+   "date": "2023-10-21",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -1.0,
+   "clv": 0.0385
+  },
+  {
+   "date": "2023-10-28",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": null
+  },
+  {
+   "date": "2023-10-28",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0292
+  },
+  {
+   "date": "2023-10-28",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-11-04",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": 0.0015
+  },
+  {
+   "date": "2023-11-05",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.005
+  },
+  {
+   "date": "2023-11-11",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-11-12",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-11-26",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-11-27",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": -0.0081
+  },
+  {
+   "date": "2023-12-02",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0396
+  },
+  {
+   "date": "2023-12-02",
+   "lg": "E0",
+   "home": "Brentford",
+   "away": "Luton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": null
+  },
+  {
+   "date": "2023-12-02",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": -0.0087
+  },
+  {
+   "date": "2023-12-05",
+   "lg": "E0",
+   "home": "Luton",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.057
+  },
+  {
+   "date": "2023-12-06",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": -0.0215
+  },
+  {
+   "date": "2023-12-07",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": -0.0034
+  },
+  {
+   "date": "2023-12-07",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": 0.0727
+  },
+  {
+   "date": "2023-12-09",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": 0.0055
+  },
+  {
+   "date": "2023-12-09",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": null
+  },
+  {
+   "date": "2023-12-09",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0232
+  },
+  {
+   "date": "2023-12-09",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 0.0,
+   "clv": -0.0393
+  },
+  {
+   "date": "2023-12-10",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2023-12-16",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": 0.04
+  },
+  {
+   "date": "2023-12-17",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0178
+  },
+  {
+   "date": "2023-12-23",
+   "lg": "E0",
+   "home": "Liverpool",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2023-12-23",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.515,
+   "clv": 0.052
+  },
+  {
+   "date": "2023-12-30",
+   "lg": "E0",
+   "home": "Luton",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 0.0,
+   "clv": 0.025
+  },
+  {
+   "date": "2024-01-02",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2024-01-12",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Luton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-01-13",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": 0.0,
+   "clv": -0.0256
+  },
+  {
+   "date": "2024-01-22",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-01-30",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 0.52,
+   "clv": null
+  },
+  {
+   "date": "2024-01-30",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": -0.0256
+  },
+  {
+   "date": "2024-01-30",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.11,
+   "profit": -0.5,
+   "clv": 0.0825
+  },
+  {
+   "date": "2024-01-31",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -0.5,
+   "clv": null
+  },
+  {
+   "date": "2024-02-01",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.14,
+   "profit": -0.5,
+   "clv": -0.038
+  },
+  {
+   "date": "2024-02-03",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 1.1,
+   "clv": -0.0261
+  },
+  {
+   "date": "2024-02-04",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": 0.0834
+  },
+  {
+   "date": "2024-02-04",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-02-10",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 1.05,
+   "clv": 0.0303
+  },
+  {
+   "date": "2024-02-10",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.13,
+   "profit": 1.13,
+   "clv": null
+  },
+  {
+   "date": "2024-02-10",
+   "lg": "E0",
+   "home": "Luton",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": 0.0359
+  },
+  {
+   "date": "2024-02-12",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-02-18",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2024-02-20",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.11,
+   "profit": 1.11,
+   "clv": 0.0191
+  },
+  {
+   "date": "2024-02-24",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": 0.0041
+  },
+  {
+   "date": "2024-03-02",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 0.0,
+   "clv": 0.0387
+  },
+  {
+   "date": "2024-03-04",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.08,
+   "profit": -1.0,
+   "clv": 0.0619
+  },
+  {
+   "date": "2024-03-09",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Brentford",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": null
+  },
+  {
+   "date": "2024-03-10",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": 0.525,
+   "clv": 0.1164
+  },
+  {
+   "date": "2024-03-30",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": 0.0936
+  },
+  {
+   "date": "2024-03-30",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": 0.52,
+   "clv": -0.0532
+  },
+  {
+   "date": "2024-04-02",
+   "lg": "E0",
+   "home": "Nott'm Forest",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": 1.02,
+   "clv": -0.0031
+  },
+  {
+   "date": "2024-04-02",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.04,
+   "profit": -1.0,
+   "clv": -0.0168
+  },
+  {
+   "date": "2024-04-03",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-04-07",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Nott'm Forest",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": -0.0072
+  },
+  {
+   "date": "2024-04-07",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Chelsea",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": 0.015
+  },
+  {
+   "date": "2024-04-13",
+   "lg": "E0",
+   "home": "Burnley",
+   "away": "Brighton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.0649
+  },
+  {
+   "date": "2024-04-13",
+   "lg": "E0",
+   "home": "Bournemouth",
+   "away": "Man United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.1,
+   "profit": 0.0,
+   "clv": null
+  },
+  {
+   "date": "2024-04-14",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Fulham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.1,
+   "profit": -1.0,
+   "clv": -0.0363
+  },
+  {
+   "date": "2024-04-20",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.05,
+   "profit": -1.0,
+   "clv": 0.033
+  },
+  {
+   "date": "2024-04-20",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Arsenal",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-04-24",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Bournemouth",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-04-27",
+   "lg": "E0",
+   "home": "Fulham",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.05,
+   "profit": 0.525,
+   "clv": -0.0555
+  },
+  {
+   "date": "2024-04-27",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.15,
+   "profit": 1.15,
+   "clv": 0.0214
+  },
+  {
+   "date": "2024-04-27",
+   "lg": "E0",
+   "home": "Newcastle",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.07,
+   "profit": 1.07,
+   "clv": 0.016
+  },
+  {
+   "date": "2024-05-04",
+   "lg": "E0",
+   "home": "Man City",
+   "away": "Wolves",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.03,
+   "profit": -1.0,
+   "clv": -0.022
+  },
+  {
+   "date": "2024-05-05",
+   "lg": "E0",
+   "home": "Chelsea",
+   "away": "West Ham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.09,
+   "profit": 1.09,
+   "clv": null
+  },
+  {
+   "date": "2024-05-05",
+   "lg": "E0",
+   "home": "Brighton",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.06,
+   "profit": 1.06,
+   "clv": 0.1187
+  },
+  {
+   "date": "2024-05-11",
+   "lg": "E0",
+   "home": "West Ham",
+   "away": "Luton",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.03,
+   "profit": 1.03,
+   "clv": null
+  },
+  {
+   "date": "2024-05-11",
+   "lg": "E0",
+   "home": "Wolves",
+   "away": "Crystal Palace",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.12,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-05-11",
+   "lg": "E0",
+   "home": "Tottenham",
+   "away": "Burnley",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 1.04,
+   "clv": -0.0664
+  },
+  {
+   "date": "2024-05-11",
+   "lg": "E0",
+   "home": "Everton",
+   "away": "Sheffield United",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.04,
+   "profit": 0.52,
+   "clv": 0.0094
+  },
+  {
+   "date": "2024-05-13",
+   "lg": "E0",
+   "home": "Aston Villa",
+   "away": "Liverpool",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.01,
+   "profit": 1.01,
+   "clv": 0.0309
+  },
+  {
+   "date": "2024-05-15",
+   "lg": "E0",
+   "home": "Man United",
+   "away": "Newcastle",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.09,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-05-19",
+   "lg": "E0",
+   "home": "Crystal Palace",
+   "away": "Aston Villa",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.06,
+   "profit": -1.0,
+   "clv": null
+  },
+  {
+   "date": "2024-05-19",
+   "lg": "E0",
+   "home": "Sheffield United",
+   "away": "Tottenham",
+   "market": "ah",
+   "side": "ah_home",
+   "odds": 2.02,
+   "profit": -1.0,
+   "clv": -0.0346
+  },
+  {
+   "date": "2024-05-19",
+   "lg": "E0",
+   "home": "Arsenal",
+   "away": "Everton",
+   "market": "ah",
+   "side": "ah_away",
+   "odds": 2.08,
+   "profit": 1.08,
+   "clv": 0.0754
+  }
+ ],
+ "notes": [
+  "Every number is from 2019/20 to 2023/24 (seasons where Pinnacle's early and closing prices both cover 90% of matches). 2024/25 onward was never read.",
+  "CLV is the entry price against Pinnacle's margin-free close; ROI is per $1. Ranges resample matches (2,000 draws).",
+  "Line-movement rules are decided at the close, so they have no CLV and are judged on ROI only; none can be a finalist.",
+  "The curve is the best rule by CLV: it beat the close but still lost or barely broke even, and the search's luck check says rules like it turn up by chance.",
+  "Cashing out (the exits) was tested separately on the comeback sample: a fair cash-out never changes the average return, and a real one costs money."
+ ]
+}

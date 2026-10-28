@@ -811,11 +811,23 @@ def pair_odds(fixtures: list[dict], odds_events: list[dict] | None) -> tuple[dic
         if p["swapped"]:
             oh, oa = oa, oh
         pr = q["outcomes"]
+        from soccer_stats.odds_feed import BOOKMAKERS
+
+        books = {}
+        for key, bq in cup_odds.h2h_prices(o, BOOKMAKERS).items():
+            bo = bq["outcomes"]
+            books[key] = {
+                "home": bo[oh],
+                "draw": bo["Draw"],
+                "away": bo[oa],
+                "last_update": bq.get("last_update"),
+            }
         out[str(p["espn"]["id"])] = {
             "odds_home": pr[oh],
             "odds_draw": pr["Draw"],
             "odds_away": pr[oa],
             "odds_updated": q.get("last_update"),
+            "books": books or None,
         }
     used = {id(p["odds"]) for p in pairs}
     horizon = max((cups._ts(f["kickoff"]) for f in fixtures), default=None)
