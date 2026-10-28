@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v66";
+const APP_VERSION = "v67";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2289,12 +2289,40 @@ function btSourceView(key, lg) {
   const files = BT_SOURCES.map(([k, label]) => ({ k, label, bt: btFile(key, k) })).filter((x) => x.bt?.available);
   const cover = files.length ? `<p class="note bt-cover">${files.map((x) => `${esc(x.label)}: ${esc(btCoverage(x.bt))}.`).join(" ")}${lg && all.length < files.length ? ` ${esc(leagueName(lg))} is only in the replay ${esc(all.map((x) => x.label.replace(/^At/, "at")).join(" and ") || "at neither")}.` : ""}</p>` : "";
   const parts = files.map((x) => ({ ...x, m: (lg ? x.bt.leagues?.[lg] : x.bt.all)?.[key] })).filter((x) => x.m?.bets != null);
-  const both = parts.length > 1 ? `
+  // In one competition the DraftKings file carries the same rule on the same matches at
+  // Pinnacle's early price (pinnacle_same_matches): the like-for-like comparison.
+  const dkPart = lg ? btFile(key, "dk")?.leagues?.[lg] : null;
+  const same = dkPart?.[key]?.bets != null ? dkPart.pinnacle_same_matches?.[key] : null;
+  const both = same ? `
+    <div class="section-title">The same rule at both books · ${esc(leagueName(lg))}</div>
+    ${lbCompare([["DraftKings", dkPart[key]], ["Pinnacle, same matches", same]])}
+    <p class="note">Like for like: the same rule on the same ${isNum(dkPart.pinnacle_same_matches.candidates) ? `${num(dkPart.pinnacle_same_matches.candidates)} ` : ""}matches, priced 48 hours before kickoff at DraftKings and early at Pinnacle; CLV is against Pinnacle's close in both. The gap is what DraftKings' prices cost (or gave).</p>`
+    : parts.length > 1 ? `
     <div class="section-title">The same rule at both books${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>
     ${lbCompare(parts.map((x) => [x.k === "dk" ? "DraftKings" : "Pinnacle", x.m]))}
-    <p class="note">CLV is against Pinnacle's close in both. The two cover different seasons, so read the gap as the price difference plus some luck, not a like-for-like cut.</p>` : "";
+    <p class="note">CLV is against Pinnacle's close in both. The two cover different seasons and leagues, so read the gap as the price difference plus some luck, not a like-for-like cut${lg ? "" : "; choose a competition for the same matches at both books"}.</p>` : "";
   const covNote = files.map((x) => x.bt.coverage_note).filter(Boolean)[0];
   return `${sw}${cover}${covNote ? `<details class="fold mk-fold"><summary>How coverage is counted</summary><p class="note">${esc(covNote)}</p></details>` : ""}${both}${strategyBacktestHtml(on.bt, lg, key)}`;
+}
+// The DraftKings files' pre-registered test (docs/leagues.md "Backtests at DraftKings' prices:
+// method"): pooled CLV against Pinnacle's close in the same snapshot, its whole 95% range above
+// 0 to pass. Lean is judged on its live rule (the odds range) and, beside it, every price.
+function dkTestHtml(bt, key) {
+  const v = bt.verdict;
+  if (!v) return "";
+  const rows = key === "lean"
+    ? [[`The live rule, ${v.live_rule?.odds_range ? rangeWords(v.live_rule.odds_range) : "its odds range"}`, v.live_rule], ["Every price (the old rule)", v.all_odds]]
+    : [[BT_NAME[key], v]];
+  const shown = rows.filter(([, r]) => r && isNum(r.clv));
+  if (!shown.length) return "";
+  const pass = shown.some(([, r]) => r.passes);
+  const line = ([label, r]) => `<li><b>${esc(label)}</b>: ${r.passes ? "passes" : "fails"}, CLV ${signedPct(r.clv)}${r.clv_ci95 ? ` (range ${ciText(r.clv_ci95)})` : ""} on ${num(r.bets)} bets</li>`;
+  return `<div class="explain dk-test"><b>Pre-registered test: ${pass ? "passes" : "fails"}.</b> It passes only if the pooled closing line value against Pinnacle's close, in the same snapshot, has its whole 95% range above 0.<ul class="dk-test-rows">${shown.map(line).join("")}</ul>${bt.method ? `<span class="muted">Method written before the run: ${esc(bt.method)}.</span>` : ""}</div>`;
+}
+// CLV against DraftKings' own close: descriptive beside the judged one.
+function dkCloseLine(c) {
+  if (!c || !isNum(c.clv)) return "";
+  return `<p class="note dk-close">Against DraftKings' own close (descriptive): CLV ${signedPct(c.clv)}${c.clv_ci95 ? ` (range ${ciText(c.clv_ci95)})` : ""} on ${num(c.bets)} bets${c.pinnacle_close_missing ? `, ${num(c.pinnacle_close_missing)} of them without Pinnacle's close in the snapshot` : ""}. The judged CLV is against Pinnacle's.</p>`;
 }
 function btVerdict(bt, key = "lean") {
   const a = bt.all?.[key] || {};
@@ -2411,12 +2439,13 @@ function strategyBacktestHtml(bt, lg = "", key = "lean", opts = {}) {
     return `${head}<div class="explain">${esc(part.note || `No ${name} bets in this backtest.`)}</div>${lbLeagueDetails(part)}`;
   }
   const verdict = close ? closeVerdict(part, key) : lg ? leagueVerdict(part, key, lg, bt) : btVerdict(bt, key);
-  const top = `
+  let top = `
     <div class="verdict ${m.roi_ci95?.[0] > 0 ? "" : m.roi < 0 || m.clv < 0 ? "neg" : "mid"}">${esc(verdict)}</div>
     ${head}
     ${lbTiles(m)}
     ${close ? `<p class="note">${esc(part.note || "")}</p>` : ""}`;
   const bands = `${sizingHtml(`bz-${key}-${lg || "all"}`, part.sizing)}${backtestBandsHtml(bt, part, key, lg)}`;
+  if (isDkBt(bt, part) && !close) top += `${lg ? "" : dkTestHtml(bt, key)}${dkCloseLine(part.clv_dk)}`;
   if (opts.brief) return `${top}${bands}${lbSeasons(part.by_season, key)}${lg ? lbLeagueDetails(part) : ""}`;
   const by = m.by_driver || {};
   const dnote = bt.rule?.driver_note || driverNote();
@@ -2590,12 +2619,13 @@ function backtestBandsHtml(bt, part, key, lg) {
 }
 const num = (v) => (isNum(v) ? v.toLocaleString() : "–");
 function lbLeagueDetails(l) {
-  const close = isClose(l);
+  const close = isClose(l), dk = l?.kind === "draftkings";
   const cov = (l.coverage || []).map((c) => close
     ? `<tr><td>${esc(c.label || seasonName(c.season))}</td><td>${num(c.matches)}</td><td>${num(c.model)}</td><td>${num(c.draftkings)}</td><td>${num(c.pinnacle)}</td><td>${num(c.candidates)}</td></tr>`
     : `<tr><td>${esc(c.label || seasonName(c.season))}</td><td>${num(c.matches)}</td><td>${isNum(c.early_share) ? pct(c.early_share) : "–"}</td><td>${isNum(c.close_share) ? pct(c.close_share) : "–"}</td><td>${c.included ? "Yes" : "No"}</td></tr>`).join("");
   const head = close
     ? "<th></th><th>Played</th><th>Model</th><th>DK</th><th>PIN</th><th>Bet on</th>"
+    : dk ? "<th></th><th>Matches</th><th>DK 48 h</th><th>PIN close</th><th>Used</th>"
     : "<th></th><th>Matches</th><th>Early</th><th>Close</th><th>Used</th>";
   const bits = [
     isNum(l.training_matches) && l.training_matches ? `${l.training_matches.toLocaleString()} matches to fit on` : "",
@@ -2604,9 +2634,10 @@ function lbLeagueDetails(l) {
     isNum(l.scored) ? `${l.scored.toLocaleString()} match${l.scored === 1 ? "" : "es"} after a fit` : "",
     l.sigma ? (l.sigma.min === l.sigma.max ? `σ ${ptsText(l.sigma.min)}` : `σ ${ptsText(l.sigma.min)} to ${ptsText(l.sigma.max)}`) : "",
     isNum(l.candidates) ? `${l.candidates.toLocaleString()} bettable matches` : "",
-    l.seasons_excluded?.length ? `left out (${close ? "no bettable matches" : "too few Pinnacle prices"}): ${esc(l.seasons_excluded.join(", "))}` : "",
+    l.seasons_excluded?.length ? `left out (${close ? "no bettable matches" : dk ? "too few DraftKings prices" : "too few Pinnacle prices"}): ${esc(l.seasons_excluded.join(", "))}` : "",
   ].filter(Boolean);
-  const what = close ? "Played = finished with a 90-minute score; Model = clubs the model covers (not low-data); DK and PIN = with DraftKings' or Pinnacle's full close; Bet on = model and DraftKings' close both." : "";
+  const what = close ? "Played = finished with a 90-minute score; Model = clubs the model covers (not low-data); DK and PIN = with DraftKings' or Pinnacle's full close; Bet on = model and DraftKings' close both."
+    : dk ? "DK 48 h = DraftKings priced the match 48 hours before kickoff (only those are bet); PIN close = Pinnacle's close was in the same snapshot (the judged CLV needs it)." : "";
   return `<details class="fold mk-fold"><summary>Seasons and fits</summary>
     ${bits.length ? `<p class="note">${bits.join(", ").replace(/^./, (c) => c.toUpperCase())}.</p>` : ""}
     ${cov ? `<div class="card" style="padding:8px 14px"><table class="mkts mk-table"><thead><tr>${head}</tr></thead><tbody>${cov}</tbody></table></div>` : ""}

@@ -67,6 +67,8 @@ DATA_LOG_FILES = [
     "backtest/E0_players_detail.json",
     "backtest/lean_backtest.json",
     "backtest/edge12_backtest.json",
+    "backtest/lean_backtest_dk.json",
+    "backtest/edge12_backtest_dk.json",
     "backtest/match_blends.json",
 ]
 TEAMS = [
@@ -380,14 +382,15 @@ def build(src: Path, out: Path) -> dict:
         extra = [r for r in eb["bets"][EDGE12_BETS:] if r[li] not in seen and not seen.add(r[li])]
         eb["bets"] = newest + extra
         eb["bets_shown"] = len(eb["bets"])
-    # Each league's bankroll curves (flat and Kelly) at every second point, the last kept,
+    # Each league's bankroll curves (flat and Kelly) at every third point, the last kept,
     # for room under 1.5 MB; the app draws whatever points come.
+    # (All's curves too since the real DraftKings files joined, 28 Oct.)
     for f in (sb.get("lean") or {}, sb.get("edge12") or {}):
-        for part in (f.get("leagues") or {}).values():
+        for part in [f.get("all"), *(f.get("leagues") or {}).values()]:
             for block in ((part or {}).get("sizing") or {}).values():
                 c = block.get("curve") if isinstance(block, dict) else None
                 if isinstance(c, list) and len(c) > 20:
-                    block["curve"] = c[::2] + ([c[-1]] if len(c) % 2 == 0 else [])
+                    block["curve"] = c[::3] + ([c[-1]] if (len(c) - 1) % 3 else [])
     add_draftkings_backtests(sb)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
@@ -1118,9 +1121,10 @@ def _passed_study():
 
 
 # The same replays at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
-# strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape) until
-# the real files land: made up from the Pinnacle replay's own numbers (ROI 2 points and CLV 1
-# point worse, 2020/21 to 2024/25), the Premier League and All only, to stay under 1.5 MB.
+# strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape): the
+# real files from data-log when they are there (trimmed), else made up from the Pinnacle
+# replay's own numbers (ROI 2 points and CLV 1 point worse, 2020/21 to 2024/25), the Premier
+# League and All only, to stay under 1.5 MB.
 DK_SEASONS = ["2020/21", "2021/22", "2022/23", "2023/24", "2024/25"]
 
 
@@ -1144,8 +1148,34 @@ def _dk_part(p: dict, metric: tuple, name: str | None = None) -> dict:
     return out | ({"name": name} if name else {})
 
 
+DK_BETS = 20  # real DraftKings-price backtest rows kept
+
+
+def _trim_dk(f: dict) -> None:
+    """The real file, smaller: its newest DK_BETS bets, no calibration (the Model view reads
+    the Pinnacle files'), bankroll curves only under All and the Premier League, each at
+    every eighth point."""
+    if f.get("bets"):
+        f["bets"] = f["bets"][:DK_BETS]
+        f["bets_shown"] = len(f["bets"])
+    for code, part in [("", f.get("all")), *(f.get("leagues") or {}).items()]:
+        if not isinstance(part, dict):
+            continue
+        part.pop("calibration", None)
+        if code not in ("", "E0"):
+            part.pop("sizing", None)
+        (part.get("pinnacle_same_matches") or {}).pop("by_season", None)
+        for block in (part.get("sizing") or {}).values():
+            c = block.get("curve") if isinstance(block, dict) else None
+            if isinstance(c, list) and len(c) > 20:
+                block["curve"] = c[::8] + ([c[-1]] if (len(c) - 1) % 8 else [])
+
+
 def add_draftkings_backtests(sb: dict) -> None:
     for key, metric in (("lean", ("lean", "strong")), ("edge12", ("edge12",))):
+        if (sb.get(f"{key}_dk") or {}).get("available"):  # Moneyline's real file (28 Oct)
+            _trim_dk(sb[f"{key}_dk"])
+            continue
         src = sb.get(key) or {}
         if not src.get("available"):
             continue
