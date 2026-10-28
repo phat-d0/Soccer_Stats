@@ -130,7 +130,7 @@ def test_paper_run_keeps_shadows_out_of_the_real_record_and_settles_them(tmp_pat
     assert written == 3  # the 12% trade, the shadow entry and the 12% draw no bet one
     live = ml["live"]
     assert [t["id"] for t in live["trades"]] == ["E0|2627|Arsenal|Leeds"]
-    assert live["summary"]["trades"] == 1 and data["portfolio"]["live"]["summary"]["trades"] == 1
+    assert live["summary"]["trades"] == 1 and "live" not in data["portfolio"]
     assert [t["id"] for t in live["shadow_trades"]] == [SHADOW_ID]
     sts = {s["key"]: s for s in live["strategies"]}
     assert [s["key"] for s in live["strategies"]] == [

@@ -120,14 +120,18 @@ def test_only_fresh_draftkings_odds_open_trades(tmp_path):
     assert ev == []  # already kicked off
 
 
+def moneyline(data):
+    return next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")["live"]
+
+
 def test_run_fails_safe_and_fills_portfolio(tmp_path):
     data = {"fixtures": [card()], "odds_source": src(), "portfolio": {}}
     assert paper.run(data, tmp_path / "missing", None, now=NOW) == 0
-    assert "unavailable" in data["portfolio"]["live"]["error"]
+    assert "unavailable" in moneyline(data)["error"]
     (tmp_path / "paper_trades").mkdir()
     (tmp_path / "paper_trades" / "E0_2627.jsonl").write_text("{not json\n")
     assert paper.run(data, tmp_path, None, now=NOW) == 0
-    assert "couldn't be read" in data["portfolio"]["live"]["error"]
+    assert "couldn't be read" in moneyline(data)["error"]
 
     good = tmp_path / "good"
     good.mkdir()
@@ -135,9 +139,11 @@ def test_run_fails_safe_and_fills_portfolio(tmp_path):
     (good / "backtest" / "E0_dk.json").write_text(json.dumps({"summary": {"trades": 3}}))
     # The 12% trade, plus its draw no bet track's (own ledger, out of the record).
     assert paper.run(data, good, None, now=NOW) == 2
-    live = data["portfolio"]["live"]
+    live = moneyline(data)
     assert live["error"] is None and live["summary"]["open"] == 1
-    assert data["portfolio"]["backtest"]["summary"]["trades"] == 3
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    assert ml["backtest"]["summary"]["trades"] == 3
+    assert "live" not in data["portfolio"] and "backtest" not in data["portfolio"]
 
 
 # ---------- the live threshold: the minimum edge learned from history ----------

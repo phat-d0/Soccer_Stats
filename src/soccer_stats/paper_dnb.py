@@ -26,6 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from soccer_stats import backcast as bc
 from soccer_stats import odds_log as ol
 from soccer_stats import trades as tr
 
@@ -226,6 +227,78 @@ def new_trade(c, pick, track, rule, kickoff, now, fetched, league, ref) -> dict:
     return t
 
 
+def _open(ledger, c, now, fetched, league, rules, ref, mark=None) -> list[dict]:
+    """Open every track's trade on one card (kickoff ahead, not low_data, priced), once
+    per match and track; `mark(t, track, rule)` tags a backcast entry. Returns events."""
+    kickoff = pd.Timestamp(c["kickoff"])
+    if kickoff <= now or c.get("low_data"):
+        return []
+    prices = tr.dnb_prices(c.get("odds"))
+    if prices is None:
+        return []
+    events = []
+    for track, rule in rules.items():
+        pick = _pick(c, track, rule, prices)
+        if not pick:
+            continue
+        t = new_trade(c, pick, track, rule, kickoff, now, fetched, league, ref)
+        if tr.holds(ledger, t["id"]):
+            continue
+        group = {m: c["odds"].get(m) for m in tr.LEAN_MARKETS}
+        quoted = c.get("odds_updated") or fetched
+        t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
+        if mark is not None:
+            mark(t, track, rule)
+        ledger[t["id"]] = t
+        events.append({"type": "open", **t})
+    return events
+
+
+SIGMA_FROM = "26 Oct refit"  # sigma_dnb first appears in the 26 Oct match_blends refit
+
+
+def sigma_from(rule: dict) -> str:
+    """Which refit a backcast Lean DNB trade's sigma comes from ("26 Oct refit"): the
+    fit's date when the rule carries it."""
+    made = rule.get("fit_made_at")
+    try:
+        return f"{pd.Timestamp(made):%-d %b} refit" if made else SIGMA_FROM
+    except (TypeError, ValueError):
+        return SIGMA_FROM
+
+
+def backcast(
+    ledger: dict[str, dict],
+    odds_log: pd.DataFrame | None,
+    league: str,
+    rules: dict[str, dict],
+    ref: dict | None = None,
+    until: str = tr.DNB_FROM,
+    start: str = bc.START,
+) -> list[dict]:
+    """The tracks replayed from bc.START up to `until` (their defined_at) on the odds log
+    (owner, 28 Oct): each logged DraftKings h2h row is the card a publish saw at its
+    `logged_at`, with the live gates (odds downloaded at most paper.FRESH_HOURS before,
+    kickoff ahead, priced) and the live rules: Model 12% on the logged raw `p`, Lean on the
+    logged `p_bet` at today's sigma_dnb (it didn't exist before its refit: flagged
+    `sigma_from`) with the odds range on the DNB price. Entries are marked backcast (never
+    judged); a match already holding a track's trade is left alone. Mutates `ledger`;
+    returns the open events. Closes and settlement are update_ledger's, as live."""
+    from soccer_stats import paper
+
+    def tag(t, track, rule):
+        bc.mark(t, **({"sigma_from": sigma_from(rule)} if track == "lean_dnb" else {}))
+
+    events: list[dict] = []
+    fresh = pd.Timedelta(hours=paper.FRESH_HOURS)
+    for now, c, downloaded in bc.observations(odds_log, until, start):
+        if downloaded is None or now - downloaded > fresh:
+            continue
+        fetched = downloaded.isoformat(timespec="seconds")
+        events += _open(ledger, c, now, fetched, league, rules, ref, mark=tag)
+    return events
+
+
 def update_ledger(
     ledger: dict[str, dict],
     fixtures: list[dict],
@@ -261,24 +334,7 @@ def update_ledger(
     # 1. Open: one trade per match and track.
     if fresh:
         for c in cards.values():
-            kickoff = pd.Timestamp(c["kickoff"])
-            if kickoff <= now or c.get("low_data"):
-                continue
-            prices = tr.dnb_prices(c.get("odds"))
-            if prices is None:
-                continue
-            for track, rule in rules.items():
-                pick = _pick(c, track, rule, prices)
-                if not pick:
-                    continue
-                t = new_trade(c, pick, track, rule, kickoff, now, fetched, league, ref)
-                if t["id"] in ledger:
-                    continue
-                group = {m: c["odds"].get(m) for m in tr.LEAN_MARKETS}
-                quoted = c.get("odds_updated") or fetched
-                t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
-                ledger[t["id"]] = t
-                events.append({"type": "open", **t})
+            events += _open(ledger, c, now, fetched, league, rules, ref)
 
     # 2a. The close from the odds log.
     if odds_log is not None:
@@ -385,7 +441,8 @@ def section(
     trades, plus variant_of (the parent), adds "dnb", filter None, defined_at
     (tr.DNB_FROM), note, `dnb_trades` (count) and `compare`: the track's and the parent's
     trades opened since defined_at, their summaries and CLV per $ against DraftKings' and
-    Pinnacle's close (descriptive; no since_defined: a DNB track isn't a cut of its parent)."""
+    Pinnacle's close (descriptive; no since_defined: a DNB track isn't a cut of its parent),
+    and `backcast` (backcast.block: the trades replayed from 14 Oct before defined_at)."""
     from soccer_stats import paper
 
     sec = paper.strategy_section(
@@ -401,6 +458,12 @@ def section(
         defined_at=tr.DNB_FROM,
         note=rule["note"],
         dnb_trades=len(trades),
+        backcast=bc.block(
+            trades,
+            tr.DNB_FROM,
+            backcast_from=bc.FROM,
+            **({"sigma_from": sigma_from(rule)} if track == "lean_dnb" else {}),
+        ),
         compare={
             "since": tr.DNB_FROM,
             "descriptive": True,

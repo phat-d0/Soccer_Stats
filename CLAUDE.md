@@ -43,7 +43,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   stay the record. Price = DraftKings' h2h, side × (1 − 1/draw) (0 credits); chance = the parent's
   without the draw; Lean's needs `sigma_dnb` in `match_blends.json` and keeps the 1.50–3.00 range
   on the DNB price. A draw refunds the stake. The tracks have their own ledger
-  (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals.
+  (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals. Backcast from 14 Oct
+  on the odds log (owner, 28 Oct; `backcast: true`, never judged; Lean's at the 26 Oct refit's
+  `sigma_dnb`).
 - The Matches tab shows Lean only. Portfolio → Moneyline lists Blend Lean and its draw no bet
   track; Model 12%, its track and Lean's old rule sit in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
@@ -219,7 +221,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month; guard `MONTHLY_CAP` 2,000; 3,000 reserve) |
-| `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` + `league` (`backtest-dk-prices` → `dk_price_backtest.json`, both rules at DraftKings' historical prices), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
+| `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
 | `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
@@ -320,19 +322,32 @@ the owner's baseball app, so the balance can drop without any run here.
   12% on the raw model, $1); metrics add `model_p`, `avg_edge`. `edge12_backtest.json` has the
   same shape with `edge12` in place of `lean`/`strong` and `all.leagues`; `draftkings_replay`
   names `E0_dk.json`. Log line `EDGE12_BACKTEST_JSON`.
-- `dk_price_backtest.py` (CLI `backtest-dk-prices --league`; lead, 28 Oct; method in
+- `dk_price_backtest.py` (CLI `backtest-dk-prices [--leagues]`; lead, 28 Oct; method in
   `docs/leagues.md` "Backtests at DraftKings' prices: method", written before the run): both
-  live rules at DraftKings' own historical prices from the ten-book bodies (`load_books`,
-  `quote`: the latest snapshot at or before a time, quote ≤ 6 h old). `candidates`:
-  DraftKings' 1X2 at kickoff − 48 h (entry, Shin-fair `mkt_` for the blend), Pinnacle's
-  close (judged CLV) and DraftKings' close (`clv_dk`) from the close snapshot, in the seasons
-  the Pinnacle backtests score. The rules: Model 12% = `edge12_filters.bets` baseline; Lean =
-  `lean_backtest.walk_forward` + `bets`, split `live_rule` (odds range) and `all_odds`. It
-  also runs the same rules on the same matches at Pinnacle's early price
-  (`pinnacle_same_matches`), and gives per-season coverage at the look and close and
-  `verdict` (pooled CLV range above 0). `merge_file` adds or replaces one league in data-log
-  `backtest/dk_price_backtest.json` and re-pools `all`. `backfill.yml` `dk_price_backtest`
-  with `league`. Log line `DK_PRICE_BACKTEST_JSON`.
+  live rules at DraftKings' own historical prices, from the ten-book bodies of every league
+  bought (`bought_leagues`).
+  - `load_books`, `quote`: the latest snapshot at or before a time, the quote ≤ 6 h old.
+  - `unmatched_names`: feed names that don't land on football-data's (a `TEAM_NAMES` gap);
+    each league entry carries them, and the log prints them.
+  - `candidates`: DraftKings' 1X2 at kickoff − 48 h (entry, Shin-fair `mkt_` for the blend),
+    Pinnacle's close (judged CLV) and DraftKings' close (`clv_dk`) from the close snapshot, in
+    the seasons the Pinnacle backtests score.
+  - `league_reports`: Model 12% = `edge12_filters.bets` baseline (+ `p_blend`); Lean =
+    `lean_backtest.walk_forward` + `bets`. Each report is in the Pinnacle reports' shape,
+    `kind: "draftkings"`, coverage rows (`early_share` = DraftKings at the look,
+    `close_share` = Pinnacle's close in the body), `clv_dk`, and `pinnacle_same_matches`
+    (the same rules on the same matches at Pinnacle's early price).
+  - `build_files`: `lean_backtest.build` / `edge12_backtest.build` relabelled, plus `book`,
+    `verdict` (pooled CLV range above 0; Lean `live_rule` and `all_odds`) and
+    `coverage_note` (`coverage_note(leagues)`: the fixed text plus each scored season
+    under `PARTIAL_BELOW` 90%, by name, from `partial_coverage`: DraftKings priced under 90%
+    of matches, or Pinnacle's close on under 90% of those; also saved as
+    `partial_coverage` [{league, name, season, priced, pinnacle}]). A partial season counts
+    only the matches priced: nothing drops a season for low coverage.
+  - Output: data-log `backtest/lean_backtest_dk.json`, `edge12_backtest_dk.json`, via
+    `backfill.yml` `dk_price_backtest`, published as
+    `portfolio.strategy_backtests.lean_dk` / `.edge12_dk` (`paper._dk_section`). Log line
+    `DK_PRICE_BACKTEST_JSON`.
 - `dnb_backtest.py` (CLI `backtest-dnb`; owner, 24 Oct; `docs/lab.md` "Draw no bet"): both match
   rules as draw no bet beside their 1X2 versions on the same scored matches (the eight domestic
   leagues, `lean_backtest`'s seasons). DNB price = side × (1 − 1/draw) from Pinnacle's early 1X2
@@ -341,6 +356,13 @@ the owner's baseball app, so the balance can drop without any run here.
   baselines `x12`, `x_lean`; a draw refunds. Metrics add won/drawn/lost, `hit_rate`, `clv` per
   stake not refunded and `clv_staked`, `profit_sd`, `bets_for_5pct`; `ah0` = the real Pinnacle AH 0
   check; `verdict` = pooled CLV 97.5% range above 0. Log line `DNB_BACKTEST_JSON`. Not in the app.
+- `backcast.py` (owner, 28 Oct): the shared backcast for any new strategy or track.
+  `START` 14 Oct; `observations(log, until, start)` yields (now = `logged_at`, card slice, download
+  time) per logged DraftKings h2h row, oldest first; `mark(t, **extra)` sets `backcast: true`,
+  `backcast_from: "odds_log"`; `block(trades, defined_at, note=, started=, **extra)` = a section's
+  `backcast` block `{applied, started, until (= defined_at), defined_at, trades, settled (won, lost
+  or a refunded push), from, to, note, descriptive: true, ...}` over the trades opened before
+  `defined_at`. Used by `paper_dnb.backcast` and `paper.lean_backcast` (which adds `lean_started`).
 - `paper_dnb.py` (owner, 26 Oct; `docs/leagues.md` "Draw no bet tracks"): the live DNB tracks
   beside the match strategies. `trades.py` holds the maths and rules (`dnb_odds`, `dnb_prices`,
   `fair_dnb`, `without_draw`, `dnb_pick_12`, `dnb_pick_lean`, `settle_dnb`, which pushes on a draw,
@@ -355,7 +377,14 @@ the owner's baseball app, so the balance can drop without any run here.
   - `section` = `strategy_section` plus `variant_of`, `adds: "dnb"`, `filter` None, `defined_at`,
     `note`, `dnb_trades` and `compare` (`{since, descriptive, track, parent, clv_per_dollar:
     {clv_dk, clv_pinnacle: {track, parent}}, note}`).
-  - `paper.run` → `_run_dnb` (a failure costs only the tracks); `portfolios_section` puts each
+  - `backcast(ledger, odds_log, league, rules, ref)` (owner, 28 Oct): both tracks replayed from
+    `backcast.START` (14 Oct) to `DNB_FROM` through the shared open step (`_open`) on each logged
+    h2h row at its `logged_at`, with the live gates and rules (Lean at today's `sigma_dnb`,
+    `sigma_from` "26 Oct refit"); entries get `backcast: true`, `backcast_from: "odds_log"`, are
+    opened once (a match with a live trade is left alone), then close and settle as live.
+    `section` adds `backcast` (`backcast.block`).
+  - `paper.run` → `_run_dnb` (a failure costs only the tracks; it runs `backcast` before
+    `update_ledger`); `portfolios_section` puts each
     track after its parent's sections and adds `live.dnb_trades`; `awaiting_results` includes
     the tracks.
   - `match_calibration.sigma_dnb` gives `league_fit`'s `sigma_dnb`; `publish.LEAN_CARD_KEYS`
@@ -547,7 +576,11 @@ the owner's baseball app, so the balance can drop without any run here.
 
 **Trades and portfolio**
 - `trades.py`: the trade rules; keep it free of network code.
-  - Match bets: `best_pick`/`select_trades` (12% by default), $10, one per match.
+  - Match bets: `best_pick`/`select_trades` (12% by default), $10, one per match. Every open
+    step (match, Lean, its shadow, DNB, corners) checks `holds(ledger, id)`, which ignores
+    case: ESPN renamed a Champions League club only in case between builds ("VIKING FK", then
+    "Viking FK", 18 Oct) and that opened a second trade. `publish.duplicate_fixtures` also
+    compares names without case. Domestic cards take football-data's names and can't split.
   - `PAPER_RULE = "fixed_raw"` (`PAPER_RULES` also has `"learned"`; reverting is one line).
     `paper_threshold(dk, league)` under `fixed_raw` = `{threshold: 0.12, source: "owner_fixed",
     note: OWNER_FIXED_NOTE, rule: "fixed_raw", p_source: "model"}` in every league; the trade uses
@@ -655,7 +688,7 @@ the owner's baseball app, so the balance can drop without any run here.
     mean_kept, diff, ci95, draws}`). A failing variant is `{key, label, variant_of,
     filter, defined_at, error}`. `by_league` per section when trades span 2+ leagues. Corners' backtest =
     `corners_research()` (`kind: "research"`, from `lab/markets_research.json`).
-    `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`. Every
+    `strategy_backtests.lean` / `.edge12` = the backtest files via `app_section`; `.lean_dk` / `.edge12_dk` = the same rules at DraftKings' prices (`lean_backtest_dk.json`, `edge12_backtest_dk.json`; `DK_MISSING_NOTE` until run). Every
     `strategy_section` (both Moneyline and both corner strategies) has `calibration` =
     `trade_calibration`: settled won/lost trades' `model_p` (a corner's given no push, ÷ (1 −
     `p_push`)) vs 1/odds vs won, `pushes`, `voids`, `by_league`, `note`; live bins (owner, 24 Oct)
@@ -680,8 +713,9 @@ the owner's baseball app, so the balance can drop without any run here.
     of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
     counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,
     `whole_lines`, `pushes`, `matches`, `model`, `price`; `{error}` on failure). `models` =
-    `equations.section(data)`. Legacy
-    `portfolio.live`/`backtest`/`player_model` stay until Record stops reading `player_model`.
+    `equations.section(data)`. The legacy `portfolio.live`/`backtest` keys were dropped (28 Oct);
+    `player_model` stays (Player shots → Backtest reads it). The CLI's "Paper trades" line reads
+    Moneyline's `live`.
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
 
@@ -864,7 +898,8 @@ the owner's baseball app, so the balance can drop without any run here.
   `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
   arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
   holdout still locked.
-- `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
+- `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
+  Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
   (bake-off 2; its 2026/27 test is locked until `EARLIEST_OPEN` 3 Feb 2027), `corner_history.py`
@@ -918,7 +953,8 @@ the owner's baseball app, so the balance can drop without any run here.
     minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
     gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
     growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
-    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    hold, cash}]} (bankrolls, ≤ 200 points; `flat` {stake 1, start 0, points}, the running
+    profit of $1 a bet, which the chart draws when present, and `note`), `bets` (the judged rule's cash-outs: {date, lg,
     home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
     line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
     (shown first, above the tiles: why the sample leaves matches out). The file shape is under
@@ -942,7 +978,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v64) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v68) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -950,8 +986,12 @@ the owner's baseball app, so the balance can drop without any run here.
   on ↻ also reloads when the deployed `sw.js` names another version (`newerAppDeployed`). The
   header subtitle ends "App vNN". The smoke test's `updateCheck` runs with the service worker
   allowed: first install no reload, a new `sw.js` one reload, ↻ on a newer `sw.js` one reload.
-- Tabs: Matches; Teams (per league, with Players season stats); Record (Match bets, Goals &
-  corners, Player shots); Portfolio; Explore.
+- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Explore. The Record
+  tab was retired in v66 (owner via the lead, 28 Oct; `setTab` sends any unknown tab to
+  Portfolio): Goals & corners became Moneyline's goals rows (below), Match bets' model replay
+  moved to Moneyline → Model (`modelReplayHtml`) and its DraftKings threshold sweep to Model 12%'s
+  Premier League backtest (`dkSweepHtml`), Player shots to the retired portfolio's Backtest
+  (`playerBacktestHtml`), and its minimum-edge panels were dropped (a one-line note stays).
 - Competition filter (`leagueFilter`, localStorage `league`): chips for every league with fixtures
   or trades (on Moneyline → Backtest also every league in the backtest files); `LEAGUES` names;
   "xG" only in Understat leagues (`XG_LEAGUES`), else "exp. goals".
@@ -993,7 +1033,33 @@ the owner's baseball app, so the balance can drop without any run here.
   replay is the old rule (every price), so the new rule's row shows `leanRangeBt`: the replay's
   `by_odds_band` rows inside its `odds_range` (1.50–2.00 and 2.00–3.00), pooled ROI per $1
   weighted by bets ("Backtest: −1.8% · 1,345 bets, −200 to +200 · at Pinnacle"), and Lean's
-  Backtest view notes the same. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
+  Backtest view notes the same. **Backtest at DraftKings' prices** (lead brief, 28 Oct; v65):
+  Moneyline's replays of Blend Lean and Model 12% at DraftKings' own historical prices come as
+  `strategy_backtests.lean_dk` / `.edge12_dk` (`kind: "draftkings"`, the Pinnacle files' shape,
+  CLV against Pinnacle's close in the same snapshot). `btSourceView(key, lg)` puts a switch
+  "At DraftKings' prices" | "At Pinnacle's prices" (`state.btSource`, localStorage `btSource`,
+  DraftKings first; `btSources`/`btSourceOn`: only the sources whose file covers the chosen
+  competition, the chosen one else the first) above a coverage line per file (`btCoverage`:
+  seasons and leagues; "La Liga is only in the replay at Pinnacle's prices" when one book
+  lacks it), "The same rule at both books" (`lbCompare`, DraftKings | Pinnacle, the
+  competition's or All's metrics) and the chosen replay (`strategyBacktestHtml`, whose verdict,
+  title and `btWhere` say which book via `isDkBt`/`bookPrices`). Lean's and the old rule's row
+  headlines, and Model 12%'s, read DraftKings' file when it covers the competition
+  (`btPartBest`; Lean's new rule still pools its range's bands, "· at DraftKings"). Model 12%
+  under the Premier League keeps its DraftKings 2025/26 backtest (`E0_dk.json`, $10 a bet)
+  first, then "Replays at DraftKings' and Pinnacle's prices" with the switch; without
+  `edge12_dk` the old layout stays. Since v67 the DraftKings files' own fields show:
+  under All the pre-registered test (`dkTestHtml`, `.dk-test`: `verdict`, Lean's `live_rule`
+  and `all_odds`, pooled CLV vs Pinnacle's close in the same snapshot, its range above 0 to
+  pass; `method` named), CLV against DraftKings' own close as a descriptive line
+  (`dkCloseLine`, `clv_dk`, All and each league), within a competition "The same rule at both
+  books" is like for like (DraftKings vs "Pinnacle, same matches" from
+  `pinnacle_same_matches[key]`), and DraftKings' coverage table reads "DK 48 h" / "PIN
+  close". The fixture copies data-log's real `lean_backtest_dk.json` / `edge12_backtest_dk.json`
+  (trimmed by `_trim_dk`: 20 bets, no calibration, no `pinnacle_same_matches.by_season`,
+  sizing curves only under All and the Premier League at every eighth point; made up from the
+  Pinnacle replay only when data-log lacks them) and keeps every third point of the Pinnacle
+  files' bankroll curves, All's included, to stay under 1.5 MB. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
   archived too (`PF_ARCHIVED` {corners: pinnacle, draftkings}, `archivedTrack`: "Archived Oct
   25 · still logs every 12%-edge pick"; data and ledgers unchanged), so Team corners' main list
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
@@ -1027,8 +1093,20 @@ the owner's baseball app, so the balance can drop without any run here.
   note. `lean_dnb` with `rule.source: "none"` says it starts after the refit that adds
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
-  `clv_pinnacle_staked`). The fixture adds five synthetic `edge12_dnb` trades (`DNB_TRADES`: two
-  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
+  `clv_pinnacle_staked`). **Backcasts** (owner via the lead, 28 Oct; v68: every new strategy or
+  track starts on the original portfolio's start, backcast from logged prices): any live section
+  with `backcast.applied` (`bcOf`; `bcStart` = `started`, else Lean's `lean_started`; `bcDay`)
+  gets one treatment. A draw no bet track's lines start at the backcast's start (the parent's
+  counts its trades since then) with the "rule set (judged from here)" marker at its
+  `defined_at`; a note "Backcast before <date>: this line starts <date>, with the N trades … the
+  rule would have opened before it was set" (σ source when `sigma_from`), descriptive, the judged
+  comparison counting only live ones (Lean's new rule keeps its own sentence); each trade with
+  `backcast: true` carries a Backcast chip (`bcChip`, `.chip-backcast`) and a "Backcast" sheet
+  row; the strategy row's meta and empty right side read "since <start>". The fixture adds seven
+  synthetic `edge12_dnb` trades (`DNB_TRADES`: three won, two lost, a draw, one open;
+  `FIXTURE_DNB_FROM` 27 Sep), the two opened before it marked `backcast`, and a `backcast` block
+  from `FIXTURE_DNB_STARTED` 14 Sep (`add_dnb_backcast`, kept when paper.py builds one); none for
+  Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
   Portfolio, pass or fail; data `research_studies`, older data's `comeback_research` read as
   the one study): `studies()`, `studiesFor(portfolio)`, `studyStrat` (key = study id, `study`
   set; `isStudy`), `studyJudged` (role "judged", else the first design), `studyHeadline`,
@@ -1059,13 +1137,17 @@ the owner's baseball app, so the balance can drop without any run here.
   A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
   (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
   vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
-  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
-  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  the judged rule in words with the sample's counts, hold vs cash out (`overlayCurveChart` id
+  `cbcv`: `curves.flat`, the running profit at $1 a bet, when present, with the bankroll at the
+  judged stake in one sentence, since at 2% both fall to almost nothing in the real file; else
+  the bankrolls from `curves.points`, base `curves.start`) and `curves.note` folded, the grid by threshold and margin
   (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
   calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
   league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
-  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
-  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
+  reads the growth difference ("growth a bet vs holding"). The fixture uses Research's file when
+  it is committed, trimmed (`_trim_cashout`: the judged design whole, hold and the judged rule for
+  the other samples, 60 points a curve, 40 cash-outs), else a made-up one in its shape
+  (`_cashout_study`); beside them a made-up passing study (`_passed_study`).
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
@@ -1191,22 +1273,33 @@ the owner's baseball app, so the balance can drop without any run here.
     won/lost/void; readout "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)",
     the latest day by default; its $0 origin is a stop too, labelled with the first trade
     opened, `firstOpened`, readout "Thu, Oct 9 · first trade opened · …"), `overlayCurveChart`
-    (same id), Record's running profit (`profitChart`, id `pc`, readout under the chart), the
+    (same id), the running profit (`profitChart`, id `pc`, readout under the chart; Moneyline →
+    Model's replay and the classic backtest views), the
     blend's shape (`shape-<code>`, 1-point steps 4–94%, a dot on each of the three curves) and
     model (f)'s shape (`cshape-<code>`) and the backtest's claimed edge vs CLV (`ce-…`);
   - point (`pick`): `reliabilityChart` (`rel-…`, `qrel-<book>`): one stop per bin of chances
     holding every series' point, nearest by x then distance, all series' marks highlighted and
     compared in one readout;
-  - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, Record → Goals &
-    corners, the backtest's CLV bands), `binRowsChart` (bets and live trades), `oddsBandChart`
+  - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, the Goals markets
+    row, the backtest's CLV bands), `binRowsChart` (bets and live trades), `oddsBandChart`
     (`ob-…`), `edgeBucketsHtml` (`eb-<pfId>`) and the
     Teams players chart (`devChartHtml`, id `dev`, bars as stops).
   Not charts: the match card's 1X2 bar, the Teams table's net bars and the team-total progress
-  bar (numbers printed beside them); Record's threshold sweeps are tables.
-- **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
-  Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts
-  and `rangeChart` per league, team-total progress), Player shots (strategy switch, threshold
-  sweep, predicted vs actual).
+  bar (numbers printed beside them); threshold sweeps are tables.
+- **Goals rows in Moneyline** (v66; `marketStudies` adds them to `studies()` from
+  `data.markets_research`, `isMarketStudy`, `marketStudyHeadline`, `marketStudyPageHtml`):
+  "Goals markets: total goals and each team's goals" (`goals_markets`, verdict "closed", pill
+  Closed, in the Archive; the total-goals CLV `rangeChart` `tg`, the league tables folded, each
+  team's goals' research with its live part pointing at the next row) and "Team totals (logging
+  only)" (`team_totals_log`, verdict "testing", pill Testing, in the main list;
+  `teamTotalsProgressHtml`: settled of 50 toward the round-13 gate). Neither has Result/Why.
+  **Moneyline → Model** under All or the Premier League ends with "The model replayed, Premier
+  League" (`data.record`: accuracy vs the price, the 12% replay in units, goals + xG vs goals only,
+  the running profit folded); other leagues get a one-line note. **Model 12% → Backtest,
+  Premier League** folds `E0_dk.json`'s sweep (Model alone and Blend columns, odds caps) and log
+  loss (`details.dk-sweep`) under its bets. **Player shots → Backtest**: the classic view, then
+  "The strategies compared" (switch `data-recstrat`, tiles for a non-main strategy, the sweep,
+  predicted vs actual, the shot model's checks).
 - Live trade fields the app reads (Moneyline contract): per trade `close_odds`,
   `close_fetched_at`, `close_minutes_before`, `clv_dk`, `beat_close_dk`; summary `clv_dk`,
   `beat_close_dk`, `close_early`. A close over 60 min before kickoff is "approx."
@@ -1300,11 +1393,11 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 - Name watch: check each publish log's "Duplicate fixtures" and "odds events unmatched" lines; a
   promoted or relegated club needs its spelling checked (`odds-check.yml` `task=markets` /
   `task=espn` with `leagues=…`, free).
-- Housekeeping: drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading
-  `player_model`.
 
 ## Conventions
 
+- A new strategy or track is backcast from 14 Oct on logged prices (descriptive), and judged only
+  from its `defined_at` (owner, 28 Oct; `backcast.py`).
 - Workflows run on `ubuntu-24.04` (pinned 24 Oct: `ubuntu-latest` moved to 26.04 with Python 3.14,
   where argparse rejects a bare `%` in a help string and Playwright 1.56.1 can't install Chromium;
   publish failed until the pin). Write `%%` for a percent sign in any argparse `help=`;

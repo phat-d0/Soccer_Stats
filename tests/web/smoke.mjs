@@ -515,50 +515,42 @@ const STEPS = [
   ["players-stats-e1", click('.chip[data-league="E1"]')],
   ["players-model-sp1", async (p) => { await p.click('.chip[data-league="SP1"]'); await p.click('button[data-plmode="model"]'); }],
   ["players-e0-sheet", async (p) => { await p.click('.chip[data-league="E0"]'); await p.click('button[data-plmode="stats"]'); await p.click('button[data-plview="list"]'); await p.click("#pl-list button[data-player] >> nth=0"); await sheet(p); }, true],
-  ["record-match", async (p) => { await closeSheet(p); await tab("record")(p); }],
-  ["record-match-bucket", async (p) => {
-    await p.click('.eb-row[data-ebrow="0"]');
-    await scrubCheck(p, "[data-scrub^='eb-']");
-    await scrubCheck(p, "[data-scrub='pc']");
+  // The Record tab is gone (owner via the lead, 28 Oct): its parts live in Portfolio.
+  ["no-record-tab", async (p) => {
+    await closeSheet(p);
+    if (await p.locator('.tabbar button[data-tab="record"]').count()) throw new Error("the Record tab is still in the tab bar");
+    if ((await p.locator(".tabbar button").count()) !== 4) throw new Error("the tab bar should have four tabs");
+    await tab("portfolio")(p);
   }],
-  // Blend trades through Blend Lean now: its tiles are Lean's Premier League backtest.
-  ["record-match-blend-lean", async (p) => {
-    await p.click('button[data-recdk="blend"]');
-    const tiles = await p.locator(".tiles.lean-dk .tile").count();
-    if (tiles !== 4) throw new Error(`Blend shows ${tiles} Lean tiles, not 4`);
+  // Record → Goals & corners became two Moneyline rows: Goals markets (closed, in the
+  // Archive, with the range charts) and Team totals (logging only), testing, in the main list.
+  ["portfolio-goals-markets", async (p) => {
+    await pfOpenPf(p, "moneyline");
+    if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="goals_markets"]').count())) throw new Error("Goals markets isn't in the Archive");
+    const row = (await p.locator('button[data-pfstrat="goals_markets"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Goals markets", "Closed", "No edge", "never traded", "Total goals lose to Pinnacle's price"]) if (!row.includes(w)) throw new Error(`Goals markets row lacks "${w}": ${row}`);
+    await p.click('button[data-pfstrat="goals_markets"]');
     const text = await p.textContent("#view");
-    for (const want of ["Blend Lean (1σ+), the rule the blend trades on now", "Premier League, Pinnacle's early prices 2019/20–2024/25", "from 351 bets at 1σ+", "−4.2%", "needed to break even", "vs Pinnacle's close", "No bets at a 12% edge"]) {
-      if (!text.includes(want)) throw new Error(`Blend tab lacks "${want}"`);
-    }
+    for (const w of ["Total goals", "Each team's goals", "No edge", "Team totals (logging only) row", "Corners' research is under Team corners"]) if (!text.includes(w)) throw new Error(`Goals markets page lacks "${w}"`);
+    if (text.includes("5 of 50")) throw new Error("the team-total progress belongs on its own row");
+    await scrubCheck(p, "[data-scrub='tg']");
   }],
-  ["record-match-raw", async (p) => {
-    await p.click('button[data-recdk="raw"]');
-    if (await p.locator(".tiles.lean-dk").count()) throw new Error("Lean tiles on Model alone");
-  }],
-  ["record-match-sp1", click('.chip[data-league="SP1"]')],
-  ["record-match-all", click('.chip[data-league=""]')],
-  ["record-player", click('button[data-recbet="player"]')],
-  ["record-player-blend_3h", click('button[data-recstrat="blend_3h"]')],
-  ["record-player-raw_3h", click('button[data-recstrat="raw_3h"]')],
-  // Record → Goals & corners: three research cards, details folded, a range-plot readout.
-  ["record-markets", async (p) => {
-    await p.click('button[data-recbet="markets"]');
-    const text = await p.textContent("#view");
-    for (const want of ["Total goals", "Each team's goals", "Corners", "5 of 50", "No edge"]) {
-      if (!text.includes(want)) throw new Error(`Goals & corners lacks "${want}"`);
-    }
-  }],
-  ["record-markets-details", async (p) => {
+  ["portfolio-goals-markets-details", async (p) => {
     for (const d of await p.locator("details.mk-fold > summary").all()) await d.click();
-    await p.click('.rc-row[data-rc="co"][data-rcrow="4"]');
-    const readout = await p.textContent("#rc-readout-co");
-    if (!readout.includes("Ligue 1") || !readout.includes("2025/26")) throw new Error(`corner readout: ${readout}`);
-    await scrubCheck(p, "[data-scrub='co']");
-    const text = await p.textContent("#view");
-    for (const run of ["37863800450", "38004172501", "38022942019"]) if (!text.includes(run)) throw new Error(`run ${run} not shown`);
+    if (!(await p.textContent("#view")).includes("Lines better")) throw new Error("the league tables don't open");
   }],
-  // The publish field missing (a broken or old build): a plain note, nothing else breaks.
-  ["record-markets-missing", async (p) => {
+  ["portfolio-team-totals", async (p) => {
+    await pfUp(p);
+    const main = await p.locator('.card.folders').first().locator('button[data-pfstrat="team_totals_log"]').count();
+    if (!main) throw new Error("Team totals isn't in the main list");
+    const row = (await p.locator('button[data-pfstrat="team_totals_log"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Team totals (logging only)", "Testing", "5 of 50", "places no bets"]) if (!row.includes(w)) throw new Error(`Team totals row lacks "${w}": ${row}`);
+    await p.click('button[data-pfstrat="team_totals_log"]');
+    const text = await p.textContent("#view");
+    for (const w of ["5 of 50", "matches ready to score", "Live test against FanDuel", "nothing is bet"]) if (!text.includes(w)) throw new Error(`Team totals page lacks "${w}"`);
+  }],
+  // The publish field missing (a broken or old build): no goals rows, nothing else breaks.
+  ["portfolio-markets-missing", async (p) => {
     await p.route("**/data.json", async (route) => {
       const res = await route.fetch();
       const d = await res.json();
@@ -566,16 +558,38 @@ const STEPS = [
       await route.fulfill({ response: res, json: d });
     });
     await p.reload(); await p.waitForSelector("button.match");
-    await tab("record")(p); await p.click('button[data-recbet="markets"]');
-    const text = await p.textContent("#view");
-    if (!text.includes("aren't in this update")) throw new Error("no plain note when markets_research is missing");
+    await tab("portfolio")(p); await pfOpenPf(p, "moneyline");
+    if (await p.locator('button[data-pfstrat="goals_markets"], button[data-pfstrat="team_totals_log"]').count()) throw new Error("goals rows without markets_research");
   }],
-  ["record-player-restored", async (p) => {
+  ["portfolio-markets-restored", async (p) => {
     await p.unroute("**/data.json");
     await p.reload(); await p.waitForSelector("button.match");
-    await tab("record")(p); await p.click('button[data-recbet="player"]');
+    await tab("portfolio")(p); await pfOpenPf(p, "moneyline");
   }],
-  ["record-player-trade", async (p) => { await p.click('button[data-recstrat="blend_lineup"]'); await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
+  // Record → Match bets: the Premier League model replay is in Moneyline's Model view,
+  // E0_dk.json's threshold sweep folded under Model 12%'s Premier League backtest.
+  ["portfolio-model-replay", async (p) => {
+    await pfOpenStrat(p, "lean"); await p.click('button[data-pf="model"]'); await p.click('.chip[data-league="E0"]');
+    const text = await p.textContent("#view");
+    for (const w of ["The model replayed, Premier League", "Accuracy vs price", "Goals + xG", "Goals only", "Running profit (units)"]) if (!text.includes(w)) throw new Error(`model replay lacks "${w}"`);
+    await p.locator("details.mk-fold > summary", { hasText: "Running profit (units)" }).click();
+    await scrubCheck(p, "[data-scrub='pc']");
+  }],
+  ["portfolio-model-replay-sp1", async (p) => {
+    await p.click('.chip[data-league="SP1"]');
+    const text = await p.textContent("#view");
+    if (text.includes("The model replayed, Premier League") || !text.includes("covers the Premier League only")) throw new Error("the replay should be a one-line note outside the Premier League");
+    await p.click('.chip[data-league=""]');
+    if (!(await p.textContent("#view")).includes("The model replayed, Premier League")) throw new Error("no replay under All");
+  }],
+  ["portfolio-edge12-e0-sweep", async (p) => {
+    await pfOpenStrat(p, "edge12"); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]');
+    await p.locator("details.dk-sweep > summary").click();
+    const text = await p.textContent("details.dk-sweep");
+    for (const w of ["Model alone", "Blend", "Odds capped at", "Log loss", "Most accurate"]) if (!text.includes(w)) throw new Error(`DraftKings sweep lacks "${w}"`);
+    if ((await p.textContent("#view")).includes("Record →")) throw new Error("a note still points at Record");
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pf="live"]');
+  }],
   ["portfolio-live", async (p) => {
     await closeSheet(p); await tab("portfolio")(p);
     // The top level: one folder per portfolio, Anytime goalscorer hidden (owner, 24 Oct).
@@ -589,7 +603,7 @@ const STEPS = [
     // Each draw no bet track sits right after its parent in the main list (owner, 26 Oct).
     // Model 12% and its draw no bet track are archived (owner, 26 Oct), after the old Lean rule.
     // A failed pre-match study (the strategy search) joins the Archive last (owner, 28 Oct).
-    if (strats.join(",") !== "lean,lean_dnb,lean_all_odds,edge12,edge12_dnb,strategy_search") throw new Error(`strategy folders: ${strats.join(",")}`);
+    if (strats.join(",") !== "lean,lean_dnb,team_totals_log,lean_all_odds,edge12,edge12_dnb,strategy_search,goals_markets") throw new Error(`strategy folders: ${strats.join(",")}`);
     const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
     if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
@@ -679,15 +693,17 @@ const STEPS = [
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
     if (!vrow.includes("Blend Lean, all odds (old rule)") || !vrow.includes("Old rule, until") || vrow.includes("↳")) throw new Error(`old-rule row: ${vrow}`);
     // The new rule's backtest is the replay's bands inside its range, pooled; the archived
-    // old rule keeps the whole replay (every price).
+    // old rule keeps the whole replay (every price). Both read DraftKings' replay when there
+    // is one (lead brief, 28 Oct), else Pinnacle's.
     const btWant = await p.evaluate(() => {
-      const part = state.data.portfolio.strategy_backtests.lean.all;
+      const sb = state.data.portfolio.strategy_backtests;
+      const part = (sb.lean_dk?.available ? sb.lean_dk : sb.lean).all;
       const b = part.by_odds_band.filter((x) => x.lo === 1.5 || x.lo === 2);
       const bets = b.reduce((a, x) => a + x.bets, 0);
       return { bets, roi: signedPct(b.reduce((a, x) => a + x.roi * x.bets, 0) / bets), all: signedPct(part.lean.roi) };
     });
     const bt = (await p.locator('button[data-pfstrat="lean"] .bt').innerText()).replace(/\s+/g, " ");
-    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
+    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200 · at DraftKings`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
     if (!vrow.includes(`Backtest: ${btWant.all}`)) throw new Error(`old-rule backtest: ${vrow}`);
     await pfOpenStrat(p, "lean");
     if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
@@ -723,9 +739,9 @@ const STEPS = [
   ["portfolio-dnb", async (p) => {
     await pfUp(p);
     const row = (await p.locator('button[data-pfstrat="edge12_dnb"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
+    for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet · since Sep 14", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
     const leanRow = (await p.locator('button[data-pfstrat="lean_dnb"]').innerText()).replace(/\s+/g, " ");
-    if (!leanRow.includes("Tracked beside the record · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
+    if (!leanRow.includes("Tracked beside the record since Sep 14 · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
     // Model 12% and its track sit in the Archive (owner, 26 Oct); Lean's track stays in the main list.
     for (const k of ["edge12", "edge12_dnb"]) if (!(await p.locator(`.section-title:has-text("Archive") + .card button[data-pfstrat="${k}"]`).count())) throw new Error(`${k} isn't in the Archive`);
     if (await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_dnb"]').count()) throw new Error("Lean's DNB track is in the Archive");
@@ -735,7 +751,7 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 4 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
     // The headline counts the active strategies only: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
@@ -749,8 +765,13 @@ const STEPS = [
     if (!draw.includes("Crystal Palace, draw no bet") || !draw.includes("Draw stake back") || /Lost|−\$10/.test(draw)) throw new Error(`draw row: ${draw}`);
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     const m = await p.evaluate(() => tradeStats(strategyLiveSet(pfCurrent(), pfSelected(pfStrategies(pfCurrent())), "").trades));
-    if (m.won !== 2 || m.lost !== 1 || m.draws !== 1 || m.open !== 1) throw new Error(`DNB stats: ${JSON.stringify(m)}`);
-    for (const w of ["2–1", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
+    if (m.won !== 3 || m.lost !== 2 || m.draws !== 1 || m.open !== 1) throw new Error(`DNB stats: ${JSON.stringify(m)}`);
+    // Backcast from the portfolio's start (owner via the lead, 28 Oct): the two trades opened
+    // before the track was set carry a Backcast chip, and a note says that part is descriptive.
+    const chips = await p.locator("#view .trade-row .chip-backcast").count();
+    if (chips !== 2) throw new Error(`backcast chips: ${chips}`);
+    for (const w of ["Backcast before Sun, Sep 27:", "this line starts Mon, Sep 14", "with the 2 trades (2 settled) the rule would have opened before it was set", "the judged comparison counts only those"]) if (!text.includes(w)) throw new Error(`DNB backcast note lacks "${w}"`);
+    for (const w of ["3–2", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
       if (!text.includes(w)) throw new Error(`DNB view lacks "${w}"`);
     }
     // The track leads with its own note, ahead of the tiles; the parent's rule comes last (lead, 26 Oct).
@@ -765,9 +786,11 @@ const STEPS = [
     // Profit over time: the parent solid (since the track started) and draw no bet dashed.
     const legend = (await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|");
     if (!legend.startsWith("1X2 (the record)") || !legend.includes("Draw no bet")) throw new Error(`DNB legend: ${legend}`);
-    if (await p.locator("[data-scrub='cv'] .filter-lab").count()) throw new Error("DNB chart has a filter marker");
+    // Both lines start at the backcast's start, marked where the track was set.
+    const mark = (await p.locator("[data-scrub='cv'] .filter-lab").evaluateAll((els) => els.map((e) => e.textContent))).join(" ");
+    if (!mark.includes("rule set (judged from here)")) throw new Error(`DNB chart marker: ${mark}`);
     const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
-    const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").defined_at).slice(0, 10)));
+    const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").backcast.started).slice(0, 10)));
     if (!origin.startsWith(start)) throw new Error(`DNB overlay origin ${origin} vs ${start}`);
     await scrubCheck(p, "[data-scrub='cv']");
     // The parent's own chart leaves the draw no bet line out.
@@ -775,7 +798,13 @@ const STEPS = [
     if ((await p.locator(".pf-curve .curve-legend").count())) throw new Error("Model 12% chart overlays its DNB track");
     await pfOpenStrat(p, "edge12_dnb");
   }],
+  ["portfolio-dnb-backcast-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Everton|Wolves|dnb"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    if (!text.includes("Backcast") || !text.includes("Yes: opened afterwards from the logged DraftKings prices, as the rule would have, before the track was set. Descriptive only.")) throw new Error(`backcast sheet: ${text.slice(0, 300)}`);
+  }, true],
   ["portfolio-dnb-trade", async (p) => {
+    await closeSheet(p);
     await p.click('button[data-trade="E0|2627|Leeds|Crystal Palace|dnb"]'); await sheet(p);
     const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
     for (const w of ["A draw: stake back.", "Away, draw no bet", "Model 12%, draw no bet (tracked beside the record)", "Built from DraftKings' 1X2", "side × (1 − 1/draw)", "Model chance, draw taken out", "Draw no bet: fixed edge, model alone", "CLV vs DraftKings (per stake not refunded)", "CLV per $ vs DraftKings", "CLV per $ vs Pinnacle", "Draw: stake back"]) {
@@ -878,6 +907,41 @@ const STEPS = [
     // No summary covers a competition plus a driver, so no ROI range may show.
     if (text.includes("95% range on ROI")) throw new Error("SP1 model-driven shows a ROI range it has no summary for");
   }],
+  // The backtest at DraftKings' own prices (lead brief, 28 Oct; Moneyline's real
+  // strategy_backtests.lean_dk from data-log): first when present, a switch to Pinnacle's
+  // replay, a coverage line for each, the pre-registered test, CLV against DraftKings' own
+  // close and the same rule at both books (like for like within a competition). It ends on
+  // Pinnacle's, which the next steps check in full.
+  ["portfolio-lean-backtest-dk", async (p) => {
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
+    const on = await p.locator(".bt-src button.on").innerText();
+    if (on !== "At DraftKings' prices") throw new Error(`backtest source on: ${on}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    const nDk = await p.evaluate(() => Object.keys(state.data.portfolio.strategy_backtests.lean_dk.leagues).length);
+    for (const w of [`At DraftKings' prices: 2020/21 to 2024/25, ${nDk} leagues.`, "At Pinnacle's prices: 2019/20", "The same rule at both books", "In the replay at DraftKings' prices Lean", "Blend Lean at DraftKings' own prices", "Pre-registered test: fails.", "The live rule, −200 to +200: fails", "Every price (the old rule): fails", "Against DraftKings' own close (descriptive)"]) {
+      if (!text.includes(w)) throw new Error(`DraftKings backtest lacks "${w}"`);
+    }
+    // The comparison under All: the same rule's ROI at both books, from each file.
+    const want = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return [signedPct(sb.lean_dk.all.lean.roi), signedPct(sb.lean.all.lean.roi)]; });
+    const table = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
+    if (!table.startsWith("DraftKings Pinnacle") || !want.every((w) => table.includes(w))) throw new Error(`both-books table: ${table} vs ${want}`);
+    // A competition in both: like for like, the same matches at Pinnacle; DraftKings' coverage columns.
+    await p.click('.chip[data-league="E0"]');
+    const same = await p.evaluate(() => signedPct(state.data.portfolio.strategy_backtests.lean_dk.leagues.E0.pinnacle_same_matches.lean.clv));
+    const t2 = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
+    if (!t2.startsWith("DraftKings Pinnacle, same matches") || !t2.includes(same)) throw new Error(`same-matches table: ${t2} vs ${same}`);
+    const e0 = await p.textContent("#view");
+    if (!e0.includes("Like for like") || !e0.includes("DK 48 h") || e0.includes("Pre-registered test")) throw new Error("E0 DraftKings view");
+    // A league only Pinnacle's replay has: no switch, and the note says so.
+    const only = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return Object.keys(sb.lean.leagues).find((c) => !sb.lean_dk.leagues[c] && sb.lean.leagues[c]?.kind !== "close"); });
+    await p.click(`.chip[data-league="${only}"]`);
+    if (await p.locator(".bt-src").count()) throw new Error("a switch for a league only one book covers");
+    const name = await p.evaluate((c) => leagueName(c), only);
+    if (!(await p.textContent("#view")).includes(`${name} is only in the replay at Pinnacle's prices.`)) throw new Error("one-book note");
+    await p.click('.chip[data-league=""]');
+    await p.click('button[data-btsrc="pin"]');
+    if ((await p.locator(".bt-src button.on").innerText()) !== "At Pinnacle's prices") throw new Error("switch to Pinnacle");
+  }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
@@ -907,10 +971,12 @@ const STEPS = [
   ["portfolio-backtest-headlines", async (p) => {
     await pfUp(p);
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
+    // DraftKings' replay (the Premier League, La Liga and Serie A in data-log's file) heads
+    // the row where it covers the competition, Pinnacle's elsewhere (lead brief, 28 Oct).
     const want = {
-      "": ["bets, −200 to +200 · at Pinnacle", "bets · at Pinnacle"],
-      E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
-      SP1: ["La Liga at Pinnacle", "La Liga at Pinnacle"],
+      "": ["bets, −200 to +200 · at DraftKings", "bets · at DraftKings"],
+      E0: ["Premier League at DraftKings", "Premier League at DraftKings"],
+      SP1: ["La Liga at DraftKings", "La Liga at DraftKings"],
       E2: ["League One at Pinnacle", "League One at Pinnacle"],
       E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
       UCL: ["0 bets, −200 to +200 · Champions League at DraftKings' close", "Champions League at DraftKings' close"],
@@ -976,7 +1042,7 @@ const STEPS = [
   ["portfolio-backtest-edge12-e0", async (p) => {
     await p.click('.chip[data-league="E0"]');
     const text = await p.textContent("#view");
-    for (const w of ["DraftKings backtest, Premier League", "Replay at Pinnacle's early prices, Premier League"]) {
+    for (const w of ["DraftKings backtest, Premier League", "Replays at DraftKings' and Pinnacle's prices, Premier League"]) {
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
     await bandsCheck(p, "edge12", "E0");
@@ -1100,7 +1166,18 @@ const STEPS = [
     await p.click('button.linkish[data-pfid="player_shots"]'); await p.click('button[data-pf="live"]');
     if ((await p.locator(".crumbs").innerText()).trim() !== "‹ Portfolio") throw new Error("retired crumbs");
   }],
-  ["portfolio-retired-backtest", click('button[data-pf="backtest"]')],
+  // Record → Player shots moved here: below the bet-by-bet backtest, the three strategies
+  // compared (switch), their threshold sweep and predicted vs actual.
+  ["portfolio-retired-backtest", async (p) => {
+    await p.click('button[data-pf="backtest"]');
+    const text = await p.textContent("#view");
+    for (const w of ["Running profit ($)", "The strategies compared", "Return per bet by edge threshold", "Predicted vs actual win rate", "Its bets are the ones above"]) if (!text.includes(w)) throw new Error(`player shots backtest lacks "${w}"`);
+  }],
+  ["portfolio-retired-backtest-blend_3h", async (p) => {
+    await p.click('button[data-recstrat="blend_3h"]');
+    if ((await p.locator(".tiles.player-strat-tiles .tile").count()) !== 4) throw new Error("no tiles for the other strategy");
+  }],
+  ["portfolio-retired-backtest-raw_3h", async (p) => { await p.click('button[data-recstrat="raw_3h"]'); await p.click('button[data-recstrat="blend_lineup"]'); }],
   ["portfolio-retired-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
   // In-play research (owner, 28 Oct; Comeback bets until then): every study a row with its
   // verdict pill, headline and cost; the top-level row counts them (never live profit).
@@ -1111,7 +1188,7 @@ const STEPS = [
     if (await p.locator('button.linkish[data-pfid="comebacks"]').count()) throw new Error("research shouldn't sit behind the retired link");
     await p.click('button[data-pfid="comebacks"]');
     const list = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (list.join(",") !== "comeback_ht,heavy_fav_ht,cashout_ht,fixture_pass") throw new Error(`research studies: ${list}`);
+    if (list.join(",") !== "comeback_ht,cashout_ht,heavy_fav_ht,fixture_pass") throw new Error(`research studies: ${list}`);
     if (await p.locator("#view .chips").count()) throw new Error("research needs no competition chips");
     const rowText = async (k) => (await p.locator(`button[data-pfstrat="${k}"]`).innerText()).replace(/\s+/g, " ");
     const cb = await rowText("comeback_ht");
@@ -1119,7 +1196,7 @@ const STEPS = [
     const hv = await rowText("heavy_fav_ht");
     for (const w of ["Running", "Pre-registered Oct 4", "planned 410 bets", "up to 4,300 credits"]) if (!hv.includes(w)) throw new Error(`running row lacks "${w}": ${hv}`);
     const co = await rowText("cashout_ht");
-    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "148,200 credits", "growth a bet vs holding", "cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
+    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "150,910 credits", "growth a bet vs holding", "570 cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
     const ps = await rowText("fixture_pass");
     for (const w of ["Passed", "640 credits", "per $1"]) if (!ps.includes(w)) throw new Error(`passed row lacks "${w}": ${ps}`);
   }],
@@ -1208,16 +1285,26 @@ const STEPS = [
     await pfUp(p); await p.click('button[data-pfstrat="cashout_ht"]');
     await p.click('button[data-pf="result"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No: cashing out at 50% lowered", "Decisions", "cash-outs at 50%", "Growth vs holding, 2% stake", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 336 decisions", "Bankroll: hold vs cash out (2% a bet)", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Underdogs at 3.0 to 4.0", "Partial cash-out to the Kelly stake", "The sample. Matches already bought", "Other samples (descriptive)", "With B and C put back (already read, half-time only): 2,900 bets", "2025/26 only (nothing excluded): 1,100 bets (descriptive)"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
+    for (const w of ["Decisions", "570", "cash-outs at 50%", "Growth vs holding, 2% stake", "+0.020%", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 570 decisions", "The sample.", "Hold vs cash out ($1 a bet)", "less than a billionth of the start", "About these curves", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Other samples (descriptive)", "Underdogs at 3.0 to 4.0", "With B and C put back (already read, half-time only)", "The frozen sample at half-time only", "2025/26 only", "Partial cash-out to the Kelly stake"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
     if ((await p.locator(".co-grid tbody tr").count()) !== 9) throw new Error("the 3 x 3 grid");
     if ((await p.locator(".co-grid tr.co-primary").count()) !== 1) throw new Error("one judged row");
+    // The chart is the running profit at $1 a bet (curves.flat), ending on its last point.
     if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 2) throw new Error("hold and cash-out lines");
+    const end = await p.evaluate(() => { const f = studies().find((x) => x.id === "cashout_ht").curves.flat.points; return usd(f[f.length - 1].hold, 2); });
+    if (!(await p.textContent("#cbcv-readout")).includes(`Hold to the end ${end}`)) throw new Error(`flat curve should end at ${end}`);
     for (const id of ["cbcv", "cbcal"]) {
       await p.locator(`[data-scrub='${id}']`).evaluate((e) => e.scrollIntoView({ block: "center" }));
       await scrubCheck(p, `[data-scrub='${id}']`);
     }
     await p.click("details.cb-bets > summary");
     if (!/hold [+−]\$[\d.]+ · cash [+−]\$/.test(await p.locator("details.cb-bets .cb-table tbody tr").first().innerText())) throw new Error("cash-out bet row");
+    await p.click('button[data-pf="why"]');
+    const why = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Why holding lost so much", "Is the in-play price right?", "What the fee does", "How this was measured"]) if (!why.includes(w)) throw new Error(`cash-out why lacks "${w}"`);
+    await p.locator("[data-scrub='why0']").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await scrubCheck(p, "[data-scrub='why0']");
+    if (!(await p.textContent("#rc-readout-why0")).includes("holding returned")) throw new Error("why row's hold");
+    await p.click('button[data-pf="result"]');
   }],
   // A failed pre-match study sits in Moneyline's Archive with its pill and result: the real
   // strategy search (Research, #131), shown through its own search view (lead brief, 28 Oct).
@@ -1407,11 +1494,6 @@ const STEPS = [
       if (!text.includes(w)) throw new Error(`DraftKings corners model view lacks "${w}"`);
     }
     await pfOpenStrat(p, "pinnacle"); await p.click('button[data-pf="live"]');
-  }],
-  ["record-markets-corners-link", async (p) => {
-    await tab("record")(p); await p.click('button[data-recbet="markets"]');
-    await p.click('button[data-goto-pf="corners"]');
-    if (!(await p.textContent("#view")).includes("Team corners")) throw new Error("corners link didn't open the portfolio");
   }],
   ["portfolio-moneyline", async (p) => { await pfOpenPf(p, "moneyline"); }],
   // Matches after kickoff (the clock moved past Arsenal v Leeds, 10 Oct 11:30 UTC): the

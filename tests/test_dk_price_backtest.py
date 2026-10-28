@@ -127,57 +127,113 @@ def test_no_pinnacle_close_means_no_clv_and_it_is_counted(tmp_path):
 
     b = dpb._with_dk_clv(ef.bets(target, "E0", "baseline"), target)
     assert cov["2425"]["pinnacle_close"] == 0 and b["clv"].isna().all()
-    extra = dpb._extra(b)
-    assert extra["clv_missing"] == 1 and extra["clv_dk_bets"] == 1
+    block = dpb.clv_dk_block(b)
+    assert block["pinnacle_close_missing"] == 1 and block["bets"] == 1
 
 
-def test_the_lean_block_splits_the_live_odds_range_from_every_price():
-    rows = []
-    for i, odds in enumerate([1.4, 1.9, 2.8, 4.0]):
-        rows.append(
-            {"date": f"2024-09-{i + 10}", "season": "2425", "league": "E0", "home": f"H{i}",
-             "away": f"A{i}", "market": "home", "odds": odds, "p_bet": 0.6, "p_model": 0.6,
-             "z": 1.5, "z_market": 0.5, "driver": "model", "tier": "lean", "sigma": 0.02,
-             "won": i % 2 == 0, "profit": odds - 1 if i % 2 == 0 else -1.0, "clv": 0.01,
-             "clv_dk": 0.02}
-        )  # fmt: skip
-    block = dpb.lean_block(pd.DataFrame(rows))
-    assert block["all_odds"]["lean"]["bets"] == 4
-    assert block["live_rule"]["lean"]["bets"] == 2  # 1.50 < odds <= 3.00
-    assert block["live_rule"]["odds_range"] == list(tr.LEAN_ODDS_RANGE)
-
-
-def test_merge_file_replaces_a_league_and_pools_every_league(tmp_path):
-    hist = history(tmp_path)
-    target, _ = dpb.candidates(merged_rows(), hist, {"2425"})
-    from soccer_stats.lab import edge12_filters as ef
-
-    e12 = dpb._with_dk_clv(ef.bets(target, "E0", "baseline"), target)
-    bets = {"lean": lb.bets(pd.DataFrame(), "E0"), "edge12": e12}
-    rep = {"kind": dpb.KIND, "candidates": 1}
-    out = dpb.merge_file(None, "E0", rep, bets)
-    out = json.loads(json.dumps(out, default=str))  # as saved
-    out = dpb.merge_file(
-        out, "SP1", rep, {"lean": bets["lean"], "edge12": e12.assign(league="SP1")}
-    )
-    assert out["all"]["leagues"] == ["E0", "SP1"]
-    assert out["all"]["edge12"]["edge12"]["bets"] == 2
-    assert out["all"]["edge12"]["verdict"]["passes"] in (True, False)
-    again = dpb.merge_file(out, "E0", rep, bets)  # a rerun replaces, never doubles
-    assert again["all"]["edge12"]["edge12"]["bets"] == 2
-
-
-def test_league_report_end_to_end_on_a_tiny_league(tmp_path):
+def tiny_league(tmp_path):
     hist = history(tmp_path)
     m = merged_rows()
     price_cols = [c for c in m.columns if c.startswith(("odds_", "close_"))]
     preds = m.drop(columns=price_cols)
     pins = m[["season", "date", "home", "away", *price_cols]]
-    rep, bets = dpb.league_report("E0", preds, pins, hist)
-    assert rep["seasons"] == ["2024/25"] and rep["candidates"] == 1
-    assert rep["coverage"][0]["look"] == 1 and rep["fits"] == 0  # too few rows for a blend
-    assert rep["edge12"]["edge12"]["bets"] == 1 and rep["lean"]["all_odds"]["lean"]["bets"] == 0
-    same = rep["pinnacle_same_matches"]
-    assert same["candidates"] == 1 and same["edge12"]["edge12"]["bets"] == 1  # 0.60 x 2.0
-    assert bets["edge12"].iloc[0]["odds"] == 1.9  # DraftKings', not Pinnacle's early 2.0
-    assert any("Model 12%: 1 bets" in line for line in dpb.headline(rep))
+    return dpb.league_reports("E0", preds, pins, hist)
+
+
+def test_league_reports_in_the_pinnacle_files_shape(tmp_path):
+    lr, lbets, er, ebets = tiny_league(tmp_path)
+    for rep in (lr, er):
+        assert rep["kind"] == "draftkings" and rep["seasons_included"] == ["2024/25"]
+        c = rep["coverage"][0]
+        assert (c["early_share"], c["close_share"], c["included"]) == (0.5, 0.5, True)
+    assert lr["fits"] == 0 and lr["lean"]["bets"] == 0  # too few rows for a blend
+    assert er["edge12"]["bets"] == 1 and ebets.iloc[0]["odds"] == 1.9  # DraftKings', not 2.0
+    assert er["pinnacle_same_matches"]["edge12"]["bets"] == 1  # 0.60 x 2.0 at Pinnacle early
+    assert er["clv_dk"]["bets"] == 1 and "p_blend" in ebets
+    assert any("Model 12% at DraftKings: 1 bets" in line for line in dpb.headline("E0", lr, er))
+
+
+def test_build_files_are_app_ready_and_pool_every_league(tmp_path):
+    from soccer_stats import edge12_backtest as eb
+    from soccer_stats import paper
+
+    lr, lbets, er, ebets = tiny_league(tmp_path)
+    sp1 = er.copy()
+    lean = {"E0": (lr, lbets), "SP1": (lr, lbets.assign(league="SP1"))}
+    e12 = {"E0": (er, ebets), "SP1": (sp1, ebets.assign(league="SP1"))}
+    lf, ef = dpb.build_files(lean, e12, from_season=2019, names={"E0": "Premier League"})
+    assert lf["kind"] == "lean_backtest" and ef["kind"] == eb.KIND  # the app's sections read them
+    assert lf["book"] == ef["book"] == "draftkings" and "coverage_note" in lf
+    assert ef["all"]["edge12"]["bets"] == 2 and ef["bets_total"] == 2
+    assert "by_odds_band" in ef["leagues"]["E0"] and "sizing" in ef["leagues"]["E0"]
+    assert ef["verdict"]["bets"] == 2 and ef["verdict"]["passes"] in (True, False)
+    assert lf["verdict"]["live_rule"]["odds_range"] == list(tr.LEAN_ODDS_RANGE)
+    assert "price" in lf["rule"] and "DraftKings" in lf["rule"]["price"]
+    for rep in lf["leagues"].values():
+        assert lb.OUTCOMES not in rep  # outcome rows are never saved
+    sec = eb.app_section(json.loads(json.dumps(ef, default=str)))
+    assert sec["available"] and sec["bets_shown"] == 2
+    assert paper._dk_section({"available": False, "note": "x"})["note"] == paper.DK_MISSING_NOTE
+
+
+def test_unmatched_feed_names_are_listed(tmp_path):
+    history(tmp_path)
+    missing = dpb.unmatched_names("E0", {"Arsenal", "Chelsea", "Everton"}, tmp_path)
+    assert missing == {"Fulham": 1}
+
+
+def test_serie_a_feed_names_land_on_football_data():
+    from soccer_stats.odds_feed import _team
+
+    known = {"Inter", "Milan", "Verona", "Roma"}
+    for feed, ours in {
+        "Inter Milan": "Inter",
+        "FC Internazionale": "Inter",
+        "Hellas Verona FC": "Verona",
+        "Hellas Verona": "Verona",
+        "AC Milan": "Milan",
+    }.items():
+        assert _team(feed, known) == ours
+
+
+def test_coverage_note_names_partial_seasons():
+    row = {"included": True, "matches": 100, "early": 95, "both": 95, "early_share": 0.95}
+    leagues = {
+        "E0": {"name": "Premier League", "coverage": [{**row, "label": "2020/21"}]},
+        "E1": {
+            "name": "Championship",
+            "coverage": [
+                {**row, "label": "2021/22", "early": 67, "both": 66, "early_share": 0.67},
+                {**row, "label": "2022/23", "early": 0, "both": 0, "early_share": 0.0},
+                {**row, "label": "2023/24", "early": 90, "both": 40, "early_share": 0.9},
+                {**row, "label": "2019/20", "early_share": 0.0, "included": False},
+            ],
+        },
+    }
+    parts = dpb.partial_coverage(leagues)
+    assert [(p["league"], p["season"]) for p in parts] == [
+        ("E1", "2021/22"),
+        ("E1", "2022/23"),
+        ("E1", "2023/24"),
+    ]
+    note = dpb.coverage_note(leagues)
+    assert "Championship 2021/22 (DraftKings priced 67% of matches)" in note
+    assert "Championship 2022/23 (no DraftKings history bought yet)" in note
+    assert "Pinnacle's close on 44% of those" in note and "Premier League" not in note
+    assert dpb.coverage_note({"E0": leagues["E0"]}) == dpb.COVERAGE_NOTE
+
+
+def test_bundesliga_ligue_1_and_championship_feed_names_land_on_football_data():
+    from soccer_stats.odds_feed import _team
+
+    known = {"Darmstadt", "St Pauli", "St Etienne", "West Brom", "West Ham"}
+    for feed, ours in {
+        "SV Darmstadt 98": "Darmstadt",
+        "FC St. Pauli": "St Pauli",
+        "St. Pauli": "St Pauli",
+        "Saint Etienne": "St Etienne",
+        "Saint-Etienne": "St Etienne",
+        "West Bromwich": "West Brom",
+        "West Bromwich Albion": "West Brom",
+    }.items():
+        assert _team(feed, known) == ours

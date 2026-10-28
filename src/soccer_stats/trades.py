@@ -495,6 +495,7 @@ def dnb_rule(parent: dict | None, track: str) -> dict:
             "sigma": sd if _ok(sd) and sd > 0 else None,
             "odds_range": list(LEAN_ODDS_RANGE),
             "odds_range_on": "dnb_price",
+            "fit_made_at": parent.get("fit_made_at"),
             "note": DNB_LEAN_NOTE + " " + DNB_NOTE,
         }
     return {
@@ -636,6 +637,16 @@ def portfolio_of(trade: dict) -> str:
 def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str:
     """League, season, home and away (plus player and market for player bets)."""
     return "|".join([league, str(season), home, away, *extra])
+
+
+def holds(ledger, tid: str) -> bool:
+    """Whether `ledger` (ids, or a dict keyed by them) already holds trade `tid`, ignoring
+    case: ESPN renamed a Champions League club between builds ("VIKING FK" then "Viking
+    FK", 18 Oct), and the second spelling must not open a second trade on the match."""
+    if tid in ledger:
+        return True
+    key = tid.casefold()
+    return any(x.casefold() == key for x in ledger)
 
 
 ENTRY_FIELDS = (

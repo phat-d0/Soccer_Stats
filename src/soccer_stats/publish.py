@@ -269,13 +269,15 @@ def align_to_schedule(dk: pd.DataFrame, fixtures: pd.DataFrame, hours: float = 3
 
 
 def duplicate_fixtures(fixtures: list[dict]) -> list[tuple]:
-    """Cards that share (league, home, away, kickoff): should always be empty."""
+    """Cards that share (league, home, away, kickoff), names compared without case: should
+    always be empty."""
     seen, dups = set(), []
     for f in fixtures:
         key = (f.get("league", lgs.PRIMARY), f.get("home"), f.get("away"), f.get("kickoff"))
-        if key in seen:
+        folded = (key[0], str(key[1] or "").casefold(), str(key[2] or "").casefold(), key[3])
+        if folded in seen:
             dups.append(key)
-        seen.add(key)
+        seen.add(folded)
     return dups
 
 
@@ -514,9 +516,10 @@ def research_studies(registry=None, lab_dir: Path = LAB_DIR) -> list[dict]:
 
 
 def markets_research(dirs=(), results=None, path: Path = MARKETS_RESEARCH_FILE) -> dict | None:
-    """Record > Goals & corners: the committed research numbers (lab/markets_research.json)
-    plus the live team-total test's progress. None if the file is missing or unreadable;
-    a progress failure leaves an error note and keeps the research. Never raises."""
+    """Moneyline's goals-market rows (Goals markets, Team totals): the committed research
+    numbers (lab/markets_research.json) plus the live team-total test's progress. None if
+    the file is missing or unreadable; a progress failure leaves an error note and keeps the
+    research. Never raises."""
     try:
         data = json.loads(Path(path).read_text())
         if not isinstance(data, dict):
@@ -708,12 +711,6 @@ def portfolio_placeholder() -> dict:
             "presets": list(FILTER_PRESETS),
             "fresh_hours": FRESH_HOURS,
         },
-        "live": {
-            "trades": [],
-            "summary": {"trades": 0},
-            "error": "The paper-trade ledger wasn't updated in this build.",
-        },
-        "backtest": None,
     }
 
 

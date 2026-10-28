@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from soccer_stats import backcast as bc
 from soccer_stats import bands as bd
 from soccer_stats import calibration as cal
 from soccer_stats import edge12_backtest as e12b
@@ -48,6 +49,13 @@ from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
 LEAN_BACKTEST = "lean_backtest.json"  # on data-log under backtest/ (soccer-stats backtest-lean)
 EDGE12_BACKTEST = "edge12_backtest.json"  # on data-log under backtest/ (backtest-edge12)
+# The same two rules at DraftKings' own historical prices (backtest-dk-prices, 28 Oct).
+LEAN_BACKTEST_DK = "lean_backtest_dk.json"
+EDGE12_BACKTEST_DK = "edge12_backtest_dk.json"
+DK_MISSING_NOTE = (
+    "The backtest at DraftKings' own prices hasn't been run yet: it fills in league by "
+    "league as the bought DraftKings history lands."
+)
 FRESH_HOURS = 3.0  # only open on odds fetched this recently
 VOID_MOVED_HOURS = 48.0
 VOID_AFTER_DAYS = 14
@@ -399,7 +407,7 @@ def update_ledger(
             if not pick:
                 continue
             tid = tr.trade_id(league, tr.season_label(kickoff), c["home"], c["away"])
-            if tid in ledger:
+            if tr.holds(ledger, tid):
                 continue
             base = _base_probs(c)
             t = tr.new_trade(
@@ -558,11 +566,11 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean, shadow=None)
         p_source="blend",
         strategy="lean",
     )
-    if t["id"] in ledger:
+    if tr.holds(ledger, t["id"]):
         return None
     in_range = tr.in_lean_range(pick["odds"])
     if not in_range:
-        if shadow is None or t["id"] + tr.SHADOW_SUFFIX in shadow:
+        if shadow is None or tr.holds(shadow, t["id"] + tr.SHADOW_SUFFIX):
             return None
         t["id"] += tr.SHADOW_SUFFIX
         t.update(shadow=True, excluded_by="odds_range")
@@ -1051,7 +1059,7 @@ def update_corner_ledger(
                 ref=ref,
                 book=book,
             )
-            if t["id"] in ledger:
+            if tr.holds(ledger, t["id"]):
                 continue
             t["model_mean"] = model.get("mean")
             # Until a later quote, the entry price is the close.
@@ -1531,7 +1539,7 @@ def variant_since(parent: list[dict], kept: list[dict], defined_at: str) -> dict
 
 
 def _match_key(t: dict) -> str:
-    return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away"))
+    return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away")).casefold()
 
 
 def _has_value(v) -> bool:
@@ -1635,14 +1643,14 @@ def new_rule_trades(real: list[dict]) -> list[dict]:
 def lean_backcast(
     trades: list[dict], started: str | None = None, real: list[dict] | None = None
 ) -> dict:
-    """The new-rule line's backcast part: `applied`, the trades opened before
-    tr.LEAN_RANGE_FROM (count, settled, first and last opened), `lean_started` (Lean's
-    first trade, in or out of the range: both lines start there), the note and, with
+    """The new-rule line's backcast part (backcast.block's shape: applied, started, until,
+    defined_at = tr.LEAN_RANGE_FROM, the trades opened before it with settled, from and to,
+    note, descriptive), `lean_started` (Lean's first trade, in or out of the range: both
+    lines start there; also `started`) and, with
     `real` (every real Lean trade), the pre-rule summaries `new_rule` (in range), `old_rule`
     (all odds) and `cut` (outside the range), descriptive only."""
     since = _utc(tr.LEAN_RANGE_FROM)
     before = [t for t in trades if not _opened_since(t, since)]
-    opened = sorted(str(t.get("opened_at")) for t in before if t.get("opened_at"))
     extra = {}
     if real is not None:
         old = [
@@ -1655,19 +1663,15 @@ def lean_backcast(
             "new_rule": portfolio_section(before)["summary"],
             "old_rule": portfolio_section(old)["summary"],
             "cut": portfolio_section([t for t in old if t["id"] not in kept])["summary"],
-            "descriptive": True,
         }
-    return {
-        "applied": True,
-        "until": tr.LEAN_RANGE_FROM,
-        "trades": len(before),
-        "settled": sum(1 for t in before if t.get("status") in ("won", "lost")),
-        "from": opened[0] if opened else None,
-        "to": opened[-1] if opened else None,
-        "lean_started": started,
-        "note": LEAN_BACKCAST_NOTE,
+    return bc.block(
+        before,
+        tr.LEAN_RANGE_FROM,
+        note=LEAN_BACKCAST_NOTE,
+        started=started or bc.START,
+        lean_started=started,  # kept for the app's older readers (same as `started`)
         **extra,
-    }
+    )
 
 
 def lean_shadow_section(
@@ -1754,6 +1758,11 @@ def _safe_shadow_section(real, shadow, rule, now) -> dict:
             "defined_at": tr.LEAN_RANGE_FROM,
             "error": type(exc).__name__,
         }
+
+
+def _dk_section(sec: dict) -> dict:
+    """A DraftKings-price backtest's app section; its own note when the file is missing."""
+    return sec if sec.get("available") else {**sec, "note": DK_MISSING_NOTE}
 
 
 def portfolios_section(
@@ -1951,6 +1960,8 @@ def run(
     """
     now = now or pd.Timestamp.now(tz="UTC")
     portfolio = data.setdefault("portfolio", {})
+    for legacy in ("live", "backtest"):  # dropped 28 Oct: the app reads `portfolios`
+        portfolio.pop(legacy, None)
     live = {"trades": [], "summary": {"trades": 0}, "error": None, "note": None}
     written = 0
     live_trades: list[dict] = []
@@ -2088,25 +2099,14 @@ def run(
             if found is not None or p["id"] not in backtests:
                 backtests[p["id"]] = found
         _add_league_levels(backtests.get("moneyline"), codes, learned, log_dir, league)
-        bt = backtest_path(log_dir, league)
-        if bt.exists():
-            try:
-                portfolio["backtest"] = json.loads(bt.read_text())
-            except ValueError:
-                portfolio["backtest"] = None
         pm = Path(log_dir) / "backtest" / f"{league}_players.json"
         if pm.exists():
             try:
                 players = json.loads(pm.read_text())
             except ValueError:
                 players = {}
-            ptrades = players.pop("trades", [])
+            players.pop("trades", None)  # the player_shots portfolio's backtest has them
             portfolio["player_model"] = players
-            if ptrades:  # priced player backtest trades join the match ones
-                b = portfolio.get("backtest") or {}
-                combined = (b.get("trades") or []) + ptrades
-                merged = portfolio_section(combined)
-                portfolio["backtest"] = {**b, **merged}
     # Each match strategy's own backtest on Pinnacle's early prices (backtest-lean and
     # backtest-edge12; the Champions League at the close), trimmed for data.json; no file
     # = {available: False, note}. E0_dk.json stays Moneyline's `backtest`.
@@ -2114,14 +2114,21 @@ def run(
     portfolio["strategy_backtests"] = {
         "lean": lb.app_section(_read_json(bdir / LEAN_BACKTEST) if bdir else None),
         "edge12": e12b.app_section(_read_json(bdir / EDGE12_BACKTEST) if bdir else None),
+        # The same rules at DraftKings' own historical prices, in the same shape.
+        "lean_dk": _dk_section(
+            lb.app_section(_read_json(bdir / LEAN_BACKTEST_DK) if bdir else None)
+        ),
+        "edge12_dk": _dk_section(
+            e12b.app_section(_read_json(bdir / EDGE12_BACKTEST_DK) if bdir else None)
+        ),
     }
     try:  # each model's equation and fitted numbers per league (from data.json only)
         portfolio["models"] = eq.section(data)
     except Exception as exc:  # noqa: BLE001  never costs the portfolio
         portfolio["models"] = {"error": type(exc).__name__}
-    portfolio["live"] = live
-    # One portfolio per strategy (the app reads these); live, backtest and player_model
-    # above stay for one release.
+    # One portfolio per strategy (the app reads these). The legacy portfolio.live and
+    # portfolio.backtest keys are gone (28 Oct); player_model stays (Portfolio -> Player
+    # shots reads it).
     if live.get("error") and not corner_section["error"]:
         corner_section["error"] = live["error"]
     corner_section["strategies"] = corner_strategies(corner_trades, now)
@@ -2158,6 +2165,9 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
             res = res[res["league"] == lg]
         log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
         books = ol.load(log_dir, lg, kind=ol.BOOKS) if log is not None else None
+        # The tracks backcast from 14 Oct on the odds log (owner, 28 Oct): opened once,
+        # then closed and settled below like every other trade.
+        events += pdnb.backcast(ledger, log, lg, rules[lg], ref)
         events += pdnb.update_ledger(
             ledger,
             cards,
@@ -2173,8 +2183,12 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
         )
         trades += list(ledger.values())
     n = pdnb.append_events(log_dir, events)
-    opened = sum(1 for e in events if e.get("type") == "open")
-    print(f"Draw no bet tracks: {len(trades)} trades, {opened} opened this update")
+    opened = sum(1 for e in events if e.get("type") == "open" and not e.get("backcast"))
+    back = sum(1 for e in events if e.get("type") == "open" and e.get("backcast"))
+    print(
+        f"Draw no bet tracks: {len(trades)} trades ({sum(map(bc.is_backcast, trades))} "
+        f"backcast), {opened} opened this update" + (f", {back} backcast" if back else "")
+    )
     return n, trades
 
 

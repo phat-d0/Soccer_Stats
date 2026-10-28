@@ -296,7 +296,8 @@ def test_missing_blends_file_means_no_lean_with_a_note(tmp_path):
     paper.run(data, tmp_path, None, now=NOW)
     r = data["portfolio"]["rules"]["E0"]
     assert r["sigma"] is None and r["lean"]["source"] == "none"
-    ids = [t["id"] for t in data["portfolio"]["live"]["trades"]]
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    ids = [t["id"] for t in ml["live"]["trades"]]
     assert ids == ["E0|2627|Arsenal|Leeds"]
 
 

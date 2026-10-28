@@ -67,6 +67,8 @@ DATA_LOG_FILES = [
     "backtest/E0_players_detail.json",
     "backtest/lean_backtest.json",
     "backtest/edge12_backtest.json",
+    "backtest/lean_backtest_dk.json",
+    "backtest/edge12_backtest_dk.json",
     "backtest/match_blends.json",
 ]
 TEAMS = [
@@ -380,6 +382,16 @@ def build(src: Path, out: Path) -> dict:
         extra = [r for r in eb["bets"][EDGE12_BETS:] if r[li] not in seen and not seen.add(r[li])]
         eb["bets"] = newest + extra
         eb["bets_shown"] = len(eb["bets"])
+    # Each league's bankroll curves (flat and Kelly) at every third point, the last kept,
+    # for room under 1.5 MB; the app draws whatever points come.
+    # (All's curves too since the real DraftKings files joined, 28 Oct.)
+    for f in (sb.get("lean") or {}, sb.get("edge12") or {}):
+        for part in [f.get("all"), *(f.get("leagues") or {}).values()]:
+            for block in ((part or {}).get("sizing") or {}).values():
+                c = block.get("curve") if isinstance(block, dict) else None
+                if isinstance(c, list) and len(c) > 20:
+                    block["curve"] = c[::3] + ([c[-1]] if (len(c) - 1) % 3 else [])
+    add_draftkings_backtests(sb)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -504,7 +516,8 @@ SYNTHETIC_SETTLED = [
 
 
 def add_settled_live_matches(data: dict) -> None:
-    live = data["portfolio"].get("live") or {"trades": []}
+    ml = next((p for p in data["portfolio"].get("portfolios") or [] if p["id"] == "moneyline"), {})
+    live = ml.get("live") or {"trades": []}
     trades = list(live.get("trades") or [])
     for home, away, ko, market, odds, close, mins, score, won in SYNTHETIC_SETTLED:
         kick = pd.Timestamp(ko)
@@ -544,7 +557,6 @@ def add_settled_live_matches(data: dict) -> None:
                 "settled_at": (kick + pd.Timedelta(hours=3)).isoformat(),
             }
         )
-    data["portfolio"]["live"] = {**live, **paper.portfolio_section(trades)}
     # Rebuild the per-strategy portfolios with these trades, keeping their backtests.
     backtests = {p["id"]: p["backtest"] for p in data["portfolio"].get("portfolios") or []}
     r = data["portfolio"].get("rule") or {}
@@ -556,10 +568,6 @@ def add_settled_live_matches(data: dict) -> None:
     data["portfolio"]["portfolios"] = paper.portfolios_section(
         live, trades, backtests, match_rule, now=NOW
     )
-    # The app reads only `portfolios`: leave the old top-level copies out of the fixture
-    # (production keeps them for one release), so the smoke test proves nothing needs them.
-    data["portfolio"].pop("live", None)
-    data["portfolio"].pop("backtest", None)
 
 
 # The research lab's edge_threshold contract, until data-log's backtests carry it: one
@@ -1108,6 +1116,108 @@ def _passed_study():
     }
 
 
+# The same replays at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
+# strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape): the
+# real files from data-log when they are there (trimmed), else made up from the Pinnacle
+# replay's own numbers (ROI 2 points and CLV 1 point worse, 2020/21 to 2024/25), the Premier
+# League and All only, to stay under 1.5 MB.
+DK_SEASONS = ["2020/21", "2021/22", "2022/23", "2023/24", "2024/25"]
+
+
+def _dk_metrics(m: dict | None) -> dict | None:
+    if not m:
+        return m
+    out = dict(m)
+    for k, shift in (("roi", -0.02), ("clv", -0.01)):
+        if isinstance(out.get(k), (int, float)):
+            out[k] = round(out[k] + shift, 4)
+        ci = out.get(f"{k}_ci95")
+        if isinstance(ci, list) and len(ci) == 2 and all(isinstance(v, (int, float)) for v in ci):
+            out[f"{k}_ci95"] = [round(v + shift, 4) for v in ci]
+    return out
+
+
+def _dk_part(p: dict, metric: tuple, name: str | None = None) -> dict:
+    out = {"kind": "draftkings", "seasons_included": DK_SEASONS}
+    out |= {k: _dk_metrics(p.get(k)) for k in metric if p.get(k)}
+    out["by_odds_band"] = [_dk_metrics(b) for b in p.get("by_odds_band") or []]
+    return out | ({"name": name} if name else {})
+
+
+DK_BETS = 20  # real DraftKings-price backtest rows kept
+
+
+def _trim_dk(f: dict) -> None:
+    """The real file, smaller: its newest DK_BETS bets, no calibration (the Model view reads
+    the Pinnacle files'), bankroll curves only under All and the Premier League, each at
+    every eighth point."""
+    if f.get("bets"):
+        f["bets"] = f["bets"][:DK_BETS]
+        f["bets_shown"] = len(f["bets"])
+    for code, part in [("", f.get("all")), *(f.get("leagues") or {}).items()]:
+        if not isinstance(part, dict):
+            continue
+        part.pop("calibration", None)
+        if code not in ("", "E0"):
+            part.pop("sizing", None)
+        (part.get("pinnacle_same_matches") or {}).pop("by_season", None)
+        for block in (part.get("sizing") or {}).values():
+            c = block.get("curve") if isinstance(block, dict) else None
+            if isinstance(c, list) and len(c) > 20:
+                block["curve"] = c[::8] + ([c[-1]] if (len(c) - 1) % 8 else [])
+
+
+def add_draftkings_backtests(sb: dict) -> None:
+    for key, metric in (("lean", ("lean", "strong")), ("edge12", ("edge12",))):
+        if (sb.get(f"{key}_dk") or {}).get("available"):  # Moneyline's real file (28 Oct)
+            _trim_dk(sb[f"{key}_dk"])
+            continue
+        src = sb.get(key) or {}
+        if not src.get("available"):
+            continue
+
+        e0 = (src.get("leagues") or {}).get("E0")
+        if not e0 or e0.get("error"):
+            continue
+        sb[f"{key}_dk"] = {
+            "available": True,
+            "kind": src.get("kind"),
+            "book": "draftkings",
+            "coverage_note": "Made up for the fixture: DraftKings priced the match 48 hours "
+            "before kickoff, and Pinnacle's close was in the same snapshot.",
+            "title": f"{'Lean' if key == 'lean' else 'Model 12%'} replayed on DraftKings' "
+            "historical prices",
+            "note": "Made up for the fixture from the Pinnacle replay until Moneyline's file "
+            "lands.",
+            "generated_at": src.get("generated_at"),
+            "rule": src.get("rule"),
+            "leagues": {"E0": _dk_part(e0, metric, e0.get("name"))},
+            "all": _dk_part(src.get("all") or {}, metric),
+            "bet_fields": src.get("bet_fields"),
+            "bets": (src.get("bets") or [])[:3],
+            "bets_shown": min(3, len(src.get("bets") or [])),
+            "bets_total": min(3, len(src.get("bets") or [])),
+        }
+
+
+def _trim_cashout(st: dict) -> None:
+    pr = st.get("primary_rule") or {"t": 0.5, "m": 0.05}
+    keep = ("hold", f"cash T={pr['t']:.2f} m={pr['m']:.2f}")
+    for d in (st.get("designs") or {}).values():
+        if d.get("role") == "judged":
+            continue
+        d["variants"] = [v for v in d.get("variants") or [] if v.get("name") in keep]
+        for k in ("calibration", "by_league", "by_season"):
+            d.pop(k, None)
+    for c in (st.get("curves") or {}, (st.get("curves") or {}).get("flat") or {}):
+        pts = c.get("points") or []
+        if len(pts) > 60:
+            step = len(pts) // 60 + 1
+            c["points"] = pts[::step] + ([pts[-1]] if (len(pts) - 1) % step else [])
+    bets = st.get("bets") or []
+    st["bets"] = bets[:: max(1, len(bets) // 40)][:40]
+
+
 def add_research_studies(data: dict) -> None:
     studies = _clean(pub.research_studies())
     # The real strategy search (Research, #131) is ~100 KB: the fixture keeps 60 of its best
@@ -1144,9 +1254,16 @@ def add_research_studies(data: dict) -> None:
             "bets": [],
             "notes": ["Synthetic study for the fixture."],
         },
-        _cashout_study(),
         _passed_study(),
     ]
+    # The cash-out test: Research's real file (lab/cashout_research.json, #136) when it is
+    # committed, trimmed to fit (the judged design whole; hold and the judged rule for the
+    # other samples; 60 points a curve; 40 cash-outs); else a made-up one in its shape.
+    real = next((x for x in studies if x["id"] == "cashout_ht"), None)
+    if real:
+        _trim_cashout(real)
+    else:
+        synthetic.insert(1, _cashout_study())
     data["research_studies"] = studies + synthetic
 
 
@@ -1527,7 +1644,15 @@ LEAN_SHADOWS = [
 # close 1X2 (DraftKings), Pinnacle's close 1X2, score (None = open)
 FIXTURE_DNB_FROM = "2026-09-27T00:00:00+00:00"
 tr.DNB_FROM = FIXTURE_DNB_FROM
+# Every new track starts on the original portfolio's start, backcast from logged prices (owner
+# via the lead, 28 Oct; Moneyline's backcast block): here 14 Sep, so the first two trades below
+# (opened before FIXTURE_DNB_FROM) are backcast ones.
+FIXTURE_DNB_STARTED = "2026-09-14T00:00:00+00:00"
 DNB_TRADES = [
+    ("E0", "Everton", "Wolves", "2026-09-18T19:00:00Z", "home", (2.1, 3.4, 3.6), 0.7)
+    + ((2.05, 3.4, 3.7), (2.06, 3.45, 3.75), "1-0"),
+    ("SP1", "Sevilla", "Getafe", "2026-09-21T16:00:00Z", "home", (1.8, 3.5, 4.8), 0.86)
+    + ((1.8, 3.6, 4.9), (1.82, 3.6, 5.0), "0-1"),
     ("E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "home", (1.9, 3.6, 4.2), 0.84)
     + ((1.85, 3.7, 4.4), (1.86, 3.75, 4.5), "2-0"),
     ("E0", "West Ham", "Arsenal", "2026-09-29T19:00:00Z", "home", (4.5, 3.9, 1.75), 0.42)
@@ -1563,6 +1688,8 @@ def dnb_trades(rules: dict) -> list[dict]:
                 t, dict(zip(tr.LEAN_MARKETS, close, strict=True)), quoted, kick.isoformat()
             )
         )
+        if opened < pd.Timestamp(FIXTURE_DNB_FROM):
+            t.update(backcast=True, backcast_from="odds_log")
         if score:
             h, a = (int(v) for v in score.split("-"))
             t.update(tr.settle_dnb(t, h, a), result_source="football-data")
@@ -1700,6 +1827,39 @@ def add_lean_strategy(data: dict) -> None:
             for track in tr.DNB_TRACKS.values()
         },
     )
+    add_dnb_backcast(data)
+
+
+def add_dnb_backcast(data: dict) -> None:
+    """The draw no bet tracks' `backcast` blocks start at FIXTURE_DNB_STARTED: paper_dnb builds
+    them (backcast.block) with the real 14 Oct start, which is after the fixture's moved
+    DNB_FROM. An older paper.py without blocks gets Model 12%'s track's built here."""
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    for sec in ml["live"].get("strategies") or []:
+        if sec.get("adds") == "dnb" and (sec.get("backcast") or {}).get("applied"):
+            sec["backcast"]["started"] = FIXTURE_DNB_STARTED
+    sec = next(
+        (x for x in ml["live"].get("strategies") or [] if x.get("key") == "edge12_dnb"), None
+    )
+    if not sec or (sec.get("backcast") or {}).get("applied"):
+        return
+    bc = [t for t in ml["live"].get("dnb_trades") or [] if t.get("backcast")]
+    bc = [t for t in bc if t.get("strategy") == "edge12_dnb"]
+    opened = sorted(t["opened_at"] for t in bc)
+    sec["backcast"] = {
+        "applied": bool(bc),
+        "started": FIXTURE_DNB_STARTED,
+        "until": FIXTURE_DNB_FROM,
+        "defined_at": FIXTURE_DNB_FROM,
+        "trades": len(bc),
+        "settled": sum(t["status"] in ("won", "lost") or bool(t.get("push")) for t in bc),
+        "from": opened[0] if opened else None,
+        "to": opened[-1] if opened else None,
+        "note": "Backcast from the logged DraftKings prices: the trades this track would have "
+        "opened from the portfolio's start, before it was defined. Descriptive only.",
+        "descriptive": True,
+        "backcast_from": "odds_log",
+    }
 
 
 def add_second_league(data: dict) -> None:

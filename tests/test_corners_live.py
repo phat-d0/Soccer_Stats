@@ -574,7 +574,6 @@ def test_paper_run_shows_corners_as_their_own_portfolio(tmp_path):
     assert c["backtest"]["holdout"] and c["backtest"]["recalibration"]
     ml = pfs["moneyline"]["live"]["trades"]
     assert all(t["market"] != "team_corners" for t in ml)  # moneyline keeps its own trades
-    assert all(t.get("market") != "team_corners" for t in data["portfolio"]["live"]["trades"])
     dnb = pfs["moneyline"]["live"]["dnb_trades"]  # draw no bet tracks: their own ledger
     assert n == len(ml) + 2 + len(dnb)  # the match opens, the two corner opens, the DNB ones
     json.dumps(data)

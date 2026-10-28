@@ -443,7 +443,27 @@ beside it. The tracks are descriptive, and nothing changes live unless the owner
 - **In data.json:** each track is a section in Moneyline's `live.strategies`, after its parent and
   that parent's other variants (`variant_of`, `adds: "dnb"`, `compare`). The trades are in the live
   section's `dnb_trades`.
-- **No backcast** from the odds log yet (optional in the brief; descriptive at best).
+- **Backcast from 14 Oct** (owner rule, 28 Oct: a new strategy or track starts on the original
+  portfolio's date). `paper_dnb.backcast`, through the shared `backcast.py`, replays both tracks
+  from 14 Oct up to `DNB_FROM` on the DraftKings odds log. Each logged h2h row is what a publish
+  saw at its `logged_at`: the prices, the quote time, and the model's `p` and `p_bet` then. The
+  live gates and rules run on each row in time order: odds downloaded at most 3 h before, kickoff
+  ahead, all three prices, Model 12% on the logged raw `p`, and Lean on the logged `p_bet` with the
+  odds range on the DNB price. So a trade opens at the first logged moment its rule fires.
+  - `sigma_dnb` didn't exist before the 26 Oct refit. Lean's backcast uses that refit's value,
+    and its trades say `sigma_from: "26 Oct refit"`.
+  - Entries carry `backcast: true` and `backcast_from: "odds_log"`. They close on the odds log's
+    last pre-kickoff quote and settle from football-data or ESPN, as live.
+  - A match that already holds a live trade on the track is left alone.
+  - They are never judged. `compare` counts only trades opened from `DNB_FROM`, and each section's
+    `backcast` block (`backcast.block`) gives `applied, started, until, defined_at, trades,
+    settled, from, to, note, descriptive: true`, plus `backcast_from` (and Lean's `sigma_from`).
+    Lean's new-rule `backcast` block has the same shape, plus `lean_started`.
+  - Limits: the log is deduplicated on the price, so a model change with no price change isn't
+    its own observation; `low_data` isn't logged, so that gate can't be replayed.
+  - A dry run on data-log (28 Oct) opens 109 Model 12% DNB trades (E0 11, SP1 12, D1 6, I1 6, F1 9,
+    E1 15, E2 21, E3 15, UCL 14) and 2 Lean DNB trades (F1). Lean's DNB picks are rare on the
+    logged prices: none in seven leagues, and E1's only pick is outside the range.
 
 ## DraftKings history (28 Oct, lead brief 2; lead-approved, cap 200,000)
 
@@ -555,10 +575,20 @@ Pinnacle's early price, a sharper and different book.
   vs Pinnacle's close is above 0. This is the same pass rule as the DNB and Pinnacle
   backtests. ROI is reported, not judged: its ranges are wide. Per-league numbers are
   descriptive.
-- **Where it runs.** `backfill.yml` input `dk_price_backtest` with `league`, from the cached
-  `odds-history-` bodies. It uses no key and no credits. Each run adds or replaces its
-  league's entry in data-log `backtest/dk_price_backtest.json`. It runs once per league as
-  the bodies land.
+- **Where it runs, and the app** (lead, 28 Oct: the owner wants the results in the app).
+  `backfill.yml` input `dk_price_backtest`: every league whose ten-book bodies are in the
+  cached `odds-history-`. It uses no key and no credits, and it reruns as each league's bodies
+  land. It writes data-log `backtest/lean_backtest_dk.json` and `edge12_backtest_dk.json` in
+  exactly the shape of `lean_backtest.json` and `edge12_backtest.json`, built by their own
+  `build`:
+  - per league: metrics, seasons, odds, edge and CLV bands, calibration and sizing;
+  - `all`, and bets newest first.
+
+  Each league entry has `kind: "draftkings"`. In its `coverage` rows, `early_share` is
+  DraftKings at the look and `close_share` is Pinnacle's close in the same body. Each entry
+  also carries `clv_dk` and `pinnacle_same_matches`. The top level adds `book`, `verdict` and
+  `coverage_note`. `paper.run` publishes them as `portfolio.strategy_backtests.lean_dk` and
+  `.edge12_dk` through the same `app_section`.
 
 ## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
 
