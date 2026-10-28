@@ -894,26 +894,37 @@ const STEPS = [
     // No summary covers a competition plus a driver, so no ROI range may show.
     if (text.includes("95% range on ROI")) throw new Error("SP1 model-driven shows a ROI range it has no summary for");
   }],
-  // The backtest at DraftKings' own prices (lead brief, 28 Oct; strategy_backtests.lean_dk,
-  // made up in the fixture until Moneyline's file lands): first when present, a switch to
-  // Pinnacle's replay, a coverage line for each and the same rule at both books. It ends on
+  // The backtest at DraftKings' own prices (lead brief, 28 Oct; Moneyline's real
+  // strategy_backtests.lean_dk from data-log): first when present, a switch to Pinnacle's
+  // replay, a coverage line for each, the pre-registered test, CLV against DraftKings' own
+  // close and the same rule at both books (like for like within a competition). It ends on
   // Pinnacle's, which the next steps check in full.
   ["portfolio-lean-backtest-dk", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
     const on = await p.locator(".bt-src button.on").innerText();
     if (on !== "At DraftKings' prices") throw new Error(`backtest source on: ${on}`);
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["At DraftKings' prices: 2020/21 to 2024/25, 1 league.", "At Pinnacle's prices: 2019/20", "The same rule at both books", "In the replay at DraftKings' prices Lean", "Lean replayed on DraftKings' historical prices"]) {
+    const nDk = await p.evaluate(() => Object.keys(state.data.portfolio.strategy_backtests.lean_dk.leagues).length);
+    for (const w of [`At DraftKings' prices: 2020/21 to 2024/25, ${nDk} leagues.`, "At Pinnacle's prices: 2019/20", "The same rule at both books", "In the replay at DraftKings' prices Lean", "Blend Lean at DraftKings' own prices", "Pre-registered test: fails.", "The live rule, −200 to +200: fails", "Every price (the old rule): fails", "Against DraftKings' own close (descriptive)"]) {
       if (!text.includes(w)) throw new Error(`DraftKings backtest lacks "${w}"`);
     }
-    // The comparison: the same rule's ROI at both books, from each file.
+    // The comparison under All: the same rule's ROI at both books, from each file.
     const want = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return [signedPct(sb.lean_dk.all.lean.roi), signedPct(sb.lean.all.lean.roi)]; });
     const table = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
     if (!table.startsWith("DraftKings Pinnacle") || !want.every((w) => table.includes(w))) throw new Error(`both-books table: ${table} vs ${want}`);
-    // La Liga is in Pinnacle's replay only: no switch, and the note says so.
-    await p.click('.chip[data-league="SP1"]');
+    // A competition in both: like for like, the same matches at Pinnacle; DraftKings' coverage columns.
+    await p.click('.chip[data-league="E0"]');
+    const same = await p.evaluate(() => signedPct(state.data.portfolio.strategy_backtests.lean_dk.leagues.E0.pinnacle_same_matches.lean.clv));
+    const t2 = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
+    if (!t2.startsWith("DraftKings Pinnacle, same matches") || !t2.includes(same)) throw new Error(`same-matches table: ${t2} vs ${same}`);
+    const e0 = await p.textContent("#view");
+    if (!e0.includes("Like for like") || !e0.includes("DK 48 h") || e0.includes("Pre-registered test")) throw new Error("E0 DraftKings view");
+    // A league only Pinnacle's replay has: no switch, and the note says so.
+    const only = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return Object.keys(sb.lean.leagues).find((c) => !sb.lean_dk.leagues[c] && sb.lean.leagues[c]?.kind !== "close"); });
+    await p.click(`.chip[data-league="${only}"]`);
     if (await p.locator(".bt-src").count()) throw new Error("a switch for a league only one book covers");
-    if (!(await p.textContent("#view")).includes("La Liga is only in the replay at Pinnacle's prices.")) throw new Error("one-book note");
+    const name = await p.evaluate((c) => leagueName(c), only);
+    if (!(await p.textContent("#view")).includes(`${name} is only in the replay at Pinnacle's prices.`)) throw new Error("one-book note");
     await p.click('.chip[data-league=""]');
     await p.click('button[data-btsrc="pin"]');
     if ((await p.locator(".bt-src button.on").innerText()) !== "At Pinnacle's prices") throw new Error("switch to Pinnacle");

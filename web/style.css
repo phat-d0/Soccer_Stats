@@ -890,3 +890,7 @@ details.drv-fold { margin-top: 10px; }
 /* A search study's rule tables: each range on its own line under the number. */
 .cb-table td .meta.rng { display: block; white-space: normal; font-size: 11px; }
 .co-grid tr.co-primary td { font-weight: 600; }
+/* The DraftKings replays' pre-registered test: one line per judged rule. */
+.dk-test-rows { margin: 6px 0; padding-left: 18px; }
+.dk-test-rows li { margin: 2px 0; }
+.dk-test .muted { display: block; font-size: 12px; }

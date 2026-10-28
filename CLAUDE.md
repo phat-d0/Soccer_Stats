@@ -941,7 +941,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v66) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v67) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1011,10 +1011,18 @@ the owner's baseball app, so the balance can drop without any run here.
   (`btPartBest`; Lean's new rule still pools its range's bands, "· at DraftKings"). Model 12%
   under the Premier League keeps its DraftKings 2025/26 backtest (`E0_dk.json`, $10 a bet)
   first, then "Replays at DraftKings' and Pinnacle's prices" with the switch; without
-  `edge12_dk` the old layout stays. The fixture makes both `_dk` files up from the Pinnacle
-  replay (ROI 2 points and CLV 1 point worse, 2020/21–2024/25, All and the Premier League only;
-  `add_draftkings_backtests`) and keeps every second point of each league's bankroll curves to
-  stay under 1.5 MB. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
+  `edge12_dk` the old layout stays. Since v67 the DraftKings files' own fields show:
+  under All the pre-registered test (`dkTestHtml`, `.dk-test`: `verdict`, Lean's `live_rule`
+  and `all_odds`, pooled CLV vs Pinnacle's close in the same snapshot, its range above 0 to
+  pass; `method` named), CLV against DraftKings' own close as a descriptive line
+  (`dkCloseLine`, `clv_dk`, All and each league), within a competition "The same rule at both
+  books" is like for like (DraftKings vs "Pinnacle, same matches" from
+  `pinnacle_same_matches[key]`), and DraftKings' coverage table reads "DK 48 h" / "PIN
+  close". The fixture copies data-log's real `lean_backtest_dk.json` / `edge12_backtest_dk.json`
+  (trimmed by `_trim_dk`: 20 bets, no calibration, no `pinnacle_same_matches.by_season`,
+  sizing curves only under All and the Premier League at every eighth point; made up from the
+  Pinnacle replay only when data-log lacks them) and keeps every third point of the Pinnacle
+  files' bankroll curves, All's included, to stay under 1.5 MB. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
   archived too (`PF_ARCHIVED` {corners: pinnacle, draftkings}, `archivedTrack`: "Archived Oct
   25 · still logs every 12%-edge pick"; data and ledgers unchanged), so Team corners' main list
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
