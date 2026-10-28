@@ -445,6 +445,57 @@ beside it. The tracks are descriptive, and nothing changes live unless the owner
   section's `dnb_trades`.
 - **No backcast** from the odds log yet (optional in the brief; descriptive at best).
 
+## DraftKings history (28 Oct, lead brief 2; lead-approved, cap 200,000)
+
+The goal is to replay every live strategy at DraftKings' own prices in every league, not
+only at Pinnacle's early price, and with Pinnacle's price taken from the same snapshot.
+
+**Coverage probe** (`dk_history.py`, `odds-check.yml` `task=dk-history`, run 40647443891,
+400 credits). It bought one ten-book snapshot per league and season, on the first Saturday
+of November at 09:00 UTC, walking back from 2024/25:
+
+- The archive is empty before mid-2020: every 2019/20 snapshot had 0 events.
+- DraftKings is priced from 2020/21 in E0, SP1, D1, I1, E1 and E2, and from 2021/22 in F1
+  and E3. Their 2020/21 snapshots had no DraftKings at all.
+- Pinnacle is in the same bodies everywhere except E2 2020/21–2022/23 and E3 2021/22. It
+  covers about half of E1's events in 2021/22 and 2023/24.
+
+**Estimate.** A 48 h look plus the close, kickoffs within 15 minutes sharing, ten books at 10
+credits a snapshot, covered seasons only: 16,018 snapshots, **160,180 credits**.
+
+| League | Credits |
+| --- | --- |
+| E0 | 24,460 |
+| SP1 | 34,340 |
+| I1 | 30,680 |
+| F1 | 18,680 |
+| D1 | 17,380 |
+| E1 | 16,940 |
+| E2 | 10,100 |
+| E3 | 7,600 |
+
+**The buy** (lead sign-off, 28 Oct). `backfill.yml` with `books=ten`, `league`, `seasons`,
+`max_credits` and `dry_run` off, from the default branch, one run at a time:
+
+- E0 first, at cap 25,000, `seasons` 2020-2024. Report its real cost and its DraftKings and
+  Pinnacle coverage per season.
+- Then SP1, I1, D1, F1, E1, E2 and E3. F1 and E3 start at 2021.
+
+The rules, from `odds_history.backfill`:
+
+- h2h at the live call's ten books, Pinnacle included.
+- Every asked book's prices are kept in `data/raw/odds_history/<code>/`, the paid
+  `odds-history-` cache. It is archived right after the run (#128) and never bought twice.
+- Each season's first 3 snapshots in time order with no DraftKings price stop that season
+  (design C's guard). Cached snapshots count toward the guard.
+- A call billed over 10 credits stops the run.
+- The 3,000 reserve applies (`keep_credits`).
+- Each call is budgeted at 10 at least.
+
+The run prints each season's events and how many DraftKings and Pinnacle priced, plus a
+`BACKFILL_ODDS_JSON` line. No backtest runs in it, so `E0_dk.json` stays as it is. The
+backtests at DraftKings' prices are re-run afterwards, and what changed is recorded here.
+
 ## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
 
 A dataset collected from now on for the in-play questions: comebacks, cash-out, and heavy

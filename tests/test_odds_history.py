@@ -133,3 +133,116 @@ def test_history_and_price_at(tmp_path):
     assert oh.coverage(played, hist) == [
         {"season": "2526", "matches": 2, "priced": 1, "share": 0.5}
     ]
+
+
+def snap_body(books=("draftkings", "pinnacle", "fanduel")):
+    ev = FakeResp(0).json()["data"][0]
+    market = ev["bookmakers"][0]["markets"]
+    return {
+        "timestamp": "2025-09-13T10:55:00Z",
+        "data": [{**ev, "bookmakers": [{"key": b, "markets": market} for b in books]}],
+    }
+
+
+class Resp:
+    def __init__(self, body, cost=10, remaining=9000):
+        self.ok, self.status_code, self._body = True, 200, body
+        self.headers = {"x-requests-remaining": str(remaining), "x-requests-last": str(cost)}
+
+    def json(self):
+        return self._body
+
+
+def test_ten_book_backfill_keeps_every_asked_book_and_counts_coverage(tmp_path):
+    asked = []
+
+    def get(url, params, timeout):
+        asked.append(params)
+        return Resp(snap_body(("draftkings", "pinnacle", "fanduel", "unasked_book")))
+
+    times = [ts("2025-09-13 11:00"), ts("2025-09-13 13:55")]
+    rep = oh.backfill(
+        times,
+        max_credits=100,
+        api_key="k",
+        raw_dir=tmp_path,
+        get=get,
+        books=oh.TEN_BOOKS,
+        markets="h2h",
+        cost_per_snapshot=oh.TEN_BOOKS_COST,
+    )
+    assert rep.fetched == 2 and rep.credits_used == 20
+    assert asked[0]["bookmakers"] == ",".join(oh.TEN_BOOKS) and asked[0]["markets"] == "h2h"
+    saved = (tmp_path / "odds_history" / "E0").glob("*.json")
+    text = next(saved).read_text()
+    assert "pinnacle" in text and "fanduel" in text and "unasked_book" not in text
+    assert rep.by_season == {"2526": {"snapshots": 2, "events": 2, "draftkings": 2, "pinnacle": 2}}
+    assert any("DraftKings 2 (100%), Pinnacle 2 (100%)" in line for line in rep.lines())
+    # The backtest still reads DraftKings' prices from the ten-book bodies.
+    hist = oh.load_history("E0", {"Arsenal", "Leeds"}, raw_dir=tmp_path)
+    assert hist["odds_home"].iloc[0] == 1.4
+
+
+def test_guard_stops_a_season_without_draftkings_and_moves_on(tmp_path):
+    """Design C's guard: 2019/20's first three snapshots hold no DraftKings price, so
+    the rest of 2019/20 is skipped; 2020/21 is bought as usual."""
+    asked = []
+
+    def get(url, params, timeout):
+        asked.append(params["date"])
+        dk = params["date"].startswith("2020-09")
+        return Resp(snap_body(("draftkings", "pinnacle") if dk else ("pinnacle",)))
+
+    old = [ts("2019-09-14 11:00") + pd.Timedelta(days=7 * i) for i in range(6)]
+    new = [ts("2020-09-12 11:00") + pd.Timedelta(days=i) for i in range(2)]
+    rep = oh.backfill(
+        old + new,
+        max_credits=1000,
+        api_key="k",
+        raw_dir=tmp_path,
+        get=get,
+        books=oh.TEN_BOOKS,
+        markets="h2h",
+        cost_per_snapshot=10,
+        guard_first=oh.GUARD_FIRST,
+    )
+    assert len(asked) == 5 and rep.fetched == 5 and rep.credits_used == 50
+    assert set(rep.guarded) == {"1920"} and rep.skipped == 3
+    assert rep.by_season["1920"]["draftkings"] == 0 and rep.by_season["2021"]["draftkings"] == 2
+    assert "guarded" in "\n".join(rep.lines())
+    # A rerun counts the cached snapshots toward the guard and buys nothing for 2019/20.
+    asked.clear()
+    again = oh.backfill(
+        old + new, max_credits=1000, api_key="k", raw_dir=tmp_path, get=get, guard_first=3
+    )
+    assert asked == [] and again.skipped == 3
+
+
+def test_a_snapshot_billed_less_never_loosens_the_cap(tmp_path):
+    """A cheap answer (an emptier snapshot) mustn't make the next call look cheap: each
+    call is budgeted at the planned cost at least."""
+    costs = iter([5, 10, 10])
+    times = [ts("2025-09-13 11:00") + pd.Timedelta(hours=i) for i in range(3)]
+    rep = oh.backfill(
+        times,
+        max_credits=12,
+        api_key="k",
+        raw_dir=tmp_path,
+        get=lambda *a, **k: Resp({"timestamp": None, "data": []}, cost=next(costs)),
+        cost_per_snapshot=10,
+    )
+    assert rep.fetched == 1 and rep.credits_used == 5 and "max-credits" in rep.stopped
+
+
+def test_a_call_billed_over_the_limit_stops_the_run(tmp_path):
+    times = [ts("2025-09-13 11:00") + pd.Timedelta(hours=i) for i in range(3)]
+    rep = oh.backfill(
+        times,
+        max_credits=1000,
+        api_key="k",
+        raw_dir=tmp_path,
+        get=lambda *a, **k: Resp(snap_body(), cost=20),
+        cost_per_snapshot=10,
+        max_call_cost=10,
+    )
+    assert rep.fetched == 1 and rep.credits_used == 20 and "over 10" in rep.stopped
