@@ -2462,3 +2462,97 @@ DraftKings' in-play price implies, enough to make a profit backing it.
 - The purchase still buys the only fresh prices that exist for these league-seasons. Pooling
   them later with a separately pre-registered cup or extra-league sample would need its own
   rule, written before that sample's prices are seen.
+
+## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
+
+**The owner's ask.** "Study the data we already have to find a strategy (position sizing,
+when to cash out…) that would have had positive ROI. I know this can be overfitting, but we
+can try first." This is an open search, built so luck can be told from a real edge
+afterwards. This section is the design. It was written and committed before any search code
+ran, and the results will follow below it with run ids.
+
+**1. The holdout, locked first.**
+- `lab.harness.Holdout` locks every football-data row from **2024-07-01 onward**
+  (2024/25, 2025/26, 2026/27) in all eight leagues.
+- Also locked: every live paper ledger and odds log on data-log, and DraftKings' 2025/26 E0
+  file (`E0_dk.json` and its trades).
+- The search scores 2017/18–2023/24 only. In practice, seasons where Pinnacle's early and
+  close prices both cover ≥ 90% are the ones scored: 2019/20–2023/24, `lean_backtest`'s rule.
+- The comeback snapshots (B, C, H) are spent on their own tests. They appear only in the
+  in-play exit arms, labelled exploratory, and never in the multiple-comparison check.
+
+**2. The search space.** Every rule tried is logged as an arm and counted, losers included.
+- **Base selections**, all walk-forward on earlier data, refit every 28 days:
+  - (a) the raw model's best side at an edge ≥ t;
+  - (b) Blend Lean's z ≥ k on the blend;
+  - (c) the market alone: every side in a price band.
+  - t ∈ {0, 5, 12, 20%}, k ∈ {0.5, 1, 2}.
+- **Filters**, at most two combined:
+  - league (each of eight);
+  - price band (≤1.50, 1.50–2.00, 2.00–3.00, 3.00–5.00, >5.00);
+  - edge or z band (the pooled quintiles of the search window);
+  - Lean's driver (market/model);
+  - side (home/draw/away);
+  - favourite/underdog;
+  - day of week (weekend/midweek);
+  - kickoff cluster (lone kickoff vs a shared slot);
+  - team-strength gap (the model's rating gap in quintiles);
+  - line movement (below).
+- **Line movement.** football-data holds only two prices, the early one (about 2–4 days out)
+  and the close. A rule that uses the move from early to close can only be decided **at the
+  close**. Those arms bet at Pinnacle's close and are judged on ROI only: their CLV is 0 by
+  construction, and that is said beside them. Rules decided at the early price can't see
+  the move.
+- **Markets:**
+  - 1X2;
+  - draw no bet (from the 1X2, as in "Draw no bet");
+  - Asian handicap and over/under 2.5 at Pinnacle's own prices, through
+    `match_markets.clean_prices`, with the model's chances from the same walk-forward score
+    matrices.
+- **Sizing**, applied to each selection's bets in time order:
+  - flat $1;
+  - ¼ and ½ Kelly on the blend's chance (where one exists), capped at 5%;
+  - a stop rule: stop a rule for the rest of its season after a 20-unit drawdown.
+  Sizing changes the money curve, not which bets are placed. It is reported beside flat and
+  never counted as a separate edge.
+- **Exits (exploratory, the comeback sample only):** hold, full cash-out and Kelly partial
+  cash-out at half-time, as in "Cash-out". These arms are outside the multiple-comparison
+  check because their data has been spent.
+
+**3. Scoring, inside the search window only.**
+- For each arm: bets, ROI per $1 and CLV against Pinnacle's Shin-fair close, each with a
+  match-resampled 95% range (2,000 draws, seed 0).
+- An arm with fewer than 100 bets is kept in the count and flagged.
+
+**4. Correcting for the search.**
+- **Number of arms tried:** every arm, losers included.
+- **The best arm** by mean CLV, and the best by ROI.
+- **The bootstrap of the maximum** (White's reality check):
+  - recentre every arm's per-bet CLV to mean 0 (the no-skill null);
+  - resample matches jointly across all arms 2,000 times;
+  - take the maximum mean CLV over arms in each draw.
+  The p-value is the share of draws whose maximum reaches the best arm's real mean. The same
+  is done for ROI.
+- **The share of arms with CLV above 0,** against the share the recentred null gives. Prices
+  carry a margin, so most arms should sit below 0. A real edge has to beat the null's share,
+  not 50%.
+
+**5. Finalists and the holdout.**
+- **Rule, fixed now:** an arm is a finalist only if:
+  - its CLV 95% range is entirely above 0 in the search window;
+  - it has at least 300 bets;
+  - the reality-check p for CLV is below 0.05.
+  At most three, ranked by the lower end of the CLV range. Line-movement arms (CLV 0 by
+  construction) can't qualify.
+- If no arm passes, the holdout stays locked and the search ends with "no strategy found".
+- Otherwise the holdout is opened **once**, for the finalists only, with a logged reason
+  (`Holdout.unlock`), and they are scored on 2024/25 onward with the same metrics.
+- A finalist whose holdout CLV range is above 0 becomes a pre-registered live paper track.
+  Nothing goes live otherwise, and the owner decides.
+
+**Delivery:**
+- `lab/strategy_search.py` and `odds-check.yml` `task=strategy-search`, no key (no purchase
+  is planned);
+- results in this section with run ids;
+- a plain-English summary for the owner: what was tried, what the best looked like, how
+  likely that was luck, and what the holdout said.
