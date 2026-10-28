@@ -89,6 +89,9 @@ settlement runs after them.
   early price (domestic, `kind: "early"`), with UCL at DraftKings' bought close
   (`kind: "close"`, kept out of the pooled numbers).
 - `E0_dk.json`: Model 12% at DraftKings' own prices, Premier League 2025/26 only.
+- `lean_backtest_dk.json` and `edge12_backtest_dk.json`: both rules at DraftKings' own
+  historical prices (the ten-book history bought 28 Oct, 160,180 credits), eight domestic
+  leagues 2020/21–2024/25, CLV vs Pinnacle's close in the same snapshot (`dk_price_backtest`).
 - `match_blends.json`: the live Lean fits.
 
 **Research verdicts to date** (nothing beats Pinnacle's close):
@@ -105,6 +108,13 @@ settlement runs after them.
   bets, ROI −2.2% (−7.5% to +2.9%), CLV −3.1% (−3.4% to −2.8%); the branch run in
   `docs/leagues.md` had 2,629 bets, ROI −2.3%. UCL Lean: 0 bets (only one block reaches the
   300-row minimum).
+- Both rules at DraftKings' own prices (lead, 28 Oct; `docs/leagues.md` "Backtests at
+  DraftKings' prices: results", run 40747442368): neither passes. Model 12% 5,324 bets, CLV
+  −7.4% (−7.7% to −7.1%) vs Pinnacle's close, ROI −8.4% (−13.3% to −3.8%); Lean all odds 881
+  bets, CLV −5.8% (−6.4% to −5.2%); Lean live rule 443 bets, CLV −5.0% (−5.7% to −4.2%). Every
+  league's CLV range is below 0. On the same matches at Pinnacle's early price, CLV is about
+  2.7 points better (12% −4.7%, Lean −3.1%): DraftKings widens a loss that is already there.
+  Coverage is 91–100% of matches in every season.
 - Draw no bet (owner, 24 Oct; `docs/lab.md` "Draw no bet", run 40140494754): both rules as DNB
   beside their 1X2 versions on the same matches, eight leagues. Neither passes: DNB 12% 7,017 bets,
   CLV −6.2% (−6.5% to −5.8%) per stake not refunded, −4.8% per $ (1X2 12%: −4.6%), ROI −5.0%;
@@ -153,7 +163,9 @@ the app): Blend Lean (new rule) 7 trades (7 settled), all odds (old rule) 22 (20
 settled).
 
 **Credits:** the owner upgraded the plan to about 5M a month (28 Oct): 4,938,760 left at the
-05:50 UTC publish that day. Caps are no longer the constraint; the 3,000 reserve floor stays.
+05:50 UTC publish that day; 4,589,590 after the 160,180-credit DraftKings history backfill
+(28 Oct, runs listed in `docs/leagues.md` "The buy: results"). Caps are no longer the
+constraint; the 3,000 reserve floor stays.
 The half-time in-play snapshots (`inplay.yml`) add about 580 a month.
 Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
