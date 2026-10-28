@@ -1,0 +1,2468 @@
+{
+ "design": "H",
+ "rule": "favourite >= 75% (Pinnacle's close, else the average's) trailing at half-time; one snapshot per slot at kickoff + 55 min",
+ "slots": [
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2020-10-17T16:30Z",
+   "request_at": "2020-10-17T17:25Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Cadiz",
+     "favourite": "home",
+     "p_fav": 0.7775,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2020-12-05T20:00Z",
+   "request_at": "2020-12-05T20:55Z",
+   "matches": [
+    {
+     "home": "Cadiz",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.7861,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2021-08-28T18:45Z",
+   "request_at": "2021-08-28T19:40Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Empoli",
+     "favourite": "home",
+     "p_fav": 0.8055,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2021-09-20T19:00Z",
+   "request_at": "2021-09-20T19:55Z",
+   "matches": [
+    {
+     "home": "Barcelona",
+     "away": "Granada",
+     "favourite": "home",
+     "p_fav": 0.7663,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2021-10-26T19:30Z",
+   "request_at": "2021-10-26T20:25Z",
+   "matches": [
+    {
+     "home": "Villarreal",
+     "away": "Cadiz",
+     "favourite": "home",
+     "p_fav": 0.7587,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2021-12-22T19:45Z",
+   "request_at": "2021-12-22T20:40Z",
+   "matches": [
+    {
+     "home": "Napoli",
+     "away": "Spezia",
+     "favourite": "home",
+     "p_fav": 0.8065,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2022-01-23T15:15Z",
+   "request_at": "2022-01-23T16:10Z",
+   "matches": [
+    {
+     "home": "Real Madrid",
+     "away": "Elche",
+     "favourite": "home",
+     "p_fav": 0.8403,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2022-02-20T17:00Z",
+   "request_at": "2022-02-20T17:55Z",
+   "matches": [
+    {
+     "home": "Inter",
+     "away": "Sassuolo",
+     "favourite": "home",
+     "p_fav": 0.7723,
+     "ht": [
+      0,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2022-05-02T18:45Z",
+   "request_at": "2022-05-02T19:40Z",
+   "matches": [
+    {
+     "home": "Atalanta",
+     "away": "Salernitana",
+     "favourite": "home",
+     "p_fav": 0.7563,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2022-05-14T18:45Z",
+   "request_at": "2022-05-14T19:40Z",
+   "matches": [
+    {
+     "home": "Roma",
+     "away": "Venezia",
+     "favourite": "home",
+     "p_fav": 0.7738,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2022-08-06T14:30Z",
+   "request_at": "2022-08-06T15:25Z",
+   "matches": [
+    {
+     "home": "For Sittard",
+     "away": "Ajax",
+     "favourite": "away",
+     "p_fav": 0.7877,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2022-08-27T18:30Z",
+   "request_at": "2022-08-27T19:25Z",
+   "matches": [
+    {
+     "home": "AEK",
+     "away": "Volos NFC",
+     "favourite": "home",
+     "p_fav": 0.7666,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2022-08-28T19:30Z",
+   "request_at": "2022-08-28T20:25Z",
+   "matches": [
+    {
+     "home": "Rio Ave",
+     "away": "Porto",
+     "favourite": "away",
+     "p_fav": 0.7561,
+     "ht": [
+      3,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2022-09-02T18:00Z",
+   "request_at": "2022-09-02T18:55Z",
+   "matches": [
+    {
+     "home": "Benfica",
+     "away": "Vizela",
+     "favourite": "home",
+     "p_fav": 0.8162,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2022-09-11T15:30Z",
+   "request_at": "2022-09-11T16:25Z",
+   "matches": [
+    {
+     "home": "Olympiakos",
+     "away": "Volos NFC",
+     "favourite": "home",
+     "p_fav": 0.7719,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2022-09-18T11:00Z",
+   "request_at": "2022-09-18T11:55Z",
+   "matches": [
+    {
+     "home": "St Mirren",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.7952,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2022-10-22T14:00Z",
+   "request_at": "2022-10-22T14:55Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Livingston",
+     "favourite": "home",
+     "p_fav": 0.7952,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2022-10-22T14:30Z",
+   "request_at": "2022-10-22T15:25Z",
+   "matches": [
+    {
+     "home": "Feyenoord",
+     "away": "For Sittard",
+     "favourite": "home",
+     "p_fav": 0.8086,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2022-10-23T12:30Z",
+   "request_at": "2022-10-23T13:25Z",
+   "matches": [
+    {
+     "home": "Groningen",
+     "away": "PSV Eindhoven",
+     "favourite": "away",
+     "p_fav": 0.7656,
+     "ht": [
+      3,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2022-11-06T12:00Z",
+   "request_at": "2022-11-06T12:55Z",
+   "matches": [
+    {
+     "home": "St Johnstone",
+     "away": "Rangers",
+     "favourite": "away",
+     "p_fav": 0.7542,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2023-01-22T14:00Z",
+   "request_at": "2023-01-22T14:55Z",
+   "matches": [
+    {
+     "home": "Ionikos",
+     "away": "AEK",
+     "favourite": "away",
+     "p_fav": 0.8017,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2023-02-01T17:00Z",
+   "request_at": "2023-02-01T17:55Z",
+   "matches": [
+    {
+     "home": "Galatasaray",
+     "away": "Umraniyespor",
+     "favourite": "home",
+     "p_fav": 0.778,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-02-12T15:45Z",
+   "request_at": "2023-02-12T16:40Z",
+   "matches": [
+    {
+     "home": "Ajax",
+     "away": "Waalwijk",
+     "favourite": "home",
+     "p_fav": 0.8526,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-02-26T20:30Z",
+   "request_at": "2023-02-26T21:25Z",
+   "matches": [
+    {
+     "home": "Porto",
+     "away": "Gil Vicente",
+     "favourite": "home",
+     "p_fav": 0.8301,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-03-05T12:00Z",
+   "request_at": "2023-03-05T12:55Z",
+   "matches": [
+    {
+     "home": "St Mirren",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.7903,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-03-12T19:00Z",
+   "request_at": "2023-03-12T19:55Z",
+   "matches": [
+    {
+     "home": "Feyenoord",
+     "away": "Volendam",
+     "favourite": "home",
+     "p_fav": 0.8753,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-03-18T15:00Z",
+   "request_at": "2023-03-18T15:55Z",
+   "matches": [
+    {
+     "home": "Celtic",
+     "away": "Hibernian",
+     "favourite": "home",
+     "p_fav": 0.8862,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-04-16T19:30Z",
+   "request_at": "2023-04-16T20:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Arouca",
+     "favourite": "home",
+     "p_fav": 0.8013,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-05-13T19:30Z",
+   "request_at": "2023-05-13T20:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Maritimo",
+     "favourite": "home",
+     "p_fav": 0.854,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-05-14T19:30Z",
+   "request_at": "2023-05-14T20:25Z",
+   "matches": [
+    {
+     "home": "Porto",
+     "away": "Casa Pia",
+     "favourite": "home",
+     "p_fav": 0.8167,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-05-20T14:00Z",
+   "request_at": "2023-05-20T14:55Z",
+   "matches": [
+    {
+     "home": "Celtic",
+     "away": "St Mirren",
+     "favourite": "home",
+     "p_fav": 0.8485,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-05-21T12:30Z",
+   "request_at": "2023-05-21T13:25Z",
+   "matches": [
+    {
+     "home": "PSV Eindhoven",
+     "away": "Heerenveen",
+     "favourite": "home",
+     "p_fav": 0.8239,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2023-08-26T18:30Z",
+   "request_at": "2023-08-26T19:25Z",
+   "matches": [
+    {
+     "home": "AEK",
+     "away": "Panserraikos",
+     "favourite": "home",
+     "p_fav": 0.8362,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "B1",
+   "sport": "soccer_belgium_first_div",
+   "kickoff": "2023-09-24T17:15Z",
+   "request_at": "2023-09-24T18:10Z",
+   "matches": [
+    {
+     "home": "Gent",
+     "away": "Eupen",
+     "favourite": "home",
+     "p_fav": 0.7928,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-10-07T17:00Z",
+   "request_at": "2023-10-07T17:55Z",
+   "matches": [
+    {
+     "home": "Sp Braga",
+     "away": "Rio Ave",
+     "favourite": "home",
+     "p_fav": 0.7598,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "B1",
+   "sport": "soccer_belgium_first_div",
+   "kickoff": "2023-10-21T14:00Z",
+   "request_at": "2023-10-21T14:55Z",
+   "matches": [
+    {
+     "home": "Kortrijk",
+     "away": "Club Brugge",
+     "favourite": "away",
+     "p_fav": 0.7623,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-10-29T13:30Z",
+   "request_at": "2023-10-29T14:25Z",
+   "matches": [
+    {
+     "home": "PSV Eindhoven",
+     "away": "Ajax",
+     "favourite": "home",
+     "p_fav": 0.7597,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-10-29T15:00Z",
+   "request_at": "2023-10-29T15:55Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Hearts",
+     "favourite": "home",
+     "p_fav": 0.7769,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2023-11-04T20:30Z",
+   "request_at": "2023-11-04T21:25Z",
+   "matches": [
+    {
+     "home": "Sp Braga",
+     "away": "Portimonense",
+     "favourite": "home",
+     "p_fav": 0.8111,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2023-11-26T16:00Z",
+   "request_at": "2023-11-26T16:55Z",
+   "matches": [
+    {
+     "home": "Fenerbahce",
+     "away": "Karagumruk",
+     "favourite": "home",
+     "p_fav": 0.7846,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-12-03T12:00Z",
+   "request_at": "2023-12-03T12:55Z",
+   "matches": [
+    {
+     "home": "St Johnstone",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.8099,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-12-06T18:00Z",
+   "request_at": "2023-12-06T18:55Z",
+   "matches": [
+    {
+     "home": "AZ Alkmaar",
+     "away": "Nijmegen",
+     "favourite": "home",
+     "p_fav": 0.7719,
+     "ht": [
+      0,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-12-08T19:00Z",
+   "request_at": "2023-12-08T19:55Z",
+   "matches": [
+    {
+     "home": "Twente",
+     "away": "Excelsior",
+     "favourite": "home",
+     "p_fav": 0.7839,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2023-12-16T15:00Z",
+   "request_at": "2023-12-16T15:55Z",
+   "matches": [
+    {
+     "home": "Celtic",
+     "away": "Hearts",
+     "favourite": "home",
+     "p_fav": 0.8111,
+     "ht": [
+      0,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2023-12-16T20:00Z",
+   "request_at": "2023-12-16T20:55Z",
+   "matches": [
+    {
+     "home": "Heerenveen",
+     "away": "Volendam",
+     "favourite": "home",
+     "p_fav": 0.7831,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2024-01-03T15:00Z",
+   "request_at": "2024-01-03T15:55Z",
+   "matches": [
+    {
+     "home": "Lamia",
+     "away": "Olympiakos",
+     "favourite": "away",
+     "p_fav": 0.7581,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2024-01-29T17:00Z",
+   "request_at": "2024-01-29T17:55Z",
+   "matches": [
+    {
+     "home": "Galatasaray",
+     "away": "Gaziantep",
+     "favourite": "home",
+     "p_fav": 0.8527,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2024-02-11T16:00Z",
+   "request_at": "2024-02-11T16:55Z",
+   "matches": [
+    {
+     "home": "Fenerbahce",
+     "away": "Alanyaspor",
+     "favourite": "home",
+     "p_fav": 0.8318,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2024-02-25T16:00Z",
+   "request_at": "2024-02-25T16:55Z",
+   "matches": [
+    {
+     "home": "Olympiakos",
+     "away": "Asteras Tripolis",
+     "favourite": "home",
+     "p_fav": 0.8153,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2024-02-28T17:00Z",
+   "request_at": "2024-02-28T17:55Z",
+   "matches": [
+    {
+     "home": "AEK",
+     "away": "Giannina",
+     "favourite": "home",
+     "p_fav": 0.8961,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2024-03-02T15:00Z",
+   "request_at": "2024-03-02T15:55Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Motherwell",
+     "favourite": "home",
+     "p_fav": 0.8474,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2024-03-10T16:00Z",
+   "request_at": "2024-03-10T16:55Z",
+   "matches": [
+    {
+     "home": "Fenerbahce",
+     "away": "Pendikspor",
+     "favourite": "home",
+     "p_fav": 0.8233,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2024-03-16T20:30Z",
+   "request_at": "2024-03-16T21:25Z",
+   "matches": [
+    {
+     "home": "Porto",
+     "away": "Vizela",
+     "favourite": "home",
+     "p_fav": 0.8769,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-03-31T12:30Z",
+   "request_at": "2024-03-31T13:25Z",
+   "matches": [
+    {
+     "home": "Feyenoord",
+     "away": "Utrecht",
+     "favourite": "home",
+     "p_fav": 0.7501,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-04-13T16:45Z",
+   "request_at": "2024-04-13T17:40Z",
+   "matches": [
+    {
+     "home": "AZ Alkmaar",
+     "away": "Waalwijk",
+     "favourite": "home",
+     "p_fav": 0.7519,
+     "ht": [
+      0,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2024-04-13T17:00Z",
+   "request_at": "2024-04-13T17:55Z",
+   "matches": [
+    {
+     "home": "Porto",
+     "away": "Famalicao",
+     "favourite": "home",
+     "p_fav": 0.7927,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2024-04-24T14:00Z",
+   "request_at": "2024-04-24T14:55Z",
+   "matches": [
+    {
+     "home": "Lamia",
+     "away": "PAOK",
+     "favourite": "away",
+     "p_fav": 0.8206,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I2",
+   "sport": "soccer_italy_serie_b",
+   "kickoff": "2024-05-10T18:30Z",
+   "request_at": "2024-05-10T19:25Z",
+   "matches": [
+    {
+     "home": "Como",
+     "away": "Cosenza",
+     "favourite": "home",
+     "p_fav": 0.7599,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-05-12T12:30Z",
+   "request_at": "2024-05-12T13:25Z",
+   "matches": [
+    {
+     "home": "For Sittard",
+     "away": "PSV Eindhoven",
+     "favourite": "away",
+     "p_fav": 0.7556,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2024-05-14T18:30Z",
+   "request_at": "2024-05-14T19:25Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Dundee",
+     "favourite": "home",
+     "p_fav": 0.8298,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-08-18T10:15Z",
+   "request_at": "2024-08-18T11:10Z",
+   "matches": [
+    {
+     "home": "Heracles",
+     "away": "PSV Eindhoven",
+     "favourite": "away",
+     "p_fav": 0.8587,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2024-08-24T18:30Z",
+   "request_at": "2024-08-24T19:25Z",
+   "matches": [
+    {
+     "home": "AEK",
+     "away": "Lamia",
+     "favourite": "home",
+     "p_fav": 0.8875,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-09-14T14:30Z",
+   "request_at": "2024-09-14T15:25Z",
+   "matches": [
+    {
+     "home": "Twente",
+     "away": "Zwolle",
+     "favourite": "home",
+     "p_fav": 0.7559,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2024-10-06T11:00Z",
+   "request_at": "2024-10-06T11:55Z",
+   "matches": [
+    {
+     "home": "Ross County",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.836,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2024-11-23T15:45Z",
+   "request_at": "2024-11-23T16:40Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Dundee United",
+     "favourite": "home",
+     "p_fav": 0.7945,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2024-11-30T19:00Z",
+   "request_at": "2024-11-30T19:55Z",
+   "matches": [
+    {
+     "home": "Feyenoord",
+     "away": "For Sittard",
+     "favourite": "home",
+     "p_fav": 0.7924,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2024-11-30T20:30Z",
+   "request_at": "2024-11-30T21:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Santa Clara",
+     "favourite": "home",
+     "p_fav": 0.7876,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2025-01-11T18:30Z",
+   "request_at": "2025-01-11T19:25Z",
+   "matches": [
+    {
+     "home": "Olympiakos",
+     "away": "Aris",
+     "favourite": "home",
+     "p_fav": 0.7744,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2025-01-17T17:00Z",
+   "request_at": "2025-01-17T17:55Z",
+   "matches": [
+    {
+     "home": "Hatayspor",
+     "away": "Galatasaray",
+     "favourite": "away",
+     "p_fav": 0.7563,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2025-01-18T15:30Z",
+   "request_at": "2025-01-18T16:25Z",
+   "matches": [
+    {
+     "home": "Zwolle",
+     "away": "PSV Eindhoven",
+     "favourite": "away",
+     "p_fav": 0.7941,
+     "ht": [
+      2,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2025-02-15T20:30Z",
+   "request_at": "2025-02-15T21:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Arouca",
+     "favourite": "home",
+     "p_fav": 0.7879,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2025-02-23T15:00Z",
+   "request_at": "2025-02-23T15:55Z",
+   "matches": [
+    {
+     "home": "Lamia",
+     "away": "Panathinaikos",
+     "favourite": "away",
+     "p_fav": 0.7884,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2025-03-01T15:00Z",
+   "request_at": "2025-03-01T15:55Z",
+   "matches": [
+    {
+     "home": "Rangers",
+     "away": "Motherwell",
+     "favourite": "home",
+     "p_fav": 0.86,
+     "ht": [
+      0,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2025-04-06T11:00Z",
+   "request_at": "2025-04-06T11:55Z",
+   "matches": [
+    {
+     "home": "St Johnstone",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.8503,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2025-04-27T13:00Z",
+   "request_at": "2025-04-27T13:55Z",
+   "matches": [
+    {
+     "home": "Konyaspor",
+     "away": "Ad. Demirspor",
+     "favourite": "home",
+     "p_fav": 0.826,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2025-05-04T19:30Z",
+   "request_at": "2025-05-04T20:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Gil Vicente",
+     "favourite": "home",
+     "p_fav": 0.8814,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP2",
+   "sport": "soccer_spain_segunda_division",
+   "kickoff": "2025-05-10T19:00Z",
+   "request_at": "2025-05-10T19:55Z",
+   "matches": [
+    {
+     "home": "Zaragoza",
+     "away": "Cartagena",
+     "favourite": "home",
+     "p_fav": 0.7704,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2025-05-18T12:30Z",
+   "request_at": "2025-05-18T13:25Z",
+   "matches": [
+    {
+     "home": "AZ Alkmaar",
+     "away": "Almere City",
+     "favourite": "home",
+     "p_fav": 0.7982,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2025-05-31T13:00Z",
+   "request_at": "2025-05-31T13:55Z",
+   "matches": [
+    {
+     "home": "Fenerbahce",
+     "away": "Konyaspor",
+     "favourite": "home",
+     "p_fav": 0.7655,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "E1",
+   "sport": "soccer_efl_champ",
+   "kickoff": "2025-08-10T15:30Z",
+   "request_at": "2025-08-10T16:25Z",
+   "matches": [
+    {
+     "home": "Leicester",
+     "away": "Sheffield Weds",
+     "favourite": "home",
+     "p_fav": 0.7805,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2025-08-23T17:00Z",
+   "request_at": "2025-08-23T17:55Z",
+   "matches": [
+    {
+     "home": "Nacional",
+     "away": "Sp Lisbon",
+     "favourite": "away",
+     "p_fav": 0.7747,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-08-23T19:30Z",
+   "request_at": "2025-08-23T20:25Z",
+   "matches": [
+    {
+     "home": "Levante",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.7955,
+     "ht": [
+      2,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2025-08-30T14:30Z",
+   "request_at": "2025-08-30T15:25Z",
+   "matches": [
+    {
+     "home": "Volendam",
+     "away": "Ajax",
+     "favourite": "away",
+     "p_fav": 0.7551,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2025-08-30T18:00Z",
+   "request_at": "2025-08-30T18:55Z",
+   "matches": [
+    {
+     "home": "PSV Eindhoven",
+     "away": "Telstar",
+     "favourite": "home",
+     "p_fav": 0.8961,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2025-08-31T18:45Z",
+   "request_at": "2025-08-31T19:40Z",
+   "matches": [
+    {
+     "home": "Inter",
+     "away": "Udinese",
+     "favourite": "home",
+     "p_fav": 0.7635,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2025-09-17T17:00Z",
+   "request_at": "2025-09-17T17:55Z",
+   "matches": [
+    {
+     "home": "Fenerbahce",
+     "away": "Alanyaspor",
+     "favourite": "home",
+     "p_fav": 0.7803,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SP1",
+   "sport": "soccer_spain_la_liga",
+   "kickoff": "2025-09-25T19:30Z",
+   "request_at": "2025-09-25T20:25Z",
+   "matches": [
+    {
+     "home": "Oviedo",
+     "away": "Barcelona",
+     "favourite": "away",
+     "p_fav": 0.802,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "SC0",
+   "sport": "soccer_spl",
+   "kickoff": "2025-10-19T11:00Z",
+   "request_at": "2025-10-19T11:55Z",
+   "matches": [
+    {
+     "home": "Dundee",
+     "away": "Celtic",
+     "favourite": "away",
+     "p_fav": 0.8209,
+     "ht": [
+      2,
+      0
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2025-10-29T20:05Z",
+   "request_at": "2025-10-29T21:00Z",
+   "matches": [
+    {
+     "home": "Marseille",
+     "away": "Angers",
+     "favourite": "home",
+     "p_fav": 0.7952,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2025-11-22T17:00Z",
+   "request_at": "2025-11-22T17:55Z",
+   "matches": [
+    {
+     "home": "Galatasaray",
+     "away": "Genclerbirligi",
+     "favourite": "home",
+     "p_fav": 0.828,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "G1",
+   "sport": "soccer_greece_super_league",
+   "kickoff": "2025-12-21T19:00Z",
+   "request_at": "2025-12-21T19:55Z",
+   "matches": [
+    {
+     "home": "AEK",
+     "away": "OFI Crete",
+     "favourite": "home",
+     "p_fav": 0.8431,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2026-01-03T17:00Z",
+   "request_at": "2026-01-03T17:55Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Lecce",
+     "favourite": "home",
+     "p_fav": 0.7849,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "F1",
+   "sport": "soccer_france_ligue_one",
+   "kickoff": "2026-01-04T14:00Z",
+   "request_at": "2026-01-04T14:55Z",
+   "matches": [
+    {
+     "home": "Marseille",
+     "away": "Nantes",
+     "favourite": "home",
+     "p_fav": 0.7706,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "pinnacle"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2026-02-02T20:45Z",
+   "request_at": "2026-02-02T21:40Z",
+   "matches": [
+    {
+     "home": "Casa Pia",
+     "away": "Porto",
+     "favourite": "away",
+     "p_fav": 0.7653,
+     "ht": [
+      2,
+      0
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2026-05-02T13:30Z",
+   "request_at": "2026-05-02T14:25Z",
+   "matches": [
+    {
+     "home": "Bayern Munich",
+     "away": "Heidenheim",
+     "favourite": "home",
+     "p_fav": 0.7661,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "I1",
+   "sport": "soccer_italy_serie_a",
+   "kickoff": "2026-05-03T16:00Z",
+   "request_at": "2026-05-03T16:55Z",
+   "matches": [
+    {
+     "home": "Juventus",
+     "away": "Verona",
+     "favourite": "home",
+     "p_fav": 0.8256,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "T1",
+   "sport": "soccer_turkey_super_league",
+   "kickoff": "2026-05-09T17:00Z",
+   "request_at": "2026-05-09T17:55Z",
+   "matches": [
+    {
+     "home": "Galatasaray",
+     "away": "Antalyaspor",
+     "favourite": "home",
+     "p_fav": 0.8645,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2026-08-08T18:00Z",
+   "request_at": "2026-08-08T18:55Z",
+   "matches": [
+    {
+     "home": "PSV Eindhoven",
+     "away": "For Sittard",
+     "favourite": "home",
+     "p_fav": 0.8324,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "N1",
+   "sport": "soccer_netherlands_eredivisie",
+   "kickoff": "2026-08-30T12:30Z",
+   "request_at": "2026-08-30T13:25Z",
+   "matches": [
+    {
+     "home": "Feyenoord",
+     "away": "Den Haag",
+     "favourite": "home",
+     "p_fav": 0.8177,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "E0",
+   "sport": "soccer_epl",
+   "kickoff": "2026-09-12T14:00Z",
+   "request_at": "2026-09-12T14:55Z",
+   "matches": [
+    {
+     "home": "Chelsea",
+     "away": "Hull",
+     "favourite": "home",
+     "p_fav": 0.7996,
+     "ht": [
+      1,
+      2
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "D1",
+   "sport": "soccer_germany_bundesliga",
+   "kickoff": "2026-10-10T13:30Z",
+   "request_at": "2026-10-10T14:25Z",
+   "matches": [
+    {
+     "home": "Augsburg",
+     "away": "Bayern Munich",
+     "favourite": "away",
+     "p_fav": 0.8485,
+     "ht": [
+      1,
+      0
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "B1",
+   "sport": "soccer_belgium_first_div",
+   "kickoff": "2026-10-11T14:00Z",
+   "request_at": "2026-10-11T14:55Z",
+   "matches": [
+    {
+     "home": "St. Gilloise",
+     "away": "Oud-Heverlee Leuven",
+     "favourite": "home",
+     "p_fav": 0.7718,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  },
+  {
+   "league": "P1",
+   "sport": "soccer_portugal_primeira_liga",
+   "kickoff": "2026-10-25T20:30Z",
+   "request_at": "2026-10-25T21:25Z",
+   "matches": [
+    {
+     "home": "Sp Lisbon",
+     "away": "Academico Viseu",
+     "favourite": "home",
+     "p_fav": 0.7666,
+     "ht": [
+      0,
+      1
+     ],
+     "price": "average"
+    }
+   ]
+  }
+ ],
+ "per_league_season": {
+  "E0 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E0 2026/27": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "D1 2025/26": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "D1 2026/27": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "F1 2025/26": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "F1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E1 2025/26": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "E1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E2 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E2 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E3 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "E3 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP1 2020/21": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "SP1 2021/22": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "SP1 2025/26": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "SP1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "I1 2021/22": {
+   "trailing": 5,
+   "no_kickoff_time": 0,
+   "slots": 5,
+   "matches": 5,
+   "dropped_as_used": 0
+  },
+  "I1 2025/26": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "I1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2021/22": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2022/23": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2023/24": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2024/25": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "D2 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP2 2021/22": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP2 2022/23": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP2 2023/24": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP2 2024/25": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "SP2 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "SP2 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "N1 2022/23": {
+   "trailing": 6,
+   "no_kickoff_time": 0,
+   "slots": 6,
+   "matches": 6,
+   "dropped_as_used": 0
+  },
+  "N1 2023/24": {
+   "trailing": 7,
+   "no_kickoff_time": 0,
+   "slots": 7,
+   "matches": 7,
+   "dropped_as_used": 0
+  },
+  "N1 2024/25": {
+   "trailing": 5,
+   "no_kickoff_time": 0,
+   "slots": 5,
+   "matches": 5,
+   "dropped_as_used": 0
+  },
+  "N1 2025/26": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "N1 2026/27": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "P1 2022/23": {
+   "trailing": 6,
+   "no_kickoff_time": 0,
+   "slots": 6,
+   "matches": 6,
+   "dropped_as_used": 0
+  },
+  "P1 2023/24": {
+   "trailing": 4,
+   "no_kickoff_time": 0,
+   "slots": 4,
+   "matches": 4,
+   "dropped_as_used": 0
+  },
+  "P1 2024/25": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "P1 2025/26": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "P1 2026/27": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "SC0 2022/23": {
+   "trailing": 6,
+   "no_kickoff_time": 0,
+   "slots": 6,
+   "matches": 6,
+   "dropped_as_used": 0
+  },
+  "SC0 2023/24": {
+   "trailing": 5,
+   "no_kickoff_time": 0,
+   "slots": 5,
+   "matches": 5,
+   "dropped_as_used": 0
+  },
+  "SC0 2024/25": {
+   "trailing": 4,
+   "no_kickoff_time": 0,
+   "slots": 4,
+   "matches": 4,
+   "dropped_as_used": 0
+  },
+  "SC0 2025/26": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "SC0 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "B1 2022/23": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "B1 2023/24": {
+   "trailing": 2,
+   "no_kickoff_time": 0,
+   "slots": 2,
+   "matches": 2,
+   "dropped_as_used": 0
+  },
+  "B1 2024/25": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "B1 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "B1 2026/27": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "T1 2022/23": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "T1 2023/24": {
+   "trailing": 4,
+   "no_kickoff_time": 0,
+   "slots": 4,
+   "matches": 4,
+   "dropped_as_used": 0
+  },
+  "T1 2024/25": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "T1 2025/26": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "T1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "G1 2022/23": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "G1 2023/24": {
+   "trailing": 5,
+   "no_kickoff_time": 0,
+   "slots": 5,
+   "matches": 5,
+   "dropped_as_used": 0
+  },
+  "G1 2024/25": {
+   "trailing": 3,
+   "no_kickoff_time": 0,
+   "slots": 3,
+   "matches": 3,
+   "dropped_as_used": 0
+  },
+  "G1 2025/26": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "G1 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "I2 2022/23": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "I2 2023/24": {
+   "trailing": 1,
+   "no_kickoff_time": 0,
+   "slots": 1,
+   "matches": 1,
+   "dropped_as_used": 0
+  },
+  "I2 2024/25": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "I2 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "I2 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "F2 2022/23": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "F2 2023/24": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "F2 2024/25": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "F2 2025/26": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  },
+  "F2 2026/27": {
+   "trailing": 0,
+   "no_kickoff_time": 0,
+   "slots": 0,
+   "matches": 0,
+   "dropped_as_used": 0
+  }
+ },
+ "totals": {
+  "slots": 103,
+  "matches": 103,
+  "credits": 1030
+ },
+ "frozen_at": "2026-10-28"
+}

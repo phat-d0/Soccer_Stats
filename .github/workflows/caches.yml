@@ -87,11 +87,13 @@ jobs:
           - { name: player-odds-history, prefix: player-odds-history-, paid: true, path: "data/raw/player_odds_history" }
           - { name: cup-odds-history, prefix: cup-odds-history-, paid: true, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
           - { name: comeback-odds, prefix: comeback-odds-, paid: true, path: "data/raw/comeback_odds" }
+          - { name: archive-probe, prefix: archive-probe-, paid: true, path: "data/raw/archive_probe" }
           # Free (rebuilt from public sources, but slowly).
           - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
           - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
           - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }
           - { name: espn-timelines, prefix: espn-timelines-, paid: false, path: "data/raw/espn_timelines" }
+          - { name: heavy-espn, prefix: heavy-espn-, paid: false, path: "data/raw/heavy_espn" }
           - { name: understat-SP1, prefix: understat-SP1-, paid: false, path: "data/raw" }
           - { name: understat-D1, prefix: understat-D1-, paid: false, path: "data/raw" }
           - { name: understat-I1, prefix: understat-I1-, paid: false, path: "data/raw" }
@@ -322,6 +324,7 @@ jobs:
           - { name: player-odds-history, path: "data/raw/player_odds_history" }
           - { name: cup-odds-history, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
           - { name: comeback-odds, path: "data/raw/comeback_odds" }
+          - { name: archive-probe, path: "data/raw/archive_probe" }
     steps:
       - uses: actions/checkout@v4
       - name: Local archive from this run's packs (branch dry run)
