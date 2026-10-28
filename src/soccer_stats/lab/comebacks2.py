@@ -410,26 +410,47 @@ def report(res: dict, title: str = "design B") -> str:
     return "\n".join(lines)
 
 
-def load_fd(slots: list[dict]) -> pd.DataFrame:
-    """football-data favourites for every league-season the slots touch."""
+def load_fd(slots: list[dict], any_price: bool = False) -> pd.DataFrame:
+    """football-data favourites for every league-season the slots touch. With `any_price`
+    (design H) the favourite is priced from Pinnacle's close, else the market average's
+    (`heavy_favourites.fair_chances`), and every match is kept."""
     pairs = sorted({(s["league"], season_of(s["kickoff"])) for s in slots})
-    return pd.concat([cb.favourites(load_season(lg, y)) for lg, y in pairs], ignore_index=True)
+    if not any_price:
+        return pd.concat([cb.favourites(load_season(lg, y)) for lg, y in pairs], ignore_index=True)
+    from soccer_stats.lab.heavy_favourites import fair_chances
+
+    frames = []
+    for lg, y in pairs:
+        df = fair_chances(load_season(lg, y))
+        fdraw, fover = np.full(len(df), np.nan), np.full(len(df), np.nan)
+        for i, r in enumerate(df.itertuples()):
+            cols = ("ph", "pd", "pa") if r.source == "pinnacle" else ("ah", "ad", "aa")
+            if r.source is not None:
+                fdraw[i] = cb._fair(np.array([getattr(r, c) for c in cols], float))[1]
+            if np.isfinite(r.pov) and np.isfinite(r.pun) and r.pov > 1 and r.pun > 1:
+                fover[i] = cb._fair(np.array([r.pov, r.pun], float))[0]
+        df["fd"], df["f_over"] = fdraw, fover
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True)
 
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cache-dir", default="", help="the fetch's bodies (default raw dir)")
-    p.add_argument("--slots", default="B", help="design B or C (C is judged; B stays apart)")
+    p.add_argument(
+        "--slots", default="B", help="design B, C or H (C and H are judged; B stays apart)"
+    )
     p.add_argument("--json", default="")
     args = p.parse_args(argv)
     cache_dir = Path(args.cache_dir) if args.cache_dir else Path(RAW_DIR) / cf.CACHE
     design = args.slots.upper()
     slots = cf.load_slots(cf.slots_path(design))
     b_slots = cf.load_slots(cf.slots_path("B")) if design == "C" else []
-    fd = load_fd(slots + b_slots)
+    fd = load_fd(slots + b_slots, any_price=design == "H")
     rows, counts = match_rows(slots, cache_dir, fd)
     res = analyse(rows, counts)
-    print(report(res, f"design {design}" + (" (C minus B, judged)" if design == "C" else "")))
+    title = {"C": " (C minus B, judged)", "H": " (heavy favourites 75%+, judged)"}
+    print(report(res, f"design {design}" + title.get(design, "")))
     out = {**res}
     if design == "C":  # B was looked at already: descriptive only, never in the verdict
         b_rows, b_counts = match_rows(b_slots, cache_dir, fd)
