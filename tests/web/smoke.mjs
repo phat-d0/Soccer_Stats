@@ -221,6 +221,8 @@ async function scrubCheck(p, sel) {
   const ta = await (info.rows ? wrap : wrap.locator("svg").first()).evaluate((el) => getComputedStyle(el).touchAction);
   if (ta !== "pan-y") throw new Error(`${id}: touch-action ${ta}`);
   await p.mouse.move(a.x, a.y);
+  // (a page shorter than the screen can't scroll at all, so there is nothing to check)
+  if (await p.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)) return;
   const y0 = await p.evaluate(() => window.scrollY);
   const room = await p.evaluate(() => window.scrollY + innerHeight + 50 < document.documentElement.scrollHeight);
   await p.mouse.wheel(0, room ? 200 : -200);
@@ -733,7 +735,7 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 3 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 4 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
     // The headline counts the active strategies only: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
@@ -1168,6 +1170,7 @@ const STEPS = [
   // A study still running (pre-registered, prices being bought) shows its plan.
   ["portfolio-study-running", async (p) => {
     await pfUp(p); await p.click('button[data-pfstrat="heavy_fav_ht"]');
+    await p.click('button[data-pf="result"]');
     if (!(await p.locator(".pf-title .pill.v-run").count())) throw new Error("running pill");
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["Running: pre-registered Oct 4", "Pre-registered", "Planned sample", "410", "bets from 430 matches", "4,300", "the most it may spend", "Design H: eight leagues", "design H in commit a291256", "Nothing to judge yet"]) if (!text.includes(w)) throw new Error(`running study lacks "${w}"`);
@@ -1178,18 +1181,21 @@ const STEPS = [
   // A study that passed, with cash-out returns (profit per bet, not odds − 1) and a generic Why.
   ["portfolio-study-pass", async (p) => {
     await pfUp(p); await p.click('button[data-pfstrat="cashout_ht"]');
+    await p.click('button[data-pf="result"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["Yes on this sample", "No live trades yet: this idea passed", "Bets (design A)", "Cost in credits", "A 600 · probes 40", "Return by league (design A)", "Won vs the price, by pre-match chance", "Pre-match price's chance", "Design A is the judged test"]) if (!text.includes(w)) throw new Error(`passed study lacks "${w}"`);
     if (text.includes("Betfair")) throw new Error("no Betfair line without Betfair numbers");
     if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 1) throw new Error("one profit line");
     const end = await p.evaluate(() => usd(studies().find((x) => x.id === "cashout_ht").bets.reduce((a, b) => a + b.profit, 0), 2));
     if (!(await p.textContent("#cbcv-readout")).includes(end)) throw new Error(`cash-out curve should end at ${end}`);
+    await p.locator("[data-scrub='cbcv']").evaluate((e) => e.scrollIntoView({ block: "center" }));
     await scrubCheck(p, "[data-scrub='cbcv']");
     await p.click("details.cb-bets > summary");
     if (!/Cashed out [+−]\$\d/.test(await p.locator(".cb-table tbody tr").first().innerText())) throw new Error("cash-out bet row");
     await p.click('button[data-pf="why"]');
     const why = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["1. The idea", "Holding to full time", "2. What it means", "How this was measured"]) if (!why.includes(w)) throw new Error(`passed study why lacks "${w}"`);
+    await p.locator("[data-scrub='why0']").evaluate((e) => e.scrollIntoView({ block: "center" }));
     await scrubCheck(p, "[data-scrub='why0']");
     await p.click('button[data-pf="result"]');
   }],
@@ -1201,6 +1207,7 @@ const STEPS = [
     for (const w of ["Strategy search: home underdogs", "Failed", "never traded", "per $1"]) if (!row.includes(w)) throw new Error(`study row lacks "${w}": ${row}`);
     if (!(await p.textContent("#view")).includes("Failed studies stay here with their result")) throw new Error("archive note for studies");
     await p.click('button[data-pfstrat="strategy_search"]');
+    await p.click('button[data-pf="result"]');
     if ((await p.locator(".crumbs").innerText()).replace(/\s+/g, " ") !== "‹ Portfolio › Moneyline") throw new Error("study crumbs");
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["No: the finalist lost", "tested on free historical prices", "Pinnacle's price's chance"]) if (!text.includes(w)) throw new Error(`moneyline study lacks "${w}"`);

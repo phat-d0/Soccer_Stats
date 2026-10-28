@@ -871,6 +871,11 @@ def _study_bets(n, start, seed, design="A", cashout=False):
     return out
 
 
+def _roi_range(g):
+    roi = round(sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in g) / len(g), 4)
+    return {"roi": roi, "roi_ci95": [round(roi - 0.3, 4), round(roi + 0.3, 4)]}
+
+
 def _design(bets, role, label, band_noun=None):
     won = sum(b["won"] for b in bets)
     profit = sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in bets)
@@ -884,7 +889,8 @@ def _design(bets, role, label, band_noun=None):
             bands.append({"lo": lo, "hi": hi, "bets": len(g), "wins": gw})
             bands[-1] |= {"win_rate": round(gw / len(g), 4)}
             bands[-1] |= {"implied": round(sum(b["implied"] for b in g) / len(g), 4)}
-            bands[-1] |= {"roi": round(gp / len(g), 4), "roi_ci95": [-0.4, 0.4]}
+            bands[-1] |= {"roi": round(gp / len(g), 4)}
+            bands[-1] |= {"roi_ci95": [round(gp / len(g) - 0.4, 4), round(gp / len(g) + 0.4, 4)]}
     roi = round(profit / len(bets), 4)
     d = {"role": role, "label": label, "bets": len(bets), "wins": won}
     d |= {"win_rate": round(won / len(bets), 4), "implied": round(implied, 4)}
@@ -896,12 +902,7 @@ def _design(bets, role, label, band_noun=None):
     d["by_league"] = [
         {"code": lg, "bets": len(g), "wins": sum(b["won"] for b in g)}
         | {"win_rate": round(sum(b["won"] for b in g) / len(g), 4), "implied": 0.4}
-        | {
-            "roi": round(
-                sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in g) / len(g), 4
-            )
-        }
-        | {"roi_ci95": [-0.3, 0.3]}
+        | _roi_range(g)
         for lg, g in by_lg.items()
     ]
     d["by_band"] = bands

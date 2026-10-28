@@ -894,7 +894,7 @@ the owner's baseball app, so the balance can drop without any run here.
   selected study) has Result and Why; a pending study's Result is its plan (`studyPlanHtml`:
   pre-registered date and commits, planned sample, credit cap, spent so far, question, rule).
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
-  its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Whywhose page (`cbStrategyHtml`) has Result and Why in place of Live / Backtest
+  its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
   trades", tiles (bets, won vs the price with the gap, return per $1 and range, cost in
   credits), Betfair after 2%, profit over time at $1 a bet (`cbProfitChart`, scrub id `cbcv`: C

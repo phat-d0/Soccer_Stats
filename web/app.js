@@ -1644,7 +1644,7 @@ function rangeChart(id, rows, fmt) {
   rows = rows.filter((r) => r.v != null && r.lo != null && r.hi != null);
   if (!rows.length) return "";
   scrubCharts[id] = { n: rows.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => rows[i].readout };
-  const vals = rows.flatMap((r) => [r.lo, r.hi]).concat(0);
+  const vals = rows.flatMap((r) => [r.lo, r.hi, r.v]).concat(0); // (the value too, so it stays on the plot)
   const span = Math.max(...vals) - Math.min(...vals) || 1;
   const lo = Math.min(...vals) - span * 0.08, hi = Math.max(...vals) + span * 0.08;
   const x = (v) => ((v - lo) / (hi - lo)) * 100;
