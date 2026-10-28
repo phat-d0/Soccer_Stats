@@ -386,6 +386,9 @@ def build(src: Path, out: Path) -> dict:
     # for room under 1.5 MB; the app draws whatever points come.
     # (All's curves too since the real DraftKings files joined, 28 Oct.)
     for f in (sb.get("lean") or {}, sb.get("edge12") or {}):
+        for code, part in (f.get("leagues") or {}).items():
+            if code not in FULL_LEAGUES and isinstance(part, dict):
+                part.pop("calibration", None)
         for part in [f.get("all"), *(f.get("leagues") or {}).values()]:
             for block in ((part or {}).get("sizing") or {}).values():
                 c = block.get("curve") if isinstance(block, dict) else None
@@ -1116,6 +1119,28 @@ def _passed_study():
     }
 
 
+def _inconclusive_study():
+    """A made-up study that ended inconclusive (too few usable bets; Research's heavy-favourite
+    study can end this way, lead 28 Oct), for the Inconclusive pill."""
+    bets = _study_bets(24, "2025-08-16", 5)
+    return {
+        "id": "fixture_inconclusive",
+        "portfolio": "comebacks",
+        "name": "Made-up study, inconclusive",
+        "title": "A made-up inconclusive study",
+        "question": "Does a heavy favourite behind at half-time win more than its price says?",
+        "rule": "$1 on the 75%+ favourite trailing at half-time, at DraftKings' in-play price.",
+        "verdict": "inconclusive",
+        "verdict_text": "Inconclusive: 24 usable bets, under the 136 the test needs to decide.",
+        "closed_at": "2026-10-27",
+        "preregistered": {"H": "a291256"},
+        "cost": {"total": 240},
+        "designs": {"H": _design(bets, "judged", "Design H: eight leagues, 2025/26")},
+        "bets": bets,
+        "notes": ["Made-up study for the fixture."],
+    }
+
+
 # The same replays at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
 # strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape): the
 # real files from data-log when they are there (trimmed), else made up from the Pinnacle
@@ -1145,6 +1170,9 @@ def _dk_part(p: dict, metric: tuple, name: str | None = None) -> dict:
 
 
 DK_BETS = 20  # real DraftKings-price backtest rows kept
+# The leagues whose backtest parts the fixture keeps whole (the smoke test reads them); the
+# others drop their seasons, edge and CLV bands (DraftKings' files) or calibration (Pinnacle's).
+FULL_LEAGUES = ("E0", "SP1", "E3", "UCL")
 
 
 def _trim_dk(f: dict) -> None:
@@ -1160,6 +1188,9 @@ def _trim_dk(f: dict) -> None:
         part.pop("calibration", None)
         if code not in ("", "E0"):
             part.pop("sizing", None)
+        if code not in ("", *FULL_LEAGUES):  # every league is in since 28 Oct: room
+            for k in ("by_season", "by_edge_band", "by_clv_band"):
+                part.pop(k, None)
         (part.get("pinnacle_same_matches") or {}).pop("by_season", None)
         for block in (part.get("sizing") or {}).values():
             c = block.get("curve") if isinstance(block, dict) else None
@@ -1255,6 +1286,7 @@ def add_research_studies(data: dict) -> None:
             "notes": ["Synthetic study for the fixture."],
         },
         _passed_study(),
+        _inconclusive_study(),
     ]
     # The cash-out test: Research's real file (lab/cashout_research.json, #136) when it is
     # committed, trimmed to fit (the judged design whole; hold and the judged rule for the

@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v68";
+const APP_VERSION = "v69";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -4161,7 +4161,7 @@ function studyCashout(sd) {
 // Log growth a bet, in %: three decimals, four when it is under 0.01% (growth differences are tiny).
 const growthText = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(Math.abs(v * 100) < 0.01 && v !== 0 ? 4 : 3)}%` : "–");
 const pText = (v) => (isNum(v) ? (v >= 0.995 ? "0.99+" : v.toFixed(2)) : "–");
-const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"], closed: ["Closed", "st-closed"], testing: ["Testing", "st-testing"] };
+const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"], inconclusive: ["Inconclusive", "v-inc"], closed: ["Closed", "st-closed"], testing: ["Testing", "st-testing"] };
 const verdictPill = (sd) => { const [t, c] = VERDICT[sd.verdict] || ["Running", "v-run"]; return `<span class="pill ${c}">${t}</span>`; };
 const studyDay = (d) => (d ? monthDay(`${String(d).slice(0, 10)}T12:00:00Z`) : "");
 const studyCost = (sd) => (isNum(sd.cost?.total) ? (sd.cost.total ? `${num(sd.cost.total)} credits` : "free data, no credits") : "");
@@ -4176,7 +4176,7 @@ function studyHeadline(sd) {
     };
   }
   const when = sd.closed_at ? ` ${studyDay(sd.closed_at)}` : "";
-  const meta = [`${sd.verdict === "pass" ? "Passed" : "Closed"}${when}`, sd.verdict === "fail" ? "never traded" : "", studyCost(sd)].filter(Boolean).join(" · ");
+  const meta = [`${sd.verdict === "pass" ? "Passed" : "Closed"}${when}`, sd.verdict === "fail" || sd.verdict === "inconclusive" ? "never traded" : "", studyCost(sd)].filter(Boolean).join(" · ");
   const co = studyCashout(sd);
   if (co?.g) return { right: `<b class="${signCls(co.g.minus_hold * 100)}">${growthText(co.g.minus_hold)}</b><small>growth a bet vs holding</small>`, meta };
   if (j?.d.arms) {
@@ -4191,7 +4191,7 @@ function studyRowHtml(x) {
   const bt = isMarketStudy(sd) ? h.bt : sd.verdict === "pending" ? (sd.planned?.note ? esc(sd.planned.note) : "Pre-registered: the result shows here once the prices are in")
     : studyCashout(sd)?.rule ? `${num(studyCashout(sd).rule.decisions)} cash-outs at ${pct(studyCashout(sd).pr.t)} · cash out ${signedPct(studyCashout(sd).rule.mean)} vs hold ${signedPct(studyCashout(sd).hold?.mean)} per $1 · Result: ${sd.verdict === "fail" ? "no gain" : sd.verdict === "pass" ? "passed" : esc(sd.verdict)}`
     : j?.d.arms ? `Best rule beat the close by ${signedPct(j.d.best_clv?.clv)} · luck check p ${pText(j.d.reality_check?.clv?.p_best)} · Result: ${sd.verdict === "fail" ? "no strategy" : "a finalist"}`
-    : `${j ? `Judged on ${esc(j.short)} · ${num(j.d.wins)} of ${num(j.d.bets)} won · ` : ""}Result: ${sd.verdict === "fail" ? "no edge" : sd.verdict === "pass" ? "passed" : esc(sd.verdict || "–")}`;
+    : `${j ? `Judged on ${esc(j.short)} · ${num(j.d.wins)} of ${num(j.d.bets)} won · ` : ""}Result: ${sd.verdict === "fail" ? "no edge" : sd.verdict === "pass" ? "passed" : sd.verdict === "inconclusive" ? "too few bets to decide" : esc(sd.verdict || "–")}`;
   return `
     <button class="row-btn folder strat study-row${archivedStrat(x) ? " archived" : ""}" data-pfstrat="${esc(x.key)}">
       <span class="who"><b>${esc(x.label)}</b> ${verdictPill(sd)}<span class="meta">${esc(h.meta)}</span><span class="bt">${bt}</span></span>
@@ -4201,7 +4201,7 @@ function studyRowHtml(x) {
 // The research portfolio's pill and top-level row: counts of its studies by verdict.
 function studyCounts(list) {
   const n = (v) => list.filter((x) => x.verdict === v).length;
-  return [[n("fail"), "failed"], [n("pass"), "passed"], [n("pending"), "running"]].filter(([k]) => k).map(([k, w]) => `${k} ${w}`).join(" · ");
+  return [[n("fail"), "failed"], [n("pass"), "passed"], [n("inconclusive"), "inconclusive"], [n("pending"), "running"]].filter(([k]) => k).map(([k, w]) => `${k} ${w}`).join(" · ");
 }
 function cbHeadline() {
   const list = studiesFor(CB_ID);
@@ -4277,6 +4277,7 @@ function studyPageHtml(cur, sd) {
   const when = sd.closed_at ? ` ${studyDay(sd.closed_at)}` : "";
   const sub = sd.verdict === "pending" ? `Running: pre-registered${sd.preregistered_at ? ` ${studyDay(sd.preregistered_at)}` : ""}, the result isn't in yet`
     : sd.verdict === "pass" ? `Passed${when}: not traded yet; a passing study becomes a paper track first`
+    : sd.verdict === "inconclusive" ? `Closed${when}: inconclusive, too few usable bets to decide either way; never traded`
     : `Closed${when}: no edge found, never traded`;
   const head = `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(studyStrat(sd).label)} ${verdictPill(sd)}</h2><div class="pf-sub">${sub}</div>`;
   if (sd.verdict === "pending") return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studyPlanHtml(sd)}`;
@@ -4594,7 +4595,7 @@ function studyResultHtml(sd) {
   const designsNote = sd.designs_note || (legacy ? "Design C is the judged test, pre-registered before its prices were bought. Design B (the first look) and the two together are shown for description only."
     : `${cap} is the judged test, pre-registered before its prices were bought.${others.length ? ` ${others.map(([k, d]) => capFirst(designShort(k, d))).join(" and ")} ${others.length === 1 ? "is" : "are"} shown for description only.` : ""}`);
   const vcls = sd.verdict === "pass" ? "pos" : sd.verdict === "fail" ? "neg" : "";
-  const liveNote = sd.live_note || (sd.verdict === "pass" ? "No live trades yet: this idea passed its test on bought historical prices. It becomes a paper track before any trading." : "No live trades: this idea was tested on bought historical in-play prices and closed without ever opening a paper trade. The numbers below are that test, $1 a bet.");
+  const liveNote = sd.live_note || (sd.verdict === "pass" ? "No live trades yet: this idea passed its test on bought historical prices. It becomes a paper track before any trading." : sd.verdict === "inconclusive" ? "No live trades: the test ended with too few usable bets to say yes or no, so it never opened a paper trade. The numbers below are what it had, $1 a bet." : "No live trades: this idea was tested on bought historical in-play prices and closed without ever opening a paper trade. The numbers below are that test, $1 a bet.");
   return `
     <div class="verdict ${vcls}">${esc(sd.verdict_text || (sd.verdict === "fail" ? "No edge." : ""))}</div>
     <p class="note">${esc(liveNote)}</p>

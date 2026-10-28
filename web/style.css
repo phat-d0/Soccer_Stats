@@ -896,3 +896,5 @@ details.drv-fold { margin-top: 10px; }
 .dk-test .muted { display: block; font-size: 12px; }
 /* A backcast trade: opened afterwards from logged prices, before its track was set. */
 .chip-backcast { border-style: dotted; }
+/* A study that ended without enough usable bets to decide: neutral, outlined. */
+.pill.v-inc { background: transparent; color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--text-muted); }
