@@ -605,6 +605,7 @@ details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; 
 /* Record → Goals & corners: verdict line, range plot extras, progress bar */
 .verdict { font-weight: 600; font-size: 15px; line-height: 1.35; padding: 10px 14px; border-radius: 12px; background: var(--track); border-left: 4px solid var(--text-muted); }
 .verdict.neg { border-left-color: var(--neg); }
+.verdict.pos { border-left-color: var(--pos); }
 .verdict.mid { border-left-color: var(--text-muted); }
 .eb-range.mid, .eb-dot.real.mid { background: var(--text-muted); }
 .rc-row.sel .eb-label { color: var(--text-primary); font-weight: 600; }
@@ -881,3 +882,8 @@ details.drv-fold { margin-top: 10px; }
 .pill.st-closed { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--neg); }
 .cb-table td .meta { display: block; font-size: 11px; color: var(--text-muted); }
 .cb-table td.num { white-space: nowrap; }
+/* Research studies' verdict pills (owner, 28 Oct): Passed / Failed / Running. */
+.pill.v-pass { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+.pill.v-fail { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--neg); }
+.pill.v-run { background: var(--track); color: var(--text-secondary); }
+.row-btn.folder.study-row .who .pill { margin-left: 4px; vertical-align: 1px; white-space: nowrap; }

@@ -359,7 +359,7 @@ def build(src: Path, out: Path) -> dict:
     add_team_total_prices(data)
     add_espn_team_news(data)
     add_markets_research(data)
-    add_comeback_research(data)
+    add_research_studies(data)
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
@@ -845,10 +845,146 @@ def add_markets_research(data: dict) -> None:
         data["markets_research"] = _clean(markets_research([tmp], pd.DataFrame(results)))
 
 
-# Portfolio > Comeback bets: Research lab's committed result (lab/comeback_research.json,
-# PR #115) through publish.comeback_research, every bet kept (the fixture stays under 1.5 MB).
-def add_comeback_research(data: dict) -> None:
-    data["comeback_research"] = _clean(pub.comeback_research())
+# Portfolio's research studies (owner, 28 Oct: every tested strategy shows in Portfolio):
+# the real committed comeback study through publish.research_studies, every bet kept, plus
+# synthetic studies for the states the real files don't have yet: one running (pre-registered,
+# prices being bought), one in-play that passed with cash-out returns and a generic Why, and
+# one pre-match that failed (Moneyline's Archive). The fixture stays under 1.5 MB.
+def _study_bets(n, start, seed, design="A", cashout=False):
+    rng = np.random.default_rng(seed)
+    clubs = [("Arsenal", "Leeds"), ("Chelsea", "Fulham"), ("Betis", "Celta"), ("Lyon", "Nice")]
+    out = []
+    for i in range(n):
+        home, away = clubs[i % len(clubs)]
+        odds = round(float(rng.uniform(1.6, 4.5)), 2)
+        won = bool(rng.random() < 1 / odds + (0.03 if cashout else -0.02))
+        b = {"date": (pd.Timestamp(start) + pd.Timedelta(days=3 * i)).strftime("%Y-%m-%d")}
+        b |= {"lg": ["E0", "SP1", "F1"][i % 3], "home": home, "away": away, "odds": odds}
+        b |= {"implied": round(1 / odds, 4), "won": won, "design": design}
+        if cashout:
+            b["pick"] = f"{home} to win, cashed out at half-time"
+            b["profit"] = round(float(rng.uniform(-0.6, 0.9)), 3)
+            b["result_text"] = (
+                f"Cashed out {'+' if b['profit'] >= 0 else '−'}${abs(b['profit']):.2f}"
+            )
+        out.append(b)
+    return out
+
+
+def _design(bets, role, label, band_noun=None):
+    won = sum(b["won"] for b in bets)
+    profit = sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in bets)
+    implied = sum(b["implied"] for b in bets) / len(bets)
+    bands = []
+    for lo, hi in ((0.2, 0.4), (0.4, 0.6), (0.6, 1.0)):
+        g = [b for b in bets if lo <= b["implied"] < hi]
+        if g:
+            gw = sum(b["won"] for b in g)
+            gp = sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in g)
+            bands.append({"lo": lo, "hi": hi, "bets": len(g), "wins": gw})
+            bands[-1] |= {"win_rate": round(gw / len(g), 4)}
+            bands[-1] |= {"implied": round(sum(b["implied"] for b in g) / len(g), 4)}
+            bands[-1] |= {"roi": round(gp / len(g), 4), "roi_ci95": [-0.4, 0.4]}
+    roi = round(profit / len(bets), 4)
+    d = {"role": role, "label": label, "bets": len(bets), "wins": won}
+    d |= {"win_rate": round(won / len(bets), 4), "implied": round(implied, 4)}
+    d |= {"implied_matches": len(bets), "gap": round(won / len(bets) - implied, 4)}
+    d |= {"gap_ci95": [-0.08, 0.06], "roi": roi, "roi_ci95": [roi - 0.15, roi + 0.15]}
+    by_lg = {}
+    for b in bets:
+        by_lg.setdefault(b["lg"], []).append(b)
+    d["by_league"] = [
+        {"code": lg, "bets": len(g), "wins": sum(b["won"] for b in g)}
+        | {"win_rate": round(sum(b["won"] for b in g) / len(g), 4), "implied": 0.4}
+        | {
+            "roi": round(
+                sum(b.get("profit", b["odds"] - 1 if b["won"] else -1) for b in g) / len(g), 4
+            )
+        }
+        | {"roi_ci95": [-0.3, 0.3]}
+        for lg, g in by_lg.items()
+    ]
+    d["by_band"] = bands
+    return d
+
+
+def add_research_studies(data: dict) -> None:
+    studies = _clean(pub.research_studies())
+    cash = _study_bets(36, "2024-08-17", 7, cashout=True)
+    search = _study_bets(30, "2023-08-12", 11)
+    synthetic = [
+        {
+            "id": "heavy_fav_ht",
+            "portfolio": "comebacks",
+            "name": "$1 on a 75%+ favourite trailing at half-time",
+            "title": "Heavy favourites coming back",
+            "question": "Does a favourite priced 75% or more before kickoff, behind at "
+            "half-time, win more often than its in-play price implies?",
+            "rule": "$1 on the 75%+ favourite trailing at half-time, at DraftKings' in-play price.",
+            "verdict": "pending",
+            "verdict_text": "Running: pre-registered, the in-play prices are being bought.",
+            "preregistered_at": "2026-10-04",
+            "preregistered": {"H": "a291256"},
+            "planned": {"bets": 410, "matches": 430, "credits": 4300}
+            | {"note": "Design H: eight leagues 2025/26 plus the cups, one snapshot per slot."},
+            "cost": {"total": 0},
+            "designs": {},
+            "bets": [],
+            "notes": ["Synthetic study for the fixture."],
+        },
+        {
+            "id": "cashout_ht",
+            "portfolio": "comebacks",
+            "name": "Cash out at half-time",
+            "title": "Cashing out at half-time",
+            "question": "Does cashing out a pre-match bet at half-time beat holding it?",
+            "rule": "$1 on the pre-match favourite, cashed out at half-time at the in-play price.",
+            "verdict": "pass",
+            "verdict_text": "Yes on this sample: cashing out returned more than holding.",
+            "closed_at": "2026-10-03",
+            "preregistered": {"A": "f64d618"},
+            "cost": {"total": 640, "design_a": 600, "probes": 40},
+            "price_name": "Pre-match price",
+            "band_title": "Won vs the price, by pre-match chance",
+            "band_note": "Rows group the bets by the pre-match price's chance.",
+            "designs": {"A": _design(cash, "judged", "Design A: three leagues, 2024/25")},
+            "bets": cash,
+            "why": [
+                {
+                    "title": "1. The idea",
+                    "text": "Holding to full time adds risk the price doesn't pay for.",
+                    "ref_name": "Price",
+                    "rows": [
+                        {"label": "Ahead at half-time", "n": 120, "won": 0.71, "ref": 0.68},
+                        {"label": "Level at half-time", "n": 90, "won": 0.44, "ref": 0.47},
+                    ],
+                },
+                {"title": "2. What it means", "text": "Synthetic study for the fixture."},
+            ],
+            "notes": ["Synthetic study for the fixture."],
+            "runs": {"fetch": "1", "analysis": "2"},
+        },
+        {
+            "id": "strategy_search",
+            "portfolio": "moneyline",
+            "name": "Strategy search: home underdogs",
+            "title": "Strategy search",
+            "question": "Does any simple pre-match rule beat Pinnacle's close?",
+            "rule": "$1 on home underdogs priced 2.50 to 4.00, at Pinnacle's early price.",
+            "verdict": "fail",
+            "verdict_text": "No: the finalist lost to the closing price on the held-out seasons.",
+            "closed_at": "2026-10-02",
+            "preregistered": {"A": "0bcc7fa"},
+            "cost": {"total": 0},
+            "price_name": "Pinnacle's price",
+            "live_note": "No live trades: this rule was tested on free historical prices and "
+            "failed before any paper trade opened.",
+            "designs": {"A": _design(search, "judged", "Held-out seasons 2023/24 to 2024/25")},
+            "bets": search,
+            "notes": ["Synthetic study for the fixture."],
+        },
+    ]
+    data["research_studies"] = studies + synthetic
 
 
 # Team corners (owner's live test, PR #41) until the real ledger's matches reach the fixture
