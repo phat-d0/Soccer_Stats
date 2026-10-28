@@ -2689,6 +2689,7 @@ bets, adjusted p < 0.05). The holdout stays locked and unread. Nothing goes live
 - So there is nothing to test on the locked seasons, and we didn't open them. They stay
   clean for any future idea.
 - App file: `lab/strategy_search_research.json` (the best arm's bets for the curve).
+
 ## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 151,000 credits; pre-registration frozen with its slot file on 2026-10-28, before any purchase)
 
 **Up front (frozen 2026-10-28).**
@@ -2837,3 +2838,45 @@ once. It pins down these points the text above left open:
 **App file.** The finished test ships `lab/cashout_research.json`, pass or fail, in the same
 shape as `lab/comeback_research.json` (title, question, rule, verdict, verdict_text, cost,
 runs, preregistered, designs with by-band tables, a bets list for the curve, notes).
+
+### Cash-out test: result (2026-10-28; `odds-check.yml` `task=cashout-test` run 40706645115 from the default branch, run once, 0 credits, no key)
+
+**Verdict: fail.** The primary rule (cash out at a 50% in-play chance, 5% fee, 2% stakes,
+underdog 4.0+) made 570 qualifying decisions. Its growth difference against holding was
+**+0.000312 per bet, 95% range −0.00011 to +0.00073**. The range includes 0.
+
+- **Sample:** 10,149 of the 11,864 frozen matches analysed: 1,715 unmatched, 0 not priced
+  (the guard blocked nothing), 0 without a result. 5,401 positions at 4.0+ and 4,748 at
+  3.0–4.0.
+- **Holding (4.0+):** the underdog won 14.0% at an average price of 6.45. Mean −0.246 per $1
+  (−0.297 to −0.192). Growth at 2% stakes −0.00567 a bet. The worst drawdown was 100% at every
+  stake.
+- **Growth difference against holding at 2% stakes, 4.0+ (decisions):**
+
+  | Rule | No fee | 5% fee | 10% fee |
+  | --- | --- | --- | --- |
+  | Cash out at 40%+ (809) | +0.00081 (+0.00029 to +0.00134) | +0.00040 (−0.00013 to +0.00092) | −0.00002 |
+  | Cash out at 50%+ (570) | +0.00063 (+0.00022 to +0.00105) | **+0.00031 (−0.00011 to +0.00073)** | −0.00001 |
+  | Cash out at 60%+ (288) | +0.00051 | +0.00032 (+0.00003 to +0.00064) | +0.00013 |
+  | Kelly partial, half-time | +0.00104 (+0.0004 to +0.0017) | +0.00065 (+0.00002 to +0.0013) | |
+
+- **The in-play price against results (underdog won vs DraftKings' fair chance, 4.0+):**
+  - at half-time: under 40% 10.6% vs 10.2%; 40–55% 42.9% vs 47.5%; 55%+ 63.4% vs 72.0% (gap
+    −0.086, −0.155 to −0.016);
+  - at the 70th minute: 8.3% vs 8.0%; 44.6% vs 48.6%; 67.1% vs 69.6%.
+- **3.0–4.0 (descriptive):** holding −0.095 per $1. The primary rule's growth difference was
+  −0.00017 (−0.00062 to +0.00029) on 1,272 decisions; at a 10% fee cashing out loses (range
+  below 0).
+- **By season (4.0+, decisions):** 2024/25 190, 2025/26 307, 2026/27 to date 73. By league the
+  difference ranges from SC0 +0.0045 to D2 −0.0014 (descriptive).
+
+**Plain English for the owner.** The in-play price slightly overrates a heavy underdog that is
+leading, so cashing out at a fair price helps a little. Once a realistic 5% cash-out fee is
+paid, the gain can't be told apart from zero. The bigger problem is the bet itself: backing
+4.0+ underdogs at the quoted close lost about a quarter of every dollar, and no cash-out rule
+fixes that. Nothing goes live.
+
+**App file.** `lab/cashout_research.json` (`lab/cashout_research.py`, `odds-check.yml`
+`task=cashout-research`). It is rebuilt from the same frozen code and cached snapshots and
+fails unless run 40706645115 reproduces. The bets list holds every 4.0+ position, for the
+curve.
