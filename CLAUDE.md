@@ -325,6 +325,8 @@ the owner's baseball app, so the balance can drop without any run here.
   live rules at DraftKings' own historical prices, from the ten-book bodies of every league
   bought (`bought_leagues`).
   - `load_books`, `quote`: the latest snapshot at or before a time, the quote ≤ 6 h old.
+  - `unmatched_names`: feed names that don't land on football-data's (a `TEAM_NAMES` gap);
+    each league entry carries them, and the log prints them.
   - `candidates`: DraftKings' 1X2 at kickoff − 48 h (entry, Shin-fair `mkt_` for the blend),
     Pinnacle's close (judged CLV) and DraftKings' close (`clv_dk`) from the close snapshot, in
     the seasons the Pinnacle backtests score.
