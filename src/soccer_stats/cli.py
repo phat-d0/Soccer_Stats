@@ -609,7 +609,8 @@ def cmd_paper(args: argparse.Namespace) -> None:
         shutil.copy(detail, site / "players_backtest.json")
         data["players_backtest"] = "players_backtest.json"
     (site / "data.json").write_text(json.dumps(_clean(data), separators=(",", ":")))
-    live = data["portfolio"]["live"]
+    pm = next((p for p in data["portfolio"].get("portfolios", []) if p["id"] == "moneyline"), None)
+    live = (pm or {}).get("live") or {}
     s = live.get("summary", {})
     print(
         live.get("error")
@@ -617,7 +618,6 @@ def cmd_paper(args: argparse.Namespace) -> None:
         f"{s.get('open', 0)} open"
         + (f". {live['note']}" if live.get("note") else "")
     )
-    pm = next((p for p in data["portfolio"].get("portfolios", []) if p["id"] == "moneyline"), None)
     for st in (pm or {}).get("live", {}).get("strategies") or []:
         ss, rl = st.get("summary") or {}, st.get("rule") or {}
         sig = rl.get("sigma") if isinstance(rl.get("sigma"), dict) else None

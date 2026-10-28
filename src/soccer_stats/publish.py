@@ -709,12 +709,6 @@ def portfolio_placeholder() -> dict:
             "presets": list(FILTER_PRESETS),
             "fresh_hours": FRESH_HOURS,
         },
-        "live": {
-            "trades": [],
-            "summary": {"trades": 0},
-            "error": "The paper-trade ledger wasn't updated in this build.",
-        },
-        "backtest": None,
     }
 
 

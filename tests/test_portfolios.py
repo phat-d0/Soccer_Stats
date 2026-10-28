@@ -124,7 +124,9 @@ def test_run_fills_portfolios(tmp_path):
     assert pfs["moneyline"]["live"]["summary"]["open"] == 1
     assert pfs["moneyline"]["backtest"]["summary"]["trades"] == 3
     assert pfs["goalscorer"]["live"]["summary"]["trades"] == 0
-    assert data["portfolio"]["live"]["summary"]["open"] == 1  # old key kept for a release
+    assert (
+        "live" not in data["portfolio"] and "backtest" not in data["portfolio"]
+    )  # legacy keys gone
 
     missing = {"fixtures": [], "portfolio": {}}
     paper.run(missing, tmp_path / "nope", None, now=NOW)

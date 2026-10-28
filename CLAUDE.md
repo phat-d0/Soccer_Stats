@@ -687,8 +687,9 @@ the owner's baseball app, so the balance can drop without any run here.
     of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
     counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,
     `whole_lines`, `pushes`, `matches`, `model`, `price`; `{error}` on failure). `models` =
-    `equations.section(data)`. Legacy `portfolio.live`/`backtest` are no longer read by the app
-    (v66) and can go; `player_model` is still read (Player shots → Backtest).
+    `equations.section(data)`. The legacy `portfolio.live`/`backtest` keys were dropped (28 Oct);
+    `player_model` stays (Player shots → Backtest reads it). The CLI's "Paper trades" line reads
+    Moneyline's `live`.
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
 
@@ -1344,8 +1345,6 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 - Name watch: check each publish log's "Duplicate fixtures" and "odds events unmatched" lines; a
   promoted or relegated club needs its spelling checked (`odds-check.yml` `task=markets` /
   `task=espn` with `leagues=…`, free).
-- Housekeeping: the app stopped reading the legacy `portfolio.live` / `portfolio.backtest` keys in
-  v66, so paper.py can drop them; `player_model` stays (Player shots → Backtest reads it).
 
 ## Conventions
 

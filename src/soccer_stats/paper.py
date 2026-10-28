@@ -1963,6 +1963,8 @@ def run(
     """
     now = now or pd.Timestamp.now(tz="UTC")
     portfolio = data.setdefault("portfolio", {})
+    for legacy in ("live", "backtest"):  # dropped 28 Oct: the app reads `portfolios`
+        portfolio.pop(legacy, None)
     live = {"trades": [], "summary": {"trades": 0}, "error": None, "note": None}
     written = 0
     live_trades: list[dict] = []
@@ -2100,25 +2102,14 @@ def run(
             if found is not None or p["id"] not in backtests:
                 backtests[p["id"]] = found
         _add_league_levels(backtests.get("moneyline"), codes, learned, log_dir, league)
-        bt = backtest_path(log_dir, league)
-        if bt.exists():
-            try:
-                portfolio["backtest"] = json.loads(bt.read_text())
-            except ValueError:
-                portfolio["backtest"] = None
         pm = Path(log_dir) / "backtest" / f"{league}_players.json"
         if pm.exists():
             try:
                 players = json.loads(pm.read_text())
             except ValueError:
                 players = {}
-            ptrades = players.pop("trades", [])
+            players.pop("trades", None)  # the player_shots portfolio's backtest has them
             portfolio["player_model"] = players
-            if ptrades:  # priced player backtest trades join the match ones
-                b = portfolio.get("backtest") or {}
-                combined = (b.get("trades") or []) + ptrades
-                merged = portfolio_section(combined)
-                portfolio["backtest"] = {**b, **merged}
     # Each match strategy's own backtest on Pinnacle's early prices (backtest-lean and
     # backtest-edge12; the Champions League at the close), trimmed for data.json; no file
     # = {available: False, note}. E0_dk.json stays Moneyline's `backtest`.
@@ -2138,9 +2129,9 @@ def run(
         portfolio["models"] = eq.section(data)
     except Exception as exc:  # noqa: BLE001  never costs the portfolio
         portfolio["models"] = {"error": type(exc).__name__}
-    portfolio["live"] = live
-    # One portfolio per strategy (the app reads these); live, backtest and player_model
-    # above stay for one release.
+    # One portfolio per strategy (the app reads these). The legacy portfolio.live and
+    # portfolio.backtest keys are gone (28 Oct); player_model stays (Portfolio -> Player
+    # shots reads it).
     if live.get("error") and not corner_section["error"]:
         corner_section["error"] = live["error"]
     corner_section["strategies"] = corner_strategies(corner_trades, now)
