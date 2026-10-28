@@ -110,7 +110,8 @@ jobs:
 
       # Historical snapshots are kept in their own cache, separate from the scheduled
       # build's, and are not committed (check The Odds API's terms before publishing them).
-      - uses: actions/cache@v4
+      # Restored here and saved right after the download, even when it fails (paid data).
+      - uses: actions/cache/restore@v4
         if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
@@ -544,6 +545,12 @@ jobs:
             --max-credits "${{ inputs.max_credits }}" --keep-credits "${{ inputs.keep_credits }}" \
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
+      - uses: actions/cache/save@v4
+        if: ${{ always() && !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-${{ github.run_id }}
+
       - name: Run the DraftKings backtest and save it for the app
         if: ${{ !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
         run: |
@@ -562,3 +569,21 @@ jobs:
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
+
+  # Archive right after a purchase (owner, 28 Oct: "save the api data permanently"): a
+  # paid run on the default branch dispatches caches.yml once this job's caches are saved
+  # (a job that needs it starts after its post-job cache saves), so a bought snapshot reaches the
+  # release within minutes, not at the next twice-weekly run (docs/caches.md). Caches
+  # saved on another branch are invisible to caches.yml: paid fetches run from the
+  # default branch.
+  archive:
+    needs: backfill
+    if: ${{ always() && github.ref_name == github.event.repository.default_branch && !inputs.dry_run && inputs.max_credits != '0' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write # dispatch caches.yml
+    steps:
+      - name: Dispatch the paid-odds archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run caches.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f archive=true

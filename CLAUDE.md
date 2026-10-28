@@ -218,13 +218,20 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
 - Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
-  `cup-odds-history-*`, `comeback-odds-*` (paid odds), `cup-espn-*` (ESPN cup days),
+  `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
   delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones
   as release assets (`paid-odds-archive`, manifest on data-log `archive/manifest.json`); every
   step that restores a paid cache is followed by `.github/actions/paid-archive-restore`, which
   rebuilds a missed cache from the archive before anything can buy (`docs/caches.md`).
-  A new cache needs a keep-alive matrix row (`tests/test_cache_archive.py` checks it).
+  A new cache needs a keep-alive matrix row (`tests/test_cache_archive.py` checks it). A cache
+  saved in a job that can get `ODDS_API_KEY` must be in `cache_archive.PAID` or in
+  `cache_archive.FREE` (with why it holds nothing bought). A paid cache restored there is saved by
+  an explicit save step under `always()`. A paid run's workflow ends with an `archive` job that
+  dispatches `caches.yml` (default branch only), so a purchase is archived within minutes. Paid
+  fetches run from the default branch: caches saved on a work branch are invisible to `caches.yml`.
+  The live FanDuel player lines are the one live dataset not on data-log (cache only;
+  `docs/caches.md`).
   The first run (28 Oct) found `odds-history-` and `cup-odds-history-` already evicted. Their raw
   bodies are lost, but what was parsed from them is safe on data-log (`E0_dk.json`,
   `UCL_closes.jsonl`). The comeback (1.5 MB packed) and FanDuel (1.2 MB) caches are archived.
@@ -683,7 +690,9 @@ the owner's baseball app, so the balance can drop without any run here.
   `task=inplay-probe` with `league` and `cap`. `hist_dates` set to one ISO time buys one
   historical h2h snapshot (10 credits); otherwise one live `/odds` call (1 credit), only if a
   match is in play (a free events list checks first). Prints each started match's prices per
-  book, their age and ESPN's score then. First run (24 Oct, run 40136522857, 10 credits): the
+  book, their age and ESPN's score then. Every bought answer is kept in
+  `data/raw/inplay_probe/<league>/` (paid cache `inplay-probe-`, from 28 Oct); a historical
+  snapshot already held is never bought again. First run (24 Oct, run 40136522857, 10 credits): the
   archive keeps in-play prices (four Premier League matches at half-time, Pinnacle,
   DraftKings and Betfair among the books; `docs/lab.md` "Phase 2, step 1"). A second
   snapshot (run 40136975819, 10 credits, 25 May 2025) agreed, except that Pinnacle's quote was
