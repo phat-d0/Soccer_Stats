@@ -145,6 +145,7 @@ settled).
 
 **Credits:** the owner upgraded the plan to about 5M a month (28 Oct): 4,938,760 left at the
 05:50 UTC publish that day. Caps are no longer the constraint; the 3,000 reserve floor stays.
+The half-time in-play snapshots (`inplay.yml`) add about 580 a month.
 Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
 40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
@@ -209,7 +210,8 @@ the owner's baseball app, so the balance can drop without any run here.
 | File | What | Credits |
 | --- | --- | --- |
 | `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
-| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
+| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
+| `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month; guard `MONTHLY_CAP` 2,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
 | `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
@@ -244,6 +246,10 @@ the owner's baseball app, so the balance can drop without any run here.
   stays the book trades open at; the others feed the every-book log, Pinnacle's live close and
   the best US price. DraftKings lists no main soccer `totals`. The budget still counts 2 a
   call (`BUDGET_COST`).
+- **In-play h2h** (lead brief 2, 28 Oct; `inplay_log.py`, `inplay.yml`): the same live `/odds`
+  call with the same ten books, made at kickoff + 55 and + 75 minutes for each kickoff
+  cluster. That is 1 credit per league per cluster per snapshot, about 580 a month, with a
+  guard of 2,000 a month.
 - **Team totals:** `/events/{id}/odds`, `bookmakers=fanduel,bovada,pinnacle`,
   `markets=team_totals,totals`, 2 credits a call, E0, SP1, D1, I1, F1 (`team_totals.py`).
   Pinnacle quotes no goal team totals on this API.
@@ -478,8 +484,17 @@ the owner's baseball app, so the balance can drop without any run here.
   90-minute score known. Settles only on one event with both names exact, home/away right,
   kickoff ±3 h; corner counts from the summary's `wonCorners`. `Budget`: 60 s, 3 failures, 80
   requests. Rows carry `result_source: "espn"`. Log "ESPN results: N of M matches final …".
-- `close_runs.py`: the close and settlement planner behind `closes.yml` (`plan`, `SETTLE_AFTER`,
-  `SETTLE_MERGE`, `settle_pending`).
+- `inplay_log.py` (lead brief 2, 28 Oct): the half-time in-play snapshots (`inplay.yml`, CLI
+  `log-inplay --log-dir --pending`). `KINDS` inplay55/inplay75, `WINDOWS` (45, 65) and (65, 90)
+  minutes after kickoff; `kickoffs` (DraftKings logs only, `DK_LOG`), `due` (minus the call
+  record's `done_keys`), `rows_from` (one row per started event and book with all three prices,
+  ESPN via `lab.inplay_probe.espn_live`/`match_espn`), `run` (free events call, reserve
+  `RESERVE` 3,000, `MONTHLY_CAP` 2,000, one `/odds` call per due league, cost from
+  `x-requests-last`; a parsing failure still records the call), `append`, `summary_line`. Log
+  lines "In-play snapshots: …" and `INPLAY_LOG_JSON`.
+- `close_runs.py`: the close, settlement and in-play planner behind `closes.yml` (`plan`,
+  `SETTLE_AFTER`, `SETTLE_MERGE`, `settle_pending`, `INPLAY`, `WORKFLOWS`; `to_json` names each
+  dispatch's `workflow`).
 - `cup_model.py`: the cross-league model for UCL. One goals-only Dixon-Coles fit (`XI` 0.0019,
   `RIDGE` 0.1, `WINDOW_DAYS` 730, matches before `as_of` only) over football-data's top and
   extra European leagues plus every UEFA cup result with a 90-minute score from ESPN
