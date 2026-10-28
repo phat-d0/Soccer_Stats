@@ -2743,19 +2743,20 @@ a **separate sample**: never pooled with H ∪ H2, and never used to change H's 
 - **When it is judged.** Usable bets (rows passing the checks, counted without any result)
   are counted at each monthly review. The outcome is read **once**:
   - when the count first reaches **136**; or
-  - on **31 May 2028**, whichever comes first.
+  - on **31 May 2030**, whichever comes first (the lead's date, chosen 28 Oct before any HF
+    data exists).
 
   No result is looked at before then.
 - **Pass:** at least 136 usable DraftKings bets **and** the ROI range per $1 entirely above 0
   (match-resampled, 2,000 draws, seed 0).
 - **Fail:** at least 136 usable and the range includes 0 or sits below it.
-- **Inconclusive:** under 136 on 31 May 2028.
+- **Inconclusive:** under 136 on 31 May 2030.
 - Per-competition lines are descriptive only. Nothing changes live in any case. A pass only
   justifies proposing a live paper track to the owner.
 - **Expected pace:** about 24 usable bets a season from the cups, UEFA and the extra leagues
   (the scope's figure), plus the live leagues' share (about 9 a season). At roughly 33 a
-  season, 136 would take about four seasons. 31 May 2028 is likely to end "inconclusive"
-  unless the coverage turns out wider than estimated.
+  season, 136 would take about four seasons, close to the 31 May 2030 date. A slower pace
+  ends "inconclusive" on that date.
 
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
