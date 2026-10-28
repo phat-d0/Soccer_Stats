@@ -73,7 +73,7 @@ BOOKS_PARAM = ",".join(BOOKS)
 LEAGUES = ("E0", "SP1", "D1", "I1", "F1", "E1", "E2", "E3")
 PINNACLE_ONLY = ("E2", "E3")
 COST_PER_CALL = 1  # one market, up to ten books (one region): 1 credit
-CORNERS_MONTHLY_CAP = 750  # credits a calendar month (UTC); 500 until 10 Oct, 550 until 24 Oct
+CORNERS_MONTHLY_CAP = 20000  # credits a calendar month (UTC); 750 until 28 Oct (the ~5M plan)
 # Listed is not priced: in a PINNACLE_ONLY league, a snapshot kind ("look" or "close") whose
 # last EMPTY_PAUSE answered calls all came back with no rows, over at least two runs or
 # kickoff days, is paused for EMPTY_PAUSE_DAYS after the last of them, then looked at once

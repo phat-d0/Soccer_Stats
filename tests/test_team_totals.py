@@ -409,13 +409,15 @@ def mixed_body():
     return b
 
 
-def test_cap_is_800_and_a_call_costs_two():
-    assert tt.MONTHLY_CAP == 800 and tt.COST_PER_CALL == 2
+def test_cap_is_20000_and_a_call_costs_two():
+    assert tt.MONTHLY_CAP == 20000 and tt.COST_PER_CALL == 2  # 800 until 28 Oct
     assert tt.MARKETS == ("team_totals", "totals")
     assert "pinnacle" in tt.BOOKS and len(tt.BOOKS) <= 10  # one region
 
 
-@pytest.mark.parametrize("spent, allowed", [(798, True), (799, False)])
+@pytest.mark.parametrize(
+    "spent, allowed", [(tt.MONTHLY_CAP - 2, True), (tt.MONTHLY_CAP - 1, False)]
+)
 def test_cap_counts_the_two_credit_call(tmp_path, spent, allowed):
     raw, out, state = tmp_path / "raw", tmp_path / "out", tmp_path / "state"
     raw.mkdir()
@@ -426,9 +428,10 @@ def test_cap_counts_the_two_credit_call(tmp_path, spent, allowed):
     calls = []
     s = tt.run([card()], out, [state], raw, "k", K - pd.Timedelta(hours=24), fake_get(calls))
     if allowed:
-        assert s["calls"] == 1 and s["month_spent"] == 800 and s["stop"] is None
+        assert s["calls"] == 1 and s["month_spent"] == tt.MONTHLY_CAP and s["stop"] is None
     else:
-        assert calls == [] and "monthly cap: 799 of 800" in s["stop"]
+        cap = tt.MONTHLY_CAP
+        assert calls == [] and f"monthly cap: {cap - 1} of {cap}" in s["stop"]
 
 
 def test_mixed_rows_keep_the_markets_apart(tmp_path):
@@ -440,7 +443,9 @@ def test_mixed_rows_keep_the_markets_apart(tmp_path):
     calls = []
     s = tt.run([c], out, [], raw, "k", K - pd.Timedelta(hours=24), fake_get(calls, mixed_body()))
     assert s["calls"] == 1 and s["credits"] == 2 and s["rows"] == 4 and s["totals_rows"] == 2
-    assert "(2 match totals)" in tt.summary_line(s) and "of 800 credits" in tt.summary_line(s)
+    assert "(2 match totals)" in tt.summary_line(
+        s
+    ) and f"of {tt.MONTHLY_CAP} credits" in tt.summary_line(s)
     rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
     team = [r for r in rows if r["market"] == "team_totals"]
     tot = {r["book"]: r for r in rows if r["market"] == "totals"}

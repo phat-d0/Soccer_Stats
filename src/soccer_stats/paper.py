@@ -39,6 +39,7 @@ from soccer_stats import edge12_backtest as e12b
 from soccer_stats import equations as eq
 from soccer_stats import lean_backtest as lb
 from soccer_stats import match_calibration as mc
+from soccer_stats import odds_feed
 from soccer_stats import odds_log as ol
 from soccer_stats import paper_dnb as pdnb
 from soccer_stats import sizing as sz
@@ -76,6 +77,11 @@ UPDATE_FIELDS = {
     # Kelly sizing (24 Oct): a Model 12% trade's blend chance for its side, once.
     "p_blend",
     "p_blend_from",
+    # Pinnacle's live close from the every-book log (28 Oct), before football-data's.
+    "pinnacle_live_close_prices",
+    "pinnacle_live_fetched_at",
+    "pinnacle_live_minutes_before",
+    "clv_pinnacle_live",
 }
 FOOTBALL_DATA = "football-data"
 
@@ -254,6 +260,41 @@ def _close_fields(t: dict, group: dict, quoted, kickoff) -> dict:
     }
 
 
+def best_us(c: dict, market: str) -> dict:
+    """The best US price on a card's side at open (card `best_us`, odds_feed.best_prices):
+    {best_us_odds, best_us_book}, None for both when the call had no other book."""
+    b = ((c.get("best_us") or {}).get(market)) or {}
+    return {"best_us_odds": b.get("odds"), "best_us_book": b.get("book")}
+
+
+def pinnacle_live(
+    t: dict, books: pd.DataFrame | None, now: pd.Timestamp, clv_fn=None
+) -> dict | None:
+    """An update event with Pinnacle's live close for a match trade (h2h sides only): its
+    last quote before kickoff in the every-book log (odds_log BOOKS), `clv_pinnacle_live`
+    = entry odds x its margin-free chance - 1 (`clv_fn(t, prices)` overrides, for draw no
+    bet), when it is newer than the one the trade has. Never steps back in time."""
+    if books is None or books.empty or t.get("market") not in tr.LEAN_MARKETS:
+        return None
+    r = ol.last_before(books, t["home"], t["away"], t["kickoff"], "h2h", book=odds_feed.SHARP_BOOK)
+    if r is None:
+        return None
+    quoted = r["fetched_at"].isoformat(timespec="seconds")
+    prices = {m: r["prices"].get(m) for m in tr.LEAN_MARKETS}
+    have = t.get("pinnacle_live_fetched_at")
+    if have and (quoted == have or pd.Timestamp(quoted) < pd.Timestamp(have)):
+        return None
+    clv = clv_fn(t, prices) if clv_fn else tr.clv(t["odds"], t["market"], prices)
+    return _update(
+        t,
+        now,
+        pinnacle_live_close_prices=prices,
+        pinnacle_live_fetched_at=quoted,
+        pinnacle_live_minutes_before=_minutes_before(t["kickoff"], quoted),
+        clv_pinnacle_live=clv,
+    )
+
+
 def _log_close(t: dict, log: pd.DataFrame, now: pd.Timestamp) -> dict | None:
     """An update event when the odds log holds a later close than the trade has."""
     market = "h2h" if t["market"] in ol.MARKETS["h2h"] else "totals"
@@ -285,6 +326,7 @@ def update_ledger(
     lean: dict | None = None,
     espn: pd.DataFrame | None = None,
     shadow: dict[str, dict] | None = None,
+    books_log: pd.DataFrame | None = None,
 ) -> tuple[list[dict], str | None]:
     """Open, update and settle paper trades. Mutates `ledger`; returns (new events, note).
 
@@ -309,6 +351,10 @@ def update_ledger(
     (the league's Lean shadow ledger, load_lean_shadow) as a shadow entry instead, its open
     event returned with the others (append_events files it apart). Run update_ledger on the
     shadow ledger itself (no threshold, no lean) to close and settle its entries.
+
+    `books_log` (odds_log.load(..., kind=odds_log.BOOKS), the every-book log) gives every
+    live h2h trade Pinnacle's live close (`clv_pinnacle_live`, pinnacle_live); new
+    trades record the best US price on their side (best_us).
 
     Settlement takes `results` (football-data; ESPN for a cup) first, else `espn`
     (espn_results.fetch: ESPN's final 90-minute scores, matched to the trade's names and
@@ -379,6 +425,7 @@ def update_ledger(
             # The blend's chance for the side (Kelly sizing; the 12% trades on the raw p).
             pb = (c.get("p_bet") or {}).get(t["market"]) if t["market"] in tr.LEAN_MARKETS else None
             t.update(p_blend=round(float(pb), 4) if pb is not None else None, p_blend_from="open")
+            t.update(best_us(c, t["market"]))
             # Until a later price arrives, the entry price is the last one seen.
             group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
             quoted = c.get("odds_updated") or fetched
@@ -398,6 +445,14 @@ def update_ledger(
             ev = _log_close(t, odds_log, now)
             if ev:
                 events.append(ev)
+    if books_log is not None:
+        for t in ledger.values():
+            if t["source"] != "live" or t.get("bet_type") == "player" or t["status"] == "void":
+                continue
+            ev = pinnacle_live(t, books_log, now)
+            if ev:
+                events.append(ev)
+    if odds_log is not None:
         # Lean trades opened before trades recorded their driver get it once, from the
         # logged quote they opened on (an update event; entry fields never change).
         for t in ledger.values():
@@ -524,6 +579,7 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean, shadow=None)
         if (c.get("p") or {}).get(pick["market"]) is not None
         else None,
     )
+    t.update(best_us(c, t["market"]))
     group = {m: c["odds"].get(m) for m in tr.GROUPS[t["market"]]}
     quoted = c.get("odds_updated") or fetched
     t.update(_close_fields(t, group, quoted, kickoff.isoformat()))
@@ -1960,6 +2016,7 @@ def run(
                 if res is not None and "league" in res and not res.empty:
                     res = res[res["league"] == lg]
                 log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
+                books = ol.load(log_dir, lg, kind=ol.BOOKS) if log is not None else None
                 esp = _league_rows(espn_results, lg)
                 ev, n = update_ledger(
                     sub,
@@ -1977,6 +2034,7 @@ def run(
                     lean=leans[lg],
                     espn=esp,
                     shadow=shadow,
+                    books_log=books,
                 )
                 # The shadow entries close and settle exactly as trades do; nothing opens.
                 sev, _ = update_ledger(
@@ -1989,6 +2047,7 @@ def run(
                     odds_log=log,
                     threshold=None,
                     espn=esp,
+                    books_log=books,
                 )
                 ledger.update(sub)
                 shadows.update(shadow)
@@ -2098,6 +2157,7 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
         if res is not None and "league" in res and not res.empty:
             res = res[res["league"] == lg]
         log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
+        books = ol.load(log_dir, lg, kind=ol.BOOKS) if log is not None else None
         events += pdnb.update_ledger(
             ledger,
             cards,
@@ -2109,6 +2169,7 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
             ref,
             odds_log=log,
             espn=_league_rows(espn, lg),
+            books_log=books,
         )
         trades += list(ledger.values())
     n = pdnb.append_events(log_dir, events)

@@ -261,7 +261,7 @@ def test_every_paid_restore_is_followed_by_the_archive_fallback():
         assert nxt["with"]["name"] == paid[prefix]
         assert nxt.get("if") == s.get("if"), f"{wf} {job}: the fallback's condition differs"
         found += 1
-    assert found == 9
+    assert found == 10
 
 
 # ---------- bought data can't be left out of the archive ----------

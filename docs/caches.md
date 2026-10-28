@@ -20,6 +20,7 @@ snapshots alone were about 8,000).
 | `player-odds-history-` | `data/raw/player_odds_history` | FanDuel historical player lines | `players.yml` |
 | `cup-odds-history-` | `data/raw/cup_odds`, `data/raw/cups/espn` | Champions League closes (Pinnacle, DraftKings) | `backfill.yml` `cup_odds` |
 | `comeback-odds-` | `data/raw/comeback_odds` | comeback phase 2 in-play snapshots, designs B and C | `odds-check.yml` `comeback-fetch` |
+| `archive-probe-` | `data/raw/archive_probe` | in-play archive probes, one snapshot per league-season | `odds-check.yml` `archive-probe` |
 | `inplay-probe-` | `data/raw/inplay_probe` | in-play probe answers, live and historical (from 28 Oct) | `odds-check.yml` `inplay-probe` |
 
 **What the first run found** (28 Oct, `caches.yml` dry run 40640065501, before any archive):
@@ -61,7 +62,7 @@ Until 28 Oct some paid data was never cached:
   lost what it bought. Both now save with an explicit save step under `always()`.
 
 **Free** (kept alive only): `raw-data-` (`data/raw`), `cup-espn-`, `cup-corners-`,
-`espn-timelines-`, `understat-SP1/D1/I1/F1-`, `comebacks-E0/SP1/D1/I1/F1-`. CI keeps `playwright-…`
+`espn-timelines-`, `heavy-espn-`, `understat-SP1/D1/I1/F1-`, `comebacks-E0/SP1/D1/I1/F1-`. CI keeps `playwright-…`
 and setup-uv's own caches in use itself.
 
 The `usage` job prints every cache's size and when it was last used, plus the total against the
@@ -133,7 +134,7 @@ is the player-props team's call.
 - **One job does both.** The keep-alive already restores the paid caches, so it also
   refreshes the archive (uploading only on a change). There is no separate archive schedule.
 - **Fallback on a miss** (`.github/actions/paid-archive-restore`). It runs right after every step
-  that restores a paid cache: 9 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
+  that restores a paid cache: 10 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
   - If any archived path has fewer files on disk than the archive holds, it downloads that cache's
     assets, checks every sha256 against the manifest, and extracts the missing files. Files already
     on disk are kept.

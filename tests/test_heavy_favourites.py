@@ -69,3 +69,37 @@ def test_scope_reports_a_missing_file_and_keeps_going(tmp_path, monkeypatch):
               "trailing_from_average": 0, "one_down": 0, "slots": 0, "credits": 0,
               "usable_estimate": 0}
     }  # fmt: skip
+
+
+def test_freeze_lists_trailing_heavy_slots_and_drops_used_ones(tmp_path, monkeypatch):
+    raw = frame(
+        [
+            match("A", "B", (0, 1)),  # heavy, trailing, 15:00
+            match("C", "D", (0, 2)),  # heavy, trailing, same slot
+            match("G", "H", (0, 1), time="17:30", PSCH=None),  # average's close, 17:30
+            match("E", "F", (1, 0)),  # ahead: not listed
+        ]
+    )
+    path = tmp_path / "N1.csv"
+    raw.to_csv(path, index=False)
+    monkeypatch.setattr(cp, "download", lambda *a, **k: path)
+    out = hf.freeze({"N1": (2025,)}, tmp_path, used={("N1", "2025-08-09T16:30Z")})
+    assert out["design"] == "H" and out["totals"] == {"slots": 1, "matches": 2, "credits": 10}
+    slot = out["slots"][0]
+    assert slot["request_at"] == "2025-08-09T14:55Z" and slot["sport"] == hf.OTHER["N1"][1]
+    assert [m["home"] for m in slot["matches"]] == ["A", "C"]
+    assert slot["matches"][0]["price"] == "pinnacle" and slot["matches"][0]["favourite"] == "home"
+    assert out["per_league_season"]["N1 2025/26"]["dropped_as_used"] == 1
+
+
+def test_comebacks2_reads_design_h_with_the_average_close(tmp_path, monkeypatch):
+    from soccer_stats.lab import comebacks2 as c2
+
+    raw = frame([match("A", "B", (0, 1)), match("G", "H", (0, 1), PSCH=None)])
+    raw["PC>2.5"], raw["PC<2.5"] = 1.8, 2.0
+    path = tmp_path / "N1.csv"
+    raw.to_csv(path, index=False)
+    monkeypatch.setattr(cp, "download", lambda *a, **k: path)
+    fd = c2.load_fd([{"league": "N1", "kickoff": "2025-08-09T14:00Z"}], any_price=True)
+    assert list(fd["source"]) == ["pinnacle", "average"]
+    assert fd["fd"].notna().all() and fd["f_over"].notna().all() and fd["p_fav"].min() > 0.75

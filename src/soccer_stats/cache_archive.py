@@ -58,6 +58,11 @@ PAID = {
         "paths": ["data/raw/comeback_odds"],
         "what": "comeback phase 2 in-play snapshots, designs B and C (odds-check.yml)",
     },
+    "archive-probe": {
+        "prefix": "archive-probe-",
+        "paths": ["data/raw/archive_probe"],
+        "what": "in-play archive probes, one snapshot per league-season (odds-check.yml)",
+    },
     "inplay-probe": {
         "prefix": "inplay-probe-",
         "paths": ["data/raw/inplay_probe"],
@@ -77,6 +82,7 @@ FREE = {
     "espn-timelines-": "ESPN goal timelines (free)",
     "understat-*-": "Understat downloads for one league (free)",
     "comebacks-*-": "Understat match files for the comeback research (free)",
+    "heavy-espn-": "ESPN cup and extra-league days for the 75%+ counting (free)",
 }
 
 
