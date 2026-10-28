@@ -27,6 +27,7 @@ MODULES = [
     "soccer_stats.lab.heavy_favourites",
     "soccer_stats.lab.cashout",
     "soccer_stats.lab.archive_probe",
+    "soccer_stats.lab.heavy_more",
     "soccer_stats.lab.timelines",
 ]
 

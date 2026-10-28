@@ -34,6 +34,8 @@
 #   comebacks2: the analysis (`design`) on the cached bodies and football-data; no key.
 #   cashout: hold vs cash out an underdog leading at half-time (docs/lab.md "Cash-out"),
 #            on the same cached snapshots; exploratory, no key.
+#   heavy-more: free counts for the 75%+ idea beyond heavy-favourites: domestic and UEFA
+#            cups (ESPN half-times and odds), football-data's extra leagues, earlier seasons.
 #   archive-probe: in-play archive probes (owner-approved 28 Oct): one historical snapshot per
 #            league-season at a busy half-time, walking back until unpriced; `cap`, `leagues`.
 #   heavy-favourites: free scope of a 75%+ favourite test (football-data only, no key):
@@ -101,9 +103,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe: most credits to spend (0 = dry run)"
@@ -181,6 +183,13 @@ jobs:
           restore-keys: espn-timelines-
       # Comeback phase 2 (design B): the bought half-time snapshots and their call record.
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
+      # More data for the 75%+ idea: ESPN cup and extra-league days, cached for good.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'heavy-more' }}
+        with:
+          path: data/raw/heavy_espn
+          key: heavy-espn-none
+          restore-keys: heavy-espn-
       # In-play archive probes: the bought snapshots (never bought twice); same path as the save.
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'archive-probe' }}
@@ -349,6 +358,9 @@ jobs:
             comeback-research) uv run python -m soccer_stats.lab.comeback_research \
                      --json out/comeback_research.json ;;
             cashout) uv run python -m soccer_stats.lab.cashout --json out/cashout.json ;;
+            heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
+              mkdir -p data/raw/heavy_espn  # the save step always has a folder to save
+              uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json ;;
             archive-probe)  # owner-approved: one historical snapshot per league-season, walking back
               mkdir -p data/raw/archive_probe  # the save step always has a folder to save
               LG=""; [ -n "$LEAGUES" ] && LG="--leagues $LEAGUES"
@@ -446,6 +458,11 @@ jobs:
         with:
           path: data/raw/espn_timelines
           key: espn-timelines-${{ github.run_id }}
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'heavy-more' }}
+        with:
+          path: data/raw/heavy_espn
+          key: heavy-espn-${{ github.run_id }}
       # In-play archive probes: the bought snapshots, saved even on failure (paid data).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'archive-probe' }}
