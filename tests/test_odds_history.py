@@ -246,3 +246,24 @@ def test_a_call_billed_over_the_limit_stops_the_run(tmp_path):
         max_call_cost=10,
     )
     assert rep.fetched == 1 and rep.credits_used == 20 and "over 10" in rep.stopped
+
+
+def test_a_failed_call_says_what_its_status_most_likely_means(tmp_path):
+    class Bad:
+        ok, headers = False, {}
+
+        def __init__(self, status):
+            self.status_code = status
+
+    times = [ts("2025-09-13 11:00"), ts("2025-09-13 13:55")]
+    for status, words in [(502, "server failed"), (401, "paid plan"), (429, "rate limited")]:
+        rep = oh.backfill(
+            times,
+            max_credits=1000,
+            api_key="k",
+            raw_dir=tmp_path,
+            get=lambda *a, s=status, **k: Bad(s),
+        )
+        assert rep.fetched == 0 and words in rep.stopped
+        assert rep.errors == [f"The Odds API returned HTTP {status}"]
+    assert oh.api_error(418) == "unexpected answer"
