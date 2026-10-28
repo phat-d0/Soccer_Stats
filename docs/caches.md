@@ -134,7 +134,7 @@ is the player-props team's call.
 - **One job does both.** The keep-alive already restores the paid caches, so it also
   refreshes the archive (uploading only on a change). There is no separate archive schedule.
 - **Fallback on a miss** (`.github/actions/paid-archive-restore`). It runs right after every step
-  that restores a paid cache: 11 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
+  that restores a paid cache: 12 steps in `backfill.yml`, `odds-check.yml` and `players.yml`.
   - If any archived path has fewer files on disk than the archive holds, it downloads that cache's
     assets, checks every sha256 against the manifest, and extracts the missing files. Files already
     on disk are kept.

@@ -1181,6 +1181,79 @@ def _write_backtest(out: dict, args, name: str, label: str) -> None:
         print(f"{label} written to {path}")
 
 
+def cmd_backtest_dk_prices(args: argparse.Namespace) -> None:
+    """Blend Lean and Model 12% at DraftKings' own historical prices (dk_price_backtest.py),
+    for every league whose ten-book bodies are cached (or --leagues). No key, no credits.
+    Writes backtest/lean_backtest_dk.json and backtest/edge12_backtest_dk.json, in the
+    Pinnacle files' shape, for the app."""
+    from soccer_stats import dk_price_backtest as dpb
+    from soccer_stats import edge12_backtest as e12b
+    from soccer_stats import leagues as lgs
+    from soccer_stats import lean_backtest as lb
+
+    codes = args.leagues or dpb.bought_leagues()
+    print("Leagues with bought DraftKings history: " + (", ".join(codes) or "none"))
+    lean, edge12 = {}, {}
+    for code in codes:
+        try:
+            preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+            known = set(preds["home"]) | set(preds["away"]) if len(preds) else set()
+            hist = dpb.load_books(code, known)
+            lr, lbets, er, ebets = dpb.league_reports(code, preds, pins, hist)
+            lr["xg_weight"] = er["xg_weight"] = weight
+            print(f"\n=== {lgs.name(code)}: {len(hist)} event-snapshots ===")
+            for line in dpb.headline(code, lr, er):
+                print(line)
+        except Exception as exc:  # one league failing never costs the others
+            err = {"error": f"{type(exc).__name__}: {exc}"}
+            print(f"{lgs.name(code)}: {err['error']}")
+            lr, lbets, er, ebets = err, lb.bets(pd.DataFrame(), code), err, e12b.empty_bets(code)
+        lean[code], edge12[code] = (lr, lbets), (er, ebets)
+    lf, ef = dpb.build_files(
+        lean, edge12, from_season=args.from_season, names={c: lgs.name(c) for c in codes}
+    )
+    print("\n=== Pooled (" + ", ".join(codes) + ") ===")
+    for name, v in (
+        ("Blend Lean, live rule (odds range)", lf["verdict"]["live_rule"]),
+        ("Blend Lean, all odds", lf["verdict"]["all_odds"]),
+        ("Model 12%", ef["verdict"]),
+    ):
+        ci = v["clv_ci95"] or [None, None]
+        clv = "n/a" if v["clv"] is None else f"{v['clv']:+.2%}"
+        rng = "n/a" if ci[0] is None else f"{ci[0]:+.2%} to {ci[1]:+.2%}"
+        print(f"  {name}: {v['bets']} bets, CLV vs Pinnacle {clv} ({rng}); passes {v['passes']}")
+    brief = {
+        "leagues": codes,
+        "lean_verdict": lf["verdict"],
+        "edge12_verdict": ef["verdict"],
+        "lean": {c: _calibration_free(r) for c, r in lf["leagues"].items()},
+        "edge12": {c: _calibration_free(r) for c, r in ef["leagues"].items()},
+    }
+    print("DK_PRICE_BACKTEST_JSON " + json_dumps(brief))
+    _write_backtest(lf, args, dpb.LEAN_FILE, "Lean backtest at DraftKings' prices")
+    if args.json:  # --json names the Lean file; Model 12% goes beside it
+        args = argparse.Namespace(
+            **{**vars(args), "json": str(Path(args.json).with_name(dpb.EDGE12_FILE))}
+        )
+    _write_backtest(ef, args, dpb.EDGE12_FILE, "Model 12% backtest at DraftKings' prices")
+
+
+def _calibration_free(rep: dict) -> dict:
+    """A league entry for the log line: its headline blocks, no calibration, bands or curves."""
+    keep = ("seasons_included", "candidates", "lean", "strong", "edge12", "clv_dk", "error")
+    out = {k: rep.get(k) for k in keep if k in rep}
+    for k in ("lean", "strong", "edge12"):
+        if isinstance(out.get(k), dict):
+            out[k] = {x: out[k].get(x) for x in ("bets", "roi", "roi_ci95", "clv", "clv_ci95")}
+    same = rep.get("pinnacle_same_matches") or {}
+    out["pinnacle_same_matches"] = {
+        k: {x: (same.get(k) or {}).get(x) for x in ("bets", "roi", "clv", "clv_ci95")}
+        for k in ("lean", "edge12")
+        if k in same
+    }
+    return out
+
+
 def cmd_backtest_lean(args: argparse.Namespace) -> None:
     """Blend Lean replayed walk-forward on Pinnacle's early prices, per league
     (lean_backtest.py), plus the Champions League at DraftKings' bought close
@@ -3165,6 +3238,22 @@ def main(argv: list[str] | None = None) -> None:
     mb.add_argument("--json", help="path for the fits")
     mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
     mb.set_defaults(func=cmd_fit_match_blends)
+
+    dpk = sub.add_parser(
+        "backtest-dk-prices",
+        help="both live match rules at DraftKings' own historical prices (no key)",
+    )
+    dpk.add_argument(
+        "--leagues", nargs="+", help="football-data codes (default: every league bought)"
+    )
+    dpk.add_argument("--from-season", type=int, default=2019, help="as backtest-lean")
+    dpk.add_argument("--burn-in", type=int, default=2, help="as backtest-lean")
+    dpk.add_argument("--json", help="path for the Lean file (Model 12%%'s goes beside it)")
+    dpk.add_argument(
+        "--log-dir",
+        help="data-log checkout: writes backtest/lean_backtest_dk.json and edge12_backtest_dk.json",
+    )
+    dpk.set_defaults(func=cmd_backtest_dk_prices)
 
     lbk = sub.add_parser(
         "backtest-lean",
