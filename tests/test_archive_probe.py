@@ -107,3 +107,23 @@ def test_dry_run_and_unknown_sport_buy_nothing(tmp_path, monkeypatch):
                  get=fake_get([], calls), raw_dir=tmp_path)  # fmt: skip
     assert calls == [] and "not listed" in res["probes"][0]["error"]
     assert "k" not in json.dumps(res["log"])
+
+
+def test_slots_from_more_build_newest_first_chains(tmp_path):
+    more = {
+        "cups": [
+            {"cup": "FAC", "season": "2022/23", "sport": "soccer_fa_cup",
+             "probe_kickoff": "2023-01-07T15:00Z"},
+            {"cup": "FAC", "season": "2023/24", "sport": "soccer_fa_cup",
+             "probe_kickoff": "2024-01-06T15:00Z"},
+            {"cup": "CDR", "season": "2022/23", "error": "time"},
+        ],
+        "extra": [{"league": "AUT", "season": "2023/2024", "sport": "soccer_austria_bundesliga",
+                   "probe_kickoff": "2023-10-01T13:00Z"}],
+    }  # fmt: skip
+    path = tmp_path / "more.json"
+    path.write_text(json.dumps(more))
+    chains = ap.slots_from_more(path)
+    assert list(chains) == ["FAC", "AUT"]
+    assert [s["season"] for s in chains["FAC"]] == ["2023/24", "2022/23"]
+    assert chains["FAC"][0]["request_at"] == "2024-01-06T15:55Z"

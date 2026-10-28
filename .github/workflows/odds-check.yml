@@ -185,7 +185,7 @@ jobs:
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
       # More data for the 75%+ idea: ESPN cup and extra-league days, cached for good.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'heavy-more' }}
+        if: ${{ inputs.task == 'heavy-more' || inputs.task == 'archive-probe' }}
         with:
           path: data/raw/heavy_espn
           key: heavy-espn-none
@@ -363,9 +363,15 @@ jobs:
               uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json ;;
             archive-probe)  # owner-approved: one historical snapshot per league-season, walking back
               mkdir -p data/raw/archive_probe  # the save step always has a folder to save
-              LG=""; [ -n "$LEAGUES" ] && LG="--leagues $LEAGUES"
-              uv run python -m soccer_stats.lab.archive_probe --cap "$CAP" $LG \
-                --json out/archive_probe.json ;;
+              if [ "$LEAGUES" = "more" ]; then  # cups, UEFA, extra leagues: slots from heavy-more
+                uv run python -m soccer_stats.lab.heavy_more --minutes 30 --json out/heavy_more.json
+                uv run python -m soccer_stats.lab.archive_probe --cap "$CAP" \
+                  --more out/heavy_more.json --json out/archive_probe.json
+              else
+                LG=""; [ -n "$LEAGUES" ] && LG="--leagues $LEAGUES"
+                uv run python -m soccer_stats.lab.archive_probe --cap "$CAP" $LG \
+                  --json out/archive_probe.json
+              fi ;;
             timelines-fetch)  # free: ESPN scoreboards on football-data's match days, counts only
               mkdir -p data/raw/espn_timelines  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.timelines --fetch --minutes 110 ;;

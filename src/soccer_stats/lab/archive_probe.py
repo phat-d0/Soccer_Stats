@@ -68,6 +68,34 @@ def pick_slot(league: str, year: int, raw_dir: Path = RAW_DIR) -> dict | None:
     }
 
 
+def slots_from_more(path: Path) -> dict[str, list[dict]]:
+    """Walk-back chains for the cups, UEFA and extra leagues from `heavy_more`'s JSON: per
+    competition its seasons newest first, each probed at its busiest kickoff + 55 min."""
+    res = json.loads(Path(path).read_text())
+    chains: dict[str, list[dict]] = {}
+    rows = [(r.get("cup"), r) for r in res.get("cups", [])]
+    rows += [(r.get("league"), r) for r in res.get("extra", [])]
+    for key, r in rows:
+        if "error" in r or not r.get("probe_kickoff") or not r.get("sport"):
+            continue
+        ko = pd.Timestamp(r["probe_kickoff"])
+        chains.setdefault(key, []).append(
+            {
+                "league": key,
+                "season": str(r["season"]),
+                "sport": r["sport"],
+                "kickoff": r["probe_kickoff"],
+                "request_at": (ko + pd.Timedelta(minutes=SNAPSHOT_AFTER)).strftime(
+                    "%Y-%m-%dT%H:%MZ"
+                ),
+                "matches_in_slot": None,
+            }
+        )
+    for key in chains:
+        chains[key].sort(key=lambda s: s["kickoff"], reverse=True)
+    return chains
+
+
 def books_seen(body: dict) -> dict:
     """Started events and, per book, how many of them it quoted freshly (after kickoff and
     within `cf.FRESH_MINUTES` of the snapshot)."""
@@ -123,8 +151,8 @@ def run(
         sports = known_sports(get, api_key)
     for league, years in chains.items():
         for year in years:
-            try:
-                slot = pick_slot(league, year, raw_dir)
+            try:  # a ready slot (cups, extra leagues) or a football-data season to plan
+                slot = year if isinstance(year, dict) else pick_slot(league, year, raw_dir)
             except Exception as exc:  # noqa: BLE001 - a missing file is reported, not fatal
                 res["probes"].append(
                     {"league": league, "season": f"{year}", "error": str(exc)[:120]}
@@ -212,10 +240,12 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
     p.add_argument("--leagues", default="", help="comma list (default: every chain)")
+    p.add_argument("--more", default="", help="heavy_more JSON: probe its cups and leagues")
     p.add_argument("--json", default="")
     args = p.parse_args(argv)
     want = [x.strip() for x in args.leagues.split(",") if x.strip()]
-    chains = {k: v for k, v in CHAINS.items() if not want or k in want}
+    base = slots_from_more(Path(args.more)) if args.more else CHAINS
+    chains = {k: v for k, v in base.items() if not want or k in want}
     res = run(cap=args.cap, chains=chains)
     print(report(res))
     print("ARCHIVE_PROBE_JSON " + json.dumps({k: v for k, v in res.items() if k != "log"}))

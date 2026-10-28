@@ -205,6 +205,15 @@ def trails(ht: list[int] | None, side: str) -> bool:
     return (ht[0] < ht[1]) if side == "home" else (ht[1] < ht[0])
 
 
+def busiest(kickoffs) -> str | None:
+    """The kickoff most matches share (ties: the earliest), for an archive probe."""
+    ks = pd.Series([k for k in kickoffs if pd.notna(k)])
+    if ks.empty:
+        return None
+    counts = ks.value_counts()
+    return f"{counts[counts == counts.max()].index.min():%Y-%m-%dT%H:%MZ}"
+
+
 # ---------- cups ----------
 
 
@@ -254,6 +263,7 @@ def cup_season(code: str, year: int, raw_dir: Path, get: Callable, stats: dict,
         "pre_match_slots": len(pre_slots),
         "pre_match_credits": len(pre_slots) * HIST_COST,
         "requests": cal.get("requests"),
+        "probe_kickoff": busiest(e["kickoff"] for e in evs),
         "trailing_list": [
             f"{e['kickoff']:%Y-%m-%d} {e['home']} {e['ht'][0]}-{e['ht'][1]} {e['away']}"
             for e in trail
@@ -367,6 +377,7 @@ def extra_league(code: str, raw_dir: Path, get: Callable, stats: dict,
                 "trailing": int(len(trail)),
                 "slots": slots,
                 "credits": slots * HIST_COST,
+                "probe_kickoff": busiest(g["kickoff"]),
             }
         )
     for r in rows:
