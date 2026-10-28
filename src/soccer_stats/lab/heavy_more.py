@@ -372,7 +372,8 @@ def join_extra(fd: pd.DataFrame, evs: list[dict]) -> tuple[pd.DataFrame, dict]:
     by_day: dict = {}
     for e in evs:
         by_day.setdefault(e["kickoff"].date(), []).append(e)
-    ht, ko, counts = [], [], {"matches": len(fd), "joined": 0, "no_event": 0}
+    ht, ko, ids, names = [], [], [], []
+    counts = {"matches": len(fd), "joined": 0, "no_event": 0}
     for r in fd.itertuples():
         hit = None
         if pd.notna(r.date):
@@ -387,9 +388,11 @@ def join_extra(fd: pd.DataFrame, evs: list[dict]) -> tuple[pd.DataFrame, dict]:
                     break
         ht.append(hit["ht"] if hit else None)
         ko.append(hit["kickoff"] if hit else pd.NaT)
+        ids.append(hit.get("id") if hit else None)
+        names.append((hit["home"], hit["away"]) if hit else None)
         counts["joined" if hit else "no_event"] += 1
     out = fd.copy()
-    out["ht"], out["kickoff"] = ht, ko
+    out["ht"], out["kickoff"], out["espn_id"], out["espn_names"] = ht, ko, ids, names
     return out, counts
 
 
@@ -421,8 +424,12 @@ def extra_league(code: str, raw_dir: Path, get: Callable, stats: dict,
     rows = []
     for season, g in fav.groupby("season"):
         heavy = g[g["p_fav"] >= MIN_FAV]
-        trail = heavy[[trails(h, "home" if fh else "away") for h, fh in
-                       zip(heavy["ht"], heavy["fav_home"], strict=True)]]  # fmt: skip
+        # A boolean Series, not a list: an empty list would select no columns (the KeyError
+        # 'kickoff' of run 40744037363 in a season without a heavy favourite).
+        mask = pd.Series([trails(h, "home" if fh else "away") for h, fh in
+                          zip(heavy["ht"], heavy["fav_home"], strict=True)],
+                         index=heavy.index, dtype=bool)  # fmt: skip
+        trail = heavy[mask]
         timed = trail[trail["kickoff"].notna()]
         slots = int(timed["kickoff"].nunique())
         rows.append(
@@ -439,6 +446,23 @@ def extra_league(code: str, raw_dir: Path, get: Callable, stats: dict,
                 "slots": slots,
                 "credits": slots * HIST_COST,
                 "probe_kickoff": busiest(g["kickoff"]),
+                # H2's sample: the trailing heavy favourites with ESPN's kickoff (half-time
+                # state and pre-match price only).
+                "trailing_list": [
+                    {
+                        "kickoff": f"{r.kickoff:%Y-%m-%dT%H:%MZ}",
+                        "home": r.home,
+                        "away": r.away,
+                        "espn_id": r.espn_id,
+                        "espn_home": r.espn_names[0],
+                        "espn_away": r.espn_names[1],
+                        "favourite": "home" if r.fav_home else "away",
+                        "p_fav": round(float(r.p_fav), 4),
+                        "ht": [int(x) for x in r.ht],
+                        "price": r.source,
+                    }
+                    for r in timed.sort_values(["kickoff", "home"]).itertuples()
+                ],
             }
         )
     for r in rows:
