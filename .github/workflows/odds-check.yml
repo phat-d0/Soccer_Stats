@@ -34,6 +34,8 @@
 #   comebacks2: the analysis (`design`) on the cached bodies and football-data; no key.
 #   cashout: hold vs cash out an underdog leading at half-time (docs/lab.md "Cash-out"),
 #            on the same cached snapshots; exploratory, no key.
+#   archive-probe: in-play archive probes (owner-approved 28 Oct): one historical snapshot per
+#            league-season at a busy half-time, walking back until unpriced; `cap`, `leagues`.
 #   heavy-favourites: free scope of a 75%+ favourite test (football-data only, no key):
 #            trailing at half-time per league-season, kickoff slots, credits, bets needed.
 #   comeback-research: the app's frozen comeback summary (lab/comeback_research.json) rebuilt
@@ -99,12 +101,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
         default: coverage
       cap:
-        description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -179,6 +181,13 @@ jobs:
           restore-keys: espn-timelines-
       # Comeback phase 2 (design B): the bought half-time snapshots and their call record.
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
+      # In-play archive probes: the bought snapshots (never bought twice); same path as the save.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'archive-probe' }}
+        with:
+          path: data/raw/archive_probe
+          key: archive-probe-none
+          restore-keys: archive-probe-
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' }}
         with:
@@ -277,7 +286,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe') && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
@@ -340,6 +349,11 @@ jobs:
             comeback-research) uv run python -m soccer_stats.lab.comeback_research \
                      --json out/comeback_research.json ;;
             cashout) uv run python -m soccer_stats.lab.cashout --json out/cashout.json ;;
+            archive-probe)  # owner-approved: one historical snapshot per league-season, walking back
+              mkdir -p data/raw/archive_probe  # the save step always has a folder to save
+              LG=""; [ -n "$LEAGUES" ] && LG="--leagues $LEAGUES"
+              uv run python -m soccer_stats.lab.archive_probe --cap "$CAP" $LG \
+                --json out/archive_probe.json ;;
             timelines-fetch)  # free: ESPN scoreboards on football-data's match days, counts only
               mkdir -p data/raw/espn_timelines  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.timelines --fetch --minutes 110 ;;
@@ -432,6 +446,12 @@ jobs:
         with:
           path: data/raw/espn_timelines
           key: espn-timelines-${{ github.run_id }}
+      # In-play archive probes: the bought snapshots, saved even on failure (paid data).
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'archive-probe' }}
+        with:
+          path: data/raw/archive_probe
+          key: archive-probe-${{ github.run_id }}
       # Comeback phase 2: the bought snapshots, saved even when the fetch fails (paid data).
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'comeback-fetch' }}
