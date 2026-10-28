@@ -874,7 +874,8 @@ the owner's baseball app, so the balance can drop without any run here.
     minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
     gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
     growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
-    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    hold, cash}]} (bankrolls, ≤ 200 points; `flat` {stake 1, start 0, points}, the running
+    profit of $1 a bet, which the chart draws when present, and `note`), `bets` (the judged rule's cash-outs: {date, lg,
     home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
     line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
     (shown first, above the tiles: why the sample leaves matches out). The file shape is under
@@ -1033,13 +1034,17 @@ the owner's baseball app, so the balance can drop without any run here.
   A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
   (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
   vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
-  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
-  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  the judged rule in words with the sample's counts, hold vs cash out (`overlayCurveChart` id
+  `cbcv`: `curves.flat`, the running profit at $1 a bet, when present, with the bankroll at the
+  judged stake in one sentence, since at 2% both fall to almost nothing in the real file; else
+  the bankrolls from `curves.points`, base `curves.start`) and `curves.note` folded, the grid by threshold and margin
   (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
   calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
   league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
-  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
-  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
+  reads the growth difference ("growth a bet vs holding"). The fixture uses Research's file when
+  it is committed, trimmed (`_trim_cashout`: the judged design whole, hold and the judged rule for
+  the other samples, 60 points a curve, 40 cash-outs), else a made-up one in its shape
+  (`_cashout_study`); beside them a made-up passing study (`_passed_study`).
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live

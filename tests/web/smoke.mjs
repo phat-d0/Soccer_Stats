@@ -1139,7 +1139,7 @@ const STEPS = [
     if (await p.locator('button.linkish[data-pfid="comebacks"]').count()) throw new Error("research shouldn't sit behind the retired link");
     await p.click('button[data-pfid="comebacks"]');
     const list = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (list.join(",") !== "comeback_ht,heavy_fav_ht,cashout_ht,fixture_pass") throw new Error(`research studies: ${list}`);
+    if (list.join(",") !== "comeback_ht,cashout_ht,heavy_fav_ht,fixture_pass") throw new Error(`research studies: ${list}`);
     if (await p.locator("#view .chips").count()) throw new Error("research needs no competition chips");
     const rowText = async (k) => (await p.locator(`button[data-pfstrat="${k}"]`).innerText()).replace(/\s+/g, " ");
     const cb = await rowText("comeback_ht");
@@ -1147,7 +1147,7 @@ const STEPS = [
     const hv = await rowText("heavy_fav_ht");
     for (const w of ["Running", "Pre-registered Oct 4", "planned 410 bets", "up to 4,300 credits"]) if (!hv.includes(w)) throw new Error(`running row lacks "${w}": ${hv}`);
     const co = await rowText("cashout_ht");
-    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "148,200 credits", "growth a bet vs holding", "cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
+    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "150,910 credits", "growth a bet vs holding", "570 cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
     const ps = await rowText("fixture_pass");
     for (const w of ["Passed", "640 credits", "per $1"]) if (!ps.includes(w)) throw new Error(`passed row lacks "${w}": ${ps}`);
   }],
@@ -1236,16 +1236,26 @@ const STEPS = [
     await pfUp(p); await p.click('button[data-pfstrat="cashout_ht"]');
     await p.click('button[data-pf="result"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No: cashing out at 50% lowered", "Decisions", "cash-outs at 50%", "Growth vs holding, 2% stake", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 336 decisions", "Bankroll: hold vs cash out (2% a bet)", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Underdogs at 3.0 to 4.0", "Partial cash-out to the Kelly stake", "The sample. Matches already bought", "Other samples (descriptive)", "With B and C put back (already read, half-time only): 2,900 bets", "2025/26 only (nothing excluded): 1,100 bets (descriptive)"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
+    for (const w of ["Decisions", "570", "cash-outs at 50%", "Growth vs holding, 2% stake", "+0.020%", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 570 decisions", "The sample.", "Hold vs cash out ($1 a bet)", "less than a billionth of the start", "About these curves", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Other samples (descriptive)", "Underdogs at 3.0 to 4.0", "With B and C put back (already read, half-time only)", "The frozen sample at half-time only", "2025/26 only", "Partial cash-out to the Kelly stake"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
     if ((await p.locator(".co-grid tbody tr").count()) !== 9) throw new Error("the 3 x 3 grid");
     if ((await p.locator(".co-grid tr.co-primary").count()) !== 1) throw new Error("one judged row");
+    // The chart is the running profit at $1 a bet (curves.flat), ending on its last point.
     if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 2) throw new Error("hold and cash-out lines");
+    const end = await p.evaluate(() => { const f = studies().find((x) => x.id === "cashout_ht").curves.flat.points; return usd(f[f.length - 1].hold, 2); });
+    if (!(await p.textContent("#cbcv-readout")).includes(`Hold to the end ${end}`)) throw new Error(`flat curve should end at ${end}`);
     for (const id of ["cbcv", "cbcal"]) {
       await p.locator(`[data-scrub='${id}']`).evaluate((e) => e.scrollIntoView({ block: "center" }));
       await scrubCheck(p, `[data-scrub='${id}']`);
     }
     await p.click("details.cb-bets > summary");
     if (!/hold [+−]\$[\d.]+ · cash [+−]\$/.test(await p.locator("details.cb-bets .cb-table tbody tr").first().innerText())) throw new Error("cash-out bet row");
+    await p.click('button[data-pf="why"]');
+    const why = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Why holding lost so much", "Is the in-play price right?", "What the fee does", "How this was measured"]) if (!why.includes(w)) throw new Error(`cash-out why lacks "${w}"`);
+    await p.locator("[data-scrub='why0']").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await scrubCheck(p, "[data-scrub='why0']");
+    if (!(await p.textContent("#rc-readout-why0")).includes("holding returned")) throw new Error("why row's hold");
+    await p.click('button[data-pf="result"]');
   }],
   // A failed pre-match study sits in Moneyline's Archive with its pill and result: the real
   // strategy search (Research, #131), shown through its own search view (lead brief, 28 Oct).
