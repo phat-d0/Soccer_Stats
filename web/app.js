@@ -4458,16 +4458,31 @@ function studyCashoutHtml(sd) {
     ${tile("Hold, per $1", signedPct(h.mean), h.ci95 ? `range ${ci(h.ci95)}` : "", signCls(h.mean))}
     ${tile(`Cash out at ${pct(pr.t)}, per $1`, signedPct(r.mean), r.minus_hold ? `vs hold ${ci(r.minus_hold)}` : "", signCls(r.mean))}
   </div>`;
-  const cv = sd.curves || {}, pts = (cv.points || []).filter((p) => p.date && isNum(p.hold) && isNum(p.cash));
-  const base = isNum(cv.start) ? cv.start : 1000;
+  // The chart draws `curves.flat` (the running profit of $1 on every bet) when the file has it:
+  // at 2% of the bankroll a bet both bankrolls can compound to almost nothing (lead, 28 Oct),
+  // so that one is said in words. Without `flat`, the bankroll curves are drawn.
+  const cv = sd.curves || {}, flat = cv.flat;
+  const ok = (p) => p.date && isNum(p.hold) && isNum(p.cash);
+  const fpts = (flat?.points || []).filter(ok), bpts = (cv.points || []).filter(ok);
+  const useFlat = fpts.length > 0, pts = useFlat ? fpts : bpts;
+  const base = useFlat ? (isNum(flat.start) ? flat.start : 0) : isNum(cv.start) ? cv.start : 1000;
+  const money = useFlat ? (v, d = 0) => usd(v, d) : (v, d = 0) => bankUsd(v, d);
   const curve = pts.length ? overlayCurveChart([
     { name: "Hold to the end", curve: pts.map((p) => ({ date: p.date, cum: p.hold })) },
     { name: `Cash out at ${pct(pr.t)}`, curve: pts.map((p) => ({ date: p.date, cum: p.cash })) },
   ], null, pts[0].date, "", {
-    id: "cbcv", base, axis: (v) => bankUsd(v), end: (v) => bankUsd(v), dateLabel: cbMonth,
-    readout: (ser, rows, i) => `${rows[0][i].origin ? "Start" : esc(cbDate(rows[0][i].date))} · ${ser.map((o, k) => `${esc(o.name)} ${bankUsd(rows[k][i].cum, 2)}`).join(" · ")}`,
-    aria: `Bankroll staking ${pct(cv.stake ?? pr.s)} a bet: hold against cash out`,
+    id: "cbcv", base, axis: (v) => money(v), end: (v) => money(v), dateLabel: cbMonth,
+    readout: (ser, rows, i) => `${rows[0][i].origin ? "Start" : esc(cbDate(rows[0][i].date))} · ${ser.map((o, k) => `${esc(o.name)} ${money(rows[k][i].cum, 2)}`).join(" · ")}`,
+    aria: useFlat ? "Running profit at $1 a bet: hold against cash out" : `Bankroll staking ${pct(cv.stake ?? pr.s)} a bet: hold against cash out`,
   }) : "";
+  // The bankroll at the judged stake in words: where each ended, as a share of the start.
+  const share = (v) => {
+    if (!isNum(v) || !isNum(cv.start) || !cv.start) return "–";
+    const r = v / cv.start;
+    return r >= 0.01 ? `${pct(r, 0)} of the start` : r >= 1e-6 ? `${(r * 100).toPrecision(2)}% of the start` : r >= 1e-9 ? "less than a millionth of the start" : "less than a billionth of the start";
+  };
+  const lastB = bpts[bpts.length - 1];
+  const bankLine = useFlat && lastB ? `<p class="note co-bank">Staking ${pct(cv.stake ?? pr.s)} of a ${bankUsd(cv.start ?? 1000)} bankroll on each bet instead, in kickoff order, holding ends at ${share(lastB.hold)} and cashing out at ${share(lastB.cash)}${(lastB.hold / cv.start < 0.01 || lastB.cash / cv.start < 0.01) ? ": both bankrolls fall to almost nothing, so they aren't drawn" : ""}.</p>` : "";
   const cash = (d.variants || []).filter((v) => isNum(v.t));
   const gk = (v) => v.growth?.[co.sk] || {};
   const isPrimary = (v) => Math.abs(v.t - pr.t) < 1e-9 && Math.abs(v.m - pr.m) < 1e-9;
@@ -4502,7 +4517,10 @@ function studyCashoutHtml(sd) {
     <p class="note">${esc(sd.live_note || "No live trades: this was tested on bought historical in-play prices. A pass would only justify proposing a paper cash-out track; nothing changes live either way.")}</p>
     ${tiles}
     <p class="note">The judged test: cash out at ${pct(pr.t)} with a ${pct(pr.m)} cash-out margin, staking ${pct(pr.s)} of the bankroll a bet${isNum(tv.decisions) ? `, on ${num(tv.decisions)} decisions` : ""}. It passes only if the growth difference's range sits above 0 on at least 300 decisions.${isNum(cnt.matches) ? ` ${num(cnt.matches)} matches in the sample${cnt.not_priced ? `; ${num(cnt.not_priced)} had no fresh in-play price` : ""}${cnt.unmatched ? `, ${num(cnt.unmatched)} weren't found in the snapshots` : ""}, and these are left out.` : ""}</p>
-    ${curve ? `<div class="section-title">Bankroll: hold vs cash out (${pct(cv.stake ?? pr.s)} a bet)</div><div class="card pf-curve">${curve}</div><p class="note">Both start at ${bankUsd(base)} and stake ${pct(cv.stake ?? pr.s)} of the bankroll on each bet, in kickoff order.</p>` : ""}
+    ${curve ? (useFlat
+      ? `<div class="section-title">Hold vs cash out ($1 a bet)</div><div class="card pf-curve">${curve}</div><p class="note">The running profit of $1 on every bet, in kickoff order: holding to the end against cashing out by the rule.</p>${bankLine}`
+      : `<div class="section-title">Bankroll: hold vs cash out (${pct(cv.stake ?? pr.s)} a bet)</div><div class="card pf-curve">${curve}</div><p class="note">Both start at ${bankUsd(base)} and stake ${pct(cv.stake ?? pr.s)} of the bankroll on each bet, in kickoff order.</p>`) : ""}
+    ${cv.note ? `<details class="fold mk-fold"><summary>About these curves</summary><p class="note">${esc(cv.note)}</p></details>` : ""}
     ${grid ? `<div class="section-title">By threshold and margin</div>${grid}<p class="note">Growth vs hold is the average gain in log bankroll a bet at a ${pct(pr.s)} stake, with its 95% range; below 0 means cashing out grew the bankroll more slowly than holding. Only the row marked judged decides the verdict; the rest are descriptive.</p>` : ""}
     ${kellyTable}
     ${cal ? `<div class="section-title">Is the in-play price right?</div>${cal}<p class="note">Bets grouped by the in-play chance at the moment the rule looked. Blue: the underdog won at least as often as the price implied; red: less. Cashing out can only pay if the price undervalues the leading underdog by more than the margin.</p>` : ""}
@@ -4614,7 +4632,7 @@ function studyWhyHtml(sd) {
   const sections = (sd.why || []).map((w, i) => `
     ${w.title ? `<div class="section-title">${esc(w.title)}</div>` : ""}
     ${w.text ? `<p class="note">${esc(w.text)}</p>` : ""}
-    ${(w.rows || []).length ? cbRowsChart(`why${i}`, w.rows.map((r) => ({ label: r.label, n: r.n, won: r.won, ref: r.ref, unit: r.unit })), w.ref_name || "Reference", `the ${(w.ref_name || "reference").toLowerCase()}'s`) : ""}`).join("");
+    ${(w.rows || []).length ? cbRowsChart(`why${i}`, w.rows.map((r) => ({ label: r.label, n: r.n, won: r.won, ref: r.ref, unit: r.unit, extra: isNum(r.hold) ? `holding returned ${signedPct(r.hold)} per $1` : "" })), w.ref_name || "Reference", `the ${(w.ref_name || "reference").toLowerCase()}'s`) : ""}`).join("");
   return `${sections || `<p class="note">${esc(sd.question || "No write-up for this study yet.")}</p>`}${studyMeasuredHtml(sd, [])}`;
 }
 // "How this was measured": question, rule, notes, pre-registration commits and run ids.

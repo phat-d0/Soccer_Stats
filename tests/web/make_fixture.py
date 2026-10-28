@@ -1171,6 +1171,24 @@ def add_draftkings_backtests(sb: dict) -> None:
         }
 
 
+def _trim_cashout(st: dict) -> None:
+    pr = st.get("primary_rule") or {"t": 0.5, "m": 0.05}
+    keep = ("hold", f"cash T={pr['t']:.2f} m={pr['m']:.2f}")
+    for d in (st.get("designs") or {}).values():
+        if d.get("role") == "judged":
+            continue
+        d["variants"] = [v for v in d.get("variants") or [] if v.get("name") in keep]
+        for k in ("calibration", "by_league", "by_season"):
+            d.pop(k, None)
+    for c in (st.get("curves") or {}, (st.get("curves") or {}).get("flat") or {}):
+        pts = c.get("points") or []
+        if len(pts) > 60:
+            step = len(pts) // 60 + 1
+            c["points"] = pts[::step] + ([pts[-1]] if (len(pts) - 1) % step else [])
+    bets = st.get("bets") or []
+    st["bets"] = bets[:: max(1, len(bets) // 40)][:40]
+
+
 def add_research_studies(data: dict) -> None:
     studies = _clean(pub.research_studies())
     # The real strategy search (Research, #131) is ~100 KB: the fixture keeps 60 of its best
@@ -1207,9 +1225,16 @@ def add_research_studies(data: dict) -> None:
             "bets": [],
             "notes": ["Synthetic study for the fixture."],
         },
-        _cashout_study(),
         _passed_study(),
     ]
+    # The cash-out test: Research's real file (lab/cashout_research.json, #136) when it is
+    # committed, trimmed to fit (the judged design whole; hold and the judged rule for the
+    # other samples; 60 points a curve; 40 cash-outs); else a made-up one in its shape.
+    real = next((x for x in studies if x["id"] == "cashout_ht"), None)
+    if real:
+        _trim_cashout(real)
+    else:
+        synthetic.insert(1, _cashout_study())
     data["research_studies"] = studies + synthetic
 
 
