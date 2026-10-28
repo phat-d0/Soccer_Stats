@@ -2337,7 +2337,11 @@ and D1 but priced for SP1 and I1. These probes settle where each league's archiv
 - **Spend:** 28 paid snapshots, **280 credits**. Balance 4,938,756 → 4,938,476 on the
   upgraded plan; the owner lifted the 200 cap the same day. Two snapshots came back empty and
   cost 0.
-- The bodies are in the cache `archive-probe-40640666882`.
+- The bodies are in the cache `archive-probe-40640666882`. That run was on a work branch,
+  so its cache can't be archived. The same 28 probes were bought again from the default
+  branch (run 40644746190, 280 credits, balance 4,937,476 → 4,937,196) into
+  `archive-probe-40644746190`, which is archived. Every probe came back identical: the same
+  snapshot times, events, books and verdicts.
 
 | League | Season (slot) | Priced? | Started events | Books quoting in play, fresh |
 | --- | --- | --- | --- | --- |
@@ -2357,7 +2361,7 @@ and D1 but priced for SP1 and I1. These probes settle where each league's archiv
 | SC0 | 2021/22 (16 Oct 2021) | no | 5 | none |
 | B1 | 2022/23 (23 Apr 2023) | **yes** | 7 | all ten, Betfair included |
 | B1 | 2021/22 (10 Apr 2022) | no | 7 | none |
-| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, FanDuel… (one started match) |
+| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, Bovada, Paddy Power, Unibet, Pinnacle (one started match) |
 | T1 | 2021/22 (23 Jan 2022) | no | 3 | Pinnacle, Paddy Power, Bovada |
 | G1 | 2022/23 (12 Mar 2023) | **yes** | 7 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Unibet, Pinnacle |
 | G1 | 2021/22 (6 Mar 2022) | no: no snapshot (empty, 0 credits) | 0 | none |
