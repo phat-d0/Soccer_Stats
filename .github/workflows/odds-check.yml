@@ -61,6 +61,12 @@
 #            FanDuel, a verdict per league, and football-data's HC/AC and Pinnacle coverage,
 #            plus every events-list team name against football-data's clubs this season
 #            (`--names`, free; the 13 Oct name check, run 38447588309).
+#   dk-history: DraftKings' historical pre-match coverage probe (lead brief 2, item 3; cap
+#             approved 600): one bulk h2h snapshot (ten books, ~10 credits) per league and
+#             season, newest first, a league stopping at its first season without
+#             DraftKings; then the backfill estimate per league and season (no key needed
+#             for the estimate: cap 0 = estimate every season). Bodies kept in the paid
+#             odds-history cache (never bought twice).
 #   espn: ESPN slugs, team names and summary shape (no key); with `leagues` (e.g. E2,E3)
 #            only those, 21 days of scoreboards, names checked against football-data's clubs.
 #   corner-history: historical Pinnacle team-corner prices (alternate_team_totals_corners;
@@ -99,7 +105,7 @@ on:
       task:
         description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, heavy-favourites, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, dk-history, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch: most credits to spend (0 = dry run)"
@@ -198,6 +204,21 @@ jobs:
         uses: ./.github/actions/paid-archive-restore
         with:
           name: comeback-odds
+      # DraftKings' historical snapshots (paid): the probe never buys a snapshot already held.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'dk-history' }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-none
+          restore-keys: odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ inputs.task == 'dk-history' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
       # Favourite comebacks: each league's Understat goal files have their own prefix too.
       # The paths must match the save step exactly, or the cache version differs and misses.
       - uses: actions/cache/restore@v4
@@ -290,7 +311,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch') && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
@@ -356,6 +377,7 @@ jobs:
               mkdir -p data/raw/espn_timelines  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.timelines --fetch --minutes 110 ;;
             timelines) uv run python -m soccer_stats.lab.timelines --json out/timelines.json ;;
+            dk-history) uv run soccer-stats dk-history --cap "$CAP" --json out/dk_history.json ;;
             inplay-probe)  # comebacks phase 2 step 1: one live h2h call during play (1 credit)
               # hist_dates set to ONE ISO time = a historical snapshot (10 credits); the default
               # (a comma list, for props) or "live" = a live call now (1 credit)
@@ -439,6 +461,11 @@ jobs:
             data/raw/cups/espn
           key: cup-corners-${{ github.run_id }}
       # ESPN goal timelines: saved even when the fetch stops part-way, so the next run resumes.
+      - uses: actions/cache/save@v4
+        if: ${{ always() && inputs.task == 'dk-history' && inputs.cap != '0' }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-${{ github.run_id }}
       - uses: actions/cache/save@v4
         if: ${{ always() && inputs.task == 'timelines-fetch' }}
         with:

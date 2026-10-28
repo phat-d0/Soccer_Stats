@@ -1538,6 +1538,71 @@ def cmd_backtest_dnb(args: argparse.Namespace) -> None:
     _write_backtest(out, args, "dnb_backtest.json", "DNB backtest")
 
 
+def cmd_dk_history(args: argparse.Namespace) -> None:
+    """DraftKings' historical pre-match odds (lead brief 2, item 3): with --cap above 0, the
+    coverage probe (one snapshot per league and season, newest first, a league stopping at
+    its first season without DraftKings; ODDS_API_KEY, the 3,000 reserve kept); then the
+    backfill estimate per league and season (football-data kickoffs, no key) for the seasons
+    the probe found DraftKings in, or every season without a probe."""
+    import json
+    import os
+
+    from soccer_stats import dk_history as dh
+    from soccer_stats.data import season_kickoffs
+
+    leagues = args.leagues or list(dh.LEAGUES)
+    covered = {c: list(dh.SEASONS) for c in leagues}
+    out: dict = {}
+    if args.cap > 0:
+        res = dh.probe(args.cap, leagues, api_key=os.environ.get("ODDS_API_KEY", ""))
+        out["probe"] = res
+        print(
+            f"== DraftKings coverage probe: {res['spent']} credits of {args.cap}, "
+            f"credits left {res['credits_left']} =="
+        )
+        for code, rows in res["leagues"].items():
+            for r in rows:
+                if r.get("error"):
+                    print(f"  {code} {r['season']}: {r['error']}")
+                    continue
+                top = ", ".join(f"{k} {v}" for k, v in list(r["books"].items())[:10])
+                print(
+                    f"  {code} {r['season']} ({r['at'][:10]}): {r['events']} events, DraftKings "
+                    f"{r['draftkings']}" + (" (cached)" if r["cached"] else "") + f"; {top}"
+                )
+        if res.get("stopped"):
+            print(f"  Stopped: {res['stopped']}")
+        covered = res["covered"]
+        print("DK_HISTORY_PROBE_JSON " + json_dumps({k: v for k, v in res.items() if k != "log"}))
+    kicks = {}
+    for code in leagues:
+        for year in covered.get(code, []):
+            try:
+                kicks[(code, year)] = list(season_kickoffs(code, year))
+            except Exception as exc:  # noqa: BLE001  one season failing never costs the rest
+                print(f"  {code} {year}: no kickoffs ({type(exc).__name__}: {exc})")
+    est = dh.estimate(kicks)
+    out["estimate"] = est
+    print(
+        f"== Backfill estimate: a {est['looks_hours'][0]:g} h look plus the close, h2h at ten "
+        f"books, {est['cost_per_snapshot']} credits a snapshot =="
+    )
+    for r in est["rows"]:
+        print(
+            f"  {r['league']} {r['season']}: {r['kickoffs']} kickoffs, {r['snapshots']} snapshots, "
+            f"{r['credits']} credits"
+        )
+    for code, b in est["by_league"].items():
+        print(
+            f"  {code}: {b['seasons']} seasons, {b['snapshots']} snapshots, {b['credits']} credits"
+        )
+    print(f"  Total: {est['total']['snapshots']} snapshots, {est['total']['credits']} credits")
+    print("DK_HISTORY_ESTIMATE_JSON " + json_dumps(est))
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(out, default=str))
+
+
 def cmd_backtest_edge12(args: argparse.Namespace) -> None:
     """Model 12% replayed per league on Pinnacle's early prices (edge12_backtest.py), plus
     the Champions League at DraftKings' bought close (cup_backtest.py). Football-data,
@@ -3062,6 +3127,15 @@ def main(argv: list[str] | None = None) -> None:
     e12b.add_argument("--json", help="path for the results")
     e12b.add_argument("--log-dir", help="data-log checkout: writes backtest/edge12_backtest.json")
     e12b.set_defaults(func=cmd_backtest_edge12)
+
+    dkh = sub.add_parser(
+        "dk-history",
+        help="DraftKings historical coverage probe (capped) and backfill estimate",
+    )
+    dkh.add_argument("--leagues", nargs="+", help="football-data codes (default: the eight)")
+    dkh.add_argument("--cap", type=int, default=0, help="credits for the probe (0 = estimate only)")
+    dkh.add_argument("--json", help="path for the results")
+    dkh.set_defaults(func=cmd_dk_history)
 
     dnbp = sub.add_parser(
         "backtest-dnb",
