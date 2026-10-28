@@ -933,7 +933,7 @@ const STEPS = [
     const e0 = await p.textContent("#view");
     if (!e0.includes("Like for like") || !e0.includes("DK 48 h") || e0.includes("Pre-registered test")) throw new Error("E0 DraftKings view");
     // A league only Pinnacle's replay has: no switch, and the note says so.
-    const only = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return Object.keys(sb.lean.leagues).find((c) => !sb.lean_dk.leagues[c] && sb.lean.leagues[c]?.kind !== "close"); });
+    const only = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return Object.keys(sb.lean.leagues).find((c) => !sb.lean_dk.leagues[c]); }); // the Champions League since every domestic league is in
     await p.click(`.chip[data-league="${only}"]`);
     if (await p.locator(".bt-src").count()) throw new Error("a switch for a league only one book covers");
     const name = await p.evaluate((c) => leagueName(c), only);
@@ -971,14 +971,14 @@ const STEPS = [
   ["portfolio-backtest-headlines", async (p) => {
     await pfUp(p);
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
-    // DraftKings' replay (the Premier League, La Liga and Serie A in data-log's file) heads
-    // the row where it covers the competition, Pinnacle's elsewhere (lead brief, 28 Oct).
+    // DraftKings' replay (every domestic league in data-log's file since 28 Oct) heads the row
+    // where it covers the competition; the Champions League stays at DraftKings' bought close.
     const want = {
       "": ["bets, −200 to +200 · at DraftKings", "bets · at DraftKings"],
       E0: ["Premier League at DraftKings", "Premier League at DraftKings"],
       SP1: ["La Liga at DraftKings", "La Liga at DraftKings"],
-      E2: ["League One at Pinnacle", "League One at Pinnacle"],
-      E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
+      E2: ["League One at DraftKings", "League One at DraftKings"],
+      E3: ["League Two at DraftKings", "League Two at DraftKings"],
       UCL: ["0 bets, −200 to +200 · Champions League at DraftKings' close", "Champions League at DraftKings' close"],
     };
     const seen = {};
