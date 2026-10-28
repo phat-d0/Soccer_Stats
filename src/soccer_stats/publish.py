@@ -440,11 +440,45 @@ def team_total_progress(dirs, results: pd.DataFrame) -> dict:
     return out
 
 
-COMEBACK_RESEARCH_FILE = Path(__file__).parent / "lab" / "comeback_research.json"
+LAB_DIR = Path(__file__).parent / "lab"
+COMEBACK_RESEARCH_FILE = LAB_DIR / "comeback_research.json"
+# Every strategy we test shows in Portfolio, pass or fail (owner, 28 Oct): the research-results
+# registry. Each study is a committed JSON in the comeback_research.json shape (title, question,
+# rule, verdict pass/fail/pending, verdict_text, cost, runs, preregistered, designs, bets,
+# notes; CLAUDE.md "Research studies"), shown as a strategy row in `portfolio`: in-play studies
+# in "In-play research" (id comebacks), pre-match ones in Moneyline (failed: its Archive). A
+# study whose file isn't committed yet is skipped, so Research only has to add the file.
+RESEARCH_STUDIES = [
+    {
+        "id": "comeback_ht",
+        "file": "comeback_research.json",
+        "portfolio": "comebacks",
+        "name": "$1 on the trailing favourite at half-time",
+    },
+    {
+        "id": "heavy_fav_ht",
+        "file": "heavy_favourites_research.json",
+        "portfolio": "comebacks",
+        "name": "$1 on a 75%+ favourite trailing at half-time",
+    },
+    {
+        "id": "cashout_ht",
+        "file": "cashout_research.json",
+        "portfolio": "comebacks",
+        "name": "Cash out a heavy underdog once it reaches 50%",
+    },
+    {
+        "id": "strategy_search",
+        "file": "strategy_search_research.json",
+        "portfolio": "moneyline",
+        "name": "Strategy search",
+    },
+]
+STUDY_PORTFOLIOS = {"comebacks", "moneyline"}
 
 
 def comeback_research(path: Path = COMEBACK_RESEARCH_FILE) -> dict | None:
-    """Portfolio "Comeback bets" (closed research): the committed result file
+    """Portfolio "In-play research" (closed research): the committed result file
     (lab/comeback_research.json, Research lab) passed through as is. None if it is
     missing or unreadable. Never raises."""
     try:
@@ -452,6 +486,31 @@ def comeback_research(path: Path = COMEBACK_RESEARCH_FILE) -> dict | None:
     except Exception:  # noqa: BLE001
         return None
     return data if isinstance(data, dict) else None
+
+
+def research_studies(registry=None, lab_dir: Path = LAB_DIR) -> list[dict]:
+    """Portfolio's research rows: each registry entry whose file is committed, as the file's
+    fields plus `id`, `portfolio` and `name` (the file's own `name` wins). A missing,
+    unreadable or non-object file, or an unknown portfolio, is skipped. Never raises."""
+    out = []
+    for entry in RESEARCH_STUDIES if registry is None else registry:
+        try:
+            if entry.get("portfolio") not in STUDY_PORTFOLIOS:
+                continue
+            data = comeback_research(Path(lab_dir) / entry["file"])
+            if data is None:
+                continue
+            out.append(
+                {
+                    **data,
+                    "id": entry["id"],
+                    "portfolio": entry["portfolio"],
+                    "name": data.get("name") or entry.get("name") or data.get("title"),
+                }
+            )
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def markets_research(dirs=(), results=None, path: Path = MARKETS_RESEARCH_FILE) -> dict | None:
@@ -1276,13 +1335,14 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
     add_corners(data)
-    try:  # Portfolio > Comeback bets: the closed research result (a file read only)
-        data["comeback_research"] = _clean(comeback_research())
-        cr = data["comeback_research"]
-        print(f"Comeback research: {'file missing' if cr is None else cr.get('verdict')}")
+    try:  # Portfolio: every research study's committed result (file reads only)
+        data["research_studies"] = _clean(research_studies())
+        rs = data["research_studies"]
+        listed = ", ".join(f"{x['id']} {x.get('verdict')}" for x in rs)
+        print(f"Research studies: {listed or 'none'}")
     except Exception as exc:  # noqa: BLE001
-        data["comeback_research"] = None
-        print(f"Comeback research: failed ({type(exc).__name__})")
+        data["research_studies"] = []
+        print(f"Research studies: failed ({type(exc).__name__})")
     try:  # Record > Goals & corners: research numbers plus the live test's progress
         state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
         try:

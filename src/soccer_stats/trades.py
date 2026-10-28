@@ -601,12 +601,13 @@ PORTFOLIOS = [
     },
     {
         "id": "comebacks",
-        "name": "Comeback bets",
+        "name": "In-play research",
         "status": "closed",
-        "note": "Research, closed 25 Oct 2026, never traded: backing the pre-match favourite "
-        "when it is behind at half-time, at the in-play price. The bought test found no edge "
-        "(the price already expects the comeback and overrates it), so nothing was ever "
-        "paper-traded. Its result and the reasoning are kept here.",
+        "note": "Research on betting during the match, at the in-play price: each study is "
+        "pre-registered, tested on bought historical prices and kept here, pass or fail. They "
+        "are never traded here: one that passes becomes a paper track first. The first, "
+        "backing the favourite behind at half-time, closed on 25 Oct 2026 with no edge (the "
+        "price already expects the comeback and overrates it).",
         "backtest": "comebacks",
     },
 ]

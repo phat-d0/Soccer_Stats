@@ -566,8 +566,9 @@ the owner's baseball app, so the balance can drop without any run here.
     = False` (published as `players_status.paper_trades`).
   - Portfolios: `PORTFOLIOS` registry (`id`, `name`, `status` live/testing/retired/closed,
     `note`, `backtest` stem): `moneyline` (live, `dk`), `goalscorer` (testing), `corners`
-    (testing), `player_shots` (retired), `comebacks` (closed: research finished without ever
-    trading, 26 Oct; no ledger, its section stays empty). `portfolio_of(trade)`.
+    (testing), `player_shots` (retired), `comebacks` ("In-play research" since 28 Oct,
+    "Comeback bets" before; closed: research studies, never traded; no ledger, its section
+    stays empty). `portfolio_of(trade)`.
   - `summarize` (adds `close_early`: closes taken over 60 min before kickoff), settlement, `clv`.
 - `paper.py`: the live ledgers and `data.json` → `portfolio`.
   - Leagues in play (`leagues_in_play`): E0, every league with fixtures this build, and every
@@ -779,6 +780,22 @@ the owner's baseball app, so the balance can drop without any run here.
   slots and credits for the eight leagues 2025/26–2026/27 (`EIGHT_YEARS`) and `OTHER` leagues with sport
   keys 2022/23–2025/26; `needed(gap)` sizes the sample. `odds-check.yml` `task=heavy-favourites`, log
   line `HEAVY_FAVOURITES_JSON`; `docs/lab.md` "Heavy favourites (75%+)" (DRAFT, not approved).
+- Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
+  `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
+  `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's
+  label), `title`, `question`, `rule`, `verdict` ("pass" / "fail" / "pending"), `verdict_text`,
+  `closed_at`, `preregistered_at` (date), `preregistered` {design key: commit}, `planned`
+  {bets, matches, credits, note} (a running study's plan), `cost` {total, design_<k>, probes,
+  …}, `runs` {name: run id or list}, `designs` {key: {role "judged"/"descriptive", label, short?,
+  series?, bets, wins, win_rate, implied, implied_matches, gap, gap_ci95, roi, roi_ci95,
+  betfair_roi?, betfair_roi_ci95?, not_priced?, by_league [{code, bets, wins, win_rate, implied,
+  roi, roi_ci95}], by_season [{season, …}], by_band [{lo, hi, label?, bets, wins, win_rate,
+  implied, roi, roi_ci95}]}} (key "pooled" = every bet), `bets` [{date, kickoff?, lg, home, away,
+  odds, implied, won, design, pick?, profit? (per $1, when not odds − 1, e.g. a cash-out),
+  result_text?, fav?, ht?}] in date order, `why` [{title, text, rows [{label, n, won, ref,
+  unit?}], ref_name}], `notes` [...], and display words `price_name` ("In-play price"),
+  `band_noun` ("favourite"), `band_title`, `band_note`, `designs_note`, `live_note`. The comeback
+  study's `phase1` and `timelines` keep its own Why. Chances 0–1, ROI per $1, ranges [lo, hi].
 - `lab/cashout.py` (owner via the lead, 28 Oct; exploratory, no key): hold vs cash out a winning
   underdog at half-time on the design B/C snapshots (`comebacks2.match_rows` rows now also carry `ft`,
   `close`, `dk_prices`, `model_draw`): entry at Pinnacle's close, cash-out at DraftKings' margin-free
@@ -858,8 +875,31 @@ the owner's baseball app, so the balance can drop without any run here.
     default branch, then `add_quotes` per book; each step in its own try), `team_news` (ESPN, not
     the top-level FPL `team_news` dict) and `news` (FPL absences, E0, applied to the model).
   - `markets_research` (`lab/markets_research.json` + `team_total_progress`, counts only).
-  - `comeback_research` (`comeback_research()`: Research lab's `lab/comeback_research.json`
-    passed through for Portfolio → Comeback bets; None when missing; its own try).
+  - `research_studies` (owner, 28 Oct: every strategy we test shows in Portfolio, pass or fail;
+    `research_studies()` over the registry `RESEARCH_STUDIES` = `[{id, file, portfolio, name}]`,
+    `portfolio` in `STUDY_PORTFOLIOS` (comebacks = In-play research, moneyline): each committed
+    `lab/<file>` passed through plus `id`, `portfolio` and `name` (the file's own `name` wins); a
+    missing or unreadable file is skipped, so Research adds a study by committing its file;
+    its own try; log "Research studies: <id> <verdict>, …"). Registered: `comeback_ht`
+    (`comeback_research.json`), `heavy_fav_ht` (`heavy_favourites_research.json`),
+    `cashout_ht` (`cashout_research.json`, the cash-out test: "Cash out a heavy underdog once it
+    reaches 50%"), `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
+    study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
+    `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
+    `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`, still
+    buying on 28 Oct) is `lab/cashout_test.py`'s `analyse` output laid into the same file:
+    `kind: "cashout"`, `primary_rule` {t, m, s} (0.50, 0.05, 0.02), `test_verdict` (its `verdict`
+    dict), `designs.primary` (judged, the 4.0+ band: `analyse_band`'s positions, won, avg_entry,
+    quoted_ht, quoted_m70, `variants` [hold; cash T/m with decisions, at_ht, at_m70; kelly m/s],
+    each with mean, sd, ci95, minus_hold and `growth` {"0.01"|"0.02"|"0.05": {mean, ci95,
+    minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
+    gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
+    growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
+    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
+    line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
+    (shown first, above the tiles: why the sample leaves matches out). The file shape is under
+    "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
   `PAID` (name → key prefix, exact paths), `list_files`, `content_sha256`, `entry` (files, bytes,
@@ -879,7 +919,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v63) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v64) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -965,18 +1005,53 @@ the owner's baseball app, so the balance can drop without any run here.
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
   `clv_pinnacle_staked`). The fixture adds five synthetic `edge12_dnb` trades (`DNB_TRADES`: two
-  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Comeback bets** (lead brief, 26 Oct; `CB_ID`, data `comeback_research`):
-  a closed research portfolio, never traded. Its top-level row shows a "Closed: no edge" pill
-  and design C's headline ("−25.1% · 732 bets · per $1"; `cbHeadline`, never live profit);
-  its list (`cbFolderHtml`, no chips) has one row, "$1 on the trailing favourite at half-time"
-  (`comeback_ht`), whose page (`cbStrategyHtml`) has Result and Why in place of Live / Backtest
-  / Model (other portfolios fall back to Live paper). Result (`cbResultHtml`): verdict, "No live
+  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
+  Portfolio, pass or fail; data `research_studies`, older data's `comeback_research` read as
+  the one study): `studies()`, `studiesFor(portfolio)`, `studyStrat` (key = study id, `study`
+  set; `isStudy`), `studyJudged` (role "judged", else the first design), `studyHeadline`,
+  `studyRowHtml` (verdict pill `verdictPill`: Passed / Failed / Running, `.pill.v-pass` /
+  `v-fail` / `v-run`; meta "Closed Oct 25 · never traded · 8,011 credits" or "Pre-registered Oct
+  4 · planned 410 bets · up to 4,300 credits"; the judged ROI per $1 on the right, "Running" for
+  a pending study). In-play studies are the rows of "In-play research" (id `comebacks`,
+  `CB_ID`; "Comeback bets" until 28 Oct): its top-level row counts them ("3 studies · N credits",
+  "1 failed · 1 passed · 1 running · never traded"; `cbHeadline`, never live profit; one study
+  shows its own headline), its pill is `researchPill` (Running while any is pending, "Closed: no
+  edge" when all failed, else Research), its list is `cbFolderHtml` (no chips; selection
+  `state.pfStratResearch`). Pre-match studies are Moneyline rows after its strategies
+  (`pfStrategies`): a failed one in the Archive (`archivedStrat`; the Archive note says failed
+  studies stay with their result), a running or passed one in the main list (the top-level row
+  adds "N studies running"). A study's page (`studyPageHtml`, from `pfStrategyHtml` for any
+  selected study) has Result and Why; a pending study's Result is its plan (`studyPlanHtml`:
+  pre-registered date and commits, planned sample, credit cap, spent so far, question, rule).
+  A search study (`studySearch`: the judged design has `arms`; today the real strategy search,
+  `strategy_search_research.json`, #131, in Moneyline's Archive) has its own Result
+  (`studySearchHtml`): verdict, tiles (rules tried, best CLV with the luck check's p, the share
+  of large rules beating the close against a no-skill search, finalists and cost), "The best rule,
+  against luck" (`reality_check.clv`), the shares as rows (`cbRowsChart` `cbshare`), the best
+  rule's curve (`cbcv`, from `bets`' `profit`; `bets_of` names it), every market (`rangeChart`
+  `cbmk` from `by_market`), the best rules by CLV (`top_clv`, 10 then a fold) and by ROI (folded)
+  with each rule's p, and the bets (market and side, CLV; result from `profit`). Rule labels are
+  put into words by `ruleWords` ("Asian handicap, edge ≥ 0% · Premier League, odds 2–3"). Its row
+  reads "None found · of 11,857 rules". The fixture keeps 60 of its bets and 12 rules per list.
+  A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
+  (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
+  vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
+  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
+  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
+  calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
+  league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
+  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
+  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
+  The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
+  its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
+  / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
   trades", tiles (bets, won vs the price with the gap, return per $1 and range, cost in
   credits), Betfair after 2%, profit over time at $1 a bet (`cbProfitChart`, scrub id `cbcv`: C
   judged solid, B and the two together dashed, from `bets`), return by league and season
   (`rangeChart` `cblg`/`cbse`), won vs the in-play price by pre-match favourite band
   (`cbRowsChart` `cbband`: Wilson ranges), the judged bets folded (50, then 100 more per "Show
-  more", `state.cbShown`). Why (`cbWhyHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
+  more", `state.cbShown`). Why (`cbWhyHtml` for a study with `phase1`/`timelines`, else `studyWhyHtml`: its `why` sections with `cbRowsChart` rows `why<i>`, then `studyMeasuredHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
   (`cbmin`), the conclusion, and run ids and pre-registration commits under "How this was
   measured". The minute chart and its totals use the matches with a fair benchmark
   (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). The "Won" tile and the Why text use the like-for-like pair

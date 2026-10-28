@@ -170,3 +170,30 @@ def test_comeback_research_passes_the_file_through(tmp_path):
     ok = tmp_path / "ok.json"
     ok.write_text(json.dumps({"verdict": "fail", "designs": {"C": {"bets": 732}}}))
     assert publish.comeback_research(ok) == {"verdict": "fail", "designs": {"C": {"bets": 732}}}
+
+
+def test_research_studies_read_the_registry_and_skip_missing_files(tmp_path):
+    from soccer_stats import publish
+
+    (tmp_path / "a.json").write_text(json.dumps({"verdict": "fail", "title": "A"}))
+    (tmp_path / "c.json").write_text(json.dumps({"verdict": "pending", "name": "Own name"}))
+    (tmp_path / "d.json").write_text("[1]")
+    reg = [
+        {"id": "a", "file": "a.json", "portfolio": "comebacks", "name": "Registry A"},
+        {"id": "b", "file": "missing.json", "portfolio": "comebacks"},
+        {"id": "c", "file": "c.json", "portfolio": "moneyline", "name": "Registry C"},
+        {"id": "d", "file": "d.json", "portfolio": "moneyline"},
+        {"id": "e", "file": "a.json", "portfolio": "nowhere"},
+    ]
+    out = publish.research_studies(reg, tmp_path)
+    assert [(s["id"], s["portfolio"], s["name"]) for s in out] == [
+        ("a", "comebacks", "Registry A"),
+        ("c", "moneyline", "Own name"),
+    ]
+    assert out[0]["verdict"] == "fail" and out[1]["verdict"] == "pending"
+    # The real registry: the committed comeback study comes first, ids unique.
+    real = publish.research_studies()
+    assert real[0]["id"] == "comeback_ht" and real[0]["designs"]["C"]["bets"] == 732
+    ids = [e["id"] for e in publish.RESEARCH_STUDIES]
+    assert len(ids) == len(set(ids))
+    assert {e["portfolio"] for e in publish.RESEARCH_STUDIES} <= publish.STUDY_PORTFOLIOS
