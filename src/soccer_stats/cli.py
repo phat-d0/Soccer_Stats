@@ -388,6 +388,26 @@ def cmd_log_cup_odds(args: argparse.Namespace) -> None:
     print(f"Cup odds log: {rows} new rows, {calls} new calls")
 
 
+def cmd_log_inplay(args: argparse.Namespace) -> None:
+    """Half-time in-play snapshots (inplay.yml): one live h2h call per league with a
+    kickoff in a snapshot window, logged to data-log's odds_log/ with ESPN's score."""
+    import json
+    import os
+
+    from soccer_stats import inplay_log
+
+    key = os.environ.get("ODDS_API_KEY", "")
+    try:
+        res = inplay_log.run(Path(args.log_dir), key, out_dir=Path(args.pending))
+    except Exception as exc:  # noqa: BLE001  never print a URL (it holds the key)
+        res = {"calls": 0, "credits": 0, "rows": 0, "stop": type(exc).__name__, "log": []}
+    for line in res.get("log") or []:
+        print(" ", line)
+    print(inplay_log.summary_line(res))
+    text = json.dumps(res, default=str)
+    print("INPLAY_LOG_JSON", text.replace(key, "***") if key else text)
+
+
 def cmd_close_plan(args: argparse.Namespace) -> None:
     """When closes.yml should dispatch publish.yml so close snapshots land in their window
     (reads data-log's odds_log files only: no key, no calls)."""
@@ -642,21 +662,44 @@ def _plan(league: str, seasons: list[int], looks: list[float]):
 
 
 def cmd_backfill(args: argparse.Namespace) -> None:
-    from soccer_stats.odds_history import backfill
+    import json
 
-    plan = _plan(args.league, _years(args.seasons), args.looks)
-    print(f"{plan['kickoff'].nunique()} kickoffs played in {args.seasons}")
-    rep = backfill(
+    from soccer_stats import odds_history as oh
+    from soccer_stats.data import season_kickoffs
+
+    ten = args.books == "ten"
+    if ten:  # the multi-league backfill: football-data's kickoffs, as dk-history estimates
+        kicks = pd.concat([season_kickoffs(args.league, y) for y in _years(args.seasons)])
+        now = pd.Timestamp.now(tz="UTC")
+        plan = oh.plan_snapshots(kicks[kicks < now], looks_hours=args.looks)
+    else:
+        plan = _plan(args.league, _years(args.seasons), args.looks)
+    print(
+        f"{args.league}: {plan['kickoff'].nunique()} kickoffs played in {args.seasons}; "
+        + ("h2h at ten books, 10 credits a snapshot" if ten else "DraftKings h2h and totals")
+        + (
+            f"; guard: {args.guard} snapshots without DraftKings stop a season"
+            if args.guard
+            else ""
+        )
+    )
+    rep = oh.backfill(
         plan["at"],
         args.league,
         max_credits=args.max_credits,
         keep_credits=args.keep_credits,
         dry_run=args.dry_run,
+        books=oh.TEN_BOOKS if ten else (oh.BOOKMAKER,),
+        markets="h2h" if ten else "h2h,totals",
+        cost_per_snapshot=oh.TEN_BOOKS_COST if ten else oh.COST_PER_SNAPSHOT,
+        guard_first=args.guard,
+        max_call_cost=oh.TEN_BOOKS_COST if ten else None,
     )
     for line in rep.lines():
         print(line)
     if args.dry_run:
         print("Dry run: no API calls made.")
+    print("BACKFILL_ODDS_JSON", json.dumps({"league": args.league, **rep.to_json()}))
 
 
 def _pinnacle_edge_threshold(preds: pd.DataFrame, league: str) -> dict:
@@ -1136,6 +1179,47 @@ def _write_backtest(out: dict, args, name: str, label: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(_clean(out), separators=(",", ":")))
         print(f"{label} written to {path}")
+
+
+def cmd_backtest_dk_prices(args: argparse.Namespace) -> None:
+    """Blend Lean and Model 12% at DraftKings' own historical prices for one league
+    (dk_price_backtest.py), from the cached ten-book bodies. No key, no credits. Adds or
+    replaces the league's entry in backtest/dk_price_backtest.json."""
+    import json
+
+    from soccer_stats import dk_price_backtest as dpb
+    from soccer_stats import leagues as lgs
+
+    code = args.league
+    preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+    known = set(preds["home"]) | set(preds["away"]) if len(preds) else set()
+    hist = dpb.load_books(code, known)
+    print(f"{lgs.name(code)}: {len(hist)} event-snapshots in the cached DraftKings history")
+    rep, bets = dpb.league_report(code, preds, pins, hist)
+    rep["xg_weight"] = weight
+    for line in dpb.headline(rep):
+        print(line)
+    path = None
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = Path(args.log_dir) / "backtest" / dpb.NAME
+    old = json.loads(path.read_text()) if path and path.exists() else None
+    out = dpb.merge_file(old, code, rep, bets)
+    a = out["all"]
+    print(
+        "Pooled so far ("
+        + ", ".join(a["leagues"])
+        + "): Lean live rule passes "
+        + str(a["lean"]["verdict"]["live_rule"]["passes"])
+        + ", all odds "
+        + str(a["lean"]["verdict"]["all_odds"]["passes"])
+        + "; Model 12% "
+        + str(a["edge12"]["verdict"]["passes"])
+    )
+    brief = {k: v for k, v in rep.items() if k not in ("coverage",)}
+    print("DK_PRICE_BACKTEST_JSON " + json_dumps({"league": code, **brief}))
+    _write_backtest(out, args, dpb.NAME, "DraftKings-price backtest")
 
 
 def cmd_backtest_lean(args: argparse.Namespace) -> None:
@@ -2958,6 +3042,13 @@ def main(argv: list[str] | None = None) -> None:
     lco.add_argument("--log-dir", required=True, help="data-log checkout")
     lco.set_defaults(func=cmd_log_corners)
 
+    lip = sub.add_parser(
+        "log-inplay", help="half-time in-play h2h snapshots (inplay.yml; 1 credit a league)"
+    )
+    lip.add_argument("--log-dir", required=True, help="data-log's odds_log files (read)")
+    lip.add_argument("--pending", required=True, help="folder for the new rows and calls")
+    lip.set_defaults(func=cmd_log_inplay)
+
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
     eco.add_argument(
@@ -3060,6 +3151,20 @@ def main(argv: list[str] | None = None) -> None:
         help="never let credits left fall below this (live refreshes)",
     )
     bf.add_argument("--dry-run", action="store_true", help="print the plan; no API calls")
+    bf.add_argument(
+        "--books",
+        choices=["draftkings", "ten"],
+        default="draftkings",
+        help="draftkings: DraftKings h2h and totals (the original E0 run); ten: h2h at the "
+        "live call's ten books, football-data's kickoffs (the multi-league backfill; a call "
+        "billed over 10 credits stops the run)",
+    )
+    bf.add_argument(
+        "--guard",
+        type=int,
+        default=0,
+        help="stop a season after this many snapshots without DraftKings (0 = off)",
+    )
     bf.set_defaults(func=cmd_backfill)
 
     dk = sub.add_parser("backtest-dk", help="replay the trade rule on historical DraftKings odds")
@@ -3101,6 +3206,17 @@ def main(argv: list[str] | None = None) -> None:
     mb.add_argument("--json", help="path for the fits")
     mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
     mb.set_defaults(func=cmd_fit_match_blends)
+
+    dpk = sub.add_parser(
+        "backtest-dk-prices",
+        help="both live match rules at DraftKings' own historical prices, one league (no key)",
+    )
+    dpk.add_argument("--league", required=True, help="football-data code")
+    dpk.add_argument("--from-season", type=int, default=2019, help="as backtest-lean")
+    dpk.add_argument("--burn-in", type=int, default=2, help="as backtest-lean")
+    dpk.add_argument("--json", help="path for the results (read first, the league replaced)")
+    dpk.add_argument("--log-dir", help="data-log checkout (backtest/dk_price_backtest.json)")
+    dpk.set_defaults(func=cmd_backtest_dk_prices)
 
     lbk = sub.add_parser(
         "backtest-lean",

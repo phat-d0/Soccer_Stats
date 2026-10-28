@@ -9,7 +9,7 @@ name: Paid odds archive fallback
 description: Fill a missed paid-odds cache back in from the permanent archive
 inputs:
   name:
-    description: "The paid cache (cache_archive.PAID): odds-history, player-odds-history, cup-odds-history or comeback-odds"
+    description: "The paid cache (cache_archive.PAID): a name in cache_archive.PAID, e.g. odds-history or comeback-odds"
     required: true
   archive-dir:
     description: "Test only: a local folder with manifest.json and the assets, in place of data-log and the release"

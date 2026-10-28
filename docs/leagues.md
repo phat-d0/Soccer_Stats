@@ -445,6 +445,161 @@ beside it. The tracks are descriptive, and nothing changes live unless the owner
   section's `dnb_trades`.
 - **No backcast** from the odds log yet (optional in the brief; descriptive at best).
 
+## DraftKings history (28 Oct, lead brief 2; lead-approved, cap 200,000)
+
+The goal is to replay every live strategy at DraftKings' own prices in every league, not
+only at Pinnacle's early price, and with Pinnacle's price taken from the same snapshot.
+
+**Coverage probe** (`dk_history.py`, `odds-check.yml` `task=dk-history`, run 40647443891,
+400 credits). It bought one ten-book snapshot per league and season, on the first Saturday
+of November at 09:00 UTC, walking back from 2024/25:
+
+- The archive is empty before mid-2020: every 2019/20 snapshot had 0 events.
+- DraftKings is priced from 2020/21 in E0, SP1, D1, I1, E1 and E2, and from 2021/22 in F1
+  and E3. Their 2020/21 snapshots had no DraftKings at all.
+- Pinnacle is in the same bodies everywhere except E2 2020/21–2022/23 and E3 2021/22. It
+  covers about half of E1's events in 2021/22 and 2023/24.
+
+**Estimate.** A 48 h look plus the close, kickoffs within 15 minutes sharing, ten books at 10
+credits a snapshot, covered seasons only: 16,018 snapshots, **160,180 credits**.
+
+| League | Credits |
+| --- | --- |
+| E0 | 24,460 |
+| SP1 | 34,340 |
+| I1 | 30,680 |
+| F1 | 18,680 |
+| D1 | 17,380 |
+| E1 | 16,940 |
+| E2 | 10,100 |
+| E3 | 7,600 |
+
+**The buy** (lead sign-off, 28 Oct). `backfill.yml` with `books=ten`, `league`, `seasons`,
+`max_credits` and `dry_run` off, from the default branch, one run at a time:
+
+- E0 first, at cap 25,000, `seasons` 2020-2024. Report its real cost and its DraftKings and
+  Pinnacle coverage per season.
+- Then SP1, I1, D1, F1, E1, E2 and E3. F1 and E3 start at 2021.
+
+The rules, from `odds_history.backfill`:
+
+- h2h at the live call's ten books, Pinnacle included.
+- Every asked book's prices are kept in `data/raw/odds_history/<code>/`, the paid
+  `odds-history-` cache. It is archived right after the run (#128) and never bought twice.
+- Each season's first 3 snapshots in time order with no DraftKings price stop that season
+  (design C's guard). Cached snapshots count toward the guard.
+- A call billed over 10 credits stops the run.
+- The 3,000 reserve applies (`keep_credits`).
+- Each call is budgeted at 10 at least.
+
+The run prints each season's events and how many DraftKings and Pinnacle priced, plus a
+`BACKFILL_ODDS_JSON` line. No backtest runs in it, so `E0_dk.json` stays as it is. The
+backtests at DraftKings' prices are re-run afterwards (method below), and what changed is recorded here.
+
+### Backtests at DraftKings' prices: method (written 28 Oct, before any run)
+
+The lead asked for this on 28 Oct, and it is fixed here before the code runs. The question is
+what the two live match strategies would have done at DraftKings' own prices, the book they
+trade at, with CLV measured against Pinnacle's close taken from the same snapshot. The
+Pinnacle backtests (`lean_backtest.json`, `edge12_backtest.json`) answer the same question at
+Pinnacle's early price, a sharper and different book.
+
+- **Matches.** Every match of a league's seasons that are both:
+  - scored by the Pinnacle backtests (football-data's Pinnacle early and close cover at least
+    90% of the matches, `lean_backtest.coverage`); and
+  - bought in the DraftKings history.
+
+  That means 2020/21–2024/25, or 2021/22–2024/25 for F1 and E3, less any season the
+  Pinnacle backtests leave out.
+
+  A match is a candidate when DraftKings priced its full 1X2 in the 48 h look snapshot
+  (`odds_history.price_at` at kickoff − 48 h, the price updated no more than 6 h before).
+  Matches are joined on football-data's names and kickoff day.
+- **Model.** The same walk-forward model chances the Pinnacle backtests use
+  (`backtest.walk_forward`, xG weight 0.7 where Understat has xG, else goals only, from
+  2019-07-01 with 2 seasons of burn-in). This is the same `_early_preds` call with the same
+  `--from-season` 2019 as `backtest-lean`. (The first version of this note said 2022-07-01,
+  which is the live fit's start, not the backtests'. It was corrected before any run.)
+- **Entry.** DraftKings' quoted decimal price at the 48 h look. The break-even is 1/decimal,
+  margin kept, as live.
+- **Model 12%.** `trades.best_pick` on the raw model chance at 12% against that price, one
+  pick per match, $1. This is exactly the live rule.
+- **Blend Lean.** The live rule, `trades.lean_pick` at 1σ, "strong" at 2σ, $1, one pick per
+  match:
+  - The blend is `match_calibration.fit` on Pinnacle's margin-free close beside the model's
+    walk-forward chance, refitted every 28 days on matches played before the block. The block
+    is set by the look time, kickoff − 48 h. σ comes from each fit's own rows. This is
+    `lean_backtest.walk_forward`, as the live fit.
+  - The blend is fed DraftKings' Shin-fair look price, as `publish.add_lean` feeds the card's
+    `implied`.
+  - The driver is the blend with the model term removed.
+  - Two lines are reported: the live rule, inside `trades.LEAN_ODDS_RANGE` (1.50 < odds ≤
+    3.00), and the old rule at every price.
+- **Close and CLV.** The close is the snapshot just before kickoff (`price_at` at kickoff, the
+  price updated no more than 6 h before).
+  - The judged CLV is entry odds × Pinnacle's Shin-fair close − 1, from Pinnacle's prices in
+    that same close snapshot. A bet without Pinnacle there has no CLV and is counted as
+    `clv_missing`. There is no fallback to football-data.
+  - CLV against DraftKings' own close is reported beside it, descriptive, as live `clv_dk`.
+- **Same matches at Pinnacle.** The same two rules on the same candidate matches at
+  football-data's Pinnacle early price, with CLV against football-data's Pinnacle close. This
+  shows what changes with the book, not with the sample.
+- **Reported per league, then pooled once all eight are in:**
+  - bets, win rate vs break-even, ROI per $1 with a match-resampled 95% range (2,000 draws,
+    seed 0);
+  - CLV vs Pinnacle's close with its range, CLV vs DraftKings' close, beat-the-close share;
+  - per season, per tier and driver (Lean), and per odds band (`bands.ODDS_BANDS`);
+  - DraftKings' coverage per season: candidates out of the season's matches, at the look and
+    at the close.
+- **Verdict.** A rule shows an edge at DraftKings when the 97.5% end of its pooled CLV range
+  vs Pinnacle's close is above 0. This is the same pass rule as the DNB and Pinnacle
+  backtests. ROI is reported, not judged: its ranges are wide. Per-league numbers are
+  descriptive.
+- **Where it runs.** `backfill.yml` input `dk_price_backtest` with `league`, from the cached
+  `odds-history-` bodies. It uses no key and no credits. Each run adds or replaces its
+  league's entry in data-log `backtest/dk_price_backtest.json`. It runs once per league as
+  the bodies land.
+
+## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
+
+A dataset collected from now on for the in-play questions: comebacks, cash-out, and heavy
+favourites trailing at half-time. We buy no history for it. Twice a match, one live h2h call
+per league records every match in play at ten books, with ESPN's score and clock at that moment.
+Nothing trades on it.
+
+- **When.** `closes.yml` already plans the close and settlement runs. It now also dispatches
+  `inplay.yml` for each kickoff cluster:
+  - at the cluster's first kickoff + 58 min (`inplay55`, half-time);
+  - at the first kickoff + 78 min (`inplay75`).
+
+  These come from `close_runs.INPLAY` with a 3-minute shift. A cluster spans up to 12 minutes, so
+  each call lands 8 minutes before to 6 minutes after the target for every kickoff in it. That is
+  inside the run's own windows (`inplay_log.WINDOWS`: 45–65 and 65–90 minutes after kickoff, no
+  overlap).
+- **What the run does** (`inplay_log.run`, CLI `log-inplay`):
+  - It reads data-log's DraftKings logs (kickoffs) and the in-play call record.
+  - For each league with a kickoff in a window that the call record doesn't hold yet, it makes a
+    free events call first, which shows whether anything has started and gives the balance.
+  - Then it makes one live `/odds` call: h2h at the same ten books as the pre-match call, one
+    region, 1 credit.
+  - The cost is read from `x-requests-last`. The call keeps the shared 3,000 reserve and stays
+    under a monthly guard of 2,000 credits (`MONTHLY_CAP`, against a runaway loop).
+- **What is logged** (data-log, permanent):
+  - `odds_log/<code>_inplay_<YYYY-MM>.jsonl` has one row per started match and book: league,
+    home and away (football-data names), kickoff, kind (the nearest), `minutes_since_kickoff`,
+    `checked_at`, book, prices, margin, `last_update`, `age_min`, and ESPN's `espn_score`,
+    `espn_clock`, `espn_state` and `espn_goals`. Every match in play goes in, not only the due
+    ones.
+  - `odds_log/inplay_calls_<YYYY-MM>.jsonl` has one row per call: league, kinds, kickoffs
+    covered, `fetched_at`, status, cost, `credits_left`, events, rows.
+  - The record is read before every call, so a (league, kind, kickoff) is never snapshotted twice.
+  - The run writes to a pending folder and appends to the newest data-log on each push attempt,
+    so a push race never repeats a paid call. On a final failure the rows go to a 30-day artifact.
+- **Cost.** One credit per league per cluster per kind. The lead's estimate is about 580 a month
+  across the nine live leagues.
+- **Only the default branch** gets the key and writes to data-log. A run anywhere else reads and
+  prints, and buys nothing.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper

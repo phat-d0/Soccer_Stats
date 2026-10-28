@@ -133,6 +133,13 @@ settlement runs after them.
   shortfall, which the half-time market already covers). A priced trail-first test would cost
   about 18,820 credits (1,882 snapshots); recommended not to buy.
   The whole study is in the app as the closed portfolio "Comeback bets" (v61, PRs #115/#116).
+- Cash-out test (owner, 28 Oct; design X, 150,910 credits; `docs/lab.md` "Cash-out test: result",
+  rerun 40709968765 after a result-join fix): **fail**. Cash out a 4.0+ underdog at a 50% in-play
+  chance with a 5% fee, 2% stakes: 570 decisions, growth vs holding +0.00020 a bet (−0.00022 to
+  +0.00062). The in-play price overrates a leading underdog a little (55%+ at half-time: 65% won
+  vs 72%), which a free cash-out uses and a 5% fee cancels. Holding lost −25.3% per $1, but the
+  sample left out B/C/H's matches (underdogs leading at half-time), so the hold level is biased
+  low; with B and C's put back −17.0%. App file `lab/cashout_research.json`.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -145,6 +152,7 @@ settled).
 
 **Credits:** the owner upgraded the plan to about 5M a month (28 Oct): 4,938,760 left at the
 05:50 UTC publish that day. Caps are no longer the constraint; the 3,000 reserve floor stays.
+The half-time in-play snapshots (`inplay.yml`) add about 580 a month.
 Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
 40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
@@ -209,22 +217,30 @@ the owner's baseball app, so the balance can drop without any run here.
 | File | What | Credits |
 | --- | --- | --- |
 | `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
-| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
-| `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
+| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
+| `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month; guard `MONTHLY_CAP` 2,000; 3,000 reserve) |
+| `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` + `league` (`backtest-dk-prices` → `dk_price_backtest.json`, both rules at DraftKings' historical prices), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
 - Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
-  `cup-odds-history-*`, `comeback-odds-*` (paid odds), `cup-espn-*` (ESPN cup days),
+  `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
   delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones
   as release assets (`paid-odds-archive`, manifest on data-log `archive/manifest.json`); every
   step that restores a paid cache is followed by `.github/actions/paid-archive-restore`, which
   rebuilds a missed cache from the archive before anything can buy (`docs/caches.md`).
-  A new cache needs a keep-alive matrix row (`tests/test_cache_archive.py` checks it).
+  A new cache needs a keep-alive matrix row (`tests/test_cache_archive.py` checks it). A cache
+  saved in a job that can get `ODDS_API_KEY` must be in `cache_archive.PAID` or in
+  `cache_archive.FREE` (with why it holds nothing bought). A paid cache restored there is saved by
+  an explicit save step under `always()`. A paid run's workflow ends with an `archive` job that
+  dispatches `caches.yml` (default branch only), so a purchase is archived within minutes. Paid
+  fetches run from the default branch: caches saved on a work branch are invisible to `caches.yml`.
+  The live FanDuel player lines are the one live dataset not on data-log (cache only;
+  `docs/caches.md`).
   The first run (28 Oct) found `odds-history-` and `cup-odds-history-` already evicted. Their raw
   bodies are lost, but what was parsed from them is safe on data-log (`E0_dk.json`,
   `UCL_closes.jsonl`). The comeback (1.5 MB packed) and FanDuel (1.2 MB) caches are archived.
@@ -244,6 +260,10 @@ the owner's baseball app, so the balance can drop without any run here.
   stays the book trades open at; the others feed the every-book log, Pinnacle's live close and
   the best US price. DraftKings lists no main soccer `totals`. The budget still counts 2 a
   call (`BUDGET_COST`).
+- **In-play h2h** (lead brief 2, 28 Oct; `inplay_log.py`, `inplay.yml`): the same live `/odds`
+  call with the same ten books, made at kickoff + 55 and + 75 minutes for each kickoff
+  cluster. That is 1 credit per league per cluster per snapshot, about 580 a month, with a
+  guard of 2,000 a month.
 - **Team totals:** `/events/{id}/odds`, `bookmakers=fanduel,bovada,pinnacle`,
   `markets=team_totals,totals`, 2 credits a call, E0, SP1, D1, I1, F1 (`team_totals.py`).
   Pinnacle quotes no goal team totals on this API.
@@ -300,6 +320,19 @@ the owner's baseball app, so the balance can drop without any run here.
   12% on the raw model, $1); metrics add `model_p`, `avg_edge`. `edge12_backtest.json` has the
   same shape with `edge12` in place of `lean`/`strong` and `all.leagues`; `draftkings_replay`
   names `E0_dk.json`. Log line `EDGE12_BACKTEST_JSON`.
+- `dk_price_backtest.py` (CLI `backtest-dk-prices --league`; lead, 28 Oct; method in
+  `docs/leagues.md` "Backtests at DraftKings' prices: method", written before the run): both
+  live rules at DraftKings' own historical prices from the ten-book bodies (`load_books`,
+  `quote`: the latest snapshot at or before a time, quote ≤ 6 h old). `candidates`:
+  DraftKings' 1X2 at kickoff − 48 h (entry, Shin-fair `mkt_` for the blend), Pinnacle's
+  close (judged CLV) and DraftKings' close (`clv_dk`) from the close snapshot, in the seasons
+  the Pinnacle backtests score. The rules: Model 12% = `edge12_filters.bets` baseline; Lean =
+  `lean_backtest.walk_forward` + `bets`, split `live_rule` (odds range) and `all_odds`. It
+  also runs the same rules on the same matches at Pinnacle's early price
+  (`pinnacle_same_matches`), and gives per-season coverage at the look and close and
+  `verdict` (pooled CLV range above 0). `merge_file` adds or replaces one league in data-log
+  `backtest/dk_price_backtest.json` and re-pools `all`. `backfill.yml` `dk_price_backtest`
+  with `league`. Log line `DK_PRICE_BACKTEST_JSON`.
 - `dnb_backtest.py` (CLI `backtest-dnb`; owner, 24 Oct; `docs/lab.md` "Draw no bet"): both match
   rules as draw no bet beside their 1X2 versions on the same scored matches (the eight domestic
   leagues, `lean_backtest`'s seasons). DNB price = side × (1 − 1/draw) from Pinnacle's early 1X2
@@ -418,7 +451,15 @@ the owner's baseball app, so the balance can drop without any run here.
   from it (`pinnacle_live_close_prices`, `pinnacle_live_fetched_at`,
   `pinnacle_live_minutes_before`, `clv_pinnacle_live`; the summaries add `clv_pinnacle_live`),
   and new match trades record `best_us_odds` and `best_us_book` (`paper.best_us`).
-- `odds_history.py`: historical match odds (cached).
+- `odds_history.py`: historical match odds (cached). `backfill(..., books=, markets=,
+  cost_per_snapshot=, guard_first=, max_call_cost=)`: the original E0 run asked DraftKings alone
+  for h2h and totals (20 credits). The multi-league backfill (lead brief 2, 28 Oct; CLI
+  `backfill-odds --books ten --guard 3 --looks 48`, `backfill.yml` `books=ten`, `league`) asks
+  `TEN_BOOKS` for h2h (`TEN_BOOKS_COST` 10). It keeps every asked book (`compact_events(events,
+  keep)`), stops a season whose first `GUARD_FIRST` 3 snapshots hold no DraftKings price
+  (cached ones count), and stops on a call over 10. It reports `by_season` events,
+  DraftKings and Pinnacle counts (`snapshot_counts`, `BACKFILL_ODDS_JSON`) and uses
+  football-data's kickoffs (`data.season_kickoffs`). `docs/leagues.md` "DraftKings history".
 - `dk_history.py` (lead brief 2, item 3, 28 Oct): DraftKings' historical pre-match odds.
   `probe(cap, leagues, seasons)` buys one bulk h2h snapshot per league and season at ten
   books (about 10 credits, `probe_time`: the first Saturday of November, 09:00 UTC), newest
@@ -478,8 +519,17 @@ the owner's baseball app, so the balance can drop without any run here.
   90-minute score known. Settles only on one event with both names exact, home/away right,
   kickoff ±3 h; corner counts from the summary's `wonCorners`. `Budget`: 60 s, 3 failures, 80
   requests. Rows carry `result_source: "espn"`. Log "ESPN results: N of M matches final …".
-- `close_runs.py`: the close and settlement planner behind `closes.yml` (`plan`, `SETTLE_AFTER`,
-  `SETTLE_MERGE`, `settle_pending`).
+- `inplay_log.py` (lead brief 2, 28 Oct): the half-time in-play snapshots (`inplay.yml`, CLI
+  `log-inplay --log-dir --pending`). `KINDS` inplay55/inplay75, `WINDOWS` (45, 65) and (65, 90)
+  minutes after kickoff; `kickoffs` (DraftKings logs only, `DK_LOG`), `due` (minus the call
+  record's `done_keys`), `rows_from` (one row per started event and book with all three prices,
+  ESPN via `lab.inplay_probe.espn_live`/`match_espn`), `run` (free events call, reserve
+  `RESERVE` 3,000, `MONTHLY_CAP` 2,000, one `/odds` call per due league, cost from
+  `x-requests-last`; a parsing failure still records the call), `append`, `summary_line`. Log
+  lines "In-play snapshots: …" and `INPLAY_LOG_JSON`.
+- `close_runs.py`: the close, settlement and in-play planner behind `closes.yml` (`plan`,
+  `SETTLE_AFTER`, `SETTLE_MERGE`, `settle_pending`, `INPLAY`, `WORKFLOWS`; `to_json` names each
+  dispatch's `workflow`).
 - `cup_model.py`: the cross-league model for UCL. One goals-only Dixon-Coles fit (`XI` 0.0019,
   `RIDGE` 0.1, `WINDOW_DAYS` 730, matches before `as_of` only) over football-data's top and
   extra European leagues plus every UEFA cup result with a 90-minute score from ESPN
@@ -529,8 +579,9 @@ the owner's baseball app, so the balance can drop without any run here.
     = False` (published as `players_status.paper_trades`).
   - Portfolios: `PORTFOLIOS` registry (`id`, `name`, `status` live/testing/retired/closed,
     `note`, `backtest` stem): `moneyline` (live, `dk`), `goalscorer` (testing), `corners`
-    (testing), `player_shots` (retired), `comebacks` (closed: research finished without ever
-    trading, 26 Oct; no ledger, its section stays empty). `portfolio_of(trade)`.
+    (testing), `player_shots` (retired), `comebacks` ("In-play research" since 28 Oct,
+    "Comeback bets" before; closed: research studies, never traded; no ledger, its section
+    stays empty). `portfolio_of(trade)`.
   - `summarize` (adds `close_early`: closes taken over 60 min before kickoff), settlement, `clv`.
 - `paper.py`: the live ledgers and `data.json` → `portfolio`.
   - Leagues in play (`leagues_in_play`): E0, every league with fixtures this build, and every
@@ -683,7 +734,9 @@ the owner's baseball app, so the balance can drop without any run here.
   `task=inplay-probe` with `league` and `cap`. `hist_dates` set to one ISO time buys one
   historical h2h snapshot (10 credits); otherwise one live `/odds` call (1 credit), only if a
   match is in play (a free events list checks first). Prints each started match's prices per
-  book, their age and ESPN's score then. First run (24 Oct, run 40136522857, 10 credits): the
+  book, their age and ESPN's score then. Every bought answer is kept in
+  `data/raw/inplay_probe/<league>/` (paid cache `inplay-probe-`, from 28 Oct); a historical
+  snapshot already held is never bought again. First run (24 Oct, run 40136522857, 10 credits): the
   archive keeps in-play prices (four Premier League matches at half-time, Pinnacle,
   DraftKings and Betfair among the books; `docs/lab.md` "Phase 2, step 1"). A second
   snapshot (run 40136975819, 10 credits, 25 May 2025) agreed, except that Pinnacle's quote was
@@ -740,6 +793,22 @@ the owner's baseball app, so the balance can drop without any run here.
   slots and credits for the eight leagues 2025/26–2026/27 (`EIGHT_YEARS`) and `OTHER` leagues with sport
   keys 2022/23–2025/26; `needed(gap)` sizes the sample. `odds-check.yml` `task=heavy-favourites`, log
   line `HEAVY_FAVOURITES_JSON`; `docs/lab.md` "Heavy favourites (75%+)" (DRAFT, not approved).
+- Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
+  `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
+  `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's
+  label), `title`, `question`, `rule`, `verdict` ("pass" / "fail" / "pending"), `verdict_text`,
+  `closed_at`, `preregistered_at` (date), `preregistered` {design key: commit}, `planned`
+  {bets, matches, credits, note} (a running study's plan), `cost` {total, design_<k>, probes,
+  …}, `runs` {name: run id or list}, `designs` {key: {role "judged"/"descriptive", label, short?,
+  series?, bets, wins, win_rate, implied, implied_matches, gap, gap_ci95, roi, roi_ci95,
+  betfair_roi?, betfair_roi_ci95?, not_priced?, by_league [{code, bets, wins, win_rate, implied,
+  roi, roi_ci95}], by_season [{season, …}], by_band [{lo, hi, label?, bets, wins, win_rate,
+  implied, roi, roi_ci95}]}} (key "pooled" = every bet), `bets` [{date, kickoff?, lg, home, away,
+  odds, implied, won, design, pick?, profit? (per $1, when not odds − 1, e.g. a cash-out),
+  result_text?, fav?, ht?}] in date order, `why` [{title, text, rows [{label, n, won, ref,
+  unit?}], ref_name}], `notes` [...], and display words `price_name` ("In-play price"),
+  `band_noun` ("favourite"), `band_title`, `band_note`, `designs_note`, `live_note`. The comeback
+  study's `phase1` and `timelines` keep its own Why. Chances 0–1, ROI per $1, ranges [lo, hi].
 - `lab/cashout.py` (owner via the lead, 28 Oct; exploratory, no key): hold vs cash out a winning
   underdog at half-time on the design B/C snapshots (`comebacks2.match_rows` rows now also carry `ft`,
   `close`, `dk_prices`, `model_draw`): entry at Pinnacle's close, cash-out at DraftKings' margin-free
@@ -752,6 +821,39 @@ the owner's baseball app, so the balance can drop without any run here.
   slot (`requests_for`); `--b64` prints the file gzipped in base64 with its SHA-256 (the sandbox
   can't download artifacts). `odds-check.yml` `task=cashout-plan`. Bought by `comeback_fetch
   --slots X`, which takes `--minutes` (the workflow gives 120) and resumes on the next run.
+- `lab/cashout_test.py` (owner via the lead, 28 Oct; written before any outcome was read): the cash-out
+  test's frozen analysis on design X. Per match DraftKings' Shin-fair underdog chance at half-time
+  and the 70th minute (quote updated after kickoff, ≤ 5 min old, snapshot in its window); hold vs
+  cash out at T 0.40/0.50/0.60 and margins 0/5/10%, and a half-time Kelly partial; growth
+  log(1 + s × profit) at stakes 1/2/5% with its difference from holding, drawdowns, q's
+  calibration; `verdict` = the one primary (5%, T 0.50, 2%, 4.0+, ≥ 300 decisions).
+  `odds-check.yml` `task=cashout-test`, log line `CASHOUT_TEST_JSON`. Run 40706645115, rerun
+  40709968765 after the result-join fix (`comebacks2.result_row`: teams plus kickoff when a pair
+  meets twice at a ground, SC0/B1/G1): fail.
+- `lab/cashout_research.py` (lead brief, 28 Oct; no key): the app file `lab/cashout_research.json`
+  in the shape the app's research studies read (`kind: "cashout"`, `primary_rule`, `test_verdict`,
+  `designs` = `analyse_band` dicts plus `role`, `label`, `by_league`, `by_season`: `primary` judged,
+  `band_3_4`, `put_back` (B and C's matches back, half-time only, already read), `frozen_ht`,
+  `season_2025` descriptive; `curves` (hold vs cash at 2%, $1,000, ≤ 200 points), `bets` (the judged
+  rule's cash-outs), `why`, `notes`), rebuilt from `cashout_test`; fails unless the analysis run
+  reproduces (`EXPECTED`). `odds-check.yml` `task=cashout-research` prints `CASHOUT_RESEARCH_JSON`
+  (no bets) and the file as `CASHOUT_RESEARCH_B64` chunks with its SHA-256.
+- `lab/cashout_check.py` (lead, 28 Oct; read-only, no key, H never joined to a result): checks on
+  the cash-out hold line (football-data alone on every frozen match, the result join, unmatched
+  matches, the matches B/C bought). `odds-check.yml` `task=cashout-check`, log line
+  `CASHOUT_CHECK_JSON` (run 40708947532).
+- `lab/strategy_search.py` (owner via the lead, 28 Oct; `docs/lab.md` "Strategy search with a
+  locked holdout"; no key): every arm (a base of the raw model's best edge ≥ t, Lean's best z ≥ k
+  on 1X2/DNB or every side; 1X2, DNB, AH and O/U 2.5 at Pinnacle's early price; none, one or two
+  filters of different kinds) plus line-movement arms at the close (ROI only), on football-data
+  before 2024-07-01 (`Holdout` checked on every row). One shared match bootstrap (2,000 draws)
+  gives every arm's ROI and CLV ranges, White's reality check (recentred maxima over arms with
+  ≥ 300 bets; per-arm adjusted p) and the null's share of arms above 0; finalists = CLV range
+  above 0, ≥ 300 bets, p < 0.05, at most 3. `odds-check.yml` `task=strategy-search`, log line
+  `STRATEGY_SEARCH_JSON`, every arm in the artifact; `--app-json` writes the app file
+  `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
+  arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
+  holdout still locked.
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
@@ -786,8 +888,31 @@ the owner's baseball app, so the balance can drop without any run here.
     default branch, then `add_quotes` per book; each step in its own try), `team_news` (ESPN, not
     the top-level FPL `team_news` dict) and `news` (FPL absences, E0, applied to the model).
   - `markets_research` (`lab/markets_research.json` + `team_total_progress`, counts only).
-  - `comeback_research` (`comeback_research()`: Research lab's `lab/comeback_research.json`
-    passed through for Portfolio → Comeback bets; None when missing; its own try).
+  - `research_studies` (owner, 28 Oct: every strategy we test shows in Portfolio, pass or fail;
+    `research_studies()` over the registry `RESEARCH_STUDIES` = `[{id, file, portfolio, name}]`,
+    `portfolio` in `STUDY_PORTFOLIOS` (comebacks = In-play research, moneyline): each committed
+    `lab/<file>` passed through plus `id`, `portfolio` and `name` (the file's own `name` wins); a
+    missing or unreadable file is skipped, so Research adds a study by committing its file;
+    its own try; log "Research studies: <id> <verdict>, …"). Registered: `comeback_ht`
+    (`comeback_research.json`), `heavy_fav_ht` (`heavy_favourites_research.json`),
+    `cashout_ht` (`cashout_research.json`, the cash-out test: "Cash out a heavy underdog once it
+    reaches 50%"), `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
+    study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
+    `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
+    `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`, still
+    buying on 28 Oct) is `lab/cashout_test.py`'s `analyse` output laid into the same file:
+    `kind: "cashout"`, `primary_rule` {t, m, s} (0.50, 0.05, 0.02), `test_verdict` (its `verdict`
+    dict), `designs.primary` (judged, the 4.0+ band: `analyse_band`'s positions, won, avg_entry,
+    quoted_ht, quoted_m70, `variants` [hold; cash T/m with decisions, at_ht, at_m70; kelly m/s],
+    each with mean, sd, ci95, minus_hold and `growth` {"0.01"|"0.02"|"0.05": {mean, ci95,
+    minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
+    gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
+    growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
+    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
+    line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
+    (shown first, above the tiles: why the sample leaves matches out). The file shape is under
+    "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
   `PAID` (name → key prefix, exact paths), `list_files`, `content_sha256`, `entry` (files, bytes,
@@ -807,7 +932,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v63) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v64) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -893,18 +1018,53 @@ the owner's baseball app, so the balance can drop without any run here.
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
   `clv_pinnacle_staked`). The fixture adds five synthetic `edge12_dnb` trades (`DNB_TRADES`: two
-  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Comeback bets** (lead brief, 26 Oct; `CB_ID`, data `comeback_research`):
-  a closed research portfolio, never traded. Its top-level row shows a "Closed: no edge" pill
-  and design C's headline ("−25.1% · 732 bets · per $1"; `cbHeadline`, never live profit);
-  its list (`cbFolderHtml`, no chips) has one row, "$1 on the trailing favourite at half-time"
-  (`comeback_ht`), whose page (`cbStrategyHtml`) has Result and Why in place of Live / Backtest
-  / Model (other portfolios fall back to Live paper). Result (`cbResultHtml`): verdict, "No live
+  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
+  Portfolio, pass or fail; data `research_studies`, older data's `comeback_research` read as
+  the one study): `studies()`, `studiesFor(portfolio)`, `studyStrat` (key = study id, `study`
+  set; `isStudy`), `studyJudged` (role "judged", else the first design), `studyHeadline`,
+  `studyRowHtml` (verdict pill `verdictPill`: Passed / Failed / Running, `.pill.v-pass` /
+  `v-fail` / `v-run`; meta "Closed Oct 25 · never traded · 8,011 credits" or "Pre-registered Oct
+  4 · planned 410 bets · up to 4,300 credits"; the judged ROI per $1 on the right, "Running" for
+  a pending study). In-play studies are the rows of "In-play research" (id `comebacks`,
+  `CB_ID`; "Comeback bets" until 28 Oct): its top-level row counts them ("3 studies · N credits",
+  "1 failed · 1 passed · 1 running · never traded"; `cbHeadline`, never live profit; one study
+  shows its own headline), its pill is `researchPill` (Running while any is pending, "Closed: no
+  edge" when all failed, else Research), its list is `cbFolderHtml` (no chips; selection
+  `state.pfStratResearch`). Pre-match studies are Moneyline rows after its strategies
+  (`pfStrategies`): a failed one in the Archive (`archivedStrat`; the Archive note says failed
+  studies stay with their result), a running or passed one in the main list (the top-level row
+  adds "N studies running"). A study's page (`studyPageHtml`, from `pfStrategyHtml` for any
+  selected study) has Result and Why; a pending study's Result is its plan (`studyPlanHtml`:
+  pre-registered date and commits, planned sample, credit cap, spent so far, question, rule).
+  A search study (`studySearch`: the judged design has `arms`; today the real strategy search,
+  `strategy_search_research.json`, #131, in Moneyline's Archive) has its own Result
+  (`studySearchHtml`): verdict, tiles (rules tried, best CLV with the luck check's p, the share
+  of large rules beating the close against a no-skill search, finalists and cost), "The best rule,
+  against luck" (`reality_check.clv`), the shares as rows (`cbRowsChart` `cbshare`), the best
+  rule's curve (`cbcv`, from `bets`' `profit`; `bets_of` names it), every market (`rangeChart`
+  `cbmk` from `by_market`), the best rules by CLV (`top_clv`, 10 then a fold) and by ROI (folded)
+  with each rule's p, and the bets (market and side, CLV; result from `profit`). Rule labels are
+  put into words by `ruleWords` ("Asian handicap, edge ≥ 0% · Premier League, odds 2–3"). Its row
+  reads "None found · of 11,857 rules". The fixture keeps 60 of its bets and 12 rules per list.
+  A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
+  (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
+  vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
+  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
+  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
+  calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
+  league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
+  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
+  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
+  The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
+  its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
+  / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
   trades", tiles (bets, won vs the price with the gap, return per $1 and range, cost in
   credits), Betfair after 2%, profit over time at $1 a bet (`cbProfitChart`, scrub id `cbcv`: C
   judged solid, B and the two together dashed, from `bets`), return by league and season
   (`rangeChart` `cblg`/`cbse`), won vs the in-play price by pre-match favourite band
   (`cbRowsChart` `cbband`: Wilson ranges), the judged bets folded (50, then 100 more per "Show
-  more", `state.cbShown`). Why (`cbWhyHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
+  more", `state.cbShown`). Why (`cbWhyHtml` for a study with `phase1`/`timelines`, else `studyWhyHtml`: its `why` sections with `cbRowsChart` rows `why<i>`, then `studyMeasuredHtml`): phase 1 (`cbp1`), the ESPN timelines by minute
   (`cbmin`), the conclusion, and run ids and pre-registration commits under "How this was
   measured". The minute chart and its totals use the matches with a fair benchmark
   (`benchmarked`, 3,789); a bet's `implied` can be null (shown "–"). The "Won" tile and the Why text use the like-for-like pair

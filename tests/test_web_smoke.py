@@ -32,8 +32,10 @@ def test_fixture_is_complete():
     assert pfs["player_shots"]["status"] == "retired" and pfs["player_shots"]["backtest"]
     # Comeback bets (26 Oct): a closed research portfolio, its result passed through publish
     assert pfs["comebacks"]["status"] == "closed" and pfs["comebacks"]["live"]["trades"] == []
-    cr = data["comeback_research"]
-    assert cr["verdict"] == "fail" and cr["designs"]["C"]["bets"] == len(
+    studies = {s["id"]: s for s in data["research_studies"]}
+    assert {s["verdict"] for s in studies.values()} == {"pass", "fail", "pending"}
+    cr = studies["comeback_ht"]
+    assert cr["portfolio"] == "comebacks" and cr["designs"]["C"]["bets"] == len(
         [b for b in cr["bets"] if b["design"] == "C"]
     )
     ml = pfs["moneyline"]["backtest"]

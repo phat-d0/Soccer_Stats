@@ -7,6 +7,8 @@
 # Since 18 Oct it also dispatches one publish 2 h 15 min after each cluster of kickoffs,
 # so the paper step settles those trades from ESPN's final scores (free) right after full
 # time; DraftKings refreshes in that run still follow the per-league refresh floors.
+# Since 28 Oct it also dispatches inplay.yml at each cluster's first kickoff + 58 and + 78
+# minutes: the half-time in-play snapshots (close_runs.INPLAY, inplay_log.py).
 name: Close snapshots
 
 on:
@@ -17,7 +19,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write # dispatch publish.yml and the next planner run
+  actions: write # dispatch publish.yml, inplay.yml and the next planner run
   contents: read
 
 # One planner at a time. A new run waits for the sleeping one rather than cancelling it.
@@ -58,15 +60,16 @@ jobs:
           REF: ${{ github.ref_name }}
         run: |
           plan="$RUNNER_TEMP/plan.json"
-          for at in $(jq -r '.dispatch[].epoch' "$plan"); do
+          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
+          while read -r at wf; do
             wait=$(( at - $(date +%s) ))
             if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
-            if gh workflow run publish.yml --ref "$REF"; then
-              echo "Dispatched publish at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if gh workflow run "$wf" --ref "$REF" < /dev/null; then
+              echo "Dispatched $wf at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             else
-              echo "Dispatch failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Dispatch of $wf failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             fi
-          done
+          done < "$RUNNER_TEMP/dispatch.txt"
           if [ "$(jq -r '.continue' "$plan")" = "true" ]; then
             wait=$(( $(jq -r '.horizon_end.epoch' "$plan") - $(date +%s) ))
             if [ "$wait" -gt 0 ]; then sleep "$wait"; fi

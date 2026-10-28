@@ -2492,6 +2492,15 @@ as frozen.
   bets and the ROI range above 0). The most likely verdict is then "inconclusive".
 - **Why:** this stops H's result from steering which cups or leagues go into H2.
 
+**Disclosure (28 Oct, Research lab).** While checking the cash-out test's hold line, one local
+check computed a single pooled result (hold ROI and win rate) over the 299 underdogs at 4.0+ in
+2024/25 and 2025/26 of the eight main leagues that designs B, C and H had bought (and one over
+the 106 at 3.0–4.0, none of them H's). Nine of those 299 were design H's matches. H's matches were never looked at on their own, nothing
+read H's in-play prices, and no H-only number exists. Every later check leaves H's matches
+out of any result. H's judgement is unchanged. The same work fixed the result join that H's
+analysis will use (`comebacks2.result_row`): 31 of H's matches are in SC0, G1 and B1, where a
+pair can meet twice at the same ground.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,
@@ -2585,6 +2594,110 @@ ran, and the results will follow below it with run ids.
 - results in this section with run ids;
 - a plain-English summary for the owner: what was tried, what the best looked like, how
   likely that was luck, and what the holdout said.
+
+**Implementation notes (28 Oct, written with the code and before the full run;
+`lab/strategy_search.py`).** These pin down choices the design left open. None was picked
+from a result. The only run before this note was a two-league smoke test (E1 and E2, 200
+draws) to check the code works; it is not a result.
+- **Refits:** the model refits weekly (`backtest.walk_forward`, as every backtest here); the
+  blend and σ every 28 days (`lean_backtest.walk_forward`).
+- **Lean bases** exist only for 1X2 and draw no bet, the markets with a fitted blend. AH and
+  over/under have the edge and every-side bases.
+- **Filters:**
+  - "Strength gap" = |model home chance − model away chance|, cut at the window's quintiles;
+  - "Weekend" = Saturday or Sunday;
+  - "Shared kickoff" = another match in the league kicks off at the same date and time
+    (football-data's `Time`);
+  - "Favourite" = the side with the highest margin-free early chance in its market;
+  - edge and z quintiles are cut per market;
+  - driver = "market" when z with the model's term removed reaches 1.
+- **Every side** bets every side of every match, so its arms hedge within a match. They
+  still count as arms.
+- **The reality check's universe** is the arms that could be finalists: those with at least
+  300 bets. A 2-bet arm can't be a finalist, so it can't set the bar. The same check over
+  every arm is printed beside it.
+  - Each arm gets an adjusted p: the share of draws whose recentred maximum reaches its
+    mean. A finalist needs p < 0.05. For the best arm this is White's p.
+  - The no-skill null's share of arms above 0 is measured on the same draws.
+- **Sizing** runs on the finalists and the ten best arms by the CLV range's lower end, not
+  on all of them. Kelly needs the blend's chance, so AH and over/under get flat and the
+  stop rule only.
+- **Exits:** the exploratory exit arms are the "Cash-out" section's numbers on the spent
+  comeback sample. They are quoted, not rerun.
+- **Holdout scoring** is written only if a finalist appears. It then reads the holdout once,
+  after a logged `Holdout.unlock(reason)`, with the window's frozen cuts. With no finalist,
+  no code ever reads 2024/25 onward.
+
+### Strategy search: results (2026-10-28; `odds-check.yml` `task=strategy-search` run 40646880618, 0 credits, no key; the holdout was never read)
+
+The first full run (40646100195, the same code without the app file) found the same best
+arms and the same verdict. One arm sat on the 300-bet line between the two runs (4,542 vs
+4,541 eligible), and the best arm's p moved from 0.946 to 0.944, so a few model chances
+differed slightly between the two runs' inputs. The numbers below are from 40646880618,
+which wrote the app file.
+
+**Data.**
+- Eight leagues, 2019/20 to 2023/24 (every season passed the 90% coverage rule): 16,283
+  matches.
+- About 96,000 priced sides across 1X2, draw no bet, Asian handicap and over/under 2.5.
+- xG weight 0.7 in the five Understat leagues; goals only in E1, E2 and E3.
+
+**What was tried.**
+- **11,857 arms:** 11,203 decided at the early price and 654 line-movement arms at the
+  close.
+- 2,897 were empty and 4,771 had under 100 bets.
+- 4,541 arms had 300+ bets with a CLV (the finalist universe); 5,266 had 300+ bets for ROI.
+
+**The market as a whole** (every side, no filter; per $1, 95% ranges):
+
+| Market | Bets | ROI | CLV |
+| --- | --- | --- | --- |
+| 1X2 | 48,849 | −3.6% (−4.4% to −2.9%) | −3.5% (−3.6% to −3.5%) |
+| Draw no bet | 32,548 | −3.5% (−4.3% to −2.8%) | −4.7% (−4.8% to −4.7%) |
+| Asian handicap | 32,566 | −2.2% (−2.3% to −2.1%) | −2.4% (−2.5% to −2.4%) |
+| Over/under 2.5 | 32,458 | −3.7% (−3.9% to −3.4%) | −3.5% (−3.5% to −3.4%) |
+
+**The best arms, and whether they beat luck.**
+- **Best by CLV** (300+ bets): Asian handicap, the model's edge ≥ 0%, Premier League,
+  price 2.00–3.00. 537 bets, 320 with a closing CLV.
+  - CLV +1.32% (+0.83% to +1.81%); ROI +4.4% (−3.1% to +12.4%).
+  - **Reality-check p = 0.944.** A search with no skill, over the same arms and draws,
+    finds a best arm at least that good 94% of the time. The null's maximum reaches +2.7%
+    CLV in 5% of draws.
+  - Over every arm, including tiny ones, the p is 0.82.
+- **Best by ROI** (300+ bets): 1X2, the model's edge ≥ 5%, Premier League, the widest
+  strength gaps. 360 bets, ROI +27.1% (−5.0% to +61.0%), CLV −4.6% (−6.2% to −3.2%).
+  Reality-check p = 0.65: noise.
+- **Share of arms beating the close:** 92 of 4,541 arms (2.0%) have CLV above 0. A
+  no-skill search would put about 50% there (95% upper 61%). The prices win almost
+  everywhere.
+- **The one recurring pattern:** Asian handicap sides priced 2.00–3.00 at the early price
+  closed shorter.
+  - All of them: 10,619 bets, CLV +0.58% (+0.45% to +0.69%).
+  - ROI −2.2% (−4.0% to −0.5%).
+  - It fills the top of the CLV table in many filter combinations. The reality check
+    counts it as within luck for the best single arm. It loses money at Pinnacle's own
+    margin. Descriptive only.
+- **Line movement** (ROI only, decided at the close): the best was fading a 4-point move on
+  Asian handicap away sides. 848 bets, ROI +8.5% (+2.2% to +14.8%), reality-check p = 1.0
+  among the 5,266 arms.
+- **Sizing on the top ten CLV arms:** all are Asian handicap, so there is no blend chance
+  for Kelly. Flat profit ran from −$196 to +$23; the 20-unit stop rule cut both the losses
+  and the bets.
+- **Exits:** see "Cash-out". A fair cash-out never changes the average; a real one costs.
+
+**Verdict: no strategy found.** No arm meets the finalist rule (CLV range above 0, 300+
+bets, adjusted p < 0.05). The holdout stays locked and unread. Nothing goes live.
+
+**Plain English for the owner.**
+- We tried 11,857 ways of picking bets from five seasons of data. Every market's sides lose
+  about 2–5% to the closing price on average.
+- The best-looking rules (some showing +27% ROI or a small edge on the close) are what you
+  would expect to find by luck when you look at this many. The check that asks "how good
+  would the best of 11,857 random rules look?" says ours are no better than that.
+- So there is nothing to test on the locked seasons, and we didn't open them. They stay
+  clean for any future idea.
+- App file: `lab/strategy_search_research.json` (the best arm's bets for the curve).
 
 ## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 151,000 credits; pre-registration frozen with its slot file on 2026-10-28, before any purchase)
 
@@ -2716,6 +2829,121 @@ locked holdout (football-data 2024/25 onward). This test reads their in-play pri
 results for the cash-out question only. The strategy search's exit arms use the comeback
 sample from before 2024/25, so that holdout stays unread for pre-match strategies.
 
+**Analysis code (28 Oct, `lab/cashout_test.py`, `odds-check.yml` `task=cashout-test`).** It
+was written while the purchase was still running and before any outcome was read. It runs
+once. It pins down these points the text above left open:
+- **Which matches count:** a match counts when its event is found in at least one of its two
+  snapshots.
+  - A match whose league-season the guard blocked is "not priced".
+  - A match found in neither snapshot is "unmatched".
+  - Both are left out and counted.
+- **At a moment where the event is missing or DraftKings' quote fails, no cash-out is
+  offered.** The bet holds.
+- **The Kelly partial** treats a stake s as a bankroll of 1/s per $1 entry, as in the
+  free study (`cashout.kelly_hold`).
+- **The DraftKings early-price entry is left out.** Moneyline's historical DraftKings file
+  is not built for these leagues and seasons.
+
 **App file.** The finished test ships `lab/cashout_research.json`, pass or fail, in the same
 shape as `lab/comeback_research.json` (title, question, rule, verdict, verdict_text, cost,
 runs, preregistered, designs with by-band tables, a bets list for the curve, notes).
+
+### Cash-out test: result (2026-10-28; `odds-check.yml` `task=cashout-test`, 0 credits, no key; first run 40706645115 from the default branch, rerun 40709968765 after the result-join fix below)
+
+**Verdict: fail.** The primary rule (cash out at a 50% in-play chance, 5% fee, 2% stakes,
+underdog 4.0+) made 570 qualifying decisions. Its growth difference against holding was
+**+0.000199 per bet, 95% range −0.00022 to +0.00062** (rerun 40709968765). The range includes
+0. The first run said +0.000312 (−0.00011 to +0.00073); same verdict.
+
+**Read this first: the sample's hold line is biased by its own exclusion.**
+- The sample left out every match designs B, C and H had bought ("spent"; see "Excluded"
+  above). B and C hold favourites trailing at half-time, so the underdog was **leading** at
+  half-time.
+- In 2024/25's eight main leagues that removed 290 underdogs at 4.0+. They are most of the
+  4.0+ underdogs who led at half-time there, and they won 50.3%. All 18 leagues: they are
+  28% of the 4.0+ underdogs leading at half-time.
+- So holding looks worse than backing long shots really is:
+  - frozen sample, football-data alone, all 11,864 matches: 4.0+ hold −26.0% (−30.7% to
+    −21.2%), won 13.8% vs 17.7% implied;
+  - with B and C's matches put back: −17.0% (−21.9% to −12.0%);
+  - 2025/26, where no B or C match was left out: −22.5% (−29.5% to −14.9%). Design H's 75%+
+    favourites trailing at half-time are still left out there; their results are not read.
+- That remaining shortfall is beyond the margin (5.0% on average, 3.8% at Pinnacle). It
+  holds at both price sources (Pinnacle −27.1%, the average close −24.0%) and in most leagues.
+  Underdogs won about 2.5 to 3.5 points less often than their closing price implied over
+  these seasons. It is a pre-match fact about this sample, not something the cash-out rule
+  does.
+- **The cash-out comparison is still fair.** The left-out set depends only on the pre-match
+  price and the half-time score, both known when the rule decides. So cash-out against hold
+  per decision is unbiased for the matches kept. The verdict stands. The hold level,
+  drawdowns and growth levels describe this filtered sample, not "backing 4.0+ underdogs".
+- I should have seen this consequence when freezing the sample; the exclusion was declared,
+  its effect was not.
+
+**Checks on the hold line (lead, 28 Oct; `lab/cashout_check.py`, `task=cashout-check` run
+40708947532, read-only, H never read).**
+- The entry is the underdog's decimal close (Pinnacle's PSCH/PSCA, else the average's
+  AvgCH/AvgCA). All 11,864 frozen matches join football-data by teams and kickoff, and every
+  entry price matches exactly. Hold = odds − 1 on a win, else −1.
+- Mean won × odds 0.740 against mean 1/odds 0.177 (4.0+). Average odds 5.38 on winners vs
+  6.74 on losers.
+- **Bug found and fixed.** The result join used the teams alone. In SC0, and in B1's and
+  G1's play-offs, a pair meets more than once at the same ground in a season, so a later
+  meeting took the first meeting's result. That affected 90 positions (SC0 49, G1 21, B1 20).
+  `comebacks2.result_row` now matches the kickoff when the teams alone are ambiguous; both
+  `cashout_test` and `comebacks2` use it. B and C are in leagues without repeat pairings, so
+  their published numbers don't move. Design H, still unread, has 31 matches in those leagues
+  and is now joined correctly before it is judged.
+- The 1,715 unmatched matches (event not found in either snapshot) are mostly P1, B1, G1, T1
+  and N1 (team-name gaps). Their hold, from football-data alone, is close to the analysed
+  ones' (4.0+: −30.0% vs −25.3%; 3.0–4.0: −21.1% vs −10.4%). The join does not drop winners.
+
+**Results (rerun 40709968765).**
+- **Sample:** 10,149 of 11,864 matches analysed: 1,715 unmatched, 0 not priced (the guard
+  blocked nothing), 0 without a result. 5,401 positions at 4.0+ and 4,748 at 3.0–4.0.
+- **Holding (4.0+):** won 14.0% at an average price of 6.45. Mean −0.253 per $1 (−0.303 to
+  −0.200). Growth at 2% stakes −0.00580 a bet. Worst drawdown 100% at every stake.
+- **Growth difference against holding at 2% stakes, 4.0+ (decisions):**
+
+  | Rule | No fee | 5% fee | 10% fee |
+  | --- | --- | --- | --- |
+  | Cash out at 40%+ (809) | +0.00062 (+0.00011 to +0.00115) | +0.00020 (−0.00031 to +0.00074) | −0.00021 (−0.00072 to +0.00031) |
+  | Cash out at 50%+ (570) | +0.00052 (+0.00010 to +0.00094) | **+0.00020 (−0.00022 to +0.00062)** | −0.00012 (−0.00054 to +0.00029) |
+  | Cash out at 60%+ (288) | +0.00042 (+0.00013 to +0.00073) | +0.00023 (−0.00006 to +0.00054) | +0.00004 (−0.00024 to +0.00035) |
+  | Kelly partial, half-time | +0.00086 (+0.00020 to +0.00151) | +0.00048 (−0.00017 to +0.00113) | +0.00010 (−0.00056 to +0.00075) |
+
+- **The in-play price against results (4.0+, underdog won vs DraftKings' fair chance):**
+  - at half-time: under 40% 10.3% vs 10.2%; 40–55% 44.3% vs 47.5%; 55%+ 64.6% vs 72.0% (gap
+    −0.075, −0.141 to −0.005);
+  - at the 70th minute: 8.0% vs 8.0%; 47.6% vs 48.6%; 67.6% vs 69.6%.
+- **3.0–4.0 (descriptive):** holding −0.104 per $1. The primary rule's growth difference was
+  −0.00029 (−0.00075 to +0.00016) on 1,272 decisions. At a 10% fee cashing out loses (range
+  below 0). The in-play price is on the mark there at every band.
+- **By season (4.0+, decisions):** 2024/25 190, 2025/26 307, 2026/27 to date 73. By league the
+  difference ranges from SC0 +0.0022 to D2 −0.0014 (descriptive).
+
+**Descriptive extras (app file, run 40711752539; already read, not judged).**
+- **With B and C's matches put back, half-time only** (they have no 70th-minute snapshot;
+  279 of the 290 found in their snapshots): 5,680 positions at 4.0+, hold −15.2% (−20.4% to
+  −9.6%). Cash out at 50%, 5% fee: 386 decisions, growth difference +0.00025 (−0.00005 to
+  +0.00057). The in-play price at half-time, 55%+: 66.7% won vs 71.6% implied.
+- **The frozen sample at half-time only** (to compare): 272 decisions, +0.00029 (+0.00002 to
+  +0.00056). This is a cell nobody pre-registered, so its range just above 0 is not a pass.
+- **2025/26 alone** (no B or C match left out; design H's 18 are): 2,343 positions, hold −18.6%
+  (−26.3% to −10.5%); the judged rule +0.00045 (−0.00020 to +0.00118) on 307 decisions.
+
+**Plain English for the owner.**
+- First, why holding looks so bad. To avoid buying any match twice, the sample left out the
+  matches earlier tests had bought. Those were mostly heavy underdogs leading at half-time,
+  which win about half the time. So "holding" looks worse here than backing long shots really
+  is. The comparison between cashing out and holding is still fair.
+- The in-play price slightly overrates a heavy underdog that is leading, so a free cash-out
+  helps a little. Once a realistic 5% cash-out fee is paid, the gain can't be told apart from
+  zero. Nothing goes live.
+
+**App file.** `lab/cashout_research.json` (`lab/cashout_research.py`, `odds-check.yml`
+`task=cashout-research`), in the shape the app's research studies read (`kind: "cashout"`).
+It is rebuilt from the same frozen code and cached snapshots, and fails unless run 40709968765
+reproduces. Beside the judged band it carries descriptive designs: the half-time cash-out with
+B and C's matches put back (already read, not judged; they have half-time snapshots only),
+the frozen sample at half-time only, and 2025/26 alone.
