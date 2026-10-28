@@ -174,3 +174,23 @@ def test_build_files_are_app_ready_and_pool_every_league(tmp_path):
     sec = eb.app_section(json.loads(json.dumps(ef, default=str)))
     assert sec["available"] and sec["bets_shown"] == 2
     assert paper._dk_section({"available": False, "note": "x"})["note"] == paper.DK_MISSING_NOTE
+
+
+def test_unmatched_feed_names_are_listed(tmp_path):
+    history(tmp_path)
+    missing = dpb.unmatched_names("E0", {"Arsenal", "Chelsea", "Everton"}, tmp_path)
+    assert missing == {"Fulham": 1}
+
+
+def test_serie_a_feed_names_land_on_football_data():
+    from soccer_stats.odds_feed import _team
+
+    known = {"Inter", "Milan", "Verona", "Roma"}
+    for feed, ours in {
+        "Inter Milan": "Inter",
+        "FC Internazionale": "Inter",
+        "Hellas Verona FC": "Verona",
+        "Hellas Verona": "Verona",
+        "AC Milan": "Milan",
+    }.items():
+        assert _team(feed, known) == ours
