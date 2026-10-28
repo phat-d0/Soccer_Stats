@@ -93,3 +93,9 @@ def test_trim_drops_the_oldest_seasons_first():
 def test_every_priced_league_has_a_sport_key():
     for lg in xp.PRICED:
         assert xp.sport_of(lg).startswith("soccer_")
+
+
+def test_the_owners_sample_starts_in_2024_and_the_text_is_canonical():
+    s = xp.sample({"SP1": (2020, 2021, 2024, 2025), "N1": (2022,)})
+    assert s == {"SP1": (2024, 2025), "N1": ()}
+    assert xp.canonical({"a": [1, 2], "b": None}) == '{"a":[1,2],"b":null}'

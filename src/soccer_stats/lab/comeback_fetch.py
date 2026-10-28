@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -161,6 +162,7 @@ def run(
     slots: list[dict] | None = None,
     get: Callable = requests.get,
     books=BOOKS,
+    minutes: float | None = None,
 ) -> dict:
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     cache_dir = Path(cache_dir) if cache_dir is not None else Path(RAW_DIR) / CACHE
@@ -209,7 +211,13 @@ def run(
     budget.left = balance(get, api_key)
     res["left_before"] = budget.left
     budget.log.append(f"Credits left before the run: {budget.left}")
+    end = time.monotonic() + minutes * 60 if minutes else None
     for s in pending:
+        if end is not None and time.monotonic() > end:
+            res["stopped"] = f"time budget of {minutes:g} minutes used; run again to resume"
+            res["out_of_time"] = True
+            budget.log.append(f"Stopping: {res['stopped']}")
+            break
         key = guard_key(s)
         if blocked(key):
             res["not_priced"][key] = res["not_priced"].get(key, 0) + 1
@@ -291,12 +299,14 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
     p.add_argument("--cache-dir", default="", help="bodies and call record (default raw dir)")
-    p.add_argument("--slots", default="B", help="design B, C, H or X (the cash-out test), or a slot file")
+    p.add_argument("--slots", default="B", help="design B, C, H or X (cash-out), or a slot file")
+    p.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
     args = p.parse_args(argv)
     res = run(
         cap=args.cap,
         cache_dir=Path(args.cache_dir) if args.cache_dir else None,
         slots=load_slots(slots_path(args.slots)),
+        minutes=args.minutes or None,
     )
     res["design"] = args.slots
     print(report(res))

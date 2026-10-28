@@ -396,7 +396,7 @@ jobs:
               status=0
               mkdir -p data/raw/comeback_odds  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.comeback_fetch --cap "$CAP" --slots "$DESIGN" \
-                || status=$?
+                --minutes 120 || status=$?  # resumable: a slot already held is never bought again
               mkdir -p out && cp -r data/raw/comeback_odds out/ 2>/dev/null || true
               exit $status ;;
             comebacks2) uv run python -m soccer_stats.lab.comebacks2 --slots "$DESIGN" \
@@ -407,7 +407,7 @@ jobs:
             heavy-slots) uv run python -m soccer_stats.lab.heavy_favourites \
                      --slots-out out/comeback_h_slots.json ;;
             cashout-plan) uv run python -m soccer_stats.lab.cashout_plan \
-                     --json out/cashout_slots.json ;;
+                     --b64 --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
               mkdir -p data/raw/heavy_espn  # the save step always has a folder to save
               uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json ;;

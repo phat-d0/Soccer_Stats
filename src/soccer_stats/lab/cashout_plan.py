@@ -14,14 +14,18 @@ match went.
 - Excluded: every match bought by B, C or H. B and C are spent; H's outcomes must stay
   unread until it is judged (its amendment), so H's matches never enter this sample.
 - Priced league-seasons (`PRICED`): design C's purchase and the archive probes of 28 Oct.
-- Over `BUDGET` credits, the oldest seasons are dropped first (lead, 28 Oct), whole
-  league-seasons at a time, until the estimate fits.
+- The owner chose 2024/25 onward in every priced league (`FROM_YEAR`, budget `BUDGET`
+  151,000 credits; lead, 28 Oct). Over the budget, the oldest seasons would be dropped
+  first, whole league-seasons at a time, until the estimate fits.
 `--slots-out` prints `CASHOUT_SLOTS_JSON`, the file `comeback_fetch --slots X` buys from.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
+import hashlib
 import json
 from pathlib import Path
 
@@ -37,8 +41,10 @@ from soccer_stats.leagues import LEAGUES
 
 MIN_DOG = 3.0
 PRIMARY_DOG = 4.0
+B64_CHUNK = 8000
 SNAPSHOTS = {"ht": 55, "m70": 85}  # minutes after kickoff
-BUDGET = 50_000
+BUDGET = 151_000  # the owner's choice (28 Oct); 50,000 was the first approval
+FROM_YEAR = 2024  # 2024/25 onward, every priced league (owner, 28 Oct)
 # In-play prices in the archive (DraftKings or Betfair quoting started matches): design C's
 # guard (E0, F1 and D1 2022/23 unpriced) and the archive probes of 28 Oct (docs/lab.md).
 _NOW = (2025, 2026)  # 2025/26 and 2026/27 to date
@@ -50,6 +56,17 @@ PRICED = {
     **{lg: (2021, 2022, 2023, 2024, *_NOW) for lg in ("D2", "SP2")},
     **{lg: (2022, 2023, 2024, *_NOW) for lg in ("N1", "P1", "SC0", "B1", "T1", "G1", "I2", "F2")},
 }
+
+
+def sample(priced: dict | None = None, from_year: int = FROM_YEAR) -> dict:
+    """The priced league-seasons from `from_year` on."""
+    priced = PRICED if priced is None else priced
+    return {lg: tuple(y for y in ys if y >= from_year) for lg, ys in priced.items()}
+
+
+def canonical(res: dict) -> str:
+    """The frozen file's exact text (its SHA-256 is quoted in the pre-registration)."""
+    return json.dumps(res, separators=(",", ":"))
 
 
 def sport_of(league: str) -> str:
@@ -245,16 +262,31 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--budget", type=int, default=BUDGET, help="most credits the sample may cost")
     p.add_argument("--slots-out", action="store_true", help="print CASHOUT_SLOTS_JSON")
     p.add_argument("--json", default="")
+    p.add_argument("--from-year", type=int, default=FROM_YEAR, help="first season (start year)")
+    p.add_argument(
+        "--b64",
+        action="store_true",
+        help="print the frozen file gzipped in base64 chunks with its SHA-256",
+    )
     args = p.parse_args(argv)
-    res = freeze(budget=args.budget)
+    res = freeze(sample(from_year=args.from_year), budget=args.budget)
+    res["from_year"] = args.from_year
+    res["frozen_at"] = pd.Timestamp.now(tz="UTC").date().isoformat()
     print(report(res))
     summary = {k: v for k, v in res.items() if k not in ("matches", "slots")}
     print("CASHOUT_PLAN_JSON " + json.dumps(summary))
     if args.slots_out:
         print("CASHOUT_SLOTS_JSON " + json.dumps(res))
+    text = canonical(res)
+    print(f"CASHOUT_SLOTS_SHA256 {hashlib.sha256(text.encode()).hexdigest()} ({len(text)} bytes)")
+    if args.b64:
+        blob = base64.b64encode(gzip.compress(text.encode(), mtime=0)).decode()
+        parts = [blob[i : i + B64_CHUNK] for i in range(0, len(blob), B64_CHUNK)]
+        for i, part in enumerate(parts):
+            print(f"CASHOUT_B64 {i + 1}/{len(parts)} {part}")
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.json).write_text(json.dumps(res, indent=1))
+        Path(args.json).write_text(text)
 
 
 if __name__ == "__main__":
