@@ -196,6 +196,33 @@ def test_serie_a_feed_names_land_on_football_data():
         assert _team(feed, known) == ours
 
 
+def test_coverage_note_names_partial_seasons():
+    row = {"included": True, "matches": 100, "early": 95, "both": 95, "early_share": 0.95}
+    leagues = {
+        "E0": {"name": "Premier League", "coverage": [{**row, "label": "2020/21"}]},
+        "E1": {
+            "name": "Championship",
+            "coverage": [
+                {**row, "label": "2021/22", "early": 67, "both": 66, "early_share": 0.67},
+                {**row, "label": "2022/23", "early": 0, "both": 0, "early_share": 0.0},
+                {**row, "label": "2023/24", "early": 90, "both": 40, "early_share": 0.9},
+                {**row, "label": "2019/20", "early_share": 0.0, "included": False},
+            ],
+        },
+    }
+    parts = dpb.partial_coverage(leagues)
+    assert [(p["league"], p["season"]) for p in parts] == [
+        ("E1", "2021/22"),
+        ("E1", "2022/23"),
+        ("E1", "2023/24"),
+    ]
+    note = dpb.coverage_note(leagues)
+    assert "Championship 2021/22 (DraftKings priced 67% of matches)" in note
+    assert "Championship 2022/23 (no DraftKings history bought yet)" in note
+    assert "Pinnacle's close on 44% of those" in note and "Premier League" not in note
+    assert dpb.coverage_note({"E0": leagues["E0"]}) == dpb.COVERAGE_NOTE
+
+
 def test_bundesliga_ligue_1_and_championship_feed_names_land_on_football_data():
     from soccer_stats.odds_feed import _team
 

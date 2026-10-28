@@ -324,6 +324,55 @@ COVERAGE_NOTE = (
     "judged CLV needs it). DraftKings history starts in 2020/21 (2021/22 for Ligue 1 and "
     "League Two); a season counts only where the Pinnacle backtests score it too."
 )
+PARTIAL_BELOW = 0.9  # a scored season under this share is named in the coverage note
+
+
+def partial_coverage(leagues: dict) -> list[dict]:
+    """Scored league-seasons where DraftKings priced under PARTIAL_BELOW of the matches
+    (`priced`), or Pinnacle's close is missing on that share of the priced ones
+    (`pinnacle`): {league, name, season, priced, pinnacle}. Read from each league
+    report's coverage rows."""
+    out = []
+    for code, rep in leagues.items():
+        for c in rep.get("coverage") or []:
+            if not c.get("included") or not c.get("matches"):
+                continue
+            priced = c["early_share"]
+            pin = c["both"] / c["early"] if c.get("early") else None
+            if priced < PARTIAL_BELOW or (pin is not None and pin < PARTIAL_BELOW):
+                out.append(
+                    {
+                        "league": code,
+                        "name": rep.get("name") or code,
+                        "season": c["label"],
+                        "priced": round(priced, 4),
+                        "pinnacle": None if pin is None else round(pin, 4),
+                    }
+                )
+    return out
+
+
+def coverage_note(leagues: dict) -> str:
+    """COVERAGE_NOTE plus, by name, each partial season (partial_coverage)."""
+    parts = []
+    for p in partial_coverage(leagues):
+        if p["priced"] == 0:
+            what = "no DraftKings history bought yet"
+        else:
+            what = f"DraftKings priced {p['priced']:.0%} of matches"
+        if p["pinnacle"] is not None and p["pinnacle"] < PARTIAL_BELOW:
+            what += f", Pinnacle's close on {p['pinnacle']:.0%} of those"
+        parts.append(f"{p['name']} {p['season']} ({what})")
+    if not parts:
+        return COVERAGE_NOTE
+    return (
+        COVERAGE_NOTE
+        + " Partial seasons, which count only the matches priced: "
+        + "; ".join(parts)
+        + "."
+    )
+
+
 PRICE = "DraftKings' quoted 1X2 48 hours before kickoff (bought history), break-even = 1/decimal"
 CLV = "entry odds x Pinnacle's margin-free (Shin) close in the same snapshot - 1"
 
@@ -356,7 +405,8 @@ def build_files(lean, edge12, *, from_season: int, names=None, now=None):
         f["note"] = NOTE
         f["book"] = "draftkings"
         f["method"] = "docs/leagues.md, 'Backtests at DraftKings' prices: method'"
-        f["coverage_note"] = COVERAGE_NOTE
+        f["coverage_note"] = coverage_note(f.get("leagues") or {})
+        f["partial_coverage"] = partial_coverage(f.get("leagues") or {})
         f["rule"] = {**f.get("rule", {}), "price": PRICE, "clv": CLV}
         f["draftkings_replay"] = None
     lean_all = pd.concat([b for _, b in lean.values() if len(b)] or [lb.bets(pd.DataFrame(), "")])
