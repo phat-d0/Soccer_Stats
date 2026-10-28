@@ -51,7 +51,9 @@
 #            from the same cached bodies (C judged, B and C+B descriptive); no key. Prints
 #            COMEBACK_RESEARCH_JSON and fails unless runs 40176653428 and 40145295663 reproduce.
 #   prematch-coverage: counts only for a bought pre-match cup design (`design` H2P or H2U):
-#            snapshots with events, matches found, full 1X2 at Pinnacle/DraftKings; no key.
+#            snapshots with events, matches found, full 1X2 at Pinnacle/DraftKings; then the
+#            75%+ favourites trailing at half-time among the priced matches (heavy_more's ESPN
+#            half-times, never the final score; H2U adds the held UCL closes); no key.
 #   cashout-check: read-only checks on the cash-out test's hold line (football-data alone, the
 #            result join, unmatched matches, the matches B/C bought); no key, H never read.
 #   cashout-research: the app's frozen cash-out summary (lab/cashout_research.json) rebuilt
@@ -230,7 +232,7 @@ jobs:
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
       # More data for the 75%+ idea: ESPN cup and extra-league days, cached for good.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'heavy-more' || inputs.task == 'archive-probe' }}
+        if: ${{ inputs.task == 'heavy-more' || inputs.task == 'archive-probe' || inputs.task == 'prematch-coverage' }}
         with:
           path: data/raw/heavy_espn
           key: heavy-espn-none
@@ -438,7 +440,11 @@ jobs:
             cashout-research) uv run python -m soccer_stats.lab.cashout_research \
                      --json out/cashout_research.json ;;
             cashout-check) uv run python -m soccer_stats.lab.cashout_check ;;
-            prematch-coverage) uv run python -m soccer_stats.lab.prematch_coverage --slots "$DESIGN" ;;
+            prematch-coverage)  # counts only; the half-time state from heavy_more's ESPN days
+              git fetch -q --depth=1 origin data-log && git show origin/data-log:odds_history/UCL_closes.jsonl \
+                > ucl_closes.jsonl || true  # the held Champions League closes (H2U)
+              uv run python -m soccer_stats.lab.prematch_coverage --slots "$DESIGN" --trailing \
+                --closes ucl_closes.jsonl ;;
             cashout-plan) uv run python -m soccer_stats.lab.cashout_plan \
                      --b64 --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
