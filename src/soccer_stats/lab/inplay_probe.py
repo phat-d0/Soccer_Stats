@@ -92,12 +92,18 @@ def match_minute(elapsed: float) -> int:
     return min(90, int(elapsed - 17))
 
 
-def espn_live(league: str, get=requests.get, date: str | None = None) -> list[dict]:
+def espn_live(
+    league: str, get=requests.get, date: str | None = None, slug: str | None = None
+) -> list[dict]:
     """ESPN's scoreboard (today, or `date` YYYYMMDD): home, away, score, clock and state
-    per match, plus each goal's side and minute (free)."""
+    per match, plus each goal's side and minute (free). `slug` for a competition outside
+    espn_news.SLUGS."""
     try:
         params = {"dates": date} if date else None
-        r = get(ESPN_BASE.format(slug=SLUGS[league]) + "/scoreboard", params=params, timeout=15)
+        slug = SLUGS.get(league) or slug
+        if not slug:
+            return []
+        r = get(ESPN_BASE.format(slug=slug) + "/scoreboard", params=params, timeout=15)
         body = r.json() if r.status_code == 200 else {}
     except Exception:  # noqa: BLE001  the scores are context, not the question
         return []

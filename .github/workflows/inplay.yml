@@ -1,7 +1,8 @@
 # Half-time in-play snapshots (lead brief 2, item 2; owner-approved 28 Oct, about 580
 # credits a month; src/soccer_stats/inplay_log.py, docs/leagues.md "In-play snapshots").
 # closes.yml dispatches this at each kickoff cluster's first kickoff + 58 and + 78 minutes
-# (close_runs.INPLAY). The run reads data-log's DraftKings logs and in-play call record,
+# (close_runs.INPLAY). The run reads data-log's DraftKings logs, the odds-only competitions'
+# events files (inplay_events: cups, UEFA cups, extra leagues) and the in-play call record,
 # makes one live h2h call (ten books, 1 credit) per league with a kickoff in a snapshot
 # window that hasn't been snapshotted yet, and appends the prices, with ESPN's score
 # then, to data-log odds_log/<code>_inplay_<YYYY-MM>.jsonl. Nothing trades on it.
@@ -34,7 +35,7 @@ jobs:
           git fetch --depth=1 origin data-log || { echo "no data-log yet"; exit 0; }
           this=$(date -u +%Y-%m)
           prev=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
-          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E "^odds_log/([A-Z0-9]+|inplay_calls)_(${this}|${prev})\.jsonl$"); do
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E "^odds_log/([A-Z0-9]+|[A-Z0-9]+_events|inplay_calls)_(${this}|${prev})\.jsonl$"); do
             git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/odds_log/$(basename "$f")"
           done
           ls "$RUNNER_TEMP/odds_log"
