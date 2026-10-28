@@ -2463,6 +2463,31 @@ DraftKings' in-play price implies, enough to make a profit backing it.
   them later with a separately pre-registered cup or extra-league sample would need its own
   rule, written before that sample's prices are seen.
 
+### Design H amendment: buy now, judge with H2 (lead sign-off, 28 Oct; committed before any H snapshot is bought)
+
+The lead signed off design H (commit ee40368, 103 slots, cap 1,236) on 28 Oct, with one
+amendment, because H alone is expected to give only about 83 usable bets. This changes only
+when and how H is judged. The sample, the purchase, the guard and the quote checks above stay
+as frozen.
+
+- **Buy H now.** The snapshots go into the `comeback-odds-*` cache, which is in
+  `cache_archive.PAID`, so they are archived for good.
+- **H's outcomes stay unread.** No `comebacks2 --slots H` run, and nothing that joins H's
+  prices to results, until one of these comes first:
+  - a second sample, **H2** (the cups and the extra leagues), has its own frozen
+    pre-registration and slot list committed; or
+  - **30 Nov 2026**.
+  Only the fetch's own counts may be read before then: calls, credits, the guard and how many
+  snapshots are priced. None of these reads a result.
+- **If H2 is frozen in time: judged sample = H ∪ H2**, under one pass rule written in H2's
+  pre-registration:
+  - at least **136** usable DraftKings bets **and** the ROI range entirely above 0;
+  - the caveat stated up front that cups and minor leagues may behave differently from the
+    leagues above.
+- **If H2 is not frozen by 30 Nov 2026:** H is judged alone under its rule above (≥100 usable
+  bets and the ROI range above 0). The most likely verdict is then "inconclusive".
+- **Why:** this stops H's result from steering which cups or leagues go into H2.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,
