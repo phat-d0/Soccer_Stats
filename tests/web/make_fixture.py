@@ -1122,8 +1122,9 @@ def _passed_study():
 
 # The same replays at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
 # strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape): the
-# real files from data-log when they are there (trimmed), else made up from the Pinnacle replay's own numbers (ROI 2 points and CLV 1
-# point worse, 2020/21 to 2024/25), the Premier League and All only, to stay under 1.5 MB.
+# real files from data-log when they are there (trimmed), else made up from the Pinnacle
+# replay's own numbers (ROI 2 points and CLV 1 point worse, 2020/21 to 2024/25), the Premier
+# League and All only, to stay under 1.5 MB.
 DK_SEASONS = ["2020/21", "2021/22", "2022/23", "2023/24", "2024/25"]
 
 
