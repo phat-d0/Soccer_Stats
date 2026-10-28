@@ -127,3 +127,21 @@ def test_cup_prematch_slots_buy_each_close_once_and_skip_held_seasons():
     assert plan["totals"] == {"kickoff_slots": 3, "snapshots": 2, "credits": 20}
     assert plan["per_cup_season"]["UCL 2024/25"] == {"held": True}
     assert "error" in plan["per_cup_season"]["CDF 2025/26"]
+
+
+def test_uefa_prematch_slots_leave_out_the_held_champions_league_closes():
+    from soccer_stats.lab import heavy_more as hm
+
+    def cup(code, season, kickoff):
+        slot = {"kickoff": kickoff, "matches": [{"home": "A", "away": "B"}]}
+        return {"cup": code, "season": season, "sport": f"soccer_{code.lower()}",
+                "pre_match_list": [slot]}  # fmt: skip
+
+    res = {"cups": [cup("UCL", "2024/25", "2024-10-01T19:00Z"),
+                    cup("UCL", "2023/24", "2023-10-03T19:00Z"),
+                    cup("UEL", "2024/25", "2024-10-03T16:45Z")]}  # fmt: skip
+    plan = hm.cup_prematch_slots(res, held=hm.HELD_UCL, design="H2U")
+    assert plan["design"] == "H2U" and plan["totals"]["snapshots"] == 2
+    assert plan["per_cup_season"]["UCL 2024/25"] == {"held": True}
+    assert {s["league"] for s in plan["slots"]} == {"UCL", "UEL"}
+    assert set(hm.UEFA) == {"UCL", "UEL", "UECL"} and not set(hm.UEFA) & set(hm.DOMESTIC)
