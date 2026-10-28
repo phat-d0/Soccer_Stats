@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v67";
+const APP_VERSION = "v68";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2005,6 +2005,15 @@ function pfSet() {
 // Every trade in every portfolio, live and backtest (for the trade sheet).
 const allTrades = () => portfolios().flatMap((p) => [...(p.live?.trades || []), ...(p.live?.shadow_trades || []), ...(p.live?.dnb_trades || []), ...(p.backtest?.trades || [])]);
 // A shadow entry (Blend Lean's old rule): what the old rule would have bet; never real P/L.
+// A strategy's backcast (owner via the lead, 28 Oct: every new strategy or track starts on the
+// original portfolio's start, backcast from logged prices): paper.py's `backcast` block
+// {applied, started, until, defined_at, trades, settled, from, to, note, descriptive,
+// backcast_from, sigma_from?} on a live section (Blend Lean's new rule keeps lean_started), and
+// `backcast: true` on each backcast trade.
+const bcOf = (x) => (x?.st?.backcast?.applied ? x.st.backcast : null);
+const bcStart = (bc) => (bc?.started || bc?.lean_started ? String(bc.started || bc.lean_started) : null);
+const bcDay = (x) => { const v = bcStart(bcOf(x)); return v ? monthDay(`${v.slice(0, 10)}T12:00:00Z`) : ""; };
+const bcChip = (t) => (t.backcast ? `<span class="chip-shadow chip-backcast">Backcast</span>` : "");
 const shadowChip = (t) => (t.shadow ? `<span class="chip-shadow">Shadow: no trade opened${t.excluded_by === "odds_range" ? " (outside the odds range)" : ""}</span>` : "");
 const PF_STATUS = { live: "Live", testing: "In testing", retired: "Retired", closed: "Closed" };
 
@@ -3339,7 +3348,7 @@ function pfTradeRow(t) {
       : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(t.profit, 2)}</b><small>${t.status}</small>`;
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
-      <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}${shadowChip(t)}
+      <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}${shadowChip(t)}${bcChip(t)}
         <span class="meta">${open && ph !== "upcoming" ? `<b class="phase-tag ${ph}">${PHASE_LABEL[ph]}</b> · ` : ""}${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
         <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span>${pinLine}</span>
       <span class="vals">${right}</span>
@@ -3857,7 +3866,9 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   // A draw no bet track overlays only its parent, both from the day the track started (the
   // parent's line counts its trades opened since then); the parent's own chart leaves it out.
   const family = dnb ? [parent, x] : [parent, ...pfVariants(strats, parent).filter((v) => !isDnbStrat(v))];
-  const dnbFrom = dnb && x.st?.defined_at ? String(x.st.defined_at) : null;
+  // With a backcast both lines start at its start (the portfolio's), marked where the track was set.
+  const bcX = bcOf(x);
+  const dnbFrom = dnb ? (bcX && bcStart(bcX)) || (x.st?.defined_at ? String(x.st.defined_at) : null) : null;
   const sinceDnb = (ts) => (dnbFrom ? ts.filter((t) => t.opened_at && new Date(t.opened_at) >= new Date(dnbFrom)) : ts);
   // A filter's parent is "All"; with a shadow variant (more trades) the parent is the live rule.
   const parentName = dnb ? "1X2 (the record)" : family.slice(1).some((v) => v.st?.adds === "shadow") ? "Live rule" : "All";
@@ -3868,20 +3879,24 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
       curve: settledCurve(s === x ? trades : sinceDnb(strategyLiveSet(cur, s, lg).trades || [])),
     }))
     : null;
-  const definedAt = dnb ? null : family.map((s) => s.st?.defined_at).find(Boolean) || null;
+  const definedAt = dnb ? (bcX ? bcX.defined_at || bcX.until || null : null) : family.map((s) => s.st?.defined_at).find(Boolean) || null;
   // The origin is the first trade opened: the parent's (every version starts there) or this set's.
   // Both lines start together: at the backcast's lean_started (Blend Lean's first trade,
   // owner 24 Oct) or else the first trade any version opened.
   const famStart = () => family.map((s) => firstOpened(strategyLiveSet(cur, s, lg).trades || [])).filter(Boolean).sort()[0];
-  const bcStart = parent.st?.backcast?.lean_started ? String(parent.st.backcast.lean_started).slice(0, 10) : null;
-  const start = dnbFrom ? dnbFrom.slice(0, 10) : overlay ? [bcStart, famStart()].filter(Boolean).sort()[0] : firstOpened(trades, curve);
-  const markLabel = family.slice(1).some((v) => v.st?.adds === "shadow") ? "rule set (judged from here)" : "filter set (judged from here)";
+  const parentBc = bcStart(bcOf(parent));
+  const start = dnbFrom ? dnbFrom.slice(0, 10) : overlay ? [parentBc && parentBc.slice(0, 10), famStart()].filter(Boolean).sort()[0] : firstOpened(trades, curve);
+  const markLabel = dnb || family.slice(1).some((v) => v.st?.adds === "shadow") ? "rule set (judged from here)" : "filter set (judged from here)";
   const chart = overlay && overlay.some((o) => o.curve.length) ? overlayCurveChart(overlay, definedAt, start, markLabel)
     : curve.length ? curveChart(curve, start) : `<p class="muted">The chart starts when the first trade settles.</p>`;
   const judged = dnb ? dnbCompareHtml(x, parent, lg) : x.variantOf ? sinceDefinedHtml(cur, x, parent, lg) : "";
   // Blend Lean's line is the new rule backcast from its first trade (owner, 24 Oct).
-  const bc = x.st?.backcast;
-  const backcast = bc?.applied ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is its own ↳ folder under Moneyline.</p>` : "";
+  // Any other backcast (a draw no bet track, a future strategy) gets the generic sentence.
+  const bc = bcX;
+  const bcSet = bc ? String(bc.defined_at || bc.until).slice(0, 10) : "";
+  const backcast = !bc ? "" : x.key === "lean"
+    ? `<p class="note backcast-note"><b>Backcast before ${esc(dayName(String(bc.until).slice(0, 10)))}:</b> this line counts the ${bc.trades} Lean trade${bc.trades === 1 ? "" : "s"} from before the rule that ${bc.trades === 1 ? "was" : "were"} inside the range (${bc.settled} settled), descriptive only since the range was chosen after seeing them; from then on it is the trades the rule opened. The old rule's line (all odds) is its own ↳ folder under Moneyline.</p>`
+    : `<p class="note backcast-note"><b>Backcast before ${esc(dayName(bcSet))}:</b> this line starts ${bcStart(bc) ? esc(dayName(bcStart(bc).slice(0, 10))) : "at the portfolio's start"}, with the ${bc.trades} trade${bc.trades === 1 ? "" : "s"} (${bc.settled} settled) the rule would have opened before it was set, worked out from the logged prices${bc.sigma_from ? ` (σ from the ${esc(bc.sigma_from)})` : ""} and marked Backcast below. That part is descriptive only: the rule wasn't fixed yet. From ${esc(dayName(bcSet))} on, the trades were opened live; the judged comparison counts only those.</p>`;
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
   const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
@@ -3974,8 +3989,8 @@ function pfHomeHtml() {
 // an archived old rule (Lean's all odds) has the replay at every price as its backtest.
 function stratMeta(cur, x, m) {
   if (x.st?.adds === "shadow") return `Old rule, until ${x.st?.defined_at ? monthDay(x.st.defined_at) : "the change"} · tracked with no bets`;
-  if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick${isDnbStrat(x) ? ", draw no bet" : ""}`;
-  if (isDnbStrat(x)) return "Tracked beside the record · places no bets of its own · a draw returns the stake";
+  if (archivedTrack(x)) return `Archived ${monthDay(PF_ARCHIVED[cur.id]?.since)} · still logs every ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}pick${isDnbStrat(x) ? ", draw no bet" : ""}${bcDay(x) ? ` · since ${bcDay(x)}` : ""}`;
+  if (isDnbStrat(x)) return `Tracked beside the record${bcDay(x) ? ` since ${bcDay(x)}` : ""} · places no bets of its own · a draw returns the stake`;
   const f = x.st?.filter;
   if (x.variantOf && f && isNum(f.max)) return `Only the ${ruleText(x) ? `${ruleText(x).replace("+", "")}-edge ` : ""}picks model (f) gives under a ${pct(f.max)} chance to win${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
   if (x.variantOf) return `Shadow test · places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`;
@@ -3993,7 +4008,7 @@ function strategyFolders(cur, strats, lg) {
     const m = tradeStats(strategyLiveSet(cur, x, lg).trades || []);
     const right = x.st?.error ? `<b class="muted">–</b><small>unavailable</small>` : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.won}–${m.lost} · ${signedPct(m.roi)}</small>`
-      : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
+      : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : bcDay(x) ? `since ${bcDay(x)}` : "no trades"}</small>`;
     // Shadow tests have no backtest of their own; an archived rule has its replay.
     // A draw no bet track quotes the 24 Oct backtest's finding from its rule note.
     const h = x.variantOf && !archivedStrat(x) ? null : backtestHeadline(cur, x, lg);
@@ -4724,6 +4739,7 @@ const TRADE_FIELDS = [
   ["Match", (t) => `${t.home} v ${t.away}`],
   ["Kickoff", (t) => kickoffText(t.kickoff)],
   ["Pick", (t) => tradeLabel(t)],
+  ["Backcast", (t) => `Yes: opened afterwards from the logged ${t.backcast_from === "odds_log" ? "DraftKings prices" : "prices"}, as the rule would have, before the track was set${t.sigma_from ? ` (σ from the ${t.sigma_from})` : ""}. Descriptive only.`, (t) => !!t.backcast],
   ["Strategy", (t) => (isDnb(t) ? `${DNB_STRAT_LABEL[t.strategy] || "Draw no bet"} (tracked beside the record)` : isLean(t) ? "Blend Lean (1σ+)" : "Model 12% (your live test)"), (t) => !isPlayer(t) && !isCorner(t) && t.source === "live" && (leanOn() || !!t.strategy)],
   ["Player", (t) => `${t.player} (${t.team || "?"}${t.position ? `, ${t.position}` : ""})`, "player"],
   ["Result", (t) => (t.actual != null ? `${countWord(t.market, t.actual)}${t.started != null ? (t.started ? ", started" : ", came on") : ""}` : "–"), "player"],

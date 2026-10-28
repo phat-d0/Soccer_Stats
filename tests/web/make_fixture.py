@@ -1648,7 +1648,15 @@ LEAN_SHADOWS = [
 # close 1X2 (DraftKings), Pinnacle's close 1X2, score (None = open)
 FIXTURE_DNB_FROM = "2026-09-27T00:00:00+00:00"
 tr.DNB_FROM = FIXTURE_DNB_FROM
+# Every new track starts on the original portfolio's start, backcast from logged prices (owner
+# via the lead, 28 Oct; Moneyline's backcast block): here 14 Sep, so the first two trades below
+# (opened before FIXTURE_DNB_FROM) are backcast ones.
+FIXTURE_DNB_STARTED = "2026-09-14T00:00:00+00:00"
 DNB_TRADES = [
+    ("E0", "Everton", "Wolves", "2026-09-18T19:00:00Z", "home", (2.1, 3.4, 3.6), 0.7)
+    + ((2.05, 3.4, 3.7), (2.06, 3.45, 3.75), "1-0"),
+    ("SP1", "Sevilla", "Getafe", "2026-09-21T16:00:00Z", "home", (1.8, 3.5, 4.8), 0.86)
+    + ((1.8, 3.6, 4.9), (1.82, 3.6, 5.0), "0-1"),
     ("E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "home", (1.9, 3.6, 4.2), 0.84)
     + ((1.85, 3.7, 4.4), (1.86, 3.75, 4.5), "2-0"),
     ("E0", "West Ham", "Arsenal", "2026-09-29T19:00:00Z", "home", (4.5, 3.9, 1.75), 0.42)
@@ -1684,6 +1692,8 @@ def dnb_trades(rules: dict) -> list[dict]:
                 t, dict(zip(tr.LEAN_MARKETS, close, strict=True)), quoted, kick.isoformat()
             )
         )
+        if opened < pd.Timestamp(FIXTURE_DNB_FROM):
+            t.update(backcast=True, backcast_from="odds_log")
         if score:
             h, a = (int(v) for v in score.split("-"))
             t.update(tr.settle_dnb(t, h, a), result_source="football-data")
@@ -1821,6 +1831,35 @@ def add_lean_strategy(data: dict) -> None:
             for track in tr.DNB_TRACKS.values()
         },
     )
+    add_dnb_backcast(data)
+
+
+def add_dnb_backcast(data: dict) -> None:
+    """Model 12%'s draw no bet track carries Moneyline's `backcast` block (kept when paper.py
+    already built one): its backcast trades, from FIXTURE_DNB_STARTED to the track's start."""
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    sec = next(
+        (x for x in ml["live"].get("strategies") or [] if x.get("key") == "edge12_dnb"), None
+    )
+    if not sec or sec.get("backcast"):
+        return
+    bc = [t for t in ml["live"].get("dnb_trades") or [] if t.get("backcast")]
+    bc = [t for t in bc if t.get("strategy") == "edge12_dnb"]
+    opened = sorted(t["opened_at"] for t in bc)
+    sec["backcast"] = {
+        "applied": bool(bc),
+        "started": FIXTURE_DNB_STARTED,
+        "until": FIXTURE_DNB_FROM,
+        "defined_at": FIXTURE_DNB_FROM,
+        "trades": len(bc),
+        "settled": sum(t["status"] in ("won", "lost") or bool(t.get("push")) for t in bc),
+        "from": opened[0] if opened else None,
+        "to": opened[-1] if opened else None,
+        "note": "Backcast from the logged DraftKings prices: the trades this track would have "
+        "opened from the portfolio's start, before it was defined. Descriptive only.",
+        "descriptive": True,
+        "backcast_from": "odds_log",
+    }
 
 
 def add_second_league(data: dict) -> None:

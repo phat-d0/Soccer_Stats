@@ -894,3 +894,5 @@ details.drv-fold { margin-top: 10px; }
 .dk-test-rows { margin: 6px 0; padding-left: 18px; }
 .dk-test-rows li { margin: 2px 0; }
 .dk-test .muted { display: block; font-size: 12px; }
+/* A backcast trade: opened afterwards from logged prices, before its track was set. */
+.chip-backcast { border-style: dotted; }

@@ -739,7 +739,7 @@ const STEPS = [
   ["portfolio-dnb", async (p) => {
     await pfUp(p);
     const row = (await p.locator('button[data-pfstrat="edge12_dnb"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
+    for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet · since Sep 14", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
     const leanRow = (await p.locator('button[data-pfstrat="lean_dnb"]').innerText()).replace(/\s+/g, " ");
     if (!leanRow.includes("Tracked beside the record · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
     // Model 12% and its track sit in the Archive (owner, 26 Oct); Lean's track stays in the main list.
@@ -765,8 +765,13 @@ const STEPS = [
     if (!draw.includes("Crystal Palace, draw no bet") || !draw.includes("Draw stake back") || /Lost|−\$10/.test(draw)) throw new Error(`draw row: ${draw}`);
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     const m = await p.evaluate(() => tradeStats(strategyLiveSet(pfCurrent(), pfSelected(pfStrategies(pfCurrent())), "").trades));
-    if (m.won !== 2 || m.lost !== 1 || m.draws !== 1 || m.open !== 1) throw new Error(`DNB stats: ${JSON.stringify(m)}`);
-    for (const w of ["2–1", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
+    if (m.won !== 3 || m.lost !== 2 || m.draws !== 1 || m.open !== 1) throw new Error(`DNB stats: ${JSON.stringify(m)}`);
+    // Backcast from the portfolio's start (owner via the lead, 28 Oct): the two trades opened
+    // before the track was set carry a Backcast chip, and a note says that part is descriptive.
+    const chips = await p.locator("#view .trade-row .chip-backcast").count();
+    if (chips !== 2) throw new Error(`backcast chips: ${chips}`);
+    for (const w of ["Backcast before Sun, Sep 27:", "this line starts Mon, Sep 14", "with the 2 trades (2 settled) the rule would have opened before it was set", "the judged comparison counts only those"]) if (!text.includes(w)) throw new Error(`DNB backcast note lacks "${w}"`);
+    for (const w of ["3–2", "1 draw, stake back", "per stake not refunded", "(not refunded)", "ROI counts only the bets that weren't refunded", `Compared with Model 12% (your live test), since`, "descriptive", "CLV per $", "1X2 (the record)", "+1 back", "Descriptive only: the two bet different sides and at different prices", "How this comparison works", "Model 12%, draw no bet. Model 12%'s rule on draw no bet", "side x (1 - 1/draw)", "may carry a bigger margin", "The parent's rule, Model 12% (your live test):", "Draw = stake back"]) {
       if (!text.includes(w)) throw new Error(`DNB view lacks "${w}"`);
     }
     // The track leads with its own note, ahead of the tiles; the parent's rule comes last (lead, 26 Oct).
@@ -781,9 +786,11 @@ const STEPS = [
     // Profit over time: the parent solid (since the track started) and draw no bet dashed.
     const legend = (await p.locator(".pf-curve .curve-legend .lg-item").allInnerTexts()).join("|");
     if (!legend.startsWith("1X2 (the record)") || !legend.includes("Draw no bet")) throw new Error(`DNB legend: ${legend}`);
-    if (await p.locator("[data-scrub='cv'] .filter-lab").count()) throw new Error("DNB chart has a filter marker");
+    // Both lines start at the backcast's start, marked where the track was set.
+    const mark = (await p.locator("[data-scrub='cv'] .filter-lab").allInnerTexts()).join(" ");
+    if (!mark.includes("rule set (judged from here)")) throw new Error(`DNB chart marker: ${mark}`);
     const origin = await p.evaluate(() => plain(scrubCharts.cv.readout(0)));
-    const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").defined_at).slice(0, 10)));
+    const start = await p.evaluate(() => dayName(String(pfById("moneyline").live.strategies.find((s) => s.key === "edge12_dnb").backcast.started).slice(0, 10)));
     if (!origin.startsWith(start)) throw new Error(`DNB overlay origin ${origin} vs ${start}`);
     await scrubCheck(p, "[data-scrub='cv']");
     // The parent's own chart leaves the draw no bet line out.
@@ -791,7 +798,13 @@ const STEPS = [
     if ((await p.locator(".pf-curve .curve-legend").count())) throw new Error("Model 12% chart overlays its DNB track");
     await pfOpenStrat(p, "edge12_dnb");
   }],
+  ["portfolio-dnb-backcast-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Everton|Wolves|dnb"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    if (!text.includes("Backcast") || !text.includes("Yes: opened afterwards from the logged DraftKings prices, as the rule would have, before the track was set. Descriptive only.")) throw new Error(`backcast sheet: ${text.slice(0, 300)}`);
+  }, true],
   ["portfolio-dnb-trade", async (p) => {
+    await closeSheet(p);
     await p.click('button[data-trade="E0|2627|Leeds|Crystal Palace|dnb"]'); await sheet(p);
     const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
     for (const w of ["A draw: stake back.", "Away, draw no bet", "Model 12%, draw no bet (tracked beside the record)", "Built from DraftKings' 1X2", "side × (1 − 1/draw)", "Model chance, draw taken out", "Draw no bet: fixed edge, model alone", "CLV vs DraftKings (per stake not refunded)", "CLV per $ vs DraftKings", "CLV per $ vs Pinnacle", "Draw: stake back"]) {
