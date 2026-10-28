@@ -388,6 +388,26 @@ def cmd_log_cup_odds(args: argparse.Namespace) -> None:
     print(f"Cup odds log: {rows} new rows, {calls} new calls")
 
 
+def cmd_log_inplay(args: argparse.Namespace) -> None:
+    """Half-time in-play snapshots (inplay.yml): one live h2h call per league with a
+    kickoff in a snapshot window, logged to data-log's odds_log/ with ESPN's score."""
+    import json
+    import os
+
+    from soccer_stats import inplay_log
+
+    key = os.environ.get("ODDS_API_KEY", "")
+    try:
+        res = inplay_log.run(Path(args.log_dir), key, out_dir=Path(args.pending))
+    except Exception as exc:  # noqa: BLE001  never print a URL (it holds the key)
+        res = {"calls": 0, "credits": 0, "rows": 0, "stop": type(exc).__name__, "log": []}
+    for line in res.get("log") or []:
+        print(" ", line)
+    print(inplay_log.summary_line(res))
+    text = json.dumps(res, default=str)
+    print("INPLAY_LOG_JSON", text.replace(key, "***") if key else text)
+
+
 def cmd_close_plan(args: argparse.Namespace) -> None:
     """When closes.yml should dispatch publish.yml so close snapshots land in their window
     (reads data-log's odds_log files only: no key, no calls)."""
@@ -2957,6 +2977,13 @@ def main(argv: list[str] | None = None) -> None:
     lco.add_argument("--pending", required=True, help="folder publish wrote rows/calls to")
     lco.add_argument("--log-dir", required=True, help="data-log checkout")
     lco.set_defaults(func=cmd_log_corners)
+
+    lip = sub.add_parser(
+        "log-inplay", help="half-time in-play h2h snapshots (inplay.yml; 1 credit a league)"
+    )
+    lip.add_argument("--log-dir", required=True, help="data-log's odds_log files (read)")
+    lip.add_argument("--pending", required=True, help="folder for the new rows and calls")
+    lip.set_defaults(func=cmd_log_inplay)
 
     eco = sub.add_parser("estimate-corners", help="credits to log team corners (no key)")
     eco.add_argument("--months", default="2026-10,2026-11,2026-12", help="YYYY-MM,YYYY-MM")
