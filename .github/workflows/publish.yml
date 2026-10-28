@@ -132,9 +132,11 @@ jobs:
         continue-on-error: true # the site still publishes; the Portfolio tab says why
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          # Only the odds-only in-play competitions' events lists use it here (free, 0
-          # credits; inplay_events): the step returns early off the default branch.
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          # Given to one command only (log-inplay-events: the odds-only in-play
+          # competitions' free events lists, 0 credits, stops at the first call that
+          # bills). No other command in this step gets the key, and the step returns
+          # early off the default branch.
+          EVENTS_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           if [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]; then
             uv run soccer-stats paper --site _site  # no ledger off the default branch
@@ -174,7 +176,7 @@ jobs:
             # Kickoffs of the odds-only in-play competitions (free events lists, at most
             # every 3 h each), for closes.yml's in-play runs.
             mkdir -p ../log/odds_log
-            uv run soccer-stats log-inplay-events --log-dir ../log/odds_log ||
+            ODDS_API_KEY="$EVENTS_KEY" uv run soccer-stats log-inplay-events --log-dir ../log/odds_log ||
               echo "in-play events lists failed; ledger continues"
             uv run soccer-stats paper --site _site --log-dir ../log
             git -C ../log add -A

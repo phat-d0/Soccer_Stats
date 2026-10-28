@@ -192,3 +192,35 @@ def test_a_paused_competition_makes_no_call(tmp_path):
 
 def test_the_monthly_cap_is_3000():
     assert il.MONTHLY_CAP == 3000
+
+
+def test_a_sports_list_that_bills_stops_before_any_events_list(tmp_path):
+    calls = []
+
+    def get(url, params=None, timeout=None):
+        calls.append(url)
+        return Resp(200, [{"key": "soccer_fa_cup"}], {"x-requests-last": "1"})
+
+    res = ie.fetch(tmp_path, "key", now=NOW, get=get)
+    assert calls == [ie.SPORTS_URL] and res["asked"] == 0 and "cost 1" in res["stop"]
+
+
+def test_only_the_events_command_gets_the_key_in_publish_data_log_step():
+    from pathlib import Path
+
+    import yaml
+
+    wf = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "publish.yml"
+    steps = yaml.safe_load(wf.read_text())["jobs"]["build"]["steps"]
+    step = next(s for s in steps if s.get("name", "").startswith("Paper trades"))
+    assert "ODDS_API_KEY" not in step["env"] and "EVENTS_KEY" in step["env"]
+    lines = [
+        x.strip() for x in step["run"].splitlines() if "EVENTS_KEY" in x or "ODDS_API_KEY" in x
+    ]
+    assert lines == [
+        'ODDS_API_KEY="$EVENTS_KEY" uv run soccer-stats log-inplay-events '
+        "--log-dir ../log/odds_log ||"
+    ]
+    # Off the default branch the step exits before the data-log loop.
+    run = step["run"]
+    assert run.index('"$GITHUB_REF_NAME" != "$DEFAULT_BRANCH"') < run.index("log-inplay-events")
