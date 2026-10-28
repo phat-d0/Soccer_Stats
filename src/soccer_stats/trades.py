@@ -495,6 +495,7 @@ def dnb_rule(parent: dict | None, track: str) -> dict:
             "sigma": sd if _ok(sd) and sd > 0 else None,
             "odds_range": list(LEAN_ODDS_RANGE),
             "odds_range_on": "dnb_price",
+            "fit_made_at": parent.get("fit_made_at"),
             "note": DNB_LEAN_NOTE + " " + DNB_NOTE,
         }
     return {

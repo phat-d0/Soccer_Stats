@@ -177,6 +177,13 @@ TEAM_NAMES = {
     # Italy
     "AC Milan": "Milan",
     "AS Roma": "Roma",
+    # "Inter Milan" matches both "Inter" and "Milan" on a whole word, so the fuzzy match
+    # gives up; the historical feed also says "FC Internazionale" and "Hellas Verona FC"
+    # (found by the DraftKings history backfill, 28 Oct: Serie A matched only ~79%).
+    "Inter Milan": "Inter",
+    "FC Internazionale": "Inter",
+    "Hellas Verona FC": "Verona",
+    "Hellas Verona": "Verona",
     # France
     "AS Monaco": "Monaco",
     "Paris Saint Germain": "Paris SG",

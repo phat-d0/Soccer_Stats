@@ -59,6 +59,19 @@ NOTE = (
 )
 
 
+def unmatched_names(league: str, known: set[str], raw_dir: Path = RAW_DIR) -> dict[str, int]:
+    """Feed names in the cached bodies that don't land on a football-data name in `known`,
+    with how many event-snapshots they appear in: matches with such a team can't be
+    candidates (a TEAM_NAMES gap, not a DraftKings one)."""
+    out: dict[str, int] = {}
+    for path in sorted(history_dir(league, raw_dir).glob("*.json")):
+        for ev in json.loads(path.read_text()).get("data") or []:
+            for n in (ev.get("home_team"), ev.get("away_team")):
+                if n and _team(n, known) not in known:
+                    out[n] = out.get(n, 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]))
+
+
 def load_books(league: str, known: set[str] | None = None, raw_dir: Path = RAW_DIR):
     """Every cached snapshot as rows: at (requested), snapshot_ts, kickoff, home, away and
     `books` = {book: {home, draw, away, last_update}} (football-data names)."""

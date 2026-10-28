@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from soccer_stats import backcast as bc
 from soccer_stats import bands as bd
 from soccer_stats import calibration as cal
 from soccer_stats import edge12_backtest as e12b
@@ -1642,14 +1643,14 @@ def new_rule_trades(real: list[dict]) -> list[dict]:
 def lean_backcast(
     trades: list[dict], started: str | None = None, real: list[dict] | None = None
 ) -> dict:
-    """The new-rule line's backcast part: `applied`, the trades opened before
-    tr.LEAN_RANGE_FROM (count, settled, first and last opened), `lean_started` (Lean's
-    first trade, in or out of the range: both lines start there), the note and, with
+    """The new-rule line's backcast part (backcast.block's shape: applied, started, until,
+    defined_at = tr.LEAN_RANGE_FROM, the trades opened before it with settled, from and to,
+    note, descriptive), `lean_started` (Lean's first trade, in or out of the range: both
+    lines start there; also `started`) and, with
     `real` (every real Lean trade), the pre-rule summaries `new_rule` (in range), `old_rule`
     (all odds) and `cut` (outside the range), descriptive only."""
     since = _utc(tr.LEAN_RANGE_FROM)
     before = [t for t in trades if not _opened_since(t, since)]
-    opened = sorted(str(t.get("opened_at")) for t in before if t.get("opened_at"))
     extra = {}
     if real is not None:
         old = [
@@ -1662,19 +1663,15 @@ def lean_backcast(
             "new_rule": portfolio_section(before)["summary"],
             "old_rule": portfolio_section(old)["summary"],
             "cut": portfolio_section([t for t in old if t["id"] not in kept])["summary"],
-            "descriptive": True,
         }
-    return {
-        "applied": True,
-        "until": tr.LEAN_RANGE_FROM,
-        "trades": len(before),
-        "settled": sum(1 for t in before if t.get("status") in ("won", "lost")),
-        "from": opened[0] if opened else None,
-        "to": opened[-1] if opened else None,
-        "lean_started": started,
-        "note": LEAN_BACKCAST_NOTE,
+    return bc.block(
+        before,
+        tr.LEAN_RANGE_FROM,
+        note=LEAN_BACKCAST_NOTE,
+        started=started or bc.START,
+        lean_started=started,  # kept for the app's older readers (same as `started`)
         **extra,
-    }
+    )
 
 
 def lean_shadow_section(
@@ -2177,6 +2174,9 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
             res = res[res["league"] == lg]
         log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
         books = ol.load(log_dir, lg, kind=ol.BOOKS) if log is not None else None
+        # The tracks backcast from 14 Oct on the odds log (owner, 28 Oct): opened once,
+        # then closed and settled below like every other trade.
+        events += pdnb.backcast(ledger, log, lg, rules[lg], ref)
         events += pdnb.update_ledger(
             ledger,
             cards,
@@ -2192,8 +2192,12 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
         )
         trades += list(ledger.values())
     n = pdnb.append_events(log_dir, events)
-    opened = sum(1 for e in events if e.get("type") == "open")
-    print(f"Draw no bet tracks: {len(trades)} trades, {opened} opened this update")
+    opened = sum(1 for e in events if e.get("type") == "open" and not e.get("backcast"))
+    back = sum(1 for e in events if e.get("type") == "open" and e.get("backcast"))
+    print(
+        f"Draw no bet tracks: {len(trades)} trades ({sum(map(bc.is_backcast, trades))} "
+        f"backcast), {opened} opened this update" + (f", {back} backcast" if back else "")
+    )
     return n, trades
 
 

@@ -1201,6 +1201,10 @@ def cmd_backtest_dk_prices(args: argparse.Namespace) -> None:
             hist = dpb.load_books(code, known)
             lr, lbets, er, ebets = dpb.league_reports(code, preds, pins, hist)
             lr["xg_weight"] = er["xg_weight"] = weight
+            missing = dpb.unmatched_names(code, known)
+            lr["unmatched_names"] = er["unmatched_names"] = missing
+            if missing:
+                print(f"{lgs.name(code)}: feed names not matched to football-data's: {missing}")
             print(f"\n=== {lgs.name(code)}: {len(hist)} event-snapshots ===")
             for line in dpb.headline(code, lr, er):
                 print(line)
