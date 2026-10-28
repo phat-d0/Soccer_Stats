@@ -33,7 +33,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from soccer_stats.cup_odds import HIST_COST, URL, _call, balance, iso, redact, stamp
+from soccer_stats.cup_odds import BASE, HIST_COST, URL, _call, balance, iso, redact, stamp
 from soccer_stats.data import RAW_DIR
 from soccer_stats.player_goal_odds import CappedBudget
 
@@ -154,6 +154,17 @@ def _append_call(cache_dir: Path, row: dict) -> None:
         f.write(json.dumps(row) + "\n")
 
 
+def known_sports(get: Callable, api_key: str) -> set[str] | None:
+    """Every sport key the API lists, inactive ones included (free call); None if the list
+    can't be read or is empty."""
+    try:
+        r = get(f"{BASE}/sports", params={"apiKey": api_key, "all": "true"}, timeout=30)
+        keys = {x["key"] for x in r.json()} if r.status_code == 200 else set()
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return None
+    return keys or None
+
+
 def held(cache_dir: Path, slot: dict, answered: set) -> bool:
     return body_path(cache_dir, slot).exists() or (slot["sport"], slot["request_at"]) in answered
 
@@ -217,6 +228,11 @@ def run(
     budget.left = balance(get, api_key)
     res["left_before"] = budget.left
     budget.log.append(f"Credits left before the run: {budget.left}")
+    # A slot whose sport key the API doesn't list can't be bought (H2's ROU, 28 Oct: HTTP 404
+    # "Unknown sport"): its league-season counts as not priced, like the guard's.
+    sports = known_sports(get, api_key)
+    if sports is None:
+        budget.log.append("Sports list not read: sport keys unchecked")
     end = time.monotonic() + minutes * 60 if minutes else None
     for s in pending:
         if end is not None and time.monotonic() > end:
@@ -225,6 +241,14 @@ def run(
             budget.log.append(f"Stopping: {res['stopped']}")
             break
         key = guard_key(s)
+        if sports is not None and s["sport"] not in sports:
+            if key not in guard:
+                guard[key] = {"blocked": True, "at": iso(pd.Timestamp.now(tz="UTC")),
+                              "note": f"sport key {s['sport']} unknown to the API"}  # fmt: skip
+                _write_guard(cache_dir, guard)
+                budget.log.append(f"Unknown sport: {key} ({s['sport']}) counts as not priced")
+            res["not_priced"][key] = res["not_priced"].get(key, 0) + 1
+            continue
         if blocked(key):
             res["not_priced"][key] = res["not_priced"].get(key, 0) + 1
             continue
