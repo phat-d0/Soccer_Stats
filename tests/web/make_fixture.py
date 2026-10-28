@@ -1021,7 +1021,9 @@ def _cashout_study():
     return {
         "id": "cashout_ht",
         "portfolio": "comebacks",
-        "name": "Cash out when the heavy underdog reaches 50%",
+        "name": "Cash out a heavy underdog once it reaches 50%",
+        "sample_note": "Matches already bought for the comeback tests (designs B, C and H) are "
+        "left out, so no outcome is read twice. Two descriptive samples put them back.",
         "kind": "cashout",
         "title": "Cash-out test: heavy underdogs at every score state",
         "question": "Does cashing out a heavy-underdog bet once its in-play chance reaches 50% "
@@ -1036,7 +1038,23 @@ def _cashout_study():
         "primary_rule": {"t": 0.5, "m": 0.05, "s": 0.02},
         "test_verdict": {"verdict": "fail", "decisions": 336, "growth_minus_hold": -0.00031}
         | {"ci95": [-0.0007, 0.00005], "below_zero": False},
-        "designs": {"primary": primary, "band_3_4": second},
+        "designs": {
+            "primary": primary,
+            "band_3_4": second,
+            # Research's file adds wider samples as descriptive designs (lead, 28 Oct); one
+            # with the judged rule's numbers, one with its size alone.
+            "with_bc": {
+                "role": "descriptive",
+                "label": "With B and C put back (already read, half-time only)",
+                "positions": 2900,
+                "variants": [v for v in second["variants"]],
+            },
+            "season_2526": {
+                "role": "descriptive",
+                "label": "2025/26 only (nothing excluded)",
+                "positions": 1100,
+            },
+        },
         "curves": {"stake": 0.02, "start": 1000, "points": points},
         "bets": bets,
         "why": [

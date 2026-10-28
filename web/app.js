@@ -4434,7 +4434,10 @@ function studyCashoutHtml(sd) {
   const others = Object.entries(sd.designs).filter(([k]) => k !== co.key).map(([, x]) => {
     const xr = (x.variants || []).find((v) => isNum(v.t) && Math.abs(v.t - pr.t) < 1e-9 && Math.abs(v.m - pr.m) < 1e-9);
     const xh = (x.variants || []).find((v) => v.name === "hold");
-    return xr ? `<li>${esc(x.label)}: ${num(x.positions)} bets, ${num(xr.decisions)} cash-outs; hold ${signedPct(xh?.mean)}, cash out ${signedPct(xr.mean)} per $1, growth vs hold ${growthText(xr.growth?.[co.sk]?.minus_hold)} a bet (descriptive).</li>` : "";
+    // Any further design (a wider or narrower sample) is one descriptive line: its judged-rule
+    // numbers when it has them, else its size.
+    if (!xr) return `<li>${esc(x.label || "Another sample")}${isNum(x.positions) ? `: ${num(x.positions)} bets` : ""}${xh ? `, hold ${signedPct(xh.mean)} per $1` : ""} (descriptive).</li>`;
+    return `<li>${esc(x.label)}: ${num(x.positions)} bets, ${num(xr.decisions)} cash-outs; hold ${signedPct(xh?.mean)}, cash out ${signedPct(xr.mean)} per $1, growth vs hold ${growthText(xr.growth?.[co.sk]?.minus_hold)} a bet (descriptive).</li>`;
   }).join("");
   const cnt = d.counts || {};
   const tv = sd.test_verdict || {};
@@ -4443,6 +4446,7 @@ function studyCashoutHtml(sd) {
   const betRows = bets.slice(0, shown).map((x) => `<tr><td>${esc(cbDate(x.date))}</td><td>${esc(leagueShort(x.lg))}</td><td>${esc(x.home)} v ${esc(x.away)}<span class="meta">${esc(MOMENT_NAME[x.moment] || "")}${isNum(x.q) ? ` at ${pct(x.q)}` : ""}</span></td><td class="num">${cbOdds(x.odds)}</td><td>${x.won ? '<b class="pos-text">Won</b>' : "Lost"}<span class="meta">hold ${usd(x.hold, 2)} · cash ${usd(x.cash, 2)}</span></td></tr>`).join("");
   return `
     <div class="verdict ${sd.verdict === "fail" ? "neg" : sd.verdict === "pass" ? "pos" : ""}">${esc(sd.verdict_text || "")}</div>
+    ${sd.sample_note ? `<p class="note co-sample"><b>The sample.</b> ${esc(sd.sample_note)}</p>` : ""}
     <p class="note">${esc(sd.live_note || "No live trades: this was tested on bought historical in-play prices. A pass would only justify proposing a paper cash-out track; nothing changes live either way.")}</p>
     ${tiles}
     <p class="note">The judged test: cash out at ${pct(pr.t)} with a ${pct(pr.m)} cash-out margin, staking ${pct(pr.s)} of the bankroll a bet${isNum(tv.decisions) ? `, on ${num(tv.decisions)} decisions` : ""}. It passes only if the growth difference's range sits above 0 on at least 300 decisions.${isNum(cnt.matches) ? ` ${num(cnt.matches)} matches in the sample${cnt.not_priced ? `; ${num(cnt.not_priced)} had no fresh in-play price` : ""}${cnt.unmatched ? `, ${num(cnt.unmatched)} weren't found in the snapshots` : ""}, and these are left out.` : ""}</p>
@@ -4450,7 +4454,7 @@ function studyCashoutHtml(sd) {
     ${grid ? `<div class="section-title">By threshold and margin</div>${grid}<p class="note">Growth vs hold is the average gain in log bankroll a bet at a ${pct(pr.s)} stake, with its 95% range; below 0 means cashing out grew the bankroll more slowly than holding. Only the row marked judged decides the verdict; the rest are descriptive.</p>` : ""}
     ${kellyTable}
     ${cal ? `<div class="section-title">Is the in-play price right?</div>${cal}<p class="note">Bets grouped by the in-play chance at the moment the rule looked. Blue: the underdog won at least as often as the price implied; red: less. Cashing out can only pay if the price undervalues the leading underdog by more than the margin.</p>` : ""}
-    ${others ? `<ul class="slopes">${others}</ul>` : ""}
+    ${others ? `<div class="section-title">Other samples (descriptive)</div><ul class="slopes">${others}</ul>` : ""}
     ${Object.keys(d.by_league || {}).length ? `<div class="section-title">By league</div>${rowsTable(d.by_league, "League", (k) => leagueName(k))}` : ""}
     ${Object.keys(d.by_season || {}).length ? `<div class="section-title">By season</div>${rowsTable(d.by_season, "Season", (k) => k)}<p class="note">League and season rows use the judged rule and are descriptive.</p>` : ""}
     ${bets.length ? `<details class="fold mk-fold cb-bets"${state.cbShown ? " open" : ""}><summary>The ${num(bets.length)} cash-outs, newest first</summary>

@@ -465,13 +465,7 @@ RESEARCH_STUDIES = [
         "id": "cashout_ht",
         "file": "cashout_research.json",
         "portfolio": "comebacks",
-        "name": "Cash out at half-time",
-    },
-    {
-        "id": "underdog_50",
-        "file": "underdog_cashout_research.json",
-        "portfolio": "comebacks",
-        "name": "Cash out when the heavy underdog reaches 50%",
+        "name": "Cash out a heavy underdog once it reaches 50%",
     },
     {
         "id": "strategy_search",

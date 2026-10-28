@@ -846,8 +846,8 @@ the owner's baseball app, so the balance can drop without any run here.
     missing or unreadable file is skipped, so Research adds a study by committing its file;
     its own try; log "Research studies: <id> <verdict>, …"). Registered: `comeback_ht`
     (`comeback_research.json`), `heavy_fav_ht` (`heavy_favourites_research.json`),
-    `cashout_ht` (`cashout_research.json`), `underdog_50` (`underdog_cashout_research.json`),
-    `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
+    `cashout_ht` (`cashout_research.json`, the cash-out test: "Cash out a heavy underdog once it
+    reaches 50%"), `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
     study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
     `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
     `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`, still
@@ -859,8 +859,10 @@ the owner's baseball app, so the balance can drop without any run here.
     minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
     gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
     growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
-    hold, cash}]} (bankrolls, ≤ 200 points) and `bets` (the judged rule's cash-outs: {date, lg,
-    home, away, odds, won, moment, q, hold, cash}). The file shape is under
+    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
+    line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
+    (shown first, above the tiles: why the sample leaves matches out). The file shape is under
     "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):

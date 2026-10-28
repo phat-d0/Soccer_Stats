@@ -1119,7 +1119,7 @@ const STEPS = [
     const hv = await rowText("heavy_fav_ht");
     for (const w of ["Running", "Pre-registered Oct 4", "planned 410 bets", "up to 4,300 credits"]) if (!hv.includes(w)) throw new Error(`running row lacks "${w}": ${hv}`);
     const co = await rowText("cashout_ht");
-    for (const w of ["Cash out when the heavy underdog reaches 50%", "Failed", "148,200 credits", "growth a bet vs holding", "cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
+    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "148,200 credits", "growth a bet vs holding", "cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
     const ps = await rowText("fixture_pass");
     for (const w of ["Passed", "640 credits", "per $1"]) if (!ps.includes(w)) throw new Error(`passed row lacks "${w}": ${ps}`);
   }],
@@ -1208,7 +1208,7 @@ const STEPS = [
     await pfUp(p); await p.click('button[data-pfstrat="cashout_ht"]');
     await p.click('button[data-pf="result"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No: cashing out at 50% lowered", "Decisions", "cash-outs at 50%", "Growth vs holding, 2% stake", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 336 decisions", "Bankroll: hold vs cash out (2% a bet)", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Underdogs at 3.0 to 4.0", "Partial cash-out to the Kelly stake"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
+    for (const w of ["No: cashing out at 50% lowered", "Decisions", "cash-outs at 50%", "Growth vs holding, 2% stake", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 336 decisions", "Bankroll: hold vs cash out (2% a bet)", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Underdogs at 3.0 to 4.0", "Partial cash-out to the Kelly stake", "The sample. Matches already bought", "Other samples (descriptive)", "With B and C put back (already read, half-time only): 2,900 bets", "2025/26 only (nothing excluded): 1,100 bets (descriptive)"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
     if ((await p.locator(".co-grid tbody tr").count()) !== 9) throw new Error("the 3 x 3 grid");
     if ((await p.locator(".co-grid tr.co-primary").count()) !== 1) throw new Error("one judged row");
     if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 2) throw new Error("hold and cash-out lines");
