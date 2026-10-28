@@ -237,11 +237,19 @@ def trailing(plan: dict, cache_dir: Path, espn_dir: Path, closes: Path | None = 
     """Counts per cup and season: matches, priced, heavy (75%+), heavy and trailing at HT."""
     groups: dict[tuple, Counter] = defaultdict(Counter)
     idx: dict[str, dict] = {}
+    found: list[dict] = []  # the trailing heavy favourites themselves (H2's sample)
 
-    def add(cup: str, kickoff: str, row: dict) -> None:
+    def add(cup: str, kickoff: str, row: dict, home: str = "", away: str = "",
+            price: tuple | None = None, e: dict | None = None) -> None:  # fmt: skip
         y = season_of(kickoff)
         for g in (("all",), ("cup", cup), ("season", y), ("cup_season", cup, y)):
             groups[g].update(row)
+        if row["heavy_trailing"]:
+            side, chance = favourite(price[1])
+            found.append({"league": cup, "kickoff": kickoff, "home": home, "away": away,
+                          "espn_id": (e or {}).get("id"), "favourite": side,
+                          "p_fav": round(chance, 4), "ht": (e or {}).get("ht"),
+                          "price": price[0]})  # fmt: skip
 
     for s in plan["kickoff_slots"]:
         slug = hm.CUPS[s["league"]][1]
@@ -253,21 +261,23 @@ def trailing(plan: dict, cache_dir: Path, espn_dir: Path, closes: Path | None = 
         ko = pd.Timestamp(s["kickoff"])
         for m in s["matches"]:
             hit = find_side(events, m["home"], m["away"], ko)
-            ht = (idx[slug].get((m["home"], m["away"], s["kickoff"])) or {}).get("ht")
-            add(s["league"], s["kickoff"], _row(priced(*hit) if hit else None, ht))
+            e = idx[slug].get((m["home"], m["away"], s["kickoff"])) or {}
+            price = priced(*hit) if hit else None
+            add(s["league"], s["kickoff"], _row(price, e.get("ht")), m["home"], m["away"],
+                price, e)  # fmt: skip
     if plan.get("design") == "H2U":
         now = now or pd.Timestamp.now(tz="UTC")
         held = ucl_closes(closes)
         slug = hm.CUPS["UCL"][1]
         idx.setdefault(slug, half_times(espn_dir, slug))
-        for (_, _, ko), e in sorted(idx[slug].items(), key=lambda kv: kv[0][2]):
+        for (home, away, ko), e in sorted(idx[slug].items(), key=lambda kv: kv[0][2]):
             if ("UCL", season_of(ko)) not in hm.HELD_UCL or not e["completed"]:
                 continue
             if not e["ht"] or e["ht"][0] == e["ht"][1] or pd.Timestamp(ko) >= now:
                 continue
             books = held.get(e["id"], {})
             price = next(((b, books[b]) for b in BOOKS if b in books), None)
-            add("UCL", ko, {**_row(price, e["ht"]), "held_close": 1})
+            add("UCL", ko, {**_row(price, e["ht"]), "held_close": 1}, home, away, price, e)
     return {
         "design": plan.get("design"),
         "min_fav": hm.MIN_FAV,
@@ -277,6 +287,7 @@ def trailing(plan: dict, cache_dir: Path, espn_dir: Path, closes: Path | None = 
         "by_cup_season": {
             f"{g[1]} {g[2]}": dict(v) for g, v in sorted(groups.items()) if g[0] == "cup_season"
         },
+        "trailing_list": sorted(found, key=lambda r: (r["kickoff"], r["league"], r["home"])),
     }
 
 
@@ -340,7 +351,8 @@ def main(argv: list[str] | None = None) -> None:
         espn = Path(args.espn_dir) if args.espn_dir else Path(RAW_DIR) / hm.SUBDIR
         tr = trailing(plan, cache, espn, Path(args.closes) if args.closes else None)
         print(trailing_report(tr))
-        print("PREMATCH_TRAILING_JSON " + json.dumps(tr))
+        print("PREMATCH_TRAILING_JSON " + json.dumps({k: v for k, v in tr.items()
+                                                      if k != "trailing_list"}))  # fmt: skip
 
 
 if __name__ == "__main__":

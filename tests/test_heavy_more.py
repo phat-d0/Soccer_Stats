@@ -145,3 +145,25 @@ def test_uefa_prematch_slots_leave_out_the_held_champions_league_closes():
     assert plan["per_cup_season"]["UCL 2024/25"] == {"held": True}
     assert {s["league"] for s in plan["slots"]} == {"UCL", "UEL"}
     assert set(hm.UEFA) == {"UCL", "UEL", "UECL"} and not set(hm.UEFA) & set(hm.DOMESTIC)
+
+
+def test_extra_league_survives_a_season_without_heavy_favourites(monkeypatch, tmp_path):
+    # run 40744037363: an empty list mask selected no columns, so trail["kickoff"] failed
+    fd = pd.DataFrame({
+        "season": ["2023", "2024"], "date": pd.to_datetime(["2023-05-06", "2024-05-04"]),
+        "home": ["Big", "Even"], "away": ["Small", "Odd"], "fthg": [2.0, 1.0], "ftag": [1.0, 1.0],
+        "ph": [1.2, 2.6], "pd": [7.0, 3.3], "pa": [15.0, 2.8],
+        "ah": [1.2, 2.6], "ad": [7.0, 3.3], "aa": [15.0, 2.8],
+    })  # fmt: skip
+    days = {"20230506": {"events": [event("7", "2023-05-06T15:00Z", "Big FC", "Small FC",
+                                          (2, 1), ht=(0, 1))]},
+            "20240504": {"events": [event("8", "2024-05-04T15:00Z", "Even FC", "Odd FC",
+                                          (1, 1), ht=(0, 0))]}}  # fmt: skip
+    monkeypatch.setattr(hm, "read_extra", lambda code, raw: fd)
+    monkeypatch.setattr(hm.cups, "scoreboard_day", lambda slug, day, *a, **k: days.get(day))
+    rows = hm.extra_league("AUT", tmp_path, None, {}, pd.Timestamp("2026-10-28", tz="UTC"))
+    by = {r["season"]: r for r in rows}
+    assert by["2024"]["heavy"] == 0 and by["2024"]["trailing_list"] == []
+    t = by["2023"]["trailing_list"]
+    assert by["2023"]["trailing"] == 1 and t[0]["espn_id"] == "7" and t[0]["ht"] == [0, 1]
+    assert t[0]["favourite"] == "home" and t[0]["kickoff"] == "2023-05-06T15:00Z"

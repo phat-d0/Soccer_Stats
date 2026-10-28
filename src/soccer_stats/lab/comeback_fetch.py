@@ -44,6 +44,7 @@ SLOT_FILES = {
     "X": "cashout_slots.json",  # the cash-out test (cashout_plan), docs/lab.md
     "H2P": "h2_cup_prematch_slots.json",  # the domestic cups' pre-match prices (heavy_more)
     "H2U": "h2_uefa_prematch_slots.json",  # the UEFA cups' pre-match prices (heavy_more)
+    "H2": "comeback_h2_slots.json",  # 75%+ favourites in the cups and extra leagues (h2_slots)
 }
 SLOTS_FILE = Path(__file__).with_name(SLOT_FILES["B"])
 CACHE = "comeback_odds"  # under RAW_DIR; the Actions cache `comeback-odds-*` holds it

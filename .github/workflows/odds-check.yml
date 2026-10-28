@@ -54,6 +54,9 @@
 #            snapshots with events, matches found, full 1X2 at Pinnacle/DraftKings; then the
 #            75%+ favourites trailing at half-time among the priced matches (heavy_more's ESPN
 #            half-times, never the final score; H2U adds the held UCL closes); no key.
+#   h2-slots: design H2's slot list (75%+ favourites trailing at half-time in the cups, UEFA
+#            and heavy_more's extra leagues; pre-match prices and half-time only); no key.
+#            Prints H2_SLOTS_SHA256 and H2_SLOTS_JSON. Run it on team/research (heavy-espn-*).
 #   cashout-check: read-only checks on the cash-out test's hold line (football-data alone, the
 #            result join, unmatched matches, the matches B/C bought); no key, H never read.
 #   cashout-research: the app's frozen cash-out summary (lab/cashout_research.json) rebuilt
@@ -128,9 +131,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -232,7 +235,7 @@ jobs:
       # Restored for the fetch (never buy a slot twice) and the analysis; same path as the save.
       # More data for the 75%+ idea: ESPN cup and extra-league days, cached for good.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'heavy-more' || inputs.task == 'archive-probe' || inputs.task == 'prematch-coverage' }}
+        if: ${{ inputs.task == 'heavy-more' || inputs.task == 'archive-probe' || inputs.task == 'prematch-coverage' || inputs.task == 'h2-slots' }}
         with:
           path: data/raw/heavy_espn
           key: heavy-espn-none
@@ -250,7 +253,7 @@ jobs:
         with:
           name: archive-probe
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' || inputs.task == 'cashout-check' || inputs.task == 'prematch-coverage' }}
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' || inputs.task == 'cashout-check' || inputs.task == 'prematch-coverage' || inputs.task == 'h2-slots' }}
         with:
           path: data/raw/comeback_odds
           key: comeback-odds-none
@@ -259,7 +262,7 @@ jobs:
       # Paid odds: if the cache missed, rebuild it from the permanent archive before
       # anything can buy (docs/caches.md).
       - name: Rebuild the paid comeback-odds cache from the archive if it missed
-        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' || inputs.task == 'cashout-check' || inputs.task == 'prematch-coverage' }}
+        if: ${{ inputs.task == 'comeback-fetch' || inputs.task == 'comebacks2' || inputs.task == 'comeback-research' || inputs.task == 'cashout' || inputs.task == 'cashout-test' || inputs.task == 'cashout-research' || inputs.task == 'cashout-check' || inputs.task == 'prematch-coverage' || inputs.task == 'h2-slots' }}
         uses: ./.github/actions/paid-archive-restore
         with:
           name: comeback-odds
@@ -445,6 +448,12 @@ jobs:
                 > ucl_closes.jsonl || true  # the held Champions League closes (H2U)
               uv run python -m soccer_stats.lab.prematch_coverage --slots "$DESIGN" --trailing \
                 --closes ucl_closes.jsonl ;;
+            h2-slots)  # free: design H2's slot list (cups, UEFA, extra leagues); no result read
+              mkdir -p data/raw/heavy_espn  # the save step always has a folder to save
+              git fetch -q --depth=1 origin data-log && git show origin/data-log:odds_history/UCL_closes.jsonl \
+                > ucl_closes.jsonl || true
+              uv run python -m soccer_stats.lab.h2_slots --closes ucl_closes.jsonl --minutes 90 \
+                --out out/comeback_h2_slots.json ;;
             cashout-plan) uv run python -m soccer_stats.lab.cashout_plan \
                      --b64 --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
@@ -566,7 +575,7 @@ jobs:
           path: data/raw/espn_timelines
           key: espn-timelines-${{ github.run_id }}
       - uses: actions/cache/save@v4
-        if: ${{ always() && inputs.task == 'heavy-more' }}
+        if: ${{ always() && (inputs.task == 'heavy-more' || inputs.task == 'h2-slots') }}
         with:
           path: data/raw/heavy_espn
           key: heavy-espn-${{ github.run_id }}
