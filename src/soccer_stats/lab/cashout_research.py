@@ -1,13 +1,21 @@
 """The cash-out test for the app (lead brief, 28 Oct): builds `cashout_research.json`, a
-frozen summary of the pre-registered cash-out test (design X, docs/lab.md "Cash-out test") in
-the shape of `comeback_research.json`, which the Portfolio view reads.
+frozen summary of the pre-registered cash-out test (design X, docs/lab.md "Cash-out test"),
+in the shape the app's research studies read (`kind: "cashout"`, UI PR #134).
 
 No key: re-runs `cashout_test.build` and `analyse` on the cached snapshot bodies
 (`comeback-odds-*`) and football-data, so every number is recomputed the frozen way. `EXPECTED`
-holds the published numbers of run 40706645115, and the build fails unless they reproduce.
-This is a rebuild for the app, not a second analysis. `odds-check.yml`
-`task=cashout-research` prints `CASHOUT_RESEARCH_JSON` (without the bets) and the whole file
-gzipped in base64 chunks with its SHA-256; the committed file is that text.
+holds the published numbers of the analysis run (`RUNS["analysis"]`, the rerun after the
+result-join fix), and the build fails unless they reproduce. This is a rebuild for the app,
+not a second analysis.
+
+Beside the judged band it carries descriptive designs the lead asked for (28 Oct): the
+half-time cash-out with the matches designs B and C had bought put back (already read, not
+judged; they have half-time snapshots only), the frozen sample at half-time only to compare
+with, and 2025/26 alone, where no B or C match was left out. Design H's matches are never
+joined to a result.
+
+`odds-check.yml` `task=cashout-research` prints `CASHOUT_RESEARCH_JSON` (without the bets) and
+the whole file gzipped in base64 chunks with its SHA-256; the committed file is that text.
 """
 
 from __future__ import annotations
@@ -34,7 +42,9 @@ from soccer_stats.lab.heavy_favourites import season_name
 FILE = Path(__file__).with_name("cashout_research.json")
 B64_CHUNK = 60000
 S = f"{ct.PRIMARY['s']:.2f}"
-# Run 40706645115's published numbers (`CASHOUT_TEST_JSON`), which the rebuild must match.
+START = 1000
+MAX_POINTS = 200
+# The analysis run's published numbers (`CASHOUT_TEST_JSON`), which the rebuild must match.
 EXPECTED = {
     "counts": {
         "matches": 11864,
@@ -46,25 +56,22 @@ EXPECTED = {
     "verdict": {
         "verdict": "fail",
         "decisions": 570,
-        "growth_minus_hold": 0.000312,
-        "ci95": [-0.00011, 0.00073],
+        "growth_minus_hold": 0.000199,
+        "ci95": [-0.00022, 0.00062],
     },
     "primary_positions": 5401,
     "band_3_4_positions": 4748,
 }
-LABELS = {
-    "primary": "Underdogs at 4.0 or longer (the judged band)",
-    "band_3_4": "Underdogs at 3.0 to 4.0",
-}
-ROLES = {"primary": "judged", "band_3_4": "descriptive"}
 RUNS = {
     "plan": "40646353530",
     "dry_run": "40647360245",
     "fetch": ["40647535315", "40702312973"],
-    "analysis": "40706645115",
+    "first_analysis": "40706645115",
+    "checks": "40708947532",
+    "analysis": "40709968765",
 }
 COST = {"purchase": 150910, "snapshots_bought": 15091, "snapshots_reused": 197, "total": 150910}
-MOMENT_LABELS = {"ht": "half-time", "m70": "70th minute"}
+MOMENT_LABELS = {"ht": "Half-time", "m70": "70th minute"}
 NOTES = [
     "Entry: $1 on the underdog at its quoted pre-match close (Pinnacle's, else the market "
     "average's). The in-play price is DraftKings' moneyline, margin removed, from the odds "
@@ -73,12 +80,20 @@ NOTES = [
     "A cash-out pays entry odds x the in-play chance x (1 - fee). The fee stands in for the "
     "margin a book takes on a cash-out offer; 5% is the realistic case.",
     "Growth is the long-run rate a bankroll grows at when every bet risks the same share of "
-    "it (2% here). It is the fair way to compare holding with cashing out, because cashing out "
-    "mainly cuts the swings rather than the average.",
-    "The in-play price overrated leading underdogs a little (55%+ at half-time: 63% won vs "
-    "72% implied), so a free cash-out helped. A 5% fee ate that edge.",
-    "Every by-league, by-season, fee and threshold line is descriptive; only the primary rule "
-    "was judged.",
+    "it (2% here). It is the fair way to compare holding with cashing out, because cashing "
+    "out mainly cuts the swings rather than the average.",
+    "The sample left out every match designs B, C and H had bought, as pre-registered. Those "
+    "were favourites trailing at half-time, so in 2024/25's main leagues most underdogs "
+    "leading at half-time are missing. The left-out set depends only on the pre-match price "
+    "and the half-time score, both known when the rule decides, so the cash-out against hold "
+    "comparison stays fair for the matches kept; the hold level does not describe 'backing "
+    "4.0+ underdogs' in general.",
+    "A first run (40706645115) joined a pair that meets twice at the same ground in a season "
+    "(Scotland, and the Belgian and Greek play-offs) to its first meeting's result: 90 "
+    "positions. The join now matches the kickoff too, and this file is the rerun with that "
+    "fix.",
+    "Every by-league, by-season, fee, threshold and extra-design line is descriptive; only "
+    "the primary rule was judged.",
     "The matches sit in seasons the strategy search keeps locked. This test read them for the "
     "cash-out question only; the search's holdout stays unread for pre-match strategies.",
 ]
@@ -88,125 +103,88 @@ def _r(x: float | None, n: int = 4) -> float | None:
     return None if x is None else round(float(x), n)
 
 
-def rule_rows(band: dict) -> list[dict]:
-    """The hold vs cash-out table by threshold and fee (and the Kelly partial), at 2%."""
-    out = []
-    for v in band["variants"]:
-        g = v["growth"][S]
-        kind = "hold" if v["name"] == "hold" else ("kelly" if "kelly" in v["name"] else "cash")
-        if kind == "kelly" and v.get("s") != ct.PRIMARY["s"]:
-            continue
-        out.append(
-            {
-                "kind": kind,
-                "t": v.get("t"),
-                "m": v.get("m"),
-                "primary": kind == "cash"
-                and v.get("t") == ct.PRIMARY["t"]
-                and v.get("m") == ct.PRIMARY["m"],
-                "decisions": v["decisions"],
-                "at_ht": v.get("at_ht"),
-                "at_m70": v.get("at_m70"),
-                "mean": v["mean"],
-                "mean_ci95": v["ci95"],
-                "sd": v["sd"],
-                "growth": g["mean"],
-                "growth_minus_hold": None if kind == "hold" else g["minus_hold"],
-                "growth_minus_hold_ci95": g["minus_hold_ci95"],
-                "drawdown": {k: x["drawdown"] for k, x in v["growth"].items()},
-            }
-        )
+def _pct(x: float) -> str:
+    return f"{x * 100:.1f}%".replace("-", "−")
+
+
+def _signed(x: float, nd: int = 1) -> str:
+    return (f"{x * 100:+.{nd}f}%").replace("-", "−")
+
+
+def by_group(pos: list[dict], field: str) -> dict:
+    """{key: {positions, decisions, hold, cash, growth_minus_hold}} under the judged rule."""
+    t, m, s = ct.PRIMARY["t"], ct.PRIMARY["m"], ct.PRIMARY["s"]
+    out = {}
+    for k in sorted({p[field] for p in pos}):
+        x = sorted((p for p in pos if p[field] == k), key=lambda p: p["kickoff"])
+        base = np.array([ct.hold(p) for p in x])
+        got = [ct.rule(p, t, m) for p in x]
+        prof = np.array([g[0] for g in got])
+        name = f"{k}/{str(k + 1)[-2:]}" if field == "season" else str(k)
+        out[name] = {
+            "positions": len(x),
+            "decisions": sum(g[1] is not None for g in got),
+            "hold": _r(base.mean()),
+            "cash": _r(prof.mean()),
+            "growth_minus_hold": _r((np.log1p(s * prof) - np.log1p(s * base)).mean(), 6),
+        }
     return out
 
 
-def stake_rows(band: dict) -> list[dict]:
-    """Hold and the primary rule at each stake: growth, its difference and drawdowns."""
-    hold = band["variants"][0]
-    prim = next(
-        v
-        for v in band["variants"]
-        if v.get("t") == ct.PRIMARY["t"] and v.get("m") == ct.PRIMARY["m"]
-    )
-    return [
-        {
-            "stake": float(s),
-            "hold_growth": hold["growth"][s]["mean"],
-            "cash_growth": prim["growth"][s]["mean"],
-            "growth_minus_hold": prim["growth"][s]["minus_hold"],
-            "growth_minus_hold_ci95": prim["growth"][s]["minus_hold_ci95"],
-            "hold_drawdown": hold["growth"][s]["drawdown"],
-            "cash_drawdown": prim["growth"][s]["drawdown"],
-        }
-        for s in hold["growth"]
-    ]
+def design(pos: list[dict], role: str, label: str, **extra) -> dict:
+    """analyse_band's dict plus the app's fields."""
+    band = ct.analyse_band(pos)
+    return {
+        "role": role,
+        "label": label,
+        **band,
+        "by_league": by_group(pos, "league") if pos else {},
+        "by_season": by_group(pos, "season") if pos else {},
+        **extra,
+    }
 
 
-def group(pos: list[dict]) -> dict:
-    """One table line: hold and the primary rule per $1 and their growth difference at 2%."""
-    pos = sorted(pos, key=lambda p: p["kickoff"])
-    base = np.array([ct.hold(p) for p in pos])
-    got = [ct.rule(p, ct.PRIMARY["t"], ct.PRIMARY["m"]) for p in pos]
-    prof = np.array([g[0] for g in got])
+def halftime_only(pos: list[dict]) -> list[dict]:
+    """The same positions with no 70th-minute quote, so a rule can cash out at half-time only."""
+    return [{**p, "q_m70": None} for p in pos]
+
+
+def curves(pos: list[dict]) -> dict:
+    """Bankrolls staking 2% of themselves on each bet in kickoff order: hold and the judged
+    rule, at the end of each day, thinned to MAX_POINTS (the last day always kept)."""
     s = ct.PRIMARY["s"]
-    diff = np.log1p(s * prof) - np.log1p(s * base)
-    return {
-        "positions": len(pos),
-        "won": _r(np.mean([p["won"] for p in pos])),
-        "decisions": sum(g[1] is not None for g in got),
-        "hold": _r(base.mean()),
-        "hold_ci95": ct._boot(base),
-        "cash": _r(prof.mean()),
-        "growth_minus_hold": _r(diff.mean(), 6),
-        "growth_minus_hold_ci95": ct._boot(diff),
-    }
-
-
-def design_block(key: str, pos: list[dict], band: dict) -> dict:
-    hold = band["variants"][0]
-    return {
-        "role": ROLES[key],
-        "label": LABELS[key],
-        "positions": band["positions"],
-        "won": band["won"],
-        "avg_entry": band["avg_entry"],
-        "quoted_ht": band["quoted_ht"],
-        "quoted_m70": band["quoted_m70"],
-        "hold": {
-            "mean": hold["mean"],
-            "ci95": hold["ci95"],
-            "sd": hold["sd"],
-            "growth": hold["growth"][S]["mean"],
-            "drawdown": {k: x["drawdown"] for k, x in hold["growth"].items()},
-        },
-        "rules": rule_rows(band),
-        "by_stake": stake_rows(band),
-        "by_band": [{**r, "label": MOMENT_LABELS[r["moment"]]} for r in band["calibration"]],
-        "by_league": [
-            {"code": lg, **group([p for p in pos if p["league"] == lg])}
-            for lg in sorted({p["league"] for p in pos})
-        ],
-        "by_season": [
-            {"season": f"{y}/{str(y + 1)[-2:]}", **group([p for p in pos if p["season"] == y])}
-            for y in sorted({p["season"] for p in pos})
-        ],
-    }
+    hold = cash = float(START)
+    days: dict[str, dict] = {}
+    for p in sorted(pos, key=lambda p: (p["kickoff"], p["league"], p["home"])):
+        hold *= 1 + s * ct.hold(p)
+        cash *= 1 + s * ct.rule(p, ct.PRIMARY["t"], ct.PRIMARY["m"])[0]
+        day = p["kickoff"][:10]
+        days[day] = {"date": day, "hold": round(hold, 2), "cash": round(cash, 2)}
+    pts = list(days.values())
+    if len(pts) > MAX_POINTS:
+        idx = np.unique(np.linspace(0, len(pts) - 1, MAX_POINTS).round().astype(int))
+        pts = [pts[i] for i in idx]
+    return {"stake": s, "start": START, "points": pts}
 
 
 def bet_rows(pos: list[dict]) -> list[dict]:
-    """The judged band's positions in kickoff order, compact, for the profit curve: `cash`
-    is the primary rule's profit per $1 and `at` the moment it cashed out (None = held)."""
+    """The judged rule's cash-outs in kickoff order: hold and cash are profit per $1."""
     out = []
     for p in sorted(pos, key=lambda p: (p["kickoff"], p["league"], p["home"])):
         prof, at = ct.rule(p, ct.PRIMARY["t"], ct.PRIMARY["m"])
+        if at is None:
+            continue
         out.append(
             {
                 "date": p["kickoff"][:10],
                 "lg": p["league"],
+                "home": p["home"],
+                "away": p["away"],
                 "odds": round(p["entry"], 2),
                 "won": bool(p["won"]),
-                "q_ht": _r(p["q_ht"], 3),
-                "q_m70": _r(p["q_m70"], 3),
-                "at": at,
+                "moment": at,
+                "q": _r(p[f"q_{at}"], 3),
+                "hold": round(ct.hold(p), 4),
                 "cash": round(prof, 4),
             }
         )
@@ -247,72 +225,166 @@ def bc_slots(x_slots: list[dict]) -> list[dict]:
     return list(slots.values())
 
 
-def halftime_only(pos: list[dict]) -> dict:
-    """Hold vs cash out at half-time only (T 0.50, each fee), growth at 2%."""
-    pos = sorted(pos, key=lambda p: p["kickoff"])
-    if not pos:
-        return {"positions": 0}
-    base = np.array([ct.hold(p) for p in pos])
-    s = ct.PRIMARY["s"]
-    out = {
-        "positions": len(pos),
-        "won": _r(np.mean([p["won"] for p in pos])),
-        "led_cases": sum(p["q_ht"] is not None and p["q_ht"] >= ct.PRIMARY["t"] for p in pos),
-        "hold": _r(base.mean()),
-        "hold_ci95": ct._boot(base),
-        "rules": [],
+def h_count(x_slots: list[dict], season: int) -> int:
+    """Design H's matches in X's leagues in one season (counted, never joined to a result)."""
+    leagues = {s["league"] for s in x_slots}
+    h, _ = xp.used_matches(("H",))
+    return sum(1 for lg, ko, _ in h if lg in leagues and c2.season_of(ko) == season)
+
+
+def won_row(label: str, pos: list[dict]) -> dict:
+    return {
+        "label": label,
+        "n": len(pos),
+        "unit": "bets",
+        "won": _r(np.mean([p["won"] for p in pos])) if pos else None,
+        "ref": _r(np.mean([1 / p["entry"] for p in pos])) if pos else None,
+        "hold": _r(np.mean([ct.hold(p) for p in pos])) if pos else None,
     }
-    for m in ct.MARGINS:
-        got = [ct.rule({**p, "q_m70": None}, ct.PRIMARY["t"], m) for p in pos]
-        prof = np.array([g[0] for g in got])
-        diff = np.log1p(s * prof) - np.log1p(s * base)
-        out["rules"].append(
-            {
-                "m": m,
-                "decisions": sum(g[1] is not None for g in got),
-                "cash": _r(prof.mean()),
-                "growth_minus_hold": _r(diff.mean(), 6),
-                "growth_minus_hold_ci95": ct._boot(diff),
-            }
-        )
-    return out
 
 
-def put_back(pos: list[dict], cache_dir: Path, fd) -> dict:
-    """Descriptive, already read and not judged (lead, 28 Oct): the half-time cash-out with
-    the matches B and C had bought put back. They have half-time snapshots only."""
-    x_slots = json.loads(cf.slots_path("X").read_text())["matches"]
-    extra = bc_slots(x_slots)
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "bc.json"
-        path.write_text(json.dumps({"matches": extra}))
-        bc_pos, counts = ct.build(path, cache_dir, fd)
-    out = {
-        "label": "Already read, not judged",
-        "note": (
-            "The sample left out every match designs B and C had already bought: favourites "
-            "trailing at half-time, so underdogs leading at half-time. Put back here at "
-            "half-time only (they have no 70th-minute snapshot), with the same frozen code."
+def assemble(pos: list[dict], res: dict, bc_pos: list[dict], h_2025: int) -> dict:
+    primary = [p for p in pos if p["entry"] >= ct.PRIMARY_DOG]
+    second = [p for p in pos if p["entry"] < ct.PRIMARY_DOG]
+    bc4 = [p for p in bc_pos if p["entry"] >= ct.PRIMARY_DOG]
+    y2025 = [p for p in primary if p["season"] == 2025]
+    v, c = res["verdict"], res["counts"]
+    t, m, s = ct.PRIMARY["t"], ct.PRIMARY["m"], ct.PRIMARY["s"]
+    designs = {
+        "primary": design(
+            primary, "judged", "Underdogs at 4.0 or longer (the judged band)", counts=c
         ),
-        "matches_put_back": sum(len(s["matches"]) for s in extra),
-        "counts": counts,
+        "band_3_4": design(second, "descriptive", "Underdogs at 3.0 to 4.0"),
+        "put_back": design(
+            halftime_only(primary + bc4),
+            "descriptive",
+            "With B and C put back (already read, half-time only)",
+            put_back=len(bc4),
+        ),
+        "frozen_ht": design(
+            halftime_only(primary),
+            "descriptive",
+            "The frozen sample at half-time only (to compare with the line above)",
+        ),
+        "season_2025": design(
+            y2025,
+            "descriptive",
+            f"2025/26 only (no B or C match left out; design H's {h_2025} are)",
+        ),
     }
-    for band, keep in (
-        ("primary", lambda p: p["entry"] >= ct.PRIMARY_DOG),
-        ("band_3_4", lambda p: p["entry"] < ct.PRIMARY_DOG),
-    ):
-        mine = [p for p in pos if keep(p)]
-        theirs = [p for p in bc_pos if keep(p)]
-        out[band] = {
-            "frozen": halftime_only(mine),
-            "put_back_only": halftime_only(theirs),
-            "with_put_back": halftime_only(mine + theirs),
-        }
-    return out
+    hold = designs["primary"]["variants"][0]
+    rule = next(x for x in designs["primary"]["variants"] if x.get("t") == t and x.get("m") == m)
+    g = rule["growth"][S]
+    pb = designs["put_back"]
+    pb_rule = next(x for x in pb["variants"] if x.get("t") == t and x.get("m") == m)
+    pb_g = pb_rule["growth"][S]
+    h25 = designs["season_2025"]["variants"][0]
+    hold_bc = float(np.mean([ct.hold(p) for p in primary + bc4]))
+    calib = designs["primary"]["calibration"]
+    top = next((r for r in calib if r["moment"] == "ht" and r["lo"] >= 0.55), None)
+    lo, hi = g["minus_hold_ci95"]
+    verdict_text = (
+        f"No. First, why holding looks so bad: holding these bets lost {_pct(-hold['mean'])} "
+        "of every dollar, but the sample left out the matches earlier tests had already "
+        "bought, and those were mostly underdogs leading at half-time. Put them back and "
+        f"holding loses {_pct(-hold_bc)}; in 2025/26, where no B or C match was left out, "
+        f"{_pct(-h25['mean'])}. Now the test: cashing out once the underdog's in-play chance "
+        f"reached {t:.0%}, paying a {m:.0%} fee, beat holding by "
+        f"{_signed(g['minus_hold'], 3)} bankroll growth a bet at {s:.0%} stakes (range "
+        f"{_signed(lo, 3)} to {_signed(hi, 3)}) on {v['decisions']} cash-outs: not "
+        "distinguishable from zero. With the left-out matches back (half-time only, already "
+        f"read, not judged) it was {_signed(pb_g['minus_hold'], 3)} on "
+        f"{pb_rule['decisions']} cash-outs. A free cash-out helps a little, because the "
+        "in-play price slightly overrates a leading underdog; a realistic fee eats that."
+    )
+    why = [
+        {
+            "title": "Why holding lost so much",
+            "text": (
+                "The sample left out every match designs B, C and H had bought, as "
+                "pre-registered, so no match was bought twice. B and C's matches were "
+                "favourites trailing at half-time: underdogs leading at half-time. In "
+                "2024/25's eight main leagues that took out most of them, and they won about "
+                "half the time, so the hold line here is lower than backing every long shot "
+                "would be. Because the left-out set depends only on the pre-match price and "
+                "the half-time score, the cash-out against hold comparison is still fair for "
+                "the matches kept. The rows compare how often the underdog won with the "
+                "pre-match price's chance (with its margin)."
+            ),
+            "ref_name": "Pre-match price",
+            "rows": [
+                won_row("The sample, 4.0+", primary),
+                won_row("Left out because B or C bought them", bc4),
+                won_row("The sample with them put back", primary + bc4),
+                won_row("2025/26 only (no B or C match left out)", y2025),
+            ],
+        },
+        {
+            "title": "Is the in-play price right?",
+            "text": (
+                "Grouped by DraftKings' in-play chance at the moment the rule looked. Where "
+                "the underdog was well placed (55% or more at half-time) it won less often "
+                "than the price said"
+                + (f" ({_pct(top['won'])} vs {_pct(top['implied'])})" if top else "")
+                + ", so selling the bet at that price was a small gain before any fee."
+            ),
+            "ref_name": "In-play price",
+            "rows": [
+                {
+                    "label": f"{MOMENT_LABELS[r['moment']]}, "
+                    + (f"{r['lo']:.0%}+" if r["hi"] >= 1 else f"{r['lo']:.0%}–{r['hi']:.0%}"),
+                    "n": r["n"],
+                    "unit": "bets",
+                    "won": r["won"],
+                    "ref": r["implied"],
+                }
+                for r in calib
+            ],
+        },
+        {
+            "title": "What the fee does",
+            "text": (
+                "A cash-out at a fair price leaves the average return where it was and only "
+                "cuts the swings. The gain here came from the price overrating the leading "
+                "underdog by a few points; a 5% fee costs about as much, and at 10% cashing "
+                "out loses. Nothing changes live."
+            ),
+            "rows": [],
+        },
+    ]
+    return {
+        "kind": "cashout",
+        "title": "Cashing out a winning underdog",
+        "question": (
+            "When a long-shot underdog bet is going well, does cashing it out at the in-play "
+            "price beat holding it to the end?"
+        ),
+        "rule": (
+            f"$1 on an underdog at {ct.PRIMARY_DOG:.1f} or longer at its pre-match close. Cash "
+            f"out at half-time, or else at the 70th minute, once DraftKings' in-play chance "
+            f"for it reaches {t:.0%}, paying a {m:.0%} cash-out fee. Judged on long-run "
+            f"growth at {s:.0%} stakes against holding, on at least {ct.MIN_DECISIONS} "
+            "cash-outs."
+        ),
+        "verdict": v["verdict"],
+        "verdict_text": verdict_text,
+        "test_verdict": v,
+        "primary_rule": {"t": t, "m": m, "s": s},
+        "closed_at": "2026-10-28",
+        "preregistered_at": "2026-10-28",
+        "preregistered": {"X": "26ae427"},
+        "cost": COST,
+        "runs": RUNS,
+        "designs": designs,
+        "curves": curves(primary),
+        "bets": bet_rows(primary),
+        "why": why,
+        "notes": NOTES,
+    }
 
 
 def check(res: dict) -> list[str]:
-    """Differences from run 40706645115 (empty = reproduced exactly)."""
+    """Differences from the analysis run (empty = reproduced exactly)."""
     bad = []
     for k, v in EXPECTED["counts"].items():
         if res["counts"][k] != v:
@@ -327,62 +399,6 @@ def check(res: dict) -> list[str]:
     return bad
 
 
-def assemble(pos: list[dict], res: dict, extra: dict | None = None) -> dict:
-    primary = [p for p in pos if p["entry"] >= ct.PRIMARY_DOG]
-    second = [p for p in pos if p["entry"] < ct.PRIMARY_DOG]
-    v, c = res["verdict"], res["counts"]
-    hold = res["primary"]["variants"][0]
-    return {
-        "title": "Cashing out a winning underdog",
-        "question": (
-            "When a long-shot underdog bet is going well, does cashing it out at the in-play "
-            "price beat holding it to the end?"
-        ),
-        "rule": (
-            "$1 on an underdog at 4.0 or longer at its pre-match close. Cash out at half-time, "
-            "or else at the 70th minute, once DraftKings' in-play chance for it reaches 50%, "
-            "paying a 5% cash-out fee. Judged on long-run growth at 2% stakes against holding."
-        ),
-        "verdict": v["verdict"],
-        "verdict_text": (
-            f"No. Held to the end, these bets lost {-hold['mean']:.0%} of every dollar, so at "
-            f"2% stakes the bankroll shrank about {-hold['growth'][S]['mean']:.2%} a bet. "
-            f"Cashing out once the underdog reached a 50% chance, paying a 5% fee, shrank it "
-            f"{-(hold['growth'][S]['mean'] + v['growth_minus_hold']):.2%} a bet: better by "
-            f"{v['growth_minus_hold']:.3%} (range {v['ci95'][0]:+.3%} to {v['ci95'][1]:+.3%}) "
-            f"on {v['decisions']} cash-outs, which can't be told apart from zero. A free "
-            "cash-out helped a little, because the in-play price slightly overrates a leading "
-            "underdog, but a realistic fee eats that. The real problem is the bet itself."
-        ),
-        "closed_at": "2026-10-28",
-        "cost": COST,
-        "runs": RUNS,
-        "preregistered": {"x": "26ae427", "analysis": "e4db2ef"},
-        "primary": {
-            "t": ct.PRIMARY["t"],
-            "m": ct.PRIMARY["m"],
-            "s": ct.PRIMARY["s"],
-            "dog": ct.PRIMARY_DOG,
-            "min_decisions": ct.MIN_DECISIONS,
-            "decisions": v["decisions"],
-            "growth_minus_hold": v["growth_minus_hold"],
-            "ci95": v["ci95"],
-        },
-        "counts": c,
-        "designs": {
-            "primary": design_block("primary", primary, res["primary"]),
-            "band_3_4": design_block("band_3_4", second, res["band_3_4"]),
-        },
-        "bets": bet_rows(primary),
-        "bets_note": (
-            "Every judged position (underdog 4.0+) in kickoff order. Hold profit per $1 is "
-            "odds - 1 when won, else -1; `cash` is the primary rule's, `at` when it cashed out."
-        ),
-        "put_back": extra,
-        "notes": NOTES,
-    }
-
-
 def canonical(out: dict) -> str:
     """The committed text: indented like comeback_research.json, each bet on one line."""
     head = json.dumps({**out, "bets": "@BETS@"}, indent=1)
@@ -393,10 +409,15 @@ def canonical(out: dict) -> str:
 def build(cache_dir: Path | None = None) -> tuple[dict, list[str]]:
     cache_dir = Path(cache_dir) if cache_dir else Path(RAW_DIR) / cf.CACHE
     path = cf.slots_path("X")
-    fd = c2.load_fd(json.loads(path.read_text())["matches"], any_price=True)
+    x_slots = json.loads(path.read_text())["matches"]
+    fd = c2.load_fd(x_slots, any_price=True)
     pos, counts = ct.build(path, cache_dir, fd)
     res = ct.analyse(pos, counts)
-    out = assemble(pos, res, put_back(pos, cache_dir, fd))
+    with tempfile.TemporaryDirectory() as tmp:
+        extra = Path(tmp) / "bc.json"
+        extra.write_text(json.dumps({"matches": bc_slots(x_slots)}))
+        bc_pos, _ = ct.build(extra, cache_dir, fd)
+    out = assemble(pos, res, bc_pos, h_count(x_slots, 2025))
     bad = check(res)
     out["reproduces"] = not bad
     return out, bad
@@ -408,12 +429,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--json", default="")
     args = p.parse_args(argv)
     out, bad = build(Path(args.cache_dir) if args.cache_dir else None)
-    pr = out["primary"]
+    tv = out["test_verdict"]
     print(
-        f"  primary: {pr['decisions']} decisions, growth difference {pr['growth_minus_hold']} "
-        f"{pr['ci95']}; bets listed: {len(out['bets'])}"
+        f"  judged: {tv['decisions']} decisions, growth difference {tv['growth_minus_hold']} "
+        f"{tv['ci95']}; cash-outs listed: {len(out['bets'])}"
     )
-    print("Reproduces run 40706645115: " + ("yes" if not bad else "NO"))
+    for k, d in out["designs"].items():
+        print(f"  {k}: {d['label']}: {d['positions']} positions")
+    print(f"Reproduces run {RUNS['analysis']}: " + ("yes" if not bad else "NO"))
     for line in bad:
         print("  " + line)
     summary = {k: v for k, v in out.items() if k != "bets"}
