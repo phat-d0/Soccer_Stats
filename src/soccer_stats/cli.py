@@ -112,9 +112,20 @@ def cmd_log_odds(args: argparse.Namespace) -> None:
     from soccer_stats import odds_log
 
     data = json.loads((Path(args.site) / "data.json").read_text())
-    rows = odds_log.rows_from_data(data, pd.Timestamp.now(tz="UTC"), args.league)
+    now = pd.Timestamp.now(tz="UTC")
+    rows = odds_log.rows_from_data(data, now, args.league)
     n = odds_log.append(Path(args.log_dir), rows, args.league)
     print(f"Odds log: {n} new rows ({len(rows)} priced fixture markets this build)")
+    books = odds_log.book_rows_from_data(data, now, args.league)
+    nb = odds_log.append(Path(args.log_dir), books, args.league, kind=odds_log.BOOKS)
+    counts: dict[str, int] = {}
+    for r in books:
+        counts[r["book"]] = counts.get(r["book"], 0) + 1
+    print(
+        f"Every-book log: {nb} new rows ({len(books)} book prices this build: "
+        + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none")
+        + ")"
+    )
 
 
 def cmd_log_team_totals(args: argparse.Namespace) -> None:

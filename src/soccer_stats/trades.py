@@ -1083,7 +1083,11 @@ def summarize(trades: pd.DataFrame) -> dict:
         avg_odds=float(settled["odds"].mean()),
         max_drawdown=max_drawdown(settled["profit"]),
     )
-    for col, key in (("clv_dk", "dk"), ("clv_pinnacle", "pinnacle")):
+    for col, key in (
+        ("clv_dk", "dk"),
+        ("clv_pinnacle", "pinnacle"),
+        ("clv_pinnacle_live", "pinnacle_live"),
+    ):
         if col in settled and settled[col].notna().any():
             v = settled[col].dropna()
             out[f"clv_{key}"] = float(v.mean())

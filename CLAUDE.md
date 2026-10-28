@@ -58,7 +58,7 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   priced; there, a snapshot kind pauses 7 days after six empty calls over two or more runs).
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
 - One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
-  corner cap 750 credits a month (550 until 24 Oct; estimate 676 a month with E2/E3,
+  corner cap 20,000 credits a month since 28 Oct (750 before, 550 until 24 Oct; estimate 676 a month with E2/E3,
   `backfill.yml` run 40089304166).
 - Shadow filter "below 60%" (owner, 23 Oct; pre-registered in `docs/totals.md` "Shadow filter:
   below 60%", commit e0b0bcd): each track's trades with model chance given no push < 0.60, shown
@@ -71,7 +71,7 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   `docs/totals.md` "Cup corners model").
 
 **Team totals:** logged for data only (FanDuel team totals plus the match total at FanDuel,
-Bovada and Pinnacle; cap 800 a month). Nothing is scored until the round-13 gate (50 settled
+Bovada and Pinnacle; cap 20,000 a month since 28 Oct, 800 before). Nothing is scored until the round-13 gate (50 settled
 matches for each anchor; `docs/totals.md` "Team totals against the main market").
 
 **Players:** Anytime goalscorer is testing; its forward check (2026/27 from 10 Oct) is locked
@@ -143,7 +143,9 @@ the app): Blend Lean (new rule) 7 trades (7 settled), all odds (old rule) 22 (20
 12% 196 (161 settled), Model 12% draw no bet 25 (all open), Lean draw no bet 0; corners 135 (134
 settled).
 
-**Credits:** 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
+**Credits:** the owner upgraded the plan to about 5M a month (28 Oct): 4,938,760 left at the
+05:50 UTC publish that day. Caps are no longer the constraint; the 3,000 reserve floor stays.
+Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
 40204253352; the rest of the drop is live spend); 11,066 earlier on 25 Oct (after the 6,070-credit comeback design C fetch, run
 40176031079, from 17,136); 17,163 earlier on 25 Oct (after the 1,920-credit design B fetch, run
@@ -206,7 +208,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 | File | What | Credits |
 | --- | --- | --- |
-| `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 800 a month), 1 per corner snapshot (cap 750 a month, eight leagues), plus live player lines near kickoff |
+| `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
@@ -235,8 +237,13 @@ the owner's baseball app, so the balance can drop without any run here.
   the default cap is 0.
 - Billing: one credit per market per region per call; up to ten books in one call count as
   one region. Historical event odds cost about 10 per region per market; empty snapshots less.
-- **Match odds: DraftKings h2h** (`odds_feed.MARKETS = "h2h"`, 1 credit a refresh; DraftKings
-  lists no main soccer `totals`). The budget still counts 2 a call (`BUDGET_COST`).
+- **Match odds: h2h at ten books in one call** (owner, 28 Oct; `odds_feed.BOOKMAKERS`:
+  draftkings, pinnacle, fanduel, betmgm, williamhill_us (Caesars), betrivers, fanatics, espnbet,
+  bovada, betonlineag). Up to ten books bill as one region, so it should still be 1 credit a
+  refresh; publish prints each league's `x-requests-last` ("Odds call cost …"). DraftKings
+  stays the book trades open at; the others feed the every-book log, Pinnacle's live close and
+  the best US price. DraftKings lists no main soccer `totals`. The budget still counts 2 a
+  call (`BUDGET_COST`).
 - **Team totals:** `/events/{id}/odds`, `bookmakers=fanduel,bovada,pinnacle`,
   `markets=team_totals,totals`, 2 credits a call, E0, SP1, D1, I1, F1 (`team_totals.py`).
   Pinnacle quotes no goal team totals on this API.
@@ -387,22 +394,36 @@ the owner's baseball app, so the balance can drop without any run here.
 - `match_markets.py`: research only. 1X2, O/U 2.5 and Asian handicap vs Pinnacle; `clean_prices`.
 - `odds_feed.py`: live DraftKings odds and the credit budget. `policy_floor`: E0 every 1 h (30 min
   within 2 h of a kickoff); matchday leagues nothing without a kickoff within 48 h, then 3 h,
-  1 h within 6 h, 30 min within 2 h. `refresh_interval_hours` splits the budget; E0 always
-  budgets with share 1. Matchday leagues keep `MATCHDAY_RESERVE_CREDITS` 3,000 (on
+  1 h within 6 h, 15 min within 2 h (`KICKOFF_INTERVAL_HOURS` 0.25 since 28 Oct; 30 min
+  before). `refresh_interval_hours` can split the budget, but since the ~5M plan (owner, 28 Oct)
+  every league budgets with share 1, so refreshes follow the policy floor. Matchday leagues keep `MATCHDAY_RESERVE_CREDITS` 3,000 (on
   `latest_meta`), E0 `RESERVE_CREDITS` 20. `TEAM_NAMES` maps Odds API spellings to
   football-data's for every league (a missing one shows as a duplicate card;
   `tests/test_leagues.py` lists League One/Two's 48 clubs); `name_check` for free name checks;
   `estimate_credits` and `estimate_snapshot_credits` replay scheduled runs (CLI
   `estimate-credits`, `estimate-team-totals`); `TEAM_TOTAL_LEAGUES` = E0, SP1, D1, I1, F1.
+  `BOOKMAKERS` (the ten), `SHARP_BOOK` pinnacle, `US_BOOKS`; `book_prices(ev)` = every book's
+  h2h {home, draw, away, last_update}, `best_prices(books)` = {side: {odds, book}} among the US
+  books; `parse_odds` adds a `books` column, `apply_odds` carries it, and cards get `books` and
+  `best_us`.
 - `odds_log.py`: the DraftKings log (`log-odds`, from the built `data.json`, no API calls): one
   row per fixture and market with prices, margin-free `fair`, `bookmaker`, `fetched_at`
   (`time_source`), `downloaded_at`, `logged_at`, the model's `p` and `p_bet`; deduplicated;
-  quotes at or after kickoff skipped. `last_before(...)` = the live close.
+  quotes at or after kickoff skipped. `last_before(...)` = the live close. The every-book log
+  (owner, 28 Oct): `book_rows_from_data` (one row per fixture and book from the card's
+  `books`, field `book`), written to `odds_log/<code>_books_<YYYY-MM>.jsonl` (`append(...,
+  kind=BOOKS)`, `load(..., kind=BOOKS)`; the DraftKings log never reads it);
+  `last_before(..., book=)` picks one book. `log-odds` writes both ("Every-book log: …").
+  `paper.pinnacle_live` gives every live h2h trade (and the DNB tracks) Pinnacle's live close
+  from it (`pinnacle_live_close_prices`, `pinnacle_live_fetched_at`,
+  `pinnacle_live_minutes_before`, `clv_pinnacle_live`; the summaries add `clv_pinnacle_live`),
+  and new match trades record `best_us_odds` and `best_us_book` (`paper.best_us`).
 - `odds_history.py`: historical match odds (cached).
 - `team_totals.py`: live team totals plus the match total. `due_snapshot`: "look" 18–30 h before
   kickoff, "close" within 30 min (75 min when no later scheduled run is left). Event ids from
   the cached DraftKings body; an (event, snapshot) in the call record is never fetched again.
-  Before each call: balance − 2 ≥ 3,000 and month spend + 2 ≤ `MONTHLY_CAP` 800. An error
+  Before each call: balance − 2 ≥ 3,000 and month spend + 2 ≤ `MONTHLY_CAP` 20,000 (800
+  until 28 Oct). An error
   part-way keeps the calls made and logs only the error type. Rows: per book, team (or `team`
   null and `side: "match"` for `market: "totals"`), line, both sides, Shin `fair_over/under`,
   `margin`, `fetched_at`, `minutes_before`, `p_model_over`; rows without `market` are team
@@ -410,7 +431,7 @@ the owner's baseball app, so the balance can drop without any run here.
   `odds-check.yml task=team-totals`): the round-13 pre-registered test (anchors `fanduel_anchor`,
   `pinnacle_anchor`, the model, a 50/50 blend; counts only below the gate; `plumbing` never
   reads results). Log line "Team totals: N calls, C credits, R rows (T match totals); month M of
-  800 credits, credits left X".
+  20000 credits, credits left X".
 - `corners_live.py`: live team corners. `TeamCornersF` = bake-off 2's model (f) (empirical-Bayes
   team for/against, NB2 per side), fitted on the 730 days before now, ≥ `MIN_TRAIN` 300, from
   football-data HC/AC. `add_model(cards)` sets card `corners = {model: "f", home/away: {mean,
@@ -418,7 +439,7 @@ the owner's baseball app, so the balance can drop without any run here.
   `side_probs`, `pick(cdf, line, over, under, threshold)` (the better side if P(win) × odds +
   P(push) − 1 ≥ threshold; whole lines push). `run`: one call per (event, snapshot, group
   "team_corners") for `books_for(league)`: `BOOKS` pinnacle, draftkings, or Pinnacle alone in
-  `PINNACLE_ONLY` (E2, E3); cap `CORNERS_MONTHLY_CAP` 750 and the reserve checked at
+  `PINNACLE_ONLY` (E2, E3); cap `CORNERS_MONTHLY_CAP` 20,000 (750 until 28 Oct) and the reserve checked at
   `expected_cost` (dearest corner call this month, ≥ 1); `LEAGUES` = E0, SP1, D1, I1, F1, E1, E2,
   E3. `paused_leagues(calls, now)`: in a `PINNACLE_ONLY` league, a snapshot kind ("look"/"close",
   counted apart) whose last `EMPTY_PAUSE` 6 answered calls logged no rows, over ≥ 2 runs or
@@ -431,7 +452,7 @@ the owner's baseball app, so the balance can drop without any run here.
   downloaded_at, p_over, p_under, p_push, pick}]}`. `log` (CLI `log-corners`), `corner_results`
   (HC/AC for settlement), `estimate` (CLI `estimate-corners`). Corner files and rows never mix
   into the team-total test (tests). Log lines "Corners (Pinnacle, DraftKings): N calls, C credits,
-  R rows (P Pinnacle, D DraftKings); month M of 750 corner credits, credits left X[; paused (no
+  R rows (P Pinnacle, D DraftKings); month M of 20000 corner credits, credits left X[; paused (no
   prices in the last 6 calls): E2 look until …]" and "Corners
   shown: …".
 - `espn_news.py`: free ESPN team news for all live leagues (`SLUGS`: eng.1–eng.4, esp.1,

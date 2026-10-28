@@ -143,7 +143,10 @@ def test_expected_cost_follows_the_dearest_corner_call_this_month():
     assert cl.expected_cost(old, LOOK) == cl.COST_PER_CALL
 
 
-@pytest.mark.parametrize("spent, allowed", [(748, True), (749, False)])
+@pytest.mark.parametrize(
+    "spent, allowed",
+    [(cl.CORNERS_MONTHLY_CAP - 2, True), (cl.CORNERS_MONTHLY_CAP - 1, False)],
+)
 def test_cap_holds_if_the_two_book_call_costs_more(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -165,7 +168,7 @@ def test_cap_holds_if_the_two_book_call_costs_more(tmp_path, spent, allowed):
     s = cl.run(
         [card()], tmp_path / "o", [state], raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls)
     )
-    assert (len(calls) == 1) == allowed  # 748 + 2 <= 750; 749 + 2 > 750
+    assert (len(calls) == 1) == allowed  # cap - 2 + 2 <= cap; cap - 1 + 2 > cap
     if not allowed:
         assert s["stop"].startswith("monthly cap")
 
