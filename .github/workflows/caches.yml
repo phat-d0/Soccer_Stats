@@ -130,7 +130,7 @@ jobs:
           else
             echo "CACHE ${{ matrix.name }}: MISS"
             if [ "${{ matrix.paid }}" = "true" ]; then
-              echo "::warning::Paid cache ${{ matrix.name }} missed: the archive (release $TAG) covers it, and the next restore in a workflow rebuilds it from there"
+              echo "::warning::Paid cache ${{ matrix.name }} missed (evicted). If data-log archive/manifest.json lists it, the next restore in a workflow rebuilds it from the release $TAG; if not, its bodies are gone"
             fi
           fi
 

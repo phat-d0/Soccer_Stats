@@ -21,6 +21,32 @@ snapshots alone were about 8,000).
 | `cup-odds-history-` | `data/raw/cup_odds`, `data/raw/cups/espn` | Champions League closes (Pinnacle, DraftKings) | `backfill.yml` `cup_odds` |
 | `comeback-odds-` | `data/raw/comeback_odds` | comeback phase 2 in-play snapshots, designs B and C | `odds-check.yml` `comeback-fetch` |
 
+**What the first run found** (28 Oct, `caches.yml` dry run 40640065501, before any archive):
+
+| Cache | State | Files | On disk | Packed (tar + zstd) |
+| --- | --- | --- | --- | --- |
+| `comeback-odds-` | hit (`comeback-odds-40176031079`) | 801 | 37.4 MB | 1.5 MB |
+| `player-odds-history-` | hit (`player-odds-history-40311911428`) | 3,541 | 21.8 MB | 1.2 MB |
+| `odds-history-` | **missing: already evicted** | – | – | – |
+| `cup-odds-history-` | **missing: already evicted** | – | – | – |
+
+- **The two evicted caches are gone.** The raw DraftKings historical snapshots (`odds-history-`)
+  and the bought Champions League close bodies (`cup-odds-history-`) can't be archived. Both
+  went more than 7 days without a run that used them.
+- **What they produced is safe on data-log:** `backtest/E0_dk.json`, `E0_dk_trades.csv`, and
+  `odds_history/UCL_closes.jsonl` with `UCL_close_calls.jsonl`. Nothing live reads the raw bodies.
+- **What re-running would cost:** the DraftKings backtest's download would buy its snapshots
+  again, but `max_credits` defaults to 0, so nothing is bought unless the lead sets a cap. The
+  Champions League closes are never bought again for a slot already held in data-log's call
+  record.
+- **Totals:** 3.50 GB of the 10 GB limit, in 183 caches. `raw-data-` makes up 3.2 GB of that, in
+  165 entries, because every publish run saves a new one. Size wasn't what evicted the paid
+  caches; going unused for 7 days was.
+- **Also missing:** `understat-SP1/D1/I1/F1-` and `cup-corners-`. They stay in the keep-alive
+  list, so the next save is kept alive.
+- **Present:** the `comebacks-<league>-` caches (13–18 MB each), `cup-espn-` (6.9 MB) and
+  `espn-timelines-` (1.4 MB).
+
 Some paid data was never cached:
 - The goalscorer probe and pilot (`odds-check.yml` `goalscorer`) write under
   `data/raw/player_odds_history`, but `odds-check.yml` only restores that cache and never saves it.

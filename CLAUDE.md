@@ -223,6 +223,9 @@ the owner's baseball app, so the balance can drop without any run here.
   step that restores a paid cache is followed by `.github/actions/paid-archive-restore`, which
   rebuilds a missed cache from the archive before anything can buy (`docs/caches.md`).
   A new cache needs a keep-alive matrix row (`tests/test_cache_archive.py` checks it).
+  The first run (28 Oct) found `odds-history-` and `cup-odds-history-` already evicted. Their raw
+  bodies are lost, but what was parsed from them is safe on data-log (`E0_dk.json`,
+  `UCL_closes.jsonl`). The comeback (1.5 MB packed) and FanDuel (1.2 MB) caches are archived.
 
 ## The Odds API
 
