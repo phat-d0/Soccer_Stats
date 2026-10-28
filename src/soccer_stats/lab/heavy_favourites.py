@@ -123,6 +123,94 @@ def scope(groups: dict | None = None, raw_dir: Path = RAW_DIR) -> list[dict]:
     return rows
 
 
+# The frozen design-H sample (lead brief, 28 Oct): every league-season known to be priced in
+# play (the archive probes of 28 Oct), none used by B or C.
+SAMPLE = {
+    **{lg: (2025, 2026) for lg in ("E0", "D1", "F1", "E1", "E2", "E3")},
+    "SP1": (2020, 2021, 2025, 2026),
+    "I1": (2021, 2025, 2026),
+    **{lg: (2021, 2022, 2023, 2024, 2025, 2026) for lg in ("D2", "SP2")},
+    **{
+        lg: (2022, 2023, 2024, 2025, 2026)
+        for lg in ("N1", "P1", "SC0", "B1", "T1", "G1", "I2", "F2")
+    },
+}
+
+
+def slot_list(league: str, year: int, raw_dir: Path = RAW_DIR) -> tuple[list[dict], dict]:
+    """One league-season's slots: heavy favourites trailing at half-time grouped by kickoff,
+    with the snapshot time to request. Half-time only, never how the match ended."""
+    df = fair_chances(load_season(league, year, raw_dir))
+    heavy = df[df["p_fav"] >= MIN_FAV].dropna(subset=["hthg", "htag"])
+    fh = np.where(heavy["fav_home"], heavy["hthg"], heavy["htag"])
+    dh = np.where(heavy["fav_home"], heavy["htag"], heavy["hthg"])
+    trail = heavy[(dh - fh) > 0].sort_values(["kickoff", "home"])
+    counts = {"trailing": int(len(trail)), "no_kickoff_time": int(trail["kickoff"].isna().sum())}
+    sport = LEAGUES[league].odds_sport if league in LEAGUES else OTHER[league][1]
+    out = []
+    for ko, g in trail[trail["kickoff"].notna()].groupby("kickoff"):
+        out.append(
+            {
+                "league": league,
+                "sport": sport,
+                "kickoff": ko.strftime("%Y-%m-%dT%H:%MZ"),
+                "request_at": (ko + pd.Timedelta(minutes=SNAPSHOT_AFTER)).strftime(
+                    "%Y-%m-%dT%H:%MZ"
+                ),
+                "matches": [
+                    {
+                        "home": r.home,
+                        "away": r.away,
+                        "favourite": "home" if r.fav_home else "away",
+                        "p_fav": round(float(r.p_fav), 4),
+                        "ht": [int(r.hthg), int(r.htag)],
+                        "price": r.source,
+                    }
+                    for r in g.itertuples()
+                ],
+            }
+        )
+    return out, counts
+
+
+def freeze(sample: dict | None = None, raw_dir: Path = RAW_DIR, used=None) -> dict:
+    """Design H's slot list. `used` = (league, kickoff) pairs already bought by B or C."""
+    from soccer_stats.lab import comeback_fetch as cf
+
+    sample = SAMPLE if sample is None else sample
+    if used is None:
+        used = {
+            (s["league"], s["kickoff"]) for d in ("B", "C") for s in cf.load_slots(cf.slots_path(d))
+        }
+    slots, per = [], {}
+    for lg, years in sample.items():
+        for y in years:
+            key = f"{lg} {season_name(y)}"
+            try:
+                got, counts = slot_list(lg, y, raw_dir)
+            except Exception as exc:  # noqa: BLE001 - a missing file is reported, not fatal
+                per[key] = {"error": str(exc)[:120]}
+                continue
+            kept = [s for s in got if (s["league"], s["kickoff"]) not in used]
+            counts.update(slots=len(kept), matches=sum(len(s["matches"]) for s in kept),
+                          dropped_as_used=len(got) - len(kept))  # fmt: skip
+            per[key] = counts
+            slots += kept
+    slots.sort(key=lambda s: s["request_at"])
+    return {
+        "design": "H",
+        "rule": f"favourite >= {MIN_FAV:.0%} (Pinnacle's close, else the average's) trailing at "
+        f"half-time; one snapshot per slot at kickoff + {SNAPSHOT_AFTER} min",
+        "slots": slots,
+        "per_league_season": per,
+        "totals": {
+            "slots": len(slots),
+            "matches": sum(len(s["matches"]) for s in slots),
+            "credits": len(slots) * HIST_COST,
+        },
+    }
+
+
 def needed(gap: float, p: float = BASE_IMPLIED, power: float | None = Z_POWER) -> int:
     """Bets for a two-sided 95% range on realized - implied to exclude 0: at 80% power, or
     with `power=None` the size whose expected range just touches 0 (a coin flip)."""
@@ -174,7 +262,17 @@ def report(rows: list[dict], tot: dict, pw: dict) -> str:
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--json", default="")
+    p.add_argument("--slots-out", default="", help="write design H's frozen slot list here")
     args = p.parse_args(argv)
+    if args.slots_out:
+        frozen = freeze()
+        Path(args.slots_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.slots_out).write_text(json.dumps(frozen, indent=1))
+        for k, v in frozen["per_league_season"].items():
+            print(f"  {k}: {json.dumps(v)}")
+        print("Totals: " + json.dumps(frozen["totals"]))
+        print("COMEBACK_H_SLOTS_JSON " + json.dumps(frozen))
+        return
     rows = scope()
     tot, pw = totals(rows), power()
     print(report(rows, tot, pw))

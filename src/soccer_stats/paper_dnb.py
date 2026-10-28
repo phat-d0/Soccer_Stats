@@ -47,6 +47,11 @@ UPDATE_FIELDS = {
     "result_source",
     "result_check",
     "check_score",
+    # Pinnacle's live close from the every-book log (28 Oct; paper.pinnacle_live).
+    "pinnacle_live_close_prices",
+    "pinnacle_live_fetched_at",
+    "pinnacle_live_minutes_before",
+    "clv_pinnacle_live",
 }
 COMPARE_NOTE = (
     "Descriptive: the track and its parent bet different sides and prices, so this compares "
@@ -121,6 +126,11 @@ def _log_close(t: dict, log: pd.DataFrame, now: pd.Timestamp) -> dict | None:
     if t.get("close_fetched_at") and pd.Timestamp(quoted) < pd.Timestamp(t["close_fetched_at"]):
         return None  # never step the close back in time
     return paper._update(t, now, **_close_fields(t, group, quoted, t["kickoff"]))
+
+
+def _dnb_clv(t: dict, prices: dict) -> float | None:
+    c = tr.dnb_clv(t["odds"], t["market"], prices)
+    return None if c is None else c[0]
 
 
 def _pinnacle(res: dict, t: dict) -> dict:
@@ -227,6 +237,7 @@ def update_ledger(
     ref: dict | None = None,
     odds_log: pd.DataFrame | None = None,
     espn: pd.DataFrame | None = None,
+    books_log: pd.DataFrame | None = None,
 ) -> list[dict]:
     """Open, close and settle one league's DNB trades. Mutates `ledger`; returns events.
 
@@ -275,6 +286,13 @@ def update_ledger(
             if t["source"] != "live" or (t["status"] == "void" and not t.get("push")):
                 continue  # a refunded draw keeps its close; a voided match doesn't need one
             ev = _log_close(t, odds_log, now)
+            if ev:
+                events.append(ev)
+    if books_log is not None:  # Pinnacle's live close, priced as draw no bet
+        for t in ledger.values():
+            if t["source"] != "live" or (t["status"] == "void" and not t.get("push")):
+                continue
+            ev = paper.pinnacle_live(t, books_log, now, clv_fn=_dnb_clv)
             if ev:
                 events.append(ev)
 

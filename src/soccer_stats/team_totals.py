@@ -63,7 +63,7 @@ MATCH_SIDE = "match"  # `side` on a totals row (team rows: "home"/"away")
 LOOK_WINDOW_HOURS = (18.0, 30.0)
 CLOSE_MINUTES = 30
 CLOSE_LATEST_MINUTES = 75
-MONTHLY_CAP = 800  # credits a calendar month (UTC); the estimate is about 682
+MONTHLY_CAP = 20000  # credits a calendar month (UTC); 800 until 28 Oct (the ~5M plan)
 COST_PER_CALL = 2  # two markets, one region (billed per market requested; run 37889595473)
 KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 LOCAL_CALLS = "team_totals_calls.jsonl"  # local copy of the call record (raw-data cache)

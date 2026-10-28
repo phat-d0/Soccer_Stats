@@ -58,6 +58,11 @@ PAID = {
         "paths": ["data/raw/comeback_odds"],
         "what": "comeback phase 2 in-play snapshots, designs B and C (odds-check.yml)",
     },
+    "archive-probe": {
+        "prefix": "archive-probe-",
+        "paths": ["data/raw/archive_probe"],
+        "what": "in-play archive probes, one snapshot per league-season (odds-check.yml)",
+    },
 }
 
 

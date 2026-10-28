@@ -2214,3 +2214,345 @@ step would be a forward live log, which is not a test:
 - about 30 matches a season, about 30 credits;
 - it would be judged later under a rule frozen before it starts.
 That needs a design and the owner's approval of its own.
+
+## Cash-out: when to take risk off a winning underdog bet (owner via the lead, 28 Oct; exploratory, 0 credits)
+
+**The question.** "If we bet heavy underdogs and then cash out when it's at 50%, what's the
+best way to take risk off once we've squeezed out enough value that the swings after aren't
+worth it?"
+
+**Part 1: the framework.**
+- **A fair cash-out never changes expected value.** It sells the position at the market's own
+  chance of it winning. A fair price is a martingale: on average it equals what the position
+  will pay at the end. Cashing out at a fair price swaps the same average for less spread. It
+  is risk control, not profit.
+- **A real cash-out offer carries a margin.** The book pays less than fair, so every cash-out
+  lowers expected value by about the margin times the position's value.
+- **Value isn't "squeezed out" over time.** If the bet had an edge when it was placed, the
+  edge sits in the position until settlement. Selling early hands the rest of it, plus the
+  cash-out margin, back to the book. A position that has gone up in value has not banked
+  anything until it settles or is sold.
+- **The Kelly view.** At any moment the right exposure is the Kelly stake on your current
+  edge at the current in-play price.
+  - A partial cash-out is just rebalancing down to that stake.
+  - Cash out fully only when your edge at the current price is no bigger than what the
+    cash-out costs.
+  - With no edge at the live price, Kelly holds nothing, and a fair cash-out is the right
+    way to get there.
+- **The honest starting point.**
+  - Our pre-match picks don't beat the close: Model 12% CLV −4.6%, Blend Lean −3.1%.
+  - Long shots carry the biggest margin (the favourite–longshot bias in "Price-band edge
+    rule").
+  - A cash-out rule moves risk around. It can't turn a negative entry into a positive one.
+
+**Part 2: a free check on data we already hold** (`lab/cashout.py`, `odds-check.yml`
+`task=cashout`, run 40638748115, no key, cached snapshots only).
+
+*What was measured.*
+- The design B and C half-time snapshots are exactly the matches where the pre-match underdog
+  **led at half-time**: the moment a winning underdog bet would be cashed out.
+- 930 matches had a passing DraftKings in-play quote (C 732, B 198).
+- For each, per $1 on the underdog at Pinnacle's pre-match close (football-data; every row
+  had Pinnacle's close):
+  - **hold** = the actual result;
+  - **cash out at half-time** = entry odds × the underdog's margin-free chance at
+    DraftKings' in-play price × (1 − margin) − 1, for margins of 0% (fair), 5% and 10%;
+  - **Kelly partial** = keep the share of the position that quarter Kelly supports at
+    DraftKings' live price on phase 1's in-play model chance (bankroll 100 per $1 entry),
+    and cash out the rest.
+- Ranges resample matches (2,000 draws).
+
+*Read this first.*
+- Every return here is **conditional on the underdog already leading at half-time**, so the
+  absolute numbers (+1.7 per $1) are far above anything a real underdog strategy earns.
+- Only hold against cash out is meaningful.
+- This reuses design C's data, where the in-play price over-priced the trailing favourite
+  (17.0% won vs 21.3% implied). It is largely the same finding seen from the leader's side.
+- Underdogs that were level or behind at half-time aren't in the sample: we bought snapshots
+  only where the favourite trailed.
+
+*Results (per $1 staked pre-match).*
+
+| Group | Matches | Underdog won vs in-play chance | Hold: mean (sd) | Fair cash-out: mean (sd) | Hold − cash out at 0% · 5% · 10% (95%) | Kelly partial at 5%: mean (sd), share kept |
+| --- | --- | --- | --- | --- | --- | --- |
+| All | 930 | 55.4% vs 54.0% (+1.4 pts, −1.7 to +4.5) | +1.74 (2.77) | +1.69 (0.83) | +0.05 (−0.13 to +0.23) · +0.18 (+0.01 to +0.36) · +0.32 (+0.14 to +0.50) | +1.76 (1.96), 54% |
+| Design C | 732 | 57.1% vs 55.1% (+2.0, −1.5 to +5.3) | +1.76 (2.61) | +1.68 (0.80) | +0.08 · +0.21 · +0.35 (+0.16 to +0.52) | +1.75 (1.85), 51% |
+| Design B | 198 | 49.0% vs 50.0% (−1.0, −7.5 to +5.2) | +1.69 (3.31) | +1.74 (0.93) | −0.05 · +0.09 · +0.22 (−0.22 to +0.68) | +1.78 (2.32), 64% |
+| Underdog priced 3.0–4.0 | 242 | 63.2% vs 60.9% (+2.3, −3.5 to +8.0) | +1.34 (1.79) | +1.26 (0.48) | +0.08 · +0.19 · +0.31 (+0.09 to +0.52) | +1.24 (1.28), 52% |
+| Heavy underdog, 4.0+ | 688 | 52.6% vs 51.6% (+1.0, −2.5 to +4.5) | +1.88 (3.03) | +1.85 (0.87) | +0.04 · +0.18 · +0.32 (+0.11 to +0.55) | +1.94 (2.12), 55% |
+| Half-time chance under 40% | 132 | 40.2% vs 31.1% (**+9.0**, +0.7 to +17.2) | +2.19 (4.36) | +1.64 (0.83) | +0.55 (−0.17 to +1.30) · +0.68 · +0.81 (+0.09 to +1.56) | +2.18 (3.14), 75% |
+| Half-time chance 40–55% ("cash out at 50%") | 436 | 48.4% vs 48.5% (−0.1, −4.9 to +4.5) | +1.36 (2.53) | +1.43 (0.57) | −0.07 (−0.31 to +0.19) · +0.06 · +0.18 (−0.06 to +0.43) | +1.44 (1.87), 67% |
+| Half-time chance 55%+ | 362 | 69.3% vs 69.0% (+0.3, −4.4 to +4.8) | +2.04 (2.20) | +2.03 (0.96) | +0.01 · +0.16 · +0.31 (+0.11 to +0.51) | +1.99 (1.35), 30% |
+
+- No underdog was priced under 3.0 pre-match: the favourites in B and C were all 45%+.
+
+*What it shows.*
+- **At a fair price, cashing out changed nothing on average** (+0.05 per $1, −0.13 to
+  +0.23). It cut the spread of outcomes by about 70% (sd 2.77 → 0.83). That is the
+  martingale, measured.
+- **At a real cash-out margin it costs money.** It cost 0.18 per $1 staked at 5% and 0.32 at
+  10%; both ranges sit above 0 in favour of holding. That is about the margin times the
+  position's value (about 2.7 per $1).
+- **"Cash out at 50%"** (underdog 40–55% to win at half-time): the in-play price was right
+  (48.4% won vs 48.5%). Holding and a fair cash-out were the same. Any real margin makes
+  cashing out the worse choice on average, with a much smaller spread.
+- **The partial (Kelly) line** kept about half the position on average. It landed between
+  hold and cash out on spread (sd 1.96 against 2.77 and 0.83). Its mean was slightly above
+  both, because it held more where the model saw value (75% kept below a 40% half-time
+  chance).
+- **One hint, exploratory only.** Where the leading underdog was still priced under 40% at
+  half-time, it won 40.2% against the price's 31.1% (+9.0 points, +0.7 to +17.2, 132
+  matches). This is design C's over-priced trailing favourite seen from the other side, and
+  it is one of several cuts. It would need its own pre-registration on unused seasons, and
+  the owner's approval, before any credits.
+
+**The answer in plain English (for the owner).**
+- Cashing out doesn't lock in value. It sells your bet back at the book's price minus a fee.
+- In 930 real matches where an underdog led at half-time:
+  - at a fair price, cashing out left the average return exactly where holding left it, and
+    removed about 70% of the swings;
+  - at a typical 5–10% cash-out margin, it cost about 6–12% of the bet's value each time;
+  - at your "50%" point, the in-play price was accurate, so there was nothing left to
+    squeeze.
+- So use a cash-out only to cut risk you can't afford. Then the smart way is partial: keep
+  the share Kelly says your remaining edge supports, and sell the rest. If you see no edge at
+  the live price, sell the lot.
+- None of this fixes the entry. Our pre-match underdog picks lose to the closing price, and
+  no cash-out rule can make a losing bet a winning one.
+
+## In-play archive probes: how far back are half-time prices kept? (owner-approved 28 Oct)
+
+**What and why.** The 75%+ heavy-favourite idea ("Heavy favourites (75%+)" above) needs
+priced half-times that B and C never used. Design C's guard found 2022/23 unpriced for E0, F1
+and D1 but priced for SP1 and I1. These probes settle where each league's archive starts.
+- **Probe:** one historical bulk h2h snapshot (10 books = one region, 10 credits) per
+  league-season, at kickoff + 55 min of the busiest weekend kickoff between October and
+  April, taken from football-data.
+- **"Priced":** design C's guard (`snapshot_priced`), meaning a started event freshly quoted
+  in play by DraftKings or Betfair.
+- **Walk-back:** each league walks back from its newest unknown season and stops at the first
+  unpriced one. E0, F1 and D1 weren't probed.
+- **Run:** `lab/archive_probe.py`, `odds-check.yml` `task=archive-probe`, run 40640666882,
+  after a dry run (40640474263).
+- **Spend:** 28 paid snapshots, **280 credits**. Balance 4,938,756 → 4,938,476 on the
+  upgraded plan; the owner lifted the 200 cap the same day. Two snapshots came back empty and
+  cost 0.
+- The bodies are in the cache `archive-probe-40640666882`.
+
+| League | Season (slot) | Priced? | Started events | Books quoting in play, fresh |
+| --- | --- | --- | --- | --- |
+| SP1 | 2021/22 (3 Oct 2021) | **yes** | 2 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Pinnacle |
+| SP1 | 2020/21 (3 Oct 2020) | **yes** | 2 | DraftKings, FanDuel, BetMGM, 888, Paddy Power, Pinnacle |
+| SP1 | 2019/20 (3 Nov 2019) | no: the archive has no snapshot (empty, 0 credits) | 0 | none |
+| I1 | 2021/22 (17 Oct 2021) | **yes** | 3 | DraftKings, FanDuel, Bovada, Paddy Power, Pinnacle |
+| I1 | 2020/21 (3 Jan 2021) | no | 7 | 888 only |
+| E1 | 2021/22 (2 Oct 2021) | no | 10 | none |
+| E2 | 2021/22 (2 Oct 2021) | no | 12 | Pinnacle, Paddy Power, Bovada (no DraftKings or Betfair) |
+| E3 | 2021/22 (2 Oct 2021) | no | 12 | none |
+| N1 | 2022/23 (23 Oct 2022) | **yes** | 3 | DraftKings, Bovada, Unibet, Pinnacle |
+| N1 | 2021/22 (2 Oct 2021) | no | 2 | Pinnacle, Paddy Power, Bovada |
+| P1 | 2022/23 (13 Nov 2022) | **yes** | 3 | DraftKings, FanDuel, Bovada, Paddy Power, Unibet, Pinnacle |
+| P1 | 2021/22 (3 Oct 2021) | no | 2 | none |
+| SC0 | 2022/23 (1 Oct 2022) | **yes** | 5 | DraftKings, FanDuel, Paddy Power, Bovada, Pinnacle |
+| SC0 | 2021/22 (16 Oct 2021) | no | 5 | none |
+| B1 | 2022/23 (23 Apr 2023) | **yes** | 7 | all ten, Betfair included |
+| B1 | 2021/22 (10 Apr 2022) | no | 7 | none |
+| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, FanDuel… (one started match) |
+| T1 | 2021/22 (23 Jan 2022) | no | 3 | Pinnacle, Paddy Power, Bovada |
+| G1 | 2022/23 (12 Mar 2023) | **yes** | 7 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Unibet, Pinnacle |
+| G1 | 2021/22 (6 Mar 2022) | no: no snapshot (empty, 0 credits) | 0 | none |
+| D2 | 2022/23 (9 Apr 2023) | **yes** | 5 | all ten |
+| D2 | 2021/22 (17 Apr 2022) | **yes** | 5 | DraftKings, FanDuel, Bovada, Paddy Power, Pinnacle |
+| D2 | 2020/21 (3 Jan 2021) | no | 5 | none |
+| I2 | 2022/23 (1 Oct 2022) | **yes** | 7 | DraftKings, Bovada, Paddy Power, Pinnacle |
+| I2 | 2021/22 (30 Apr 2022) | no | 9 | none |
+| SP2 | 2022/23 (1 Oct 2022) | **yes** | 2 | DraftKings, FanDuel, Paddy Power, Pinnacle |
+| SP2 | 2021/22 (10 Oct 2021) | **yes** | 3 | DraftKings, Paddy Power, Pinnacle |
+| SP2 | 2020/21 (11 Apr 2021) | no | 3 | none |
+| F2 | 2022/23 (12 Nov 2022) | **yes** | 9 | DraftKings, FanDuel, Bovada, Paddy Power, Unibet, Pinnacle |
+| F2 | 2021/22 (2 Oct 2021) | no | 8 | none |
+
+**What it says.**
+- DraftKings' in-play prices are in the archive from **2022/23 in every league probed**:
+  the six other top divisions and four second tiers newly checked, plus C's priced SP1, I1
+  and the English lower leagues.
+- They go back further only in Spain: SP1 to 2020/21, SP2 and D2 to 2021/22, I1 to 2021/22.
+- Before mid-2020 the archive holds no snapshots at all.
+- **Caveat: one snapshot per league-season tests one date.** Coverage may start part-way
+  through a season, which is why C's guard checks its first three snapshots. So a "no" here
+  means "not on that date". E0, F1 and D1 2022/23 (unpriced in C) fit the same picture of
+  coverage arriving during 2022.
+- Some unpriced seasons still had **Pinnacle** quoting in play (E2, N1 and T1 in 2021/22).
+  A test whose price is DraftKings or Betfair can't use them. A Pinnacle-priced test could,
+  but that would be a different rule and needs its own pre-registration.
+- **Seasons newly known to be priced for a 75%+ test:** SP1 2020/21–2021/22; I1, D2 and SP2
+  2021/22; N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2 from 2022/23. The counts for these
+  follow in the heavy-favourite count below.
+
+## Heavy favourites (75%+), design H: final pre-registration (frozen 2026-10-28, before any purchase)
+
+The owner approved buying this test on 28 Oct, via the lead. This replaces the DRAFT in
+"Heavy favourites (75%+)" above. It is written and committed before any design-H snapshot is
+bought, and nothing in it changes after a price is seen.
+
+**Hypothesis (new; picked after C's results, so judged only on data no earlier test used).** A
+favourite priced 75%+ before kickoff that trails at half-time wins more often than
+DraftKings' in-play price implies, enough to make a profit backing it.
+
+**Sample (frozen).** `src/soccer_stats/lab/comeback_h_slots.json`, SHA-256 starting
+`4c37e90908306a4e`.
+- **Built by:** `heavy_favourites --slots-out` (`odds-check.yml` `task=heavy-slots`, run
+  40641592811), from football-data only, reading half-time scores, never full-time ones.
+- **Favourite:** Shin-fair chance ≥ 75% from Pinnacle's close, else the market average's
+  close. The file marks which (`price`).
+- **League-seasons:** every one the archive probes of 28 Oct showed priced:
+  - the eight leagues in 2025/26 and 2026/27 to date (to the files of 28 Oct);
+  - SP1 2020/21 and 2021/22;
+  - I1, D2 and SP2 2021/22;
+  - N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2 from 2022/23 to 2026/27 to date.
+- **Excluded:** every slot bought by B or C (none overlap).
+- **103 slots holding 103 trailing heavy favourites.** Leagues with any: N1 22, SC0 16,
+  P1 16, G1 12, T1 11, I1 8, SP1 7, B1 3, D1 2, F1 2, E0 1, E1 1, SP2 1, I2 1. E2, E3, D2
+  and F2 have none.
+- Cups and the other leagues still being counted are **not** in this test. They can become
+  a separate pre-registered sample.
+
+**Purchase.**
+- `comeback_fetch --slots H` (`odds-check.yml` `task=comeback-fetch`, `design=H`): one
+  historical bulk h2h snapshot per slot at kickoff + 55 min, at the same ten books (one
+  region, 10 credits).
+- **Estimate 1,030 credits; cap 1,236** (estimate + 20%), run by the lead or with the lead's
+  sign-off.
+- The same spending rules as C:
+  - `CappedBudget` with the 3,000 reserve;
+  - the first call budgeted at 20;
+  - stop on a call over 10 credits or any HTTP/network error;
+  - never buy a slot twice;
+  - a dry run first.
+- Bodies go to the same `comeback-odds-*` cache: different snapshot times, and guard keys
+  that don't overlap with C's.
+- **Guard (C's, every league-season):** if a league-season's first 3 bought snapshots, oldest
+  first, show no started event freshly priced by DraftKings or Betfair, no more of it is
+  bought and its matches count as **not priced**. A league-season with fewer than 3 slots is
+  bought in full.
+
+**Analysis (run once; `comebacks2 --slots H`, `task=comebacks2`, `design=H`, no key).**
+- C's quote checks, unchanged: the 48–62-minute window; updated after kickoff; at most 5
+  minutes old; moved against the favourite; Pinnacle within 0.05 of the other books' median,
+  else Betfair for the fair chance.
+- Matches are joined to football-data by league, season, home and away, with the favourite
+  priced exactly as in the slot list.
+- **Primary:** $1 on the trailing favourite at DraftKings' passing in-play price. ROI per $1
+  with a match-resampled 95% range (2,000 draws, seed 0).
+- **Pass:** at least **100** usable DraftKings bets **and** the ROI range entirely above 0.
+- **Fail:** at least 100 usable and the range includes 0 or sits below it. A range entirely
+  below 0 reads "the in-play price over-prices the comeback".
+- **Inconclusive:** under 100 usable bets. Nothing changes live in any case. A pass only
+  justifies proposing a live paper track to the owner.
+- **Secondary (descriptive):** the realized − implied win-rate gap with its range, against the
+  in-play price's margin-free chance; Betfair after 2%; per league and per season; Pinnacle-
+  vs average-priced favourites; the phase-1 model's blend weight c where Pinnacle's
+  over/under exists.
+
+**What to expect, stated before buying.**
+- At C's usable rate (81%), 103 matches give about **83 usable bets**, under the 100
+  minimum. The most likely verdict is therefore "inconclusive", whatever the prices show.
+- With 83 bets, a true +12-point gap would show a range above 0 about 59% of the time. A
+  6-point gap would only show it about 20% of the time.
+- The purchase still buys the only fresh prices that exist for these league-seasons. Pooling
+  them later with a separately pre-registered cup or extra-league sample would need its own
+  rule, written before that sample's prices are seen.
+
+## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
+
+**The owner's ask.** "Study the data we already have to find a strategy (position sizing,
+when to cash out…) that would have had positive ROI. I know this can be overfitting, but we
+can try first." This is an open search, built so luck can be told from a real edge
+afterwards. This section is the design. It was written and committed before any search code
+ran, and the results will follow below it with run ids.
+
+**1. The holdout, locked first.**
+- `lab.harness.Holdout` locks every football-data row from **2024-07-01 onward**
+  (2024/25, 2025/26, 2026/27) in all eight leagues.
+- Also locked: every live paper ledger and odds log on data-log, and DraftKings' 2025/26 E0
+  file (`E0_dk.json` and its trades).
+- The search scores 2017/18–2023/24 only. In practice, seasons where Pinnacle's early and
+  close prices both cover ≥ 90% are the ones scored: 2019/20–2023/24, `lean_backtest`'s rule.
+- The comeback snapshots (B, C, H) are spent on their own tests. They appear only in the
+  in-play exit arms, labelled exploratory, and never in the multiple-comparison check.
+
+**2. The search space.** Every rule tried is logged as an arm and counted, losers included.
+- **Base selections**, all walk-forward on earlier data, refit every 28 days:
+  - (a) the raw model's best side at an edge ≥ t;
+  - (b) Blend Lean's z ≥ k on the blend;
+  - (c) the market alone: every side in a price band.
+  - t ∈ {0, 5, 12, 20%}, k ∈ {0.5, 1, 2}.
+- **Filters**, at most two combined:
+  - league (each of eight);
+  - price band (≤1.50, 1.50–2.00, 2.00–3.00, 3.00–5.00, >5.00);
+  - edge or z band (the pooled quintiles of the search window);
+  - Lean's driver (market/model);
+  - side (home/draw/away);
+  - favourite/underdog;
+  - day of week (weekend/midweek);
+  - kickoff cluster (lone kickoff vs a shared slot);
+  - team-strength gap (the model's rating gap in quintiles);
+  - line movement (below).
+- **Line movement.** football-data holds only two prices, the early one (about 2–4 days out)
+  and the close. A rule that uses the move from early to close can only be decided **at the
+  close**. Those arms bet at Pinnacle's close and are judged on ROI only: their CLV is 0 by
+  construction, and that is said beside them. Rules decided at the early price can't see
+  the move.
+- **Markets:**
+  - 1X2;
+  - draw no bet (from the 1X2, as in "Draw no bet");
+  - Asian handicap and over/under 2.5 at Pinnacle's own prices, through
+    `match_markets.clean_prices`, with the model's chances from the same walk-forward score
+    matrices.
+- **Sizing**, applied to each selection's bets in time order:
+  - flat $1;
+  - ¼ and ½ Kelly on the blend's chance (where one exists), capped at 5%;
+  - a stop rule: stop a rule for the rest of its season after a 20-unit drawdown.
+  Sizing changes the money curve, not which bets are placed. It is reported beside flat and
+  never counted as a separate edge.
+- **Exits (exploratory, the comeback sample only):** hold, full cash-out and Kelly partial
+  cash-out at half-time, as in "Cash-out". These arms are outside the multiple-comparison
+  check because their data has been spent.
+
+**3. Scoring, inside the search window only.**
+- For each arm: bets, ROI per $1 and CLV against Pinnacle's Shin-fair close, each with a
+  match-resampled 95% range (2,000 draws, seed 0).
+- An arm with fewer than 100 bets is kept in the count and flagged.
+
+**4. Correcting for the search.**
+- **Number of arms tried:** every arm, losers included.
+- **The best arm** by mean CLV, and the best by ROI.
+- **The bootstrap of the maximum** (White's reality check):
+  - recentre every arm's per-bet CLV to mean 0 (the no-skill null);
+  - resample matches jointly across all arms 2,000 times;
+  - take the maximum mean CLV over arms in each draw.
+  The p-value is the share of draws whose maximum reaches the best arm's real mean. The same
+  is done for ROI.
+- **The share of arms with CLV above 0,** against the share the recentred null gives. Prices
+  carry a margin, so most arms should sit below 0. A real edge has to beat the null's share,
+  not 50%.
+
+**5. Finalists and the holdout.**
+- **Rule, fixed now:** an arm is a finalist only if:
+  - its CLV 95% range is entirely above 0 in the search window;
+  - it has at least 300 bets;
+  - the reality-check p for CLV is below 0.05.
+  At most three, ranked by the lower end of the CLV range. Line-movement arms (CLV 0 by
+  construction) can't qualify.
+- If no arm passes, the holdout stays locked and the search ends with "no strategy found".
+- Otherwise the holdout is opened **once**, for the finalists only, with a logged reason
+  (`Holdout.unlock`), and they are scored on 2024/25 onward with the same metrics.
+- A finalist whose holdout CLV range is above 0 becomes a pre-registered live paper track.
+  Nothing goes live otherwise, and the owner decides.
+
+**Delivery:**
+- `lab/strategy_search.py` and `odds-check.yml` `task=strategy-search`, no key (no purchase
+  is planned);
+- results in this section with run ids;
+- a plain-English summary for the owner: what was tried, what the best looked like, how
+  likely that was luck, and what the holdout said.
