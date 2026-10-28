@@ -743,7 +743,10 @@ the owner's baseball app, so the balance can drop without any run here.
   gives every arm's ROI and CLV ranges, White's reality check (recentred maxima over arms with
   ≥ 300 bets; per-arm adjusted p) and the null's share of arms above 0; finalists = CLV range
   above 0, ≥ 300 bets, p < 0.05, at most 3. `odds-check.yml` `task=strategy-search`, log line
-  `STRATEGY_SEARCH_JSON`, every arm in the artifact.
+  `STRATEGY_SEARCH_JSON`, every arm in the artifact; `--app-json` writes the app file
+  `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
+  arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
+  holdout still locked.
 - `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`

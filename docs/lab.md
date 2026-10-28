@@ -2590,7 +2590,13 @@ draws) to check the code works; it is not a result.
   after a logged `Holdout.unlock(reason)`, with the window's frozen cuts. With no finalist,
   no code ever reads 2024/25 onward.
 
-### Strategy search: results (2026-10-28; `odds-check.yml` `task=strategy-search` run 40646100195, 0 credits, no key; the holdout was never read)
+### Strategy search: results (2026-10-28; `odds-check.yml` `task=strategy-search` run 40646880618, 0 credits, no key; the holdout was never read)
+
+The first full run (40646100195, the same code without the app file) found the same best
+arms and the same verdict. One arm sat on the 300-bet line between the two runs (4,542 vs
+4,541 eligible), and the best arm's p moved from 0.946 to 0.944, so a few model chances
+differed slightly between the two runs' inputs. The numbers below are from 40646880618,
+which wrote the app file.
 
 **Data.**
 - Eight leagues, 2019/20 to 2023/24 (every season passed the 90% coverage rule): 16,283
@@ -2602,7 +2608,7 @@ draws) to check the code works; it is not a result.
 - **11,857 arms:** 11,203 decided at the early price and 654 line-movement arms at the
   close.
 - 2,897 were empty and 4,771 had under 100 bets.
-- 4,542 arms had 300+ bets with a CLV (the finalist universe); 5,267 had 300+ bets for ROI.
+- 4,541 arms had 300+ bets with a CLV (the finalist universe); 5,266 had 300+ bets for ROI.
 
 **The market as a whole** (every side, no filter; per $1, 95% ranges):
 
@@ -2617,14 +2623,14 @@ draws) to check the code works; it is not a result.
 - **Best by CLV** (300+ bets): Asian handicap, the model's edge ≥ 0%, Premier League,
   price 2.00–3.00. 537 bets, 320 with a closing CLV.
   - CLV +1.32% (+0.83% to +1.81%); ROI +4.4% (−3.1% to +12.4%).
-  - **Reality-check p = 0.946.** A search with no skill, over the same arms and draws,
-    finds a best arm at least that good 95% of the time. The null's maximum reaches +2.7%
+  - **Reality-check p = 0.944.** A search with no skill, over the same arms and draws,
+    finds a best arm at least that good 94% of the time. The null's maximum reaches +2.7%
     CLV in 5% of draws.
-  - Over every arm, including tiny ones, the p is 0.81.
+  - Over every arm, including tiny ones, the p is 0.82.
 - **Best by ROI** (300+ bets): 1X2, the model's edge ≥ 5%, Premier League, the widest
   strength gaps. 360 bets, ROI +27.1% (−5.0% to +61.0%), CLV −4.6% (−6.2% to −3.2%).
-  Reality-check p = 0.66: noise.
-- **Share of arms beating the close:** 92 of 4,542 arms (2.0%) have CLV above 0. A
+  Reality-check p = 0.65: noise.
+- **Share of arms beating the close:** 92 of 4,541 arms (2.0%) have CLV above 0. A
   no-skill search would put about 50% there (95% upper 61%). The prices win almost
   everywhere.
 - **The one recurring pattern:** Asian handicap sides priced 2.00–3.00 at the early price
@@ -2636,7 +2642,7 @@ draws) to check the code works; it is not a result.
     margin. Descriptive only.
 - **Line movement** (ROI only, decided at the close): the best was fading a 4-point move on
   Asian handicap away sides. 848 bets, ROI +8.5% (+2.2% to +14.8%), reality-check p = 1.0
-  among the 5,267 arms.
+  among the 5,266 arms.
 - **Sizing on the top ten CLV arms:** all are Asian handicap, so there is no blend chance
   for Kelly. Flat profit ran from −$196 to +$23; the 20-unit stop rule cut both the losses
   and the bets.
