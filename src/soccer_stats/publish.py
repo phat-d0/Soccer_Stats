@@ -514,9 +514,10 @@ def research_studies(registry=None, lab_dir: Path = LAB_DIR) -> list[dict]:
 
 
 def markets_research(dirs=(), results=None, path: Path = MARKETS_RESEARCH_FILE) -> dict | None:
-    """Record > Goals & corners: the committed research numbers (lab/markets_research.json)
-    plus the live team-total test's progress. None if the file is missing or unreadable;
-    a progress failure leaves an error note and keeps the research. Never raises."""
+    """Moneyline's goals-market rows (Goals markets, Team totals): the committed research
+    numbers (lab/markets_research.json) plus the live team-total test's progress. None if
+    the file is missing or unreadable; a progress failure leaves an error note and keeps the
+    research. Never raises."""
     try:
         data = json.loads(Path(path).read_text())
         if not isinstance(data, dict):

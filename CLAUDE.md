@@ -687,8 +687,8 @@ the owner's baseball app, so the balance can drop without any run here.
     of every logged team line, `p_model_over` and `fair_over` vs over won, from HC/AC or ESPN
     counts; half lines only, whole lines and pushes counted; `quotes`, `settled`, `unsettled`,
     `whole_lines`, `pushes`, `matches`, `model`, `price`; `{error}` on failure). `models` =
-    `equations.section(data)`. Legacy
-    `portfolio.live`/`backtest`/`player_model` stay until Record stops reading `player_model`.
+    `equations.section(data)`. Legacy `portfolio.live`/`backtest` are no longer read by the app
+    (v66) and can go; `player_model` is still read (Player shots → Backtest).
   - Paper CLI lines: "Paper rule: …", "Match strategy <label>: N trades, M open, S settled",
     "Corner paper trades: …", "Corner strategy <label>: …".
 
@@ -861,7 +861,8 @@ the owner's baseball app, so the balance can drop without any run here.
   `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
   arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
   holdout still locked.
-- `lab/markets_research.json`: goal and corner research numbers for Record → Goals & corners,
+- `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
+  Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
 - `edge/`: `signals.py`, `totals.py`, `corners.py` (bake-off 1), `corner_recal.py`, `corners2.py`
   (bake-off 2; its 2026/27 test is locked until `EARLIEST_OPEN` 3 Feb 2027), `corner_history.py`
@@ -940,7 +941,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v65) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v66) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -948,8 +949,12 @@ the owner's baseball app, so the balance can drop without any run here.
   on ↻ also reloads when the deployed `sw.js` names another version (`newerAppDeployed`). The
   header subtitle ends "App vNN". The smoke test's `updateCheck` runs with the service worker
   allowed: first install no reload, a new `sw.js` one reload, ↻ on a newer `sw.js` one reload.
-- Tabs: Matches; Teams (per league, with Players season stats); Record (Match bets, Goals &
-  corners, Player shots); Portfolio; Explore.
+- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Explore. The Record
+  tab was retired in v66 (owner via the lead, 28 Oct; `setTab` sends any unknown tab to
+  Portfolio): Goals & corners became Moneyline's goals rows (below), Match bets' model replay
+  moved to Moneyline → Model (`modelReplayHtml`) and its DraftKings threshold sweep to Model 12%'s
+  Premier League backtest (`dkSweepHtml`), Player shots to the retired portfolio's Backtest
+  (`playerBacktestHtml`), and its minimum-edge panels were dropped (a one-line note stays).
 - Competition filter (`leagueFilter`, localStorage `league`): chips for every league with fixtures
   or trades (on Moneyline → Backtest also every league in the backtest files); `LEAGUES` names;
   "xG" only in Understat leagues (`XG_LEAGUES`), else "exp. goals".
@@ -1211,22 +1216,33 @@ the owner's baseball app, so the balance can drop without any run here.
     won/lost/void; readout "Sat 18 Oct · +$23.40 to date · that day +$8.20 on 5 trades (3–2)",
     the latest day by default; its $0 origin is a stop too, labelled with the first trade
     opened, `firstOpened`, readout "Thu, Oct 9 · first trade opened · …"), `overlayCurveChart`
-    (same id), Record's running profit (`profitChart`, id `pc`, readout under the chart), the
+    (same id), the running profit (`profitChart`, id `pc`, readout under the chart; Moneyline →
+    Model's replay and the classic backtest views), the
     blend's shape (`shape-<code>`, 1-point steps 4–94%, a dot on each of the three curves) and
     model (f)'s shape (`cshape-<code>`) and the backtest's claimed edge vs CLV (`ce-…`);
   - point (`pick`): `reliabilityChart` (`rel-…`, `qrel-<book>`): one stop per bin of chances
     holding every series' point, nearest by x then distance, all series' marks highlighted and
     compared in one readout;
-  - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, Record → Goals &
-    corners, the backtest's CLV bands), `binRowsChart` (bets and live trades), `oddsBandChart`
+  - row (`rows`): `rangeChart` (per-league ROI/CLV, corner development, the Goals markets
+    row, the backtest's CLV bands), `binRowsChart` (bets and live trades), `oddsBandChart`
     (`ob-…`), `edgeBucketsHtml` (`eb-<pfId>`) and the
     Teams players chart (`devChartHtml`, id `dev`, bars as stops).
   Not charts: the match card's 1X2 bar, the Teams table's net bars and the team-total progress
-  bar (numbers printed beside them); Record's threshold sweeps are tables.
-- **Record**: Match bets ("Against DraftKings' prices" from `E0_dk.json` strategies, then the
-  Pinnacle replay; other leagues get a note), Goals & corners (`data.markets_research`: verdicts
-  and `rangeChart` per league, team-total progress), Player shots (strategy switch, threshold
-  sweep, predicted vs actual).
+  bar (numbers printed beside them); threshold sweeps are tables.
+- **Goals rows in Moneyline** (v66; `marketStudies` adds them to `studies()` from
+  `data.markets_research`, `isMarketStudy`, `marketStudyHeadline`, `marketStudyPageHtml`):
+  "Goals markets: total goals and each team's goals" (`goals_markets`, verdict "closed", pill
+  Closed, in the Archive; the total-goals CLV `rangeChart` `tg`, the league tables folded, each
+  team's goals' research with its live part pointing at the next row) and "Team totals (logging
+  only)" (`team_totals_log`, verdict "testing", pill Testing, in the main list;
+  `teamTotalsProgressHtml`: settled of 50 toward the round-13 gate). Neither has Result/Why.
+  **Moneyline → Model** under All or the Premier League ends with "The model replayed, Premier
+  League" (`data.record`: accuracy vs the price, the 12% replay in units, goals + xG vs goals only,
+  the running profit folded); other leagues get a one-line note. **Model 12% → Backtest,
+  Premier League** folds `E0_dk.json`'s sweep (Model alone and Blend columns, odds caps) and log
+  loss (`details.dk-sweep`) under its bets. **Player shots → Backtest**: the classic view, then
+  "The strategies compared" (switch `data-recstrat`, tiles for a non-main strategy, the sweep,
+  predicted vs actual, the shot model's checks).
 - Live trade fields the app reads (Moneyline contract): per trade `close_odds`,
   `close_fetched_at`, `close_minutes_before`, `clv_dk`, `beat_close_dk`; summary `clv_dk`,
   `beat_close_dk`, `close_early`. A close over 60 min before kickoff is "approx."
@@ -1320,8 +1336,8 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 - Name watch: check each publish log's "Duplicate fixtures" and "odds events unmatched" lines; a
   promoted or relegated club needs its spelling checked (`odds-check.yml` `task=markets` /
   `task=espn` with `leagues=…`, free).
-- Housekeeping: drop the legacy `portfolio.live` / `portfolio.backtest` keys once Record stops reading
-  `player_model`.
+- Housekeeping: the app stopped reading the legacy `portfolio.live` / `portfolio.backtest` keys in
+  v66, so paper.py can drop them; `player_model` stays (Player shots → Backtest reads it).
 
 ## Conventions
 
