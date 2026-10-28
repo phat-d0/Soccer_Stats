@@ -60,6 +60,7 @@ def test_the_app_file_has_the_shape_the_app_reads_and_round_trips():
     assert [b["date"] for b in out["bets"]] == sorted(b["date"] for b in out["bets"])
     assert out["why"][0]["rows"][0]["n"] == first
     assert out["verdict_text"].startswith("No. First, why holding looks so bad")
+    assert out["sample_note"].startswith("To avoid buying any match twice")
     assert json.loads(cr.canonical(out)) == json.loads(json.dumps(out))
 
 

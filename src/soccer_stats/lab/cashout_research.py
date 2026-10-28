@@ -297,6 +297,17 @@ def assemble(pos: list[dict], res: dict, bc_pos: list[dict], h_2025: int) -> dic
         f"{pb_rule['decisions']} cash-outs. A free cash-out helps a little, because the "
         "in-play price slightly overrates a leading underdog; a realistic fee eats that."
     )
+    sample_note = (
+        "To avoid buying any match twice, the sample left out the matches earlier tests had "
+        f"already bought ({len(bc4)} at 4.0+, plus a few of design H's). Those were favourites "
+        "losing at half-time, so the underdogs we left out were mostly ones leading at "
+        "half-time, and about half of them went on to win. That makes holding look worse "
+        f"here ({_signed(hold['mean'])} per $1) than backing long shots really is: with them put "
+        f"back, holding returns {_signed(hold_bc)}, and in 2025/26, where none of B or C's "
+        f"matches were left out, {_signed(h25['mean'])}. The comparison between cashing out "
+        "and holding is still fair, because what was left out depends only on the pre-match "
+        "price and the half-time score, both known when the rule decides."
+    )
     why = [
         {
             "title": "Why holding lost so much",
@@ -368,6 +379,7 @@ def assemble(pos: list[dict], res: dict, bc_pos: list[dict], h_2025: int) -> dic
         ),
         "verdict": v["verdict"],
         "verdict_text": verdict_text,
+        "sample_note": sample_note,
         "test_verdict": v,
         "primary_rule": {"t": t, "m": m, "s": s},
         "closed_at": "2026-10-28",
