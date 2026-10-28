@@ -407,7 +407,7 @@ def update_ledger(
             if not pick:
                 continue
             tid = tr.trade_id(league, tr.season_label(kickoff), c["home"], c["away"])
-            if tid in ledger:
+            if tr.holds(ledger, tid):
                 continue
             base = _base_probs(c)
             t = tr.new_trade(
@@ -566,11 +566,11 @@ def _open_lean(ledger, c, kickoff, now, fetched, league, ref, lean, shadow=None)
         p_source="blend",
         strategy="lean",
     )
-    if t["id"] in ledger:
+    if tr.holds(ledger, t["id"]):
         return None
     in_range = tr.in_lean_range(pick["odds"])
     if not in_range:
-        if shadow is None or t["id"] + tr.SHADOW_SUFFIX in shadow:
+        if shadow is None or tr.holds(shadow, t["id"] + tr.SHADOW_SUFFIX):
             return None
         t["id"] += tr.SHADOW_SUFFIX
         t.update(shadow=True, excluded_by="odds_range")
@@ -1059,7 +1059,7 @@ def update_corner_ledger(
                 ref=ref,
                 book=book,
             )
-            if t["id"] in ledger:
+            if tr.holds(ledger, t["id"]):
                 continue
             t["model_mean"] = model.get("mean")
             # Until a later quote, the entry price is the close.
@@ -1539,7 +1539,7 @@ def variant_since(parent: list[dict], kept: list[dict], defined_at: str) -> dict
 
 
 def _match_key(t: dict) -> str:
-    return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away"))
+    return "|".join(str(t.get(k)) for k in ("league", "season", "home", "away")).casefold()
 
 
 def _has_value(v) -> bool:

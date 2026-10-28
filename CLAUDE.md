@@ -572,7 +572,11 @@ the owner's baseball app, so the balance can drop without any run here.
 
 **Trades and portfolio**
 - `trades.py`: the trade rules; keep it free of network code.
-  - Match bets: `best_pick`/`select_trades` (12% by default), $10, one per match.
+  - Match bets: `best_pick`/`select_trades` (12% by default), $10, one per match. Every open
+    step (match, Lean, its shadow, DNB, corners) checks `holds(ledger, id)`, which ignores
+    case: ESPN renamed a Champions League club only in case between builds ("VIKING FK", then
+    "Viking FK", 18 Oct) and that opened a second trade. `publish.duplicate_fixtures` also
+    compares names without case. Domestic cards take football-data's names and can't split.
   - `PAPER_RULE = "fixed_raw"` (`PAPER_RULES` also has `"learned"`; reverting is one line).
     `paper_threshold(dk, league)` under `fixed_raw` = `{threshold: 0.12, source: "owner_fixed",
     note: OWNER_FIXED_NOTE, rule: "fixed_raw", p_source: "model"}` in every league; the trade uses

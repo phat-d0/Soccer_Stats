@@ -639,6 +639,16 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
     return "|".join([league, str(season), home, away, *extra])
 
 
+def holds(ledger, tid: str) -> bool:
+    """Whether `ledger` (ids, or a dict keyed by them) already holds trade `tid`, ignoring
+    case: ESPN renamed a Champions League club between builds ("VIKING FK" then "Viking
+    FK", 18 Oct), and the second spelling must not open a second trade on the match."""
+    if tid in ledger:
+        return True
+    key = tid.casefold()
+    return any(x.casefold() == key for x in ledger)
+
+
 ENTRY_FIELDS = (
     "id source bet_type league season opened_at kickoff hours_to_kickoff home away market "
     "odds odds_fetched_at model_p model_p_base edge threshold stake news_applied model_ref look "
