@@ -231,7 +231,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 ## The Odds API
 
-- Repo secret `ODDS_API_KEY`, 100K-credit plan, **shared with the owner's baseball app**.
+- Repo secret `ODDS_API_KEY`, ~5M-credit plan since 28 Oct (was 100K), **shared with the owner's baseball app**.
   Read the balance from the publish log ("credits left") or a backfill log. Never print the
   key or write it into logs, data, the ledger or commits. Only the lead sets credit caps;
   the default cap is 0.
@@ -1111,9 +1111,10 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 **Owner preferences:**
 - Plain English, no branch names in parentheses in session titles or summaries.
 - Session titles follow "Soccer team: <Role>", like the baseball team.
-- One shared Odds API key on the 100K plan (the owner decided against two keys on cost).
-  Baseball usage is small in its post-season, which ends late October.
-- Credit caps are 0 unless the owner approves a spend.
+- One shared Odds API key, upgraded 28 Oct to ~5M credits a month (owner: "don't skimp on
+  data"). Baseball usage is small in its post-season, which ends late October.
+- Credit caps are still set by the lead (0 by default in code), but data spend is now approved
+  generously: estimate first, pre-register any research purchase, keep the 3,000 reserve.
 
 **Open threads:**
 - Player shots are parked (owner, 9 Oct): no new work or spend; the free display and weekly
