@@ -2556,3 +2556,36 @@ ran, and the results will follow below it with run ids.
 - results in this section with run ids;
 - a plain-English summary for the owner: what was tried, what the best looked like, how
   likely that was luck, and what the holdout said.
+
+**Implementation notes (28 Oct, written with the code and before the full run;
+`lab/strategy_search.py`).** These pin down choices the design left open. None was picked
+from a result. The only run before this note was a two-league smoke test (E1 and E2, 200
+draws) to check the code works; it is not a result.
+- **Refits:** the model refits weekly (`backtest.walk_forward`, as every backtest here); the
+  blend and σ every 28 days (`lean_backtest.walk_forward`).
+- **Lean bases** exist only for 1X2 and draw no bet, the markets with a fitted blend. AH and
+  over/under have the edge and every-side bases.
+- **Filters:**
+  - "Strength gap" = |model home chance − model away chance|, cut at the window's quintiles;
+  - "Weekend" = Saturday or Sunday;
+  - "Shared kickoff" = another match in the league kicks off at the same date and time
+    (football-data's `Time`);
+  - "Favourite" = the side with the highest margin-free early chance in its market;
+  - edge and z quintiles are cut per market;
+  - driver = "market" when z with the model's term removed reaches 1.
+- **Every side** bets every side of every match, so its arms hedge within a match. They
+  still count as arms.
+- **The reality check's universe** is the arms that could be finalists: those with at least
+  300 bets. A 2-bet arm can't be a finalist, so it can't set the bar. The same check over
+  every arm is printed beside it.
+  - Each arm gets an adjusted p: the share of draws whose recentred maximum reaches its
+    mean. A finalist needs p < 0.05. For the best arm this is White's p.
+  - The no-skill null's share of arms above 0 is measured on the same draws.
+- **Sizing** runs on the finalists and the ten best arms by the CLV range's lower end, not
+  on all of them. Kelly needs the blend's chance, so AH and over/under get flat and the
+  stop rule only.
+- **Exits:** the exploratory exit arms are the "Cash-out" section's numbers on the spent
+  comeback sample. They are quoted, not rerun.
+- **Holdout scoring** is written only if a finalist appears. It then reads the holdout once,
+  after a logged `Holdout.unlock(reason)`, with the window's frozen cuts. With no finalist,
+  no code ever reads 2024/25 onward.

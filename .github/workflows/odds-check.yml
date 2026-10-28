@@ -93,6 +93,9 @@
 #             development seasons only (no credits).
 #   signals:  free signals (xG form, rest, model, soft books) vs Pinnacle's early-to-close
 #             move and as blend inputs (no credits).
+#   strategy-search: the owner's strategy search (docs/lab.md "Strategy search with a locked
+#            holdout"): every arm on football-data before 2024-07-01, the reality check,
+#            finalists; no key. The holdout is never read here.
 #   band-edges: a minimum edge per price band for the match rule (docs/lab.md, "Price-band
 #            edge rule", owner 20 Oct): chosen on 2019/20-2022/23, checked once on
 #            2023/24-2024/25 at Pinnacle's early prices, eight leagues. No key, no credits.
@@ -105,9 +108,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, inplay-probe, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, espn]
         default: coverage
       cap:
         description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe: most credits to spend (0 = dry run)"
@@ -236,25 +239,25 @@ jobs:
           key: comebacks-${{ inputs.league }}-none
           restore-keys: comebacks-${{ inputs.league }}-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' }}
         with:
           path: data/raw
           key: understat-SP1-none
           restore-keys: understat-SP1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' }}
         with:
           path: data/raw
           key: understat-D1-none
           restore-keys: understat-D1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' }}
         with:
           path: data/raw
           key: understat-I1-none
           restore-keys: understat-I1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' }}
         with:
           path: data/raw
           key: understat-F1-none
@@ -462,6 +465,8 @@ jobs:
                 uv run soccer-stats espn-probe
               fi ;;
             band-edges) uv run soccer-stats backtest-band-edges --json out/band_edges.json ;;
+            strategy-search) uv run python -m soccer_stats.lab.strategy_search \
+                     --json out/strategy_search.json --arms-json out/strategy_search_arms.json ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log
