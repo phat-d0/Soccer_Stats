@@ -1199,19 +1199,30 @@ const STEPS = [
     await scrubCheck(p, "[data-scrub='why0']");
     await p.click('button[data-pf="result"]');
   }],
-  // A failed pre-match study sits in Moneyline's Archive with its pill and result.
+  // A failed pre-match study sits in Moneyline's Archive with its pill and result: the real
+  // strategy search (Research, #131), shown through its own search view (lead brief, 28 Oct).
   ["portfolio-study-moneyline", async (p) => {
     await pfOpenPf(p, "moneyline");
     if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="strategy_search"]').count())) throw new Error("the failed study isn't in the Archive");
     const row = (await p.locator('button[data-pfstrat="strategy_search"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Strategy search: home underdogs", "Failed", "never traded", "per $1"]) if (!row.includes(w)) throw new Error(`study row lacks "${w}": ${row}`);
+    for (const w of ["Strategy search", "Failed", "never traded", "free data, no credits", "None found", "of 11,857 rules", "luck check p 0.94"]) if (!row.includes(w)) throw new Error(`study row lacks "${w}": ${row}`);
     if (!(await p.textContent("#view")).includes("Failed studies stay here with their result")) throw new Error("archive note for studies");
     await p.click('button[data-pfstrat="strategy_search"]');
     await p.click('button[data-pf="result"]');
     if ((await p.locator(".crumbs").innerText()).replace(/\s+/g, " ") !== "‹ Portfolio › Moneyline") throw new Error("study crumbs");
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No: the finalist lost", "tested on free historical prices", "Pinnacle's price's chance"]) if (!text.includes(w)) throw new Error(`moneyline study lacks "${w}"`);
+    for (const w of ["No strategy found", "Rules tried", "11,857", "Best CLV", "+1.3%", "luck check p 0.94", "Beat the close", "about 50% by chance", "The best rule, against luck", "a search with no skill finds one as good as this 94% of the time", "So no rule passed", "How many rules beat the close", "Profit over time: the best rule by CLV", "Every market, every side", "Best rules by closing line value", "Best rules by return (ROI)"]) if (!text.includes(w)) throw new Error(`strategy search lacks "${w}"`);
     if (await p.locator("#view .chips").count()) throw new Error("a study page has no competition chips");
+    if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 1) throw new Error("one curve for the best rule");
+    for (const id of ["cbcv", "cbshare", "cbmk"]) {
+      await p.locator(`[data-scrub='${id}']`).evaluate((e) => e.scrollIntoView({ block: "center" }));
+      await scrubCheck(p, `[data-scrub='${id}']`);
+    }
+    await p.click("details.cb-bets > summary");
+    // (some of its bets have no closing price, so only the market and side are certain)
+    if (!/Asian handicap, /.test(await p.locator("details.cb-bets .cb-table tbody tr").first().innerText())) throw new Error("search bet row");
+    await p.click('button[data-pf="why"]');
+    if (!(await p.textContent("#view")).includes("How this was measured")) throw new Error("search why");
   }],
   // Leaving Comeback bets: another portfolio's views come back on Live paper.
   ["portfolio-comebacks-leave", async (p) => {

@@ -847,7 +847,10 @@ the owner's baseball app, so the balance can drop without any run here.
     its own try; log "Research studies: <id> <verdict>, …"). Registered: `comeback_ht`
     (`comeback_research.json`), `heavy_fav_ht` (`heavy_favourites_research.json`),
     `cashout_ht` (`cashout_research.json`), `underdog_50` (`underdog_cashout_research.json`),
-    `strategy_search` (`strategy_search_research.json`, Moneyline). The file shape is under
+    `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
+    study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
+    `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
+    `bets_of`; the app gives it its own view. The file shape is under
     "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
@@ -972,6 +975,16 @@ the owner's baseball app, so the balance can drop without any run here.
   adds "N studies running"). A study's page (`studyPageHtml`, from `pfStrategyHtml` for any
   selected study) has Result and Why; a pending study's Result is its plan (`studyPlanHtml`:
   pre-registered date and commits, planned sample, credit cap, spent so far, question, rule).
+  A search study (`studySearch`: the judged design has `arms`; today the real strategy search,
+  `strategy_search_research.json`, #131, in Moneyline's Archive) has its own Result
+  (`studySearchHtml`): verdict, tiles (rules tried, best CLV with the luck check's p, the share
+  of large rules beating the close against a no-skill search, finalists and cost), "The best rule,
+  against luck" (`reality_check.clv`), the shares as rows (`cbRowsChart` `cbshare`), the best
+  rule's curve (`cbcv`, from `bets`' `profit`; `bets_of` names it), every market (`rangeChart`
+  `cbmk` from `by_market`), the best rules by CLV (`top_clv`, 10 then a fold) and by ROI (folded)
+  with each rule's p, and the bets (market and side, CLV; result from `profit`). Rule labels are
+  put into words by `ruleWords` ("Asian handicap, edge ≥ 0% · Premier League, odds 2–3"). Its row
+  reads "None found · of 11,857 rules". The fixture keeps 60 of its bets and 12 rules per list.
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live

@@ -4139,11 +4139,15 @@ function studyJudged(sd) {
   const k = Object.keys(ds).find((x) => ds[x]?.role === "judged") || Object.keys(ds)[0];
   return k && ds[k] ? { key: k, d: ds[k], short: designShort(k, ds[k]) } : null;
 }
-const designShort = (k, d) => d?.short || (k === "pooled" ? "all designs together" : `design ${k}`);
+const designShort = (k, d) => d?.short || (k === "pooled" ? "all designs together" : k.length === 1 ? `design ${k}` : k.replace(/_/g, " "));
+// A search study (Research's strategy search, 28 Oct): its judged design counts `arms` (rules
+// tried) and carries best_clv, reality_check, positive_share, by_market, top_clv, top_roi.
+const studySearch = (sd) => { const j = studyJudged(sd); return j && j.d.arms ? j : null; };
+const pText = (v) => (isNum(v) ? (v >= 0.995 ? "0.99+" : v.toFixed(2)) : "–");
 const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"] };
 const verdictPill = (sd) => { const [t, c] = VERDICT[sd.verdict] || ["Running", "v-run"]; return `<span class="pill ${c}">${t}</span>`; };
 const studyDay = (d) => (d ? monthDay(`${String(d).slice(0, 10)}T12:00:00Z`) : "");
-const studyCost = (sd) => (isNum(sd.cost?.total) ? `${num(sd.cost.total)} credits` : "");
+const studyCost = (sd) => (isNum(sd.cost?.total) ? (sd.cost.total ? `${num(sd.cost.total)} credits` : "free data, no credits") : "");
 // A study's row: its verdict pill, headline number and cost (lead brief, 28 Oct).
 function studyHeadline(sd) {
   const j = studyJudged(sd), pl = sd.planned || {};
@@ -4155,12 +4159,17 @@ function studyHeadline(sd) {
   }
   const when = sd.closed_at ? ` ${studyDay(sd.closed_at)}` : "";
   const meta = [`${sd.verdict === "pass" ? "Passed" : "Closed"}${when}`, sd.verdict === "fail" ? "never traded" : "", studyCost(sd)].filter(Boolean).join(" · ");
+  if (j?.d.arms) {
+    const found = (j.d.finalists || []).length;
+    return { right: `<b class="${found ? "pos-text" : "neg-text"}">${found ? `${num(found)} found` : "None found"}</b><small>of ${num(j.d.arms.total)} rules</small>`, meta };
+  }
   if (!j || !isNum(j.d.roi)) return { right: `<b class="muted">–</b><small>no result in this update</small>`, meta };
   return { right: `<b class="${signCls(j.d.roi)}">${signedPct(j.d.roi)}</b><small>${num(j.d.bets)} bets · per $1</small>`, meta };
 }
 function studyRowHtml(x) {
   const sd = x.study, h = studyHeadline(sd), j = studyJudged(sd);
   const bt = sd.verdict === "pending" ? (sd.planned?.note ? esc(sd.planned.note) : "Pre-registered: the result shows here once the prices are in")
+    : j?.d.arms ? `Best rule beat the close by ${signedPct(j.d.best_clv?.clv)} · luck check p ${pText(j.d.reality_check?.clv?.p_best)} · Result: ${sd.verdict === "fail" ? "no strategy" : "a finalist"}`
     : `${j ? `Judged on ${esc(j.short)} · ${num(j.d.wins)} of ${num(j.d.bets)} won · ` : ""}Result: ${sd.verdict === "fail" ? "no edge" : sd.verdict === "pass" ? "passed" : esc(sd.verdict || "–")}`;
   return `
     <button class="row-btn folder strat study-row${archivedStrat(x) ? " archived" : ""}" data-pfstrat="${esc(x.key)}">
@@ -4213,7 +4222,7 @@ function studyPageHtml(cur, sd) {
   const head = `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(studyStrat(sd).label)} ${verdictPill(sd)}</h2><div class="pf-sub">${sub}</div>`;
   if (sd.verdict === "pending") return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studyPlanHtml(sd)}`;
   if (!studyJudged(sd)) return `${head}${toggle}<div class="empty">This study's result isn't in this update. It comes back with the next site update.</div>`;
-  return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studyResultHtml(sd)}`;
+  return `${head}${toggle}${view === "why" ? studyWhyHtml(sd) : studySearch(sd) ? studySearchHtml(sd) : studyResultHtml(sd)}`;
 }
 const cbStrategyHtml = (cur) => {
   const list = studiesFor(CB_ID).map(studyStrat);
@@ -4289,7 +4298,7 @@ function cbRowsChart(id, rows, refName, refRead) {
 }
 // Each design's line on the profit chart; the comeback study's names stay as they were.
 const CB_SERIES = { C: "Design C (judged)", B: "Design B (first look)", pooled: "C and B together" };
-const seriesName = (k, d) => d.series || CB_SERIES[k] || `${capFirst(designShort(k, d))}${d.role === "judged" ? " (judged)" : ""}`;
+const seriesName = (k, d) => d.series || (d.arms ? "Best rule by closing line value" : "") || CB_SERIES[k] || `${capFirst(designShort(k, d))}${d.role === "judged" ? " (judged)" : ""}`;
 const betProfit = (b) => (isNum(b.profit) ? b.profit : b.won ? b.odds - 1 : -1); // per $1
 // Profit over time at $1 a bet, one line per design (judged solid, the others dashed; "pooled"
 // is every bet).
@@ -4299,7 +4308,7 @@ function cbProfitChart(sd) {
   const j = studyJudged(sd);
   const keys = [j.key, ...Object.keys(sd.designs).filter((k) => k !== j.key)];
   const series = keys.map((k) => {
-    const mine = bets.filter((b) => k === "pooled" || b.design === k);
+    const mine = bets.filter((b) => k === "pooled" || (b.design ?? j.key) === k);
     const byDay = new Map();
     let cum = 0;
     for (const b of mine) {
@@ -4331,6 +4340,86 @@ function costParts(sd, jKey) {
   parts.sort(([a], [b]) => (name(b) === jKey) - (name(a) === jKey));
   return parts.map(([k, v]) => `${name(k)} ${num(v)}`).join(" · ");
 }
+// A study bet's second line and result: its own words, the comeback's half-time state, or the
+// market and side with its CLV; a bet without `won` reads its result from `profit` per $1.
+const MARKET_SHORT = { "1x2": "1X2", dnb: "Draw no bet", ah: "Asian handicap", ou: "Over/under 2.5" };
+// A search rule's label in words: "ah edge>=0% [league=E0, price=2-3]" → "Asian handicap, edge
+// ≥ 0% · Premier League, odds 2–3". Unknown filters keep their own name and value.
+function ruleWords(label) {
+  const m = String(label || "").match(/^(\S+)\s*(.*?)\s*(?:\[(.*)\])?$/);
+  if (!m) return String(label || "");
+  const head = `${MARKET_SHORT[m[1].toLowerCase()] || m[1]}${m[2] ? `, ${m[2].replace(/>=/g, "≥ ").replace(/<=/g, "≤ ")}` : ""}`;
+  const filt = (m[3] || "").split(",").map((f) => f.trim()).filter(Boolean).map((f) => {
+    const [k, v = ""] = f.split("=");
+    if (k === "league") return leagueName(v);
+    if (k === "price") return `odds ${v.replace("-", "–")}`;
+    if (k === "day") return v === "weekend" ? "weekends" : v === "midweek" ? "midweek" : `day ${v}`;
+    if (k === "side") return `${v.replace(/^[a-z0-9]+_/, "")} side`;
+    return `${k.replace(/_/g, " ")} ${v}`;
+  });
+  return `${head}${filt.length ? ` · ${filt.join(", ")}` : ""}`;
+}
+function studyBetMeta(x) {
+  if (x.pick) return esc(x.pick);
+  if (x.fav && x.ht != null) return `${esc(x.fav === "home" ? x.home : x.away)} behind ${esc(x.ht)} at half-time`;
+  if (x.market || x.side) {
+    const side = String(x.side || "").replace(/^[a-z0-9]+_/, "");
+    const team = side === "home" ? x.home : side === "away" ? x.away : side;
+    return `${esc(MARKET_SHORT[x.market] || x.market || "")}${team ? `, ${esc(team)}` : ""}${isNum(x.clv) ? ` · CLV ${signedPct(x.clv)}` : ""}`;
+  }
+  return "";
+}
+function studyBetResult(x) {
+  if (x.result_text) return `<b class="${signCls(betProfit(x))}">${esc(x.result_text)}</b>`;
+  if (x.won === undefined && isNum(x.profit)) return x.profit > 0 ? `<b class="pos-text">Won ${usd(x.profit, 2)}</b>` : x.profit < 0 ? `Lost ${usd(x.profit, 2)}` : "Push";
+  return x.won ? '<b class="pos-text">Won</b>' : "Lost";
+}
+// The strategy search's Result (lead brief, 28 Oct): the verdict, how many rules were tried,
+// the best against the luck check (White's reality check), the share of rules beating the close
+// against a search with no skill, every market, the best rules, and the best rule's curve.
+function studySearchHtml(sd) {
+  const j = studySearch(sd), d = j.d, a = d.arms || {}, best = d.best_clv || {}, rc = d.reality_check || {}, ps = d.positive_share || {};
+  const tile = (label, value, sub, cls = "") => `<div class="tile"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="sub">${sub}</div></div>`;
+  const found = (d.finalists || []).length;
+  const tiles = `<div class="tiles pf-tiles">
+    ${tile("Rules tried", num(a.total), `${num(a.eligible_clv)} large enough to judge on CLV${a.empty ? `; ${num(a.empty)} never bet` : ""}`)}
+    ${tile("Best CLV", signedPct(best.clv), `on ${num(best.clv_bets)} bets · luck check p ${pText(rc.clv?.p_best)}`, signCls(best.clv))}
+    ${tile("Beat the close", pct(ps.clv?.share, 0), `${num(ps.clv?.above_0)} of ${num(ps.clv?.arms)} large rules; about ${pct(ps.null_clv?.mean, 0)} by chance`, ps.clv && ps.null_clv && ps.clv.share < ps.null_clv.mean ? "neg-text" : "")}
+    ${tile("Finalists", found ? num(found) : "None", `${studyCost(sd) || "–"}`, found ? "pos-text" : "")}
+  </div>`;
+  const shareRows = ps.clv && ps.null_clv ? cbRowsChart("cbshare", [
+    { label: "This search", n: ps.clv.arms, unit: "rules", won: ps.clv.share, ref: ps.null_clv.mean, extra: `a search with no skill lands below ${pct(ps.null_clv.q95, 0)} 95% of the time` },
+    ...(ps.roi && ps.null_roi ? [{ label: "On return (ROI)", n: ps.roi.arms, unit: "rules", won: ps.roi.share, ref: ps.null_roi.mean, extra: `no-skill searches land below ${pct(ps.null_roi.q95, 0)} 95% of the time` }] : []),
+  ], "A search with no skill", "a no-skill search's") : "";
+  const mk = (d.by_market || []).filter((m) => isNum(m.clv));
+  const market = mk.length ? rangeChart("cbmk", mk.map((m) => ({
+    label: ruleWords(m.label || m.market), sub: `${num(m.clv_bets ?? m.bets)} bets`, v: m.clv, lo: m.clv_ci95?.[0], hi: m.clv_ci95?.[1],
+    readout: `<b>${esc(ruleWords(m.label || m.market))}</b>: ${num(m.bets)} bets, CLV ${signedPct(m.clv)}${rngText(m.clv_ci95)}; ROI ${signedPct(m.roi)}${rngText(m.roi_ci95)} per $1.`,
+  })), (v) => signedPct(v, 0)) : "";
+  const ruleRows = (rows, key) => rows.map((r) => `<tr><td>${esc(ruleWords(r.label))}</td><td class="num">${num(key === "clv" ? r.clv_bets ?? r.bets : r.bets)}</td><td class="num ${signCls(r[key])}">${signedPct(r[key])}<span class="meta rng">${ciText(r[`${key}_ci95`]) || ""}</span></td><td class="num">${key === "clv" ? signedPct(r.roi) : isNum(r.clv) ? signedPct(r.clv) : "–"}</td><td class="num">${pText(r[`p_${key}`])}</td></tr>`).join("");
+  const table = (rows, key) => `<div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>Rule</th><th>Bets</th><th>${key === "clv" ? "CLV" : "ROI"}</th><th>${key === "clv" ? "ROI" : "CLV"}</th><th>p</th></tr></thead><tbody>${ruleRows(rows, key)}</tbody></table></div>`;
+  const topClv = d.top_clv || [], topRoi = d.top_roi || [];
+  const shown = state.cbShown || 50;
+  const bets = (sd.bets || []).slice().reverse();
+  const betRows = bets.slice(0, shown).map((x) => `<tr><td>${esc(cbDate(x.date))}</td><td>${esc(leagueShort(x.lg))}</td><td>${esc(x.home)} v ${esc(x.away)}${studyBetMeta(x) ? `<span class="meta">${studyBetMeta(x)}</span>` : ""}</td><td class="num">${cbOdds(x.odds)}</td><td>${studyBetResult(x)}</td></tr>`).join("");
+  return `
+    <div class="verdict ${sd.verdict === "fail" ? "neg" : sd.verdict === "pass" ? "pos" : ""}">${esc(sd.verdict_text || "")}</div>
+    <p class="note">${esc(sd.live_note || "No live trades: every rule was tested on free historical prices and none earned a paper track. The numbers below are those tests, $1 a bet.")}</p>
+    ${tiles}
+    <div class="section-title">The best rule, against luck</div>
+    <p class="note">The best of ${num(a.total)} rules, <b>${esc(ruleWords(best.label) || "–")}</b>, beat Pinnacle's closing price by ${signedPct(best.clv)}${rngText(best.clv_ci95)} on ${num(best.clv_bets)} bets. Try enough rules and some beat the close by luck: if no rule had any edge, the best of this many would still reach ${signedPct(rc.clv?.null_max_95)} one time in twenty, and a search with no skill finds one as good as this ${pct(rc.clv?.p_best, 0)} of the time (p ${pText(rc.clv?.p_best)}). ${found ? `${num(found)} rule${found === 1 ? "" : "s"} passed every test.` : "So no rule passed: a finalist needed its CLV range above 0, at least 300 bets and p below 0.05."}</p>
+    ${shareRows ? `<div class="section-title">How many rules beat the close</div>${shareRows}<p class="note">Dot: the share of large rules (300 bets or more) that beat the close (or made money), with its range; tick: the share a search with no skill would find. If prices could be beaten by chance, about half would; far fewer did, so the market's closing price is hard to beat with these rules.</p>` : ""}
+    <div class="section-title">Profit over time: the best rule by CLV ($1 a bet)</div>
+    <div class="card pf-curve">${cbProfitChart(sd)}</div>
+    <p class="note">${esc(sd.bets_of ? `The rule: ${ruleWords(sd.bets_of)}.` : "")} It beat the closing price, but the luck check says rules like it turn up by chance.</p>
+    ${market ? `<div class="section-title">Every market, every side</div>${market}<p class="note">Betting every side in each market at Pinnacle's early price, against its close: the baseline every rule starts from.</p>` : ""}
+    ${topClv.length ? `<div class="section-title">Best rules by closing line value</div>${table(topClv.slice(0, 10), "clv")}${topClv.length > 10 ? `<details class="fold mk-fold"><summary>${num(topClv.length - 10)} more</summary>${table(topClv.slice(10), "clv")}</details>` : ""}<p class="note">p is the luck check for each rule: the chance a search with no skill finds one this good. Below 0.05 would count; none is.</p>` : ""}
+    ${topRoi.length ? `<details class="fold mk-fold"><summary>Best rules by return (ROI)</summary>${table(topRoi, "roi")}<p class="note">The best returns come from rules that lose to the closing price: luck on results, not an edge.</p></details>` : ""}
+    ${bets.length ? `<details class="fold mk-fold cb-bets"${state.cbShown ? " open" : ""}><summary>The best rule's ${num(bets.length)} bets, newest first</summary>
+      <div class="card" style="padding:8px 14px"><table class="mkts mk-table cb-table"><thead><tr><th>Date</th><th>Lg</th><th>Match</th><th>Odds</th><th>Result</th></tr></thead><tbody>${betRows}</tbody></table></div>
+      ${bets.length > shown ? `<button class="more" data-cbmore="1">Show more (${num(bets.length - shown)} left)</button>` : ""}
+    </details>` : ""}`;
+}
 function studyResultHtml(sd) {
   const j = studyJudged(sd), c = j.d, cap = capFirst(j.short);
   const others = Object.entries(sd.designs).filter(([k]) => k !== j.key);
@@ -4350,9 +4439,8 @@ function studyResultHtml(sd) {
     extra: `ROI ${signedPct(g.roi)}${rngText(g.roi_ci95)} per $1`,
   })), `${priceName}'s chance`, `the ${priceName.toLowerCase()}'s`);
   const shown = state.cbShown || 50;
-  const judged = (sd.bets || []).filter((x) => x.design === j.key).slice().reverse();
-  const betMeta = (x) => (x.pick ? esc(x.pick) : x.fav && x.ht != null ? `${esc(x.fav === "home" ? x.home : x.away)} behind ${esc(x.ht)} at half-time` : "");
-  const betResult = (x) => (x.result_text ? `<b class="${signCls(betProfit(x))}">${esc(x.result_text)}</b>` : x.won ? '<b class="pos-text">Won</b>' : "Lost");
+  const judged = (sd.bets || []).filter((x) => (x.design ?? j.key) === j.key).slice().reverse();
+  const betMeta = studyBetMeta, betResult = studyBetResult;
   const betRows = judged.slice(0, shown).map((x) => `<tr><td>${esc(cbDate(x.date))}</td><td>${esc(leagueShort(x.lg))}</td><td>${esc(x.home)} v ${esc(x.away)}${betMeta(x) ? `<span class="meta">${betMeta(x)}</span>` : ""}</td><td class="num">${cbOdds(x.odds)}</td><td>${betResult(x)}</td></tr>`).join("");
   const legacy = sd.id === LEGACY_STUDY.id;
   const designsNote = sd.designs_note || (legacy ? "Design C is the judged test, pre-registered before its prices were bought. Design B (the first look) and the two together are shown for description only."

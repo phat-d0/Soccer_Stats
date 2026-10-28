@@ -911,8 +911,18 @@ def _design(bets, role, label, band_noun=None):
 
 def add_research_studies(data: dict) -> None:
     studies = _clean(pub.research_studies())
+    # The real strategy search (Research, #131) is ~100 KB: the fixture keeps 60 of its best
+    # rule's bets (spread over the seasons) and the 12 best rules of each list.
+    for st in studies:
+        if st["id"] == "strategy_search":
+            bets = st.get("bets") or []
+            step = max(1, len(bets) // 60)
+            st["bets"] = bets[::step][:60]
+            for d in (st.get("designs") or {}).values():
+                for k in ("top_clv", "top_roi"):
+                    if isinstance(d.get(k), list):
+                        d[k] = d[k][:12]
     cash = _study_bets(36, "2024-08-17", 7, cashout=True)
-    search = _study_bets(30, "2023-08-12", 11)
     synthetic = [
         {
             "id": "heavy_fav_ht",
@@ -964,25 +974,6 @@ def add_research_studies(data: dict) -> None:
             ],
             "notes": ["Synthetic study for the fixture."],
             "runs": {"fetch": "1", "analysis": "2"},
-        },
-        {
-            "id": "strategy_search",
-            "portfolio": "moneyline",
-            "name": "Strategy search: home underdogs",
-            "title": "Strategy search",
-            "question": "Does any simple pre-match rule beat Pinnacle's close?",
-            "rule": "$1 on home underdogs priced 2.50 to 4.00, at Pinnacle's early price.",
-            "verdict": "fail",
-            "verdict_text": "No: the finalist lost to the closing price on the held-out seasons.",
-            "closed_at": "2026-10-02",
-            "preregistered": {"A": "0bcc7fa"},
-            "cost": {"total": 0},
-            "price_name": "Pinnacle's price",
-            "live_note": "No live trades: this rule was tested on free historical prices and "
-            "failed before any paper trade opened.",
-            "designs": {"A": _design(search, "judged", "Held-out seasons 2023/24 to 2024/25")},
-            "bets": search,
-            "notes": ["Synthetic study for the fixture."],
         },
     ]
     data["research_studies"] = studies + synthetic
