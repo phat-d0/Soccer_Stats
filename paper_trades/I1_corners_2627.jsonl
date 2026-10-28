@@ -88,3 +88,4 @@
 {"type":"update","id":"I1|2627|Milan|Bologna|corners|home|5.5|dk","at":"2026-10-28T19:30:40+00:00","status":"won","actual":2,"push":false,"profit":6.5,"score":"2-3 corners","settled_at":"2026-10-28T19:30:40+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Milan|Bologna|corners|home|4.5","at":"2026-10-28T19:30:40+00:00","status":"won","actual":2,"push":false,"profit":11.6,"score":"2-3 corners","settled_at":"2026-10-28T19:30:40+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Milan|Bologna|corners|home|4.5|dk","at":"2026-10-28T19:30:40+00:00","status":"won","actual":2,"push":false,"profit":11.0,"score":"2-3 corners","settled_at":"2026-10-28T19:30:40+00:00","result_source":"espn"}
+{"type":"update","id":"I1|2627|Genoa|Juventus|corners|home|3.5","at":"2026-10-28T22:00:38+00:00","status":"won","actual":6,"push":false,"profit":9.5,"score":"6-9 corners","settled_at":"2026-10-28T22:00:38+00:00","result_source":"espn"}
