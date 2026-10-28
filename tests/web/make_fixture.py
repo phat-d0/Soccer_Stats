@@ -1155,7 +1155,10 @@ def add_draftkings_backtests(sb: dict) -> None:
             continue
         sb[f"{key}_dk"] = {
             "available": True,
-            "kind": "draftkings",
+            "kind": src.get("kind"),
+            "book": "draftkings",
+            "coverage_note": "Made up for the fixture: DraftKings priced the match 48 hours "
+            "before kickoff, and Pinnacle's close was in the same snapshot.",
             "title": f"{'Lean' if key == 'lean' else 'Model 12%'} replayed on DraftKings' "
             "historical prices",
             "note": "Made up for the fixture from the Pinnacle replay until Moneyline's file "

@@ -2372,7 +2372,7 @@ const isClose = (l) => l?.kind === "close";
 // The same replay at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
 // strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape, CLV
 // against Pinnacle's close in the same snapshot). DraftKings comes first: we trade there.
-const isDkBt = (bt, part) => bt?.kind === "draftkings" || part?.kind === "draftkings";
+const isDkBt = (bt, part) => bt?.book === "draftkings" || bt?.kind === "draftkings" || part?.kind === "draftkings";
 const btWhere = (l, bt) => (isClose(l) ? "at DraftKings' close" : isDkBt(bt, l) ? "at DraftKings" : "at Pinnacle");
 const bookPrices = (bt) => (isDkBt(bt) ? "DraftKings' prices" : "Pinnacle's prices");
 const BT_SOURCES = [["dk", "At DraftKings' prices"], ["pin", "At Pinnacle's prices"]];
@@ -2409,7 +2409,8 @@ function btSourceView(key, lg) {
     <div class="section-title">The same rule at both books${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>
     ${lbCompare(parts.map((x) => [x.k === "dk" ? "DraftKings" : "Pinnacle", x.m]))}
     <p class="note">CLV is against Pinnacle's close in both. The two cover different seasons, so read the gap as the price difference plus some luck, not a like-for-like cut.</p>` : "";
-  return `${sw}${cover}${both}${strategyBacktestHtml(on.bt, lg, key)}`;
+  const covNote = files.map((x) => x.bt.coverage_note).filter(Boolean)[0];
+  return `${sw}${cover}${covNote ? `<details class="fold mk-fold"><summary>How coverage is counted</summary><p class="note">${esc(covNote)}</p></details>` : ""}${both}${strategyBacktestHtml(on.bt, lg, key)}`;
 }
 function btVerdict(bt, key = "lean") {
   const a = bt.all?.[key] || {};
