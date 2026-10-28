@@ -2922,7 +2922,7 @@ underdog 4.0+) made 570 qualifying decisions. Its growth difference against hold
 - **By season (4.0+, decisions):** 2024/25 190, 2025/26 307, 2026/27 to date 73. By league the
   difference ranges from SC0 +0.0022 to D2 −0.0014 (descriptive).
 
-**Descriptive extras (app file, run 40710797271; already read, not judged).**
+**Descriptive extras (app file, run 40711752539; already read, not judged).**
 - **With B and C's matches put back, half-time only** (they have no 70th-minute snapshot;
   279 of the 290 found in their snapshots): 5,680 positions at 4.0+, hold −15.2% (−20.4% to
   −9.6%). Cash out at 50%, 5% fee: 386 decisions, growth difference +0.00025 (−0.00005 to
