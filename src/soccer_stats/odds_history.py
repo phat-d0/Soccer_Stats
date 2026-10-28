@@ -30,7 +30,7 @@ import pandas as pd
 import requests
 
 from soccer_stats.data import RAW_DIR
-from soccer_stats.odds_feed import BOOKMAKER, SPORTS, parse_odds
+from soccer_stats.odds_feed import BOOKMAKER, BOOKMAKERS, SPORTS, parse_odds
 from soccer_stats.trades import season_label
 
 URL = "https://api.the-odds-api.com/v4/historical/sports/{sport}/odds"
@@ -39,6 +39,14 @@ CLOSE_MINUTES = 1  # the close: the last snapshot this long before kickoff
 GROUP_MINUTES = 15  # kickoffs this close together share snapshots
 COST_PER_SNAPSHOT = 20  # 10 credits per region per market; two markets
 KEEP_CREDITS = 1500  # leave about a month of hourly live refreshes untouched
+# The multi-league backfill (lead brief 2, 28 Oct; docs/leagues.md "DraftKings history"):
+# h2h only at the live call's ten books (one region, 10 credits a snapshot), a 48 h look
+# plus the close, and a guard per league-season: when its first GUARD_FIRST snapshots in
+# time order (cached or bought) hold no DraftKings price, the rest of that season is
+# skipped, as in comeback design C.
+TEN_BOOKS = BOOKMAKERS
+TEN_BOOKS_COST = 10
+GUARD_FIRST = 3
 STALE_HOURS = 6.0  # a price last updated longer than this before a look is missing
 
 
@@ -85,6 +93,11 @@ class BackfillReport:
     estimated_credits: int = 0  # for the snapshots still missing
     stopped: str | None = None  # why it stopped early, if it did
     errors: list[str] = field(default_factory=list)
+    # per season (football-data code, e.g. "2425"): snapshots seen, events in them, and
+    # events DraftKings / Pinnacle priced; filled for every snapshot on disk after the run
+    by_season: dict[str, dict] = field(default_factory=dict)
+    guarded: dict[str, str] = field(default_factory=dict)  # season -> why it was skipped
+    skipped: int = 0  # snapshots not bought because their season was guarded
 
     def lines(self) -> list[str]:
         out = [
@@ -94,10 +107,46 @@ class BackfillReport:
             f"Fetched {self.fetched}, credits used {self.credits_used}"
             + (f", credits left {self.credits_left}" if self.credits_left is not None else ""),
         ]
+        for season, b in sorted(self.by_season.items()):
+            ev = b["events"] or 1
+            out.append(
+                f"  {season[:2]}/{season[2:]}: {b['snapshots']} snapshots, {b['events']} events, "
+                f"DraftKings {b['draftkings']} ({b['draftkings'] / ev:.0%}), "
+                f"Pinnacle {b['pinnacle']} ({b['pinnacle'] / ev:.0%})"
+                + (f"; guarded: {self.guarded[season]}" if season in self.guarded else "")
+            )
+        if self.skipped:
+            out.append(f"Skipped {self.skipped} snapshots in guarded seasons")
         if self.stopped:
             out.append(f"Stopped: {self.stopped}")
         out += [f"Error: {e}" for e in self.errors[:5]]
         return out
+
+    def to_json(self) -> dict:
+        return {
+            "planned": self.planned,
+            "cached": self.cached,
+            "fetched": self.fetched,
+            "credits_used": self.credits_used,
+            "credits_left": self.credits_left,
+            "estimated_credits": self.estimated_credits,
+            "stopped": self.stopped,
+            "errors": self.errors[:5],
+            "by_season": self.by_season,
+            "guarded": self.guarded,
+            "skipped": self.skipped,
+        }
+
+
+def snapshot_counts(snap: dict) -> dict:
+    """Events in a saved snapshot, and how many DraftKings and Pinnacle priced."""
+    data = snap.get("data") or []
+    keys = [{b.get("key") for b in ev.get("bookmakers") or []} for ev in data]
+    return {
+        "events": len(data),
+        "draftkings": sum(BOOKMAKER in k for k in keys),
+        "pinnacle": sum("pinnacle" in k for k in keys),
+    }
 
 
 def backfill(
@@ -110,13 +159,23 @@ def backfill(
     api_key: str | None = None,
     raw_dir: Path = RAW_DIR,
     get: Callable = requests.get,
+    books: tuple[str, ...] = (BOOKMAKER,),
+    markets: str = "h2h,totals",
+    cost_per_snapshot: int = COST_PER_SNAPSHOT,
+    guard_first: int = 0,
 ) -> BackfillReport:
-    """Download the snapshots that aren't cached yet, within the credit limits."""
+    """Download the snapshots that aren't cached yet, within the credit limits.
+
+    `books`/`markets`/`cost_per_snapshot`: the original E0 run asked DraftKings alone for
+    h2h and totals (20 credits); the multi-league backfill asks TEN_BOOKS for h2h
+    (TEN_BOOKS_COST). With `guard_first`, a season whose first `guard_first` snapshots
+    hold no DraftKings price buys nothing more."""
     times = sorted({pd.Timestamp(t) for t in snapshot_times})
     todo = [t for t in times if not snapshot_path(league, t, raw_dir).exists()]
     rep = BackfillReport(planned=len(times), cached=len(times) - len(todo))
-    rep.estimated_credits = len(todo) * COST_PER_SNAPSHOT
+    rep.estimated_credits = len(todo) * cost_per_snapshot
     if dry_run or not todo:
+        _tally(rep, times, league, raw_dir)
         return rep
 
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
@@ -124,8 +183,20 @@ def backfill(
         rep.stopped = "no ODDS_API_KEY configured"
         return rep
 
-    cost = COST_PER_SNAPSHOT
-    for t in todo:
+    # Budget each call at the larger of the planned cost and the last call's real one
+    # (an empty snapshot bills less, which must not loosen the cap).
+    cost = cost_per_snapshot
+    seen: dict[str, list[int]] = {}  # season -> DraftKings-priced events per snapshot
+    for t in times:
+        season = season_label(t)
+        if season in rep.guarded:
+            rep.skipped += t in todo
+            continue
+        path = snapshot_path(league, t, raw_dir)
+        if path.exists():  # cached: counts toward the guard, costs nothing
+            dk = snapshot_counts(json.loads(path.read_text()))["draftkings"]
+            _guard(rep, seen, season, dk, guard_first)
+            continue
         if rep.credits_used + cost > max_credits:
             rep.stopped = f"--max-credits {max_credits} reached"
             break
@@ -137,8 +208,8 @@ def backfill(
                 URL.format(sport=SPORTS[league]),
                 params={
                     "apiKey": api_key,
-                    "bookmakers": BOOKMAKER,
-                    "markets": "h2h,totals",
+                    "bookmakers": ",".join(books),
+                    "markets": markets,
                     "oddsFormat": "decimal",
                     "dateFormat": "iso",
                     "date": t.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -157,31 +228,57 @@ def backfill(
             resp.headers.get("x-requests-remaining"),
             resp.headers.get("x-requests-last"),
         )
-        cost = int(float(last)) if last else cost
-        rep.credits_used += cost
+        spent = int(float(last)) if last else cost_per_snapshot
+        cost = max(cost_per_snapshot, spent)
+        rep.credits_used += spent
         rep.credits_left = int(float(remaining)) if remaining else rep.credits_left
         body = resp.json()
-        path = snapshot_path(league, t, raw_dir)
+        snap = {
+            "requested": t.isoformat(),
+            "timestamp": body.get("timestamp"),
+            "data": compact_events(body.get("data", []), books),
+        }
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(
-                {
-                    "requested": t.isoformat(),
-                    "timestamp": body.get("timestamp"),
-                    "data": compact_events(body.get("data", [])),
-                },
-                separators=(",", ":"),
-            )
-        )
+        path.write_text(json.dumps(snap, separators=(",", ":")))
         rep.fetched += 1
+        _guard(rep, seen, season, snapshot_counts(snap)["draftkings"], guard_first)
+    _tally(rep, times, league, raw_dir)
     return rep
 
 
-def compact_events(events: list[dict]) -> list[dict]:
-    """Keep only what the backtest needs: teams, kickoff and DraftKings' two markets."""
+def _guard(rep: BackfillReport, seen: dict, season: str, dk: int, first: int) -> None:
+    """Design C's empty-data guard: the first `first` snapshots of a season (in time
+    order) with no DraftKings price stop that season."""
+    if not first:
+        return
+    got = seen.setdefault(season, [])
+    got.append(dk)
+    if len(got) == first and not any(got):
+        rep.guarded[season] = f"no DraftKings price in its first {first} snapshots"
+
+
+def _tally(rep: BackfillReport, times, league: str, raw_dir: Path) -> None:
+    """Per-season counts over every planned snapshot on disk (cached or just bought)."""
+    for t in times:
+        path = snapshot_path(league, t, raw_dir)
+        if not path.exists():
+            continue
+        c = snapshot_counts(json.loads(path.read_text()))
+        b = rep.by_season.setdefault(
+            season_label(t), {"snapshots": 0, "events": 0, "draftkings": 0, "pinnacle": 0}
+        )
+        b["snapshots"] += 1
+        for k in ("events", "draftkings", "pinnacle"):
+            b[k] += c[k]
+
+
+def compact_events(events: list[dict], keep: Iterable[str] = (BOOKMAKER,)) -> list[dict]:
+    """Keep only what the backtest needs: teams, kickoff and the asked books' markets
+    (DraftKings alone for the original E0 run, TEN_BOOKS for the multi-league one)."""
+    keep = set(keep)
     out = []
     for ev in events:
-        books = [b for b in ev.get("bookmakers", []) if b.get("key") == BOOKMAKER]
+        books = [b for b in ev.get("bookmakers", []) if b.get("key") in keep]
         out.append(
             {
                 "commence_time": ev.get("commence_time"),

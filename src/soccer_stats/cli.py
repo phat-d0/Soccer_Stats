@@ -642,21 +642,43 @@ def _plan(league: str, seasons: list[int], looks: list[float]):
 
 
 def cmd_backfill(args: argparse.Namespace) -> None:
-    from soccer_stats.odds_history import backfill
+    import json
 
-    plan = _plan(args.league, _years(args.seasons), args.looks)
-    print(f"{plan['kickoff'].nunique()} kickoffs played in {args.seasons}")
-    rep = backfill(
+    from soccer_stats import odds_history as oh
+    from soccer_stats.data import season_kickoffs
+
+    ten = args.books == "ten"
+    if ten:  # the multi-league backfill: football-data's kickoffs, as dk-history estimates
+        kicks = pd.concat([season_kickoffs(args.league, y) for y in _years(args.seasons)])
+        now = pd.Timestamp.now(tz="UTC")
+        plan = oh.plan_snapshots(kicks[kicks < now], looks_hours=args.looks)
+    else:
+        plan = _plan(args.league, _years(args.seasons), args.looks)
+    print(
+        f"{args.league}: {plan['kickoff'].nunique()} kickoffs played in {args.seasons}; "
+        + ("h2h at ten books, 10 credits a snapshot" if ten else "DraftKings h2h and totals")
+        + (
+            f"; guard: {args.guard} snapshots without DraftKings stop a season"
+            if args.guard
+            else ""
+        )
+    )
+    rep = oh.backfill(
         plan["at"],
         args.league,
         max_credits=args.max_credits,
         keep_credits=args.keep_credits,
         dry_run=args.dry_run,
+        books=oh.TEN_BOOKS if ten else (oh.BOOKMAKER,),
+        markets="h2h" if ten else "h2h,totals",
+        cost_per_snapshot=oh.TEN_BOOKS_COST if ten else oh.COST_PER_SNAPSHOT,
+        guard_first=args.guard,
     )
     for line in rep.lines():
         print(line)
     if args.dry_run:
         print("Dry run: no API calls made.")
+    print("BACKFILL_ODDS_JSON", json.dumps({"league": args.league, **rep.to_json()}))
 
 
 def _pinnacle_edge_threshold(preds: pd.DataFrame, league: str) -> dict:
@@ -3060,6 +3082,19 @@ def main(argv: list[str] | None = None) -> None:
         help="never let credits left fall below this (live refreshes)",
     )
     bf.add_argument("--dry-run", action="store_true", help="print the plan; no API calls")
+    bf.add_argument(
+        "--books",
+        choices=["draftkings", "ten"],
+        default="draftkings",
+        help="draftkings: DraftKings h2h and totals (the original E0 run); ten: h2h at the "
+        "live call's ten books, football-data's kickoffs (the multi-league backfill)",
+    )
+    bf.add_argument(
+        "--guard",
+        type=int,
+        default=0,
+        help="stop a season after this many snapshots without DraftKings (0 = off)",
+    )
     bf.set_defaults(func=cmd_backfill)
 
     dk = sub.add_parser("backtest-dk", help="replay the trade rule on historical DraftKings odds")
