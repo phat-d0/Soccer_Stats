@@ -2579,6 +2579,115 @@ in H2's own pre-registration.
   first, the 3,000 reserve, the first call budgeted at 20, a stop on a call over 10 or any
   error, resumable 120-minute runs, and no guard. It reads no result.
 
+### H2U purchase and what the pre-match snapshots hold (28 Oct; counts only, no result read)
+
+- **H2U purchase** (run 40753094483, default branch, after the dry run 40752365773):
+  - all **419 snapshots** bought, with no stop and no error;
+  - **3,800 credits** by the calls' own cost headers (380 calls at 10; 39 empty snapshots
+    billed 0);
+  - the balance fell from 4,559,156 to 4,552,836, which is 6,320. The rest is other spending
+    on the shared key in the same minutes.
+  - The bodies are in the paid cache `comeback-odds-40753094483`, and the run dispatched the
+    archive.
+- **Coverage** (`lab/prematch_coverage.py`, `odds-check.yml` `task=prematch-coverage` on
+  `team/research`, where `heavy-espn-*` lives; H2P run 40754681982, H2U run 40754726216):
+
+| | Snapshots with events | Matches | With a full 1X2 (Pinnacle / DraftKings) | 75%+ favourites | Of those trailing at half-time |
+| --- | --- | --- | --- | --- | --- |
+| H2P, domestic cups | 359 of 911 | 1,686 | 722 (722 / 336) | 115 | **13** |
+| H2U, UEFA cups (bought) | 380 of 419 | 1,238 | 1,007 (1,006 / 688) | 142 | 15 |
+| UCL 2024/25 and 2025/26 (held closes) | | 243 not level at half-time | 243 (238 / 5 DraftKings only) | 48 | 4 |
+| H2U in all | | 1,481 | 1,250 | 190 | **19** |
+
+- **The domestic cups are really the English cups.** 697 of H2P's 722 priced matches are FA
+  Cup (418) or EFL Cup (279). The archive holds almost nothing for Copa del Rey, Coppa Italia,
+  Coupe de France or DFB-Pokal before 2025/26. The DFB-Pokal has no full 1X2 from either book.
+- **Trailing 75%+ favourites by competition:**
+  - FA Cup 9, EFL Cup 4;
+  - Champions League 8, Europa League 6, Conference League 5.
+  - Three of these are from 2021/22 (FA Cup 2, Europa League 1), a season the in-play archive
+    may not price.
+- **How these were counted.** A favourite is 75%+ when its Shin-fair chance from Pinnacle's
+  full 1X2 (else DraftKings') is at least 0.75. The half-time score comes from the ESPN days
+  that chose the slots. No final score was read.
+
+### Design H2: DRAFT pre-registration (28 Oct; not approved, nothing bought)
+
+H2 is the second sample for the 75%+ idea (see "Design H amendment"). It is written here before
+any H2 in-play price is seen. The slot list will be frozen with its SHA-256 in the commit that
+finalises this section.
+
+**Sample: trailing 75%+ favourites at half-time, not in B, C or H.**
+- **Domestic cups:** the H2P priced matches, **13**.
+- **UEFA cups:** the H2U priced matches plus the held Champions League closes, **19**.
+- **`heavy_more`'s extra leagues:**
+  - Football-data's closing prices (Pinnacle's, else the average's), with ESPN's half-time
+    score, 2022/23 to date: **30** (run 40744037363).
+  - China 13, Norway 6, Mexico 4, Austria 2, Switzerland 1, Sweden 1, Romania 1, USA 1,
+    Brazil 1; Denmark and Ireland 0.
+  - **Five more leagues failed** with a `KeyError` (Poland, Finland, Russia, Japan,
+    Argentina). The fix goes in with this pre-registration, and their counts get added
+    before the freeze.
+- `heavy_more`'s "earlier seasons" (SP1, I1, D2, SP2 in 2020/21–2021/22) are already in H, so
+  they are not counted again.
+- **About 62 trailing favourites today**, plus whatever the five fixed leagues add.
+  - The extra leagues have been averaging about 3 each over five seasons. Five more would add
+    perhaps 10 to 15.
+  - Russia is likely to add none after 2022.
+- **2026/27** counts up to the freeze date.
+
+**Purchase (to be approved).**
+- One historical h2h snapshot per slot at kickoff + 55 min, at the same ten books, 10 credits.
+- About 62–80 slots, so **about 620–800 credits**.
+- C's guard on every league-season (first 3 snapshots with no started event freshly priced by
+  DraftKings or Betfair: stop that league-season and count it "not priced").
+- Same spending rules as H: the default branch, a dry run first, the 3,000 reserve.
+
+**Analysis and pass rule.** H's, unchanged:
+- the same quote checks;
+- $1 on the trailing favourite at DraftKings' passing in-play price;
+- ROI per $1 with a match-resampled 95% range (2,000 draws, seed 0).
+
+The judged sample is **H ∪ H2**, under the amendment's rule:
+- **Pass:** at least **136** usable DraftKings bets **and** the ROI range entirely above 0.
+- **Fail:** at least 136 usable and the range includes 0 or sits below it.
+- **Inconclusive:** under 136 usable bets.
+- **Caveat, stated up front:** cups and minor leagues may behave differently from H's leagues.
+  Per-sample lines (H, the cups, the extra leagues) are descriptive only.
+
+**Size and power, stated before buying.**
+- **Usable bets expected.** H: about 83 (its pre-purchase estimate: 103 trailing favourites at
+  C's 81% usable rate). H2 at the same 81%: 62 × 0.81 ≈ **50**, plus about 8–12 from the five
+  fixed leagues.
+  - **At C's rate, H ∪ H2 ≈ 133–145 usable bets: right at the 136 line.**
+  - If DraftKings prices cups and minor leagues in play less often than C's leagues (say 60%),
+    H2 gives about 37–46 and **H ∪ H2 ≈ 120–129: short of 136.**
+  - The three 2021/22 matches may not be priced in play at all.
+- **Power** (two-sided 95% range on the win-rate gap, about 46% fair chance):
+
+| Usable bets | True gap +12 points (what was seen) | True gap +6 points |
+| --- | --- | --- |
+| 83 (H alone) | 59% | 19% |
+| 120 | 75% | 26% |
+| 133 | 79% | 28% |
+| 136 | 80% | 29% |
+| 145 | 82% | 30% |
+
+- **Plainly:** H ∪ H2 is unlikely to clear 136 with any margin, and may fall short. Even at
+  136, a true +6-point gap would show a range above 0 less than a third of the time.
+
+**If H ∪ H2 falls short of 136, the honest choices:**
+1. **Judge H alone on 30 Nov 2026** under its own rule (at least 100 usable bets). With about
+   83 usable, the verdict would most likely be "inconclusive".
+2. **Add a live log going forward.**
+   - `inplay.yml` already snapshots half-time prices for the live leagues.
+   - Extending it to the cups, UEFA and the extra leagues would add about 24 usable bets a
+     season (the scope's figure). That means about two seasons to cover the gap.
+   - The live rows would be judged as a pre-registered forward sample, never mixed into the
+     historical verdict after the fact.
+3. **Not:** lowering the 136 or widening the 75% band after seeing H2's counts. The 136 is
+   what the amendment fixed before H was bought.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,

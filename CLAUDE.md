@@ -853,6 +853,17 @@ the owner's baseball app, so the balance can drop without any run here.
   H2U the same way for the UEFA cups (`UEFA`), leaving out the held Champions League closes
   (`HELD_UCL`, 2024/25 and 2025/26). The frozen file is `lab/h2_uefa_prematch_slots.json` (419
   snapshots, 4,190 credits, SHA ce759ff6…, run 40744037363), bought by `--slots H2U`.
+- `lab/prematch_coverage.py` (lead, 28 Oct; counts only, no key, never a final score): what a
+  bought pre-match design (H2P, H2U) holds. `coverage`: snapshots with any event and with one at
+  the slot's kickoff, cost per call (empty snapshots bill 0), matches found (`find_side`: kickoff
+  ±30 min, names via `same_team`, either way round) and with a full 1X2 at Pinnacle/DraftKings,
+  by cup and season. `--trailing` (`trailing`): among the priced matches, favourites 75%+
+  (Shin-fair, Pinnacle else DraftKings) and how many trailed at half-time (`half_times`: the
+  cached `heavy-espn-*` days, names, status and half-time only); H2U adds the held UCL closes
+  (`ucl_closes`, data-log `odds_history/UCL_closes.jsonl`). `odds-check.yml`
+  `task=prematch-coverage` with `design`; run it on `team/research` (where `heavy-espn-*` is
+  saved). Log lines `PREMATCH_COVERAGE_JSON`, `PREMATCH_TRAILING_JSON`. H2P (run 40750915981):
+  359 of 911 snapshots held events; 722 of 1,686 matches priced, 697 of them FA Cup or EFL Cup.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's
