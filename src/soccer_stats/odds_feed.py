@@ -184,6 +184,13 @@ TEAM_NAMES = {
     "FC Internazionale": "Inter",
     "Hellas Verona FC": "Verona",
     "Hellas Verona": "Verona",
+    # Historical feed names the DraftKings backtest listed as unmatched (28 Oct).
+    "SV Darmstadt 98": "Darmstadt",
+    "FC St. Pauli": "St Pauli",
+    "St. Pauli": "St Pauli",
+    "Saint Etienne": "St Etienne",
+    "Saint-Etienne": "St Etienne",
+    "West Bromwich": "West Brom",
     # France
     "AS Monaco": "Monaco",
     "Paris Saint Germain": "Paris SG",
