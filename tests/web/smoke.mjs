@@ -1184,11 +1184,11 @@ const STEPS = [
   ["portfolio-comebacks", async (p) => {
     await closeSheet(p); await pfHome(p);
     const row = (await p.locator('button[data-pfid="comebacks"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["In-play research", "Running", "4 studies", "2 failed · 1 passed · 1 running · never traded"]) if (!row.includes(w)) throw new Error(`research row lacks "${w}": ${row}`);
+    for (const w of ["In-play research", "Running", "5 studies", "2 failed · 1 passed · 1 inconclusive · 1 running · never traded"]) if (!row.includes(w)) throw new Error(`research row lacks "${w}": ${row}`);
     if (await p.locator('button.linkish[data-pfid="comebacks"]').count()) throw new Error("research shouldn't sit behind the retired link");
     await p.click('button[data-pfid="comebacks"]');
     const list = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (list.join(",") !== "comeback_ht,cashout_ht,heavy_fav_ht,fixture_pass") throw new Error(`research studies: ${list}`);
+    if (list.join(",") !== "comeback_ht,cashout_ht,heavy_fav_ht,fixture_pass,fixture_inconclusive") throw new Error(`research studies: ${list}`);
     if (await p.locator("#view .chips").count()) throw new Error("research needs no competition chips");
     const rowText = async (k) => (await p.locator(`button[data-pfstrat="${k}"]`).innerText()).replace(/\s+/g, " ");
     const cb = await rowText("comeback_ht");
@@ -1199,6 +1199,10 @@ const STEPS = [
     for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "150,910 credits", "growth a bet vs holding", "570 cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
     const ps = await rowText("fixture_pass");
     for (const w of ["Passed", "640 credits", "per $1"]) if (!ps.includes(w)) throw new Error(`passed row lacks "${w}": ${ps}`);
+    // An inconclusive study (lead, 28 Oct): its own neutral pill, never "Running".
+    const inc = await rowText("fixture_inconclusive");
+    for (const w of ["Inconclusive", "Closed Oct 27", "never traded", "240 credits", "Result: too few bets to decide"]) if (!inc.includes(w)) throw new Error(`inconclusive row lacks "${w}": ${inc}`);
+    if (inc.includes("Running") || !(await p.locator('button[data-pfstrat="fixture_inconclusive"] .pill.v-inc').count())) throw new Error(`inconclusive pill: ${inc}`);
   }],
   ["portfolio-comebacks-result", async (p) => {
     await p.click('button[data-pfstrat="comeback_ht"]');
@@ -1258,6 +1262,13 @@ const STEPS = [
     await p.click('button[data-pf="result"]');
   }],
   // A study that passed, with cash-out returns (profit per bet, not odds − 1) and a generic Why.
+  ["portfolio-study-inconclusive", async (p) => {
+    await pfUp(p); await p.click('button[data-pfstrat="fixture_inconclusive"]');
+    await p.click('button[data-pf="result"]');
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Inconclusive", "Closed Oct 27: inconclusive, too few usable bets to decide either way; never traded", "Inconclusive: 24 usable bets, under the 136 the test needs to decide.", "No live trades: the test ended with too few usable bets"]) if (!text.includes(w)) throw new Error(`inconclusive study lacks "${w}"`);
+    if (text.indexOf("Inconclusive: 24 usable bets") > text.indexOf("No live trades")) throw new Error("the verdict text should lead the result");
+  }],
   ["portfolio-study-pass", async (p) => {
     await pfUp(p); await p.click('button[data-pfstrat="fixture_pass"]');
     await p.click('button[data-pf="result"]');

@@ -1037,7 +1037,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v68) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v69) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1170,7 +1170,9 @@ the owner's baseball app, so the balance can drop without any run here.
   the one study): `studies()`, `studiesFor(portfolio)`, `studyStrat` (key = study id, `study`
   set; `isStudy`), `studyJudged` (role "judged", else the first design), `studyHeadline`,
   `studyRowHtml` (verdict pill `verdictPill`: Passed / Failed / Running, `.pill.v-pass` /
-  `v-fail` / `v-run`; meta "Closed Oct 25 · never traded · 8,011 credits" or "Pre-registered Oct
+  `v-fail` / `v-run`, and since v69 Inconclusive (`verdict: "inconclusive"`, too few usable
+  bets to decide; `.pill.v-inc`, neutral outlined; row "Result: too few bets to decide", page
+  "Closed <date>: inconclusive, …", its `verdict_text` first; counted in `studyCounts`); meta "Closed Oct 25 · never traded · 8,011 credits" or "Pre-registered Oct
   4 · planned 410 bets · up to 4,300 credits"; the judged ROI per $1 on the right, "Running" for
   a pending study). In-play studies are the rows of "In-play research" (id `comebacks`,
   `CB_ID`; "Comeback bets" until 28 Oct): its top-level row counts them ("3 studies · N credits",
@@ -1206,7 +1208,10 @@ the owner's baseball app, so the balance can drop without any run here.
   reads the growth difference ("growth a bet vs holding"). The fixture uses Research's file when
   it is committed, trimmed (`_trim_cashout`: the judged design whole, hold and the judged rule for
   the other samples, 60 points a curve, 40 cash-outs), else a made-up one in its shape
-  (`_cashout_study`); beside them a made-up passing study (`_passed_study`).
+  (`_cashout_study`); beside them a made-up passing study (`_passed_study`) and an inconclusive
+  one (`_inconclusive_study`). Since DraftKings' replay covers every league (28 Oct) the fixture
+  keeps backtest parts whole only in `FULL_LEAGUES` (E0, SP1, E3, UCL): elsewhere DraftKings'
+  files drop seasons and edge/CLV bands and Pinnacle's drop calibration, to stay under 1.5 MB.
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
