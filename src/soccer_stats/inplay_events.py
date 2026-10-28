@@ -6,10 +6,13 @@ trades, no cards in the app, the feed's own team names.
 
 * `COMPETITIONS`: the six domestic cups and the Europa and Conference Leagues (heavy_more's
   CUPS), the ten football-data leagues the archive prices in play beyond our eight
-  (heavy_favourites.OTHER), and heavy_more's sixteen extra leagues (EXTRA).
+  (heavy_favourites.OTHER), and heavy_more's extra leagues (EXTRA) less Romania, which The
+  Odds API doesn't list (`NOT_ON_THE_API`): 33 in all.
 * We fetch none of their pre-match odds, so their kickoffs come from The Odds API's events
   list, which is free (0 credits: `x-requests-last` 0, checked on every call; a call that
-  bills stops the step). `fetch` asks the free sports list which keys are in season, then
+  bills stops the step). `fetch` asks the free sports list (`all=true`: every key, with
+  `active`) which keys are in season, warns in its log line about any configured key the
+  API doesn't list at all (recorded as status "unknown", `res["unknown"]`), then
   each due competition's events list, at most every EVENTS_EVERY, and appends new
   (event, kickoff) rows to data-log odds_log/<code>_events_<YYYY-MM>.jsonl (league, sport,
   event_id, home, away, kickoff, fetched_at) plus a record per competition in
@@ -60,6 +63,9 @@ FD_EXTRA = {
     "SP2": ("Segunda Division", "soccer_spain_segunda_division", "esp.2"),
     "F2": ("Ligue 2", "soccer_france_ligue_two", "fra.2"),
 }
+# heavy_more's sixteen less Romania: The Odds API has no Romanian league ("Unknown sport" for
+# soccer_romania_liga_1, 28 Oct), so there is nothing to snapshot.
+NOT_ON_THE_API = {"ROU": ("Romania", "soccer_romania_liga_1", "rou.1")}
 MORE_EXTRA = {
     "AUT": ("Austria", "soccer_austria_bundesliga", "aut.1"),
     "SWZ": ("Switzerland", "soccer_switzerland_superleague", "sui.1"),
@@ -67,7 +73,6 @@ MORE_EXTRA = {
     "NOR": ("Norway", "soccer_norway_eliteserien", "nor.1"),
     "SWE": ("Sweden", "soccer_sweden_allsvenskan", "swe.1"),
     "POL": ("Poland", "soccer_poland_ekstraklasa", "pol.1"),
-    "ROU": ("Romania", "soccer_romania_liga_1", "rou.1"),
     "FIN": ("Finland", "soccer_finland_veikkausliiga", "fin.1"),
     "IRL": ("Ireland", "soccer_league_of_ireland", "irl.1"),
     "RUS": ("Russia", "soccer_russia_premier_league", "rus.1"),
@@ -187,7 +192,7 @@ def fetch(
         return res
     stamp = now.isoformat(timespec="seconds")
     try:
-        r = get(SPORTS_URL, params={"apiKey": api_key}, timeout=20)
+        r = get(SPORTS_URL, params={"apiKey": api_key, "all": "true"}, timeout=20)
     except requests.RequestException as exc:  # the message could hold the key
         res["stop"] = f"sports list failed ({type(exc).__name__})"
         return res
@@ -197,9 +202,17 @@ def fetch(
         res["stop"] = f"sports list: HTTP {r.status_code}, cost {cost}"
         return res
     body = r.json()
-    active = (
-        {s.get("key") for s in body if isinstance(s, dict)} if isinstance(body, list) else set()
-    )
+    listed = [x for x in body if isinstance(x, dict)] if isinstance(body, list) else []
+    known = {x.get("key") for x in listed}
+    active = {x.get("key") for x in listed if x.get("active", True)}
+    # A configured key the API doesn't list at all is a registry mistake, not an off-season.
+    unknown = sorted(c for c in COMPETITIONS if sport_of(c) not in known) if known else []
+    if unknown:
+        res["unknown"] = unknown
+        res["log"].append(
+            "WARNING sport keys The Odds API doesn't list: "
+            + ", ".join(f"{c} {sport_of(c)}" for c in unknown)
+        )
     seen = {
         (x.get("league"), x.get("event_id"), x.get("kickoff")) for x in _jsonl(event_files(log_dir))
     }
@@ -209,8 +222,9 @@ def fetch(
         sport = sport_of(code)
         rec = {"league": code, "sport": sport, "fetched_at": stamp}
         if sport not in active:
-            recs.append({**rec, "status": "inactive", "events": 0, "new": 0, "cost": 0})
-            res["inactive"] += 1
+            status = "unknown" if code in res.get("unknown", ()) else "inactive"
+            recs.append({**rec, "status": status, "events": 0, "new": 0, "cost": 0})
+            res["inactive"] += status == "inactive"
             continue
         try:
             r = get(

@@ -22,10 +22,13 @@ def test_registry_matches_research_lists():
     from soccer_stats.lab import heavy_favourites as hf
     from soccer_stats.lab import heavy_more as hm
 
-    assert len(ie.COMPETITIONS) == 6 + 2 + 10 + 16
+    assert len(ie.COMPETITIONS) == 6 + 2 + 10 + 15
     for code in hm.DOMESTIC + ("UEL", "UECL"):
         assert ie.sport_of(code) == hm.CUPS[code][2] and ie.slug_of(code) == hm.CUPS[code][1]
     for code, (_name, slug, sport) in hm.EXTRA.items():
+        if code in ie.NOT_ON_THE_API:  # Romania: no such key on The Odds API
+            assert code not in ie.COMPETITIONS and ie.NOT_ON_THE_API[code][1] == sport
+            continue
         assert ie.sport_of(code) == sport and ie.slug_of(code) == slug
     for code, (_name, sport) in hf.OTHER.items():
         assert ie.sport_of(code) == sport
@@ -33,7 +36,7 @@ def test_registry_matches_research_lists():
     assert "UCL" not in ie.COMPETITIONS  # live already, with its model
 
 
-def events_get(calls, cost="0", active=("soccer_fa_cup", "soccer_usa_mls")):
+def events_get(calls, cost="0", active=("soccer_fa_cup", "soccer_usa_mls"), unlisted=()):
     evs = {
         "soccer_fa_cup": [
             {
@@ -61,8 +64,11 @@ def events_get(calls, cost="0", active=("soccer_fa_cup", "soccer_usa_mls")):
 
     def get(url, params=None, timeout=None):
         calls.append(url)
-        if url == ie.SPORTS_URL:
-            return Resp(200, [{"key": k} for k in active], {"x-requests-last": "0"})
+        if url == ie.SPORTS_URL:  # all=true: every key, with `active`
+            assert params.get("all") == "true"
+            keys = {ie.sport_of(c) for c in ie.COMPETITIONS} - set(unlisted)
+            body = [{"key": k, "active": k in active} for k in sorted(keys)]
+            return Resp(200, body, {"x-requests-last": "0"})
         sport = url.split("/sports/")[1].split("/")[0]
         return Resp(200, evs.get(sport, []), {"x-requests-last": cost})
 
@@ -224,3 +230,18 @@ def test_only_the_events_command_gets_the_key_in_publish_data_log_step():
     # Off the default branch the step exits before the data-log loop.
     run = step["run"]
     assert run.index('"$GITHUB_REF_NAME" != "$DEFAULT_BRANCH"') < run.index("log-inplay-events")
+
+
+def test_a_configured_key_the_api_does_not_list_is_warned_about(tmp_path):
+    calls = []
+    res = ie.fetch(tmp_path, "key", now=NOW, get=events_get(calls, unlisted=("soccer_spl",)))
+    assert res["unknown"] == ["SC0"] and res["inactive"] == len(ie.COMPETITIONS) - 3
+    assert "WARNING sport keys The Odds API doesn't list: SC0 soccer_spl" in ie.summary_line(res)
+    recs = [
+        json.loads(x)
+        for x in (tmp_path / "inplay_events_calls_2026-10.jsonl").read_text().splitlines()
+    ]
+    assert {r["status"] for r in recs if r["league"] == "SC0"} == {"unknown"}
+    assert res["asked"] == 2  # the listed, active keys are still asked
+    ok = ie.fetch(tmp_path / "ok", "key", now=NOW, get=events_get([]))
+    assert "unknown" not in ok and "WARNING" not in ie.summary_line(ok)

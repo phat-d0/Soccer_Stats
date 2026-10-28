@@ -737,7 +737,7 @@ Nothing trades on it.
 ### Odds-only competitions (28 Oct, lead-approved; about 1,100 credits a month more)
 
 Research's 75%+ heavy-favourite idea needs in-play prices from more competitions, going
-forward (H2's forward sample). The same snapshots now also cover 34 odds-only competitions
+forward (H2's forward sample). The same snapshots now also cover 33 odds-only competitions
 (`inplay_events.COMPETITIONS`):
 
 - the six domestic cups: FA Cup, EFL Cup, Copa del Rey, DFB-Pokal, Coppa Italia, Coupe de
@@ -745,8 +745,14 @@ forward (H2's forward sample). The same snapshots now also cover 34 odds-only co
 - the Europa League and Conference League;
 - the ten football-data leagues the archive prices in play beyond our eight: N1, P1, SC0, B1,
   T1, G1, D2, I2, SP2, F2;
-- heavy_more's sixteen: Austria, Switzerland, Denmark, Norway, Sweden, Poland, Romania,
-  Finland, Ireland, Russia, Japan, China, USA, Mexico, Brazil, Argentina.
+- heavy_more's sixteen less Romania (The Odds API has no Romanian league: "Unknown sport" for
+  `soccer_romania_liga_1`, found by Research on 28 Oct): Austria, Switzerland, Denmark, Norway,
+  Sweden, Poland, Finland, Ireland, Russia, Japan, China, USA, Mexico, Brazil, Argentina.
+- **Sport keys checked** (28 Oct). 29 keys returned events in the first run (19:58 UTC, 0
+  credits). The four domestic cups out of season then (FA Cup, Copa del Rey, Coppa Italia, Coupe
+  de France) are known keys: Research's H2P bought 911 historical snapshots under them with no
+  error. The sports list is asked with `all=true`, so a configured key the API doesn't list is
+  recorded as "unknown", not "inactive", and the run's log line warns about it.
 
 They are odds only: no model, no paper trades, no cards in the app. The team names are the
 feed's own; there is no football-data mapping, and Research's H2 joins them itself.
@@ -774,7 +780,7 @@ feed's own; there is no football-data mapping, and Research's H2 joins them itse
   - cups about 60;
   - UEFA cups about 30;
   - the ten football-data leagues about 420;
-  - heavy_more's sixteen about 590.
+  - heavy_more's sixteen about 590 (less Romania's share, about 40).
 
   The monthly guard `MONTHLY_CAP` is now 3,000. The real spend per competition is read from
   `inplay_calls_*`, and the first month's is reported in the weekly line.
