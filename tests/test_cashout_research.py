@@ -34,7 +34,7 @@ def positions():
 def test_the_app_file_has_the_comeback_shape_and_round_trips():
     pos = positions()
     res = ct.analyse(pos, {"positions": len(pos)})
-    out = cr.assemble(pos, res)
+    out = cr.assemble(pos, res, {"label": "Already read, not judged"})
     for key in ("title", "question", "rule", "verdict", "verdict_text", "cost", "runs"):
         assert out[key]
     assert set(out["designs"]) == {"primary", "band_3_4"}
@@ -64,3 +64,13 @@ def test_the_check_names_every_difference_from_the_published_run():
     bad = cr.check(res)
     assert any(line.startswith("counts matches") for line in bad)
     assert any(line.startswith("verdict decisions") for line in bad)
+
+
+def test_halftime_only_ignores_the_70th_minute():
+    pos = positions()
+    for p in pos:
+        p["q_m70"] = 0.9  # would cash out every bet at the 70th minute
+    ht = cr.halftime_only(pos)
+    decisions = sum(p["q_ht"] is not None and p["q_ht"] >= 0.5 for p in pos)
+    assert [r["decisions"] for r in ht["rules"]] == [decisions] * 3
+    assert ht["led_cases"] == decisions and ht["positions"] == len(pos)

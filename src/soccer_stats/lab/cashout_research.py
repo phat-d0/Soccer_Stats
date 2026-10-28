@@ -18,14 +18,18 @@ import gzip
 import hashlib
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
 
 from soccer_stats.data import RAW_DIR
+from soccer_stats.lab import cashout_plan as xp
 from soccer_stats.lab import cashout_test as ct
 from soccer_stats.lab import comeback_fetch as cf
 from soccer_stats.lab import comebacks2 as c2
+from soccer_stats.lab.comeback_plan import load_season
+from soccer_stats.lab.heavy_favourites import season_name
 
 FILE = Path(__file__).with_name("cashout_research.json")
 B64_CHUNK = 60000
@@ -209,6 +213,104 @@ def bet_rows(pos: list[dict]) -> list[dict]:
     return out
 
 
+def bc_slots(x_slots: list[dict]) -> list[dict]:
+    """Slots, in the frozen file's shape, for the underdogs (3.0+) of X's league-seasons that
+    the sample left out because design B or C had bought them. H's matches stay out."""
+    bc, _ = xp.used_matches(("B", "C"))
+    h, _ = xp.used_matches(("H",))
+    slots: dict = {}
+    for lg, y in sorted({(s["league"], c2.season_of(s["kickoff"])) for s in x_slots}):
+        d = xp.underdogs(load_season(lg, y))
+        for r in d.itertuples():
+            ko = r.kickoff.strftime("%Y-%m-%dT%H:%MZ")
+            if (lg, ko, r.home) not in bc or (lg, ko, r.home) in h:
+                continue
+            slot = slots.setdefault(
+                (lg, ko),
+                {
+                    "league": lg,
+                    "season": season_name(y),
+                    "sport": xp.sport_of(lg),
+                    "kickoff": ko,
+                    "matches": [],
+                },
+            )
+            slot["matches"].append(
+                {
+                    "home": r.home,
+                    "away": r.away,
+                    "dog": r.dog,
+                    "dog_odds": float(r.dog_odds),
+                    "price": r.price,
+                }
+            )
+    return list(slots.values())
+
+
+def halftime_only(pos: list[dict]) -> dict:
+    """Hold vs cash out at half-time only (T 0.50, each fee), growth at 2%."""
+    pos = sorted(pos, key=lambda p: p["kickoff"])
+    if not pos:
+        return {"positions": 0}
+    base = np.array([ct.hold(p) for p in pos])
+    s = ct.PRIMARY["s"]
+    out = {
+        "positions": len(pos),
+        "won": _r(np.mean([p["won"] for p in pos])),
+        "led_cases": sum(p["q_ht"] is not None and p["q_ht"] >= ct.PRIMARY["t"] for p in pos),
+        "hold": _r(base.mean()),
+        "hold_ci95": ct._boot(base),
+        "rules": [],
+    }
+    for m in ct.MARGINS:
+        got = [ct.rule({**p, "q_m70": None}, ct.PRIMARY["t"], m) for p in pos]
+        prof = np.array([g[0] for g in got])
+        diff = np.log1p(s * prof) - np.log1p(s * base)
+        out["rules"].append(
+            {
+                "m": m,
+                "decisions": sum(g[1] is not None for g in got),
+                "cash": _r(prof.mean()),
+                "growth_minus_hold": _r(diff.mean(), 6),
+                "growth_minus_hold_ci95": ct._boot(diff),
+            }
+        )
+    return out
+
+
+def put_back(pos: list[dict], cache_dir: Path, fd) -> dict:
+    """Descriptive, already read and not judged (lead, 28 Oct): the half-time cash-out with
+    the matches B and C had bought put back. They have half-time snapshots only."""
+    x_slots = json.loads(cf.slots_path("X").read_text())["matches"]
+    extra = bc_slots(x_slots)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "bc.json"
+        path.write_text(json.dumps({"matches": extra}))
+        bc_pos, counts = ct.build(path, cache_dir, fd)
+    out = {
+        "label": "Already read, not judged",
+        "note": (
+            "The sample left out every match designs B and C had already bought: favourites "
+            "trailing at half-time, so underdogs leading at half-time. Put back here at "
+            "half-time only (they have no 70th-minute snapshot), with the same frozen code."
+        ),
+        "matches_put_back": sum(len(s["matches"]) for s in extra),
+        "counts": counts,
+    }
+    for band, keep in (
+        ("primary", lambda p: p["entry"] >= ct.PRIMARY_DOG),
+        ("band_3_4", lambda p: p["entry"] < ct.PRIMARY_DOG),
+    ):
+        mine = [p for p in pos if keep(p)]
+        theirs = [p for p in bc_pos if keep(p)]
+        out[band] = {
+            "frozen": halftime_only(mine),
+            "put_back_only": halftime_only(theirs),
+            "with_put_back": halftime_only(mine + theirs),
+        }
+    return out
+
+
 def check(res: dict) -> list[str]:
     """Differences from run 40706645115 (empty = reproduced exactly)."""
     bad = []
@@ -225,7 +327,7 @@ def check(res: dict) -> list[str]:
     return bad
 
 
-def assemble(pos: list[dict], res: dict) -> dict:
+def assemble(pos: list[dict], res: dict, extra: dict | None = None) -> dict:
     primary = [p for p in pos if p["entry"] >= ct.PRIMARY_DOG]
     second = [p for p in pos if p["entry"] < ct.PRIMARY_DOG]
     v, c = res["verdict"], res["counts"]
@@ -276,6 +378,7 @@ def assemble(pos: list[dict], res: dict) -> dict:
             "Every judged position (underdog 4.0+) in kickoff order. Hold profit per $1 is "
             "odds - 1 when won, else -1; `cash` is the primary rule's, `at` when it cashed out."
         ),
+        "put_back": extra,
         "notes": NOTES,
     }
 
@@ -293,7 +396,7 @@ def build(cache_dir: Path | None = None) -> tuple[dict, list[str]]:
     fd = c2.load_fd(json.loads(path.read_text())["matches"], any_price=True)
     pos, counts = ct.build(path, cache_dir, fd)
     res = ct.analyse(pos, counts)
-    out = assemble(pos, res)
+    out = assemble(pos, res, put_back(pos, cache_dir, fd))
     bad = check(res)
     out["reproduces"] = not bad
     return out, bad
