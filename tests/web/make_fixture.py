@@ -516,7 +516,8 @@ SYNTHETIC_SETTLED = [
 
 
 def add_settled_live_matches(data: dict) -> None:
-    live = data["portfolio"].get("live") or {"trades": []}
+    ml = next((p for p in data["portfolio"].get("portfolios") or [] if p["id"] == "moneyline"), {})
+    live = ml.get("live") or {"trades": []}
     trades = list(live.get("trades") or [])
     for home, away, ko, market, odds, close, mins, score, won in SYNTHETIC_SETTLED:
         kick = pd.Timestamp(ko)
@@ -556,7 +557,6 @@ def add_settled_live_matches(data: dict) -> None:
                 "settled_at": (kick + pd.Timedelta(hours=3)).isoformat(),
             }
         )
-    data["portfolio"]["live"] = {**live, **paper.portfolio_section(trades)}
     # Rebuild the per-strategy portfolios with these trades, keeping their backtests.
     backtests = {p["id"]: p["backtest"] for p in data["portfolio"].get("portfolios") or []}
     r = data["portfolio"].get("rule") or {}
@@ -568,10 +568,6 @@ def add_settled_live_matches(data: dict) -> None:
     data["portfolio"]["portfolios"] = paper.portfolios_section(
         live, trades, backtests, match_rule, now=NOW
     )
-    # The app reads only `portfolios`: leave the old top-level copies out of the fixture
-    # (production keeps them for one release), so the smoke test proves nothing needs them.
-    data["portfolio"].pop("live", None)
-    data["portfolio"].pop("backtest", None)
 
 
 # The research lab's edge_threshold contract, until data-log's backtests carry it: one

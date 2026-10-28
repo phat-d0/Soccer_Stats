@@ -154,7 +154,7 @@ def test_dnb_trades_stay_out_of_the_record_and_settle_on_their_own(tmp_path):
     assert t["clv_pinnacle"] is not None and t["clv_pinnacle_staked"] is not None
     live = ml["live"]
     assert [x["id"] for x in live["trades"]] == ["E0|2627|Arsenal|Leeds"]
-    assert live["summary"]["trades"] == 1 and data["portfolio"]["live"]["summary"]["trades"] == 1
+    assert live["summary"]["trades"] == 1 and "live" not in data["portfolio"]
     assert [x["id"] for x in live["dnb_trades"]] == [EDGE12_DNB]
     sts = {s["key"]: s for s in live["strategies"]}
     dnb = sts["edge12_dnb"]
