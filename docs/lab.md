@@ -2619,6 +2619,8 @@ end.
   - every match bought by design B or C (spent);
   - every design H match. H's outcomes stay unread until H is judged, so they can't enter
     another test first.
+  - The sample holds no cup and none of `heavy_more`'s extra leagues (AUT to ARG), so it
+    never touches design H2's candidates either.
 - **Budget trim (lead's rule):** over 50,000 credits, whole league-seasons are dropped, oldest
   season first, until the estimate fits. The dropped list is printed and frozen with the file.
 
