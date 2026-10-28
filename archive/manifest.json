@@ -1,0 +1,60 @@
+{
+ "tag": "paid-odds-archive",
+ "updated": "2026-10-28T06:02:58Z",
+ "checked": "2026-10-28T06:02:58Z",
+ "caches": {
+  "comeback-odds": {
+   "name": "comeback-odds",
+   "key": "comeback-odds-40176031079",
+   "paths": [
+    "data/raw/comeback_odds"
+   ],
+   "files": 801,
+   "bytes": 39217707,
+   "by_path": {
+    "data/raw/comeback_odds": 801
+   },
+   "content_sha256": "24428a1475b8b81605fbc8520eaa0c12adffc8a3cf292a9b228de4e644d72901",
+   "archive": {
+    "bytes": 1578189,
+    "sha256": "2073304c8532f9627ce1947b8e7206fc4bc4c767bd3604c1834c89593ee1e0a8",
+    "parts": [
+     {
+      "asset": "comeback-odds.tar.zst",
+      "bytes": 1578189,
+      "sha256": "2073304c8532f9627ce1947b8e7206fc4bc4c767bd3604c1834c89593ee1e0a8"
+     }
+    ]
+   },
+   "created": "2026-10-28T06:02:35Z",
+   "checked": "2026-10-28T06:02:58Z"
+  },
+  "player-odds-history": {
+   "name": "player-odds-history",
+   "key": "player-odds-history-40311911428",
+   "paths": [
+    "data/raw/player_odds_history"
+   ],
+   "files": 3541,
+   "bytes": 22811186,
+   "by_path": {
+    "data/raw/player_odds_history": 3541
+   },
+   "content_sha256": "cb8be62c07fa95c27d8ed3e323f5e6729f09d44a81ef181c917cece32bd4921e",
+   "archive": {
+    "bytes": 1229174,
+    "sha256": "f637af2a4e1c74f1224f0dae86c196572a0a7473d6f1e7da441007c7a27656f2",
+    "parts": [
+     {
+      "asset": "player-odds-history.tar.zst",
+      "bytes": 1229174,
+      "sha256": "f637af2a4e1c74f1224f0dae86c196572a0a7473d6f1e7da441007c7a27656f2"
+     }
+    ]
+   },
+   "created": "2026-10-28T06:02:33Z",
+   "checked": "2026-10-28T06:02:58Z"
+  }
+ },
+ "note": "Paid odds caches packed as tar + zstd release assets on the `paid-odds-archive` tag; content_sha256 covers every file's path, size and sha256, archive.sha256 the whole archive, parts[].sha256 each asset."
+}
