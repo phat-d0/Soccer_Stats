@@ -380,6 +380,15 @@ def build(src: Path, out: Path) -> dict:
         extra = [r for r in eb["bets"][EDGE12_BETS:] if r[li] not in seen and not seen.add(r[li])]
         eb["bets"] = newest + extra
         eb["bets_shown"] = len(eb["bets"])
+    # Each league's bankroll curves (flat and Kelly) at every second point, the last kept,
+    # for room under 1.5 MB; the app draws whatever points come.
+    for f in (sb.get("lean") or {}, sb.get("edge12") or {}):
+        for part in (f.get("leagues") or {}).values():
+            for block in ((part or {}).get("sizing") or {}).values():
+                c = block.get("curve") if isinstance(block, dict) else None
+                if isinstance(c, list) and len(c) > 20:
+                    block["curve"] = c[::2] + ([c[-1]] if len(c) % 2 == 0 else [])
+    add_draftkings_backtests(sb)
     # The app never reads each player strategy's compact trade rows (Record → Player shots
     # uses the sweeps and calibration); leave them out to keep the fixture under 1 MB.
     for st in (
@@ -1108,6 +1117,81 @@ def _passed_study():
     }
 
 
+# The same replays at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
+# strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape) until
+# the real files land: made up from the Pinnacle replay's own numbers (ROI 2 points and CLV 1
+# point worse, 2020/21 to 2024/25), the Premier League and All only, to stay under 1.5 MB.
+DK_SEASONS = ["2020/21", "2021/22", "2022/23", "2023/24", "2024/25"]
+
+
+def _dk_metrics(m: dict | None) -> dict | None:
+    if not m:
+        return m
+    out = dict(m)
+    for k, shift in (("roi", -0.02), ("clv", -0.01)):
+        if isinstance(out.get(k), (int, float)):
+            out[k] = round(out[k] + shift, 4)
+        ci = out.get(f"{k}_ci95")
+        if isinstance(ci, list) and len(ci) == 2 and all(isinstance(v, (int, float)) for v in ci):
+            out[f"{k}_ci95"] = [round(v + shift, 4) for v in ci]
+    return out
+
+
+def _dk_part(p: dict, metric: tuple, name: str | None = None) -> dict:
+    out = {"kind": "draftkings", "seasons_included": DK_SEASONS}
+    out |= {k: _dk_metrics(p.get(k)) for k in metric if p.get(k)}
+    out["by_odds_band"] = [_dk_metrics(b) for b in p.get("by_odds_band") or []]
+    return out | ({"name": name} if name else {})
+
+
+def add_draftkings_backtests(sb: dict) -> None:
+    for key, metric in (("lean", ("lean", "strong")), ("edge12", ("edge12",))):
+        src = sb.get(key) or {}
+        if not src.get("available"):
+            continue
+
+        e0 = (src.get("leagues") or {}).get("E0")
+        if not e0 or e0.get("error"):
+            continue
+        sb[f"{key}_dk"] = {
+            "available": True,
+            "kind": src.get("kind"),
+            "book": "draftkings",
+            "coverage_note": "Made up for the fixture: DraftKings priced the match 48 hours "
+            "before kickoff, and Pinnacle's close was in the same snapshot.",
+            "title": f"{'Lean' if key == 'lean' else 'Model 12%'} replayed on DraftKings' "
+            "historical prices",
+            "note": "Made up for the fixture from the Pinnacle replay until Moneyline's file "
+            "lands.",
+            "generated_at": src.get("generated_at"),
+            "rule": src.get("rule"),
+            "leagues": {"E0": _dk_part(e0, metric, e0.get("name"))},
+            "all": _dk_part(src.get("all") or {}, metric),
+            "bet_fields": src.get("bet_fields"),
+            "bets": (src.get("bets") or [])[:3],
+            "bets_shown": min(3, len(src.get("bets") or [])),
+            "bets_total": min(3, len(src.get("bets") or [])),
+        }
+
+
+def _trim_cashout(st: dict) -> None:
+    pr = st.get("primary_rule") or {"t": 0.5, "m": 0.05}
+    keep = ("hold", f"cash T={pr['t']:.2f} m={pr['m']:.2f}")
+    for d in (st.get("designs") or {}).values():
+        if d.get("role") == "judged":
+            continue
+        d["variants"] = [v for v in d.get("variants") or [] if v.get("name") in keep]
+        for k in ("calibration", "by_league", "by_season"):
+            d.pop(k, None)
+    for c in (st.get("curves") or {}, (st.get("curves") or {}).get("flat") or {}):
+        pts = c.get("points") or []
+        if len(pts) > 60:
+            step = len(pts) // 60 + 1
+            c["points"] = pts[::step] + ([pts[-1]] if (len(pts) - 1) % step else [])
+    bets = st.get("bets") or []
+    st["bets"] = bets[:: max(1, len(bets) // 40)][:40]
+
+
 def add_research_studies(data: dict) -> None:
     studies = _clean(pub.research_studies())
     # The real strategy search (Research, #131) is ~100 KB: the fixture keeps 60 of its best
@@ -1144,9 +1228,16 @@ def add_research_studies(data: dict) -> None:
             "bets": [],
             "notes": ["Synthetic study for the fixture."],
         },
-        _cashout_study(),
         _passed_study(),
     ]
+    # The cash-out test: Research's real file (lab/cashout_research.json, #136) when it is
+    # committed, trimmed to fit (the judged design whole; hold and the judged rule for the
+    # other samples; 60 points a curve; 40 cash-outs); else a made-up one in its shape.
+    real = next((x for x in studies if x["id"] == "cashout_ht"), None)
+    if real:
+        _trim_cashout(real)
+    else:
+        synthetic.insert(1, _cashout_study())
     data["research_studies"] = studies + synthetic
 
 

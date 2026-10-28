@@ -679,15 +679,17 @@ const STEPS = [
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
     if (!vrow.includes("Blend Lean, all odds (old rule)") || !vrow.includes("Old rule, until") || vrow.includes("↳")) throw new Error(`old-rule row: ${vrow}`);
     // The new rule's backtest is the replay's bands inside its range, pooled; the archived
-    // old rule keeps the whole replay (every price).
+    // old rule keeps the whole replay (every price). Both read DraftKings' replay when there
+    // is one (lead brief, 28 Oct), else Pinnacle's.
     const btWant = await p.evaluate(() => {
-      const part = state.data.portfolio.strategy_backtests.lean.all;
+      const sb = state.data.portfolio.strategy_backtests;
+      const part = (sb.lean_dk?.available ? sb.lean_dk : sb.lean).all;
       const b = part.by_odds_band.filter((x) => x.lo === 1.5 || x.lo === 2);
       const bets = b.reduce((a, x) => a + x.bets, 0);
       return { bets, roi: signedPct(b.reduce((a, x) => a + x.roi * x.bets, 0) / bets), all: signedPct(part.lean.roi) };
     });
     const bt = (await p.locator('button[data-pfstrat="lean"] .bt').innerText()).replace(/\s+/g, " ");
-    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
+    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200 · at DraftKings`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
     if (!vrow.includes(`Backtest: ${btWant.all}`)) throw new Error(`old-rule backtest: ${vrow}`);
     await pfOpenStrat(p, "lean");
     if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
@@ -878,6 +880,30 @@ const STEPS = [
     // No summary covers a competition plus a driver, so no ROI range may show.
     if (text.includes("95% range on ROI")) throw new Error("SP1 model-driven shows a ROI range it has no summary for");
   }],
+  // The backtest at DraftKings' own prices (lead brief, 28 Oct; strategy_backtests.lean_dk,
+  // made up in the fixture until Moneyline's file lands): first when present, a switch to
+  // Pinnacle's replay, a coverage line for each and the same rule at both books. It ends on
+  // Pinnacle's, which the next steps check in full.
+  ["portfolio-lean-backtest-dk", async (p) => {
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
+    const on = await p.locator(".bt-src button.on").innerText();
+    if (on !== "At DraftKings' prices") throw new Error(`backtest source on: ${on}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["At DraftKings' prices: 2020/21 to 2024/25, 1 league.", "At Pinnacle's prices: 2019/20", "The same rule at both books", "In the replay at DraftKings' prices Lean", "Lean replayed on DraftKings' historical prices"]) {
+      if (!text.includes(w)) throw new Error(`DraftKings backtest lacks "${w}"`);
+    }
+    // The comparison: the same rule's ROI at both books, from each file.
+    const want = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return [signedPct(sb.lean_dk.all.lean.roi), signedPct(sb.lean.all.lean.roi)]; });
+    const table = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
+    if (!table.startsWith("DraftKings Pinnacle") || !want.every((w) => table.includes(w))) throw new Error(`both-books table: ${table} vs ${want}`);
+    // La Liga is in Pinnacle's replay only: no switch, and the note says so.
+    await p.click('.chip[data-league="SP1"]');
+    if (await p.locator(".bt-src").count()) throw new Error("a switch for a league only one book covers");
+    if (!(await p.textContent("#view")).includes("La Liga is only in the replay at Pinnacle's prices.")) throw new Error("one-book note");
+    await p.click('.chip[data-league=""]');
+    await p.click('button[data-btsrc="pin"]');
+    if ((await p.locator(".bt-src button.on").innerText()) !== "At Pinnacle's prices") throw new Error("switch to Pinnacle");
+  }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
@@ -907,9 +933,11 @@ const STEPS = [
   ["portfolio-backtest-headlines", async (p) => {
     await pfUp(p);
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
+    // DraftKings' replay (All and the Premier League in the fixture) heads the row where it
+    // covers the competition, Pinnacle's elsewhere (lead brief, 28 Oct).
     const want = {
-      "": ["bets, −200 to +200 · at Pinnacle", "bets · at Pinnacle"],
-      E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
+      "": ["bets, −200 to +200 · at DraftKings", "bets · at DraftKings"],
+      E0: ["Premier League at DraftKings", "Premier League at DraftKings"],
       SP1: ["La Liga at Pinnacle", "La Liga at Pinnacle"],
       E2: ["League One at Pinnacle", "League One at Pinnacle"],
       E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
@@ -976,7 +1004,7 @@ const STEPS = [
   ["portfolio-backtest-edge12-e0", async (p) => {
     await p.click('.chip[data-league="E0"]');
     const text = await p.textContent("#view");
-    for (const w of ["DraftKings backtest, Premier League", "Replay at Pinnacle's early prices, Premier League"]) {
+    for (const w of ["DraftKings backtest, Premier League", "Replays at DraftKings' and Pinnacle's prices, Premier League"]) {
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
     await bandsCheck(p, "edge12", "E0");
@@ -1111,7 +1139,7 @@ const STEPS = [
     if (await p.locator('button.linkish[data-pfid="comebacks"]').count()) throw new Error("research shouldn't sit behind the retired link");
     await p.click('button[data-pfid="comebacks"]');
     const list = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (list.join(",") !== "comeback_ht,heavy_fav_ht,cashout_ht,fixture_pass") throw new Error(`research studies: ${list}`);
+    if (list.join(",") !== "comeback_ht,cashout_ht,heavy_fav_ht,fixture_pass") throw new Error(`research studies: ${list}`);
     if (await p.locator("#view .chips").count()) throw new Error("research needs no competition chips");
     const rowText = async (k) => (await p.locator(`button[data-pfstrat="${k}"]`).innerText()).replace(/\s+/g, " ");
     const cb = await rowText("comeback_ht");
@@ -1119,7 +1147,7 @@ const STEPS = [
     const hv = await rowText("heavy_fav_ht");
     for (const w of ["Running", "Pre-registered Oct 4", "planned 410 bets", "up to 4,300 credits"]) if (!hv.includes(w)) throw new Error(`running row lacks "${w}": ${hv}`);
     const co = await rowText("cashout_ht");
-    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "148,200 credits", "growth a bet vs holding", "cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
+    for (const w of ["Cash out a heavy underdog once it reaches 50%", "Failed", "150,910 credits", "growth a bet vs holding", "570 cash-outs at 50%", "vs hold"]) if (!co.includes(w)) throw new Error(`cash-out row lacks "${w}": ${co}`);
     const ps = await rowText("fixture_pass");
     for (const w of ["Passed", "640 credits", "per $1"]) if (!ps.includes(w)) throw new Error(`passed row lacks "${w}": ${ps}`);
   }],
@@ -1208,16 +1236,26 @@ const STEPS = [
     await pfUp(p); await p.click('button[data-pfstrat="cashout_ht"]');
     await p.click('button[data-pf="result"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["No: cashing out at 50% lowered", "Decisions", "cash-outs at 50%", "Growth vs holding, 2% stake", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 336 decisions", "Bankroll: hold vs cash out (2% a bet)", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Underdogs at 3.0 to 4.0", "Partial cash-out to the Kelly stake", "The sample. Matches already bought", "Other samples (descriptive)", "With B and C put back (already read, half-time only): 2,900 bets", "2025/26 only (nothing excluded): 1,100 bets (descriptive)"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
+    for (const w of ["Decisions", "570", "cash-outs at 50%", "Growth vs holding, 2% stake", "+0.020%", "Hold, per $1", "Cash out at 50%, per $1", "The judged test: cash out at 50% with a 5% cash-out margin, staking 2%", "on 570 decisions", "The sample.", "Hold vs cash out ($1 a bet)", "less than a billionth of the start", "About these curves", "By threshold and margin", "judged", "Is the in-play price right?", "By league", "By season", "Other samples (descriptive)", "Underdogs at 3.0 to 4.0", "With B and C put back (already read, half-time only)", "The frozen sample at half-time only", "2025/26 only", "Partial cash-out to the Kelly stake"]) if (!text.includes(w)) throw new Error(`cash-out study lacks "${w}"`);
     if ((await p.locator(".co-grid tbody tr").count()) !== 9) throw new Error("the 3 x 3 grid");
     if ((await p.locator(".co-grid tr.co-primary").count()) !== 1) throw new Error("one judged row");
+    // The chart is the running profit at $1 a bet (curves.flat), ending on its last point.
     if ((await p.locator("[data-scrub='cbcv'] path.line.ser").count()) !== 2) throw new Error("hold and cash-out lines");
+    const end = await p.evaluate(() => { const f = studies().find((x) => x.id === "cashout_ht").curves.flat.points; return usd(f[f.length - 1].hold, 2); });
+    if (!(await p.textContent("#cbcv-readout")).includes(`Hold to the end ${end}`)) throw new Error(`flat curve should end at ${end}`);
     for (const id of ["cbcv", "cbcal"]) {
       await p.locator(`[data-scrub='${id}']`).evaluate((e) => e.scrollIntoView({ block: "center" }));
       await scrubCheck(p, `[data-scrub='${id}']`);
     }
     await p.click("details.cb-bets > summary");
     if (!/hold [+−]\$[\d.]+ · cash [+−]\$/.test(await p.locator("details.cb-bets .cb-table tbody tr").first().innerText())) throw new Error("cash-out bet row");
+    await p.click('button[data-pf="why"]');
+    const why = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Why holding lost so much", "Is the in-play price right?", "What the fee does", "How this was measured"]) if (!why.includes(w)) throw new Error(`cash-out why lacks "${w}"`);
+    await p.locator("[data-scrub='why0']").evaluate((e) => e.scrollIntoView({ block: "center" }));
+    await scrubCheck(p, "[data-scrub='why0']");
+    if (!(await p.textContent("#rc-readout-why0")).includes("holding returned")) throw new Error("why row's hold");
+    await p.click('button[data-pf="result"]');
   }],
   // A failed pre-match study sits in Moneyline's Archive with its pill and result: the real
   // strategy search (Research, #131), shown through its own search view (lead brief, 28 Oct).

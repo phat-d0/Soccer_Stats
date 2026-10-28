@@ -915,7 +915,8 @@ the owner's baseball app, so the balance can drop without any run here.
     minus_hold, minus_hold_ci95, drawdown}}, `calibration` [{moment, lo, hi, n, won, implied, gap,
     gap_ci95}], plus `counts`, `by_league` and `by_season` {key: {positions, decisions, hold, cash,
     growth_minus_hold}}), `designs.band_3_4` (descriptive), `curves` {stake, start, points [{date,
-    hold, cash}]} (bankrolls, ≤ 200 points), `bets` (the judged rule's cash-outs: {date, lg,
+    hold, cash}]} (bankrolls, ≤ 200 points; `flat` {stake 1, start 0, points}, the running
+    profit of $1 a bet, which the chart draws when present, and `note`), `bets` (the judged rule's cash-outs: {date, lg,
     home, away, odds, won, moment, q, hold, cash}), any further descriptive designs (each one
     line: its hold and judged-rule numbers when it has them, else its bets) and `sample_note`
     (shown first, above the tiles: why the sample leaves matches out). The file shape is under
@@ -939,7 +940,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v64) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v65) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -990,7 +991,25 @@ the owner's baseball app, so the balance can drop without any run here.
   replay is the old rule (every price), so the new rule's row shows `leanRangeBt`: the replay's
   `by_odds_band` rows inside its `odds_range` (1.50–2.00 and 2.00–3.00), pooled ROI per $1
   weighted by bets ("Backtest: −1.8% · 1,345 bets, −200 to +200 · at Pinnacle"), and Lean's
-  Backtest view notes the same. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
+  Backtest view notes the same. **Backtest at DraftKings' prices** (lead brief, 28 Oct; v65):
+  Moneyline's replays of Blend Lean and Model 12% at DraftKings' own historical prices come as
+  `strategy_backtests.lean_dk` / `.edge12_dk` (`kind: "draftkings"`, the Pinnacle files' shape,
+  CLV against Pinnacle's close in the same snapshot). `btSourceView(key, lg)` puts a switch
+  "At DraftKings' prices" | "At Pinnacle's prices" (`state.btSource`, localStorage `btSource`,
+  DraftKings first; `btSources`/`btSourceOn`: only the sources whose file covers the chosen
+  competition, the chosen one else the first) above a coverage line per file (`btCoverage`:
+  seasons and leagues; "La Liga is only in the replay at Pinnacle's prices" when one book
+  lacks it), "The same rule at both books" (`lbCompare`, DraftKings | Pinnacle, the
+  competition's or All's metrics) and the chosen replay (`strategyBacktestHtml`, whose verdict,
+  title and `btWhere` say which book via `isDkBt`/`bookPrices`). Lean's and the old rule's row
+  headlines, and Model 12%'s, read DraftKings' file when it covers the competition
+  (`btPartBest`; Lean's new rule still pools its range's bands, "· at DraftKings"). Model 12%
+  under the Premier League keeps its DraftKings 2025/26 backtest (`E0_dk.json`, $10 a bet)
+  first, then "Replays at DraftKings' and Pinnacle's prices" with the switch; without
+  `edge12_dk` the old layout stays. The fixture makes both `_dk` files up from the Pinnacle
+  replay (ROI 2 points and CLV 1 point worse, 2020/21–2024/25, All and the Premier League only;
+  `add_draftkings_backtests`) and keeps every second point of each league's bankroll curves to
+  stay under 1.5 MB. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
   archived too (`PF_ARCHIVED` {corners: pinnacle, draftkings}, `archivedTrack`: "Archived Oct
   25 · still logs every 12%-edge pick"; data and ledgers unchanged), so Team corners' main list
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
@@ -1056,13 +1075,17 @@ the owner's baseball app, so the balance can drop without any run here.
   A cash-out study (`studyCashout`: the judged design has `variants`) has its own Result
   (`studyCashoutHtml`): verdict, tiles (decisions with half-time and 70th-minute counts, growth
   vs holding at the judged stake with its range via `growthText`, hold and cash-out per $1),
-  the judged rule in words with the sample's counts, the two bankrolls (`overlayCurveChart` id
-  `cbcv`, base `curves.start`, from `curves.points`), the grid by threshold and margin
+  the judged rule in words with the sample's counts, hold vs cash out (`overlayCurveChart` id
+  `cbcv`: `curves.flat`, the running profit at $1 a bet, when present, with the bankroll at the
+  judged stake in one sentence, since at 2% both fall to almost nothing in the real file; else
+  the bankrolls from `curves.points`, base `curves.start`) and `curves.note` folded, the grid by threshold and margin
   (`.co-grid`, the judged row `.co-primary`), the Kelly partials folded, the in-play price's
   calibration (`cbRowsChart` `cbcal`, per moment and band), the other band in one line, tables by
   league and season, and the cash-outs folded (moment, chance, hold and cash per $1). Its row
-  reads the growth difference ("growth a bet vs holding"). The fixture's cash-out study is made
-  up in that shape (`_cashout_study`), beside a made-up passing study (`_passed_study`).
+  reads the growth difference ("growth a bet vs holding"). The fixture uses Research's file when
+  it is committed, trimmed (`_trim_cashout`: the judged design whole, hold and the judged rule for
+  the other samples, 60 points a curve, 40 cash-outs), else a made-up one in its shape
+  (`_cashout_study`); beside them a made-up passing study (`_passed_study`).
   The first study, "$1 on the trailing favourite at half-time" (`comeback_ht`), renders as before:
   its page (`cbStrategyHtml` → `studyPageHtml`) has Result and Why in place of Live / Backtest
   / Model (other portfolios fall back to Live paper). Result (`studyResultHtml`, any study: tiles on the judged design, Betfair and not-priced lines only when present, one profit line per design with `betProfit` = `profit` or odds − 1, rows by league, season and band only when present, cash-out `result_text` in the bet list): verdict, "No live
