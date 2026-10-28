@@ -269,13 +269,15 @@ def align_to_schedule(dk: pd.DataFrame, fixtures: pd.DataFrame, hours: float = 3
 
 
 def duplicate_fixtures(fixtures: list[dict]) -> list[tuple]:
-    """Cards that share (league, home, away, kickoff): should always be empty."""
+    """Cards that share (league, home, away, kickoff), names compared without case: should
+    always be empty."""
     seen, dups = set(), []
     for f in fixtures:
         key = (f.get("league", lgs.PRIMARY), f.get("home"), f.get("away"), f.get("kickoff"))
-        if key in seen:
+        folded = (key[0], str(key[1] or "").casefold(), str(key[2] or "").casefold(), key[3])
+        if folded in seen:
             dups.append(key)
-        seen.add(key)
+        seen.add(folded)
     return dups
 
 

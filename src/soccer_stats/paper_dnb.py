@@ -242,7 +242,7 @@ def _open(ledger, c, now, fetched, league, rules, ref, mark=None) -> list[dict]:
         if not pick:
             continue
         t = new_trade(c, pick, track, rule, kickoff, now, fetched, league, ref)
-        if t["id"] in ledger:
+        if tr.holds(ledger, t["id"]):
             continue
         group = {m: c["odds"].get(m) for m in tr.LEAN_MARKETS}
         quoted = c.get("odds_updated") or fetched
