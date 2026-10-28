@@ -99,3 +99,21 @@ def test_the_owners_sample_starts_in_2024_and_the_text_is_canonical():
     s = xp.sample({"SP1": (2020, 2021, 2024, 2025), "N1": (2022,)})
     assert s == {"SP1": (2024, 2025), "N1": ()}
     assert xp.canonical({"a": [1, 2], "b": None}) == '{"a":[1,2],"b":null}'
+
+
+def test_the_frozen_sample_is_unchanged_and_never_overlaps_b_c_or_h():
+    import hashlib
+    from pathlib import Path
+
+    from soccer_stats.lab import comeback_fetch as cf
+
+    path = Path(xp.__file__).with_name("cashout_slots.json")
+    text = path.read_text()
+    assert hashlib.sha256(text.encode()).hexdigest().startswith("2c5738d80db79cf3")
+    res = xp.json.loads(text)
+    assert res["from_year"] == 2024 and res["dropped"] == []
+    assert all(s["kickoff"] >= "2024-07-01" for s in res["matches"])
+    used, _ = xp.used_matches()
+    picked = {(s["league"], s["kickoff"], m["home"]) for s in res["matches"] for m in s["matches"]}
+    assert not picked & used
+    assert cf.slots_path("X") == path and len(cf.load_slots(path)) == res["totals"]["requests"]

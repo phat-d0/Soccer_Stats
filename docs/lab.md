@@ -2586,7 +2586,29 @@ ran, and the results will follow below it with run ids.
 - a plain-English summary for the owner: what was tried, what the best looked like, how
   likely that was luck, and what the holdout said.
 
-## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 50,000 credits; DRAFT pre-registration, frozen with its slot file before any purchase)
+## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 151,000 credits; pre-registration frozen with its slot file on 2026-10-28, before any purchase)
+
+**Up front (frozen 2026-10-28).**
+- **Sample:** 2024/25 onward in every league the archive prices in play (the owner's
+  choice): 54 league-seasons, 7,673 kickoff slots, **11,864 matches**, **6,402 with the
+  underdog at 4.0+** (the primary band).
+- **Cost:** 15,288 snapshots, 197 already held from B, C and H. **Estimate 150,910
+  credits; purchase cap 151,000** (the owner's ceiling; a call never costs more than 10, so
+  the estimate is an upper bound).
+- **Slot file:** `src/soccer_stats/lab/cashout_slots.json`, SHA-256
+  `2c5738d80db79cf39093746881bfe1a71d944f3adb30671bcba97f3a213ad1c8` (4,477,397 bytes),
+  built by `odds-check.yml` `task=cashout-plan` run 40646353530 and rebuilt byte for byte
+  from that run's log.
+- **Expected qualifying decisions** (stated before buying, from half-time scores only, never
+  results): about **700** at 4.0+. The working:
+  - 4.0+ underdogs lead at half-time about 16.5% of the time;
+  - about 60% of those reach a 50% in-play chance;
+  - about 1.4 times as many decisions come in by the 70th minute;
+  - about 81% have a usable quote (C's rate).
+  That is well above the 300 minimum, unless the guard blocks whole league-seasons.
+- **Pass rule (the one primary, unchanged below):** at the 5% margin, T = 0.50, stake 2%,
+  the growth difference (cash-out − hold) has its 95% range above 0 on at least 300
+  qualifying decisions.
 
 **The owner's question.** "Cash out when the heavy underdog is breaking even (50-50 odds from a
 steep underdog) or even winning; the trade-off risk is what we have to find." The free check
@@ -2612,21 +2634,20 @@ end.
   - The price is Pinnacle's close, else the market average's close (`price` marks which).
   - **Primary band: 4.0 and up.** 3.0–4.0 is reported beside it.
   - Only kickoff times and closing prices are read: no half-time or full-time score.
-- **League-seasons:** every one where the archive prices in-play matches:
-  - E0, F1, D1: 2023/24 onward;
-  - E1, E2, E3: 2022/23 onward;
-  - SP1: 2020/21 onward;
-  - I1, D2, SP2: 2021/22 onward;
-  - N1, P1, SC0, B1, T1, G1, I2, F2: 2022/23 onward;
-  - each through 2026/27 to date (files of the day the list is frozen).
+- **League-seasons:** 2024/25, 2025/26 and 2026/27 to date (football-data's files of
+  28 Oct) in all 18 leagues the archive prices in play: E0, F1, D1, E1, E2, E3, SP1, I1,
+  D2, SP2, N1, P1, SC0, B1, T1, G1, I2 and F2. Earlier priced seasons (back to 2020/21 in
+  SP1) are left out by the owner's choice of budget.
 - **Excluded:**
   - every match bought by design B or C (spent);
   - every design H match. H's outcomes stay unread until H is judged, so they can't enter
     another test first.
   - The sample holds no cup and none of `heavy_more`'s extra leagues (AUT to ARG), so it
     never touches design H2's candidates either.
-- **Budget trim (lead's rule):** over 50,000 credits, whole league-seasons are dropped, oldest
-  season first, until the estimate fits. The dropped list is printed and frozen with the file.
+- **Budget:** at 151,000 nothing in 2024/25 onward is dropped (the frozen file's `dropped`
+  is empty). The first approval was 50,000; at that size the trim would have left about
+  2,200 primary matches and about 240 decisions, likely inconclusive, so the owner raised
+  it.
 
 **Purchase.**
 - `comeback_fetch --slots X` (`odds-check.yml` `task=comeback-fetch`, `design=X`), run **from
@@ -2640,8 +2661,10 @@ end.
   - the first call budgeted at 20;
   - stop on a call over 10 credits or on any HTTP or network error;
   - a dry run first;
-  - **cap = the frozen estimate, at most 50,000.** A call never costs more than 10, so the
-    estimate is an upper bound.
+  - **cap 151,000** (the estimate is 150,910). A call never costs more than 10, so the
+    estimate is an upper bound;
+  - each run stops cleanly after 120 minutes and the next resumes (`--minutes`); a held
+    snapshot is never bought again, so about two runs are needed.
 - **Guard:** C's, per league-season. If its first 3 snapshots show no started event freshly
   priced by DraftKings or Betfair, no more of it is bought and its matches count as **not
   priced**.
