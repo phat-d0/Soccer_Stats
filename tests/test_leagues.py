@@ -6,6 +6,7 @@ import pytest
 import requests
 from test_paper import KICKOFF, NOW, card, src
 
+from soccer_stats import corners_live as cl
 from soccer_stats import data as fd
 from soccer_stats import espn_news as en
 from soccer_stats import leagues as lgs
@@ -130,7 +131,7 @@ def test_league_one_and_two_fetch_only_near_a_match_into_their_own_cache(tmp_pat
         events, status = feed.fetch_odds(code, raw_dir=tmp_path, api_key="k", now=T, kickoffs=near)
         assert len(calls) == n + 1 and sport in calls[-1][0] and events == []
         assert calls[-1][1]["params"]["markets"] == "h2h"  # 1 credit, DraftKings only
-        assert calls[-1][1]["params"]["bookmakers"] == feed.BOOKMAKER
+        assert calls[-1][1]["params"]["bookmakers"] == ",".join(feed.BOOKMAKERS)
         assert (tmp_path / f"odds_api_{code}_draftkings.json").exists()
 
 
@@ -368,7 +369,7 @@ def test_estimate_cli_counts_league_one_and_two_as_live(monkeypatch, capsys):
     oct_line = out.split("Oct 2026:")[1].split("\n")[0]
     assert "E2 4 matches 8" in oct_line and "E3 4 matches 8" in oct_line
     assert "not in the corner test" not in out.lower()  # the extra flag is now a no-op
-    assert "(cap 750)" in out
+    assert f"(cap {cl.CORNERS_MONTHLY_CAP})" in out
 
 
 # ---------- refresh policy ----------
@@ -378,14 +379,14 @@ def test_policy_floor():
     in_h = lambda h: [T + pd.Timedelta(hours=h)]  # noqa: E731
     # Premier League: as before, hourly, every 30 minutes within 2 hours of a kickoff.
     assert feed.policy_floor("E0", [], T) == 1.0
-    assert feed.policy_floor("E0", in_h(1.5), T) == 0.5
+    assert feed.policy_floor("E0", in_h(1.5), T) == feed.KICKOFF_INTERVAL_HOURS == 0.25
     # Matchday leagues: nothing without a match within 48 hours, then 3 h / 1 h / 30 min.
     assert feed.policy_floor("SP1", [], T) is None
     assert feed.policy_floor("SP1", in_h(60), T) is None
     assert feed.policy_floor("SP1", in_h(-1), T) is None  # already kicked off
     assert feed.policy_floor("SP1", in_h(30), T) == 3.0
     assert feed.policy_floor("SP1", in_h(5), T) == 1.0
-    assert feed.policy_floor("SP1", in_h(1), T) == 0.5
+    assert feed.policy_floor("SP1", in_h(1), T) == 0.25
 
 
 def test_refresh_interval_splits_the_budget_between_live_leagues():

@@ -106,7 +106,9 @@ def test_fetch_caches_and_records_credits(tmp_path, monkeypatch):
     )
     events, status = fetch_odds(raw_dir=tmp_path, api_key="secret-key")
     assert len(events) == 3 and status.credits_left == 480 and status.error is None
-    assert calls[0]["params"]["bookmakers"] == "draftkings"
+    # Ten books in one call (one region): DraftKings first, Pinnacle beside it.
+    assert calls[0]["params"]["bookmakers"] == ",".join(feed.BOOKMAKERS)
+    assert feed.BOOKMAKERS[:2] == ("draftkings", "pinnacle") and len(feed.BOOKMAKERS) <= 10
     fetch_odds(raw_dir=tmp_path, api_key="secret-key")  # fresh cache -> no second call
     assert len(calls) == 1
 
@@ -350,7 +352,7 @@ def test_request_asks_only_for_h2h(tmp_path, monkeypatch):
     seen = []
     _simulate_month(tmp_path, monkeypatch, 1, seen)
     assert seen and all(p["markets"] == "h2h" for p in seen)
-    assert all(p["bookmakers"] == "draftkings" for p in seen)
+    assert all(p["bookmakers"] == ",".join(feed.BOOKMAKERS) for p in seen)
 
 
 def test_cheaper_call_does_not_refresh_more_often(tmp_path, monkeypatch):
