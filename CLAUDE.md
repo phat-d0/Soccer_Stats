@@ -212,7 +212,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; scheduled runs stay locked). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
@@ -231,7 +231,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 ## The Odds API
 
-- Repo secret `ODDS_API_KEY`, 100K-credit plan, **shared with the owner's baseball app**.
+- Repo secret `ODDS_API_KEY`, ~5M-credit plan since 28 Oct (was 100K), **shared with the owner's baseball app**.
   Read the balance from the publish log ("credits left") or a backfill log. Never print the
   key or write it into logs, data, the ledger or commits. Only the lead sets credit caps;
   the default cap is 0.
@@ -419,6 +419,16 @@ the owner's baseball app, so the balance can drop without any run here.
   `pinnacle_live_minutes_before`, `clv_pinnacle_live`; the summaries add `clv_pinnacle_live`),
   and new match trades record `best_us_odds` and `best_us_book` (`paper.best_us`).
 - `odds_history.py`: historical match odds (cached).
+- `dk_history.py` (lead brief 2, item 3, 28 Oct): DraftKings' historical pre-match odds.
+  `probe(cap, leagues, seasons)` buys one bulk h2h snapshot per league and season at ten
+  books (about 10 credits, `probe_time`: the first Saturday of November, 09:00 UTC), newest
+  season first, a league stopping at its first season without DraftKings, within the cap
+  and the 3,000 reserve (`CappedBudget`). Bodies go to `odds_history/<code>/` in the paid
+  `odds-history-` cache, never bought twice; an error answer isn't cached. `estimate(kickoffs_by)`
+  gives the distinct snapshots and credits per league and season (a 48 h look plus the close,
+  kickoffs within 15 min sharing, 10 credits each). CLI `dk-history --cap N` (0 = estimate
+  only); `odds-check.yml` `task=dk-history` (key only with a cap); log lines
+  `DK_HISTORY_PROBE_JSON`, `DK_HISTORY_ESTIMATE_JSON`.
 - `team_totals.py`: live team totals plus the match total. `due_snapshot`: "look" 18–30 h before
   kickoff, "close" within 30 min (75 min when no later scheduled run is left). Event ids from
   the cached DraftKings body; an (event, snapshot) in the call record is never fetched again.
@@ -1101,9 +1111,10 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 **Owner preferences:**
 - Plain English, no branch names in parentheses in session titles or summaries.
 - Session titles follow "Soccer team: <Role>", like the baseball team.
-- One shared Odds API key on the 100K plan (the owner decided against two keys on cost).
-  Baseball usage is small in its post-season, which ends late October.
-- Credit caps are 0 unless the owner approves a spend.
+- One shared Odds API key, upgraded 28 Oct to ~5M credits a month (owner: "don't skimp on
+  data"). Baseball usage is small in its post-season, which ends late October.
+- Credit caps are still set by the lead (0 by default in code), but data spend is now approved
+  generously: estimate first, pre-register any research purchase, keep the 3,000 reserve.
 
 **Open threads:**
 - Player shots are parked (owner, 9 Oct): no new work or spend; the free display and weekly
