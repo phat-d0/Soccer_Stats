@@ -22,9 +22,11 @@ resumable, with a time budget per run.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import time
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 
@@ -73,6 +75,7 @@ EXTRA = {
     "BRA": ("Brazil", "bra.1", "soccer_brazil_campeonato"),
     "ARG": ("Argentina", "arg.1", "soccer_argentina_primera_division"),
 }
+DOMESTIC = ("FAC", "EFLC", "CDR", "DFBP", "CI", "CDF")  # the approved pre-match purchase
 AMERICAS = ("USA", "MEX", "BRA", "ARG")  # evening kickoffs fall on the next UTC day
 EXTRA_FROM = pd.Timestamp("2022-07-01")  # the in-play archive is priced from 2022/23
 EARLIER = {"SP1": (2020, 2021), "I1": (2021,), "D2": (2021,), "SP2": (2021,)}
@@ -268,6 +271,60 @@ def cup_season(code: str, year: int, raw_dir: Path, get: Callable, stats: dict,
             f"{e['kickoff']:%Y-%m-%d} {e['home']} {e['ht'][0]}-{e['ht'][1]} {e['away']}"
             for e in trail
         ],
+        # The pre-match purchase's slots: kickoffs holding a match not level at half-time
+        # (the only matches that can hold a trailing favourite). No score is kept.
+        "pre_match_list": [
+            {
+                "kickoff": f"{k:%Y-%m-%dT%H:%MZ}",
+                "matches": [
+                    {"home": e["home"], "away": e["away"]} for e in decided if e["kickoff"] == k
+                ],
+            }
+            for k in sorted(pre_slots)
+        ],
+    }
+
+
+def cup_prematch_slots(res: dict, held: set | None = None) -> dict:
+    """design H2P: one pre-match snapshot per cup kickoff slot at the close (kickoff - 5
+    min, `cup_odds.request_time`), to find which cup favourites were priced 75%+. Seasons in
+    `held` ((cup, season) already bought, e.g. the Champions League closes) are left out."""
+    from soccer_stats.cup_odds import request_time
+
+    held = held or set()
+    slots, per = [], {}
+    for r in res.get("cups", []):
+        if "error" in r or "pre_match_list" not in r:
+            per[f"{r.get('cup')} {r.get('season')}"] = {"error": r.get("error", "no list")}
+            continue
+        key = f"{r['cup']} {r['season']}"
+        if (r["cup"], r["season"]) in held:
+            per[key] = {"held": True}
+            continue
+        for s in r["pre_match_list"]:
+            slots.append({"league": r["cup"], "sport": r["sport"], "kickoff": s["kickoff"],
+                          "request_at": f"{request_time(s['kickoff']):%Y-%m-%dT%H:%MZ}",
+                          "matches": s["matches"]})  # fmt: skip
+        per[key] = {"slots": len(r["pre_match_list"])}
+    # Two kickoffs can share one close snapshot; buy each (sport, time) once.
+    seen, buy = set(), []
+    for s in sorted(slots, key=lambda s: s["request_at"]):
+        if (s["sport"], s["request_at"]) not in seen:
+            seen.add((s["sport"], s["request_at"]))
+            buy.append(s)
+    return {
+        "design": "H2P",
+        "guard": False,  # a pre-match snapshot has no started events, by design
+        "rule": "one pre-match snapshot per cup kickoff slot with a match not level at "
+        "half-time, at kickoff - 5 min; prices only, no score kept",
+        "per_cup_season": per,
+        "kickoff_slots": slots,
+        "slots": buy,
+        "totals": {
+            "kickoff_slots": len(slots),
+            "snapshots": len(buy),
+            "credits": len(buy) * HIST_COST,
+        },  # fmt: skip
     }
 
 
@@ -388,6 +445,13 @@ def extra_league(code: str, raw_dir: Path, get: Callable, stats: dict,
 # ---------- the run ----------
 
 
+def why(exc: Exception) -> str:
+    """An error's type, message and the line it came from, for the counts."""
+    tb = traceback.extract_tb(exc.__traceback__)
+    where = f" at {Path(tb[-1].filename).name}:{tb[-1].lineno}" if tb else ""
+    return f"{type(exc).__name__}: {exc}{where}"[:200]
+
+
 def earlier() -> list[dict]:
     rows = []
     for lg, years in EARLIER.items():
@@ -395,7 +459,7 @@ def earlier() -> list[dict]:
             try:
                 r = hf.season_scope(lg, y)
             except Exception as exc:  # noqa: BLE001 - a missing file is reported, not fatal
-                r = {"league": lg, "season": hf.season_name(y), "error": str(exc)[:120]}
+                r = {"league": lg, "season": hf.season_name(y), "error": why(exc)}
             r.pop("snapshot_times", None)
             rows.append(r)
     return rows
@@ -416,13 +480,13 @@ def run(raw_dir: Path = RAW_DIR, seconds: float = RUN_SECONDS, get: Callable = r
                 out["cups"].append(cup_season(code, y, raw_dir, paced, stats, today))
             except Exception as exc:  # noqa: BLE001 - one cup failing is reported, not fatal
                 out["cups"].append({"cup": code, "season": hf.season_name(y),
-                                    "error": str(exc)[:120]})  # fmt: skip
+                                    "error": why(exc)})  # fmt: skip
     if not cups_only:
         for code in EXTRA:
             try:
                 out["extra"] += extra_league(code, raw_dir, paced, stats, today)
             except Exception as exc:  # noqa: BLE001
-                out["extra"].append({"league": code, "error": str(exc)[:120]})
+                out["extra"].append({"league": code, "error": why(exc)})
     out["requests"], out["failures"] = paced.calls, stats.get("failures", 0)
     out["out_of_time"] = paced.out_of_time
     return out
@@ -479,11 +543,25 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--minutes", type=float, default=RUN_SECONDS / 60, help="run time budget")
     p.add_argument("--json", default="")
+    p.add_argument("--prematch-out", default="",
+                   help="write design H2P (the domestic cups' pre-match slots) here")  # fmt: skip
     args = p.parse_args(argv)
     res = run(seconds=args.minutes * 60)
     tot = totals(res)
     print(report(res, tot))
-    print("HEAVY_MORE_JSON " + json.dumps({**res, "totals": tot}, default=str))
+    brief = {**res, "cups": [{k: v for k, v in r.items() if k != "pre_match_list"}
+                             for r in res.get("cups", [])]}  # fmt: skip
+    print("HEAVY_MORE_JSON " + json.dumps({**brief, "totals": tot}, default=str))
+    if args.prematch_out:
+        domestic = {"cups": [r for r in res.get("cups", []) if r.get("cup") in DOMESTIC]}
+        plan = cup_prematch_slots(domestic)
+        text = json.dumps(plan, separators=(",", ":"))
+        Path(args.prematch_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.prematch_out).write_text(text)
+        print(
+            f"CUP_PREMATCH_SHA256 {hashlib.sha256(text.encode()).hexdigest()} ({len(text)} bytes)"
+        )
+        print("CUP_PREMATCH_JSON " + text)
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.json).write_text(json.dumps({**res, "totals": tot}, indent=1, default=str))

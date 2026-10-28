@@ -42,6 +42,7 @@ SLOT_FILES = {
     "C": "comeback_c_slots.json",
     "H": "comeback_h_slots.json",  # heavy favourites (75%+), docs/lab.md
     "X": "cashout_slots.json",  # the cash-out test (cashout_plan), docs/lab.md
+    "H2P": "h2_cup_prematch_slots.json",  # the domestic cups' pre-match prices (heavy_more)
 }
 SLOTS_FILE = Path(__file__).with_name(SLOT_FILES["B"])
 CACHE = "comeback_odds"  # under RAW_DIR; the Actions cache `comeback-odds-*` holds it
@@ -163,6 +164,7 @@ def run(
     get: Callable = requests.get,
     books=BOOKS,
     minutes: float | None = None,
+    guard_on: bool = True,
 ) -> dict:
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     cache_dir = Path(cache_dir) if cache_dir is not None else Path(RAW_DIR) / CACHE
@@ -182,6 +184,8 @@ def run(
     guard = read_guard(cache_dir)
 
     def blocked(key: str) -> bool:
+        if not guard_on:  # pre-match snapshots have no started events to check
+            return False
         first = checks.get(key, [])[:GUARD_FIRST]
         return len(first) == GUARD_FIRST and not any(first)
 
@@ -299,7 +303,9 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
     p.add_argument("--cache-dir", default="", help="bodies and call record (default raw dir)")
-    p.add_argument("--slots", default="B", help="design B, C, H or X (cash-out), or a slot file")
+    p.add_argument(
+        "--slots", default="B", help="design B, C, H, X (cash-out) or H2P, or a slot file"
+    )
     p.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
     args = p.parse_args(argv)
     res = run(
@@ -307,6 +313,7 @@ def main(argv: list[str] | None = None) -> None:
         cache_dir=Path(args.cache_dir) if args.cache_dir else None,
         slots=load_slots(slots_path(args.slots)),
         minutes=args.minutes or None,
+        guard_on=json.loads(slots_path(args.slots).read_text()).get("guard", True),
     )
     res["design"] = args.slots
     print(report(res))

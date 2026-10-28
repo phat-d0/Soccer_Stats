@@ -2501,6 +2501,51 @@ out of any result. H's judgement is unchanged. The same work fixed the result jo
 analysis will use (`comebacks2.result_row`): 31 of H's matches are in SC0, G1 and B1, where a
 pair can meet twice at the same ground.
 
+### Design H2P: the domestic cups' pre-match prices (purchase plan, 28 Oct; committed before any H2P snapshot is bought)
+
+**Why.** H2 (the cups and extra leagues for the 75%+ idea, see the H amendment above) needs to
+know which cup favourites were priced 75%+ before kickoff. football-data has no cup prices and
+ESPN kept none, so the cups' pre-match prices have to be bought first. H2P buys only those
+pre-match prices. The in-play half-time snapshots for the 75%+ favourites it finds come later,
+in H2's own pre-registration.
+
+- **Slot file:** `src/soccer_stats/lab/h2_cup_prematch_slots.json`, SHA-256
+  `97976174c8c5a10c9087b3323136344d1884e4b40f6fc5039e94661ce9fca614` (385,107 bytes). Built
+  by `lab/heavy_more.py --prematch-out` (`odds-check.yml` `task=heavy-more`, run 40723506826,
+  0 failures, not out of time) and rebuilt byte for byte from that run's log.
+- **Sample:** the six domestic cups (FA Cup, EFL Cup, Copa del Rey, DFB-Pokal, Coppa Italia,
+  Coupe de France), 2021/22 to 2026/27 to date. One snapshot per cup kickoff slot that holds
+  at least one match **not level at half-time** (ESPN's half-time score; a level match can't
+  have a trailing favourite). That is 1,686 matches in 911 kickoff slots. No two slots share a
+  snapshot.
+  - FA Cup 204, Copa del Rey 201, Coppa Italia 156, EFL Cup 128, DFB-Pokal 122, Coupe de
+    France 100.
+  - Only the half-time state chose the slots, never a result. The file keeps no score.
+- **Snapshot:** one historical bulk h2h snapshot at the close (kickoff − 5 min, floored to 5
+  minutes, `cup_odds.request_time`), ten books (one region, 10 credits).
+- **Cost and cap:** 911 snapshots, **9,110 credits; cap 9,110**. That is 750 more than the
+  roughly 8,360 first estimated from an incomplete count, so it needs the lead's approval.
+- **Purchase:** `comeback_fetch --slots H2P` (`odds-check.yml` `task=comeback-fetch`,
+  `design=H2P`), **from the default branch only**, so the bodies land in the paid cache
+  `comeback-odds-*` (in `cache_archive.PAID`) and are archived. C's spending rules apply:
+  - `CappedBudget` with the 3,000 reserve;
+  - the first call budgeted at 20;
+  - stop on a call over 10 credits or on any HTTP or network error;
+  - a dry run first;
+  - each run stops after 120 minutes and the next resumes. A held snapshot is never bought
+    again.
+  - No guard (`"guard": false`): a pre-match snapshot has no started events to check.
+- **Reads nothing about results.** The purchase and its counts read no outcome. H's own
+  outcomes stay unread until H2 is frozen or 30 Nov 2026.
+- **The UEFA cups are not in H2P.** Their cost is reported separately and needs its own
+  approval. The Champions League closes already held (2024/25 and 2025/26, 118 snapshots on
+  data-log `odds_history/UCL_close_calls.jsonl`, 384 matches, Pinnacle on 372) are reused,
+  not bought.
+  - UCL 2021/22, 2022/23, 2023/24 and 2026/27 to date: 122 slots, 1,220 credits.
+  - Europa League: 149 slots, 1,490 credits.
+  - Conference League: 148 slots, 1,480 credits.
+  - Total 4,190 credits.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,

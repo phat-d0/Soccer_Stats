@@ -215,3 +215,19 @@ def test_a_time_budget_stops_cleanly_and_the_next_run_resumes(tmp_path, monkeypa
     first = res["bought"]
     res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=slots(10), get=get)
     assert res["held"] == first and res["bought"] == 10 - first and state["calls"] == 10
+
+
+def test_a_pre_match_plan_turns_the_guard_off(tmp_path):
+    get, state = fake()
+
+    def empty_get(url, params=None, timeout=None):
+        r = get(url, params, timeout)
+        if not url.endswith("/sports"):
+            r._body = {"timestamp": params["date"], "data": []}  # nothing started
+        return r
+
+    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path, slots=slots(6), get=empty_get,
+                 guard_on=False)  # fmt: skip
+    assert res["bought"] == 6 and not res["not_priced"]
+    res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path / "g", slots=slots(6), get=empty_get)
+    assert res["bought"] == 3 and res["not_priced"]

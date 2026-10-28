@@ -158,7 +158,7 @@ on:
       design:
         description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test)"
         type: choice
-        options: [B, C, H, X]
+        options: [B, C, H, X, H2P]
         default: B
       leagues:
         description: "markets / espn: comma-separated leagues, e.g. E2,E3 (blank = the six; markets also prints team names vs football-data's clubs, espn reads 21 days)"
@@ -440,7 +440,8 @@ jobs:
                      --b64 --json out/cashout_slots.json ;;
             heavy-more)  # free: ESPN cups, UEFA and extra leagues for the 75%+ idea; counts only
               mkdir -p data/raw/heavy_espn  # the save step always has a folder to save
-              uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json ;;
+              uv run python -m soccer_stats.lab.heavy_more --minutes 110 --json out/heavy_more.json \
+                --prematch-out out/h2_cup_prematch_slots.json ;;
             archive-probe)  # owner-approved: one historical snapshot per league-season, walking back
               mkdir -p data/raw/archive_probe  # the save step always has a folder to save
               if [ "$LEAGUES" = "more" ]; then  # cups, UEFA, extra leagues: slots from heavy-more

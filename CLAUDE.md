@@ -827,6 +827,16 @@ the owner's baseball app, so the balance can drop without any run here.
   slots and credits for the eight leagues 2025/26–2026/27 (`EIGHT_YEARS`) and `OTHER` leagues with sport
   keys 2022/23–2025/26; `needed(gap)` sizes the sample. `odds-check.yml` `task=heavy-favourites`, log
   line `HEAVY_FAVOURITES_JSON`; `docs/lab.md` "Heavy favourites (75%+)" (DRAFT, not approved).
+- `lab/heavy_more.py` (lead, 28 Oct; free, no key): counts for the 75%+ idea beyond design H. It
+  covers the domestic and UEFA cups (ESPN half-times; `DOMESTIC` = FAC, EFLC, CDR, DFBP, CI, CDF),
+  football-data's extra leagues joined to ESPN half-times, and earlier priced seasons. ESPN days
+  are cached in `heavy-espn-*`, and a run is resumable within `--minutes`. `why(exc)` names each
+  error's type and line. `cup_prematch_slots` builds design H2P: one pre-match snapshot per
+  domestic cup kickoff slot holding a match not level at half-time, at kickoff − 5 min (no guard,
+  no score kept). `--prematch-out` prints `CUP_PREMATCH_SHA256` and `CUP_PREMATCH_JSON`.
+  `odds-check.yml` `task=heavy-more`, log line `HEAVY_MORE_JSON`. The frozen file is
+  `lab/h2_cup_prematch_slots.json` (911 snapshots, 9,110 credits, SHA 97976174…, run 40723506826;
+  `docs/lab.md` "Design H2P"), bought by `comeback_fetch --slots H2P` from the default branch.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's
