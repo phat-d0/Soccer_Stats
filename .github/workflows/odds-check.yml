@@ -466,7 +466,8 @@ jobs:
               fi ;;
             band-edges) uv run soccer-stats backtest-band-edges --json out/band_edges.json ;;
             strategy-search) uv run python -m soccer_stats.lab.strategy_search \
-                     --json out/strategy_search.json --arms-json out/strategy_search_arms.json ;;
+                     --json out/strategy_search.json --arms-json out/strategy_search_arms.json \
+                     --app-json out/strategy_search_research.json ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log

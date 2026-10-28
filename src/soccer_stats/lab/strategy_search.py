@@ -42,6 +42,7 @@ import argparse
 import functools
 import itertools
 import json
+import os
 import warnings
 from pathlib import Path
 
@@ -724,8 +725,120 @@ def search(df: pd.DataFrame, n_boot: int = N_BOOT) -> tuple[dict, list[dict]]:
         "verdict": "finalists found: open the holdout once with a logged reason"
         if finalists
         else "no strategy found: no arm passes; the holdout stays locked",
+        "best_clv_bets": bet_rows(df, best_clv["rows"]) if best_clv else [],
     }
     return result, every
+
+
+def bet_rows(df: pd.DataFrame, rows: np.ndarray) -> list[dict]:
+    """An arm's bets in date order, for the app's curve."""
+    b = df.iloc[rows].sort_values("date")
+    return [
+        {
+            "date": pd.Timestamp(r.date).date().isoformat(),
+            "lg": r.league,
+            "home": r.home,
+            "away": r.away,
+            "market": r.market,
+            "side": r.side,
+            "odds": round(float(r.odds), 3),
+            "profit": round(float(r.profit), 4),
+            "clv": None if not np.isfinite(r.clv) else round(float(r.clv), 4),
+        }
+        for r in b.itertuples()
+    ]
+
+
+def _arm_app(a: dict | None) -> dict | None:
+    if not a:
+        return None
+    return {
+        "label": _label(a),
+        "family": a["family"],
+        "bets": a.get("n_roi"),
+        "roi": a.get("roi"),
+        "roi_ci95": a.get("roi_ci95"),
+        "clv_bets": a.get("n_clv"),
+        "clv": a.get("clv"),
+        "clv_ci95": a.get("clv_ci95"),
+        "p_clv": a.get("p_clv"),
+        "p_roi": a.get("p_roi"),
+    }
+
+
+def app_file(res: dict, runs: dict | None = None) -> dict:
+    """The app-ready research file (`lab/strategy_search_research.json`), in the shape of
+    `lab/comeback_research.json`: title, question, rule, verdict, verdict_text, cost,
+    runs, preregistered, designs, bets (the best arm's, for the curve), notes."""
+    t, rc, ps = res["arms_tried"], res["reality_check"], res["positive_share"]
+    best = res.get("best_clv")
+    found = bool(res["finalists"])
+    leagues = list(res.get("leagues", {}))
+    seasons = sorted({s for r in res.get("leagues", {}).values() for s in r.get("seasons", [])})
+    return {
+        "title": "Strategy search: every rule we could think of, on five seasons",
+        "question": "Study the data we already have to find a strategy (position sizing, when "
+        "to cash out...) that would have had positive ROI. I know this can be overfitting "
+        "but we can try first.",
+        "rule": "Every rule tried is counted: the raw model's best side at an edge of 0, 5, "
+        "12 or 20%, Blend Lean at z 0.5, 1 or 2, or every side, in 1X2, draw no bet, Asian "
+        "handicap and over/under 2.5 at Pinnacle's early price, with up to two filters "
+        "(league, price band, edge or z band, driver, side, favourite, day, kickoff slot, "
+        "strength gap), plus line-movement rules at the close. A rule passes only if its CLV "
+        "range is above 0 on 300+ bets and it beats the best a no-skill search would find "
+        "by luck (p < 0.05). 2024/25 onward is locked away for any finalist.",
+        "verdict": "pass" if found else "fail",
+        "verdict_text": (
+            "Finalists found; the locked seasons decide."
+            if found
+            else f"No strategy found. {t['total']:,} rules tried; the best beat the closing "
+            f"price by {best['clv']:+.1%} on {best['n_clv']} bets, but a search with no skill "
+            f"finds one that good {best['p_clv']:.0%} of the time. Only {ps['clv']['share']:.0%} "
+            "of the large rules beat the close at all, against about half if prices were "
+            "beatable by chance."
+        )
+        if best
+        else "No rule had 300 bets.",
+        "closed_at": pd.Timestamp.now(tz="UTC").date().isoformat(),
+        "cost": {"credits": 0, "total": 0},
+        "runs": runs or {},
+        "preregistered": {"design": "76557de", "implementation_notes": "e8e4e81"},
+        "designs": {
+            "search": {
+                "role": "judged",
+                "label": f"{t['total']:,} rules, eight leagues, {len(seasons)} seasons "
+                "(2024/25 onward locked)",
+                "leagues": leagues,
+                "seasons": [lb.season_label(s) for s in seasons],
+                "arms": t,
+                "best_clv": _arm_app(best),
+                "best_roi": _arm_app(res.get("best_roi")),
+                "reality_check": rc,
+                "positive_share": ps,
+                "by_market": [
+                    {"market": m, **(_arm_app(a) or {})} for m, a in res["by_market"].items()
+                ],
+                "top_clv": [_arm_app(a) for a in res["top_clv"]],
+                "top_roi": [_arm_app(a) for a in res["top_roi"]],
+                "finalists": [_arm_app(a) for a in res["finalists"]],
+                "sizing": res.get("sizing"),
+            }
+        },
+        "bets_of": _label(best) if best else None,
+        "bets": res.get("best_clv_bets", []),
+        "notes": [
+            "Every number is from 2019/20 to 2023/24 (seasons where Pinnacle's early and "
+            "closing prices both cover 90% of matches). 2024/25 onward was never read.",
+            "CLV is the entry price against Pinnacle's margin-free close; ROI is per $1. "
+            "Ranges resample matches (2,000 draws).",
+            "Line-movement rules are decided at the close, so they have no CLV and are judged "
+            "on ROI only; none can be a finalist.",
+            "The curve is the best rule by CLV: it beat the close but still lost or barely "
+            "broke even, and the search's luck check says rules like it turn up by chance.",
+            "Cashing out (the exits) was tested separately on the comeback sample: a fair "
+            "cash-out never changes the average return, and a real one costs money.",
+        ],
+    }
 
 
 def _q(x: np.ndarray, q: float) -> float | None:
@@ -843,6 +956,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--boot", type=int, default=N_BOOT, help="bootstrap draws")
     p.add_argument("--json", default="", help="the result (summary)")
     p.add_argument("--arms-json", default="", help="every arm's row (large)")
+    p.add_argument("--app-json", default="", help="the app-ready research file")
     args = p.parse_args(argv)
     holdout = Holdout(HOLDOUT_START)
     frames, reps = [], {}
@@ -858,8 +972,15 @@ def main(argv: list[str] | None = None) -> None:
     res, every = search(df, args.boot)
     res["leagues"] = reps
     print(report(res, reps))
-    print("STRATEGY_SEARCH_JSON " + json.dumps(res, default=str))
-    for path, obj in ((args.json, res), (args.arms_json, [arm_row(a) for a in every])):
+    print(
+        "STRATEGY_SEARCH_JSON "
+        + json.dumps({k: v for k, v in res.items() if k != "best_clv_bets"}, default=str)
+    )
+    run = os.environ.get("GITHUB_RUN_ID")
+    app = app_file(res, {"search": run} if run else {})
+    print("STRATEGY_SEARCH_APP_JSON " + json.dumps(app, default=str))
+    outs = ((args.json, res), (args.arms_json, [arm_row(a) for a in every]), (args.app_json, app))
+    for path, obj in outs:
         if path:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(json.dumps(obj, default=str))

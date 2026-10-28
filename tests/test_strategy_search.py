@@ -124,3 +124,17 @@ def test_sizing_stops_a_season_after_a_20_unit_drawdown():
     assert out["flat"]["profit"] == 0.0
     assert out["stop_20"] == {"bets_staked": 20, "profit": -20.0}
     assert "note" in out["kelly_quarter"]
+
+
+def test_the_app_file_has_the_research_shape():
+    df = side_table(240)
+    res, _ = ss.search(df, n_boot=100)
+    res["leagues"] = {"E0": {"seasons": ["2122"]}, "E1": {"seasons": ["2122"]}}
+    app = ss.app_file(res, {"search": "1"})
+    for key in ("title", "question", "rule", "verdict", "verdict_text", "cost", "runs",
+                "preregistered", "designs", "bets", "notes"):  # fmt: skip
+        assert key in app
+    d = app["designs"]["search"]
+    assert d["seasons"] == ["2021/22"] and d["arms"]["total"] == res["arms_tried"]["total"]
+    if app["bets"]:
+        assert [b["date"] for b in app["bets"]] == sorted(b["date"] for b in app["bets"])
