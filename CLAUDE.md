@@ -145,6 +145,12 @@ settlement runs after them.
   shortfall, which the half-time market already covers). A priced trail-first test would cost
   about 18,820 credits (1,882 snapshots); recommended not to buy.
   The whole study is in the app as the closed portfolio "Comeback bets" (v61, PRs #115/#116).
+- Heavy favourites (75%+) trailing at half-time, H ∪ H2 (lead, 28 Oct; `docs/lab.md` "Heavy
+  favourites H ∪ H2: result", run 40764816980): **inconclusive**, 114 usable bets under the
+  pre-registered 136. 47 won (41.2%); the gap to the price is +0.6 pts (−8.0 to +9.6); ROI
+  −5.2% (−28.2% to +18.8%). H2 cost 680 credits (study total 9,070). Design HF's forward live
+  sample is the only further data (read at 136 bets or 31 May 2030). App file
+  `lab/heavy_favourites_research.json`.
 - Cash-out test (owner, 28 Oct; design X, 150,910 credits; `docs/lab.md` "Cash-out test: result",
   rerun 40709968765 after a result-join fix): **fail**. Cash out a 4.0+ underdog at a 50% in-play
   chance with a 5% fee, 2% stakes: 570 decisions, growth vs holding +0.00020 a bet (−0.00022 to
@@ -198,9 +204,6 @@ the owner's baseball app, so the balance can drop without any run here.
   finalist (f)); `odds-check.yml` `task=corners2`, `finalists=f`, `cap=3`, a logged `reason`.
 
 **Open decisions with the owner:**
-- Heavy favourites (75%+) trailing at half-time (26 Oct; `docs/lab.md` "Heavy favourites", PR
-  #117): post-hoc band, 39 bets. Options put to the owner: drop it (recommended), a live log
-  (~30 credits a season), or the 890-credit test (~72 bets, 53% power at +12 points). No spend.
 - Logging Champions League corner prices only, without a model (offered; recommended no for now).
 
 ## Branches and where things run
@@ -908,7 +911,8 @@ the owner's baseball app, so the balance can drop without any run here.
   `verdict`: ≥ `MIN_BETS` 136 usable and the ROI range above 0, else fail, or "inconclusive" under
   136. `designs` pooled (judged), H, H2, cups, leagues; `app_file` → `lab/heavy_favourites_research.json`
   (`RUNS`, `COST`). `odds-check.yml` `task=heavy-analysis` (run it once, on `team/research`),
-  log lines `HEAVY_ANALYSIS_JSON`, `HEAVY_RESEARCH_SHA256`, `HEAVY_RESEARCH_JSON`.
+  log lines `HEAVY_ANALYSIS_JSON`, `HEAVY_RESEARCH_SHA256`, `HEAVY_RESEARCH_JSON`. Run once
+  (40764816980): inconclusive, 114 bets.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's

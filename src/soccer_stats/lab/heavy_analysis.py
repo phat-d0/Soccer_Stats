@@ -36,8 +36,10 @@ MIN_BETS = 136
 # The purchases (docs/lab.md): H's in-play snapshots, H2's pre-match prices (H2P, H2U) and its
 # in-play snapshots, by the calls' own cost headers.
 RUNS = {"h_fetch": 40644447587, "h2p_fetch": 40744814233, "h2u_fetch": 40753094483,
-        "h2_fetch": 40761027899}  # fmt: skip
-COST = {"design_h": 1000, "h2p_prematch": 3590, "h2u_prematch": 3800, "design_h2": None}
+        "h2_fetch": [40761027899, 40764374925]}  # fmt: skip
+# (keys are the app's cost line: "H 1,000 · H2P pre-match prices 3,590 · …")
+COST = {"design_h": 1000, "H2P pre-match prices": 3590, "H2U pre-match prices": 3800,
+        "H2 in-play": 680}  # fmt: skip
 CUP_CODES = set(hm.CUPS)
 FLIP = {"home": "away", "away": "home"}
 
@@ -202,6 +204,7 @@ def design_block(role: str, label: str, rows: list[dict], counts: dict) -> dict:
     return {
         "role": role,
         "label": label,
+        "series": label,
         "matches": counts.get("matches", 0),
         "not_priced": counts.get("matches_not_priced", 0),
         "unmatched": counts.get("unmatched", 0),
@@ -291,7 +294,7 @@ def analyse(h: tuple[list, dict], h2: tuple[list, dict]) -> dict:
 def app_file(res: dict, cost: dict, runs: dict) -> dict:
     d = res["designs"]["pooled"]
     rng = "" if not d["roi_ci95"] else f" ({d['roi_ci95'][0]:+.1%} to {d['roi_ci95'][1]:+.1%})"
-    roi_text = "" if d["roi"] is None else f", ROI {d['roi']:+.1%}{rng}"
+    roi_text = ("" if d["roi"] is None else f", ROI {d['roi']:+.1%}{rng}").replace("-", "−")
     return {
         "title": "Heavy favourites coming back",
         "question": "Does a favourite priced 75% or more before kickoff, behind at half-time, "
