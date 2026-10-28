@@ -898,7 +898,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v64) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v65) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -949,7 +949,25 @@ the owner's baseball app, so the balance can drop without any run here.
   replay is the old rule (every price), so the new rule's row shows `leanRangeBt`: the replay's
   `by_odds_band` rows inside its `odds_range` (1.50–2.00 and 2.00–3.00), pooled ROI per $1
   weighted by bets ("Backtest: −1.8% · 1,345 bets, −200 to +200 · at Pinnacle"), and Lean's
-  Backtest view notes the same. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
+  Backtest view notes the same. **Backtest at DraftKings' prices** (lead brief, 28 Oct; v65):
+  Moneyline's replays of Blend Lean and Model 12% at DraftKings' own historical prices come as
+  `strategy_backtests.lean_dk` / `.edge12_dk` (`kind: "draftkings"`, the Pinnacle files' shape,
+  CLV against Pinnacle's close in the same snapshot). `btSourceView(key, lg)` puts a switch
+  "At DraftKings' prices" | "At Pinnacle's prices" (`state.btSource`, localStorage `btSource`,
+  DraftKings first; `btSources`/`btSourceOn`: only the sources whose file covers the chosen
+  competition, the chosen one else the first) above a coverage line per file (`btCoverage`:
+  seasons and leagues; "La Liga is only in the replay at Pinnacle's prices" when one book
+  lacks it), "The same rule at both books" (`lbCompare`, DraftKings | Pinnacle, the
+  competition's or All's metrics) and the chosen replay (`strategyBacktestHtml`, whose verdict,
+  title and `btWhere` say which book via `isDkBt`/`bookPrices`). Lean's and the old rule's row
+  headlines, and Model 12%'s, read DraftKings' file when it covers the competition
+  (`btPartBest`; Lean's new rule still pools its range's bands, "· at DraftKings"). Model 12%
+  under the Premier League keeps its DraftKings 2025/26 backtest (`E0_dk.json`, $10 a bet)
+  first, then "Replays at DraftKings' and Pinnacle's prices" with the switch; without
+  `edge12_dk` the old layout stays. The fixture makes both `_dk` files up from the Pinnacle
+  replay (ROI 2 points and CLV 1 point worse, 2020/21–2024/25, All and the Premier League only;
+  `add_draftkings_backtests`) and keeps every second point of each league's bankroll curves to
+  stay under 1.5 MB. Since v60 (owner, 25 Oct) the corners' two plain 12% tracks are
   archived too (`PF_ARCHIVED` {corners: pinnacle, draftkings}, `archivedTrack`: "Archived Oct
   25 · still logs every 12%-edge pick"; data and ledgers unchanged), so Team corners' main list
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:

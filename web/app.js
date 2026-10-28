@@ -23,6 +23,7 @@ const state = {
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
   pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the first, Pinnacle)
   pfStratResearch: "", // In-play research: which study ("" = the first)
+  btSource: store.get("btSource", "dk"), // Backtest: "dk" (DraftKings' prices, first when present) or "pin"
   pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
   lbShown: 20, // Blend Lean backtest: bet rows shown
   recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
@@ -40,7 +41,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v64";
+const APP_VERSION = "v65";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2368,7 +2369,48 @@ const lbBets = (bt) => (bt.bets || []).map((r) => Object.fromEntries((bt.bet_fie
 // (kind "close"), kept out of `all` and of the per-league charts.
 const BT_NAME = { lean: "Lean", edge12: "Model 12%" };
 const isClose = (l) => l?.kind === "close";
-const btWhere = (l) => (isClose(l) ? "at DraftKings' close" : "at Pinnacle");
+// The same replay at DraftKings' own historical prices (lead brief, 28 Oct; Moneyline's
+// strategy_backtests.lean_dk / .edge12_dk, kind "draftkings", the Pinnacle files' shape, CLV
+// against Pinnacle's close in the same snapshot). DraftKings comes first: we trade there.
+const isDkBt = (bt, part) => bt?.kind === "draftkings" || part?.kind === "draftkings";
+const btWhere = (l, bt) => (isClose(l) ? "at DraftKings' close" : isDkBt(bt, l) ? "at DraftKings" : "at Pinnacle");
+const bookPrices = (bt) => (isDkBt(bt) ? "DraftKings' prices" : "Pinnacle's prices");
+const BT_SOURCES = [["dk", "At DraftKings' prices"], ["pin", "At Pinnacle's prices"]];
+const btFile = (key, src) => state.data.portfolio?.strategy_backtests?.[src === "dk" ? `${key}_dk` : key];
+// The sources with a file for this strategy and competition (DraftKings first), and the one
+// on screen: the chosen one when it has this competition, else the first.
+function btSources(key, lg = "") {
+  return BT_SOURCES.map(([k, label]) => ({ k, label, bt: btFile(key, k) })).filter((x) => x.bt?.available && (!lg || x.bt.leagues?.[lg]));
+}
+function btSourceOn(key, lg = "") {
+  const all = btSources(key, lg);
+  return all.find((x) => x.k === state.btSource) || all[0] || { k: "pin", bt: btFile(key, "pin") };
+}
+// "At DraftKings' prices: 2020/21 to 2024/25, 8 leagues." for each source's file.
+function btCoverage(bt) {
+  const lgs = Object.values(bt?.leagues || {}).filter((l) => l && !l.error && !isClose(l));
+  const seasons = [...new Set(lgs.flatMap((l) => l.seasons_included || []))].sort();
+  const cup = Object.values(bt?.leagues || {}).some(isClose);
+  return `${seasons.length ? `${seasons.length > 1 ? `${seasons[0]} to ${seasons[seasons.length - 1]}` : seasons[0]}, ` : ""}${lgs.length} league${lgs.length === 1 ? "" : "s"}${cup ? ", and the Champions League at DraftKings' close" : ""}`;
+}
+// The Backtest view of a strategy with a replay file: the source switch, the coverage line,
+// the same rule at both books (the chosen competition, or all), then the chosen replay.
+function btSourceView(key, lg) {
+  const all = btSources(key, lg), on = btSourceOn(key, lg);
+  const name = BT_NAME[key];
+  const sw = all.length > 1 ? `
+    <div class="segmented small-seg bt-src" role="group" aria-label="Which prices">
+      ${all.map((x) => `<button data-btsrc="${x.k}" class="${x.k === on.k ? "on" : ""}" aria-pressed="${x.k === on.k}">${esc(x.label)}</button>`).join("")}
+    </div>` : "";
+  const files = BT_SOURCES.map(([k, label]) => ({ k, label, bt: btFile(key, k) })).filter((x) => x.bt?.available);
+  const cover = files.length ? `<p class="note bt-cover">${files.map((x) => `${esc(x.label)}: ${esc(btCoverage(x.bt))}.`).join(" ")}${lg && all.length < files.length ? ` ${esc(leagueName(lg))} is only in the replay ${esc(all.map((x) => x.label.replace(/^At/, "at")).join(" and ") || "at neither")}.` : ""}</p>` : "";
+  const parts = files.map((x) => ({ ...x, m: (lg ? x.bt.leagues?.[lg] : x.bt.all)?.[key] })).filter((x) => x.m?.bets != null);
+  const both = parts.length > 1 ? `
+    <div class="section-title">The same rule at both books${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>
+    ${lbCompare(parts.map((x) => [x.k === "dk" ? "DraftKings" : "Pinnacle", x.m]))}
+    <p class="note">CLV is against Pinnacle's close in both. The two cover different seasons, so read the gap as the price difference plus some luck, not a like-for-like cut.</p>` : "";
+  return `${sw}${cover}${both}${strategyBacktestHtml(on.bt, lg, key)}`;
+}
 function btVerdict(bt, key = "lean") {
   const a = bt.all?.[key] || {};
   const lgs = Object.values(bt.leagues || {}).filter((l) => !isClose(l) && l[key]?.clv != null);
@@ -2378,14 +2420,14 @@ function btVerdict(bt, key = "lean") {
   const roiWord = a.roi == null ? "had no bets" : a.roi < 0 ? (roiAllBelow ? "lost money" : "lost slightly") : "made a little";
   const roiRange = a.roi_ci95 && a.roi_ci95[0] < 0 && a.roi_ci95[1] > 0 ? " (a range that includes break-even)" : roiAllBelow ? " (its whole range is below break-even)" : "";
   const clvWord = negClv === lgs.length ? "got worse prices than the close, on average, in every league" : `got worse prices than the close in ${negClv} of ${lgs.length} leagues`;
-  return `In the replay at Pinnacle's prices ${BT_NAME[key]} ${roiWord}${roiRange} and ${clvWord}.${anyRoiClear ? "" : " No league's return range clears zero."}`;
+  return `In the replay at ${bookPrices(bt)} ${BT_NAME[key]} ${roiWord}${roiRange} and ${clvWord}.${anyRoiClear ? "" : " No league's return range clears zero."}`;
 }
 // One early-price league: its own return and CLV, each with its range.
-function leagueVerdict(l, key, lg) {
+function leagueVerdict(l, key, lg, bt) {
   const m = l[key] || {};
   if (!m.bets) return `No ${BT_NAME[key]} bets in ${leagueName(lg)}'s replay.`;
   const side = (ci) => (!ci ? "" : ci[0] > 0 ? ", its whole range above 0" : ci[1] < 0 ? ", its whole range below 0" : ", a range that includes 0");
-  return `In ${leagueName(lg)}'s replay at Pinnacle's prices ${BT_NAME[key]} made ${m.bets.toLocaleString()} bets: ROI ${signedPct(m.roi)}${side(m.roi_ci95)}; CLV ${signedPct(m.clv)}${side(m.clv_ci95)}.`;
+  return `In ${leagueName(lg)}'s replay at ${bookPrices(bt)} ${BT_NAME[key]} made ${m.bets.toLocaleString()} bets: ROI ${signedPct(m.roi)}${side(m.roi_ci95)}; CLV ${signedPct(m.clv)}${side(m.clv_ci95)}.`;
 }
 // The Champions League, at DraftKings' close: what its CLV does and doesn't measure.
 function closeVerdict(l, key) {
@@ -2478,12 +2520,12 @@ function strategyBacktestHtml(bt, lg = "", key = "lean", opts = {}) {
   const close = isClose(part);
   const m = part[key] || {};
   const lgCount = (bt.all?.leagues || Object.values(bt.leagues || {}).filter((l) => !isClose(l))).length;
-  const title = close ? `${name} replayed at DraftKings' close` : bt.title || `${name} replayed on Pinnacle's early prices`;
-  const head = `<p class="note">${esc(title)}${lg ? `, ${esc(leagueName(lg))}` : `, all ${lgCount} leagues priced early`}. Money is in units: $1 a bet.</p>`;
+  const title = close ? `${name} replayed at DraftKings' close` : bt.title || `${name} replayed on ${isDkBt(bt) ? "DraftKings' historical prices" : "Pinnacle's early prices"}`;
+  const head = `<p class="note">${esc(title)}${lg ? `, ${esc(leagueName(lg))}` : `, ${lgCount === 1 ? "one league" : `all ${lgCount} leagues`}${isDkBt(bt) ? "" : " priced early"}`}. Money is in units: $1 a bet.</p>`;
   if (close && !m.bets) {
     return `${head}<div class="explain">${esc(part.note || `No ${name} bets in this backtest.`)}</div>${lbLeagueDetails(part)}`;
   }
-  const verdict = close ? closeVerdict(part, key) : lg ? leagueVerdict(part, key, lg) : btVerdict(bt, key);
+  const verdict = close ? closeVerdict(part, key) : lg ? leagueVerdict(part, key, lg, bt) : btVerdict(bt, key);
   const top = `
     <div class="verdict ${m.roi_ci95?.[0] > 0 ? "" : m.roi < 0 || m.clv < 0 ? "neg" : "mid"}">${esc(verdict)}</div>
     ${head}
@@ -2771,19 +2813,25 @@ function pfClassic(topIn) {
   const set = drv && lgSet ? driverSet(lgSet, strat, drv, lg) : lgSet;
   const top = topIn ?? `${switcher}${head}${byComp && !research ? leagueFilter() : ""}${toggle}${stratSwitch}`;
   if (research) return `${top}${researchBacktestHtml(fullSet)}${retiredLinks}`;
-  if (leanBt) return `${top}${leanBacktestHtml(state.data.portfolio?.strategy_backtests?.lean, lg)}${retiredLinks}`;
+  if (leanBt) return `${top}${btSourceView("lean", lg)}${retiredLinks}`;
   // Model 12%: the per-league replay (strategy_backtests.edge12) under All and every
   // league but the Premier League, whose body stays the DraftKings backtest with the
   // Pinnacle replay added below it (both labelled).
   const e12 = state.data.portfolio?.strategy_backtests?.edge12;
   const e12Bt = state.pfView === "backtest" && cur.id === "moneyline" && strat?.key === "edge12";
+  // With DraftKings' own replay (edge12_dk) every competition gets the source switch; the
+  // Premier League keeps its DraftKings 2025/26 backtest (E0_dk.json) first, the switch below.
+  const e12Dk = !!state.data.portfolio?.strategy_backtests?.edge12_dk?.available;
+  if (e12Bt && e12Dk && lg !== "E0") return `${top}${btSourceView("edge12", lg)}${retiredLinks}`;
   if (e12Bt && lg !== "E0") {
     const body = e12?.available || !lg
       ? strategyBacktestHtml(e12, lg, "edge12")
       : `<div class="empty">No Model 12% backtest for ${esc(leagueName(lg))} yet. Its backtest uses DraftKings' historical prices, which we have for the Premier League only. Choose Premier League or All to see it; the live paper trades in ${esc(leagueName(lg))} are under Live paper.</div>`;
     return `${top}${body}${retiredLinks}`;
   }
-  const e12E0 = e12Bt && lg === "E0" && e12?.available && e12.leagues?.E0 && !e12.leagues.E0.error
+  const e12E0 = e12Bt && lg === "E0" && e12Dk
+    ? `<div class="section-title">Replays at DraftKings' and Pinnacle's prices, Premier League ($1 a bet)</div>${btSourceView("edge12", "E0")}`
+    : e12Bt && lg === "E0" && e12?.available && e12.leagues?.E0 && !e12.leagues.E0.error
     ? `<div class="section-title">Replay at Pinnacle's early prices, Premier League ($1 a bet)</div>${strategyBacktestHtml(e12, "E0", "edge12", { brief: true })}` : "";
   const dkLabel = e12Bt && lg === "E0" ? '<div class="section-title">DraftKings backtest, Premier League ($10 a bet)</div>' : "";
   const isMoneyline = cur.id === "moneyline";
@@ -3278,10 +3326,12 @@ function btPart(bt, key, lg) {
   const part = lg ? bt.leagues?.[lg] : bt.all;
   if (!part || part.error) return null;
   const m = part[key] || part.metrics;
-  return m && m.bets != null ? { m, part } : null;
+  return m && m.bets != null ? { m, part, bt } : null;
 }
+// The headline's file: DraftKings' replay when it covers this competition, else Pinnacle's.
+const btPartBest = (key, lg) => btPart(btFile(key, "dk"), key, lg) || btPart(btFile(key, "pin"), key, lg);
 function btHead(hit, lg) {
-  const where = `${lg ? `${leagueName(lg)} ` : ""}${btWhere(hit.part)}`;
+  const where = `${lg ? `${leagueName(lg)} ` : ""}${btWhere(hit.part, hit.bt)}`;
   if (!hit.m.bets) return NO_BT(`0 bets · ${where}`);
   return { v: signedPct(hit.m.roi), cls: signCls(hit.m.roi), sub: `${hit.m.bets.toLocaleString()} bets · ${where}` };
 }
@@ -3311,13 +3361,13 @@ const archivedStrat = (x) => x.st?.adds === "shadow" || archivedTrack(x) || (isS
 function backtestHeadline(cur, x, lg = "") {
   const sb = state.data.portfolio?.strategy_backtests || {};
   if (x.key === "lean" || (archivedStrat(x) && x.variantOf === "lean")) {
-    if (!sb.lean?.available) return null;
-    const hit = btPart(sb.lean, "lean", lg);
+    if (!sb.lean?.available && !sb.lean_dk?.available) return null;
+    const hit = btPartBest("lean", lg);
     if (!hit) return NO_BT("no backtest for this competition");
     const range = x.key === "lean" ? x.rule?.odds_range : null;
     const inRange = range ? leanRangeBt(hit.part, range) : null;
     if (!inRange) return btHead(hit, lg);
-    const where = `${lg ? `${leagueName(lg)} ` : ""}${btWhere(hit.part)}`;
+    const where = `${lg ? `${leagueName(lg)} ` : ""}${btWhere(hit.part, hit.bt)}`;
     if (!inRange.bets) return NO_BT(`0 bets, ${rangeWords(range)} · ${where}`);
     return { v: signedPct(inRange.roi), cls: signCls(inRange.roi), sub: `${inRange.bets.toLocaleString()} bets, ${rangeWords(range)} · ${where}` };
   }
@@ -3327,6 +3377,8 @@ function backtestHeadline(cur, x, lg = "") {
     // Model 12%: the DraftKings backtest is the Premier League's (E0_dk.json); the
     // per-league replay (strategy_backtests.edge12) covers All and the other leagues.
     const e12 = sb.edge12;
+    const e12dk = btPart(sb.edge12_dk, "edge12", lg);
+    if (e12dk) return btHead(e12dk, lg);
     if (lg !== "E0" && e12?.available) {
       const hit = btPart(e12, "edge12", lg);
       return hit ? btHead(hit, lg) : NO_BT("no backtest for this competition yet");
@@ -4090,7 +4142,7 @@ function pfStrategyHtml(cur, allStrats) {
     ? `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(x.label)}</h2>${sub ? `<div class="pf-sub">${sub}</div>` : ""}`
     : `${pfCrumbs(cur, false)}<h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2><div class="pf-head"><span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span></div>`;
   // Lean's replay is the old rule (every price); the new rule's own figure is its range's bands.
-  const leanBt = view === "backtest" && parent.key === "lean" ? btPart(state.data.portfolio?.strategy_backtests?.lean, "lean", lg) : null;
+  const leanBt = view === "backtest" && parent.key === "lean" ? btPart(btSourceOn("lean", lg).bt, "lean", lg) : null;
   const range = parent.rule?.odds_range;
   const inRange = leanBt && range ? leanRangeBt(leanBt.part, range) : null;
   const parentNote = x.st?.adds === "shadow" && view === "backtest"
@@ -4801,6 +4853,9 @@ document.addEventListener("click", (ev) => {
     render();
   } else if (t.dataset.pf) {
     state.pfView = t.dataset.pf; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
+    render();
+  } else if (t.dataset.btsrc) {
+    state.btSource = t.dataset.btsrc; store.set("btSource", state.btSource); state.lbShown = 20;
     render();
   } else if (t.dataset.pfdriver !== undefined) {
     state.pfDriver = t.dataset.pfdriver; state.pfShown = 15; state.lbShown = 20;

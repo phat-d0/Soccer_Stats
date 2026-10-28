@@ -679,15 +679,17 @@ const STEPS = [
     const vrow = (await p.locator('button[data-pfstrat="lean_all_odds"]').innerText()).replace(/\s+/g, " ");
     if (!vrow.includes("Blend Lean, all odds (old rule)") || !vrow.includes("Old rule, until") || vrow.includes("↳")) throw new Error(`old-rule row: ${vrow}`);
     // The new rule's backtest is the replay's bands inside its range, pooled; the archived
-    // old rule keeps the whole replay (every price).
+    // old rule keeps the whole replay (every price). Both read DraftKings' replay when there
+    // is one (lead brief, 28 Oct), else Pinnacle's.
     const btWant = await p.evaluate(() => {
-      const part = state.data.portfolio.strategy_backtests.lean.all;
+      const sb = state.data.portfolio.strategy_backtests;
+      const part = (sb.lean_dk?.available ? sb.lean_dk : sb.lean).all;
       const b = part.by_odds_band.filter((x) => x.lo === 1.5 || x.lo === 2);
       const bets = b.reduce((a, x) => a + x.bets, 0);
       return { bets, roi: signedPct(b.reduce((a, x) => a + x.roi * x.bets, 0) / bets), all: signedPct(part.lean.roi) };
     });
     const bt = (await p.locator('button[data-pfstrat="lean"] .bt').innerText()).replace(/\s+/g, " ");
-    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
+    if (!bt.includes(btWant.roi) || !bt.includes(`${btWant.bets.toLocaleString()} bets, −200 to +200 · at DraftKings`)) throw new Error(`Lean in-range backtest: ${bt} vs ${JSON.stringify(btWant)}`);
     if (!vrow.includes(`Backtest: ${btWant.all}`)) throw new Error(`old-rule backtest: ${vrow}`);
     await pfOpenStrat(p, "lean");
     if (!(await p.textContent("#view")).includes("Odds range since")) throw new Error("Lean rule box lacks the odds range");
@@ -878,6 +880,30 @@ const STEPS = [
     // No summary covers a competition plus a driver, so no ROI range may show.
     if (text.includes("95% range on ROI")) throw new Error("SP1 model-driven shows a ROI range it has no summary for");
   }],
+  // The backtest at DraftKings' own prices (lead brief, 28 Oct; strategy_backtests.lean_dk,
+  // made up in the fixture until Moneyline's file lands): first when present, a switch to
+  // Pinnacle's replay, a coverage line for each and the same rule at both books. It ends on
+  // Pinnacle's, which the next steps check in full.
+  ["portfolio-lean-backtest-dk", async (p) => {
+    await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
+    const on = await p.locator(".bt-src button.on").innerText();
+    if (on !== "At DraftKings' prices") throw new Error(`backtest source on: ${on}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["At DraftKings' prices: 2020/21 to 2024/25, 1 league.", "At Pinnacle's prices: 2019/20", "The same rule at both books", "In the replay at DraftKings' prices Lean", "Lean replayed on DraftKings' historical prices"]) {
+      if (!text.includes(w)) throw new Error(`DraftKings backtest lacks "${w}"`);
+    }
+    // The comparison: the same rule's ROI at both books, from each file.
+    const want = await p.evaluate(() => { const sb = state.data.portfolio.strategy_backtests; return [signedPct(sb.lean_dk.all.lean.roi), signedPct(sb.lean.all.lean.roi)]; });
+    const table = (await p.locator(".drv-table").first().innerText()).replace(/\s+/g, " ").trim();
+    if (!table.startsWith("DraftKings Pinnacle") || !want.every((w) => table.includes(w))) throw new Error(`both-books table: ${table} vs ${want}`);
+    // La Liga is in Pinnacle's replay only: no switch, and the note says so.
+    await p.click('.chip[data-league="SP1"]');
+    if (await p.locator(".bt-src").count()) throw new Error("a switch for a league only one book covers");
+    if (!(await p.textContent("#view")).includes("La Liga is only in the replay at Pinnacle's prices.")) throw new Error("one-book note");
+    await p.click('.chip[data-league=""]');
+    await p.click('button[data-btsrc="pin"]');
+    if ((await p.locator(".bt-src button.on").innerText()) !== "At Pinnacle's prices") throw new Error("switch to Pinnacle");
+  }],
   // Blend Lean's backtest: the replay at Pinnacle (data-log's real lean_backtest.json).
   ["portfolio-lean-backtest", async (p) => {
     await p.click('.chip[data-league=""]'); await p.click('button[data-pfdriver=""]'); await p.click('button[data-pf="backtest"]');
@@ -907,9 +933,11 @@ const STEPS = [
   ["portfolio-backtest-headlines", async (p) => {
     await pfUp(p);
     const row = async (k) => (await p.locator(`button[data-pfstrat="${k}"] .bt`).innerText()).replace(/\s+/g, " ");
+    // DraftKings' replay (All and the Premier League in the fixture) heads the row where it
+    // covers the competition, Pinnacle's elsewhere (lead brief, 28 Oct).
     const want = {
-      "": ["bets, −200 to +200 · at Pinnacle", "bets · at Pinnacle"],
-      E0: ["Premier League at Pinnacle", "Premier League · DraftKings"],
+      "": ["bets, −200 to +200 · at DraftKings", "bets · at DraftKings"],
+      E0: ["Premier League at DraftKings", "Premier League at DraftKings"],
       SP1: ["La Liga at Pinnacle", "La Liga at Pinnacle"],
       E2: ["League One at Pinnacle", "League One at Pinnacle"],
       E3: ["League Two at Pinnacle", "League Two at Pinnacle"],
@@ -976,7 +1004,7 @@ const STEPS = [
   ["portfolio-backtest-edge12-e0", async (p) => {
     await p.click('.chip[data-league="E0"]');
     const text = await p.textContent("#view");
-    for (const w of ["DraftKings backtest, Premier League", "Replay at Pinnacle's early prices, Premier League"]) {
+    for (const w of ["DraftKings backtest, Premier League", "Replays at DraftKings' and Pinnacle's prices, Premier League"]) {
       if (!text.includes(w)) throw new Error(`12% E0 backtest lacks "${w}"`);
     }
     await bandsCheck(p, "edge12", "E0");
