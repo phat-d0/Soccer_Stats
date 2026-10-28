@@ -1,0 +1,382 @@
+# Cache keep-alive and the permanent paid-odds archive (lead brief, 28 Oct; docs/caches.md).
+# 0 credits: no job here gets ODDS_API_KEY.
+#
+# GitHub evicts a cache unused for 7 days (and the least recently used ones past 10 GB), and
+# the odds bought with credits live only in caches. Twice a week (and on dispatch):
+# - keepalive: restores every cache with its exact key prefix and paths (a restore counts as
+#   a use), logging hit or miss, files and size; a paid cache that missed is a warning (the
+#   archive covers it: .github/actions/paid-archive-restore);
+# - the same jobs pack each paid cache (src/soccer_stats/cache_archive.py PAID) as tar +
+#   zstd and, on the default branch, replace its asset on the release `paid-odds-archive`
+#   only when its contents changed (content_sha256); `manifest` writes data-log
+#   archive/manifest.json and `verify` downloads every asset back and checks its sha256;
+# - usage: lists every cache (key, size, last used) against the 10 GB limit and flags any
+#   key prefix this job doesn't keep alive.
+# Dispatch inputs: archive (default on), test_fallback (a forced miss: each paid cache
+# restored under a dummy key and rebuilt from the archive; nothing can buy here).
+# A push to a team/ or lead/ branch that edits this file runs a dry run: no release upload,
+# no data-log write; the packed caches go to a 3-day artifact and the fallback is tested
+# against it.
+name: Caches keep-alive and paid-odds archive
+
+on:
+  schedule:
+    - cron: "23 4 * * 1,4" # Mondays and Thursdays 04:23 UTC: a late or dropped run still
+      # leaves a margin against the 7-day eviction (the free caches have no archive)
+  workflow_dispatch:
+    inputs:
+      archive:
+        description: "Pack the paid caches; on the default branch, refresh the release assets and data-log's manifest when their contents changed"
+        type: boolean
+        default: true
+      test_fallback:
+        description: "Forced miss: restore each paid cache under a dummy key and rebuild it from the archive (dry run)"
+        type: boolean
+        default: false
+  push:
+    branches: ["team/**", "lead/**"]
+    paths:
+      - ".github/workflows/caches.yml"
+      - ".github/actions/paid-archive-restore/**"
+      - "src/soccer_stats/cache_archive.py"
+
+permissions:
+  contents: write # the release assets and data-log's manifest (default branch only)
+  actions: read # the cache list and usage
+
+concurrency:
+  group: caches
+  cancel-in-progress: false
+
+env:
+  # Pack the paid caches on the schedule, on dispatch with archive, and in a branch dry run.
+  PACK: ${{ github.event_name != 'workflow_dispatch' || inputs.archive }}
+  # Upload and write the manifest only from the default branch.
+  # (A schedule always runs on the default branch.)
+  PUBLISH: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.archive && github.ref_name == github.event.repository.default_branch) }}
+  TAG: paid-odds-archive
+
+jobs:
+  release:
+    # The release must exist before the matrix jobs upload to it (created once).
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Make sure the archive release exists
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG exists"
+          else
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+              --title "Paid odds archive" \
+              --notes "Odds bought with Odds API credits, packed from the GitHub caches (tar + zstd). The manifest with every sha256 is data-log archive/manifest.json. Written by caches.yml; restored by .github/actions/paid-archive-restore when a cache misses. Don't delete."
+          fi
+
+  keepalive:
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Paid (cache_archive.PAID): the paths exactly as saved, in the same order.
+          - { name: odds-history, prefix: odds-history-, paid: true, path: "data/raw/odds_history" }
+          - { name: player-odds-history, prefix: player-odds-history-, paid: true, path: "data/raw/player_odds_history" }
+          - { name: cup-odds-history, prefix: cup-odds-history-, paid: true, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
+          - { name: comeback-odds, prefix: comeback-odds-, paid: true, path: "data/raw/comeback_odds" }
+          # Free (rebuilt from public sources, but slowly).
+          - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
+          - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
+          - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }
+          - { name: espn-timelines, prefix: espn-timelines-, paid: false, path: "data/raw/espn_timelines" }
+          - { name: understat-SP1, prefix: understat-SP1-, paid: false, path: "data/raw" }
+          - { name: understat-D1, prefix: understat-D1-, paid: false, path: "data/raw" }
+          - { name: understat-I1, prefix: understat-I1-, paid: false, path: "data/raw" }
+          - { name: understat-F1, prefix: understat-F1-, paid: false, path: "data/raw" }
+          - { name: comebacks-E0, prefix: comebacks-E0-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
+          - { name: comebacks-SP1, prefix: comebacks-SP1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
+          - { name: comebacks-D1, prefix: comebacks-D1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
+          - { name: comebacks-I1, prefix: comebacks-I1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
+          - { name: comebacks-F1, prefix: comebacks-F1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore (this use keeps the cache alive)
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ matrix.path }}
+          key: ${{ matrix.prefix }}keepalive-none
+          restore-keys: ${{ matrix.prefix }}
+
+      - name: Hit or miss, files and size
+        env:
+          MATCHED: ${{ steps.cache.outputs.cache-matched-key }}
+          PATHS: ${{ matrix.path }}
+        run: |
+          files=0; bytes=0
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            for x in $p; do
+              [ -e "$x" ] || continue
+              files=$((files + $(find "$x" -type f | wc -l)))
+              bytes=$((bytes + $(du -sb "$x" | cut -f1)))
+            done
+          done <<< "$PATHS"
+          if [ -n "$MATCHED" ]; then
+            echo "CACHE ${{ matrix.name }}: hit $MATCHED, $files files, $bytes bytes on disk"
+          else
+            echo "CACHE ${{ matrix.name }}: MISS"
+            if [ "${{ matrix.paid }}" = "true" ]; then
+              echo "::warning::Paid cache ${{ matrix.name }} missed (evicted). If data-log archive/manifest.json lists it, the next restore in a workflow rebuilds it from the release $TAG; if not, its bodies are gone"
+            fi
+          fi
+
+      - name: Pack the paid cache
+        if: matrix.paid && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
+        env:
+          MATCHED: ${{ steps.cache.outputs.cache-matched-key }}
+          PATHS: ${{ matrix.path }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          mapfile -t paths < <(printf '%s\n' "$PATHS" | sed '/^$/d')
+          existing=()
+          for p in "${paths[@]}"; do [ -e "$p" ] && existing+=("$p"); done
+          # Deterministic tar: sorted names, fixed times and owners, so the same files pack alike.
+          tar --sort=name --mtime='2026-01-01 00:00:00Z' --owner=0 --group=0 --numeric-owner \
+            --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
+            -cf - "${existing[@]}" | zstd -q -T0 -12 -o "out/${{ matrix.name }}.tar.zst"
+          size=$(stat -c %s "out/${{ matrix.name }}.tar.zst")
+          if [ "$size" -gt 1900000000 ]; then  # release assets are capped at 2 GB
+            split -b 1900000000 -d -a 2 "out/${{ matrix.name }}.tar.zst" "out/${{ matrix.name }}.tar.zst.part"
+            rm "out/${{ matrix.name }}.tar.zst"
+          fi
+          git fetch --depth=1 -q origin data-log || true
+          git show FETCH_HEAD:archive/manifest.json > current.json 2>/dev/null || : > current.json
+          python3 src/soccer_stats/cache_archive.py entry --name "${{ matrix.name }}" --key "$MATCHED" \
+            --paths "${paths[@]}" --parts $(ls out/${{ matrix.name }}.tar.zst* | sort) \
+            --manifest current.json --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --out "out/${{ matrix.name }}.json"
+
+      - name: Upload the changed asset to the release (default branch)
+        if: matrix.paid && env.PUBLISH == 'true' && steps.cache.outputs.cache-matched-key != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$(jq -r .changed out/${{ matrix.name }}.json)" != "true" ]; then
+            echo "${{ matrix.name }}: contents unchanged, the archived asset stays"
+            exit 0
+          fi
+          for f in $(ls out/${{ matrix.name }}.tar.zst* | sort); do
+            gh release upload "$TAG" "$f" -R "$GITHUB_REPOSITORY" --clobber
+          done
+          # A smaller cache may need fewer parts than before: drop parts the manifest no longer lists.
+          keep=$(jq -r '.archive.parts[].asset' out/${{ matrix.name }}.json)
+          for a in $(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | grep "^${{ matrix.name }}\.tar\.zst" || true); do
+            echo "$keep" | grep -qx "$a" || gh release delete-asset "$TAG" "$a" -R "$GITHUB_REPOSITORY" -y
+          done
+
+      - name: Keep the manifest entry
+        if: matrix.paid && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: entry-${{ matrix.name }}
+          path: out/${{ matrix.name }}.json
+          retention-days: 3
+
+      - name: Keep the packed cache (branch dry run only, for the fallback test)
+        if: matrix.paid && github.event_name == 'push' && steps.cache.outputs.cache-matched-key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-${{ matrix.name }}
+          path: out/${{ matrix.name }}.tar.zst*
+          retention-days: 3
+
+  manifest:
+    needs: keepalive
+    if: always() && needs.keepalive.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: env.PACK == 'true'
+        continue-on-error: true # every paid cache missed: no entries, the manifest keeps its own
+        with:
+          pattern: entry-*
+          path: entries
+          merge-multiple: true
+      - name: Merge the entries into the manifest
+        if: env.PACK == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p entries
+          git fetch --depth=1 -q origin data-log
+          git show FETCH_HEAD:archive/manifest.json > current.json 2>/dev/null || : > current.json
+          python3 src/soccer_stats/cache_archive.py merge --manifest current.json --entries entries \
+            --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --out manifest.json
+      - name: Write the manifest to data-log (default branch)
+        if: env.PUBLISH == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/archive
+            cp manifest.json ../log/archive/manifest.json
+            git -C ../log add archive/manifest.json
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "Paid odds archive manifest"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: env.PACK == 'true'
+        with:
+          name: manifest
+          path: manifest.json
+          retention-days: 7
+
+  verify:
+    # Download every archived asset back and check it against the manifest.
+    needs: manifest
+    if: always() && needs.manifest.result == 'success' && github.event_name != 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the assets and check every sha256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 -q origin data-log
+          if ! git show FETCH_HEAD:archive/manifest.json > manifest.json 2>/dev/null; then
+            echo "No manifest on data-log yet: nothing to verify"
+            exit 0
+          fi
+          mkdir -p assets
+          for a in $(jq -r '.caches[].archive.parts[].asset' manifest.json); do
+            gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$a" -D assets --clobber
+          done
+          python3 src/soccer_stats/cache_archive.py verify --manifest manifest.json --dir assets
+
+  usage:
+    # Every cache in the repository against the 10 GB limit; flags key prefixes not kept alive.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache list and usage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/cache/usage" > usage.json
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" -q '.actions_caches[]' > caches.jsonl
+          kept=$(grep -E '^ *- [{] name: .*prefix:' .github/workflows/caches.yml | sed -E 's/.*prefix: ([^,]+),.*/\1/' | sort -u | tr '\n' ' ')
+          python3 - "$kept" <<'PY'
+          import json, re, sys
+          kept = sys.argv[1].split()
+          usage = json.load(open("usage.json"))
+          rows = [json.loads(l) for l in open("caches.jsonl") if l.strip()]
+          total = usage.get("active_caches_size_in_bytes") or sum(r["size_in_bytes"] for r in rows)
+          limit = 10 * 1024**3
+          print(f"CACHE USAGE: {total / 1024**3:.2f} GB of 10 GB ({total / limit:.0%}), {usage.get('active_caches_count', len(rows))} caches")
+          if total > 0.8 * limit:
+              print("::warning::Caches use over 80% of the 10 GB limit: the least recently used ones will be evicted")
+          groups = {}
+          for r in rows:
+              prefix = re.sub(r"(keepalive-none|none|\d+)$", "", r["key"])
+              g = groups.setdefault(prefix, {"n": 0, "bytes": 0, "last": "", "refs": set()})
+              g["n"] += 1
+              g["bytes"] += r["size_in_bytes"]
+              g["last"] = max(g["last"], r.get("last_accessed_at") or "")
+              g["refs"].add(r.get("ref", ""))
+          print(f"{'prefix':32} {'entries':>7} {'MB':>9}  last used             kept alive")
+          for p, g in sorted(groups.items(), key=lambda kv: -kv[1]["bytes"]):
+              ok = "yes" if p in kept else ("CI" if p.startswith(("playwright-", "setup-uv-")) else "NO")
+              print(f"{p:32} {g['n']:>7} {g['bytes'] / 1024**2:>9.1f}  {g['last'][:19]:20}  {ok}")
+          missing = [p for p in groups if p not in kept and not p.startswith(("playwright-", "setup-uv-"))]
+          if missing:
+              print("::warning::Caches this job doesn't keep alive: " + ", ".join(sorted(missing)))
+          PY
+
+  fallback-test:
+    # A forced miss: each paid cache restored under a dummy key (it can't match), then rebuilt by
+    # the fallback action, from the release (dispatch with test_fallback) or from this run's
+    # packs (a branch dry run). Nothing here can buy: no step has ODDS_API_KEY.
+    needs: keepalive
+    if: always() && needs.keepalive.result != 'cancelled' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.test_fallback))
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include: # the paid caches' exact paths, as in keepalive
+          - { name: odds-history, path: "data/raw/odds_history" }
+          - { name: player-odds-history, path: "data/raw/player_odds_history" }
+          - { name: cup-odds-history, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
+          - { name: comeback-odds, path: "data/raw/comeback_odds" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Local archive from this run's packs (branch dry run)
+        id: local
+        if: github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: pack-${{ matrix.name }}
+          path: local-archive
+      - name: This run's manifest entry (branch dry run)
+        if: github.event_name == 'push' && steps.local.outcome == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: entry-${{ matrix.name }}
+          path: local-entry
+      - name: Build the local manifest
+        if: github.event_name == 'push' && steps.local.outcome == 'success'
+        run: |
+          python3 src/soccer_stats/cache_archive.py merge --entries local-entry \
+            --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --out local-archive/manifest.json
+      - name: Skip when nothing was packed
+        id: skip
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ steps.local.outcome }}" != "success" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "${{ matrix.name }}: the cache missed in this run, so there's no pack to test against"
+          fi
+      - name: Restore under a dummy key (the forced miss)
+        id: cache
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ matrix.path }}
+          key: ${{ matrix.name }}-forced-miss-${{ github.run_id }} # no restore-keys: it can't match
+      - name: The miss is real
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          test -z "${{ steps.cache.outputs.cache-matched-key }}"
+          echo "${{ matrix.name }}: cache missed as intended"
+      - name: Rebuild from the archive
+        if: steps.skip.outputs.skip != 'true'
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: ${{ matrix.name }}
+          archive-dir: ${{ github.event_name == 'push' && 'local-archive' || '' }}
+      - name: Every archived file is back
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          m=local-archive/manifest.json
+          if [ "${{ github.event_name }}" != "push" ]; then
+            git fetch --depth=1 -q origin data-log
+            git show FETCH_HEAD:archive/manifest.json > manifest.json
+            m=manifest.json
+          fi
+          python3 src/soccer_stats/cache_archive.py missing --manifest "$m" --name "${{ matrix.name }}" --parts-out still.txt
+          test ! -s still.txt
+          echo "FALLBACK ${{ matrix.name }}: rebuilt from the archive after a forced miss"
