@@ -33,7 +33,13 @@ from soccer_stats.data import (
 )
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
-from soccer_stats.odds_feed import BOOKMAKER_NAME, apply_odds, fetch_odds, parse_odds
+from soccer_stats.odds_feed import (
+    BOOKMAKER_NAME,
+    apply_odds,
+    best_prices,
+    fetch_odds,
+    parse_odds,
+)
 from soccer_stats.paper import FRESH_HOURS
 from soccer_stats.players import (
     TeamNews,
@@ -511,6 +517,12 @@ def fixture_cards(
                 # When DraftKings last changed these prices (their last_update), if known.
                 "odds_updated": r.get("odds_updated")
                 if isinstance(r.get("odds_updated"), str)
+                else None,
+                # Every book's h2h in the same call (odds_feed.BOOKMAKERS, 28 Oct) and the
+                # best US price on each side; DraftKings' prices above stay the trade price.
+                "books": r.get("books") if isinstance(r.get("books"), dict) else None,
+                "best_us": best_prices(r.get("books"))
+                if isinstance(r.get("books"), dict)
                 else None,
                 "low_data": bool(r["low_data"]),
                 # Team news: applied only to each team's next match (see players.py).
@@ -1074,6 +1086,7 @@ def cup_league_fixtures(
             row = {"kickoff": e["kickoff"], "home": e["home"], "away": e["away"]}
             row.update({c: (o or {}).get(c, np.nan) for c in ODDS_COLS})
             row["odds_updated"] = (o or {}).get("odds_updated")
+            row["books"] = (o or {}).get("books")
             cnt = pd.Series({t: int(counts.get(k, 0)) for t, k in keys.items()})
             cards += fixture_cards(named, pd.DataFrame([row]), cnt, league=league)
     except Exception as exc:  # noqa: BLE001
@@ -1171,7 +1184,10 @@ def league_list(fixtures: list[dict], sources: dict[str, dict]) -> list[dict]:
 def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     season = current_season()
     live = lgs.live_codes()
-    share = max(len(live), 1)
+    # Every league budgets as if alone since the plan grew to ~5M credits a month (owner,
+    # 28 Oct): refreshes follow the policy floor, not a split of the budget. The reserve
+    # (MATCHDAY_RESERVE_CREDITS) still pauses the matchday leagues first.
+    share = 1
     matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
     matches, xg_error = with_xg(matches)
     fixtures = upcoming_fixtures(league)
@@ -1325,6 +1341,15 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
                 else " (player odds off until the model beats its baseline)"
             )
             + (f" ({ps['blend_note']})" if ps.get("blend_note") else "")
+        )
+    costs = {
+        lg: src.get("last_cost")
+        for lg, src in (data.get("odds_sources") or {}).items()
+        if (src or {}).get("last_cost") is not None
+    }
+    if costs:  # x-requests-last per league: the ten-book h2h call should still cost 1
+        print(
+            "Odds call cost (x-requests-last): " + ", ".join(f"{k} {v}" for k, v in costs.items())
         )
     with_odds = sum(f["implied"]["home"] is not None for f in data["fixtures"])
     print(

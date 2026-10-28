@@ -44,12 +44,30 @@ URL = "https://api.the-odds-api.com/v4/sports/{sport}/odds"
 SPORTS = {code: lg.odds_sport for code, lg in LEAGUES.items()}
 BOOKMAKER = "draftkings"
 BOOKMAKER_NAME = "DraftKings"
+# Every book asked in the live h2h call (owner, 28 Oct). Up to ten books bill as one region,
+# so the call should cost what DraftKings alone did (checked from x-requests-last).
+# DraftKings stays the book trades open at; Pinnacle gives a live sharp close; the US books
+# give the best price on each pick (`best_us`).
+BOOKMAKERS = (
+    "draftkings",
+    "pinnacle",
+    "fanduel",
+    "betmgm",
+    "williamhill_us",  # Caesars
+    "betrivers",
+    "fanatics",
+    "espnbet",
+    "bovada",
+    "betonlineag",
+)
+SHARP_BOOK = "pinnacle"
+US_BOOKS = tuple(b for b in BOOKMAKERS if b != SHARP_BOOK)
 RESERVE_CREDITS = 20  # never spend below this
 # "matchday" leagues stop below this many credits on the shared key (the same reserve the
 # player-odds fetches keep), so they pause long before the Premier League or baseball app.
 MATCHDAY_RESERVE_CREDITS = 3000
 MIN_INTERVAL_HOURS = 1.0  # never refresh more often than this...
-KICKOFF_INTERVAL_HOURS = 0.5  # ...except this close to a kickoff
+KICKOFF_INTERVAL_HOURS = 0.25  # ...except this close to a kickoff (15 min since 28 Oct)
 KICKOFF_WINDOW_HOURS = 2.0
 MARKETS = "h2h"  # DraftKings quotes no `totals` for soccer here (market probe, 9 Oct)
 DEFAULT_COST = 1  # credits per refresh until the API tells us
@@ -385,7 +403,7 @@ def fetch_odds(
                 URL.format(sport=SPORTS[league]),
                 params={
                     "apiKey": api_key,
-                    "bookmakers": BOOKMAKER,
+                    "bookmakers": ",".join(BOOKMAKERS),
                     "markets": MARKETS,
                     "oddsFormat": "decimal",
                     "dateFormat": "iso",
@@ -432,8 +450,52 @@ def fetch_odds(
     return json.loads(path.read_text()), status
 
 
+def book_prices(ev: dict, known_teams: set[str] | None = None) -> dict[str, dict]:
+    """Every book's h2h in one event: {book key: {home, draw, away, last_update}}; a book
+    needs all three prices."""
+    home, away = _team(ev["home_team"], known_teams), _team(ev["away_team"], known_teams)
+    out = {}
+    for b in ev.get("bookmakers") or []:
+        for market in b.get("markets") or []:
+            if market.get("key") != "h2h":
+                continue
+            q = {}
+            for o in market.get("outcomes") or []:
+                name = _team(o["name"], known_teams)
+                side = "home" if name == home else "away" if name == away else None
+                if side is None and str(o["name"]).lower() == "draw":
+                    side = "draw"
+                if side:
+                    q[side] = o["price"]
+            if {"home", "draw", "away"} <= set(q):
+                out[b["key"]] = {
+                    **q,
+                    "last_update": market.get("last_update") or b.get("last_update"),
+                }
+    return out
+
+
+def best_prices(books: dict | None, among=US_BOOKS) -> dict | None:
+    """{side: {odds, book}}: the highest price on each of home, draw and away among the
+    books `among` (the US books by default); None without any."""
+    if not books:
+        return None
+    out = {}
+    for side in ("home", "draw", "away"):
+        best = None
+        for key in among:
+            q = books.get(key) or {}
+            v = q.get(side)
+            if isinstance(v, (int, float)) and v > 1 and (best is None or v > best["odds"]):
+                best = {"odds": float(v), "book": key}
+        if best:
+            out[side] = best
+    return out or None
+
+
 def parse_odds(events: list[dict], known_teams: set[str] | None = None) -> pd.DataFrame:
-    """The Odds API events -> one row per match with DraftKings decimal odds."""
+    """The Odds API events -> one row per match with DraftKings decimal odds, plus every
+    book's h2h (`books`, book_prices) when the call named several."""
     rows = []
     for ev in events:
         book = next((b for b in ev.get("bookmakers", []) if b.get("key") == BOOKMAKER), None)
@@ -445,6 +507,7 @@ def parse_odds(events: list[dict], known_teams: set[str] | None = None) -> pd.Da
             "home": home,
             "away": away,
             "odds_updated": book.get("last_update"),
+            "books": book_prices(ev, known_teams) or None,
         }
         for market in book.get("markets", []):
             if market["key"] == "h2h":
@@ -471,6 +534,7 @@ def parse_odds(events: list[dict], known_teams: set[str] | None = None) -> pd.Da
         "odds_away",
         "odds_over25",
         "odds_under25",
+        "books",
     ]
     return pd.DataFrame(rows).reindex(columns=cols)
 
@@ -487,6 +551,11 @@ def apply_odds(fixtures: pd.DataFrame, odds: pd.DataFrame) -> pd.DataFrame:
         ]
     out["odds_updated"] = [
         keyed["odds_updated"].get((h, a)) if not keyed.empty else None
+        for h, a in zip(out["home"], out["away"], strict=True)
+    ]
+    has_books = not keyed.empty and "books" in keyed
+    out["books"] = [
+        keyed["books"].get((h, a)) if has_books else None
         for h, a in zip(out["home"], out["away"], strict=True)
     ]
     return out
