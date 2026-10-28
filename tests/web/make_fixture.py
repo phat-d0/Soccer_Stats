@@ -1835,13 +1835,17 @@ def add_lean_strategy(data: dict) -> None:
 
 
 def add_dnb_backcast(data: dict) -> None:
-    """Model 12%'s draw no bet track carries Moneyline's `backcast` block (kept when paper.py
-    already built one): its backcast trades, from FIXTURE_DNB_STARTED to the track's start."""
+    """The draw no bet tracks' `backcast` blocks start at FIXTURE_DNB_STARTED: paper_dnb builds
+    them (backcast.block) with the real 14 Oct start, which is after the fixture's moved
+    DNB_FROM. An older paper.py without blocks gets Model 12%'s track's built here."""
     ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    for sec in ml["live"].get("strategies") or []:
+        if sec.get("adds") == "dnb" and (sec.get("backcast") or {}).get("applied"):
+            sec["backcast"]["started"] = FIXTURE_DNB_STARTED
     sec = next(
         (x for x in ml["live"].get("strategies") or [] if x.get("key") == "edge12_dnb"), None
     )
-    if not sec or sec.get("backcast"):
+    if not sec or (sec.get("backcast") or {}).get("applied"):
         return
     bc = [t for t in ml["live"].get("dnb_trades") or [] if t.get("backcast")]
     bc = [t for t in bc if t.get("strategy") == "edge12_dnb"]

@@ -741,7 +741,7 @@ const STEPS = [
     const row = (await p.locator('button[data-pfstrat="edge12_dnb"]').innerText()).replace(/\s+/g, " ");
     for (const w of ["Model 12%, draw no bet", "Archived Oct 26 · still logs every 12%-edge pick, draw no bet · since Sep 14", "Backtest, 24 Oct: no edge;"]) if (!row.includes(w)) throw new Error(`DNB row lacks "${w}": ${row}`);
     const leanRow = (await p.locator('button[data-pfstrat="lean_dnb"]').innerText()).replace(/\s+/g, " ");
-    if (!leanRow.includes("Tracked beside the record · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
+    if (!leanRow.includes("Tracked beside the record since Sep 14 · places no bets of its own · a draw returns the stake")) throw new Error(`Lean DNB row: ${leanRow}`);
     // Model 12% and its track sit in the Archive (owner, 26 Oct); Lean's track stays in the main list.
     for (const k of ["edge12", "edge12_dnb"]) if (!(await p.locator(`.section-title:has-text("Archive") + .card button[data-pfstrat="${k}"]`).count())) throw new Error(`${k} isn't in the Archive`);
     if (await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_dnb"]').count()) throw new Error("Lean's DNB track is in the Archive");
