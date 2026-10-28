@@ -2214,3 +2214,108 @@ step would be a forward live log, which is not a test:
 - about 30 matches a season, about 30 credits;
 - it would be judged later under a rule frozen before it starts.
 That needs a design and the owner's approval of its own.
+
+## Cash-out: when to take risk off a winning underdog bet (owner via the lead, 28 Oct; exploratory, 0 credits)
+
+**The question.** "If we bet heavy underdogs and then cash out when it's at 50%, what's the
+best way to take risk off once we've squeezed out enough value that the swings after aren't
+worth it?"
+
+**Part 1: the framework.**
+- **A fair cash-out never changes expected value.** It sells the position at the market's own
+  chance of it winning. A fair price is a martingale: on average it equals what the position
+  will pay at the end. Cashing out at a fair price swaps the same average for less spread. It
+  is risk control, not profit.
+- **A real cash-out offer carries a margin.** The book pays less than fair, so every cash-out
+  lowers expected value by about the margin times the position's value.
+- **Value isn't "squeezed out" over time.** If the bet had an edge when it was placed, the
+  edge sits in the position until settlement. Selling early hands the rest of it, plus the
+  cash-out margin, back to the book. A position that has gone up in value has not banked
+  anything until it settles or is sold.
+- **The Kelly view.** At any moment the right exposure is the Kelly stake on your current
+  edge at the current in-play price.
+  - A partial cash-out is just rebalancing down to that stake.
+  - Cash out fully only when your edge at the current price is no bigger than what the
+    cash-out costs.
+  - With no edge at the live price, Kelly holds nothing, and a fair cash-out is the right
+    way to get there.
+- **The honest starting point.**
+  - Our pre-match picks don't beat the close: Model 12% CLV −4.6%, Blend Lean −3.1%.
+  - Long shots carry the biggest margin (the favourite–longshot bias in "Price-band edge
+    rule").
+  - A cash-out rule moves risk around. It can't turn a negative entry into a positive one.
+
+**Part 2: a free check on data we already hold** (`lab/cashout.py`, `odds-check.yml`
+`task=cashout`, run 40638748115, no key, cached snapshots only).
+
+*What was measured.*
+- The design B and C half-time snapshots are exactly the matches where the pre-match underdog
+  **led at half-time**: the moment a winning underdog bet would be cashed out.
+- 930 matches had a passing DraftKings in-play quote (C 732, B 198).
+- For each, per $1 on the underdog at Pinnacle's pre-match close (football-data; every row
+  had Pinnacle's close):
+  - **hold** = the actual result;
+  - **cash out at half-time** = entry odds × the underdog's margin-free chance at
+    DraftKings' in-play price × (1 − margin) − 1, for margins of 0% (fair), 5% and 10%;
+  - **Kelly partial** = keep the share of the position that quarter Kelly supports at
+    DraftKings' live price on phase 1's in-play model chance (bankroll 100 per $1 entry),
+    and cash out the rest.
+- Ranges resample matches (2,000 draws).
+
+*Read this first.*
+- Every return here is **conditional on the underdog already leading at half-time**, so the
+  absolute numbers (+1.7 per $1) are far above anything a real underdog strategy earns.
+- Only hold against cash out is meaningful.
+- This reuses design C's data, where the in-play price over-priced the trailing favourite
+  (17.0% won vs 21.3% implied). It is largely the same finding seen from the leader's side.
+- Underdogs that were level or behind at half-time aren't in the sample: we bought snapshots
+  only where the favourite trailed.
+
+*Results (per $1 staked pre-match).*
+
+| Group | Matches | Underdog won vs in-play chance | Hold: mean (sd) | Fair cash-out: mean (sd) | Hold − cash out at 0% · 5% · 10% (95%) | Kelly partial at 5%: mean (sd), share kept |
+| --- | --- | --- | --- | --- | --- | --- |
+| All | 930 | 55.4% vs 54.0% (+1.4 pts, −1.7 to +4.5) | +1.74 (2.77) | +1.69 (0.83) | +0.05 (−0.13 to +0.23) · +0.18 (+0.01 to +0.36) · +0.32 (+0.14 to +0.50) | +1.76 (1.96), 54% |
+| Design C | 732 | 57.1% vs 55.1% (+2.0, −1.5 to +5.3) | +1.76 (2.61) | +1.68 (0.80) | +0.08 · +0.21 · +0.35 (+0.16 to +0.52) | +1.75 (1.85), 51% |
+| Design B | 198 | 49.0% vs 50.0% (−1.0, −7.5 to +5.2) | +1.69 (3.31) | +1.74 (0.93) | −0.05 · +0.09 · +0.22 (−0.22 to +0.68) | +1.78 (2.32), 64% |
+| Underdog priced 3.0–4.0 | 242 | 63.2% vs 60.9% (+2.3, −3.5 to +8.0) | +1.34 (1.79) | +1.26 (0.48) | +0.08 · +0.19 · +0.31 (+0.09 to +0.52) | +1.24 (1.28), 52% |
+| Heavy underdog, 4.0+ | 688 | 52.6% vs 51.6% (+1.0, −2.5 to +4.5) | +1.88 (3.03) | +1.85 (0.87) | +0.04 · +0.18 · +0.32 (+0.11 to +0.55) | +1.94 (2.12), 55% |
+| Half-time chance under 40% | 132 | 40.2% vs 31.1% (**+9.0**, +0.7 to +17.2) | +2.19 (4.36) | +1.64 (0.83) | +0.55 (−0.17 to +1.30) · +0.68 · +0.81 (+0.09 to +1.56) | +2.18 (3.14), 75% |
+| Half-time chance 40–55% ("cash out at 50%") | 436 | 48.4% vs 48.5% (−0.1, −4.9 to +4.5) | +1.36 (2.53) | +1.43 (0.57) | −0.07 (−0.31 to +0.19) · +0.06 · +0.18 (−0.06 to +0.43) | +1.44 (1.87), 67% |
+| Half-time chance 55%+ | 362 | 69.3% vs 69.0% (+0.3, −4.4 to +4.8) | +2.04 (2.20) | +2.03 (0.96) | +0.01 · +0.16 · +0.31 (+0.11 to +0.51) | +1.99 (1.35), 30% |
+
+- No underdog was priced under 3.0 pre-match: the favourites in B and C were all 45%+.
+
+*What it shows.*
+- **At a fair price, cashing out changed nothing on average** (+0.05 per $1, −0.13 to
+  +0.23). It cut the spread of outcomes by about 70% (sd 2.77 → 0.83). That is the
+  martingale, measured.
+- **At a real cash-out margin it costs money.** It cost 0.18 per $1 staked at 5% and 0.32 at
+  10%; both ranges sit above 0 in favour of holding. That is about the margin times the
+  position's value (about 2.7 per $1).
+- **"Cash out at 50%"** (underdog 40–55% to win at half-time): the in-play price was right
+  (48.4% won vs 48.5%). Holding and a fair cash-out were the same. Any real margin makes
+  cashing out the worse choice on average, with a much smaller spread.
+- **The partial (Kelly) line** kept about half the position on average. It landed between
+  hold and cash out on spread (sd 1.96 against 2.77 and 0.83). Its mean was slightly above
+  both, because it held more where the model saw value (75% kept below a 40% half-time
+  chance).
+- **One hint, exploratory only.** Where the leading underdog was still priced under 40% at
+  half-time, it won 40.2% against the price's 31.1% (+9.0 points, +0.7 to +17.2, 132
+  matches). This is design C's over-priced trailing favourite seen from the other side, and
+  it is one of several cuts. It would need its own pre-registration on unused seasons, and
+  the owner's approval, before any credits.
+
+**The answer in plain English (for the owner).**
+- Cashing out doesn't lock in value. It sells your bet back at the book's price minus a fee.
+- In 930 real matches where an underdog led at half-time:
+  - at a fair price, cashing out left the average return exactly where holding left it, and
+    removed about 70% of the swings;
+  - at a typical 5–10% cash-out margin, it cost about 6–12% of the bet's value each time;
+  - at your "50%" point, the in-play price was accurate, so there was nothing left to
+    squeeze.
+- So use a cash-out only to cut risk you can't afford. Then the smart way is partial: keep
+  the share Kelly says your remaining edge supports, and sell the rest. If you see no edge at
+  the live price, sell the lot.
+- None of this fixes the entry. Our pre-match underdog picks lose to the closing price, and
+  no cash-out rule can make a losing bet a winning one.
