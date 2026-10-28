@@ -149,6 +149,19 @@ def snapshot_counts(snap: dict) -> dict:
     }
 
 
+def api_error(status: int) -> str:
+    """What a failed historical call's status most likely means (the stop reason)."""
+    if status in (401, 403):
+        return "key or plan: the historical endpoint needs a paid plan"
+    if status == 422:
+        return "request rejected: check the league, date or markets"
+    if status == 429:
+        return "rate limited or out of credits"
+    if status >= 500:
+        return "The Odds API's server failed; usually brief, so a rerun resumes from the cache"
+    return "unexpected answer"
+
+
 def backfill(
     snapshot_times: Iterable[pd.Timestamp],
     league: str = "E0",
@@ -224,7 +237,7 @@ def backfill(
             break
         if not resp.ok:
             rep.errors.append(f"The Odds API returned HTTP {resp.status_code}")
-            rep.stopped = "API error (the historical endpoint needs a paid plan)"
+            rep.stopped = f"API error ({api_error(resp.status_code)})"
             break
         remaining, last = (
             resp.headers.get("x-requests-remaining"),
