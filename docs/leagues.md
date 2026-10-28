@@ -514,7 +514,7 @@ The rules, from `odds_history.backfill`:
 
 The run prints each season's events and how many DraftKings and Pinnacle priced, plus a
 `BACKFILL_ODDS_JSON` line. No backtest runs in it, so `E0_dk.json` stays as it is. The
-backtests at DraftKings' prices are re-run afterwards (method below), and what changed is recorded here.
+backtests at DraftKings' prices are re-run afterwards (method below); the results follow it.
 
 ### Backtests at DraftKings' prices: method (written 28 Oct, before any run)
 
@@ -589,6 +589,110 @@ Pinnacle's early price, a sharper and different book.
   also carries `clv_dk` and `pinnacle_same_matches`. The top level adds `book`, `verdict` and
   `coverage_note`. `paper.run` publishes them as `portfolio.strategy_backtests.lean_dk` and
   `.edge12_dk` through the same `app_section`.
+
+### The buy: results (28 Oct)
+
+All eight leagues were bought from the default branch, one run at a time: **160,180 credits,
+exactly the estimate** (balance 4,589,590 after). There were no guard blocks, no call over 10
+and nothing bought twice. Each run was archived right after (#128).
+
+| League | Seasons | Run | Credits |
+| --- | --- | --- | --- |
+| E0 | 2020/21–2024/25 | 40706048261 | 24,460 |
+| SP1 | 2020/21–2024/25 | 40711644722 | 34,340 |
+| I1 | 2020/21–2024/25 | 40717483089 | 30,680 |
+| D1 | 2020/21–2024/25 | 40724126165 | 17,380 |
+| F1 | 2021/22–2024/25 | 40726795759 | 18,680 |
+| E1 | 2020/21–2024/25 | 40730770419 + 40737491347 | 6,140 + 10,800 |
+| E2 | 2020/21–2024/25 | 40741249022 | 10,100 |
+| E3 | 2021/22–2024/25 | 40745267032 | 7,600 |
+
+E1's first run stopped on an HTTP 502 from The Odds API after 614 snapshots. The lead
+approved a resume, which skipped the cached snapshots (#146 now labels a 5xx as a server
+error).
+
+The backfill logs count DraftKings and Pinnacle per event and snapshot, which includes
+matches days away from kickoff. At the match level both are much higher: see the coverage
+table below.
+
+### Backtests at DraftKings' prices: results (28 Oct)
+
+Final run 40747442368 (data-log 2ef254e; method above, 0 credits). Three name fixes came
+first, from the backtest's own unmatched-names list (#140, #147):
+
+- Inter and Verona;
+- Darmstadt and St Pauli;
+- St Etienne and West Brom.
+
+No feed name is unmatched now.
+
+**Coverage**: the share of each season's matches DraftKings priced 48 h before kickoff, with
+the candidate count. Pinnacle's close is in the same snapshot for 100% of them in every
+league and season, and no season is partial (`partial_coverage` is empty).
+
+| League | 2020/21 | 2021/22 | 2022/23 | 2023/24 | 2024/25 |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 100% (367) | 100% (373) | 99% (367) | 100% (368) | 100% (374) |
+| SP1 | 99% (364) | 96% (358) | 98% (360) | 99% (372) | 99% (369) |
+| D1 | 100% (299) | 98% (289) | 97% (297) | 100% (294) | 100% (293) |
+| I1 | 99% (356) | 99% (360) | 97% (353) | 99% (369) | 95% (343) |
+| F1 | – | 98% (363) | 98% (353) | 99% (298) | 100% (299) |
+| E1 | 99% (522) | 98% (525) | 98% (526) | 100% (522) | 91% (486) |
+| E2 | 100% (523) | 94% (498) | 98% (514) | 99% (517) | 100% (513) |
+| E3 | – | 97% (509) | 98% (514) | 100% (524) | 100% (521) |
+
+**Pooled verdict: neither live rule shows an edge at DraftKings' prices.** Each pooled CLV
+range vs Pinnacle's close is below 0. The ranges are 95%, resampling matches.
+
+| Rule | Bets | Won vs needed | CLV vs Pinnacle's close | ROI per $1 |
+| --- | --- | --- | --- | --- |
+| Model 12% | 5,324 | 27.0% vs 29.4% | −7.4% (−7.7% to −7.1%) | −8.4% (−13.3% to −3.8%) |
+| Blend Lean, all odds | 881 | 37.9% vs 40.4% | −5.8% (−6.4% to −5.2%) | −7.7% (−16.7% to +1.9%) |
+| Blend Lean, live rule (1.50–3.00) | 443 | | −5.0% (−5.7% to −4.2%) | −4.0% |
+
+- CLV against DraftKings' own close (descriptive): Model 12% −7.2% (−7.4% to −6.9%).
+- Lean by driver:
+  - market-driven: 423 bets, CLV −3.7% (−4.5% to −3.0%), ROI −2.4%;
+  - model-driven: 458 bets, CLV −7.7% (−8.7% to −6.8%), ROI −12.7%.
+
+  The same order as the Pinnacle backtest: the model's own view costs more.
+- Lean ROI by odds band:
+
+  | ≤1.50 | 1.50–2.00 | 2.00–3.00 | 3.00–5.00 | >5.00 |
+  | --- | --- | --- | --- | --- |
+  | −11.7% | −1.0% | −6.6% | −15.9% | −0.9% |
+
+  Every range spans 0, so the bands are descriptive.
+
+**Per league.** For Model 12% the CLV ranges are shown; every one is below 0. "Pinnacle" is
+the same rule on the same matches at football-data's Pinnacle early price.
+
+| League | Model 12% bets | CLV | ROI | Same matches at Pinnacle: CLV (bets) | Lean bets | Lean CLV | Lean ROI | Lean at Pinnacle: CLV |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E0 | 864 | −6.4% (−7.2% to −5.6%) | −7.7% | −4.4% (968) | 143 | −5.6% | −16.9% | −3.0% |
+| SP1 | 431 | −8.5% (−9.7% to −7.3%) | −14.8% | −4.6% (710) | 97 | −1.8% | +17.1% | −0.9% |
+| D1 | 311 | −7.4% (−8.7% to −6.0%) | 0.0% | −3.6% (490) | 22 | −3.4% | −45.8% | −0.8% |
+| I1 | 427 | −8.4% (−9.5% to −7.3%) | −27.6% | −4.5% (667) | 76 | −6.9% | −7.9% | −3.4% |
+| F1 | 462 | −6.6% (−7.6% to −5.5%) | −12.8% | −4.8% (556) | 83 | −4.5% | −7.1% | −3.0% |
+| E1 | 1,083 | −6.4% (−7.0% to −5.9%) | −2.5% | −4.6% (1,294) | 187 | −8.9% | −15.4% | −4.0% |
+| E2 | 969 | −7.7% (−8.3% to −7.0%) | −8.2% | −4.5% (1,243) | 215 | −4.8% | −1.5% | −3.8% |
+| E3 | 777 | −8.7% (−9.4% to −7.9%) | −4.3% | −5.9% (967) | 58 | −8.4% | −11.5% | −4.3% |
+
+**The book costs about 2.7 points.** On the same candidate matches at Pinnacle's early price,
+pooled CLV is:
+
+- Model 12%: −4.7% on 6,892 bets, against −7.4% at DraftKings;
+- Lean: −3.1% on 2,332 bets, against −5.8% at DraftKings.
+
+League by league, DraftKings is 1.8 to 3.9 points worse for Model 12%. Betting at the book
+the strategies trade at widens a loss that already exists at the sharper price; it doesn't
+create one. This agrees with the Pinnacle backtests (`docs/leagues.md` "Backtests in every
+live league") and with the live paper record.
+
+**No live change.** Both rules stay as they are: Lean live and Model 12% archived. The
+backtest files are in the app as `strategy_backtests.lean_dk` / `.edge12_dk` (Portfolio →
+Moneyline → Backtest, "at DraftKings' prices"), and their `coverage_note` names any partial
+season automatically (#148).
 
 ## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
 
