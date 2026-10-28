@@ -246,7 +246,9 @@ def _record(path, cost, credits=None, at=DAY_BEFORE, name="corners_calls"):
     (path / f"{name}_{at:%Y-%m}.jsonl").write_text(json.dumps(row) + "\n")
 
 
-@pytest.mark.parametrize("spent, allowed", [(749, True), (750, False)])
+@pytest.mark.parametrize(
+    "spent, allowed", [(cl.CORNERS_MONTHLY_CAP - 1, True), (cl.CORNERS_MONTHLY_CAP, False)]
+)
 def test_own_monthly_cap(tmp_path, spent, allowed):
     raw, state = tmp_path / "raw", tmp_path / "state"
     raw.mkdir()
@@ -259,7 +261,8 @@ def test_own_monthly_cap(tmp_path, spent, allowed):
     )
     assert (len(calls) == 1) == allowed
     if not allowed:
-        assert s["stop"].startswith("monthly cap: 750 of 750")
+        cap = cl.CORNERS_MONTHLY_CAP
+        assert s["stop"].startswith(f"monthly cap: {cap} of {cap}")
 
 
 def test_team_total_spend_never_counts_toward_the_corner_cap_or_back(tmp_path):
@@ -659,7 +662,7 @@ def test_league_one_and_two_ask_pinnacle_alone_and_the_rest_both_books(tmp_path)
         "E2": "pinnacle",
         "E3": "pinnacle",
     }
-    assert cl.CORNERS_MONTHLY_CAP == 750 and cl.PINNACLE_ONLY == ("E2", "E3")
+    assert cl.CORNERS_MONTHLY_CAP == 20000 and cl.PINNACLE_ONLY == ("E2", "E3")
 
 
 def _call(league, at, snapshot="look", kickoff=None, rows=0, status=200, i=0):

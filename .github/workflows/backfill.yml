@@ -117,6 +117,14 @@ jobs:
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
 
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
+
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
@@ -133,6 +141,14 @@ jobs:
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
 
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
+
       # Champions League historical closes (owner decision, 13 Oct; docs/leagues.md
       # "Champions League: historical closes download"). Bodies and ESPN's calendar days
       # live in their own cache, restored here and saved even when a later step fails, so
@@ -145,6 +161,14 @@ jobs:
             data/raw/cups/espn
           key: cup-odds-history-${{ github.run_id }}
           restore-keys: cup-odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid cup-odds-history cache from the archive if it missed
+        if: ${{ inputs.cup_odds }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: cup-odds-history
 
       # The durable copy: slots already held on data-log are never bought again, even if
       # the cache above was evicted. Fails the job, before any call, if data-log can't be read.
@@ -270,6 +294,14 @@ jobs:
             data/raw/cups/espn
           key: cup-odds-history-${{ github.run_id }}
           restore-keys: cup-odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid cup-odds-history cache from the archive if it missed
+        if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: cup-odds-history
 
       - uses: actions/cache/restore@v4
         if: ${{ inputs.match_blends && !inputs.match_markets && inputs.estimate_month == '' }}
@@ -434,6 +466,14 @@ jobs:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
           restore-keys: odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything can buy (docs/caches.md).
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ inputs.edge12_filters }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
 
       - name: Model 12% filters on Pinnacle's early prices (research, print only)
         if: ${{ inputs.edge12_filters && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && inputs.estimate_month == '' }}
