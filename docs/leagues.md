@@ -555,10 +555,20 @@ Pinnacle's early price, a sharper and different book.
   vs Pinnacle's close is above 0. This is the same pass rule as the DNB and Pinnacle
   backtests. ROI is reported, not judged: its ranges are wide. Per-league numbers are
   descriptive.
-- **Where it runs.** `backfill.yml` input `dk_price_backtest` with `league`, from the cached
-  `odds-history-` bodies. It uses no key and no credits. Each run adds or replaces its
-  league's entry in data-log `backtest/dk_price_backtest.json`. It runs once per league as
-  the bodies land.
+- **Where it runs, and the app** (lead, 28 Oct: the owner wants the results in the app).
+  `backfill.yml` input `dk_price_backtest`: every league whose ten-book bodies are in the
+  cached `odds-history-`. It uses no key and no credits, and it reruns as each league's bodies
+  land. It writes data-log `backtest/lean_backtest_dk.json` and `edge12_backtest_dk.json` in
+  exactly the shape of `lean_backtest.json` and `edge12_backtest.json`, built by their own
+  `build`:
+  - per league: metrics, seasons, odds, edge and CLV bands, calibration and sizing;
+  - `all`, and bets newest first.
+
+  Each league entry has `kind: "draftkings"`. In its `coverage` rows, `early_share` is
+  DraftKings at the look and `close_share` is Pinnacle's close in the same body. Each entry
+  also carries `clv_dk` and `pinnacle_same_matches`. The top level adds `book`, `verdict` and
+  `coverage_note`. `paper.run` publishes them as `portfolio.strategy_backtests.lean_dk` and
+  `.edge12_dk` through the same `app_section`.
 
 ## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
 

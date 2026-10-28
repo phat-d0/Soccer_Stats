@@ -16,8 +16,14 @@ before this ran. In short:
   bet without it counts in clv_missing), and against DraftKings' own close (descriptive).
 * The same rules on the same matches at football-data's Pinnacle early price, beside it.
 
-The saved file (data-log backtest/dk_price_backtest.json) holds one entry per league, each run
-adding or replacing its league's; `all` pools whichever leagues are in.
+App-ready (lead, 28 Oct): two data-log files in exactly the shape of lean_backtest.json and
+edge12_backtest.json, built by their own `build` (bands, calibration, sizing, `all`, bets
+newest first): backtest/lean_backtest_dk.json and backtest/edge12_backtest_dk.json. Each league
+entry has `kind: "draftkings"`, its `coverage` rows say how much DraftKings priced at the look
+(`early_share`) and Pinnacle at the close in the same body (`close_share`), and it carries
+`clv_dk` and `pinnacle_same_matches` beside the usual blocks. The top level adds `book`,
+`verdict` and `coverage_note`. Every run rebuilds both files from every league whose bodies
+are in the cache, so a league's numbers update when its bodies land.
 """
 
 from __future__ import annotations
@@ -28,7 +34,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import bands as bd
 from soccer_stats import edge12_backtest as eb
 from soccer_stats import lean_backtest as lb
 from soccer_stats import match_calibration as mc
@@ -43,8 +48,9 @@ H2H = mc.H2H
 LOOK = pd.Timedelta(hours=48)
 STALE_HOURS = 6.0
 SHARP = "pinnacle"
-NAME = "dk_price_backtest.json"
-KIND = "dk_price_backtest"
+LEAN_FILE = "lean_backtest_dk.json"
+EDGE12_FILE = "edge12_backtest_dk.json"
+KIND = "draftkings"  # each league entry's kind (the Pinnacle files say "early" / "close")
 NOTE = (
     "Blend Lean and Model 12% exactly as live, entered at DraftKings' own price 48 hours "
     "before kickoff from the bought ten-book history, CLV against Pinnacle's margin-free "
@@ -175,96 +181,123 @@ def _with_dk_clv(b: pd.DataFrame, target: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _extra(b: pd.DataFrame) -> dict:
-    """CLV vs DraftKings' close (mean, range), bets without Pinnacle's close, odds bands."""
+def clv_dk_block(b: pd.DataFrame) -> dict:
+    """CLV against DraftKings' own close (descriptive) and the bets without Pinnacle's close
+    in the same body (no judged CLV)."""
     col = b["clv_dk"] if "clv_dk" in b else pd.Series(dtype=float)
     dk = pd.to_numeric(col, errors="coerce").dropna().to_numpy(dtype=float)
     pin = pd.to_numeric(b["clv"], errors="coerce") if len(b) else pd.Series(dtype=float)
     return {
-        "clv_dk": float(dk.mean()) if len(dk) else None,
-        "clv_dk_ci95": lb._boot_mean(dk, seed=2),
-        "clv_dk_bets": len(dk),
-        "clv_missing": int(pin.isna().sum()) if len(b) else 0,
-        "by_odds_band": bd.by_odds_band(b) if len(b) else [],
+        "clv": float(dk.mean()) if len(dk) else None,
+        "clv_ci95": lb._boot_mean(dk, seed=2),
+        "bets": len(dk),
+        "pinnacle_close_missing": int(pin.isna().sum()) if len(b) else 0,
+        "note": "CLV against DraftKings' own close (descriptive); the judged CLV is against "
+        "Pinnacle's close in the same snapshot",
     }
 
 
 def verdict(m: dict) -> dict:
-    """The pass rule fixed in the method: the 97.5% end of the CLV range above 0."""
-    ci = m.get("clv_ci95")
+    """The pass rule fixed in the method: the CLV range vs Pinnacle's close wholly above 0."""
+    ci = (m or {}).get("clv_ci95")
     return {
         "passes": bool(ci and ci[0] > 0),
-        "rule": "pooled CLV vs Pinnacle's close: the 95% range wholly above 0",
+        "clv": (m or {}).get("clv"),
+        "clv_ci95": ci,
+        "bets": (m or {}).get("bets", 0),
+        "rule": "pooled CLV vs Pinnacle's close in the same snapshot: 95% range above 0",
     }
 
 
-def lean_block(b: pd.DataFrame) -> dict:
-    """The live rule (inside the odds range) and the old rule (every price)."""
-    inside = b[[tr.in_lean_range(o) for o in b["odds"]]] if len(b) else b
-    live, old = lb.summary(inside), lb.summary(b)
-    return {
-        "live_rule": {**live, **_extra(inside), "odds_range": list(tr.LEAN_ODDS_RANGE)},
-        "all_odds": {**old, **_extra(b)},
-    }
+def coverage_rows(dk_cov: dict, seasons: set[str]) -> list[dict]:
+    """lean_backtest.coverage's shape: early_share = DraftKings priced at the 48 h look,
+    close_share = Pinnacle's close in the same body, `included` = scored here."""
+    out = []
+    for season, c in sorted(dk_cov.items()):
+        n = c["matches"]
+        out.append(
+            {
+                "season": season,
+                "label": lb.season_label(season),
+                "matches": n,
+                "early": c["look"],
+                "close": c["pinnacle_close"],
+                "dk_close": c["close"],
+                "both": c["candidates"],
+                "early_share": round(c["look"] / n, 4) if n else 0.0,
+                "close_share": round(c["pinnacle_close"] / n, 4) if n else 0.0,
+                "included": season in seasons,
+            }
+        )
+    return out
 
 
-def edge12_block(b: pd.DataFrame) -> dict:
-    return {**eb.summary(b), **_extra(b)}
-
-
-def league_report(league: str, preds: pd.DataFrame, pins: pd.DataFrame, hist: pd.DataFrame):
-    """One league at DraftKings' prices and, on the same matches, at Pinnacle's early
-    price. Returns (report, {rule: bets frame at DraftKings})."""
+def league_reports(league: str, preds: pd.DataFrame, pins: pd.DataFrame, hist: pd.DataFrame):
+    """One league at DraftKings' prices, as lean_backtest.league_report and
+    edge12_backtest.league_report shape them: (lean report, lean bets, edge12 report, edge12
+    bets). Both reports add clv_dk and pinnacle_same_matches."""
     merged = lb.with_pinnacle(preds, pins)
-    cov = lb.coverage(pins)
-    scored_by_pin = {c["season"] for c in cov if c["included"]}
+    scored_by_pin = {c["season"] for c in lb.coverage(pins) if c["included"]}
     bought = {lb_season(k) for k in hist["kickoff"]} if len(hist) else set()
     seasons = scored_by_pin & bought
     target, dk_cov = candidates(merged, hist, seasons)
     train = mc.training_rows(merged, "h2h") if not merged.empty else merged
+    cov = coverage_rows(dk_cov, seasons)
+    base = {
+        "kind": KIND,
+        "coverage": cov,
+        "seasons_included": [c["label"] for c in cov if c["included"]],
+        "seasons_excluded": [c["label"] for c in cov if not c["included"]],
+    }
     if target.empty:
-        lean_b = lb.bets(pd.DataFrame(), league)
-        e12_b = ef.bets(pd.DataFrame(), league, "baseline")
-        fits = []
+        scored, fits = target, []
+        lean_b, e12_b = lb.bets(pd.DataFrame(), league), eb.empty_bets(league)
     else:
         scored, fits = lb.walk_forward(train, target)
         lean_b = _with_dk_clv(lb.bets(scored, league), target)
-        e12_b = _with_dk_clv(ef.bets(target, league, "baseline"), target)
+        e12_b = _with_dk_clv(
+            eb.with_blend(ef.bets(target, league, "baseline"), merged, target), target
+        )
     # The same matches at Pinnacle's early price (football-data), the same rules.
     pin_t = lb.target_rows(merged)
     if len(pin_t) and len(target):
         keys = set(zip(target["season"].astype(str), target["home"], target["away"], strict=True))
-        pin_t = pin_t[
-            [
-                (str(s), h, a) in keys
-                for s, h, a in zip(pin_t["season"], pin_t["home"], pin_t["away"], strict=True)
-            ]
+        mask = [
+            (str(s), h, a) in keys
+            for s, h, a in zip(pin_t["season"], pin_t["home"], pin_t["away"], strict=True)
         ]
+        pin_t = pin_t[mask]
         pin_scored, _ = lb.walk_forward(train, pin_t)
         pin_lean, pin_e12 = lb.bets(pin_scored, league), ef.bets(pin_t, league, "baseline")
     else:
-        pin_lean, pin_e12 = (
-            lb.bets(pd.DataFrame(), league),
-            ef.bets(pd.DataFrame(), league, "baseline"),
-        )
-    rep = {
-        "kind": KIND,
-        "seasons": sorted(lb.season_label(s) for s in seasons),
-        "seasons_scored_by_pinnacle": sorted(lb.season_label(s) for s in scored_by_pin),
-        "coverage": [
-            {"season": s, "label": lb.season_label(s), **c} for s, c in sorted(dk_cov.items())
-        ],
-        "candidates": int(len(target)),
+        pin_t = pin_t.iloc[0:0]
+        pin_lean, pin_e12 = lb.bets(pd.DataFrame(), league), eb.empty_bets(league)
+    sig = [f["sigma"] for f in fits]
+    lean_cal, lean_long = lb.calibration(scored, lean_b, lb.SERIES, "p_bet", league)
+    lean_rep = {
+        **base,
+        "training_matches": len(train),
         "fits": len(fits),
-        "lean": lean_block(lean_b),
-        "edge12": edge12_block(e12_b),
-        "pinnacle_same_matches": {
-            "candidates": int(len(pin_t)),
-            "lean": lean_block(pin_lean),
-            "edge12": edge12_block(pin_e12),
-        },
+        "first_fit": fits[0]["from"] if fits else None,
+        "sigma": {"min": min(sig), "max": max(sig)} if sig else None,
+        "candidates": int(scored["sigma"].notna().sum()) if len(scored) else 0,
+        **lb.summary(lean_b),
+        "calibration": lean_cal,
+        "clv_dk": clv_dk_block(lean_b),
+        "pinnacle_same_matches": {"candidates": int(len(pin_t)), **lb.summary(pin_lean)},
+        lb.OUTCOMES: lean_long,
     }
-    return rep, {"lean": lean_b, "edge12": e12_b}
+    e12_cal, e12_long = lb.calibration(target, e12_b, eb.SERIES, "model_p", league)
+    e12_rep = {
+        **base,
+        "candidates": int(len(target)),
+        **eb.summary(e12_b),
+        "calibration": e12_cal,
+        "clv_dk": clv_dk_block(e12_b),
+        "pinnacle_same_matches": {"candidates": int(len(pin_t)), **eb.summary(pin_e12)},
+        lb.OUTCOMES: e12_long,
+    }
+    return lean_rep, lean_b, e12_rep, e12_b
 
 
 def lb_season(kickoff: pd.Timestamp) -> str:
@@ -272,96 +305,106 @@ def lb_season(kickoff: pd.Timestamp) -> str:
     return tr.season_label(pd.Timestamp(kickoff))
 
 
-def pooled(bets_by_league: dict[str, dict[str, pd.DataFrame]]) -> dict:
-    """`all`: every league's bets together, with the verdict per rule."""
-    frames = {k: [b[k] for b in bets_by_league.values() if len(b[k])] for k in ("lean", "edge12")}
-    lean = (
-        pd.concat(frames["lean"], ignore_index=True)
-        if frames["lean"]
-        else lb.bets(pd.DataFrame(), "")
-    )
-    e12 = (
-        pd.concat(frames["edge12"], ignore_index=True)
-        if frames["edge12"]
-        else ef.bets(pd.DataFrame(), "", "baseline")
-    )
-    lb_ = lean_block(lean)
-    e12_ = edge12_block(e12)
-    return {
-        "leagues": sorted(bets_by_league),
-        "lean": {
-            **lb_,
-            "verdict": {
-                "live_rule": verdict(lb_["live_rule"]["lean"]),
-                "all_odds": verdict(lb_["all_odds"]["lean"]),
-            },
-        },
-        "edge12": {**e12_, "verdict": verdict(e12_["edge12"])},
-    }
+COVERAGE_NOTE = (
+    "Coverage per league and season: early = DraftKings priced the match 48 hours before "
+    "kickoff (only those are bet); close = Pinnacle's close was in the same snapshot (the "
+    "judged CLV needs it). DraftKings history starts in 2020/21 (2021/22 for Ligue 1 and "
+    "League Two); a season counts only where the Pinnacle backtests score it too."
+)
+PRICE = "DraftKings' quoted 1X2 48 hours before kickoff (bought history), break-even = 1/decimal"
+CLV = "entry odds x Pinnacle's margin-free (Shin) close in the same snapshot - 1"
 
 
-def merge_file(old: dict | None, league: str, rep: dict, bets: dict[str, pd.DataFrame], now=None):
-    """The saved file: `leagues[league]` replaced (with its bets as records so a later run
-    can pool them), `all` recomputed over every league in the file."""
+def build_files(lean, edge12, *, from_season: int, names=None, now=None):
+    """(lean_backtest_dk.json, edge12_backtest_dk.json) from each league's
+    league_reports(): {code: (report, bets)} per rule. The Pinnacle files' own builders,
+    relabelled for DraftKings."""
     now = now or pd.Timestamp.now(tz="UTC")
-    out = dict(old or {})
-    leagues = dict(out.get("leagues") or {})
-    leagues[league] = {
-        **rep,
-        "bets": {k: json.loads(b.to_json(orient="records")) for k, b in bets.items()},
-    }
-    every = {
-        code: {k: pd.DataFrame(v["bets"].get(k) or []) for k in ("lean", "edge12")}
-        for code, v in leagues.items()
-        if isinstance(v.get("bets"), dict)
-    }
-    for code, b in every.items():  # metrics need these columns even when empty
-        if b["lean"].empty:
-            b["lean"] = lb.bets(pd.DataFrame(), code)
-        if b["edge12"].empty:
-            b["edge12"] = ef.bets(pd.DataFrame(), code, "baseline")
-    out.update(
-        {
-            "generated_at": now.isoformat(timespec="seconds"),
-            "kind": KIND,
-            "title": "Blend Lean and Model 12% at DraftKings' own prices",
-            "note": NOTE,
-            "method": "docs/leagues.md, 'Backtests at DraftKings' prices: method'",
-            "leagues": leagues,
-            "all": pooled(every),
-        }
+    lf = lb.build(
+        {c: r for c, (r, _) in lean.items()},
+        [b for _, b in lean.values()],
+        from_season=from_season,
+        names=names,
+        now=now,
     )
-    return out
+    ef_ = eb.build(
+        {c: r for c, (r, _) in edge12.items()},
+        {c: b for c, (_, b) in edge12.items()},
+        from_season=from_season,
+        names=names,
+        now=now,
+    )
+    for f, rule_name in ((lf, "lean"), (ef_, "edge12")):
+        f["title"] = (
+            "Blend Lean at DraftKings' own prices"
+            if rule_name == "lean"
+            else "Model 12% at DraftKings' own prices"
+        )
+        f["note"] = NOTE
+        f["book"] = "draftkings"
+        f["method"] = "docs/leagues.md, 'Backtests at DraftKings' prices: method'"
+        f["coverage_note"] = COVERAGE_NOTE
+        f["rule"] = {**f.get("rule", {}), "price": PRICE, "clv": CLV}
+        f["draftkings_replay"] = None
+    lean_all = pd.concat([b for _, b in lean.values() if len(b)] or [lb.bets(pd.DataFrame(), "")])
+    e12_all = pd.concat([b for _, b in edge12.values() if len(b)] or [eb.empty_bets()])
+    inside = (
+        lean_all[[tr.in_lean_range(o) for o in lean_all["odds"]]] if len(lean_all) else lean_all
+    )
+    lf["verdict"] = {
+        "all_odds": verdict(lb.metrics(lean_all)),
+        "live_rule": {**verdict(lb.metrics(inside)), "odds_range": list(tr.LEAN_ODDS_RANGE)},
+    }
+    lf["all"]["clv_dk"] = clv_dk_block(lean_all)
+    ef_["verdict"] = verdict(eb.metrics(e12_all))
+    ef_["all"]["clv_dk"] = clv_dk_block(e12_all)
+    return lf, ef_
 
 
-def headline(rep: dict) -> list[str]:
+def headline(code: str, lean_rep: dict, e12_rep: dict) -> list[str]:
     """Plain lines for the job log."""
     out = []
-    for c in rep.get("coverage") or []:
-        n = c["matches"] or 1
+    for c in lean_rep.get("coverage") or []:
         out.append(
-            f"  {c['label']}: {c['matches']} matches, DraftKings at the look {c['look'] / n:.0%}, "
-            f"at the close {c['close'] / n:.0%}, Pinnacle close {c['pinnacle_close'] / n:.0%}"
+            f"  {c['label']}: {c['matches']} matches, DraftKings at the look "
+            f"{c['early_share']:.0%}, Pinnacle close in the body {c['close_share']:.0%}"
+            + ("" if c["included"] else " (not scored)")
         )
+
+    def f(v):
+        return "n/a" if v is None else f"{v:+.1%}"
 
     def line(name, m):
         if not m or not m.get("bets"):
             return f"  {name}: 0 bets"
-        roi_ci = m.get("roi_ci95") or [None, None]
-        clv_ci = m.get("clv_ci95") or [None, None]
-        f = lambda v: "n/a" if v is None else f"{v:+.1%}"  # noqa: E731
+        r, c = m.get("roi_ci95") or [None, None], m.get("clv_ci95") or [None, None]
         return (
             f"  {name}: {m['bets']} bets, won {m['win_rate']:.1%} vs {m['breakeven']:.1%} "
-            f"needed, ROI {f(m['roi'])} ({f(roi_ci[0])} to {f(roi_ci[1])}), CLV vs Pinnacle "
-            f"{f(m.get('clv'))} ({f(clv_ci[0])} to {f(clv_ci[1])})"
+            f"needed, ROI {f(m['roi'])} ({f(r[0])} to {f(r[1])}), CLV vs Pinnacle "
+            f"{f(m.get('clv'))} ({f(c[0])} to {f(c[1])})"
         )
 
-    for src, label in (
-        (rep, "DraftKings"),
-        (rep.get("pinnacle_same_matches") or {}, "Pinnacle early"),
-    ):
-        out.append(f" {label}:")
-        out.append(line("Blend Lean (live rule)", src["lean"]["live_rule"]["lean"]))
-        out.append(line("Blend Lean (all odds)", src["lean"]["all_odds"]["lean"]))
-        out.append(line("Model 12%", src["edge12"]["edge12"]))
+    out.append(line(f"{code} Blend Lean at DraftKings (all odds)", lean_rep.get("lean")))
+    out.append(line(f"{code} Model 12% at DraftKings", e12_rep.get("edge12")))
+    same = lean_rep.get("pinnacle_same_matches") or {}
+    out.append(line(f"{code} Blend Lean, same matches at Pinnacle early", same.get("lean")))
+    same = e12_rep.get("pinnacle_same_matches") or {}
+    out.append(line(f"{code} Model 12%, same matches at Pinnacle early", same.get("edge12")))
+    return out
+
+
+def bought_leagues(raw_dir: Path = RAW_DIR) -> list[str]:
+    """Domestic live leagues with ten-book bodies in the cache (some snapshot holds a book
+    other than DraftKings: the original E0 run kept DraftKings alone)."""
+    from soccer_stats import leagues as lgs
+
+    out = []
+    for code in lgs.live_codes():
+        d = history_dir(code, raw_dir)
+        if code == "UCL" or not d.is_dir():
+            continue
+        for path in sorted(d.glob("*.json"))[:50]:
+            if '"pinnacle"' in path.read_text():
+                out.append(code)
+                break
     return out
