@@ -43,7 +43,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   stay the record. Price = DraftKings' h2h, side × (1 − 1/draw) (0 credits); chance = the parent's
   without the draw; Lean's needs `sigma_dnb` in `match_blends.json` and keeps the 1.50–3.00 range
   on the DNB price. A draw refunds the stake. The tracks have their own ledger
-  (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals.
+  (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals. Backcast from 14 Oct
+  on the odds log (owner, 28 Oct; `backcast: true`, never judged; Lean's at the 26 Oct refit's
+  `sigma_dnb`).
 - The Matches tab shows Lean only. Portfolio → Moneyline lists Blend Lean and its draw no bet
   track; Model 12%, its track and Lean's old rule sit in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
@@ -350,6 +352,13 @@ the owner's baseball app, so the balance can drop without any run here.
   baselines `x12`, `x_lean`; a draw refunds. Metrics add won/drawn/lost, `hit_rate`, `clv` per
   stake not refunded and `clv_staked`, `profit_sd`, `bets_for_5pct`; `ah0` = the real Pinnacle AH 0
   check; `verdict` = pooled CLV 97.5% range above 0. Log line `DNB_BACKTEST_JSON`. Not in the app.
+- `backcast.py` (owner, 28 Oct): the shared backcast for any new strategy or track.
+  `START` 14 Oct; `observations(log, until, start)` yields (now = `logged_at`, card slice, download
+  time) per logged DraftKings h2h row, oldest first; `mark(t, **extra)` sets `backcast: true`,
+  `backcast_from: "odds_log"`; `block(trades, defined_at, note=, started=, **extra)` = a section's
+  `backcast` block `{applied, started, until (= defined_at), defined_at, trades, settled (won, lost
+  or a refunded push), from, to, note, descriptive: true, ...}` over the trades opened before
+  `defined_at`. Used by `paper_dnb.backcast` and `paper.lean_backcast` (which adds `lean_started`).
 - `paper_dnb.py` (owner, 26 Oct; `docs/leagues.md` "Draw no bet tracks"): the live DNB tracks
   beside the match strategies. `trades.py` holds the maths and rules (`dnb_odds`, `dnb_prices`,
   `fair_dnb`, `without_draw`, `dnb_pick_12`, `dnb_pick_lean`, `settle_dnb`, which pushes on a draw,
@@ -364,7 +373,14 @@ the owner's baseball app, so the balance can drop without any run here.
   - `section` = `strategy_section` plus `variant_of`, `adds: "dnb"`, `filter` None, `defined_at`,
     `note`, `dnb_trades` and `compare` (`{since, descriptive, track, parent, clv_per_dollar:
     {clv_dk, clv_pinnacle: {track, parent}}, note}`).
-  - `paper.run` → `_run_dnb` (a failure costs only the tracks); `portfolios_section` puts each
+  - `backcast(ledger, odds_log, league, rules, ref)` (owner, 28 Oct): both tracks replayed from
+    `backcast.START` (14 Oct) to `DNB_FROM` through the shared open step (`_open`) on each logged
+    h2h row at its `logged_at`, with the live gates and rules (Lean at today's `sigma_dnb`,
+    `sigma_from` "26 Oct refit"); entries get `backcast: true`, `backcast_from: "odds_log"`, are
+    opened once (a match with a live trade is left alone), then close and settle as live.
+    `section` adds `backcast` (`backcast.block`).
+  - `paper.run` → `_run_dnb` (a failure costs only the tracks; it runs `backcast` before
+    `update_ledger`); `portfolios_section` puts each
     track after its parent's sections and adds `live.dnb_trades`; `awaiting_results` includes
     the tracks.
   - `match_calibration.sigma_dnb` gives `league_fit`'s `sigma_dnb`; `publish.LEAN_CARD_KEYS`
@@ -1351,6 +1367,8 @@ The lead runs in the owner's main session ("Soccer stats prediction model"). Pas
 
 ## Conventions
 
+- A new strategy or track is backcast from 14 Oct on logged prices (descriptive), and judged only
+  from its `defined_at` (owner, 28 Oct; `backcast.py`).
 - Workflows run on `ubuntu-24.04` (pinned 24 Oct: `ubuntu-latest` moved to 26.04 with Python 3.14,
   where argparse rejects a bare `%` in a help string and Playwright 1.56.1 can't install Chromium;
   publish failed until the pin). Write `%%` for a percent sign in any argparse `help=`;
