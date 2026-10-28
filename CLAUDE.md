@@ -960,7 +960,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v67) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v68) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1075,8 +1075,20 @@ the owner's baseball app, so the balance can drop without any run here.
   note. `lean_dnb` with `rule.source: "none"` says it starts after the refit that adds
   `sigma_dnb`. Trade sheet: strategy, "Built from DraftKings' 1X2" (`entry_prices`, side × (1 −
   1/draw)), chance "draw taken out", CLV per stake not refunded and per $ (`clv_dk_staked`,
-  `clv_pinnacle_staked`). The fixture adds five synthetic `edge12_dnb` trades (`DNB_TRADES`: two
-  won, one lost, a draw, one open; `FIXTURE_DNB_FROM` 27 Sep) and none for Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
+  `clv_pinnacle_staked`). **Backcasts** (owner via the lead, 28 Oct; v68: every new strategy or
+  track starts on the original portfolio's start, backcast from logged prices): any live section
+  with `backcast.applied` (`bcOf`; `bcStart` = `started`, else Lean's `lean_started`; `bcDay`)
+  gets one treatment. A draw no bet track's lines start at the backcast's start (the parent's
+  counts its trades since then) with the "rule set (judged from here)" marker at its
+  `defined_at`; a note "Backcast before <date>: this line starts <date>, with the N trades … the
+  rule would have opened before it was set" (σ source when `sigma_from`), descriptive, the judged
+  comparison counting only live ones (Lean's new rule keeps its own sentence); each trade with
+  `backcast: true` carries a Backcast chip (`bcChip`, `.chip-backcast`) and a "Backcast" sheet
+  row; the strategy row's meta and empty right side read "since <start>". The fixture adds seven
+  synthetic `edge12_dnb` trades (`DNB_TRADES`: three won, two lost, a draw, one open;
+  `FIXTURE_DNB_FROM` 27 Sep), the two opened before it marked `backcast`, and a `backcast` block
+  from `FIXTURE_DNB_STARTED` 14 Sep (`add_dnb_backcast`, kept when paper.py builds one); none for
+  Lean. **Research studies** (owner, 28 Oct; v64: every strategy we test shows in
   Portfolio, pass or fail; data `research_studies`, older data's `comeback_research` read as
   the one study): `studies()`, `studiesFor(portfolio)`, `studyStrat` (key = study id, `study`
   set; `isStudy`), `studyJudged` (role "judged", else the first design), `studyHeadline`,
