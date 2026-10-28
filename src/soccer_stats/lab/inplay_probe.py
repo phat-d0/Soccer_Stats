@@ -6,7 +6,9 @@ and which events have started; then, only if at least one has and the balance st
 the shared key's 3,000 reserve, one `/odds` call (h2h, up to ten named books = one region,
 1 credit). ESPN's free scoreboard gives each live match's score and clock beside its prices,
 so we can see whether the price moves with the game. Cost from `x-requests-last`; the key is
-never printed. Descriptive only: nothing trades.
+never printed. Descriptive only: nothing trades. Every answer bought is kept under
+data/raw/inplay_probe/<league>/ (the paid cache `inplay-probe-`, archived for good:
+docs/caches.md), and a historical snapshot already held is never bought again.
 
     python -m soccer_stats.lab.inplay_probe --league E2 --cap 1 --json out/inplay.json
 """
@@ -16,9 +18,11 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import requests
 
+from soccer_stats.data import RAW_DIR
 from soccer_stats.espn_news import BASE as ESPN_BASE
 from soccer_stats.espn_news import SLUGS
 from soccer_stats.odds_feed import SPORTS, URL
@@ -30,6 +34,18 @@ BOOKS = (
 )
 RESERVE = 3000
 COST = 1  # one market, up to ten named books: one region
+CACHE = "inplay_probe"  # under RAW_DIR: the paid cache inplay-probe-
+
+
+def body_path(raw_dir: Path, league: str, kind: str, at: datetime) -> Path:
+    """Where a bought answer is kept: <raw>/inplay_probe/<league>/<kind>_<UTC stamp>.json
+    (kind "live" stamped with the call's time, "hist" with the snapshot asked for)."""
+    return Path(raw_dir) / CACHE / league / f"{kind}_{at:%Y%m%dT%H%M%SZ}.json"
+
+
+def keep(path: Path, body) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(body))
 
 
 def _now() -> datetime:
@@ -161,7 +177,7 @@ def summarise(body: list, now: datetime, live: list[dict]) -> list[dict]:
     return out
 
 
-def run(league: str, cap: int, api_key: str, get=requests.get) -> dict:
+def run(league: str, cap: int, api_key: str, get=requests.get, raw_dir: Path = RAW_DIR) -> dict:
     sport = SPORTS[league]
     res = {"league": league, "sport": sport, "cap": cap, "spent": 0, "log": []}
     if not api_key:
@@ -204,8 +220,12 @@ def run(league: str, cap: int, api_key: str, get=requests.get) -> dict:
         res["stop"] = f"odds call HTTP {r.status_code}"
         return res
     now = _now()
+    body = r.json()
+    path = body_path(raw_dir, league, "live", now)
+    keep(path, body)
+    res["kept"] = path.as_posix()
     res["checked_at"] = now.isoformat(timespec="seconds")
-    res["matches"] = summarise(r.json(), now, espn_live(league, get))
+    res["matches"] = summarise(body, now, espn_live(league, get))
     inplay = [m for m in res["matches"] if m["started"]]
     priced = [m for m in inplay if m["books"]]
     ages = [b["age_min"] for m in priced for b in m["books"] if b["age_min"] is not None]
@@ -221,12 +241,20 @@ HIST_URL = "https://api.the-odds-api.com/v4/historical/sports/{sport}/odds"
 HIST_COST = 10  # historical: 10 credits per region and market
 
 
-def run_historical(league: str, at: str, cap: int, api_key: str, get=requests.get) -> dict:
+def run_historical(
+    league: str, at: str, cap: int, api_key: str, get=requests.get, raw_dir: Path = RAW_DIR
+) -> dict:
     """One historical h2h snapshot at `at` (ISO, UTC), when matches were in play: do
     started events come back with prices, and how fresh were they then? A free events
-    list reads the balance first; the call needs cap >= 10 and the 3,000 reserve kept."""
+    list reads the balance first; the call needs cap >= 10 and the 3,000 reserve kept.
+    A snapshot already kept for `at` is read back instead of bought."""
     sport = SPORTS[league]
     res = {"league": league, "sport": sport, "cap": cap, "spent": 0, "at": at, "log": []}
+    path = body_path(raw_dir, league, "hist", _ts(at))
+    if path.exists():
+        res["log"].append(f"cached: {path.as_posix()} (nothing bought)")
+        res["kept"] = path.as_posix()
+        return _historical_report(res, json.loads(path.read_text()), league, at, get)
     if not api_key:
         res["stop"] = "no ODDS_API_KEY"
         return res
@@ -259,6 +287,12 @@ def run_historical(league: str, at: str, cap: int, api_key: str, get=requests.ge
         res["stop"] = f"historical call HTTP {r.status_code}"
         return res
     body = r.json()
+    keep(path, body)
+    res["kept"] = path.as_posix()
+    return _historical_report(res, body, league, at, get)
+
+
+def _historical_report(res: dict, body: dict, league: str, at: str, get) -> dict:
     snap = _ts(body.get("timestamp") or at)
     res["snapshot"] = body.get("timestamp")
     live = espn_live(league, get, date=f"{snap:%Y%m%d}")
