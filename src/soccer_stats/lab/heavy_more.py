@@ -25,6 +25,7 @@ import argparse
 import json
 import re
 import time
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 
@@ -388,6 +389,13 @@ def extra_league(code: str, raw_dir: Path, get: Callable, stats: dict,
 # ---------- the run ----------
 
 
+def why(exc: Exception) -> str:
+    """An error's type, message and the line it came from, for the counts."""
+    tb = traceback.extract_tb(exc.__traceback__)
+    where = f" at {Path(tb[-1].filename).name}:{tb[-1].lineno}" if tb else ""
+    return f"{type(exc).__name__}: {exc}{where}"[:200]
+
+
 def earlier() -> list[dict]:
     rows = []
     for lg, years in EARLIER.items():
@@ -395,7 +403,7 @@ def earlier() -> list[dict]:
             try:
                 r = hf.season_scope(lg, y)
             except Exception as exc:  # noqa: BLE001 - a missing file is reported, not fatal
-                r = {"league": lg, "season": hf.season_name(y), "error": str(exc)[:120]}
+                r = {"league": lg, "season": hf.season_name(y), "error": why(exc)}
             r.pop("snapshot_times", None)
             rows.append(r)
     return rows
@@ -416,13 +424,13 @@ def run(raw_dir: Path = RAW_DIR, seconds: float = RUN_SECONDS, get: Callable = r
                 out["cups"].append(cup_season(code, y, raw_dir, paced, stats, today))
             except Exception as exc:  # noqa: BLE001 - one cup failing is reported, not fatal
                 out["cups"].append({"cup": code, "season": hf.season_name(y),
-                                    "error": str(exc)[:120]})  # fmt: skip
+                                    "error": why(exc)})  # fmt: skip
     if not cups_only:
         for code in EXTRA:
             try:
                 out["extra"] += extra_league(code, raw_dir, paced, stats, today)
             except Exception as exc:  # noqa: BLE001
-                out["extra"].append({"league": code, "error": str(exc)[:120]})
+                out["extra"].append({"league": code, "error": why(exc)})
     out["requests"], out["failures"] = paced.calls, stats.get("failures", 0)
     out["out_of_time"] = paced.out_of_time
     return out
