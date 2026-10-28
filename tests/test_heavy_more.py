@@ -103,3 +103,27 @@ def test_paced_get_stops_when_the_budget_is_spent():
     with pytest.raises(hm.requests.ConnectionError):
         paced("u")
     assert calls == []
+
+
+def test_cup_prematch_slots_buy_each_close_once_and_skip_held_seasons():
+    from soccer_stats.lab import heavy_more as hm
+
+    res = {
+        "cups": [
+            {"cup": "FAC", "season": "2024/25", "sport": "soccer_fa_cup",
+             "pre_match_list": [
+                 {"kickoff": "2025-01-11T15:00Z", "matches": [{"home": "A", "away": "B"}]},
+                 {"kickoff": "2025-01-11T15:01Z", "matches": [{"home": "C", "away": "D"}]},
+                 {"kickoff": "2025-01-12T19:45Z", "matches": [{"home": "E", "away": "F"}]},
+             ]},
+            {"cup": "UCL", "season": "2024/25", "sport": "soccer_uefa_champs_league",
+             "pre_match_list": [{"kickoff": "2024-10-01T19:00Z", "matches": []}]},
+            {"cup": "CDF", "season": "2025/26", "error": "time"},
+        ]
+    }  # fmt: skip
+    plan = hm.cup_prematch_slots(res, held={("UCL", "2024/25")})
+    assert plan["guard"] is False and plan["design"] == "H2P"
+    assert [s["request_at"] for s in plan["slots"]] == ["2025-01-11T14:55Z", "2025-01-12T19:40Z"]
+    assert plan["totals"] == {"kickoff_slots": 3, "snapshots": 2, "credits": 20}
+    assert plan["per_cup_season"]["UCL 2024/25"] == {"held": True}
+    assert "error" in plan["per_cup_season"]["CDF 2025/26"]
