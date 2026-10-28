@@ -2319,3 +2319,72 @@ worth it?"
   the live price, sell the lot.
 - None of this fixes the entry. Our pre-match underdog picks lose to the closing price, and
   no cash-out rule can make a losing bet a winning one.
+
+## In-play archive probes: how far back are half-time prices kept? (owner-approved 28 Oct)
+
+**What and why.** The 75%+ heavy-favourite idea ("Heavy favourites (75%+)" above) needs
+priced half-times that B and C never used. Design C's guard found 2022/23 unpriced for E0, F1
+and D1 but priced for SP1 and I1. These probes settle where each league's archive starts.
+- **Probe:** one historical bulk h2h snapshot (10 books = one region, 10 credits) per
+  league-season, at kickoff + 55 min of the busiest weekend kickoff between October and
+  April, taken from football-data.
+- **"Priced":** design C's guard (`snapshot_priced`), meaning a started event freshly quoted
+  in play by DraftKings or Betfair.
+- **Walk-back:** each league walks back from its newest unknown season and stops at the first
+  unpriced one. E0, F1 and D1 weren't probed.
+- **Run:** `lab/archive_probe.py`, `odds-check.yml` `task=archive-probe`, run 40640666882,
+  after a dry run (40640474263).
+- **Spend:** 28 paid snapshots, **280 credits**. Balance 4,938,756 → 4,938,476 on the
+  upgraded plan; the owner lifted the 200 cap the same day. Two snapshots came back empty and
+  cost 0.
+- The bodies are in the cache `archive-probe-40640666882`.
+
+| League | Season (slot) | Priced? | Started events | Books quoting in play, fresh |
+| --- | --- | --- | --- | --- |
+| SP1 | 2021/22 (3 Oct 2021) | **yes** | 2 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Pinnacle |
+| SP1 | 2020/21 (3 Oct 2020) | **yes** | 2 | DraftKings, FanDuel, BetMGM, 888, Paddy Power, Pinnacle |
+| SP1 | 2019/20 (3 Nov 2019) | no: the archive has no snapshot (empty, 0 credits) | 0 | none |
+| I1 | 2021/22 (17 Oct 2021) | **yes** | 3 | DraftKings, FanDuel, Bovada, Paddy Power, Pinnacle |
+| I1 | 2020/21 (3 Jan 2021) | no | 7 | 888 only |
+| E1 | 2021/22 (2 Oct 2021) | no | 10 | none |
+| E2 | 2021/22 (2 Oct 2021) | no | 12 | Pinnacle, Paddy Power, Bovada (no DraftKings or Betfair) |
+| E3 | 2021/22 (2 Oct 2021) | no | 12 | none |
+| N1 | 2022/23 (23 Oct 2022) | **yes** | 3 | DraftKings, Bovada, Unibet, Pinnacle |
+| N1 | 2021/22 (2 Oct 2021) | no | 2 | Pinnacle, Paddy Power, Bovada |
+| P1 | 2022/23 (13 Nov 2022) | **yes** | 3 | DraftKings, FanDuel, Bovada, Paddy Power, Unibet, Pinnacle |
+| P1 | 2021/22 (3 Oct 2021) | no | 2 | none |
+| SC0 | 2022/23 (1 Oct 2022) | **yes** | 5 | DraftKings, FanDuel, Paddy Power, Bovada, Pinnacle |
+| SC0 | 2021/22 (16 Oct 2021) | no | 5 | none |
+| B1 | 2022/23 (23 Apr 2023) | **yes** | 7 | all ten, Betfair included |
+| B1 | 2021/22 (10 Apr 2022) | no | 7 | none |
+| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, FanDuel… (one started match) |
+| T1 | 2021/22 (23 Jan 2022) | no | 3 | Pinnacle, Paddy Power, Bovada |
+| G1 | 2022/23 (12 Mar 2023) | **yes** | 7 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Unibet, Pinnacle |
+| G1 | 2021/22 (6 Mar 2022) | no: no snapshot (empty, 0 credits) | 0 | none |
+| D2 | 2022/23 (9 Apr 2023) | **yes** | 5 | all ten |
+| D2 | 2021/22 (17 Apr 2022) | **yes** | 5 | DraftKings, FanDuel, Bovada, Paddy Power, Pinnacle |
+| D2 | 2020/21 (3 Jan 2021) | no | 5 | none |
+| I2 | 2022/23 (1 Oct 2022) | **yes** | 7 | DraftKings, Bovada, Paddy Power, Pinnacle |
+| I2 | 2021/22 (30 Apr 2022) | no | 9 | none |
+| SP2 | 2022/23 (1 Oct 2022) | **yes** | 2 | DraftKings, FanDuel, Paddy Power, Pinnacle |
+| SP2 | 2021/22 (10 Oct 2021) | **yes** | 3 | DraftKings, Paddy Power, Pinnacle |
+| SP2 | 2020/21 (11 Apr 2021) | no | 3 | none |
+| F2 | 2022/23 (12 Nov 2022) | **yes** | 9 | DraftKings, FanDuel, Bovada, Paddy Power, Unibet, Pinnacle |
+| F2 | 2021/22 (2 Oct 2021) | no | 8 | none |
+
+**What it says.**
+- DraftKings' in-play prices are in the archive from **2022/23 in every league probed**:
+  the six other top divisions and four second tiers newly checked, plus C's priced SP1, I1
+  and the English lower leagues.
+- They go back further only in Spain: SP1 to 2020/21, SP2 and D2 to 2021/22, I1 to 2021/22.
+- Before mid-2020 the archive holds no snapshots at all.
+- **Caveat: one snapshot per league-season tests one date.** Coverage may start part-way
+  through a season, which is why C's guard checks its first three snapshots. So a "no" here
+  means "not on that date". E0, F1 and D1 2022/23 (unpriced in C) fit the same picture of
+  coverage arriving during 2022.
+- Some unpriced seasons still had **Pinnacle** quoting in play (E2, N1 and T1 in 2021/22).
+  A test whose price is DraftKings or Betfair can't use them. A Pinnacle-priced test could,
+  but that would be a different rule and needs its own pre-registration.
+- **Seasons newly known to be priced for a 75%+ test:** SP1 2020/21–2021/22; I1, D2 and SP2
+  2021/22; N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2 from 2022/23. The counts for these
+  follow in the heavy-favourite count below.
