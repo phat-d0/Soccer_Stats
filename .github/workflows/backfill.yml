@@ -24,6 +24,10 @@
 # 3.00 or shorter) on Pinnacle's early prices, plus a descriptive E0 DraftKings check
 # (pre-registered in docs/lab.md, owner 19 Oct). No key, no credits, never pushes;
 # log + 7-day artifact.
+# dk_price_backtest (+ league): Blend Lean and Model 12% at DraftKings' own historical prices
+# (the books=ten bodies in the paid odds-history cache), CLV against Pinnacle's close in the
+# same snapshot; no key, no credits; adds the league to backtest/dk_price_backtest.json on
+# data-log from the default branch only.
 # dnb_backtest: draw no bet beside the 1X2 rules on Pinnacle's early prices (owner, 24 Oct;
 # pre-registered in docs/lab.md "Draw no bet"). No key, no credits; pushes
 # backtest/dnb_backtest.json to data-log only from the default branch.
@@ -73,6 +77,10 @@ on:
         default: "2017-2025"
       match_blends:
         description: "Fit each live league's h2h blend and sigma for Blend Lean (no key; saved to data-log from the default branch only)"
+        type: boolean
+        default: false
+      dk_price_backtest:
+        description: "Both live match rules at DraftKings' own historical prices for `league` (no key; the cached ten-book bodies; saved to data-log from the default branch only)"
         type: boolean
         default: false
       lean_backtest:
@@ -125,7 +133,7 @@ jobs:
       # build's, and are not committed (check The Odds API's terms before publishing them).
       # Restored here and saved right after the download, even when it fails (paid data).
       - uses: actions/cache/restore@v4
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -134,7 +142,7 @@ jobs:
       # Paid odds: if the cache missed, rebuild it from the permanent archive before
       # anything can buy (docs/caches.md).
       - name: Rebuild the paid odds-history cache from the archive if it missed
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         uses: ./.github/actions/paid-archive-restore
         with:
           name: odds-history
@@ -142,14 +150,14 @@ jobs:
       # Print-only: restore the cached odds (never saves or deletes a cache), run the
       # backtest without the API key so it can't spend credits, and print the results.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.dnb_backtest || inputs.estimate_month != '' }}
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.dnb_backtest || inputs.dk_price_backtest || inputs.estimate_month != '' }}
         with:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
       - uses: actions/cache/restore@v4
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
@@ -158,7 +166,7 @@ jobs:
       # Paid odds: if the cache missed, rebuild it from the permanent archive before
       # anything can buy (docs/caches.md).
       - name: Rebuild the paid odds-history cache from the archive if it missed
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         uses: ./.github/actions/paid-archive-restore
         with:
           name: odds-history
@@ -389,6 +397,63 @@ jobs:
           key: cup-espn-${{ github.run_id }}
           restore-keys: cup-espn-
 
+      # DraftKings-price backtest (lead, 28 Oct; docs/leagues.md "Backtests at DraftKings'
+      # prices: method"): both live rules for `league` on the cached ten-book history.
+      # No key, no credits; adds or replaces the league's entry in data-log's
+      # backtest/dk_price_backtest.json (default branch only).
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.dk_price_backtest }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-${{ github.run_id }}
+          restore-keys: odds-history-
+
+      # Paid odds: if the cache missed, rebuild it from the permanent archive before
+      # anything reads it (docs/caches.md).
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ inputs.dk_price_backtest }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
+
+      - name: Backtest both rules at DraftKings' prices
+        if: ${{ inputs.dk_price_backtest }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          git fetch --depth=1 origin data-log
+          git show FETCH_HEAD:backtest/dk_price_backtest.json > out/dk_price_backtest.json 2>/dev/null ||
+            rm -f out/dk_price_backtest.json
+          uv run soccer-stats backtest-dk-prices --league "${{ inputs.league }}" \
+            --json out/dk_price_backtest.json
+          if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Not the default branch: printed only, nothing pushed to data-log."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/backtest
+            cp out/dk_price_backtest.json ../log/backtest/dk_price_backtest.json
+            git -C ../log add backtest/dk_price_backtest.json
+            if git -C ../log diff --cached --quiet; then exit 0; fi
+            git -C ../log commit -q -m "DraftKings-price backtest: ${{ inputs.league }}"
+            if git -C ../log push origin data-log; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.dk_price_backtest && always() }}
+        with:
+          name: dk-price-backtest
+          path: out/dk_price_backtest.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Blend Lean backtest on Pinnacle's early prices
         if: ${{ inputs.lean_backtest && !inputs.match_markets && !inputs.match_blends && inputs.estimate_month == '' }}
         run: |
@@ -543,13 +608,13 @@ jobs:
           if-no-files-found: ignore
 
       - name: Backtest from cached odds (print only)
-        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         run: |
           uv sync --frozen
           uv run soccer-stats backtest-dk --seasons "${{ inputs.seasons }}"
 
       - name: Download historical odds
-        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
@@ -564,14 +629,14 @@ jobs:
             $LOOKS ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - uses: actions/cache/save@v4
-        if: ${{ always() && !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ always() && !inputs.cup_odds && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         with:
           path: data/raw/odds_history
           key: odds-history-${{ github.run_id }}
 
       # The ten-book backfill only buys; the backtests at DraftKings' prices come later.
       - name: Run the DraftKings backtest and save it for the app
-        if: ${{ inputs.books != 'ten' && inputs.league == 'E0' && !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && inputs.estimate_month == '' }}
+        if: ${{ inputs.books != 'ten' && inputs.league == 'E0' && !inputs.cup_odds && !inputs.dry_run && !inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -1181,6 +1181,47 @@ def _write_backtest(out: dict, args, name: str, label: str) -> None:
         print(f"{label} written to {path}")
 
 
+def cmd_backtest_dk_prices(args: argparse.Namespace) -> None:
+    """Blend Lean and Model 12% at DraftKings' own historical prices for one league
+    (dk_price_backtest.py), from the cached ten-book bodies. No key, no credits. Adds or
+    replaces the league's entry in backtest/dk_price_backtest.json."""
+    import json
+
+    from soccer_stats import dk_price_backtest as dpb
+    from soccer_stats import leagues as lgs
+
+    code = args.league
+    preds, pins, weight = _early_preds(code, args.from_season, args.burn_in)
+    known = set(preds["home"]) | set(preds["away"]) if len(preds) else set()
+    hist = dpb.load_books(code, known)
+    print(f"{lgs.name(code)}: {len(hist)} event-snapshots in the cached DraftKings history")
+    rep, bets = dpb.league_report(code, preds, pins, hist)
+    rep["xg_weight"] = weight
+    for line in dpb.headline(rep):
+        print(line)
+    path = None
+    if args.json:
+        path = Path(args.json)
+    elif args.log_dir:
+        path = Path(args.log_dir) / "backtest" / dpb.NAME
+    old = json.loads(path.read_text()) if path and path.exists() else None
+    out = dpb.merge_file(old, code, rep, bets)
+    a = out["all"]
+    print(
+        "Pooled so far ("
+        + ", ".join(a["leagues"])
+        + "): Lean live rule passes "
+        + str(a["lean"]["verdict"]["live_rule"]["passes"])
+        + ", all odds "
+        + str(a["lean"]["verdict"]["all_odds"]["passes"])
+        + "; Model 12% "
+        + str(a["edge12"]["verdict"]["passes"])
+    )
+    brief = {k: v for k, v in rep.items() if k not in ("coverage",)}
+    print("DK_PRICE_BACKTEST_JSON " + json_dumps({"league": code, **brief}))
+    _write_backtest(out, args, dpb.NAME, "DraftKings-price backtest")
+
+
 def cmd_backtest_lean(args: argparse.Namespace) -> None:
     """Blend Lean replayed walk-forward on Pinnacle's early prices, per league
     (lean_backtest.py), plus the Champions League at DraftKings' bought close
@@ -3165,6 +3206,17 @@ def main(argv: list[str] | None = None) -> None:
     mb.add_argument("--json", help="path for the fits")
     mb.add_argument("--log-dir", help="data-log checkout: writes backtest/match_blends.json")
     mb.set_defaults(func=cmd_fit_match_blends)
+
+    dpk = sub.add_parser(
+        "backtest-dk-prices",
+        help="both live match rules at DraftKings' own historical prices, one league (no key)",
+    )
+    dpk.add_argument("--league", required=True, help="football-data code")
+    dpk.add_argument("--from-season", type=int, default=2019, help="as backtest-lean")
+    dpk.add_argument("--burn-in", type=int, default=2, help="as backtest-lean")
+    dpk.add_argument("--json", help="path for the results (read first, the league replaced)")
+    dpk.add_argument("--log-dir", help="data-log checkout (backtest/dk_price_backtest.json)")
+    dpk.set_defaults(func=cmd_backtest_dk_prices)
 
     lbk = sub.add_parser(
         "backtest-lean",

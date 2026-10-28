@@ -517,8 +517,9 @@ Pinnacle's early price, a sharper and different book.
   Matches are joined on football-data's names and kickoff day.
 - **Model.** The same walk-forward model chances the Pinnacle backtests use
   (`backtest.walk_forward`, xG weight 0.7 where Understat has xG, else goals only, from
-  2022-07-01 with 2 seasons of burn-in). This is the same `_early_preds` call. Seasons before
-  the model's first prediction have no candidates.
+  2019-07-01 with 2 seasons of burn-in). This is the same `_early_preds` call with the same
+  `--from-season` 2019 as `backtest-lean`. (The first version of this note said 2022-07-01,
+  which is the live fit's start, not the backtests'. It was corrected before any run.)
 - **Entry.** DraftKings' quoted decimal price at the 48 h look. The break-even is 1/decimal,
   margin kept, as live.
 - **Model 12%.** `trades.best_pick` on the raw model chance at 12% against that price, one
