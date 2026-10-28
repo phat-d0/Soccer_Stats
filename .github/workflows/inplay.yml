@@ -1,0 +1,79 @@
+# Half-time in-play snapshots (lead brief 2, item 2; owner-approved 28 Oct, about 580
+# credits a month; src/soccer_stats/inplay_log.py, docs/leagues.md "In-play snapshots").
+# closes.yml dispatches this at each kickoff cluster's first kickoff + 58 and + 78 minutes
+# (close_runs.INPLAY). The run reads data-log's DraftKings logs and in-play call record,
+# makes one live h2h call (ten books, 1 credit) per league with a kickoff in a snapshot
+# window that hasn't been snapshotted yet, and appends the prices, with ESPN's score
+# then, to data-log odds_log/<code>_inplay_<YYYY-MM>.jsonl. Nothing trades on it.
+# The key only on the default branch: a manual run elsewhere reads and prints, buys nothing.
+name: In-play snapshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # data-log
+
+# One at a time: the call record read by the next run must include this one's calls.
+concurrency:
+  group: inplay
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Read the kickoffs and the in-play call record (data-log)
+        run: |
+          mkdir -p "$RUNNER_TEMP/odds_log" "$RUNNER_TEMP/pending"
+          git fetch --depth=1 origin data-log || { echo "no data-log yet"; exit 0; }
+          this=$(date -u +%Y-%m)
+          prev=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E "^odds_log/([A-Z0-9]+|inplay_calls)_(${this}|${prev})\.jsonl$"); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/odds_log/$(basename "$f")"
+          done
+          ls "$RUNNER_TEMP/odds_log"
+
+      - name: Snapshot the matches in play
+        env:
+          ODDS_API_KEY: ${{ github.ref_name == github.event.repository.default_branch && secrets.ODDS_API_KEY || '' }}
+        run: |
+          uv sync --frozen
+          uv run soccer-stats log-inplay --log-dir "$RUNNER_TEMP/odds_log" --pending "$RUNNER_TEMP/pending"
+
+      # The new rows and calls are appended to the latest data-log on every try, so a push
+      # race never repeats a paid call.
+      - name: Save to data-log (default branch only)
+        if: github.ref_name == github.event.repository.default_branch
+        run: |
+          pending="$RUNNER_TEMP/pending"
+          if [ -z "$(ls -A "$pending")" ]; then echo "Nothing new to log."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4; do
+            git worktree remove --force ../log 2>/dev/null || rm -rf ../log
+            git worktree prune
+            git fetch --depth=1 origin data-log
+            git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
+            mkdir -p ../log/odds_log
+            for f in "$pending"/*.jsonl; do cat "$f" >> "../log/odds_log/$(basename "$f")"; done
+            git -C ../log add -A odds_log
+            git -C ../log commit -q -m "In-play snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+            if git -C ../log push origin data-log; then exit 0; fi
+            echo "data-log moved on; retrying from the latest ($attempt)"
+            sleep $((attempt * 5))
+          done
+          echo "::error::couldn't push the in-play rows to data-log"
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: inplay-pending-${{ github.run_id }}
+          path: ${{ runner.temp }}/pending
+          retention-days: 30

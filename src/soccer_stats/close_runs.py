@@ -45,6 +45,16 @@ assert LEAD_MINUTES + SPAN_MINUTES < CLOSE_MINUTES
 SETTLE_AFTER = pd.Timedelta(hours=2, minutes=15)
 SETTLE_MERGE = pd.Timedelta(minutes=20)
 
+# Half-time in-play snapshots (lead brief 2, 28 Oct; inplay_log.py): inplay.yml is
+# dispatched for each cluster at its first kickoff + INPLAY[kind] + INPLAY_SHIFT, so the
+# call (1-3 minutes after the dispatch) lands within about 8 minutes before and 6 after
+# the target for every kickoff of the cluster (it spans SPAN_MINUTES): well inside
+# inplay_log.WINDOWS. A planner that starts late still dispatches while INPLAY_LATE is left.
+INPLAY = {"inplay55": 55, "inplay75": 75}
+INPLAY_SHIFT = pd.Timedelta(minutes=3)
+INPLAY_LATE = pd.Timedelta(minutes=6)
+WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml"} | dict.fromkeys(INPLAY, "inplay.yml")
+
 
 def kickoffs(log_dir) -> list[pd.Timestamp]:
     """Every distinct kickoff in data-log's odds_log files (the DraftKings log lists each
@@ -97,6 +107,17 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS) -> dict:
         if any(at <= d["at"] <= at + SETTLE_MERGE for d in dispatch if d["kind"] == "close"):
             continue
         dispatch.append({"at": at, "kickoffs": covered, "kind": "settle"})
+    # In-play snapshots: kickoffs grouped as the close runs are, from every kickoff whose
+    # snapshot time falls in this window (a late planner still sends one INPLAY_LATE late).
+    for kind, minutes in INPLAY.items():
+        after = pd.Timedelta(minutes=minutes) + INPLAY_SHIFT
+        live = [k for k in ks if now - INPLAY_LATE <= k + after < end]
+        i = 0
+        while i < len(live):
+            first = live[i]
+            covered = [k for k in live[i:] if k <= first + span]
+            i += len(covered)
+            dispatch.append({"at": max(first + after, now), "kickoffs": covered, "kind": kind})
     dispatch.sort(key=lambda d: d["at"])
     later = [k for k in ks if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
     # A cluster whose settlement falls after this window hands over to the next planner too.
@@ -130,6 +151,7 @@ def to_json(p: dict) -> dict:
             {
                 **t(d["at"]),
                 "kind": d.get("kind", "close"),
+                "workflow": WORKFLOWS[d.get("kind", "close")],
                 "kickoffs": [k.isoformat(timespec="minutes") for k in d["kickoffs"]],
             }
             for d in p["dispatch"]
@@ -141,7 +163,14 @@ def describe(p: dict) -> str:
     lines = [f"Close runs planned from {p['now']:%Y-%m-%d %H:%M} to {p['horizon_end']:%H:%M} UTC:"]
     for d in p["dispatch"]:
         ks = ", ".join(f"{k:%H:%M}" for k in d["kickoffs"])
-        why = "settle kickoffs" if d.get("kind") == "settle" else "for kickoffs"
+        kind = d.get("kind", "close")
+        if kind in INPLAY:
+            lines.append(
+                f"  in-play snapshot at {d['at']:%Y-%m-%d %H:%M} UTC "
+                f"(+{INPLAY[kind]} min) for kickoffs {ks}"
+            )
+            continue
+        why = "settle kickoffs" if kind == "settle" else "for kickoffs"
         lines.append(f"  publish at {d['at']:%Y-%m-%d %H:%M} UTC {why} {ks}")
     if not p["dispatch"]:
         lines.append("  none (no kickoff in this window)")

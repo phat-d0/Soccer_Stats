@@ -496,6 +496,46 @@ The run prints each season's events and how many DraftKings and Pinnacle priced,
 `BACKFILL_ODDS_JSON` line. No backtest runs in it, so `E0_dk.json` stays as it is. The
 backtests at DraftKings' prices are re-run afterwards, and what changed is recorded here.
 
+## In-play snapshots (28 Oct, lead brief 2; owner-approved, about 580 credits a month)
+
+A dataset collected from now on for the in-play questions: comebacks, cash-out, and heavy
+favourites trailing at half-time. We buy no history for it. Twice a match, one live h2h call
+per league records every match in play at ten books, with ESPN's score and clock at that moment.
+Nothing trades on it.
+
+- **When.** `closes.yml` already plans the close and settlement runs. It now also dispatches
+  `inplay.yml` for each kickoff cluster:
+  - at the cluster's first kickoff + 58 min (`inplay55`, half-time);
+  - at the first kickoff + 78 min (`inplay75`).
+
+  These come from `close_runs.INPLAY` with a 3-minute shift. A cluster spans up to 12 minutes, so
+  each call lands 8 minutes before to 6 minutes after the target for every kickoff in it. That is
+  inside the run's own windows (`inplay_log.WINDOWS`: 45–65 and 65–90 minutes after kickoff, no
+  overlap).
+- **What the run does** (`inplay_log.run`, CLI `log-inplay`):
+  - It reads data-log's DraftKings logs (kickoffs) and the in-play call record.
+  - For each league with a kickoff in a window that the call record doesn't hold yet, it makes a
+    free events call first, which shows whether anything has started and gives the balance.
+  - Then it makes one live `/odds` call: h2h at the same ten books as the pre-match call, one
+    region, 1 credit.
+  - The cost is read from `x-requests-last`. The call keeps the shared 3,000 reserve and stays
+    under a monthly guard of 2,000 credits (`MONTHLY_CAP`, against a runaway loop).
+- **What is logged** (data-log, permanent):
+  - `odds_log/<code>_inplay_<YYYY-MM>.jsonl` has one row per started match and book: league,
+    home and away (football-data names), kickoff, kind (the nearest), `minutes_since_kickoff`,
+    `checked_at`, book, prices, margin, `last_update`, `age_min`, and ESPN's `espn_score`,
+    `espn_clock`, `espn_state` and `espn_goals`. Every match in play goes in, not only the due
+    ones.
+  - `odds_log/inplay_calls_<YYYY-MM>.jsonl` has one row per call: league, kinds, kickoffs
+    covered, `fetched_at`, status, cost, `credits_left`, events, rows.
+  - The record is read before every call, so a (league, kind, kickoff) is never snapshotted twice.
+  - The run writes to a pending folder and appends to the newest data-log on each push attempt,
+    so a push race never repeats a paid call. On a final failure the rows go to a 30-day artifact.
+- **Cost.** One credit per league per cluster per kind. The lead's estimate is about 580 a month
+  across the nine live leagues.
+- **Only the default branch** gets the key and writes to data-log. A run anywhere else reads and
+  prints, and buys nothing.
+
 ## Champions League live (13 Oct, owner)
 
 Owner's decision (13 Oct): switch the Champions League on, with both match paper
