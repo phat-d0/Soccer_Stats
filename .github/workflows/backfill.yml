@@ -24,10 +24,10 @@
 # 3.00 or shorter) on Pinnacle's early prices, plus a descriptive E0 DraftKings check
 # (pre-registered in docs/lab.md, owner 19 Oct). No key, no credits, never pushes;
 # log + 7-day artifact.
-# dk_price_backtest (+ league): Blend Lean and Model 12% at DraftKings' own historical prices
-# (the books=ten bodies in the paid odds-history cache), CLV against Pinnacle's close in the
-# same snapshot; no key, no credits; adds the league to backtest/dk_price_backtest.json on
-# data-log from the default branch only.
+# dk_price_backtest: Blend Lean and Model 12% at DraftKings' own historical prices (the
+# books=ten bodies in the paid odds-history cache, every league bought so far), CLV against
+# Pinnacle's close in the same snapshot; no key, no credits; writes backtest/lean_backtest_dk.json
+# and edge12_backtest_dk.json on data-log from the default branch only (the app reads them).
 # dnb_backtest: draw no bet beside the 1X2 rules on Pinnacle's early prices (owner, 24 Oct;
 # pre-registered in docs/lab.md "Draw no bet"). No key, no credits; pushes
 # backtest/dnb_backtest.json to data-log only from the default branch.
@@ -80,7 +80,7 @@ on:
         type: boolean
         default: false
       dk_price_backtest:
-        description: "Both live match rules at DraftKings' own historical prices for `league` (no key; the cached ten-book bodies; saved to data-log from the default branch only)"
+        description: "Both live match rules at DraftKings' own historical prices, every league bought so far (no key; saved to data-log from the default branch only)"
         type: boolean
         default: false
       lean_backtest:
@@ -398,9 +398,10 @@ jobs:
           restore-keys: cup-espn-
 
       # DraftKings-price backtest (lead, 28 Oct; docs/leagues.md "Backtests at DraftKings'
-      # prices: method"): both live rules for `league` on the cached ten-book history.
-      # No key, no credits; adds or replaces the league's entry in data-log's
-      # backtest/dk_price_backtest.json (default branch only).
+      # prices: method"): both live rules on the cached ten-book history of every league
+      # bought so far. No key, no credits; writes data-log's backtest/lean_backtest_dk.json
+      # and edge12_backtest_dk.json (the Pinnacle files' shape, for the app; default branch
+      # only).
       - uses: actions/cache/restore@v4
         if: ${{ inputs.dk_price_backtest }}
         with:
@@ -421,11 +422,7 @@ jobs:
         run: |
           uv sync --frozen
           mkdir -p out
-          git fetch --depth=1 origin data-log
-          git show FETCH_HEAD:backtest/dk_price_backtest.json > out/dk_price_backtest.json 2>/dev/null ||
-            rm -f out/dk_price_backtest.json
-          uv run soccer-stats backtest-dk-prices --league "${{ inputs.league }}" \
-            --json out/dk_price_backtest.json
+          uv run soccer-stats backtest-dk-prices --json out/lean_backtest_dk.json
           if [ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]; then
             echo "Not the default branch: printed only, nothing pushed to data-log."
             exit 0
@@ -438,10 +435,10 @@ jobs:
             git fetch --depth=1 origin data-log
             git worktree add --detach ../log FETCH_HEAD && git -C ../log switch -C data-log
             mkdir -p ../log/backtest
-            cp out/dk_price_backtest.json ../log/backtest/dk_price_backtest.json
-            git -C ../log add backtest/dk_price_backtest.json
+            cp out/lean_backtest_dk.json out/edge12_backtest_dk.json ../log/backtest/
+            git -C ../log add backtest/lean_backtest_dk.json backtest/edge12_backtest_dk.json
             if git -C ../log diff --cached --quiet; then exit 0; fi
-            git -C ../log commit -q -m "DraftKings-price backtest: ${{ inputs.league }}"
+            git -C ../log commit -q -m "Backtests at DraftKings' prices"
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
@@ -450,7 +447,7 @@ jobs:
         if: ${{ inputs.dk_price_backtest && always() }}
         with:
           name: dk-price-backtest
-          path: out/dk_price_backtest.json
+          path: out/*_dk.json
           retention-days: 7
           if-no-files-found: ignore
 

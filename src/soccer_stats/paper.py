@@ -48,6 +48,13 @@ from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
 
 LEAN_BACKTEST = "lean_backtest.json"  # on data-log under backtest/ (soccer-stats backtest-lean)
 EDGE12_BACKTEST = "edge12_backtest.json"  # on data-log under backtest/ (backtest-edge12)
+# The same two rules at DraftKings' own historical prices (backtest-dk-prices, 28 Oct).
+LEAN_BACKTEST_DK = "lean_backtest_dk.json"
+EDGE12_BACKTEST_DK = "edge12_backtest_dk.json"
+DK_MISSING_NOTE = (
+    "The backtest at DraftKings' own prices hasn't been run yet: it fills in league by "
+    "league as the bought DraftKings history lands."
+)
 FRESH_HOURS = 3.0  # only open on odds fetched this recently
 VOID_MOVED_HOURS = 48.0
 VOID_AFTER_DAYS = 14
@@ -1756,6 +1763,11 @@ def _safe_shadow_section(real, shadow, rule, now) -> dict:
         }
 
 
+def _dk_section(sec: dict) -> dict:
+    """A DraftKings-price backtest's app section; its own note when the file is missing."""
+    return sec if sec.get("available") else {**sec, "note": DK_MISSING_NOTE}
+
+
 def portfolios_section(
     live: dict,
     live_trades: list[dict],
@@ -2114,6 +2126,13 @@ def run(
     portfolio["strategy_backtests"] = {
         "lean": lb.app_section(_read_json(bdir / LEAN_BACKTEST) if bdir else None),
         "edge12": e12b.app_section(_read_json(bdir / EDGE12_BACKTEST) if bdir else None),
+        # The same rules at DraftKings' own historical prices, in the same shape.
+        "lean_dk": _dk_section(
+            lb.app_section(_read_json(bdir / LEAN_BACKTEST_DK) if bdir else None)
+        ),
+        "edge12_dk": _dk_section(
+            e12b.app_section(_read_json(bdir / EDGE12_BACKTEST_DK) if bdir else None)
+        ),
     }
     try:  # each model's equation and fitted numbers per league (from data.json only)
         portfolio["models"] = eq.section(data)
