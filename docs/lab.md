@@ -2337,7 +2337,11 @@ and D1 but priced for SP1 and I1. These probes settle where each league's archiv
 - **Spend:** 28 paid snapshots, **280 credits**. Balance 4,938,756 → 4,938,476 on the
   upgraded plan; the owner lifted the 200 cap the same day. Two snapshots came back empty and
   cost 0.
-- The bodies are in the cache `archive-probe-40640666882`.
+- The bodies are in the cache `archive-probe-40640666882`. That run was on a work branch,
+  so its cache can't be archived. The same 28 probes were bought again from the default
+  branch (run 40644746190, 280 credits, balance 4,937,476 → 4,937,196) into
+  `archive-probe-40644746190`, which is archived. Every probe came back identical: the same
+  snapshot times, events, books and verdicts.
 
 | League | Season (slot) | Priced? | Started events | Books quoting in play, fresh |
 | --- | --- | --- | --- | --- |
@@ -2357,7 +2361,7 @@ and D1 but priced for SP1 and I1. These probes settle where each league's archiv
 | SC0 | 2021/22 (16 Oct 2021) | no | 5 | none |
 | B1 | 2022/23 (23 Apr 2023) | **yes** | 7 | all ten, Betfair included |
 | B1 | 2021/22 (10 Apr 2022) | no | 7 | none |
-| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, FanDuel… (one started match) |
+| T1 | 2022/23 (5 Mar 2023) | **yes** | 1 | DraftKings, Bovada, Paddy Power, Unibet, Pinnacle (one started match) |
 | T1 | 2021/22 (23 Jan 2022) | no | 3 | Pinnacle, Paddy Power, Bovada |
 | G1 | 2022/23 (12 Mar 2023) | **yes** | 7 | DraftKings, FanDuel, BetMGM, Bovada, Paddy Power, Unibet, Pinnacle |
 | G1 | 2021/22 (6 Mar 2022) | no: no snapshot (empty, 0 credits) | 0 | none |
@@ -2462,6 +2466,31 @@ DraftKings' in-play price implies, enough to make a profit backing it.
 - The purchase still buys the only fresh prices that exist for these league-seasons. Pooling
   them later with a separately pre-registered cup or extra-league sample would need its own
   rule, written before that sample's prices are seen.
+
+### Design H amendment: buy now, judge with H2 (lead sign-off, 28 Oct; committed before any H snapshot is bought)
+
+The lead signed off design H (commit ee40368, 103 slots, cap 1,236) on 28 Oct, with one
+amendment, because H alone is expected to give only about 83 usable bets. This changes only
+when and how H is judged. The sample, the purchase, the guard and the quote checks above stay
+as frozen.
+
+- **Buy H now.** The snapshots go into the `comeback-odds-*` cache, which is in
+  `cache_archive.PAID`, so they are archived for good.
+- **H's outcomes stay unread.** No `comebacks2 --slots H` run, and nothing that joins H's
+  prices to results, until one of these comes first:
+  - a second sample, **H2** (the cups and the extra leagues), has its own frozen
+    pre-registration and slot list committed; or
+  - **30 Nov 2026**.
+  Only the fetch's own counts may be read before then: calls, credits, the guard and how many
+  snapshots are priced. None of these reads a result.
+- **If H2 is frozen in time: judged sample = H ∪ H2**, under one pass rule written in H2's
+  pre-registration:
+  - at least **136** usable DraftKings bets **and** the ROI range entirely above 0;
+  - the caveat stated up front that cups and minor leagues may behave differently from the
+    leagues above.
+- **If H2 is not frozen by 30 Nov 2026:** H is judged alone under its rule above (≥100 usable
+  bets and the ROI range above 0). The most likely verdict is then "inconclusive".
+- **Why:** this stops H's result from steering which cups or leagues go into H2.
 
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
@@ -2660,3 +2689,136 @@ bets, adjusted p < 0.05). The holdout stays locked and unread. Nothing goes live
 - So there is nothing to test on the locked seasons, and we didn't open them. They stay
   clean for any future idea.
 - App file: `lab/strategy_search_research.json` (the best arm's bets for the curve).
+## Cash-out test: heavy underdogs at every score state (owner via the lead, 28 Oct; approved up to 151,000 credits; pre-registration frozen with its slot file on 2026-10-28, before any purchase)
+
+**Up front (frozen 2026-10-28).**
+- **Sample:** 2024/25 onward in every league the archive prices in play (the owner's
+  choice): 54 league-seasons, 7,673 kickoff slots, **11,864 matches**, **6,402 with the
+  underdog at 4.0+** (the primary band).
+- **Cost:** 15,288 snapshots, 197 already held from B, C and H. **Estimate 150,910
+  credits; purchase cap 151,000** (the owner's ceiling; a call never costs more than 10, so
+  the estimate is an upper bound).
+- **Slot file:** `src/soccer_stats/lab/cashout_slots.json`, SHA-256
+  `2c5738d80db79cf39093746881bfe1a71d944f3adb30671bcba97f3a213ad1c8` (4,477,397 bytes),
+  built by `odds-check.yml` `task=cashout-plan` run 40646353530 and rebuilt byte for byte
+  from that run's log.
+- **Expected qualifying decisions** (stated before buying, from half-time scores only, never
+  results): about **700** at 4.0+. The working:
+  - 4.0+ underdogs lead at half-time about 16.5% of the time;
+  - about 60% of those reach a 50% in-play chance;
+  - about 1.4 times as many decisions come in by the 70th minute;
+  - about 81% have a usable quote (C's rate).
+  That is well above the 300 minimum, unless the guard blocks whole league-seasons.
+- **Pass rule (the one primary, unchanged below):** at the 5% margin, T = 0.50, stake 2%,
+  the growth difference (cash-out − hold) has its 95% range above 0 on at least 300
+  qualifying decisions.
+
+**The owner's question.** "Cash out when the heavy underdog is breaking even (50-50 odds from a
+steep underdog) or even winning; the trade-off risk is what we have to find." The free check
+above answered it only for underdogs already leading at half-time, on design C's spent data.
+This test buys a clean sample covering every score state and two moments.
+
+**Hypothesis.** Cashing out a heavy-underdog bet once its in-play chance reaches 50%, at a
+realistic 5% cash-out margin, raises long-run bankroll growth compared with holding to the
+end.
+
+**What we expect, stated before buying.**
+- A fair in-play price makes cashing out a martingale, so it leaves the average return where
+  it was.
+- At a 5% margin the cash-out costs about 5% of the position's value each time. At small
+  stakes, growth tracks the average return, so the expected verdict is **fail**.
+- Cashing out can only win if the in-play price undervalues the leading underdog (the
+  under-40% hint above) by more than the margin, or if stakes are large enough that cutting
+  the spread outweighs the fee.
+
+**Sample (frozen in `src/soccer_stats/lab/cashout_slots.json`; built by `lab/cashout_plan.py`,
+`odds-check.yml` `task=cashout-plan`).**
+- **Matches:** every played match whose underdog is quoted at least 3.0 at the pre-match close.
+  - The price is Pinnacle's close, else the market average's close (`price` marks which).
+  - **Primary band: 4.0 and up.** 3.0–4.0 is reported beside it.
+  - Only kickoff times and closing prices are read: no half-time or full-time score.
+- **League-seasons:** 2024/25, 2025/26 and 2026/27 to date (football-data's files of
+  28 Oct) in all 18 leagues the archive prices in play: E0, F1, D1, E1, E2, E3, SP1, I1,
+  D2, SP2, N1, P1, SC0, B1, T1, G1, I2 and F2. Earlier priced seasons (back to 2020/21 in
+  SP1) are left out by the owner's choice of budget.
+- **Excluded:**
+  - every match bought by design B or C (spent);
+  - every design H match. H's outcomes stay unread until H is judged, so they can't enter
+    another test first.
+  - The sample holds no cup and none of `heavy_more`'s extra leagues (AUT to ARG), so it
+    never touches design H2's candidates either.
+- **Budget:** at 151,000 nothing in 2024/25 onward is dropped (the frozen file's `dropped`
+  is empty). The first approval was 50,000; at that size the trim would have left about
+  2,200 primary matches and about 240 decisions, likely inconclusive, so the owner raised
+  it.
+
+**Purchase.**
+- `comeback_fetch --slots X` (`odds-check.yml` `task=comeback-fetch`, `design=X`), run **from
+  the default branch only**, so the bodies land in `comeback-odds-*` (in `cache_archive.PAID`).
+- One historical bulk h2h snapshot per league kickoff slot at **kickoff + 55 min** (half-time)
+  and **kickoff + 85 min** (about the 70th minute), whatever the score. Each snapshot is shared
+  by every match in its slot, at the ten books (one region, 10 credits).
+- A snapshot already held for B, C or H (same sport and time) is reused, never bought again.
+- C's spending rules:
+  - `CappedBudget` with the 3,000 reserve;
+  - the first call budgeted at 20;
+  - stop on a call over 10 credits or on any HTTP or network error;
+  - a dry run first;
+  - **cap 151,000** (the estimate is 150,910). A call never costs more than 10, so the
+    estimate is an upper bound;
+  - each run stops cleanly after 120 minutes and the next resumes (`--minutes`); a held
+    snapshot is never bought again, so about two runs are needed.
+- **Guard:** C's, per league-season. If its first 3 snapshots show no started event freshly
+  priced by DraftKings or Betfair, no more of it is bought and its matches count as **not
+  priced**.
+
+**Position and rules (per $1, in kickoff order).**
+- **Entry:** $1 on the underdog at its quoted pre-match close (Pinnacle's, else the average's).
+  Descriptive: the same at DraftKings' early price where Moneyline's historical file has it.
+- **In-play chance q** at each snapshot: DraftKings' h2h, Shin-fair. The quote must pass C's
+  checks:
+  - inside a 48–62 minute window at half-time, 78–92 at the 70th;
+  - updated after kickoff and at most 5 minutes old.
+  No passing quote at a moment = no cash-out offered then (the bet holds).
+- **Hold:** the actual result (entry odds − 1, or −1).
+- **Cash-out rule T at margin m:**
+  - at half-time, if q ≥ T, cash out for entry odds × q × (1 − m);
+  - otherwise at the 70th minute, if q ≥ T, the same;
+  - otherwise hold.
+  - T ∈ {**0.50** primary, 0.40, 0.60}; m ∈ {0, **0.05** primary, 0.10}.
+- **Partial cash-out to the Kelly stake (secondary, half-time only):**
+  - keep the share of the position that quarter Kelly supports at DraftKings' live price,
+    on the phase-1 model's in-play chance (Pinnacle's 1X2 and over/under 2.5 close, the
+    half-time score, 45 minutes left);
+  - cash out the rest at margin m.
+  - Half-time only, because football-data has no 70th-minute score.
+
+**Measures (each with a match-resampled 95% range, 2,000 draws, seed 0).**
+- Per $1: mean profit, sd, and hold − rule.
+- The worst peak-to-trough drawdown of a bankroll staking a fixed 1%, 2% or 5% of itself on
+  each bet in kickoff order.
+- **Long-run growth:** the mean of log(1 + s × profit per $1) per bet, at stake s of 1%, 2%
+  and 5%, for hold and for each rule, and the difference (rule − hold).
+- Calibration of q: won vs implied, by band of q (<40%, 40–55%, 55%+) and by moment.
+- Per league, per season and per moment (descriptive).
+
+**Pass rule (one primary).**
+- **Pass:** at the 5% margin, rule T = 0.50, stake 2%, the growth difference (cash-out −
+  hold) has its 95% range entirely above 0, on **at least 300 qualifying cash-out
+  decisions** in the primary band (4.0+). A qualifying decision is a bet the rule cashed out
+  on a passing quote.
+- **Fail:** at least 300 decisions and the range includes 0 or sits below it. Below 0 reads
+  "cashing out lowers growth".
+- **Inconclusive:** under 300 decisions.
+- Every other cell (T, m, stake, band, Kelly partial) is descriptive.
+- A pass only justifies proposing a live paper cash-out track to the owner. Nothing changes
+  live in any case.
+
+**Holdout note.** The sample's 2024/25 and later seasons sit inside the strategy search's
+locked holdout (football-data 2024/25 onward). This test reads their in-play prices and
+results for the cash-out question only. The strategy search's exit arms use the comeback
+sample from before 2024/25, so that holdout stays unread for pre-match strategies.
+
+**App file.** The finished test ships `lab/cashout_research.json`, pass or fail, in the same
+shape as `lab/comeback_research.json` (title, question, rule, verdict, verdict_text, cost,
+runs, preregistered, designs with by-band tables, a bets list for the curve, notes).
