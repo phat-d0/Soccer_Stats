@@ -8,3 +8,4 @@
 {"league":"EFLC","kinds":["inplay55"],"kickoffs":["2026-10-28T20:00:00+00:00"],"fetched_at":"2026-10-28T21:03:16+00:00","status":200,"cost":1,"credits_left":4477243,"events":6,"rows":25}
 {"league":"SC0","kinds":["inplay55","inplay75"],"kickoffs":["2026-10-28T19:44:00+00:00","2026-10-28T19:45:00+00:00","2026-10-28T19:46:00+00:00","2026-10-28T20:02:00+00:00"],"fetched_at":"2026-10-28T21:03:16+00:00","status":200,"cost":1,"credits_left":4477242,"events":9,"rows":36}
 {"league":"I1","kinds":["inplay75"],"kickoffs":["2026-10-28T19:45:00+00:00"],"fetched_at":"2026-10-28T21:03:16+00:00","status":200,"cost":1,"credits_left":4477241,"events":14,"rows":16}
+{"league":"BRA","kinds":["inplay55"],"kickoffs":["2026-10-28T22:30:00+00:00"],"fetched_at":"2026-10-28T23:28:17+00:00","status":200,"cost":1,"credits_left":4411569,"events":20,"rows":18}
