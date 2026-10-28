@@ -198,7 +198,7 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
             deficit = (
                 int(m["ht"][1] - m["ht"][0]) if side == "home" else int(m["ht"][0] - m["ht"][1])
             )
-            model = cb.in_play(*means, deficit, SECOND_HALF)[0] if means else None
+            model, model_draw = cb.in_play(*means, deficit, SECOND_HALF) if means else (None, None)
             rows.append(
                 {
                     "league": s["league"],
@@ -216,6 +216,12 @@ def match_rows(slots: list[dict], cache_dir: Path, fd: pd.DataFrame) -> tuple[li
                     "fair": fair,
                     "fair_from": "pinnacle" if pin["fail"] is None else "betfair" if bf else None,
                     "model": model,
+                    "model_draw": model_draw,
+                    # For the cash-out study: the 90-minute score, Pinnacle's pre-match close
+                    # (home, draw, away) and DraftKings' passing in-play prices.
+                    "ft": [int(r["fthg"]), int(r["ftag"])],
+                    "close": [float(r["ph"]), float(r["pd"]), float(r["pa"])],
+                    "dk_prices": dict(dk["q"]["prices"]) if dk["fail"] is None else None,
                 }
             )
     counts["fails_by_book"] = fails

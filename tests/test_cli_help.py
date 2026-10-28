@@ -25,6 +25,7 @@ MODULES = [
     "soccer_stats.lab.comebacks2",
     "soccer_stats.lab.comeback_research",
     "soccer_stats.lab.heavy_favourites",
+    "soccer_stats.lab.cashout",
     "soccer_stats.lab.timelines",
 ]
 
