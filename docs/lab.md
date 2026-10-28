@@ -2720,8 +2720,27 @@ a **separate sample**: never pooled with H ∪ H2, and never used to change H's 
 - **Data:**
   - the in-play log (`odds_log/<code>_inplay_<YYYY-MM>.jsonl` on data-log, ESPN's score per
     row), and the pre-match every-book log for the favourite's price;
-  - Moneyline will name the new competitions' files when they land. A commit adds them here
-    **before** any outcome is read.
+  - The new competitions' files (Moneyline, #153, merged 28 Oct; added here before any
+    outcome is read):
+    - **Competitions:** 34 in all, registered in `soccer_stats/inplay_events.py`
+      (`COMPETITIONS`).
+      - The domestic cups FAC, EFLC, CDR, DFBP, CI and CDF.
+      - UEL and UECL (UCL as before).
+      - Football-data's extras N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2.
+      - `heavy_more`'s sixteen: AUT, SWZ, DNK, NOR, SWE, POL, ROU, FIN, IRL, RUS, JPN, CHN,
+        USA, MEX, BRA and ARG.
+    - **`odds_log/<code>_inplay_<YYYY-MM>.jsonl`:** one row per started match and book, with
+      the kind (inplay55/inplay75), `minutes_since_kickoff`, prices, `last_update`, `age_min`
+      and ESPN's score, clock, state and goals.
+      - The names are the Odds API feed's own; the analysis maps them by
+        `prematch_coverage.same_team` and the kickoff.
+      - The ESPN fields can be null. A row without ESPN's half-time score has no half-time
+        state, so it is left out and counted.
+    - **`odds_log/<code>_events_<YYYY-MM>.jsonl`:** the kickoffs from the free events list.
+    - **`odds_log/inplay_calls_<YYYY-MM>.jsonl` and `inplay_events_calls_<YYYY-MM>.jsonl`:** the
+      call records.
+      - A league-kind pauses for 7 days after 6 empty calls. Its matches are simply not in the
+        sample, and the pauses are counted.
 - **Favourite:**
   - the side whose Shin-fair chance is at least **0.75**, from Pinnacle's last pre-kickoff
     h2h quote in the logs;
