@@ -2546,6 +2546,39 @@ in H2's own pre-registration.
   - Conference League: 148 slots, 1,480 credits.
   - Total 4,190 credits.
 
+### H2P purchase (28 Oct, run 40744814233, default branch)
+
+- The dry run (40744003669) said 911 to buy, none held, about 9,110 credits. The paid run then
+  bought all **911 snapshots** (cap 9,110), with no stop and no error. The bodies are in the paid
+  cache `comeback-odds-40744814233`, and the run dispatched the archive.
+- **Spend:** the calls' own cost headers add up to **3,590 credits**. The balance fell **9,051**
+  (4,608,231 → 4,599,180) over the same 4½ minutes. The key is shared (live publish, in-play
+  snapshots, other teams' backfills, the baseball app), so the extra 5,461 is most likely other
+  spending at the same time. Between two of this run's calls the balance often fell by 20–40
+  while the call itself cost 10.
+- A later free run of `heavy_more` (40744037363) rebuilt `h2_cup_prematch_slots.json` with the
+  same SHA-256 (97976174…).
+
+### Design H2U: the UEFA cups' pre-match prices (purchase plan, 28 Oct; committed before any H2U snapshot is bought)
+
+- **Why:** the same as H2P, for the Champions League, Europa League and Conference League. The
+  lead approved 4,190 credits on the condition that it is frozen first, like H2P.
+- **Slot file:** `src/soccer_stats/lab/h2_uefa_prematch_slots.json`, SHA-256
+  `ce759ff64a537c1443eaff3cba266ef488c3ff86078025772e28d1d4a30812e9` (223,062 bytes). It was
+  built by `lab/heavy_more.py --uefa-out` (`odds-check.yml` `task=heavy-more`, run 40744037363,
+  0 failures, not out of time) and rebuilt byte for byte from that run's log.
+- **Sample:** 2021/22 to 2026/27 to date. One snapshot per kickoff slot holding a match not level
+  at half-time, at kickoff − 5 min, ten books, 10 credits. **419 snapshots covering 1,238
+  matches:** Europa League 149, Conference League 148, Champions League 122.
+- **Champions League 2024/25 and 2025/26 are left out.** Their closes are already held
+  (`cup_odds`; data-log `odds_history/UCL_closes.jsonl` and `UCL_close_calls.jsonl`: 118
+  snapshots, 384 matches, Pinnacle priced on 372). H2 reads them from there.
+- **Cost and cap: 4,190 credits**, the amount the lead approved.
+- **Purchase:** `comeback_fetch --slots H2U` (`design=H2U`), from the default branch only, into
+  the paid cache `comeback-odds-*`, after this file is merged. It follows H2P's rules: a dry run
+  first, the 3,000 reserve, the first call budgeted at 20, a stop on a call over 10 or any
+  error, resumable 120-minute runs, and no guard. It reads no result.
+
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
 **The owner's ask.** "Study the data we already have to find a strategy (position sizing,

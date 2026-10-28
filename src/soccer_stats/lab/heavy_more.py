@@ -76,6 +76,10 @@ EXTRA = {
     "ARG": ("Argentina", "arg.1", "soccer_argentina_primera_division"),
 }
 DOMESTIC = ("FAC", "EFLC", "CDR", "DFBP", "CI", "CDF")  # the approved pre-match purchase
+UEFA = ("UCL", "UEL", "UECL")
+# Champions League closes already bought (cup_odds; data-log odds_history/UCL_closes.jsonl):
+# reused for H2, never bought again.
+HELD_UCL = {("UCL", "2024/25"), ("UCL", "2025/26")}
 AMERICAS = ("USA", "MEX", "BRA", "ARG")  # evening kickoffs fall on the next UTC day
 EXTRA_FROM = pd.Timestamp("2022-07-01")  # the in-play archive is priced from 2022/23
 EARLIER = {"SP1": (2020, 2021), "I1": (2021,), "D2": (2021,), "SP2": (2021,)}
@@ -285,7 +289,7 @@ def cup_season(code: str, year: int, raw_dir: Path, get: Callable, stats: dict,
     }
 
 
-def cup_prematch_slots(res: dict, held: set | None = None) -> dict:
+def cup_prematch_slots(res: dict, held: set | None = None, design: str = "H2P") -> dict:
     """design H2P: one pre-match snapshot per cup kickoff slot at the close (kickoff - 5
     min, `cup_odds.request_time`), to find which cup favourites were priced 75%+. Seasons in
     `held` ((cup, season) already bought, e.g. the Champions League closes) are left out."""
@@ -313,7 +317,7 @@ def cup_prematch_slots(res: dict, held: set | None = None) -> dict:
             seen.add((s["sport"], s["request_at"]))
             buy.append(s)
     return {
-        "design": "H2P",
+        "design": design,
         "guard": False,  # a pre-match snapshot has no started events, by design
         "rule": "one pre-match snapshot per cup kickoff slot with a match not level at "
         "half-time, at kickoff - 5 min; prices only, no score kept",
@@ -545,6 +549,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--json", default="")
     p.add_argument("--prematch-out", default="",
                    help="write design H2P (the domestic cups' pre-match slots) here")  # fmt: skip
+    p.add_argument("--uefa-out", default="",
+                   help="write design H2U (the UEFA cups' pre-match slots, held UCL closes "
+                        "left out) here")  # fmt: skip
     args = p.parse_args(argv)
     res = run(seconds=args.minutes * 60)
     tot = totals(res)
@@ -562,6 +569,16 @@ def main(argv: list[str] | None = None) -> None:
             f"CUP_PREMATCH_SHA256 {hashlib.sha256(text.encode()).hexdigest()} ({len(text)} bytes)"
         )
         print("CUP_PREMATCH_JSON " + text)
+    if args.uefa_out:
+        uefa = {"cups": [r for r in res.get("cups", []) if r.get("cup") in UEFA]}
+        plan = cup_prematch_slots(uefa, held=HELD_UCL, design="H2U")
+        text = json.dumps(plan, separators=(",", ":"))
+        Path(args.uefa_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.uefa_out).write_text(text)
+        print(
+            f"UEFA_PREMATCH_SHA256 {hashlib.sha256(text.encode()).hexdigest()} ({len(text)} bytes)"
+        )
+        print("UEFA_PREMATCH_JSON " + text)
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.json).write_text(json.dumps({**res, "totals": tot}, indent=1, default=str))
