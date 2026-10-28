@@ -825,7 +825,9 @@ the owner's baseball app, so the balance can drop without any run here.
   3,000 reserve, first call budgeted at `FIRST_ESTIMATE` 20, stop if a call costs more than
   `MAX_CALL_COST` 10 or on any HTTP/network error; bodies and `calls.jsonl` in
   `data/raw/comeback_odds` (cache `comeback-odds-*`, saved even on failure, plus the artifact);
-  a slot with a cached body or an answered call is never bought again; reads no outcomes.
+  a slot with a cached body or an answered call is never bought again; reads no outcomes. A sport
+  key missing from the free sports list (`known_sports`) is never asked: its league-season is
+  blocked in `guard.json` and counts as not priced (28 Oct, H2's ROU).
   `lab/comebacks2.py` (`task=comebacks2`, no key): the frozen analysis (quote check,
   `PIN_TOL` 0.05, DraftKings ROI pass rule at ≥ `MIN_MATCHES` 100, Betfair after 2%, implied
   gap, blend weight c). Log lines `COMEBACK_FETCH_JSON`, `COMEBACKS2_JSON`.
@@ -896,6 +898,14 @@ the owner's baseball app, so the balance can drop without any run here.
   `team/research`), log lines `H2_SLOTS_SHA256`, `H2_SLOTS_JSON`. The frozen file is
   `lab/comeback_h2_slots.json` (70 slots, 700 credits, SHA aeadf289…, run 40755843673), bought
   by `comeback_fetch --slots H2` (cap 1,000) from the default branch after the plan merges.
+- `lab/heavy_analysis.py` (lead, 28 Oct; no key): the 75%+ favourites' judged analysis, H ∪ H2
+  (`docs/lab.md` "Design H2"). H's rows from `comebacks2.match_rows`; H2's (`h2_rows`) through the
+  same quote checks (`quote_fields`), events by `prematch_coverage.find_side`, results from
+  ESPN's 90-minute score (`espn_results`, cups) or football-data's extra file (`extra_result`).
+  `verdict`: ≥ `MIN_BETS` 136 usable and the ROI range above 0, else fail, or "inconclusive" under
+  136. `designs` pooled (judged), H, H2, cups, leagues; `app_file` → `lab/heavy_favourites_research.json`
+  (`RUNS`, `COST`). `odds-check.yml` `task=heavy-analysis` (run it once, on `team/research`),
+  log lines `HEAVY_ANALYSIS_JSON`, `HEAVY_RESEARCH_SHA256`, `HEAVY_RESEARCH_JSON`.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
   `publish.RESEARCH_STUDIES`): one committed JSON per study, `lab/<id>_research.json`, in
   `comeback_research.json`'s shape. Every field is optional except `verdict`: `name` (the row's

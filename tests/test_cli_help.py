@@ -32,6 +32,7 @@ MODULES = [
     "soccer_stats.lab.cashout_check",
     "soccer_stats.lab.prematch_coverage",
     "soccer_stats.lab.h2_slots",
+    "soccer_stats.lab.heavy_analysis",
     "soccer_stats.lab.archive_probe",
     "soccer_stats.lab.heavy_more",
     "soccer_stats.lab.strategy_search",

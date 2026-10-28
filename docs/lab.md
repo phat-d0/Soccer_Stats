@@ -2705,6 +2705,34 @@ backing it.
   this rule. The forward live sample (design HF below) is the separate, pre-registered way to
   get more data.
 
+### H2 purchase, first run, and an amendment to its spending rule (28 Oct; no result read)
+
+- **Dry run** (40760576305): 70 slots, 1 held, 69 to buy.
+  - The held slot is a snapshot H2P had already bought at the same time: soccer_fa_cup at
+    2024-12-01 12:55Z. One historical snapshot holds every FA Cup event at that moment,
+    pre-match and in play, so it serves both.
+- **First paid run** (40761027899, cap 1,000): it bought 3 snapshots (30 credits; balance
+  4,514,964 → 4,514,924), then **stopped on Romania** (`soccer_romania_liga_1`). The API answered
+  HTTP 404 "Unknown sport" at 0 credits.
+  - The key came from `heavy_more.EXTRA`, which was never checked against the sports list.
+  - Moneyline's `inplay_events` registry uses the same key.
+- **Amendment** (before any other H2 snapshot is bought; it changes no sample and no rule).
+  `comeback_fetch` now reads the free `/v4/sports?all=true` list first. A slot whose sport key
+  the API doesn't list is not bought: its league-season is marked blocked in `guard.json` and
+  counts as **not priced**, like the guard's. That is one match (Romania 2022/23) unless
+  another key turns out unknown. The run then resumes with the remaining 66 slots under the
+  same cap (1,000 − 30 already spent).
+- **The analysis** (`lab/heavy_analysis.py`, `odds-check.yml` `task=heavy-analysis`) is merged
+  with this amendment, before its one run:
+  - H's rows come from `comebacks2.match_rows` unchanged.
+  - H2's rows go through the same quote checks: the 48–62-minute window, updated after
+    kickoff, at most 5 minutes old, moved against the favourite, and Pinnacle within 0.05 of
+    the median.
+  - Results come from ESPN's 90-minute score (cups) or football-data's extra file (extra
+    leagues).
+  - The verdict uses at least 136 usable bets and the ROI range above 0.
+  - It writes the app file `lab/heavy_favourites_research.json`.
+
 ### Design HF: the forward live sample, pre-registration (28 Oct; written before any of its outcomes exists)
 
 The lead approved (28 Oct) Moneyline extending the live half-time snapshots (`inplay.yml`) to

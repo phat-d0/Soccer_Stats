@@ -231,3 +231,19 @@ def test_a_pre_match_plan_turns_the_guard_off(tmp_path):
     assert res["bought"] == 6 and not res["not_priced"]
     res = cf.run(cap=1920, api_key=KEY, cache_dir=tmp_path / "g", slots=slots(6), get=empty_get)
     assert res["bought"] == 3 and res["not_priced"]
+
+
+def test_an_unknown_sport_key_counts_as_not_priced_without_a_call(tmp_path):
+    get, state = fake()
+
+    def with_list(url, params=None, timeout=None):
+        if url.endswith("/sports") and (params or {}).get("all") == "true":
+            return Resp([{"key": "soccer_epl"}])
+        return get(url, params, timeout)
+
+    s = slots(2) + slots(1, sport="soccer_romania_liga_1")
+    s[-1] = {**s[-1], "league": "ROU", "request_at": "2024-09-01T05:55Z"}
+    res = cf.run(cap=100, api_key=KEY, cache_dir=tmp_path, slots=s, get=with_list)
+    assert res["bought"] == 2 and state["calls"] == 2 and res["stopped"] is None
+    assert res["not_priced"] == {"ROU 2024/25": 1}
+    assert cf.read_guard(tmp_path)["ROU 2024/25"]["blocked"] is True
