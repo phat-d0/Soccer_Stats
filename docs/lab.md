@@ -2388,3 +2388,77 @@ and D1 but priced for SP1 and I1. These probes settle where each league's archiv
 - **Seasons newly known to be priced for a 75%+ test:** SP1 2020/21–2021/22; I1, D2 and SP2
   2021/22; N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2 from 2022/23. The counts for these
   follow in the heavy-favourite count below.
+
+## Heavy favourites (75%+), design H: final pre-registration (frozen 2026-10-28, before any purchase)
+
+The owner approved buying this test on 28 Oct, via the lead. This replaces the DRAFT in
+"Heavy favourites (75%+)" above. It is written and committed before any design-H snapshot is
+bought, and nothing in it changes after a price is seen.
+
+**Hypothesis (new; picked after C's results, so judged only on data no earlier test used).** A
+favourite priced 75%+ before kickoff that trails at half-time wins more often than
+DraftKings' in-play price implies, enough to make a profit backing it.
+
+**Sample (frozen).** `src/soccer_stats/lab/comeback_h_slots.json`, SHA-256 starting
+`4c37e90908306a4e`.
+- **Built by:** `heavy_favourites --slots-out` (`odds-check.yml` `task=heavy-slots`, run
+  40641592811), from football-data only, reading half-time scores, never full-time ones.
+- **Favourite:** Shin-fair chance ≥ 75% from Pinnacle's close, else the market average's
+  close. The file marks which (`price`).
+- **League-seasons:** every one the archive probes of 28 Oct showed priced:
+  - the eight leagues in 2025/26 and 2026/27 to date (to the files of 28 Oct);
+  - SP1 2020/21 and 2021/22;
+  - I1, D2 and SP2 2021/22;
+  - N1, P1, SC0, B1, T1, G1, D2, I2, SP2 and F2 from 2022/23 to 2026/27 to date.
+- **Excluded:** every slot bought by B or C (none overlap).
+- **103 slots holding 103 trailing heavy favourites.** Leagues with any: N1 22, SC0 16,
+  P1 16, G1 12, T1 11, I1 8, SP1 7, B1 3, D1 2, F1 2, E0 1, E1 1, SP2 1, I2 1. E2, E3, D2
+  and F2 have none.
+- Cups and the other leagues still being counted are **not** in this test. They can become
+  a separate pre-registered sample.
+
+**Purchase.**
+- `comeback_fetch --slots H` (`odds-check.yml` `task=comeback-fetch`, `design=H`): one
+  historical bulk h2h snapshot per slot at kickoff + 55 min, at the same ten books (one
+  region, 10 credits).
+- **Estimate 1,030 credits; cap 1,236** (estimate + 20%), run by the lead or with the lead's
+  sign-off.
+- The same spending rules as C:
+  - `CappedBudget` with the 3,000 reserve;
+  - the first call budgeted at 20;
+  - stop on a call over 10 credits or any HTTP/network error;
+  - never buy a slot twice;
+  - a dry run first.
+- Bodies go to the same `comeback-odds-*` cache: different snapshot times, and guard keys
+  that don't overlap with C's.
+- **Guard (C's, every league-season):** if a league-season's first 3 bought snapshots, oldest
+  first, show no started event freshly priced by DraftKings or Betfair, no more of it is
+  bought and its matches count as **not priced**. A league-season with fewer than 3 slots is
+  bought in full.
+
+**Analysis (run once; `comebacks2 --slots H`, `task=comebacks2`, `design=H`, no key).**
+- C's quote checks, unchanged: the 48–62-minute window; updated after kickoff; at most 5
+  minutes old; moved against the favourite; Pinnacle within 0.05 of the other books' median,
+  else Betfair for the fair chance.
+- Matches are joined to football-data by league, season, home and away, with the favourite
+  priced exactly as in the slot list.
+- **Primary:** $1 on the trailing favourite at DraftKings' passing in-play price. ROI per $1
+  with a match-resampled 95% range (2,000 draws, seed 0).
+- **Pass:** at least **100** usable DraftKings bets **and** the ROI range entirely above 0.
+- **Fail:** at least 100 usable and the range includes 0 or sits below it. A range entirely
+  below 0 reads "the in-play price over-prices the comeback".
+- **Inconclusive:** under 100 usable bets. Nothing changes live in any case. A pass only
+  justifies proposing a live paper track to the owner.
+- **Secondary (descriptive):** the realized − implied win-rate gap with its range, against the
+  in-play price's margin-free chance; Betfair after 2%; per league and per season; Pinnacle-
+  vs average-priced favourites; the phase-1 model's blend weight c where Pinnacle's
+  over/under exists.
+
+**What to expect, stated before buying.**
+- At C's usable rate (81%), 103 matches give about **83 usable bets**, under the 100
+  minimum. The most likely verdict is therefore "inconclusive", whatever the prices show.
+- With 83 bets, a true +12-point gap would show a range above 0 about 59% of the time. A
+  6-point gap would only show it about 20% of the time.
+- The purchase still buys the only fresh prices that exist for these league-seasons. Pooling
+  them later with a separately pre-registered cup or extra-league sample would need its own
+  rule, written before that sample's prices are seen.
