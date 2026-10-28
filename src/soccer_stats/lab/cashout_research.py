@@ -150,21 +150,38 @@ def halftime_only(pos: list[dict]) -> list[dict]:
 
 
 def curves(pos: list[dict]) -> dict:
-    """Bankrolls staking 2% of themselves on each bet in kickoff order: hold and the judged
-    rule, at the end of each day, thinned to MAX_POINTS (the last day always kept)."""
+    """Two views of hold against the judged rule in kickoff order, at the end of each day,
+    thinned to MAX_POINTS (the last day always kept): `points`, bankrolls from START staking
+    2% of themselves on each bet (six significant figures: both fall towards $0 here), and
+    `flat`, the running profit of $1 on every bet."""
     s = ct.PRIMARY["s"]
     hold = cash = float(START)
-    days: dict[str, dict] = {}
+    flat_hold = flat_cash = 0.0
+    days: dict[str, tuple[dict, dict]] = {}
     for p in sorted(pos, key=lambda p: (p["kickoff"], p["league"], p["home"])):
-        hold *= 1 + s * ct.hold(p)
-        cash *= 1 + s * ct.rule(p, ct.PRIMARY["t"], ct.PRIMARY["m"])[0]
+        h, c = ct.hold(p), ct.rule(p, ct.PRIMARY["t"], ct.PRIMARY["m"])[0]
+        hold, cash = hold * (1 + s * h), cash * (1 + s * c)
+        flat_hold, flat_cash = flat_hold + h, flat_cash + c
         day = p["kickoff"][:10]
-        days[day] = {"date": day, "hold": round(hold, 2), "cash": round(cash, 2)}
-    pts = list(days.values())
-    if len(pts) > MAX_POINTS:
-        idx = np.unique(np.linspace(0, len(pts) - 1, MAX_POINTS).round().astype(int))
-        pts = [pts[i] for i in idx]
-    return {"stake": s, "start": START, "points": pts}
+        days[day] = (
+            {"date": day, "hold": float(f"{hold:.6g}"), "cash": float(f"{cash:.6g}")},
+            {"date": day, "hold": round(flat_hold, 2), "cash": round(flat_cash, 2)},
+        )
+    rows = list(days.values())
+    if len(rows) > MAX_POINTS:
+        idx = np.unique(np.linspace(0, len(rows) - 1, MAX_POINTS).round().astype(int))
+        rows = [rows[i] for i in idx]
+    return {
+        "stake": s,
+        "start": START,
+        "points": [r[0] for r in rows],
+        "flat": {"stake": 1, "start": 0, "points": [r[1] for r in rows]},
+        "note": (
+            f"At {s:.0%} of the bankroll a bet both bankrolls fall towards $0 in this sample, "
+            "because holding loses about a quarter of each stake; `flat` shows the running "
+            "profit of $1 on every bet instead."
+        ),
+    }
 
 
 def bet_rows(pos: list[dict]) -> list[dict]:

@@ -70,7 +70,9 @@ def test_the_curve_is_thinned_to_200_points_and_keeps_the_last_day():
         day = np.datetime64("2024-08-01") + np.timedelta64(d, "D")
         pos.append({**positions(1)[0], "kickoff": f"{day}T14:00Z", "home": f"H{d}"})
     cv = cr.curves(pos)
-    assert len(cv["points"]) == 200
+    assert len(cv["points"]) == 200 and len(cv["flat"]["points"]) == 200
+    total = sum(ct.hold(p) for p in pos)
+    assert abs(cv["flat"]["points"][-1]["hold"] - total) < 0.01
     assert cv["points"][-1]["date"] == str(np.datetime64("2024-08-01") + np.timedelta64(399, "D"))
 
 
