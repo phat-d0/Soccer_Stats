@@ -26,9 +26,7 @@ const state = {
   btSource: store.get("btSource", "dk"), // Backtest: "dk" (DraftKings' prices, first when present) or "pin"
   pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
   lbShown: 20, // Blend Lean backtest: bet rows shown
-  recBet: "match", // Record tab: "match" (model replay) or "player" (FanDuel player shots)
-  recStrat: "", // Record tab, player shots: which backtest strategy's sweep to show
-  recDk: "", // Record tab, match bets: which DraftKings backtest strategy ("raw" or "blend")
+  recStrat: "", // Player shots → Backtest: which backtest strategy's sweep to show
   teamsView: "teams", // Teams tab: "teams" or "players"
   pl: { q: "", team: "", pos: "", sort: "exp", shown: 40, mode: "stats", season: "", ssort: "shots", active: true, view: "list", metric: "p90" }, // Players view
   pb: null, // players_backtest.json once loaded (or { error })
@@ -41,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v65";
+const APP_VERSION = "v66";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -1625,19 +1623,7 @@ function niceStep(raw) {
   const f = raw / p;
   return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
 }
-function recordToggle() {
-  return `
-    <div class="segmented" role="group" aria-label="Bet type" style="margin-bottom:12px">
-      ${[["match", "Match bets"], ["player", "Player shots"], ["markets", "Goals & corners"]].map(([k, l]) => `<button data-recbet="${k}" class="${state.recBet === k ? "on" : ""}" aria-pressed="${state.recBet === k}">${l}</button>`).join("")}
-    </div>`;
-}
-
-function viewRecord() {
-  const body = state.recBet === "player" ? recordPlayerHtml() : state.recBet === "markets" ? recordMarketsHtml() : recordMatchHtml();
-  return recordToggle() + body;
-}
-
-// ---------- Record → Goals & corners: research results (lab/markets_research.json) ----------
+// ---------- Range plots, and the goals-market research (lab/markets_research.json) ----------
 // A range plot per league (dot = estimate, bar = its range, line at 0). Blue when the whole
 // range is above 0, red when it is all below, grey when it could be 0. Point at, drag or
 // tap a row to read it (a row scrub chart).
@@ -1668,17 +1654,6 @@ const rangeMeta = (lo, hi) => (lo == null || hi == null ? "" : `<span class="mk-
 const andList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 const capFirst = (t) => (t ? t[0].toUpperCase() + t.slice(1) : "");
 const sourceNote = (part) => `<p class="note small-note">Source: ${esc(part.source || "")}${part.runs ? `. Runs: ${runsLine(part.runs)}` : ""}.</p>`;
-
-function recordMarketsHtml() {
-  const mr = state.data.markets_research;
-  if (!mr || typeof mr !== "object" || !(mr.total_goals || mr.team_goals || mr.corners)) {
-    return `<div class="empty">The research results for goals and corners aren't in this update. They come back with the next site update.</div>`;
-  }
-  const cards = [marketTotalGoals(mr.total_goals), marketTeamGoals(mr.team_goals), marketCorners(mr.corners)].filter(Boolean).join("");
-  return `
-    <p class="note">What our tests found for three markets the model can price. Nothing here is a bet: no market has shown an edge yet.${mr.updated ? ` Updated ${esc(mr.updated)}.` : ""}</p>
-    ${cards}`;
-}
 
 function marketCard(title, verdict, tone, inner, fold) {
   return `
@@ -1716,9 +1691,9 @@ function marketTotalGoals(tg) {
     ${chart}`, table + baseTable);
 }
 
-function marketTeamGoals(tm) {
-  if (!tm) return "";
-  const res = tm.research || {}, live = tm.live || {};
+// The team-total live test's progress toward its gate (FanDuel, 50 matches with both prices).
+function teamTotalsProgressHtml(tm) {
+  const live = tm?.live || {};
   const p = live.progress;
   const target = p?.target || live.target || 50;
   let liveHtml;
@@ -1735,6 +1710,11 @@ function marketTeamGoals(tm) {
         ${r ? `<p class="note" style="margin:8px 0 0"><b>${r.passes ? "Passes" : "No edge yet"}.</b> Against FanDuel's early price the model's log-loss gain is ${gainFmt(r.gain, 4)}${r.gain_range ? ` (range ${gainFmt(r.gain_range[0], 4)} to ${gainFmt(r.gain_range[1], 4)})` : ""}. At a 12% edge: ${r.bets ?? 0} bets, closing line value ${signedPct(r.clv)}${r.clv_range ? ` (range ${signedPct(r.clv_range[0])} to ${signedPct(r.clv_range[1])})` : ""}. An edge needs both ranges above 0.</p>` : ""}
       </div>`;
   }
+  return liveHtml;
+}
+function marketTeamGoals(tm, withLive = true) {
+  if (!tm) return "";
+  const res = tm.research || {}, live = tm.live || {};
   const table = res.rows?.length ? `
     <div class="card" style="padding:8px 14px"><table class="mkts mk-table">
       <thead><tr><th></th><th>Lines better than the average</th></tr></thead>
@@ -1743,9 +1723,8 @@ function marketTeamGoals(tm) {
     <p class="note">Each team over/under 0.5, 1.5 and 2.5 goals. Gains ${esc(res.gains || "")}. Well calibrated at ${esc(res.calibrated || "")} (slopes ${esc(res.slopes || "")}, 1 is ideal). ${esc(res.e1 || "")} ${esc(res.seasons || "")}.</p>
     ${sourceNote(res)}` : "";
   return marketCard("Each team's goals", tm.verdict, "mid", `
-    <p class="note" style="margin-top:4px">In past seasons the model beat the league average at ${res.lines_beating_top5 ?? "–"} of ${res.lines_top5 ?? "–"} lines in the top five leagues. ${esc(live.plan || "")}</p>
-    <div class="sub-title">${esc(live.title || "Live test against FanDuel")}</div>
-    ${liveHtml}`, table);
+    <p class="note" style="margin-top:4px">In past seasons the model beat the league average at ${res.lines_beating_top5 ?? "–"} of ${res.lines_top5 ?? "–"} lines in the top five leagues. ${withLive ? esc(live.plan || "") : "Its test against a bookmaker is the team-total log: the Team totals (logging only) row in Moneyline's main list."}</p>
+    ${withLive ? `<div class="sub-title">${esc(live.title || "Live test against FanDuel")}</div>${teamTotalsProgressHtml(tm)}` : ""}`, table);
 }
 
 const bandText = (part) => ((part?.slope_band || [0.8, 1.25]).map((v) => v.toFixed(2)).join("–"));
@@ -1795,23 +1774,6 @@ function cornerDevHtml(dev) {
     ${sourceNote(dev)}`;
 }
 
-function marketCorners(co) {
-  if (!co) return "";
-  const ho = co.holdout || {}, rc = co.recalibration || {};
-  const band = bandText(rc.slope_band ? rc : ho);
-  const rows = (rc.rows || []).map((r) => ({
-    label: leagueShort(r.league), sub: `${r.matches} matches`, v: r.gain, lo: r.lo, hi: r.hi,
-    readout: `<b>${esc(leagueName(r.league))}</b>, 2025/26, recalibrated: gain ${gainFmt(r.gain)} a line (range ${gainFmt(r.lo)} to ${gainFmt(r.hi)}); line slopes ${esc(r.slopes)}. Outside ${band}: ${esc(r.outside || "none")}.`,
-  }));
-  const chart = rangeChart("co", rows, (v) => gainFmt(v, 2));
-  const live = pfById("corners");
-  const link = live ? `<div class="explain live-test"><b>Now in a live test.</b> The owner is paper-trading model (f), a newer team-corner model, against Pinnacle's live prices in every competition and, as a second track since 20 Oct, against DraftKings'. <button class="linkish" data-goto-pf="corners">Open the ${esc(live.name)} portfolio</button></div>` : "";
-  return marketCard("Corners", co.verdict, "neg", `
-    ${link}
-    <p class="note" style="margin-top:4px">Each team's corners, 2025/26 test after recalibration: how much better the model's chances scored than the league average (log loss a line; above 0 is better). Blue = the whole range is above 0. A model also needs every line's slope between ${band} (1 means its chances are spread just right), and none managed it, so nothing passes.</p>
-    ${chart}`, (co.development?.rows?.length ? `<div class="sub-title">${esc(co.development.title || "")}</div>${cornerDevHtml(co.development)}` : "") + cornerHoldoutHtml(ho) + cornerRecalHtml(rc));
-}
-
 // Portfolio → Team corners → Backtest: the research record (kind "research"). No corner
 // prices exist historically, so there is no money here: verdict, model (f) per league and
 // the earlier tests, folded.
@@ -1847,8 +1809,10 @@ const STRATEGY_NOTE = {
 };
 const countWord = (market, n) => (market === "player_shots" ? `${n} shot${n === 1 ? "" : "s"}` : `${n} on target`);
 
-// The priced player backtest: FanDuel player shot lines, strategies side by side.
-function recordPlayerHtml() {
+// Player shots → Backtest (retired portfolio), below the main strategy's bet-by-bet backtest:
+// the priced strategies side by side (portfolio.player_model.priced), their threshold sweep,
+// predicted vs actual and the shot model's own checks (moved from Record, 28 Oct).
+function playerBacktestHtml() {
   const pf = state.data.portfolio || {};
   const pm = pf.player_model || {};
   const pr = pm.priced;
@@ -1879,29 +1843,20 @@ function recordPlayerHtml() {
   }).join("")}</tr>`).join("");
   const cal = pr.calibration?.[st.snapshot === "after lineups" ? "close" : "look"]?.table || [];
   const calRows = cal.map((r) => `<tr><td>${esc(r.bucket.replace(/%-/, "–"))}<div class="meta">${r.lines.toLocaleString()} lines</div></td><td>${pct(r.implied, 1)}</td><td>${pct(r.model, 1)}</td><td>${pct(r.blend, 1)}</td><td><b>${pct(r.won, 1)}</b></td></tr>`).join("");
-  const sel = trades.map((t) => [t.kickoff.slice(0, 10), t.home, t.away, t.market, t.odds, t.edge, 0, t.profit]);
-  const recent = trades.slice(-25).reverse().map((t) => `
-    <button class="bet-row trade" data-trade="${esc(t.id)}">
-      <span>${esc(t.player)} · ${esc(lineLabel(t))}<div class="meta">${shortDate(t.kickoff)} · ${esc(t.home)} v ${esc(t.away)} · ${american(t.odds)} (${odds(t.odds)})</div><div class="meta">Chance ${pct(t.model_p, 0)} vs ${esc(playerBook())} ${pct(t.implied, 0)} · had ${countWord(t.market, t.actual)}</div></span>
-      <span class="pl ${t.profit > 0 ? "win" : "loss"}">${usd(t.profit)}</span>
-    </button>`).join("");
   const isMain = cur === main;
   return `
-    <div class="section-title" style="margin-top:4px">Minimum edge</div>
-    ${edgePanel("player_shots")}
-    ${edgeBucketsHtml("player_shots")}
-    <p class="note">The player rule replayed on ${esc(playerBook())}'s historical player shot lines${span ? ` (${esc(span)})` : ""}: $10 per bet, best line per player and market, at most ${MAX_PLAYER_TRADES} per match, with the model's chances computed only from matches before each bet.</p>
+    <div class="section-title">The strategies compared</div>
+    <p class="note" style="margin-top:0">The player rule replayed on ${esc(playerBook())}'s historical player shot lines${span ? ` (${esc(span)})` : ""}: $10 per bet, best line per player and market, at most ${MAX_PLAYER_TRADES} per match, with the model's chances computed only from matches before each bet.</p>
     <div class="segmented small-seg" role="group" aria-label="Strategy" style="margin:10px 0 6px">
       ${strats.map((k) => `<button data-recstrat="${esc(k)}" class="${k === cur ? "on" : ""}" aria-pressed="${k === cur}">${esc(short(k))}</button>`).join("")}
     </div>
-    <p class="note"><b>${esc(STRATEGY_LABEL[cur] || cur)}.</b> ${esc(STRATEGY_NOTE[cur] || "")}</p>
-    <div class="tiles" style="margin-top:12px">
+    <p class="note"><b>${esc(STRATEGY_LABEL[cur] || cur)}.</b> ${esc(STRATEGY_NOTE[cur] || "")}${isMain ? " Its bets are the ones above." : ` The bets above are the main strategy's (${esc(STRATEGY_LABEL[main] || main)}); bet by bet is kept for it only.`}</p>
+    ${isMain ? "" : `<div class="tiles player-strat-tiles" style="margin-top:12px">
       <div class="tile"><div class="label">Profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">from ${s.trades || 0} bets at 12%+ edge</div></div>
       <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${s.roi_ci95 ? `95%: ${signedPct(s.roi_ci95[0], 0)} to ${signedPct(s.roi_ci95[1], 0)}` : "ROI"}</div></div>
       <div class="tile"><div class="label">Won</div><div class="value">${pct(s.win_rate, 1)}</div><div class="sub">${pct(s.breakeven, 1)} needed to break even</div></div>
       <div class="tile"><div class="label">Beat the close</div><div class="value">${s.beat_close_dk != null ? pct(s.beat_close_dk) : "–"}</div><div class="sub">${s.clv_dk != null ? `avg price move ${signedPct(s.clv_dk)}` : "bets placed at the close"}</div></div>
-    </div>
-    ${isMain ? `<div class="section-title">Running profit ($)</div><div class="card">${profitChart(sel, "$") || '<p class="muted">No bets.</p>'}</div>` : ""}
+    </div>`}
     <div class="section-title">Return per bet by edge threshold</div>
     <div class="card" style="padding:8px 14px">
       <table class="sweep"><thead><tr><th>Edge</th>${strats.map((k) => `<th class="${k === cur ? "on-col" : ""}">${esc(short(k))}</th>`).join("")}</tr></thead><tbody>${sweepRows}</tbody></table>
@@ -1912,53 +1867,22 @@ function recordPlayerHtml() {
       <table><thead><tr><th>Group</th><th>${esc(playerBook())}</th><th>Model</th><th>Blend</th><th>Won</th></tr></thead><tbody>${calRows}</tbody></table>
     </div>
     <p class="note">Every priced line ${st.snapshot === "after lineups" ? "at the last price before kickoff" : "3 hours before kickoff"}, grouped by ${esc(playerBook())}'s chance (1 / odds, so it includes their margin). The column closest to "Won" is the best calibrated; bets use the blend.</p>` : ""}
-    ${isMain && recent ? `<div class="section-title">Latest bets</div><div class="card">${recent}</div>` : ""}
-    ${isMain ? "" : `<p class="note">The running profit and bet-by-bet list are kept for the main strategy (${esc(STRATEGY_LABEL[main] || main)}) only.</p>`}
+    <p class="note">No minimum edge has beaten the market in these bets, so none is recommended.</p>
     ${playerModelHtml(pm)}`;
 }
 
-// Match bets against DraftKings' historical prices (E0_dk.json "strategies"), styled like
-// the player shots view: a strategy switch, its tiles, then a sweep with one column each.
-const DK_LABEL = { raw: "Model alone", blend: "Model + DraftKings blend" };
+// Model 12% → Backtest, Premier League: the DraftKings backtest's threshold sweep for both
+// of its strategies (E0_dk.json "strategies": the model alone and the old blend) and its
+// forecast error, folded under the bet-by-bet body (moved from Record, 28 Oct).
 const DK_SHORT = { raw: "Model alone", blend: "Blend" };
-const DK_NOTE = {
-  raw: "The model's own chances against DraftKings' price. This is what the app used before the blend.",
-  blend: "The model mixed with DraftKings' margin-free price, the mix refitted every 4 weeks on earlier matches only. This is what value picks use now.",
-};
 // Backtest seasons as start years ("2025", "2023-2025") to "2025/26", "2023/24–2025/26".
 const startYears = (v) => String(v).split(/[-,]/).map((y) => y.trim()).filter(Boolean)
   .map((y) => `${y}/${String((Number(y) + 1) % 100).padStart(2, "0")}`).filter((_, i, a) => i === 0 || i === a.length - 1).join("–");
-// Record → Match bets → Blend: the blend trades through Blend Lean now, so its tiles are
-// Blend Lean's Premier League backtest (portfolio.strategy_backtests.lean, leagues.E0),
-// in the same four tiles as Model alone, at $10 a bet (the file is per $1).
-const leanDkOn = () => !!state.data.portfolio?.strategy_backtests?.lean;
-function leanDkTiles() {
-  const lb = state.data.portfolio?.strategy_backtests?.lean;
-  if (!lb) return "";
-  if (lb.available === false) return `<div class="explain"><b>Blend Lean backtest:</b> ${esc(lb.note || "not available yet.")}</div>`;
-  const e = lb.leagues?.E0;
-  const l = e?.lean;
-  if (!l?.bets) return `<div class="explain"><b>Blend Lean backtest:</b> ${esc(e?.error || "no Premier League bets in the file yet.")}</div>`;
-  const seasons = e.seasons_included || [];
-  const span = seasons.length ? ` ${esc(seasons[0])}${seasons.length > 1 ? `–${esc(seasons[seasons.length - 1])}` : ""}` : "";
-  return `
-    <p class="note lean-dk-label"><b>Blend Lean (1σ+), the rule the blend trades on now.</b> Premier League, Pinnacle's early prices${span}, $10 a bet. At the old ${pct(PAPER_EDGE)} edge the blend made no bets against DraftKings, as the table below shows.</p>
-    <div class="tiles lean-dk" style="margin-top:8px">
-      <div class="tile"><div class="label">Profit</div><div class="value ${plClass(l.profit)}">${usd(l.profit * 10)}</div><div class="sub">from ${l.bets} bets at 1σ+</div></div>
-      <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(l.roi)}</div><div class="sub">${l.roi_ci95 ? `95%: ${signedPct(l.roi_ci95[0], 0)} to ${signedPct(l.roi_ci95[1], 0)}` : "ROI"}</div></div>
-      <div class="tile"><div class="label">Won</div><div class="value">${pct(l.win_rate, 1)}</div><div class="sub">${pct(l.breakeven, 1)} needed to break even</div></div>
-      <div class="tile"><div class="label">Beat the close</div><div class="value">${l.beat_close != null ? pct(l.beat_close) : "–"}</div><div class="sub">avg price move ${l.clv != null ? signedPct(l.clv) : "–"} vs Pinnacle's close</div></div>
-    </div>`;
-}
-function recordDkHtml() {
-  const bt = pfById("moneyline")?.backtest;
+function dkSweepHtml(bt) {
   const strategies = bt?.strategies;
   if (!strategies || !Object.keys(strategies).length) return "";
   const strats = Object.keys(strategies).sort((a, b) => (a === "raw" ? -1 : b === "raw" ? 1 : a.localeCompare(b)));
-  const cur = strats.includes(state.recDk) ? state.recDk : strats.includes("blend") ? "blend" : strats[0];
   const short = (k) => DK_SHORT[k] || strategies[k].label || k;
-  const s = strategies[cur].summary || {};
-  const th = bt.threshold ?? PAPER_EDGE;
   // Sweep rows keyed by threshold, uncapped first, then with odds capped (max_odds).
   const key = (r) => `${r.threshold}|${r.max_odds ?? ""}`;
   const rowKeys = [];
@@ -1969,7 +1893,7 @@ function recordDkHtml() {
   });
   const cell = (k, rk) => {
     const x = (strategies[k].sweep || []).find((r) => key(r) === rk);
-    return `<td class="${k === cur ? "on-col" : ""}">${x?.trades ? `<span class="${plClass(x.roi)}">${signedPct(x.roi)}</span><div class="meta">${x.trades} bets</div>` : x ? '<span class="muted">0 bets</span>' : "–"}</td>`;
+    return `<td>${x?.trades ? `<span class="${plClass(x.roi)}">${signedPct(x.roi)}</span><div class="meta">${x.trades} bets</div>` : x ? '<span class="muted">0 bets</span>' : "–"}</td>`;
   };
   let capHead = false;
   const sweepRows = rowKeys.map((rk) => {
@@ -1982,94 +1906,58 @@ function recordDkHtml() {
   const llRows = [["Model alone", ll.model_on_blend ?? ll.model], ["Blend", ll.blend], ["DraftKings", ll.draftkings_on_blend ?? ll.draftkings]]
     .filter(([, v]) => v != null);
   const best = Math.min(...llRows.map(([, v]) => v));
-  const noBets = !s.trades;
   return `
-    <div class="section-title" style="margin-top:4px">Against DraftKings' prices</div>
-    <p class="note" style="margin-top:0">$10 bets at DraftKings' historical prices${bt.seasons ? ` (${esc(startYears(bt.seasons))})` : ""}, one per match on the best edge, with chances computed only from earlier matches.</p>
-    <div class="segmented small-seg" role="group" aria-label="DraftKings strategy" style="margin:10px 0 6px">
-      ${strats.map((k) => `<button data-recdk="${esc(k)}" class="${k === cur ? "on" : ""}" aria-pressed="${k === cur}">${esc(short(k))}</button>`).join("")}
-    </div>
-    <p class="note"><b>${esc(DK_LABEL[cur] || strategies[cur].label || cur)}.</b> ${esc(DK_NOTE[cur] || "")}</p>
-    ${cur === "blend" ? leanDkTiles() : ""}
-    ${noBets && cur === "blend" && leanDkOn() ? `<div class="explain"><b>No bets at a ${pct(th)} edge</b> against DraftKings: the blend stays too close to DraftKings' own chance to clear their margin.</div>` : noBets ? `<div class="explain"><b>No bets at a ${pct(th)} edge.</b> ${cur === "blend" ? "The blend stays so close to DraftKings' own chance that it never clears their margin, so it doesn't bet. That is the result: the model adds little that DraftKings' price doesn't already know." : "Nothing reached the threshold."}</div>` : `
-    <div class="tiles" style="margin-top:12px">
-      <div class="tile"><div class="label">Profit</div><div class="value ${plClass(s.profit)}">${usd(s.profit)}</div><div class="sub">from ${s.trades} bets at ${pct(th)}+ edge</div></div>
-      <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">${s.roi_ci95 ? `95%: ${signedPct(s.roi_ci95[0], 0)} to ${signedPct(s.roi_ci95[1], 0)}` : "ROI"}</div></div>
-      <div class="tile"><div class="label">Won</div><div class="value">${pct(s.win_rate, 1)}</div><div class="sub">${pct(s.breakeven, 1)} needed to break even</div></div>
-      <div class="tile"><div class="label">Beat the close</div><div class="value">${pct(s.beat_close_dk)}</div><div class="sub">avg price move ${signedPct(s.clv_dk)}</div></div>
-    </div>`}
-    <div class="section-title">Return per bet by edge threshold</div>
-    <div class="card" style="padding:8px 14px">
-      <table class="sweep"><thead><tr><th>Edge</th>${strats.map((k) => `<th class="${k === cur ? "on-col" : ""}">${esc(short(k))}</th>`).join("")}</tr></thead><tbody>${sweepRows}</tbody></table>
-    </div>
-    <p class="note">Each cell: return per bet, and how many bets, when only bets with at least that edge are placed. A real edge should hold up, or improve, as the threshold rises.</p>
-    ${llRows.length > 1 ? `<div class="section-title">Forecast error</div>
-    <div class="card" style="padding:8px 14px">
-      <table><thead><tr><th></th><th>Log loss</th><th>vs DraftKings</th></tr></thead><tbody>${llRows.map(([n, v]) => `<tr><td>${v === best ? `<b>${n}</b>` : n}</td><td>${v.toFixed(4)}</td><td>${n === "DraftKings" ? "–" : signed(v - (ll.draftkings_on_blend ?? ll.draftkings), 4)}</td></tr>`).join("")}</tbody></table>
-    </div>
-    <p class="note">Home/draw/away forecasts on ${(ll.blend_matches ?? ll.matches) || "the"} matches; lower is better. Most accurate: ${llRows.find(([, v]) => v === best)[0]}. Bet by bet: Portfolio → Backtest.</p>` : ""}
-    <div class="section-title" style="margin-top:22px">Longer replay at Pinnacle odds</div>`;
+    <details class="fold mk-fold dk-sweep"><summary>Return by edge threshold, and forecast error</summary>
+      <p class="note">$10 bets at DraftKings' historical prices${bt.seasons ? ` (${esc(startYears(bt.seasons))})` : ""}, one per match on the best edge, with chances computed only from earlier matches. Model alone = the model's own chances (Model 12%'s rule); Blend = the model mixed with DraftKings' margin-free price, which at a 12% edge never bets because it stays too close to DraftKings' own chance.</p>
+      <div class="card" style="padding:8px 14px">
+        <table class="sweep"><thead><tr><th>Edge</th>${strats.map((k) => `<th>${esc(short(k))}</th>`).join("")}</tr></thead><tbody>${sweepRows}</tbody></table>
+      </div>
+      <p class="note">Each cell: return per bet, and how many bets, when only bets with at least that edge are placed. A real edge should hold up, or improve, as the threshold rises.</p>
+      ${llRows.length > 1 ? `<div class="card" style="padding:8px 14px">
+        <table><thead><tr><th></th><th>Log loss</th><th>vs DraftKings</th></tr></thead><tbody>${llRows.map(([n, v]) => `<tr><td>${v === best ? `<b>${n}</b>` : n}</td><td>${v.toFixed(4)}</td><td>${n === "DraftKings" ? "–" : signed(v - (ll.draftkings_on_blend ?? ll.draftkings), 4)}</td></tr>`).join("")}</tbody></table>
+      </div>
+      <p class="note">Home/draw/away forecasts on ${(ll.blend_matches ?? ll.matches) || "the"} matches; lower is better. Most accurate: ${llRows.find(([, v]) => v === best)[0]}.</p>` : ""}
+    </details>`;
 }
 
-// The DraftKings strategy comparison and the Pinnacle replay (data.record) are Premier
-// League numbers; another competition's backtest bets are listed in Portfolio → Backtest.
-function recordMatchHtml() {
+// Moneyline → Model, Premier League (moved from Record, 28 Oct): the match model replayed
+// week by week (data.record: the model with xG, and goals only), against the market's
+// accuracy, with the 12% rule's running profit in units at the historical opening odds.
+function modelReplayHtml() {
   const d = state.data;
-  const lg = leagueOn();
-  const edgeTop = `
-    ${leagueFilter()}
-    <div class="section-title" style="margin-top:4px">Minimum edge${lg ? ` · ${esc(leagueName(lg))}` : ""}</div>
-    ${edgePanel("moneyline", lg)}
-    ${edgeBucketsHtml("moneyline", lg)}`;
-  if (lg && lg !== "E0") {
-    const n = (pfById("moneyline")?.backtest?.trades || []).filter((t) => tLeague(t) === lg).length;
-    return `${edgeTop}<p class="note">The DraftKings strategy comparison and the week-by-week model replay cover the Premier League only: choose Premier or All to see them.${n ? ` ${esc(leagueName(lg))}'s ${n} backtest bet${n > 1 ? "s are" : " is"} in Portfolio → Backtest.` : ""}</p>`;
-  }
-  const rec = d.record.model;
-  if (!rec || !rec.matches) return `${edgeTop}<div class="empty">Not enough data to replay yet.</div>`;
-  const replayEdge = matchEdge("E0") ?? PAPER_EDGE; // no recommended level: replay the paper rule
+  const rec = d.record?.model;
+  if (!rec || !rec.matches) return "";
+  const replayEdge = PAPER_EDGE;
   const s = summarize(rec.bets, replayEdge);
   const gap = rec.log_loss - rec.market_log_loss;
-  const since = new Date(d.record_start).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-
+  const since = d.record_start ? new Date(d.record_start).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "";
   let compare = "";
   if (d.record.goals_only) {
     const g = d.record.goals_only;
     const sg = summarize(g.bets, replayEdge);
     const row = (name, r, sm) => `<tr><td>${name}</td><td>${r.log_loss.toFixed(4)}</td><td>${signed(r.log_loss - r.market_log_loss, 4)}</td><td>${sm.n}</td><td>${signedPct(sm.roi)}</td></tr>`;
     compare = `
-      <div class="section-title">Goals only vs goals + xG</div>
       <div class="card" style="padding:8px 14px">
-        <table>
-          <thead><tr><th></th><th>Log loss</th><th>vs bookie</th><th>Bets</th><th>ROI</th></tr></thead>
+        <table class="replay-compare">
+          <thead><tr><th></th><th>Log loss</th><th>vs price</th><th>Bets</th><th>ROI</th></tr></thead>
           <tbody>${row("Goals + xG", rec, s)}${row("Goals only", g, sg)}</tbody>
         </table>
       </div>
-      <p class="note">Log loss measures prediction error: lower is better. The app uses goals + xG.</p>`;
+      <p class="note">Log loss measures prediction error: lower is better, and "vs price" below 0 would mean the model forecast better than the bookmaker. The app uses goals + xG.</p>`;
   }
-
-  const recent = s.sel.slice(-10).reverse().map((b) => `
-    <div class="bet-row">
-      <span>${esc(b[1])} v ${esc(b[2])}<div class="meta">${new Date(b[0]).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${esc(PICK_LABEL[b[3]] || b[3])} @ ${odds(b[4])} · edge ${signedPct(b[5])}</div></span>
-      <span class="pl ${b[7] > 0 ? "win" : ""}">${b[7] > 0 ? "Won " : "Lost "}${signed(b[7], 2)}</span>
-    </div>`).join("");
-
   return `
-    ${edgeTop}
-    ${recordDkHtml()}
-    <p class="note">The model replayed week by week since ${esc(since)}, using only data it would have had before each match. 1-unit bets at the historical opening odds in football-data's files (mostly Pinnacle)${isDK() ? "; past DraftKings prices aren't available, so DraftKings' bigger margin would make real results somewhat worse" : ""}.</p>
-    <p class="note">${multiLeague() ? "Premier League matches, r" : "R"}eplayed at ${pct(replayEdge)}+ edge${matchEdge("E0") == null ? ", the paper-trade rule, since no level is recommended" : ""}.</p>
-    <div class="tiles" style="margin-top:12px">
+    <div class="section-title">The model replayed, Premier League</div>
+    <p class="note">The match model replayed week by week${since ? ` since ${esc(since)}` : ""}, using only data it would have had before each match, against the historical opening odds in football-data's files (mostly Pinnacle). 1-unit bets at a ${pct(replayEdge)}+ edge on the model alone.</p>
+    <div class="tiles pf-tiles replay-tiles">
+      <div class="tile"><div class="label">Accuracy vs price</div><div class="value">${gap <= 0 ? "Better" : "Worse"}</div><div class="sub">log loss ${signed(gap, 4)} on ${num(rec.matches)} matches</div></div>
       <div class="tile"><div class="label">Profit</div><div class="value">${signed(s.profit)}</div><div class="sub">units from ${s.n} bets</div></div>
       <div class="tile"><div class="label">Return per bet</div><div class="value">${signedPct(s.roi)}</div><div class="sub">ROI</div></div>
       <div class="tile"><div class="label">Beat closing odds</div><div class="value">${pct(s.beat)}</div><div class="sub">avg ${signedPct(s.clv)} vs close</div></div>
-      <div class="tile"><div class="label">Accuracy vs bookie</div><div class="value">${gap <= 0 ? "Better" : "Worse"}</div><div class="sub">log loss ${signed(gap, 4)}</div></div>
     </div>
-    <p class="note">Beating the closing odds consistently is the best sign of a real edge; profit alone can be luck.</p>
-    <div class="section-title">Running profit (units)</div>
-    <div class="card">${profitChart(s.sel) || '<p class="muted">No bets at this threshold.</p>'}</div>
     ${compare}
-    ${recent ? `<div class="section-title">Latest bets</div><div class="card">${recent}</div>` : ""}`;
+    <details class="fold mk-fold"><summary>Running profit (units)</summary>
+      <div class="card">${profitChart(s.sel) || '<p class="muted">No bets at this threshold.</p>'}</div>
+    </details>`;
 }
 
 function viewExplore() {
@@ -2101,13 +1989,9 @@ const seasonName = (s) => (s && s.length === 4 ? `20${s.slice(0, 2)}/${s.slice(2
 const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
 const kickoffText = (iso) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-// The per-strategy portfolios (data.json → portfolio.portfolios). An older data.json
-// without them is shown as one Moneyline portfolio built from its live and backtest.
-function portfolios() {
-  const pf = state.data.portfolio || {};
-  if (pf.portfolios?.length) return pf.portfolios;
-  return [{ id: "moneyline", name: "Moneyline", status: "live", note: "", live: pf.live, backtest: pf.backtest }];
-}
+// The per-strategy portfolios (data.json → portfolio.portfolios). The legacy
+// portfolio.live / .backtest keys are no longer read (28 Oct).
+const portfolios = () => state.data.portfolio?.portfolios || [];
 const pfById = (id) => portfolios().find((p) => p.id === id);
 // The portfolio on screen: the remembered one, else the first that isn't retired.
 function pfCurrent() {
@@ -2283,7 +2167,7 @@ function pfBacktestExtras(bt) {
       </div>`;
   }
   if (bt.log_loss?.matches) {
-    html += `<p class="note">Forecast error (log loss, lower is better) on ${bt.log_loss.matches} matches: model ${bt.log_loss.model.toFixed(4)}${bt.log_loss.blend != null ? `, blend ${bt.log_loss.blend.toFixed(4)}` : ""}, DraftKings ${bt.log_loss.draftkings.toFixed(4)}. The threshold sweep and the model-vs-blend comparison are on Record → Match bets.</p>`;
+    html += `<p class="note">Forecast error (log loss, lower is better) on ${bt.log_loss.matches} matches: model ${bt.log_loss.model.toFixed(4)}${bt.log_loss.blend != null ? `, blend ${bt.log_loss.blend.toFixed(4)}` : ""}, DraftKings ${bt.log_loss.draftkings.toFixed(4)}. The threshold sweep and the model-vs-blend comparison are in the fold below.</p>`;
   }
   return html;
 }
@@ -2883,6 +2767,7 @@ function pfClassic(topIn) {
     ${pfSettled(trades)}
     ${pfBreakdowns(set.breakdowns || {})}
     ${state.pfView === "backtest" ? edgeBucketsHtml(cur.id, lg) + pfBacktestExtras(set) : ""}
+    ${e12Bt && lg === "E0" ? dkSweepHtml(set) : ""}
     ${e12E0}
     ${retiredLinks}
     ${foot}`;
@@ -3229,9 +3114,13 @@ function modelViewHtml(cur, x, lg) {
       <div class="section-title">Lined up with results: live paper trades</div>
       ${liveCalHtml(`live-${x.key}-${lg || "all"}`, x.st?.calibration, lg, "trades")}`;
   }
+  // The week-by-week model replay is the Premier League's (data.record).
+  const replay = cur.id !== "moneyline" ? ""
+    : !lg || lg === "E0" ? modelReplayHtml()
+    : state.data.record?.model?.matches ? `<p class="note">The week-by-week replay of the match model against the opening odds covers the Premier League only: choose Premier League or All to see it.</p>` : "";
   return `
     <p class="note">${esc(name)}: the equation behind each chance, its fitted numbers, and how the chances lined up with what happened.</p>
-    ${cards}${shape}${results}`;
+    ${cards}${shape}${results}${replay}`;
 }
 
 // ---------- Portfolio, laid out like the baseball app's (owner, 11 Oct) ----------
@@ -3358,7 +3247,7 @@ const archivedTrack = (x) => {
   const key = isDnbStrat(x) ? x.variantOf : x.variantOf ? null : x.key;
   return !!key && Object.values(PF_ARCHIVED).some((a) => a.keys.includes(key));
 };
-const archivedStrat = (x) => x.st?.adds === "shadow" || archivedTrack(x) || (isStudy(x) && x.study.verdict === "fail" && x.study.portfolio !== CB_ID);
+const archivedStrat = (x) => x.st?.adds === "shadow" || archivedTrack(x) || (isStudy(x) && (x.study.verdict === "fail" || x.study.verdict === "closed") && x.study.portfolio !== CB_ID);
 function backtestHeadline(cur, x, lg = "") {
   const sb = state.data.portfolio?.strategy_backtests || {};
   if (x.key === "lean" || (archivedStrat(x) && x.variantOf === "lean")) {
@@ -4153,6 +4042,7 @@ function pfStrategyHtml(cur, allStrats) {
     : x.key === "lean" && inRange?.bets ? `<p class="note lean-range-bt">This replay is the old rule, at every price. Inside the ${rangeWords(range)} range it placed ${inRange.bets.toLocaleString()} bets, ROI ${signedPct(inRange.roi)}: the ${range[0].toFixed(2)}–2.00 and 2.00–${range[1].toFixed(2)} rows under "Where the bets sit on the odds".</p>` : "";
   const top = `${head}${byComp && !research ? leagueFilter() : ""}${toggle}${parentNote}`;
   if (view === "model") return `${top}${modelViewHtml(cur, parent, lg)}`;
+  if (view === "backtest" && cur.id === "player_shots") return pfClassic(top) + playerBacktestHtml();
   if (view === "backtest") return pfClassic(top);
   return `${top}${liveStrategyHtml(cur, x, lg, allStrats)}`;
 }
@@ -4179,10 +4069,24 @@ const CB_ID = "comebacks";
 const LEGACY_STUDY = { id: "comeback_ht", portfolio: CB_ID, name: "$1 on the trailing favourite at half-time" };
 function studies() {
   const rs = state.data?.research_studies;
-  if (Array.isArray(rs)) return rs.filter((x) => x && x.id);
   const cr = state.data?.comeback_research;
-  return cr ? [{ ...cr, ...LEGACY_STUDY }] : [];
+  const files = Array.isArray(rs) ? rs.filter((x) => x && x.id) : cr ? [{ ...cr, ...LEGACY_STUDY }] : [];
+  return [...files, ...marketStudies()];
 }
+// The goals-market research (data.markets_research, from lab/markets_research.json; moved from
+// Record → Goals & corners on 28 Oct) as two Moneyline rows: "Goals markets" (total goals and
+// each team's goals), closed, in the Archive; and the team-total log (FanDuel, scored at the
+// round-13 gate of 50 matches), in testing, in the main list. Corners' research is Team
+// corners → Backtest. `markets` says which page a row opens.
+function marketStudies() {
+  const mr = state.data?.markets_research;
+  if (!mr || typeof mr !== "object") return [];
+  const out = [];
+  if (mr.total_goals || mr.team_goals) out.push({ id: "goals_markets", portfolio: "moneyline", name: "Goals markets: total goals and each team's goals", verdict: "closed", markets: "goals", closed_at: mr.updated || null, cost: { total: 0 } });
+  if (mr.team_goals?.live) out.push({ id: "team_totals_log", portfolio: "moneyline", name: "Team totals (logging only)", verdict: "testing", markets: "team_totals" });
+  return out;
+}
+const isMarketStudy = (sd) => !!sd?.markets;
 const studiesFor = (pid) => studies().filter((x) => x.portfolio === pid);
 const studyStrat = (sd) => ({ key: sd.id, label: sd.name || sd.title || sd.id, st: null, rule: null, study: sd });
 const isStudy = (x) => !!x?.study;
@@ -4211,12 +4115,13 @@ function studyCashout(sd) {
 // Log growth a bet, in %: three decimals, four when it is under 0.01% (growth differences are tiny).
 const growthText = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(Math.abs(v * 100) < 0.01 && v !== 0 ? 4 : 3)}%` : "–");
 const pText = (v) => (isNum(v) ? (v >= 0.995 ? "0.99+" : v.toFixed(2)) : "–");
-const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"] };
+const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"], closed: ["Closed", "st-closed"], testing: ["Testing", "st-testing"] };
 const verdictPill = (sd) => { const [t, c] = VERDICT[sd.verdict] || ["Running", "v-run"]; return `<span class="pill ${c}">${t}</span>`; };
 const studyDay = (d) => (d ? monthDay(`${String(d).slice(0, 10)}T12:00:00Z`) : "");
 const studyCost = (sd) => (isNum(sd.cost?.total) ? (sd.cost.total ? `${num(sd.cost.total)} credits` : "free data, no credits") : "");
 // A study's row: its verdict pill, headline number and cost (lead brief, 28 Oct).
 function studyHeadline(sd) {
+  if (isMarketStudy(sd)) return marketStudyHeadline(sd);
   const j = studyJudged(sd), pl = sd.planned || {};
   if (sd.verdict === "pending") {
     return {
@@ -4237,7 +4142,7 @@ function studyHeadline(sd) {
 }
 function studyRowHtml(x) {
   const sd = x.study, h = studyHeadline(sd), j = studyJudged(sd);
-  const bt = sd.verdict === "pending" ? (sd.planned?.note ? esc(sd.planned.note) : "Pre-registered: the result shows here once the prices are in")
+  const bt = isMarketStudy(sd) ? h.bt : sd.verdict === "pending" ? (sd.planned?.note ? esc(sd.planned.note) : "Pre-registered: the result shows here once the prices are in")
     : studyCashout(sd)?.rule ? `${num(studyCashout(sd).rule.decisions)} cash-outs at ${pct(studyCashout(sd).pr.t)} · cash out ${signedPct(studyCashout(sd).rule.mean)} vs hold ${signedPct(studyCashout(sd).hold?.mean)} per $1 · Result: ${sd.verdict === "fail" ? "no gain" : sd.verdict === "pass" ? "passed" : esc(sd.verdict)}`
     : j?.d.arms ? `Best rule beat the close by ${signedPct(j.d.best_clv?.clv)} · luck check p ${pText(j.d.reality_check?.clv?.p_best)} · Result: ${sd.verdict === "fail" ? "no strategy" : "a finalist"}`
     : `${j ? `Judged on ${esc(j.short)} · ${num(j.d.wins)} of ${num(j.d.bets)} won · ` : ""}Result: ${sd.verdict === "fail" ? "no edge" : sd.verdict === "pass" ? "passed" : esc(sd.verdict || "–")}`;
@@ -4278,7 +4183,45 @@ function cbFolderHtml(cur) {
     ${list.length ? `<div class="card list folders">${list.map(studyRowHtml).join("")}</div>` : `<div class="empty">No research results in this update.</div>`}
     <p class="note">Each study is a strategy tested on bought historical prices, kept here whatever the result. Open one for its result (what the test found, in dollars per $1 bet) and why (the reasoning behind it, and what it means). A running study shows its plan from the day it is pre-registered.</p>`;
 }
+// The goals-market rows: their headline and page (the range charts and tables of
+// markets_research, as Record → Goals & corners showed them).
+function marketStudyHeadline(sd) {
+  const mr = state.data?.markets_research || {};
+  if (sd.markets === "team_totals") {
+    const live = mr.team_goals?.live || {}, p = live.progress || {};
+    const target = p.target || live.target || 50;
+    return {
+      right: `<b>${num(p.settled || 0)} of ${num(target)}</b><small>matches ready to score</small>`,
+      meta: "Logging FanDuel's prices · places no bets",
+      bt: `Scored against FanDuel's closing price once ${num(target)} matches have both prices and a result${p.both != null ? ` · ${num(p.both)} with both prices so far` : ""}`,
+    };
+  }
+  const parts = [mr.total_goals && "total goals", mr.team_goals && "each team's goals"].filter(Boolean);
+  return {
+    right: `<b class="neg-text">No edge</b><small>${parts.length} market${parts.length === 1 ? "" : "s"}</small>`,
+    meta: [`Closed${sd.closed_at ? ` ${studyDay(sd.closed_at)}` : ""}`, "never traded", "free data, no credits"].join(" · "),
+    bt: `${mr.total_goals ? "Total goals lose to Pinnacle's price" : ""}${mr.total_goals && mr.team_goals ? " · " : ""}${mr.team_goals ? "each team's goals beat the league average, not yet a bookmaker" : ""}`,
+  };
+}
+function marketStudyPageHtml(cur, sd) {
+  const mr = state.data?.markets_research || {};
+  const head = (sub) => `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(studyStrat(sd).label)} ${verdictPill(sd)}</h2><div class="pf-sub">${sub}</div>`;
+  if (sd.markets === "team_totals") {
+    const tm = mr.team_goals || {}, live = tm.live || {};
+    return `${head("Testing: FanDuel's team-total prices are logged, nothing is bet")}
+      <div class="verdict mid">${esc(tm.verdict || "")}</div>
+      <p class="note">${esc(live.plan || "")}</p>
+      <div class="section-title">${esc(live.title || "Live test against FanDuel")}</div>
+      ${teamTotalsProgressHtml(tm)}
+      <p class="note">The test is pre-registered: the model, FanDuel's early price and a 50/50 mix of the two are scored against FanDuel's closing price, and nothing is read until the gate. The research behind it is in the Archive's Goals markets row.</p>`;
+  }
+  const cards = [marketTotalGoals(mr.total_goals), marketTeamGoals(mr.team_goals, false)].filter(Boolean).join("");
+  return `${head(`Closed${sd.closed_at ? ` ${studyDay(sd.closed_at)}` : ""}: research on free data, never traded`)}
+    <p class="note">What our tests found for two goal markets the model can price. Nothing here is a bet: neither has shown an edge against a bookmaker.${mr.updated ? ` Updated ${esc(mr.updated)}.` : ""} Corners' research is under Team corners → Backtest.</p>
+    ${cards || `<div class="empty">The research results for goals aren't in this update. They come back with the next site update.</div>`}`;
+}
 function studyPageHtml(cur, sd) {
+  if (isMarketStudy(sd)) return marketStudyPageHtml(cur, sd);
   const views = [["result", "Result"], ["why", "Why"]];
   const view = views.some(([k]) => k === state.pfView) ? state.pfView : "result";
   const toggle = `
@@ -4691,7 +4634,7 @@ function impliedVsRealizedHtml(trades) {
   const withImp = done.filter((t) => t.implied != null);
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
   const hit = avg(done.map((t) => (t.status === "won" ? 1 : 0)));
-  // Same groups as the calibration table on Record → Player shots (most lines are long shots).
+  // Same groups as the calibration table on Player shots → Backtest (most lines are long shots).
   const buckets = [[0, 0.05], [0.05, 0.1], [0.1, 0.2], [0.2, 0.35], [0.35, 0.5], [0.5, 0.7], [0.7, 1.01]];
   const rows = buckets.map(([lo, hi]) => {
     const g = withImp.filter((t) => t.implied >= lo && t.implied < hi);
@@ -4823,7 +4766,8 @@ function tradeHtml(t) {
     </div>`;
 }
 
-const VIEWS = { matches: viewMatches, ratings: viewRatings, record: viewRecord, portfolio: viewPortfolio, explore: viewExplore };
+// The Record tab was retired on 28 Oct (its parts live in Portfolio); any other tab name opens Portfolio.
+const VIEWS = { matches: viewMatches, ratings: viewRatings, portfolio: viewPortfolio, explore: viewExplore };
 
 function render() {
   $("#view").innerHTML = VIEWS[state.tab]();
@@ -4835,7 +4779,7 @@ function render() {
 }
 
 function setTab(tab) {
-  state.tab = tab;
+  state.tab = VIEWS[tab] ? tab : "portfolio";
   closeSheet();
   render();
   window.scrollTo(0, 0);
@@ -4892,18 +4836,11 @@ document.addEventListener("click", (ev) => {
     state.pfLevel = "strategy"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     render();
     window.scrollTo(0, 0);
-  } else if (t.dataset.recbet) {
-    state.recBet = t.dataset.recbet;
-    render();
-
   } else if (t.dataset.gotoPf) {
     state.pfId = t.dataset.gotoPf; state.pfLevel = "portfolio"; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     store.set("pfId", state.pfId);
     setTab("portfolio");
 
-  } else if (t.dataset.recdk) {
-    state.recDk = t.dataset.recdk;
-    render();
   } else if (t.dataset.recstrat) {
     state.recStrat = t.dataset.recstrat;
     render();
