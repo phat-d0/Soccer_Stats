@@ -37,3 +37,5 @@
 {"league":"EFLC","kinds":["inplay55"],"kickoffs":["2026-10-29T19:45:00+00:00"],"fetched_at":"2026-10-29T20:43:16+00:00","status":200,"cost":1,"credits_left":4398729,"events":7,"rows":5}
 {"league":"I1","kinds":["inplay55"],"kickoffs":["2026-10-29T19:45:00+00:00"],"fetched_at":"2026-10-29T20:43:16+00:00","status":200,"cost":1,"credits_left":4398728,"events":11,"rows":8}
 {"league":"CDR","kinds":["inplay55"],"kickoffs":["2026-10-29T20:00:00+00:00"],"fetched_at":"2026-10-29T20:48:17+00:00","status":200,"cost":1,"credits_left":4398720,"events":11,"rows":7}
+{"league":"EFLC","kinds":["inplay75"],"kickoffs":["2026-10-29T19:45:00+00:00"],"fetched_at":"2026-10-29T20:58:17+00:00","status":200,"cost":1,"credits_left":4398719,"events":7,"rows":5}
+{"league":"I1","kinds":["inplay75"],"kickoffs":["2026-10-29T19:45:00+00:00"],"fetched_at":"2026-10-29T20:58:17+00:00","status":200,"cost":1,"credits_left":4398718,"events":11,"rows":8}
