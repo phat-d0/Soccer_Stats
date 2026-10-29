@@ -1,7 +1,7 @@
 {
  "tag": "paid-odds-archive",
  "updated": "2026-10-28T20:35:38Z",
- "checked": "2026-10-28T20:35:38Z",
+ "checked": "2026-10-29T10:59:08Z",
  "caches": {
   "archive-probe": {
    "name": "archive-probe",
@@ -27,7 +27,7 @@
     ]
    },
    "created": "2026-10-28T14:05:13Z",
-   "checked": "2026-10-28T20:35:38Z"
+   "checked": "2026-10-29T10:59:08Z"
   },
   "comeback-odds": {
    "name": "comeback-odds",
@@ -53,7 +53,7 @@
     ]
    },
    "created": "2026-10-28T20:35:19Z",
-   "checked": "2026-10-28T20:35:38Z"
+   "checked": "2026-10-29T10:59:08Z"
   },
   "odds-history": {
    "name": "odds-history",
@@ -79,7 +79,7 @@
     ]
    },
    "created": "2026-10-28T18:35:04Z",
-   "checked": "2026-10-28T20:35:38Z"
+   "checked": "2026-10-29T10:59:08Z"
   },
   "player-odds-history": {
    "name": "player-odds-history",
@@ -105,7 +105,7 @@
     ]
    },
    "created": "2026-10-28T06:02:33Z",
-   "checked": "2026-10-28T20:35:38Z"
+   "checked": "2026-10-29T10:59:08Z"
   }
  },
  "note": "Paid odds caches packed as tar + zstd release assets on the `paid-odds-archive` tag; content_sha256 covers every file's path, size and sha256, archive.sha256 the whole archive, parts[].sha256 each asset."
