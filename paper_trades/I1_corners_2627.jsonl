@@ -97,3 +97,4 @@
 {"type":"update","id":"I1|2627|Milan|Bologna|corners|home|4.5","at":"2026-10-29T16:58:57+00:00","result_check":"ok","check_score":"2-3 corners"}
 {"type":"update","id":"I1|2627|Milan|Bologna|corners|home|4.5|dk","at":"2026-10-29T16:58:57+00:00","result_check":"ok","check_score":"2-3 corners"}
 {"type":"update","id":"I1|2627|Genoa|Juventus|corners|home|3.5","at":"2026-10-29T16:58:57+00:00","result_check":"ok","check_score":"6-9 corners"}
+{"type":"update","id":"I1|2627|Frosinone|Lecce|corners|away|3.5","at":"2026-10-29T17:16:02+00:00","close_odds":1.66,"close_prices":{"over":1.66,"under":2.15},"close_fetched_at":"2026-10-29T17:15:41+00:00","close_minutes_before":14.3,"close_snapshot":"close","clv_pinnacle":-0.004868310451106583,"beat_close_pinnacle":false}

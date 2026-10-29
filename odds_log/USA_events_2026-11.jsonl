@@ -5,3 +5,4 @@
 {"league":"USA","sport":"soccer_usa_mls","event_id":"b728a3eea55b37d5ce5268b9a594802f","home":"New England Revolution","away":"Inter Miami CF","kickoff":"2026-11-02T00:00:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"1a27bec6400dba567344a86aee6fca4a","home":"Los Angeles FC","away":"Minnesota United FC","kickoff":"2026-11-02T01:30:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"c59921cdf131bc3c6e9fdc0cbe5abe3f","home":"Portland Timbers","away":"Houston Dynamo","kickoff":"2026-11-02T02:45:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"196c38051dc539d3d85bc3b2e3f9b45b","home":"Vancouver Whitecaps FC","away":"Seattle Sounders FC","kickoff":"2026-11-01T20:30:00+00:00","fetched_at":"2026-10-29T17:15:55+00:00"}
