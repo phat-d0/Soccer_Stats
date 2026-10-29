@@ -11,3 +11,4 @@
 {"league":"BRA","kinds":["inplay55"],"kickoffs":["2026-10-28T22:30:00+00:00"],"fetched_at":"2026-10-28T23:28:17+00:00","status":200,"cost":1,"credits_left":4411569,"events":20,"rows":18}
 {"league":"BRA","kinds":["inplay75"],"kickoffs":["2026-10-28T22:30:00+00:00"],"fetched_at":"2026-10-28T23:48:17+00:00","status":200,"cost":1,"credits_left":4411496,"events":20,"rows":17}
 {"league":"USA","kinds":["inplay55"],"kickoffs":["2026-10-28T23:30:00+00:00"],"fetched_at":"2026-10-29T00:28:14+00:00","status":200,"cost":1,"credits_left":4411495,"events":29,"rows":40}
+{"league":"USA","kinds":["inplay75"],"kickoffs":["2026-10-28T23:30:00+00:00"],"fetched_at":"2026-10-29T00:48:17+00:00","status":200,"cost":1,"credits_left":4411487,"events":29,"rows":94}
