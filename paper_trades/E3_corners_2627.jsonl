@@ -11,3 +11,5 @@
 {"type":"update","id":"E3|2627|Barnet|York|corners|home|5.5","at":"2026-10-27T19:30:53+00:00","close_odds":1.74,"close_prices":{"over":1.74,"under":2.0},"close_fetched_at":"2026-10-27T19:30:38+00:00","close_minutes_before":14.4,"close_snapshot":"close","clv_pinnacle":-0.016637931034478304,"beat_close_pinnacle":false}
 {"type":"update","id":"E3|2627|Barnet|York|corners|away|4.5","at":"2026-10-27T22:00:41+00:00","status":"won","actual":4,"push":false,"profit":7.0,"score":"4-4 corners","settled_at":"2026-10-27T22:00:41+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Barnet|York|corners|home|5.5","at":"2026-10-27T22:00:41+00:00","status":"lost","actual":4,"push":false,"profit":-10.0,"score":"4-4 corners","settled_at":"2026-10-27T22:00:41+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Barnet|York|corners|away|4.5","at":"2026-10-29T16:58:57+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E3|2627|Barnet|York|corners|home|5.5","at":"2026-10-29T16:58:57+00:00","result_check":"ok","check_score":"4-4 corners"}
