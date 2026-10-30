@@ -103,3 +103,6 @@
 {"type":"update","id":"I1|2627|Frosinone|Lecce|corners|away|3.5","at":"2026-10-29T19:30:47+00:00","status":"lost","actual":3,"push":false,"profit":-10.0,"score":"10-3 corners","settled_at":"2026-10-29T19:30:47+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Fiorentina|Atalanta|corners|home|4.5","at":"2026-10-29T21:51:43+00:00","status":"lost","actual":8,"push":false,"profit":-10.0,"score":"8-2 corners","settled_at":"2026-10-29T21:51:43+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Fiorentina|Atalanta|corners|home|4.5|dk","at":"2026-10-29T21:51:43+00:00","status":"lost","actual":8,"push":false,"profit":-10.0,"score":"8-2 corners","settled_at":"2026-10-29T21:51:43+00:00","result_source":"espn"}
+{"type":"update","id":"I1|2627|Frosinone|Lecce|corners|away|3.5","at":"2026-10-30T07:01:12+00:00","result_check":"ok","check_score":"10-3 corners"}
+{"type":"update","id":"I1|2627|Fiorentina|Atalanta|corners|home|4.5","at":"2026-10-30T07:01:12+00:00","result_check":"ok","check_score":"8-2 corners"}
+{"type":"update","id":"I1|2627|Fiorentina|Atalanta|corners|home|4.5|dk","at":"2026-10-30T07:01:12+00:00","result_check":"ok","check_score":"8-2 corners"}
