@@ -166,3 +166,4 @@
 {"league":"SWZ","kinds":["inplay55"],"kickoffs":["2026-10-31T17:00:00+00:00"],"fetched_at":"2026-10-31T17:48:17+00:00","status":200,"cost":1,"credits_left":4398083,"events":6,"rows":12}
 {"league":"USA","kinds":["inplay55"],"kickoffs":["2026-10-31T17:00:00+00:00"],"fetched_at":"2026-10-31T17:48:17+00:00","status":200,"cost":1,"credits_left":4398082,"events":15,"rows":8}
 {"league":"I1","kinds":["inplay55"],"kickoffs":["2026-10-31T17:00:00+00:00"],"fetched_at":"2026-10-31T17:48:17+00:00","status":200,"cost":1,"credits_left":4398081,"events":9,"rows":1}
+{"league":"RUS","kinds":["inplay75"],"kickoffs":["2026-10-31T16:45:00+00:00"],"fetched_at":"2026-10-31T17:58:15+00:00","status":200,"cost":1,"credits_left":4398080,"events":8,"rows":1}
