@@ -31,3 +31,7 @@
 {"league":"USA","sport":"soccer_usa_mls","event_id":"22fbabab5da12c7e78a8aa08ac6387ec","home":"Minnesota United FC","away":"Sporting Kansas City","kickoff":"2026-10-29T00:40:00+00:00","fetched_at":"2026-10-29T00:48:26+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"88e2736c1e17fafa10888dfcf932f44d","home":"Nashville SC","away":"Philadelphia Union","kickoff":"2026-10-29T00:40:00+00:00","fetched_at":"2026-10-29T00:48:26+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"47c2514142ff3a1962e588c98d655c5f","home":"St. Louis City SC","away":"Portland Timbers","kickoff":"2026-10-29T00:40:00+00:00","fetched_at":"2026-10-29T00:48:26+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"3b648c07b3eb3429ada3616b1f53f889","home":"Charlotte FC","away":"Orlando City SC","kickoff":"2026-10-31T17:10:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"e6cddc7994d0c088f048322c281f4692","home":"New York City FC","away":"CF Montreal","kickoff":"2026-10-31T18:10:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"b9b85ea9c4f291bde6e54aadf8569303","home":"Columbus Crew SC","away":"D.C. United","kickoff":"2026-10-31T18:10:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"4a7f23af0e71f2d528510b2be9dfa80a","home":"FC Cincinnati","away":"Philadelphia Union","kickoff":"2026-10-31T18:10:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}

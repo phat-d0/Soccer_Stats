@@ -7,3 +7,6 @@
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"af11a8a3ec5dd89c925e4786cc061904","home":"Mallorca","away":"C\u00e1diz CF","kickoff":"2026-11-02T20:00:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"b8fa8002fb548ec7d8cbe11b7d4b0ba6","home":"CD Castell\u00f3n","away":"SD Eibar","kickoff":"2026-11-06T19:30:00+00:00","fetched_at":"2026-10-30T21:08:54+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"b68207565e75753877ade56fe96f5cb8","home":"Burgos CF","away":"Celta Fortuna","kickoff":"2026-11-07T13:00:00+00:00","fetched_at":"2026-10-31T15:15:43+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"d6ac2cda054a3905cc7f2e5568787a67","home":"C\u00e1diz CF","away":"Oviedo","kickoff":"2026-11-07T15:15:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"b9e2011f8642a0d0dfea4854957e199f","home":"C\u00f3rdoba","away":"AD Ceuta FC","kickoff":"2026-11-07T17:30:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"74b73ae67252501f068cac62f02f25bb","home":"Legan\u00e9s","away":"Albacete","kickoff":"2026-11-07T17:30:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
