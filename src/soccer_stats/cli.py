@@ -2730,6 +2730,26 @@ def cmd_corner_history_probe(args: argparse.Namespace) -> None:
     corner_history.cli(args.cap, args.json)
 
 
+def cmd_goalscorer_probe(args: argparse.Namespace) -> None:
+    """Priced goalscorer test, step 0: who prices anytime goalscorer in the five leagues,
+    live and in history (2025/26, 2026/27), and how many names match; within --cap."""
+    import json
+
+    from soccer_stats import player_goal_probe as gp
+    from soccer_stats.publish import _clean
+
+    res = gp.run(args.cap)
+    for line in res["log"]:
+        print(f"  {line}")
+    for line in gp.summary_lines(res):
+        print(line)
+    print(f"Credits spent: {res['spent']} of {args.cap}; credits left {res.get('left')}")
+    body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
+    print("GOALSCORER_PROBE_JSON " + body)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -3448,6 +3468,14 @@ def main(argv: list[str] | None = None) -> None:
     gp_.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     gp_.add_argument("--json", help="write the results as JSON")
     gp_.set_defaults(func=cmd_goalscorer_pilot)
+
+    gpr = sub.add_parser(
+        "goalscorer-probe",
+        help="priced goalscorer step 0: books and names in five leagues, live and history",
+    )
+    gpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
+    gpr.add_argument("--json", help="write the results as JSON")
+    gpr.set_defaults(func=cmd_goalscorer_probe)
 
     pl_ = sub.add_parser("player-lab", help="player shot lines through the lab's metrics")
     pl_.add_argument("--lines", required=True, help="E0_player_lines.csv(.gz) from data-log")
