@@ -15,6 +15,12 @@ and, later, the judged read. Nothing here calls The Odds API: it reads the bodie
   entry best price and book, the close best price, and the entry book's own close.
 - `t_volume`: bets per match at each candidate T (volume only, no result) and the T the
   amended §16 rule picks: the largest candidate giving at least `MIN_BETS_PER_MATCH`, else 5%.
+- `band_edges` / `band_of`: five entry-price bands; the judged edges (`PRICE_BAND_EDGES`)
+  are the 2025/26 development rule bets' odds quintiles at T, fixed 1 Nov 2026.
+- `matched_excess`: the judged CLV measure (departure of 1 Nov 2026): the rule's mean
+  best-to-best CLV minus the no-rule baseline's, the baseline reweighted to the rule's mix
+  over the price bands; one shared match bootstrap (2,000 draws, seed 0).
+- `verdict`: §16's pass rule on c's range and the matched excess.
 - `describe`: development-only descriptive numbers (c, best-to-best CLV and the no-rule
   baseline, same-book CLV, ROI, gap), never a verdict.
 """
@@ -38,6 +44,13 @@ T_FALLBACK = 0.05
 MIN_BETS_PER_MATCH = 0.3
 NOT_A_PLAYER = {"no scorer", "no goalscorer", "no goal scorer"}
 LINK_HOURS = 3
+T_JUDGED = 0.20  # §16: fixed by the volume rule on 2025/26 development (run 41346853368)
+BAND_COUNT = 5
+# §16: inner edges of the five entry-price bands (decimal odds; lo < odds <= hi), the
+# 2025/26 development rule bets' odds quintiles at T_JUDGED, fixed 1 Nov 2026.
+PRICE_BAND_EDGES: tuple[float, ...] | None = (6.5, 11.5, 17.0, 23.0)  # run 41350946771
+MIN_JUDGED_BETS = 300
+BOOT_DRAWS, BOOT_SEED = 2000, 0
 
 
 def price_rows(league: str, base: Path | None = None) -> pd.DataFrame:
@@ -178,6 +191,134 @@ def t_volume(j: pd.DataFrame, candidates=T_CANDIDATES) -> dict:
     return {"matches": matches, "by_t": rows, "T": max(ok) if ok else T_FALLBACK, "rule": rule}
 
 
+def bets_at(j: pd.DataFrame, t: float, col: str = "p_B") -> pd.Series:
+    """True for the rule's bets: chance × best entry odds − 1 ≥ t."""
+    return j[col] * j["entry_odds"] - 1 >= t
+
+
+def band_edges(j: pd.DataFrame, t: float, col: str = "p_B", k: int = BAND_COUNT) -> list[float]:
+    """The k−1 inner edges splitting the rule's bets at `t` into k equal groups by entry odds."""
+    odds = j.loc[bets_at(j, t, col), "entry_odds"].to_numpy(float)
+    if len(odds) < k:
+        return []
+    qs = np.quantile(odds, [i / k for i in range(1, k)])
+    return [round(float(q), 2) for q in qs]
+
+
+def band_of(odds, edges) -> np.ndarray:
+    """Band index 0..len(edges): band i holds edges[i−1] < odds <= edges[i]."""
+    return np.searchsorted(np.asarray(edges, float), np.asarray(odds, float), side="left")
+
+
+def matched_excess(
+    j: pd.DataFrame,
+    t: float,
+    edges,
+    col: str = "p_B",
+    draws: int = BOOT_DRAWS,
+    seed: int = BOOT_SEED,
+) -> dict:
+    """§16's judged CLV measure: the rule's mean best-to-best CLV minus the no-rule baseline's,
+    with the baseline reweighted to the rule's share of bets in each entry-price band. Both on
+    the same rows (every starter with an entry and a best close); the 95% range comes from one
+    match bootstrap shared by the rule and the baseline. Also the unweighted baseline and
+    excess (descriptive)."""
+    v = (j["entry_odds"] / j["close_best"] - 1).replace([np.inf, -np.inf], np.nan)
+    ok = v.notna().to_numpy()
+    x = j.loc[ok]
+    v = v[ok].to_numpy(float)
+    rule = bets_at(x, t, col).to_numpy()
+    nb = len(edges) + 1
+    band = band_of(x["entry_odds"], edges)
+    uniq, mi = np.unique(x["match_id"].astype(str).to_numpy(), return_inverse=True)
+    m = len(uniq)
+    out = {"t": t, "edges": list(edges), "bets": int(rule.sum()), "rows": int(len(x)),
+           "matches": int(m), "draws": draws, "seed": seed}  # fmt: skip
+    if not rule.any():
+        return {**out, "rule_clv": None, "baseline_matched": None, "excess": None, "ci95": None}
+
+    # Per match and band: sums and counts for the rule and the baseline.
+    def per_match(mask):
+        s = np.zeros((m, nb))
+        c = np.zeros((m, nb))
+        np.add.at(s, (mi[mask], band[mask]), v[mask])
+        np.add.at(c, (mi[mask], band[mask]), 1)
+        return s, c
+
+    rs, rc = per_match(rule)
+    bs, bc = per_match(np.ones(len(x), bool))
+
+    def stats(w):
+        r_s, r_c = w @ rs, w @ rc
+        b_s, b_c = w @ bs, w @ bc
+        n_rule = r_c.sum()
+        if n_rule == 0:
+            return np.nan, np.nan, np.nan, np.nan
+        mix = r_c / n_rule
+        with np.errstate(invalid="ignore", divide="ignore"):
+            b_mean = np.where(b_c > 0, b_s / b_c, 0.0)
+        rule_mean = r_s.sum() / n_rule
+        matched = float((mix * b_mean).sum())
+        plain = b_s.sum() / b_c.sum()
+        return rule_mean, matched, rule_mean - matched, rule_mean - plain
+
+    rule_mean, matched, excess, plain_excess = stats(np.ones(m))
+    rng = np.random.default_rng(seed)
+    boot = []
+    for _ in range(draws):
+        w = np.bincount(rng.integers(0, m, m), minlength=m).astype(float)
+        boot.append(stats(w))
+    boot = np.array(boot)
+
+    def ci(col_i):
+        b = boot[:, col_i]
+        b = b[np.isfinite(b)]
+        lo, hi = np.percentile(b, [2.5, 97.5])
+        return [round(float(lo), 4), round(float(hi), 4)]
+
+    r_c = rc.sum(axis=0)
+    b_c, b_s = bc.sum(axis=0), bs.sum(axis=0)
+    by_band = []
+    lows = [None, *edges]
+    highs = [*edges, None]
+    for i in range(nb):
+        base = round(float(b_s[i] / b_c[i]), 4) if b_c[i] else None
+        by_band.append(
+            {
+                "lo": lows[i],
+                "hi": highs[i],
+                "rule_bets": int(r_c[i]),
+                "rule_share": round(float(r_c[i] / r_c.sum()), 4),
+                "baseline_rows": int(b_c[i]),
+                "baseline_clv": base,
+            }
+        )
+    return {
+        **out,
+        "rule_clv": round(float(rule_mean), 4),
+        "rule_clv_ci95": ci(0),
+        "baseline_matched": round(float(matched), 4),
+        "excess": round(float(excess), 4),
+        "ci95": ci(2),
+        "baseline_plain": round(float(bs.sum() / bc.sum()), 4),
+        "excess_plain": round(float(plain_excess), 4),
+        "excess_plain_ci95": ci(3),
+        "by_band": by_band,
+    }
+
+
+def verdict(c: dict, excess: dict, min_bets: int = MIN_JUDGED_BETS) -> str:
+    """§16 (as amended 1 Nov 2026): pass when c's range and the matched CLV excess's range both
+    lie above 0 with at least `min_bets` bets; inconclusive when c's range lies above 0 but
+    there are fewer bets; fail otherwise."""
+    c_ok = bool(c.get("ci95")) and c["ci95"][0] > 0
+    if not c_ok:
+        return "fail"
+    if (excess.get("bets") or 0) < min_bets:
+        return "inconclusive"
+    return "pass" if excess.get("ci95") and excess["ci95"][0] > 0 else "fail"
+
+
 def _logit(p):
     p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
     return np.log(p / (1 - p))
@@ -226,11 +367,12 @@ def _clv(j: pd.DataFrame, col: str) -> dict:
             "missing": int((~ok).sum())}  # fmt: skip
 
 
-def describe(j: pd.DataFrame, t: float, col: str = "p_B") -> dict:
-    """Development-only descriptive numbers at threshold `t` for chance column `col`."""
+def describe(j: pd.DataFrame, t: float, col: str = "p_B", edges=None) -> dict:
+    """Development-only descriptive numbers at threshold `t` for chance column `col`; with
+    `edges`, also the price-matched CLV excess (§16's judged measure, here descriptive)."""
     if not len(j):
         return {"rows": 0}
-    bets = j[j[col] * j["entry_odds"] - 1 >= t]
+    bets = j[bets_at(j, t, col)]
     profit = np.where(bets["scored"] == 1, bets["entry_odds"] - 1, -1.0)
     rng = bootstrap_mean(profit, bets["match_id"].to_numpy()) if len(bets) > 1 else None
     roi = (float(profit.mean()), *rng) if rng else None
@@ -247,4 +389,5 @@ def describe(j: pd.DataFrame, t: float, col: str = "p_B") -> dict:
         "roi": {"mean": round(roi[0], 4), "ci95": [round(roi[1], 4), round(roi[2], 4)]}
         if roi
         else None,
+        **({"clv_matched": matched_excess(j, t, edges, col)} if edges else {}),
     }

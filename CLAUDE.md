@@ -86,8 +86,12 @@ Model quality only, not a priced test; nothing live changes unless the owner dec
 A priced test of B against bookmakers' anytime-goalscorer prices is being set up: the step-0
 probe (1 Nov, run 41339771090, 235 credits) found all five leagues priced live and in 2025/26–2026/27
 history (DraftKings and FanDuel except in D1), no book with a "No" price, and 75–97% of names matching
-Understat; the pre-registration is `docs/player_props.md` §16 (B primary; c range and best-to-best CLV range above 0
-on ≥300 bets, beside a no-rule CLV baseline; 600 matches or 31 Jan 2027, read once).
+Understat; the pre-registration is `docs/player_props.md` §16 (B primary; pass = c's range above 0 and,
+on ≥300 bets, the range of the rule's best-to-best CLV minus a price-matched no-rule baseline above 0
+(amended 1 Nov before any judged read: starter prices drift ~3% into kickoff); 600 matches or 31 Jan
+2027, read once). T = 20% from the 2025/26 development (run 41346853368; descriptive there: c 0.49,
+rule CLV +7.6% vs baseline +2.85%, ROI −3.8%). Development cost 35,688 credits; the window's history
+since 10 Oct 3,101 (bought, not read); live logging runs in `publish.yml`.
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
@@ -819,9 +823,15 @@ the owner's baseball app, so the balance can drop without any run here.
   names by `match_in_fixture` within the two clubs; `entry_odds`, `entry_book`, `close_best`,
   `close_same`), `t_volume` (bets per match at `T_CANDIDATES`; T = the largest with ≥ 0.3, else
   5%), `blend_c` (c with a 2,000-draw match bootstrap), `describe` (development only: gap, c,
-  baseline and rule CLV best-to-best, same-book CLV, hit rate, ROI). CLI `goalscorer-dev --league`
-  (2025/26 rows from 2025-07-01, `--out judged_<league>.csv.gz`) and `goalscorer-dev-pool --dir`
-  (`GOALSCORER_DEV_JSON`), run by `goalscorer-test.yml`.
+  baseline and rule CLV best-to-best, same-book CLV, hit rate, ROI, and with `edges` the
+  matched excess). The judged measure (amended 1 Nov): `T_JUDGED` 0.20, `PRICE_BAND_EDGES`
+  (five entry-price bands, lo < odds ≤ hi, the development rule bets' odds quintiles),
+  `band_edges`, `band_of`, `matched_excess` (rule CLV minus the no-rule baseline reweighted to
+  the rule's band mix, one shared match bootstrap, 2,000 draws, seed 0; also the unweighted
+  baseline and excess and `by_band`) and `verdict` (pass / inconclusive / fail, ≥ 300 bets).
+  CLI `goalscorer-dev --league` (2025/26 rows from 2025-07-01, `--out judged_<league>.csv.gz`)
+  and `goalscorer-dev-pool --dir` (prints the band edges; `GOALSCORER_DEV_JSON`), run by
+  `goalscorer-test.yml`.
 - `player_goal_live.py` (§16 step 2, lead-approved 1 Nov): the live anytime-goalscorer log.
   `publish.run` calls `run` after ESPN's team news when `GOALSCORER_DIR` is set (default branch
   only; `GOALSCORER_STATE` holds data-log's call record). `due_snapshot`: entry at 20–75 min

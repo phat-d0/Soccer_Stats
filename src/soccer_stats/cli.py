@@ -2813,10 +2813,22 @@ def cmd_goalscorer_dev_pool(args: argparse.Namespace) -> None:
     vol = gp.t_volume(j)
     print("Volume by T (pooled, no result read): " + json.dumps(vol))
     print(f"T = {vol['T']} ({vol['rule']})")
-    out = {"volume": vol, "T": vol["T"], "describe": gp.describe(j, vol["T"]) if len(j) else {}}
+    # §16 (1 Nov 2026): the five entry-price bands are the development rule bets' odds
+    # quintiles at T (no result, no CLV); the fixed copy is gp.PRICE_BAND_EDGES.
+    dev_edges = gp.band_edges(j, vol["T"]) if len(j) else []
+    edges = list(gp.PRICE_BAND_EDGES) if gp.PRICE_BAND_EDGES else dev_edges
+    print(f"Price-band edges (development rule bets' odds quintiles at T): {dev_edges}; "
+          f"used: {edges}")  # fmt: skip
+    out = {
+        "volume": vol,
+        "T": vol["T"],
+        "band_edges_dev": dev_edges,
+        "band_edges": edges,
+        "describe": gp.describe(j, vol["T"], edges=edges) if len(j) else {},
+    }
     if len(j):
         out["by_league"] = {
-            lg: {"volume": gp.t_volume(g), "describe": gp.describe(g, vol["T"])}
+            lg: {"volume": gp.t_volume(g), "describe": gp.describe(g, vol["T"], edges=edges)}
             for lg, g in j.groupby("league")
         }
     print(
