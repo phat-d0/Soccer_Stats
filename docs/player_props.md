@@ -995,3 +995,157 @@ from the default branch):
 - **Departure from the scope:** the scope priced one close per league for 2023/24–2026/27.
   The lead approved 2025/26 only as development, so the probe spends that budget on
   2025/26 and 2026/27 at both snapshots the test would use.
+
+### Probe result (run 41339771090, 1 Nov 2026, 235 of 250 credits)
+
+Every planned call answered (HTTP 200). The cost headers summed to 235: live 25, lists 10,
+snapshots 200. The key's balance was 4,999,734 before and 4,999,499 after. The bodies are
+in the paid `player-odds-history-` cache (key `player-odds-history-41339771090`), and the
+archive job dispatched `caches.yml`.
+
+**Who prices anytime goalscorer** (players priced per book; one match per row):
+
+| League | Live (all regions) | 2025/26 at kickoff − 50 min | 2026/27 at kickoff − 50 min |
+| --- | --- | --- | --- |
+| E0 | 20 books, incl. DraftKings 39, FanDuel 20, BetMGM 31, Caesars 38, Bovada 39, 1xBet 39, Kambi 31, Betfair exchange 22–38 | 1xBet 44, Bovada 43, DraftKings 43, Kambi 30 | 1xBet 40, TAB 34, Caesars 33, ReBet 32, Bovada 25, DraftKings 19, Betfair AU 19 |
+| SP1 | 13, incl. Betfair exchange 41–47, 1xBet 24, DraftKings 20, FanDuel 19, BetMGM 19, Kambi 18 | 1xBet 45, DraftKings 44, FanDuel 41, Kambi 34 | DraftKings 39, FanDuel 38, William Hill 38, Sportsbet 38, Kambi 34, BetMGM 16 |
+| D1 | 5: Kambi 20, TABtouch 20, PointsBet AU 14 | Bovada 38, Kambi 25 | Kambi 30, TABtouch 29, BetMGM 17 |
+| I1 | 12, incl. DraftKings 34, Betfair exchange 32, FanDuel 31, Kambi 24, BetMGM 20 | DraftKings 32, Kambi 28, FanDuel 14 | Betfair exchange 45, DraftKings 45, William Hill 45, FanDuel 44, Kambi 32 |
+| F1 | 13, incl. Betfair exchange 39, 1xBet 39, ESPN BET 35, DraftKings 21, FanDuel 20, BetMGM 20, Kambi 20 | 1xBet 42, DraftKings 35, FanDuel 35, Kambi 26 | Betfair exchange 35, ESPN BET 30, Kambi 19, FanDuel 18, DraftKings 17, BetMGM 15 |
+
+- **All five leagues are priced, live and in both seasons' history**, at the entry and
+  the close.
+- **DraftKings and FanDuel now price it** (they didn't in the 7 Oct EPL probe, §6), except
+  in the Bundesliga, where no US book but BetMGM and the Kambi books appear.
+- **No book lists a "No" price: 0 two-sided lines in all 25 snapshots.** So there is
+  still no fair price.
+- **The Betfair exchange's numbers look wrong for this market:** average Yes odds of 1.7–7.0
+  in 14 of its 18 book-snapshots (9.5–14.4 in the other four), when DraftKings averages
+  9.7–14.5 in the same matches. Those
+  can't be real back prices for "to score". They are left out of the judged price
+  until checked (§16).
+- **Fewer players are priced at the close:** books drop players not in the lineup, so a
+  close holds 16–45 names where the entry held 17–45.
+- **Name matching:** 75–97% of priced names land on the two clubs' Understat players.
+  - Most misses are full legal names ("Carlos Baleba Noom Quomah", "Joao Pedro Junqueira de
+    Jesus", "Gleison Bremer Silva Nascimento") or new and young players with no Understat
+    row yet.
+  - Every snapshot also carries a "No Scorer" line, which is not a player.
+  - Overrides in `player_names.csv` and dropping "No Scorer" come before any scoring (§16).
+
+## 16. Priced goalscorer test: pre-registration (2026-11-01; binding once merged with the lead's sign-off)
+
+Written after the probe (§15), which read no result, and before any further price is
+bought. Steps 1–3 buy nothing until this section is merged. A change after the merge is
+recorded here as a dated departure, never made silently.
+
+**Caveat, stated first:** the forward window's model-quality results (§14: B and B-cal
+against the season benchmarks) were read on 1 Nov, and this test judges matches in that same
+window. The priced test uses no choice made from those results:
+- B is primary because §10b made it so on 8 Oct;
+- the edge threshold T comes from the 2025/26 development season;
+- no price has been joined to any result.
+
+So the window stays usable for this test, but it is not untouched.
+
+### Question
+
+Does model B carry information about who scores beyond bookmakers' anytime-goalscorer
+prices? And do its bets beat the closing price? Nothing goes live from this:
+`PLAYER_PAPER_TRADES` stays False, and any live use is the owner's decision.
+
+### Model and rows
+
+- **Primary model: B** (lineup known; walk-forward fits on earlier matches only, exactly
+  as scored in §10b and §14). **B-cal** gets the same measures beside it, descriptive only.
+  A (before lineups) is not scored.
+- **Rows:** Understat starters in E0, SP1, D1, I1 and F1 whose name matches a priced name
+  at the entry snapshot.
+  - Matching uses `match_in_fixture` within the match's two clubs, after `player_names.csv`
+    overrides for the legal-name misses that §15 and step 1 show. The overrides are
+    written before any result is joined.
+  - "No Scorer" and unmatched names are dropped and counted.
+  - A starter needs at least 3 earlier appearances (as §10b).
+
+### Prices and snapshots
+
+- **Books (one ten-book list, one region):** draftkings, fanduel, betmgm, betrivers,
+  williamhill_us, bovada, espnbet, onexbet, williamhill, betfair_ex_uk.
+- **Entry price:** the best Yes price among the first nine (the bookmakers) at the entry
+  snapshot; implied chance = 1 / odds.
+  - The Betfair exchange is logged but kept out of the judged price, because its §15
+    numbers aren't plausible back prices.
+  - A per-book breakdown is descriptive.
+- **Entry snapshot:** kickoff − 50 min in history.
+  - Live, it is the first call after ESPN's `first_confirmed_at` for the match, and no
+    earlier than kickoff − 75 min.
+  - If the lineup isn't confirmed by kickoff − 30 min, the entry is taken at kickoff − 30
+    min.
+- **Close:** kickoff − 2 min in history. Live, it is the last call before kickoff, which
+  must be within 20 min of it; otherwise the bet has no close.
+- **Judged CLV of a bet** = best entry odds ÷ best close odds − 1, where both are the
+  maximum Yes price for that player over the same nine bookmakers (at the entry snapshot
+  and at the close).
+  - This compares like with like. Taking the best of nine prices at entry and then
+    measuring against that one book's own close would favour a pass with no skill: the
+    book that is briefly highest tends to fall back.
+  - A bet with no close price at any of the nine has no CLV and is counted.
+- **Same-book CLV** (entry odds ÷ the entry book's own close − 1) is descriptive only.
+
+### Measures and pass rule (read once)
+
+1. **Information (c):** logistic regression on the judged rows,
+   logit P(scored) = a + b·logit(implied) + c·logit(p_B). Its 95% range comes from 2,000
+   bootstrap draws resampling whole matches.
+2. **CLV of the rule's bets:** a starter is a bet when p_B × best entry odds − 1 ≥ T, at
+   the best price, one bet per player per match, $1. The judged measure is the mean
+   best-to-best CLV (above), with a 95% range from 2,000 match-resampled draws.
+3. **Baseline (descriptive):** the same best-to-best CLV over every judged starter priced
+   at entry, with no rule. It is reported beside the rule's CLV.
+   - It shows how prices drift between entry and close for everyone.
+   - If the baseline's 95% range lies clearly above 0, the measure still carries a bias,
+     and the result says so beside the verdict (the verdict itself is unchanged).
+
+- **T, the edge threshold**, is fixed from the 2025/26 development season by volume alone.
+  T is the smallest of 5%, 8%, 12%, 16% and 20% that gives at least 0.3 bets a match there.
+  It never uses a result or a CLV.
+  - If development is not bought, or fails the plumbing checks, T = 12%.
+  - Development may set nothing else. Its c, CLV and ROI are reported as development and
+    cannot change this section.
+- **Verdict:**
+  - **pass:** c's range lies above 0, and the mean CLV's range lies above 0 on at least 300
+    bets with a CLV;
+  - **inconclusive:** c's range lies above 0 but there are fewer than 300 bets with a CLV;
+  - **fail:** otherwise.
+  - The verdict is model-quality-against-the-market only; a pass is not a live decision.
+- **Descriptive:**
+  - the baseline CLV (measure 3) and same-book CLV;
+  - ROI at the entry price;
+  - the gap (mean implied − scoring rate);
+  - hit rate;
+  - every measure per league, per book, and for B-cal.
+
+### Judged sample and when it is read
+
+- **Matches:** E0, SP1, D1, I1 and F1, kicking off from **2026-10-10**.
+- **Stopping rule:** stop at the earlier of **600 judged matches** (a match with at least one
+  judged row) or matches kicking off by **2027-01-31 23:59 UTC**.
+- **The read:** once, after the last of them is settled. Nothing is computed on judged
+  results before then; the plumbing checks read prices and names only.
+- **Matches since 10 Oct** come from history (step 1). **Matches from the start of live
+  logging** come from the live calls (step 2). History is bought only for matches the live
+  log lacks.
+
+### Steps and credits (approved at these estimates once this section merges)
+
+| Step | What | Credits |
+| --- | --- | --- |
+| 1 | History for the forward window since 10 Oct (~240 matches × 2 snapshots × 10, plus ~100 event lists) | ~4,900 |
+| 2 | Live logging in `publish.yml` (entry and close, 1 credit a call, call record on data-log, never fetched twice; monthly cap 3,000, 3,000 reserve) through the end of the judged window, then the lead decides | ~2,200–4,400 |
+| 3 | 2025/26 development, approved in principle by the lead (sets T only) | ~35,000 |
+
+### Expectations, stated now
+
+My prior for a pass is about 10–15%, or about 20% for c alone. Every price is Yes only, with
+an overround of roughly 50% (§6), so a profitable rule is unlikely even if B carries
+information.
