@@ -10,3 +10,6 @@
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"c7ad58db2278db2259846b11c28ae1c2","home":"Goztepe","away":"Basaksehir","kickoff":"2026-11-07T16:00:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"5706f8b2f4d8a94519bbea0efc91e36b","home":"Amed SK","away":"Ey\u00fcpspor","kickoff":"2026-11-01T10:29:00+00:00","fetched_at":"2026-11-01T11:15:40+00:00"}
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"cf2febfddf729564889172cf83e8fbab","home":"\u00c7aykur Rizespor","away":"Erzurum BB","kickoff":"2026-11-08T10:30:00+00:00","fetched_at":"2026-11-01T11:15:40+00:00"}
+{"league":"T1","sport":"soccer_turkey_super_league","event_id":"f4e049de3ce6858d46dd45ab5cfa0e8c","home":"Basaksehir","away":"Samsunspor","kickoff":"2026-11-01T12:59:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
+{"league":"T1","sport":"soccer_turkey_super_league","event_id":"cd2960ff2b4d605144a83562b0085400","home":"Trabzonspor","away":"Gazi\u015fehir Gaziantep","kickoff":"2026-11-01T12:59:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
+{"league":"T1","sport":"soccer_turkey_super_league","event_id":"6692a3ca274d09ffbfabd943320d62f5","home":"\u00c7orum FK","away":"Fenerbahce","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
