@@ -24,7 +24,7 @@ on:
         type: boolean
         default: true
       goal_forward_reason:
-        description: "Opens the goalscorer forward window (from 2026-10-10) in E0_goals.json; blank keeps it locked"
+        description: "Opens the goalscorer forward window (from 2026-10-10) in E0_goals.json; blank uses the recorded 1 Nov opening (player_goals.FORWARD_OPENED)"
         default: ""
 
 permissions:

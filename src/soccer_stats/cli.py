@@ -2263,7 +2263,8 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
             trades.to_csv(args.out, index=False)
 
     # Anytime goalscorer, stage 1 (no odds): same appearances and match model.
-    # The forward window (from 2026-10-10) stays out until opened with its reason.
+    # The forward window (from 2026-10-10) was opened once on 1 Nov 2026; the opening is
+    # recorded in player_goals.FORWARD_OPENED, so runs without a reason include it too.
     goals = {
         "generated_at": out["generated_at"],
         "seasons": args.seasons,
@@ -2274,6 +2275,8 @@ def cmd_backtest_players(args: argparse.Namespace) -> None:
         f"Goalscorer forward window from {fw['start']}: "
         + ("open" if fw["open"] else f"locked, {fw['dropped']} appearances left out")
     )
+    for line in fw["log"]:
+        print(f"Goalscorer forward window log: {line}")
     _print_goals(goals)
 
     print(f"\n=== Player model, {args.seasons} (stage 1: no odds) ===")
@@ -3392,7 +3395,8 @@ def main(argv: list[str] | None = None) -> None:
         "--goal-forward-reason",
         default="",
         help="opens the goalscorer forward window (from 2026-10-10) in E0_goals.json; "
-        "blank keeps it locked (docs/player_props.md §10b)",
+        "blank uses the recorded opening (player_goals.FORWARD_OPENED, 1 Nov 2026), "
+        "or keeps a window with no record locked (docs/player_props.md §10b, §14)",
     )
     bp.set_defaults(func=cmd_backtest_players)
 
