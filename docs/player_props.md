@@ -1149,3 +1149,17 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
 My prior for a pass is about 10–15%, or about 20% for c alone. Every price is Yes only, with
 an overround of roughly 50% (§6), so a profitable rule is unlikely even if B carries
 information.
+
+### Building the steps (2026-11-01, after the sign-off)
+
+- **Steps 3 and 1, the history:** `player_goal_backfill.py` (`odds-check.yml`
+  `task=goalscorer-backfill`).
+  - `design=dev` buys 2025/26 for step 3.
+  - `design=forward` buys 2026/27 from 10 Oct for step 1, matches kicked off at least 3 h ago.
+  - Per league and match day: one events list, then each event at the entry and the close
+    with the ten books above.
+  - A dry run (`cap=0`) comes first. Every body is cached in the paid `player-odds-history-`
+    cache, and a recorded answer is never bought twice.
+- **The development analysis** that fixes T (bets per match at each candidate threshold,
+  from B's 2025/26 walk-forward chances on the matched starters) and the live log (step 2)
+  come in their own PRs.
