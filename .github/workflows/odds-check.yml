@@ -107,6 +107,11 @@
 #   goalscorer: the anytime-goalscorer stage-0 live probe and 5-match pilot
 #             (docs/player_props.md), never past `cap` credits (0 = no calls); prints
 #             the books, margins, name matches, measures and the pre-registered verdict.
+#   goalscorer-probe: priced goalscorer test, step 0 (lead-approved 1 Nov, cap 250): per
+#             league (E0, SP1, D1, I1, F1) one live match at all five regions, then one
+#             Saturday match in 2025/26 and 2026/27 at kickoff - 50 and - 2 min (ten books);
+#             books, two-sided lines and Understat name matches. Bodies go into the paid
+#             player-odds-history cache (never bought twice). No result is read.
 #   goal-lab: the goalscorer model improvements (docs/player_props.md section 8),
 #             development seasons; `reason` opens the locked 2026/27 forward window
 #             (once, logged). No credits.
@@ -134,12 +139,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
         default: coverage
       cap:
-        description: "props / goalscorer / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / goalscorer-probe / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -376,7 +381,7 @@ jobs:
           restore-keys: cup-corners-
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || (inputs.task == 'goalscorer-probe' && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
@@ -515,6 +520,8 @@ jobs:
               if [ -d data/raw/corner_history ]; then cp -r data/raw/corner_history out/; fi ;;
             goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
                      --json out/goalscorer_pilot.json ;;
+            goalscorer-probe)  # priced goalscorer step 0 (lead-approved 1 Nov, cap 250); no results read
+              uv run soccer-stats goalscorer-probe --cap "$CAP" --json out/goalscorer_probe.json ;;
             goal-lab)
               curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \
                 "https://api.github.com/repos/${{ github.repository }}/actions/jobs/112639640656/logs" \
@@ -600,7 +607,7 @@ jobs:
       # The goalscorer probe and pilot write their bought lines into the restored
       # player-odds-history folder: saved so they outlive the run (paid data).
       - uses: actions/cache/save@v4
-        if: ${{ always() && inputs.task == 'goalscorer' && inputs.cap != '0' }}
+        if: ${{ always() && (inputs.task == 'goalscorer' || inputs.task == 'goalscorer-probe') && inputs.cap != '0' }}
         with:
           path: data/raw/player_odds_history
           key: player-odds-history-${{ github.run_id }}

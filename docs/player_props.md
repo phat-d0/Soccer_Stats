@@ -962,3 +962,34 @@ Fitted on each league's 2023/24–2025/26 starters from the locked rows, as regi
 - Weekly `players.yml` runs on the schedule pass no reason, so they go back to the locked
   `E0_goals.json` (live split to 9 Oct) until the lead decides to switch them (§ "Weekly
   `E0_goals.json` stops at the forward window").
+
+## 15. Priced goalscorer test: step 0, the probe (lead-approved 2026-11-01, cap 250)
+
+The forward pass (§14) is about model quality only. The next honest step is a priced
+test of B against bookmakers' anytime-goalscorer prices. The lead's decisions (1 Nov):
+- B is the primary model, keeping §10b's order; B-cal is reported beside it.
+- Step 0, this probe, is approved at ≤ 250 credits.
+- The 2025/26 development season (~35,000 credits) is approved in principle if the probe
+  shows the other leagues are priced in history. It may only set the edge threshold and
+  check the plumbing.
+- The pre-registration (the c-range and CLV rules, 600 matches or 31 Jan 2027, at least
+  300 bets, read once) comes after the probe, for the lead's sign-off, before anything
+  else is bought.
+
+**What the probe asks** (`player_goal_probe.py`, `odds-check.yml` `task=goalscorer-probe`,
+from the default branch):
+- **Live, per league (E0, SP1, D1, I1, F1):** upcoming matches in kickoff order, all five
+  regions, until one is priced (at most 5 credits a call; an empty answer costs 0).
+- **History, per league, 2025/26 and 2026/27:** one historical events list on a Saturday
+  (1 November 2025, 31 October 2026; 1 credit) and the first match from 11:00 UTC that day,
+  at the planned entry (kickoff − 50 min, after lineups) and close (kickoff − 2 min), with one
+  ten-book list (10 credits each). The list is the books found live in that league, topped
+  up with the books seen pricing the Premier League in §6.
+- **Worst case:** 25 live + 10 lists + 20 snapshots × 10 = 235 credits.
+- **Reported:** per snapshot, which books price it and for how many players, any two-sided
+  (Yes and No) lines, and how many priced names match the two clubs' Understat players.
+- **Not read:** no result, start or model chance is joined. The bodies are kept in the paid
+  `player-odds-history-` cache and never bought twice.
+- **Departure from the scope:** the scope priced one close per league for 2023/24–2026/27.
+  The lead approved 2025/26 only as development, so the probe spends that budget on
+  2025/26 and 2026/27 at both snapshots the test would use.
