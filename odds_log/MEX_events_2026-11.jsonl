@@ -7,3 +7,6 @@
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"aa1aedf26c4af7a878d368957721b84e","home":"Atl\u00e9tico San Luis","away":"FC Ju\u00e1rez","kickoff":"2026-11-07T01:00:00+00:00","fetched_at":"2026-10-31T05:23:55+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"90e0f4548382be5b3aa1f9391728a520","home":"Necaxa","away":"Tijuana","kickoff":"2026-11-07T01:00:00+00:00","fetched_at":"2026-10-31T05:23:55+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"cfd69045a3b7fa67d80438040ca62e28","home":"Atlante FC","away":"Santos Laguna","kickoff":"2026-11-07T03:00:00+00:00","fetched_at":"2026-10-31T05:23:55+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"7435027a7b7fa1a9b750080b68477664","home":"Tigres","away":"Cruz Azul","kickoff":"2026-11-07T23:00:00+00:00","fetched_at":"2026-11-01T03:22:46+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"45fe0042959aa9830b0090f13dd73164","home":"Toluca","away":"Monterrey","kickoff":"2026-11-08T01:00:00+00:00","fetched_at":"2026-11-01T03:22:46+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"855f868ca1fa329da3e3374347d4911e","home":"Pumas","away":"Am\u00e9rica","kickoff":"2026-11-08T03:00:00+00:00","fetched_at":"2026-11-01T03:22:46+00:00"}
