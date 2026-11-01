@@ -1,0 +1,90 @@
+# Priced goalscorer test (docs/player_props.md §16), step 3: the 2025/26 development read.
+# One job per league joins B's 2025/26 walk-forward chances (starters, lineup known) to the
+# anytime-goalscorer prices player_goal_backfill cached (paid player-odds-history cache,
+# restore only); a pooling job applies §16's volume rule for T (largest of 5/8/12/16/20%
+# with at least 0.3 bets a match, else 5%) and prints development-only descriptive numbers.
+# No API key, no credits, never pushes. Results in the log (GOALSCORER_DEV_JSON) and a
+# 7-day artifact.
+name: Goalscorer priced test
+
+on:
+  workflow_dispatch:
+    inputs:
+      design:
+        description: "dev = the 2025/26 development read (sets T only)"
+        type: choice
+        options: [dev]
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  league:
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04
+    timeout-minutes: 150  # a league's Understat files and walk-forward refits
+    strategy:
+      fail-fast: false
+      matrix:
+        league: [E0, SP1, D1, I1, F1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # Free data first (restore only), then the paid prices on top.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-data-none
+          restore-keys: raw-data-
+      - uses: actions/cache/restore@v4
+        if: ${{ matrix.league != 'E0' }}
+        with:
+          path: data/raw
+          key: understat-${{ matrix.league }}-none
+          restore-keys: understat-${{ matrix.league }}-
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/player_odds_history
+          key: player-odds-history-none
+          restore-keys: player-odds-history-
+      - name: Rebuild the paid player-odds-history cache from the archive if it missed
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: player-odds-history
+      - name: Join B's chances to the prices
+        env:
+          LEAGUE: ${{ matrix.league }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          uv run soccer-stats goalscorer-dev --league "$LEAGUE" --out "out/judged_${LEAGUE}.csv.gz"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: goalscorer-dev-${{ matrix.league }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  pool:
+    needs: league
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: goalscorer-dev-*
+          path: out
+      - name: T by the volume rule, then the development description
+        run: |
+          uv sync --frozen
+          uv run soccer-stats goalscorer-dev-pool --dir out --json out/goalscorer_dev.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: goalscorer-dev-pooled
+          path: out/goalscorer_dev.json
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1172,6 +1172,13 @@ Nothing had been bought for development when it was changed.
     with the ten books above.
   - A dry run (`cap=0`) comes first. Every body is cached in the paid `player-odds-history-`
     cache, and a recorded answer is never bought twice.
-- **The development analysis** that fixes T (bets per match at each candidate threshold,
-  from B's 2025/26 walk-forward chances on the matched starters) and the live log (step 2)
-  come in their own PRs.
+- **The development analysis** (`goalscorer-test.yml`, `player_goal_priced.py`):
+  - B's 2025/26 walk-forward chances come from refits anchored at 2025-07-01 on all earlier
+    matches. The refit dates can differ slightly from §11's 2023-anchored run; this is
+    development only.
+  - Each league's starters are joined to the cached prices.
+  - T comes from the pooled bets per match at each candidate (volume only).
+  - The development c, CLV (best-to-best, with the no-rule baseline) and ROI at that T are
+    printed as development only.
+  - B-cal is not in the development read; it joins the judged read.
+- **The live log (step 2)** comes in its own PR.

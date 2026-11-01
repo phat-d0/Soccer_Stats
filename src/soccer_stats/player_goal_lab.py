@@ -471,6 +471,10 @@ def scored_rows(feats, league, start, end, holdout=None, seasons=None) -> pd.Dat
             "bench_xg": 1 - np.exp(-r["season_avg_xg"].clip(lower=1e-4).to_numpy()),
         }
     )
+    # Who and where (for joining prices by name, docs/player_props.md §16); extra columns only.
+    for col in ("player_id", "player", "team", "home"):
+        if col in r:
+            out[col] = r[col].to_numpy()
     if seasons is not None:
         out = out[out["season"].isin(seasons)]
     return out.reset_index(drop=True)

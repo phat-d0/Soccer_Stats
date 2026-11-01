@@ -2769,6 +2769,66 @@ def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_goalscorer_dev(args: argparse.Namespace) -> None:
+    """Priced goalscorer test, step 3 (docs/player_props.md §16): one league's 2025/26
+    starters with B's walk-forward chance joined to the cached prices; volume per T only."""
+    import json
+
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats import player_goal_priced as gp
+    from soccer_stats.lab.harness import Holdout
+
+    feats = _goal_league_feats(args.league, "")
+    rows = gl.scored_rows(
+        feats,
+        args.league,
+        pd.Timestamp("2025-07-01", tz="UTC"),
+        gl.FORWARD_START,
+        Holdout(gl.FORWARD_START),
+        ("2526",),
+    )
+    pr = gp.price_rows(args.league)
+    j, counts = gp.join(rows, pr)
+    vol = gp.t_volume(j)
+    print(f"{args.league} 2025/26: {len(rows)} scored appearances; prices for "
+          f"{pr['event_id'].nunique() if len(pr) else 0} events")  # fmt: skip
+    print(f"{args.league} join: " + json.dumps(counts))
+    print(f"{args.league} volume (no result read): " + json.dumps(vol))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        j.to_csv(args.out, index=False)
+
+
+def cmd_goalscorer_dev_pool(args: argparse.Namespace) -> None:
+    """Pool the five leagues' development rows: T by the volume rule, then development-only
+    descriptive numbers at that T (docs/player_props.md §16)."""
+    import json
+
+    from soccer_stats import player_goal_priced as gp
+    from soccer_stats.publish import _clean
+
+    files = sorted(Path(args.dir).rglob("judged_*.csv.gz"))
+    j = pd.concat([pd.read_csv(f) for f in files], ignore_index=True) if files else pd.DataFrame()
+    print(f"Development rows: {len(j)} from {len(files)} files")
+    vol = gp.t_volume(j)
+    print("Volume by T (pooled, no result read): " + json.dumps(vol))
+    print(f"T = {vol['T']} ({vol['rule']})")
+    out = {"volume": vol, "T": vol["T"], "describe": gp.describe(j, vol["T"]) if len(j) else {}}
+    if len(j):
+        out["by_league"] = {
+            lg: {"volume": gp.t_volume(g), "describe": gp.describe(g, vol["T"])}
+            for lg, g in j.groupby("league")
+        }
+    print(
+        "Development, descriptive only (cannot change §16): " + json.dumps(_clean(out["describe"]))
+    )
+    for lg, d in (out.get("by_league") or {}).items():
+        print(f"Development {lg}: " + json.dumps(_clean(d["describe"])))
+    print("GOALSCORER_DEV_JSON " + json.dumps(_clean(out), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -3487,6 +3547,15 @@ def main(argv: list[str] | None = None) -> None:
     gp_.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     gp_.add_argument("--json", help="write the results as JSON")
     gp_.set_defaults(func=cmd_goalscorer_pilot)
+
+    gdv = sub.add_parser("goalscorer-dev", help="priced goalscorer step 3: one league's rows")
+    gdv.add_argument("--league", default="E0")
+    gdv.add_argument("--out", help="CSV(.gz) of the joined starters")
+    gdv.set_defaults(func=cmd_goalscorer_dev)
+    gdp = sub.add_parser("goalscorer-dev-pool", help="priced goalscorer step 3: T and description")
+    gdp.add_argument("--dir", default="out", help="folder with judged_<league>.csv.gz files")
+    gdp.add_argument("--json", help="write the results as JSON")
+    gdp.set_defaults(func=cmd_goalscorer_dev_pool)
 
     gbf = sub.add_parser(
         "goalscorer-backfill",

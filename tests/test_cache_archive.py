@@ -205,7 +205,7 @@ def _paths(v) -> list[str]:
 def _prefix(w: dict) -> str:
     """The key prefix a cache step restores or saves under ({league} for a dynamic one)."""
     key = w.get("restore-keys") or re.sub(r"(\$\{\{ github\.run_id \}\}|none)$", "", w["key"])
-    return key.replace("${{ inputs.league }}", "*")
+    return key.replace("${{ inputs.league }}", "*").replace("${{ matrix.league }}", "*")
 
 
 def _keepalive() -> list[dict]:
@@ -261,7 +261,7 @@ def test_every_paid_restore_is_followed_by_the_archive_fallback():
         assert nxt["with"]["name"] == paid[prefix]
         assert nxt.get("if") == s.get("if"), f"{wf} {job}: the fallback's condition differs"
         found += 1
-    assert found == 12
+    assert found == 13
 
 
 # ---------- bought data can't be left out of the archive ----------
