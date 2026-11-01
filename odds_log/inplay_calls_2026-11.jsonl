@@ -17,3 +17,4 @@
 {"league":"RUS","kinds":["inplay75"],"kickoffs":["2026-11-01T10:00:00+00:00"],"fetched_at":"2026-11-01T11:18:16+00:00","status":200,"cost":1,"credits_left":4999942,"events":8,"rows":1}
 {"league":"T1","kinds":["inplay55"],"kickoffs":["2026-11-01T10:29:00+00:00","2026-11-01T10:30:00+00:00"],"fetched_at":"2026-11-01T11:18:16+00:00","status":200,"cost":1,"credits_left":4999941,"events":11,"rows":1}
 {"league":"T1","kinds":["inplay75"],"kickoffs":["2026-11-01T10:29:00+00:00","2026-11-01T10:30:00+00:00"],"fetched_at":"2026-11-01T11:48:16+00:00","status":200,"cost":1,"credits_left":4999940,"events":11,"rows":0}
+{"league":"N1","kinds":["inplay55"],"kickoffs":["2026-11-01T11:15:00+00:00"],"fetched_at":"2026-11-01T12:13:15+00:00","status":200,"cost":1,"credits_left":4999939,"events":13,"rows":6}
