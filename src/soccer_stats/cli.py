@@ -2750,6 +2750,25 @@ def cmd_goalscorer_probe(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
+    """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
+    at the entry and close for the dev (2025/26) or forward (2026/27 from 10 Oct) design."""
+    import json
+
+    from soccer_stats import player_goal_backfill as gb
+    from soccer_stats.publish import _clean
+
+    res = gb.run(args.design, args.cap, minutes=args.minutes or None)
+    for line in res["log"][-15:]:
+        print(f"  {line}")
+    for line in gb.summary_lines(res):
+        print(line)
+    body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
+    print("GOALSCORER_BACKFILL_JSON " + body)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -3468,6 +3487,16 @@ def main(argv: list[str] | None = None) -> None:
     gp_.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     gp_.add_argument("--json", help="write the results as JSON")
     gp_.set_defaults(func=cmd_goalscorer_pilot)
+
+    gbf = sub.add_parser(
+        "goalscorer-backfill",
+        help="priced goalscorer test: historical prices at the entry and close (dev or forward)",
+    )
+    gbf.add_argument("--design", choices=["dev", "forward"], default="dev")
+    gbf.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
+    gbf.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
+    gbf.add_argument("--json", help="write the results as JSON")
+    gbf.set_defaults(func=cmd_goalscorer_backfill)
 
     gpr = sub.add_parser(
         "goalscorer-probe",
