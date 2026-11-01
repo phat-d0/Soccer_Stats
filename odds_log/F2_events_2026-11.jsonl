@@ -6,3 +6,6 @@
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"12e661a2aa5dc95aa7530fa0d9b1bf5c","home":"USL Dunkerque","away":"Guingamp","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-10-31T22:04:45+00:00"}
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"b34ca990cb7daf96d0a96dc33f609250","home":"Pau FC","away":"Nantes","kickoff":"2026-11-07T19:00:00+00:00","fetched_at":"2026-10-31T22:04:45+00:00"}
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"cb1988f7950962d316571dd0ed98b540","home":"Saint Etienne","away":"Stade Lavallois","kickoff":"2026-11-07T19:00:00+00:00","fetched_at":"2026-10-31T22:04:45+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"47b7fc7d25003a9083df3789f996281e","home":"Dijon","away":"Red Star","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"d5a74e1730cf9bd8bfe0488e3d064e35","home":"Grenoble","away":"Stade de Reims","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"658bb2b77031ef93a7ae893145b663b3","home":"Nancy","away":"Sochaux","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}

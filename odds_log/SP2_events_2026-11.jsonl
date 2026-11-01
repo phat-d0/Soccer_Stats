@@ -15,3 +15,5 @@
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"c9b00d678d1d9654496f868b321afa81","home":"Andorra CF","away":"Mallorca","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"f89b9247af7cc118faae54ec9f0934ee","home":"Tenerife","away":"Andorra CF","kickoff":"2026-11-02T13:00:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"d30d1bf02fe13e8aade539b76289bdc3","home":"Girona FC","away":"Almer\u00eda","kickoff":"2026-11-08T15:15:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"0377ed072a93f8b77593c0f001fda9ec","home":"Las Palmas","away":"CD Eldense","kickoff":"2026-11-08T17:30:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"76611e81a480e9f83b04f21c1cad402d","home":"Sporting Gij\u00f3n","away":"Real Valladolid CF","kickoff":"2026-11-08T17:30:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
