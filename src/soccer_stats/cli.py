@@ -2463,24 +2463,24 @@ def _print_bench(name: str, res: dict) -> None:
     )
 
 
-def _print_bcal(res: dict) -> None:
+def _print_bcal(res: dict, prefix: str = "B-cal") -> None:
     import json
 
-    for key, c in res["coefficients"].items():
-        print(f"B-cal {key}: {json.dumps(c)}")
+    for key, c in (res.get("coefficients") or {}).items():
+        print(f"{prefix} {key}: {json.dumps(c)}")
     for name, v in [("Pooled", res["pooled"]), *res["leagues"].items()]:
         if not v.get("rows"):
             continue
         b, bc = v["b"], v
         print(
-            f"B-cal {name}: {v['rows']} starters | log loss B {b['model']['log_loss']} -> "
+            f"{prefix} {name}: {v['rows']} starters | log loss B {b['model']['log_loss']} -> "
             f"B-cal {bc['model']['log_loss']}, B-cal vs B {bc['vs_B']['gain']} "
             f"{bc['vs_B']['range']}, vs xG B {b['vs']['season_xg']['gain']} -> B-cal "
             f"{bc['vs']['season_xg']['gain']}, 30%+ B {b['model']['share_30plus']:.1%} -> "
             f"B-cal {bc['model']['share_30plus']:.1%}"
         )
-        print(f"B-cal {name}: tail B {json.dumps(b['model']['tail'])}")
-        print(f"B-cal {name}: tail B-cal {json.dumps(bc['model']['tail'])}")
+        print(f"{prefix} {name}: tail B {json.dumps(b['model']['tail'])}")
+        print(f"{prefix} {name}: tail B-cal {json.dumps(bc['model']['tail'])}")
 
 
 def cmd_goal_pool(args: argparse.Namespace) -> None:
@@ -2518,9 +2518,20 @@ def cmd_goal_pool(args: argparse.Namespace) -> None:
         if not allh.empty:  # B-cal for the window is fitted on the locked history only
             fr, out["b_cal_forward_coefficients"] = gl.add_bcal(fr, allh)
         out["forward"] = gl.forward_report(fr)
-        print("Forward check: " + json.dumps(out["forward"].get("gate"), default=str))
-        if "b_cal" in out["forward"]:
-            print("Forward check, B-cal: " + json.dumps(out["forward"]["b_cal"]["gate"]))
+        fo = out["forward"]
+        # The window opens once, so the whole report goes to the log (artifacts may expire).
+        print(f"Forward window: {fo['matches']} matches, enough for the gate: {fo['enough']}")
+        if "pooled" in fo:
+            _print_bench("Forward pooled (95%)", fo["pooled"])
+            for lg, res in fo["leagues"].items():
+                _print_bench(f"Forward {lg} (95%, not gated)", res)
+        for key, c in (out.get("b_cal_forward_coefficients") or {}).items():
+            print(f"Forward B-cal fit {key}: {json.dumps(c)}")
+        if "b_cal" in fo:
+            _print_bcal(fo["b_cal"], prefix="Forward B-cal")
+        print("Forward check: " + json.dumps(fo.get("gate"), default=str))
+        if "b_cal" in fo:
+            print("Forward check, B-cal: " + json.dumps(fo["b_cal"]["gate"]))
     if args.json:
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
 

@@ -339,6 +339,9 @@ def test_bcal_forward_uses_locked_history_only(tmp_path, capsys):
     cli.main(["goal-pool", "--rows-dir", str(tmp_path), "--json", str(tmp_path / "p.json")])
     printed = capsys.readouterr().out
     assert "Forward check, B-cal:" in printed and "B-cal Pooled:" in printed
+    # The full forward report reaches the log, not only the gate line.
+    assert "Forward window: " in printed and "Forward pooled (95%):" in printed
+    assert "Forward B-cal Pooled:" in printed and "Forward B-cal fit E0 2627:" in printed
     import json
 
     rep = json.loads((tmp_path / "p.json").read_text())
