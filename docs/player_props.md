@@ -1097,14 +1097,24 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
 1. **Information (c):** logistic regression on the judged rows,
    logit P(scored) = a + b·logit(implied) + c·logit(p_B). Its 95% range comes from 2,000
    bootstrap draws resampling whole matches.
-2. **CLV of the rule's bets:** a starter is a bet when p_B × best entry odds − 1 ≥ T, at
-   the best price, one bet per player per match, $1. The judged measure is the mean
-   best-to-best CLV (above), with a 95% range from 2,000 match-resampled draws.
-3. **Baseline (descriptive):** the same best-to-best CLV over every judged starter priced
-   at entry, with no rule. It is reported beside the rule's CLV.
-   - It shows how prices drift between entry and close for everyone.
-   - If the baseline's 95% range lies clearly above 0, the measure still carries a bias,
-     and the result says so beside the verdict (the verdict itself is unchanged).
+2. **CLV of the rule's bets, against a price-matched baseline** (amended 1 Nov 2026, before
+   any judged number was read; see the second departure note below): a starter is a bet when
+   p_B × best entry odds − 1 ≥ T, at the best price, one bet per player per match, $1.
+   - The rule's CLV is the mean best-to-best CLV (above) of its bets.
+   - The baseline is the same best-to-best CLV over every judged starter priced at entry and
+     close, with no rule, **reweighted to the rule's mix over five entry-price bands**: the
+     baseline's mean CLV in each band, weighted by the rule's share of bets in that band.
+   - The bands are fixed now (decimal odds, lo < odds ≤ hi): {BANDS}. Their edges are
+     the odds quintiles of the 2025/26 development rule bets at T = 20% (run {BANDRUN};
+     volume only, no result and no CLV used).
+   - **The judged measure is the excess:** the rule's mean CLV minus the matched baseline's,
+     both on the same judged matches. Its 95% range comes from one match bootstrap shared by
+     the rule and the baseline (2,000 draws, seed 0).
+   - Code: `player_goal_priced.matched_excess` and `verdict`; edges in
+     `PRICE_BAND_EDGES`, T in `T_JUDGED`.
+3. **Descriptive, beside the verdict:** the plain best-to-best CLV of the rule's bets, the
+   unweighted baseline (every judged starter, no rule) and the rule's excess over it, and the
+   same-book CLV.
 
 - **T, the edge threshold**, is fixed from the 2025/26 development season by volume alone.
   T is the **largest** of 5%, 8%, 12%, 16% and 20% that gives at least 0.3 bets a match
@@ -1115,13 +1125,13 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
   - Development may set nothing else. Its c, CLV and ROI are reported as development and
     cannot change this section.
 - **Verdict:**
-  - **pass:** c's range lies above 0, and the mean CLV's range lies above 0 on at least 300
-    bets with a CLV;
+  - **pass:** c's range lies above 0, and the matched CLV excess's range (measure 2) lies
+    above 0 on at least 300 bets with a CLV;
   - **inconclusive:** c's range lies above 0 but there are fewer than 300 bets with a CLV;
   - **fail:** otherwise.
   - The verdict is model-quality-against-the-market only; a pass is not a live decision.
 - **Descriptive:**
-  - the baseline CLV (measure 3) and same-book CLV;
+  - measure 3 (plain CLV, unweighted baseline and excess, same-book CLV);
   - ROI at the entry price;
   - the gap (mean implied − scoring rate);
   - hit rate;
@@ -1161,6 +1171,54 @@ the strictest threshold that still gives enough bets to reach 300 in the judged 
 rule now reads "the largest … that gives at least 0.3 bets a match, pooled over the five
 leagues; 5% if none does". Like the old rule, it uses volume only (no result, no CLV).
 Nothing had been bought for development when it was changed.
+
+### Departure, 2026-11-01, second (after the development read; before any judged number)
+
+The 2025/26 development read (descriptive, run 41346853368) showed that the best Yes price
+50 minutes before kickoff is about 3% longer than the best at 2 minutes for every starter,
+with no rule: the no-rule baseline CLV was +2.85% (+2.63% to +3.06%), above 0 in every
+league (E0 +1.5% to F1 +4.4%). Starter prices shorten into kickoff. As written, measure 2
+judged the rule's CLV against 0, so that drift alone could have passed the test without any
+skill. The lead approved changing the judged measure to the rule's CLV minus the no-rule
+baseline's. The baseline is reweighted to the rule's mix over five entry-price bands, since
+the rule picks a different mix of prices than the average starter and the drift may differ
+by price. The bands are the development rule bets' odds quintiles, fixed before the judged
+read. Pass now needs that excess's range above 0 on at least 300 bets, and c's range above 0
+as before. Nothing had been computed on the judged window (prices, CLV or results) when this
+was changed; its history was bought (step 1) but not read.
+
+### Development result (2025/26, run 41346853368; development only, descriptive)
+
+**T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes
+the largest; each league alone also gives 20%.
+
+| T | Bets | Per match |
+| --- | --- | --- |
+| 5% | 4,649 | 2.73 |
+| 8% | 4,000 | 2.35 |
+| 12% | 3,246 | 1.91 |
+| 16% | 2,648 | 1.55 |
+| 20% | 2,113 | 1.24 |
+
+1,704 matched development matches (E0 380 of 380, SP1 341 of 380, D1 306 of 306, I1 380 of
+380, F1 297 of 306) and 27,167 starter rows with prices. At 1.24 bets a match, 600 judged
+matches would give about 740 bets.
+
+These numbers are development only. They are descriptive and cannot change this section:
+
+- **c:** 0.49 (0.37 to 0.60); each league alone 0.45 to 0.51, every range above 0.
+- **No-rule baseline CLV (unweighted):** +2.85% (+2.63% to +3.06%) on 27,164 rows.
+- **The rule's CLV, best to best:** +7.61% (+6.85% to +8.40%) on 2,113 bets; same book
+  +13.1% (+11.8% to +14.4%; it carries the selection bias of picking the best price).
+- **Price-matched excess (the amended judged measure, here descriptive):** {EXCESS}
+- **Hit rate:** 9.5%. **ROI** at the entry price: −3.8% (−20.3% to +14.0%).
+- **Gap** (the best price's chance minus the rate scored): +2.85 points; the best price still
+  carries margin.
+
+Development spend: 35,688 credits (runs 41342996136 and 41344832136). Step 1, the judged
+window's history since 10 Oct: 3,101 credits (runs 41346901027, which stopped on an HTTP 502,
+and 41349243376), every listed match priced at entry and close (E0 30, SP1 30, D1 26, I1 40,
+F1 29 events); not read.
 
 ### Building the steps (2026-11-01, after the sign-off)
 
