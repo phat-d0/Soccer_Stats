@@ -130,3 +130,59 @@ def test_blend_c_finds_information_beyond_the_price():
     assert c["c"] > 0 and c["ci95"][0] > 0
     d = gp.describe(j.assign(close_best=j["entry_odds"], close_same=j["entry_odds"]), 0.12)
     assert d["baseline_clv"]["mean"] == 0 and d["bets"] > 0
+
+
+def test_price_bands_split_the_rule_bets_into_quintiles():
+    j = pd.DataFrame({"match_id": [f"m{i}" for i in range(10)],
+                      "entry_odds": [float(o) for o in range(2, 12)], "p_B": 0.9})  # fmt: skip
+    edges = gp.band_edges(j, 0.2)
+    assert edges == [3.8, 5.6, 7.4, 9.2]
+    # lo < odds <= hi: an odds equal to an edge sits in the lower band.
+    assert list(gp.band_of([3.8, 3.81, 2.0, 50.0], edges)) == [0, 1, 0, 4]
+    assert gp.band_edges(j.assign(p_B=0.01), 0.2) == []
+
+
+def drift_rows():
+    """Prices drift more on long shots; the rule bets only long shots, with the same drift."""
+    rng = np.random.default_rng(3)
+    rows = []
+    for m in range(400):
+        for odds, drift, p in ((2.5, 0.00, 0.30), (12.0, 0.08, 0.05), (12.0, 0.08, 0.20)):
+            noise = rng.normal(0, 0.02)
+            rows.append({"match_id": f"m{m}", "entry_odds": odds, "p_B": p,
+                         "close_best": odds / (1 + drift + noise), "scored": 0})  # fmt: skip
+    return pd.DataFrame(rows)
+
+
+def test_matched_excess_removes_the_drift_of_the_rule_price_mix():
+    j = drift_rows()
+    edges = [3.0, 6.0, 9.0, 11.0]
+    e = gp.matched_excess(j, 0.2, edges, draws=300)
+    assert e["bets"] == 400 and e["matches"] == 400
+    assert abs(e["rule_clv"] - 0.08) < 0.01
+    assert abs(e["baseline_matched"] - 0.08) < 0.01  # same band, same drift
+    assert abs(e["excess"]) < 0.005 and e["ci95"][0] < 0 < e["ci95"][1]
+    # Unweighted, the long-shot drift looks like skill.
+    assert e["excess_plain"] > 0.02 and e["excess_plain_ci95"][0] > 0
+    shares = {b["lo"]: b["rule_share"] for b in e["by_band"]}
+    assert shares[11.0] == 1.0
+
+
+def test_matched_excess_finds_a_real_edge_within_a_band():
+    j = drift_rows()
+    picked = j["p_B"] == 0.20
+    j.loc[picked, "close_best"] = (
+        j.loc[picked, "entry_odds"] / 1.12
+    )  # the rule's picks shorten more
+    e = gp.matched_excess(j, 0.2, [3.0, 6.0, 9.0, 11.0], draws=300)
+    assert e["excess"] > 0.015 and e["ci95"][0] > 0
+
+
+def test_verdict_needs_c_and_the_matched_excess():
+    c_ok, c_no = {"ci95": [0.1, 0.5]}, {"ci95": [-0.1, 0.5]}
+    ex_ok = {"bets": 400, "ci95": [0.01, 0.05]}
+    ex_no = {"bets": 400, "ci95": [-0.01, 0.05]}
+    assert gp.verdict(c_ok, ex_ok) == "pass"
+    assert gp.verdict(c_ok, ex_no) == "fail"
+    assert gp.verdict(c_no, ex_ok) == "fail"
+    assert gp.verdict(c_ok, {"bets": 200, "ci95": [0.01, 0.05]}) == "inconclusive"
