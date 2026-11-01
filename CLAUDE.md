@@ -86,8 +86,8 @@ Model quality only, not a priced test; nothing live changes unless the owner dec
 A priced test of B against bookmakers' anytime-goalscorer prices is being set up: the step-0
 probe (1 Nov, run 41339771090, 235 credits) found all five leagues priced live and in 2025/26–2026/27
 history (DraftKings and FanDuel except in D1), no book with a "No" price, and 75–97% of names matching
-Understat; the pre-registration is `docs/player_props.md` §16 (B primary; c range and CLV range above 0
-on ≥300 bets; 600 matches or 31 Jan 2027, read once).
+Understat; the pre-registration is `docs/player_props.md` §16 (B primary; c range and best-to-best CLV range above 0
+on ≥300 bets, beside a no-rule CLV baseline; 600 matches or 31 Jan 2027, read once).
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.

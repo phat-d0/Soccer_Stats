@@ -1039,6 +1039,15 @@ Written after the probe (§15), which read no result, and before any further pri
 bought. Steps 1–3 buy nothing until this section is merged. A change after the merge is
 recorded here as a dated departure, never made silently.
 
+**Caveat, stated first:** the forward window's model-quality results (§14: B and B-cal
+against the season benchmarks) were read on 1 Nov, and this test judges matches in that same
+window. The priced test uses no choice made from those results:
+- B is primary because §10b made it so on 8 Oct;
+- the edge threshold T comes from the 2025/26 development season;
+- no price has been joined to any result.
+
+So the window stays usable for this test, but it is not untouched.
+
 ### Question
 
 Does model B carry information about who scores beyond bookmakers' anytime-goalscorer
@@ -1074,9 +1083,14 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
     min.
 - **Close:** kickoff − 2 min in history. Live, it is the last call before kickoff, which
   must be within 20 min of it; otherwise the bet has no close.
-- **CLV of a bet** = entry odds ÷ the same book's close odds for that player − 1. The same
-  book's margin sits in both prices, so no fair price is needed. A bet whose book has no
-  close price for the player has no CLV and is counted.
+- **Judged CLV of a bet** = best entry odds ÷ best close odds − 1, where both are the
+  maximum Yes price for that player over the same nine bookmakers (at the entry snapshot
+  and at the close).
+  - This compares like with like. Taking the best of nine prices at entry and then
+    measuring against that one book's own close would favour a pass with no skill: the
+    book that is briefly highest tends to fall back.
+  - A bet with no close price at any of the nine has no CLV and is counted.
+- **Same-book CLV** (entry odds ÷ the entry book's own close − 1) is descriptive only.
 
 ### Measures and pass rule (read once)
 
@@ -1084,8 +1098,13 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
    logit P(scored) = a + b·logit(implied) + c·logit(p_B). Its 95% range comes from 2,000
    bootstrap draws resampling whole matches.
 2. **CLV of the rule's bets:** a starter is a bet when p_B × best entry odds − 1 ≥ T, at
-   the best book, one bet per player per match, $1. The judged measure is the mean CLV
-   with a 95% range from 2,000 match-resampled draws.
+   the best price, one bet per player per match, $1. The judged measure is the mean
+   best-to-best CLV (above), with a 95% range from 2,000 match-resampled draws.
+3. **Baseline (descriptive):** the same best-to-best CLV over every judged starter priced
+   at entry, with no rule. It is reported beside the rule's CLV.
+   - It shows how prices drift between entry and close for everyone.
+   - If the baseline's 95% range lies clearly above 0, the measure still carries a bias,
+     and the result says so beside the verdict (the verdict itself is unchanged).
 
 - **T, the edge threshold**, is fixed from the 2025/26 development season by volume alone.
   T is the smallest of 5%, 8%, 12%, 16% and 20% that gives at least 0.3 bets a match there.
@@ -1100,11 +1119,11 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
   - **fail:** otherwise.
   - The verdict is model-quality-against-the-market only; a pass is not a live decision.
 - **Descriptive:**
+  - the baseline CLV (measure 3) and same-book CLV;
   - ROI at the entry price;
   - the gap (mean implied − scoring rate);
   - hit rate;
-  - every measure per league, per book, and for B-cal;
-  - CLV against the best close across books.
+  - every measure per league, per book, and for B-cal.
 
 ### Judged sample and when it is read
 
