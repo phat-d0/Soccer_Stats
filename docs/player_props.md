@@ -854,3 +854,102 @@ forward window the same way `goal-league` does:
   `goal_forward_reason` (CLI `--goal-forward-reason`), which prints and logs the opening.
   Scheduled Monday runs pass nothing, so they stay locked until the lead switches them.
 - The development seasons and the 2025/26 holdout are unaffected, so the gate is unchanged.
+
+## 14. Forward check, five leagues: result (2026-11-01, window opened once)
+
+**Verdict: B passes and B-cal passes** the gate pre-registered in §10b and §12. This is a
+model-quality result only: nothing goes live and nothing is bet unless the owner decides,
+and it says nothing about beating bookmakers' prices (that needs priced data and its own
+pre-registered, costed test).
+
+### Opening
+
+- **Reason (lead, 1 Nov), logged in both places:** "Lead, 1 Nov 2026: 240 matches in
+  E0/SP1/D1/I1/F1 since 10 Oct, past the pre-registered 150 gate; open the forward window
+  once."
+- **`odds-check.yml` `task=goal-leagues`, run 41325824036** (default branch at 182a2c3, 0
+  credits, 16:20–18:23 UTC): one "HOLDOUT OPENED … (rows from 2026-10-10)" line per league,
+  E0 16:27:11Z, SP1 16:58:24Z, D1 17:23:36Z, I1 17:54:47Z, F1 18:22:46Z. Each league took
+  about 30 minutes (its 2026/27 Understat files were downloaded for the first time).
+- **`players.yml` with `goal_forward_reason`, run 41325826728:** "HOLDOUT OPENED at
+  2026-11-01T16:22:54Z"; `E0_goals.json` on data-log carries `forward_window` "open"
+  (data-log 609e817).
+- PR #161 printed the whole forward report to the job log first, because the sandbox can't
+  download artifacts; every number below is from the log.
+
+### Sample
+
+179 scored matches (E0 38, SP1 34, D1 33, I1 44, F1 30): 5,338 appearances, 3,840 starters.
+That is above the 150 gate. The lead's count of 240 was played matches in the odds logs;
+Understat had lineups for 179 of them by the run (no match file missing).
+
+### Pooled result (the gate)
+
+Log loss per appearance; "gain" = benchmark's log loss minus the model's (higher is
+better); 95% ranges resample whole matches.
+
+| | Rows | Log loss | Gain vs season goals | Gain vs season xG | Tail rule |
+| --- | --- | --- | --- | --- | --- |
+| A, before lineups | 5,338 appearances | 0.2726 | +0.251 (+0.214 to +0.290) | +0.048 (+0.035 to +0.061) | |
+| **B, lineup known** | 3,840 starters | 0.2909 | +0.297 (+0.249 to +0.348) | +0.057 (+0.040 to +0.075) | ok |
+| **B-cal** | 3,840 starters | 0.2910 | | +0.056 | ok |
+
+- B's AUC is 0.767; B beats A on the same starters by 0.0065.
+- B's tail buckets:
+  - 20–30%: 377 starters, predicted 24.8%, scored 23.3% (19.4% to 27.9%);
+  - 30%+: 236 starters, predicted 37.9%, scored 36.0% (30.2% to 42.3%).
+- B-cal vs B: −0.00007 (−0.0009 to +0.0007), so no difference in log loss.
+- B-cal's tail buckets are tighter:
+  - 20–30%: 361 starters, predicted 24.5%, scored 24.7%;
+  - 30%+: 188 starters, predicted 37.0%, scored 37.8%.
+  - 4.9% of starters are at 30%+ under B-cal, against 6.2% under B.
+- **Gate B:** `{"beats_both": true, "tail_ok": true, "passes": true}`.
+- **Gate B-cal:** `{"beats_both": true, "tail_ok": true, "passes": true}`.
+
+### B-cal's forward coefficients
+
+Fitted on each league's 2023/24–2025/26 starters from the locked rows, as registered in §12:
+
+| League | Rows | a | b |
+| --- | --- | --- | --- |
+| E0 | 24,446 | −0.070 | 0.999 |
+| SP1 | 24,374 | −0.088 | 0.998 |
+| D1 | 19,533 | −0.164 | 0.964 |
+| I1 | 24,368 | −0.124 | 0.968 |
+| F1 | 19,371 | −0.145 | 0.969 |
+
+### Per league (descriptive, not gated: 30–44 matches each)
+
+| League | Starters | B log loss | B gain vs xG (95%) | B tail | B-cal vs B (95%) | B-cal tail |
+| --- | --- | --- | --- | --- | --- | --- |
+| E0 | 822 | 0.2662 | +0.029 (+0.004 to +0.058) | ok | +0.0001 (−0.0010 to +0.0012) | fails (20–30%: 28.0% vs 24.5%) |
+| SP1 | 737 | 0.2860 | +0.053 (+0.021 to +0.094) | fails (20–30%: 19.2% vs 24.6%) | −0.0003 (−0.0021 to +0.0016) | ok |
+| D1 | 705 | 0.2860 | +0.030 (+0.000 to +0.068) | fails (20–30%: 16.7% vs 24.9%) | +0.0022 (−0.0001 to +0.0044) | fails |
+| I1 | 941 | 0.3198 | +0.078 (+0.039 to +0.120) | fails (scored above predicted) | −0.0014 (−0.0028 to −0.0001) | fails |
+| F1 | 635 | 0.2912 | +0.094 (+0.046 to +0.145) | ok | −0.0006 (−0.0034 to +0.0020) | fails (20–30%: 27.9% vs 24.1%) |
+
+- B beats both benchmarks in every league, but D1's and E0's xG ranges only just clear 0.
+- Per-league tail buckets hold 26–81 starters, so they are noisy; the gate is pooled by
+  design. I1 is the one league where B-cal is worse than B with a range below 0.
+
+### Same run, development seasons (context, seen before)
+
+- SP1, D1, I1 and F1 pooled over 2023/24–2025/26: B's tail rule fails (it scores 1.5–2.7
+  points under predicted in both buckets), and B-cal's passes on 74,761 starters.
+- B-cal vs B there: +0.0001 (−0.0001 to +0.0003). This matches §13.
+- The Premier League's weekly live split (`players.yml`, 2,410 appearances from 10 Oct):
+  before lineups 0.2461, gain vs xG +0.042 (+0.024 to +0.061); lineup known 0.2393, gain
+  vs xG +0.049 (+0.030 to +0.068); the 2025/26 holdout gate still passes (0.2464).
+
+### What it means
+
+- On 2026/27 matches it had never seen, in five leagues, the goalscorer model beats both
+  simple benchmarks clearly. Its high-chance players score about as often as it says.
+- B-cal makes no difference to log loss but trims B's over-confidence at the top. The
+  development seasons showed the same, now confirmed out of sample.
+- §12's reading applies: B passed, so nothing changes automatically. Whether B-cal
+  replaces B, and whether a priced goalscorer test is proposed, are the owner's decisions.
+- The window has been opened once. It is not re-scored or opened again on this question.
+- Weekly `players.yml` runs on the schedule pass no reason, so they go back to the locked
+  `E0_goals.json` (live split to 9 Oct) until the lead decides to switch them (§ "Weekly
+  `E0_goals.json` stops at the forward window").

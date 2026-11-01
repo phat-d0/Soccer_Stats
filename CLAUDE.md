@@ -76,8 +76,13 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 Bovada and Pinnacle; cap 20,000 a month since 28 Oct, 800 before). Nothing is scored until the round-13 gate (50 settled
 matches for each anchor; `docs/totals.md` "Team totals against the main market").
 
-**Players:** Anytime goalscorer is testing; its forward check (2026/27 from 10 Oct) is locked
-until opened once with a reason. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
+**Players:** Anytime goalscorer is testing. Its five-league forward check (2026/27 from 10 Oct)
+was opened once on 1 Nov (lead's reason; runs 41325824036 and 41325826728) and **passes**:
+179 matches, 3,840 starters, B beats season goals by +0.297 (+0.249 to +0.348) and season xG
+by +0.057 (+0.040 to +0.075) in log loss, tail rule ok; B-cal passes too, no log-loss
+difference from B (−0.00007) but better calibrated at 30%+ (`docs/player_props.md` §14).
+Model quality only, not a priced test; nothing live changes unless the owner decides.
+Scheduled weekly `players.yml` runs still lock the window. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
 
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
@@ -185,9 +190,6 @@ Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on
 the owner's baseball app, so the balance can drop without any run here.
 
 **Scheduled checks** (send_later into the lead session; trigger ids):
-- 1 Nov 2026 (`trig_01PZn5NWRdXbQXB4PV3Y4C8g`): goalscorer forward-window count (E0, SP1, D1,
-  I1, F1 since 10 Oct). At 150 or more, open it once with a reason in both places: `odds-check.yml`
-  `task=goal-leagues` with `reason`, and `players.yml` with `goal_forward_reason`.
 - 9 Nov 2026 (`trig_01RznLks8hbfhYeLHgWPQCR5`): Lean refit (`backfill.yml` `match_blends`, then
   `lean_backtest`) and Lean live tracking by driver.
 - 12 Nov 2026 (`trig_01U5txZuqCkL1ZeB5ik3XAJK`): should Blend Lean extend to team corners and
@@ -195,8 +197,8 @@ the owner's baseball app, so the balance can drop without any run here.
 - 16 Nov 2026 (`trig_01N4zsU1KdvQ66W9MZhGBDeK`): late team news vs the DraftKings odds log
   (Research lab; ≥100 logged matches). Measure how fast DraftKings reacts compared with
   Pinnacle after a lineup surprise; data-log `team_news/` has `first_confirmed_at` per match.
-- 7 Dec 2026 (`trig_01KakNWotv6GkGQUqhjTvtbT`): goalscorer forward check, five leagues, ≥150
-  pooled matches (may be ready in early November; delete once the window is opened).
+- 7 Dec 2026 (`trig_01KakNWotv6GkGQUqhjTvtbT`): goalscorer forward check. Done 1 Nov (the
+  window opened at 179 matches; §14); delete the trigger.
 - 8 Dec 2026 (`trig_01SJk1xh2PSaKfKEe6VfHW2m`): live team-corners review: per league and pooled
   trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from SP1/D1/E1, credit use vs the cap;
   record in `docs/totals.md`.
