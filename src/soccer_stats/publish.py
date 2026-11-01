@@ -1367,6 +1367,17 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         print(espn_news.summary_line(espn_news.add(data["fixtures"])))
     except Exception as exc:  # noqa: BLE001
         print(f"Team news (ESPN): failed ({type(exc).__name__}); no team news this run")
+    gs_dir = os.environ.get("GOALSCORER_DIR")
+    if gs_dir:  # priced goalscorer test, step 2 (§16): default branch only, after ESPN's lineups
+        try:  # a goalscorer-log bug must never stop the site build; the type only (no URL/key)
+            from soccer_stats import player_goal_live
+
+            s = player_goal_live.run(
+                data["fixtures"], Path(gs_dir), [os.environ.get("GOALSCORER_STATE")]
+            )
+            print(player_goal_live.summary_line(s))
+        except Exception as exc:  # noqa: BLE001
+            print(f"Goalscorer prices: failed ({type(exc).__name__}); nothing fetched after it")
     data["portfolio"] = portfolio_placeholder()
     if league == "E0":
         status, stats = add_players(data, league, players, odds_source["credits_left"])

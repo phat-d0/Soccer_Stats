@@ -2829,6 +2829,14 @@ def cmd_goalscorer_dev_pool(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
 
 
+def cmd_log_goalscorer(args: argparse.Namespace) -> None:
+    """Append a publish run's live goalscorer rows and calls to data-log (§16 step 2)."""
+    from soccer_stats import player_goal_live
+
+    rows, calls = player_goal_live.log(Path(args.pending), Path(args.log_dir))
+    print(f"Goalscorer log: {rows} rows and {calls} calls appended")
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -3548,6 +3556,10 @@ def main(argv: list[str] | None = None) -> None:
     gp_.add_argument("--json", help="write the results as JSON")
     gp_.set_defaults(func=cmd_goalscorer_pilot)
 
+    lgs = sub.add_parser("log-goalscorer", help="append live goalscorer prices to data-log")
+    lgs.add_argument("--pending", required=True, help="the publish run's goalscorer folder")
+    lgs.add_argument("--log-dir", required=True, help="data-log checkout")
+    lgs.set_defaults(func=cmd_log_goalscorer)
     gdv = sub.add_parser("goalscorer-dev", help="priced goalscorer step 3: one league's rows")
     gdv.add_argument("--league", default="E0")
     gdv.add_argument("--out", help="CSV(.gz) of the joined starters")

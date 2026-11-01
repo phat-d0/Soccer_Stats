@@ -1181,4 +1181,16 @@ Nothing had been bought for development when it was changed.
   - The development c, CLV (best-to-best, with the no-rule baseline) and ROI at that T are
     printed as development only.
   - B-cal is not in the development read; it joins the judged read.
-- **The live log (step 2)** comes in its own PR.
+- **The live log (step 2):** `player_goal_live.py`, run by every default-branch publish
+  after ESPN's team news.
+  - Entry: the first run 20–75 min before kickoff once both lineups are confirmed, or at
+    20–30 min regardless.
+  - Close: the first run 0–20 min before kickoff (`closes.yml` plans a publish 15 min
+    before each cluster).
+  - Each snapshot is one live call with the ten books (1 credit), never taken twice. The cap
+    is 3,000 a month, with the 3,000 reserve. Logging stops on 1 Feb 2027 until the lead
+    decides.
+  - Rows go to data-log `odds_log/<code>_goalscorer_<YYYY-MM>.jsonl`.
+  - §16 asks for the live entry "no earlier than kickoff − 75 min". A run between 30 and 75
+    min with no confirmed lineups waits, so the entry is taken at confirmation, or at 30 min
+    at the latest.

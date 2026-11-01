@@ -101,6 +101,17 @@ jobs:
             git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/corners_state/$(basename "$f")"
           done
 
+      # Goalscorer snapshots already taken (§16 step 2): the call record, so a match's entry
+      # or close is never fetched twice, and this month's spend for its cap.
+      - name: Read the goalscorer call record
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/gs_state"
+          git fetch --depth=1 origin data-log || exit 0
+          for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E '/goalscorer_calls_'); do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/gs_state/$(basename "$f")"
+          done
+
       - name: Build site
         env:
           PLAYER_GATE_FILE: ${{ runner.temp }}/players_gate.json
@@ -114,6 +125,10 @@ jobs:
           # the default branch, logged to data-log below. Empty elsewhere = off.
           CORNERS_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/corners', runner.temp) || '' }}
           CORNERS_STATE: ${{ runner.temp }}/corners_state
+          # Anytime-goalscorer prices for the priced test (§16 step 2, lead-approved 1 Nov,
+          # own monthly cap): fetched only on the default branch, logged to data-log below.
+          GOALSCORER_DIR: ${{ github.ref_name == github.event.repository.default_branch && format('{0}/goalscorer', runner.temp) || '' }}
+          GOALSCORER_STATE: ${{ runner.temp }}/gs_state
           # DraftKings odds via the-odds-api.com; empty if the secret isn't set yet.
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           # Free allowance assumed to reset on the 5th (key created 5 Oct); the code
@@ -172,6 +187,10 @@ jobs:
             if [ -d "$RUNNER_TEMP/corners" ]; then
               uv run soccer-stats log-corners --pending "$RUNNER_TEMP/corners" --log-dir ../log ||
                 echo "corner log failed; ledger continues"
+            fi
+            if [ -d "$RUNNER_TEMP/goalscorer" ]; then
+              uv run soccer-stats log-goalscorer --pending "$RUNNER_TEMP/goalscorer" --log-dir ../log ||
+                echo "goalscorer log failed; ledger continues"
             fi
             # Kickoffs of the odds-only in-play competitions (free events lists, at most
             # every 3 h each), for closes.yml's in-play runs.
