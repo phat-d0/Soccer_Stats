@@ -48,9 +48,10 @@ def nb_pmf(mean: np.ndarray, alpha: float, kmax: int = MAX_COUNT) -> np.ndarray:
 class NBRegression:
     """Regularised negative binomial regression with a log(exposure) offset."""
 
-    def __init__(self, features: list[str], l2: float = 1.0):
+    def __init__(self, features: list[str], l2: float = 1.0, options: dict | None = None):
         self.features = list(features)
         self.l2 = l2
+        self.options = options  # L-BFGS-B options; None keeps scipy's defaults
         self.coef_: np.ndarray | None = None
         self.alpha_ = 0.5
         self.mu_ = None
@@ -91,7 +92,13 @@ class NBRegression:
 
         b0 = np.zeros(X.shape[1])
         b0[0] = np.log(max(y.sum() / np.clip(exposure, 1e-6, None).sum(), 1e-3))
-        res = minimize(f, np.r_[b0, 0.0], jac=True, method="L-BFGS-B")
+        res = minimize(
+            f,
+            np.r_[b0, 0.0],
+            jac=True,
+            method="L-BFGS-B",
+            **({"options": self.options} if self.options else {}),
+        )
         self.coef_ = res.x[:-1]
         self.alpha_ = float(1 / np.exp(res.x[-1]))
         return self

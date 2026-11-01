@@ -50,6 +50,9 @@ BAND_COUNT = 5
 # 2025/26 development rule bets' odds quintiles at T_JUDGED, fixed 1 Nov 2026.
 PRICE_BAND_EDGES: tuple[float, ...] | None = (6.5, 11.5, 17.0, 23.0)  # run 41350946771
 MIN_JUDGED_BETS = 300
+# B's chance is rounded to this many decimals before the threshold test, so a chance that
+# differs only in its last digits between runs can't flip a bet (lead, 1 Nov 2026).
+P_DECIMALS = 6
 BOOT_DRAWS, BOOT_SEED = 2000, 0
 
 
@@ -181,7 +184,7 @@ def join(rows: pd.DataFrame, pr: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 def t_volume(j: pd.DataFrame, candidates=T_CANDIDATES) -> dict:
     """Bets per judged match at each candidate T (volume only) and the T the rule picks."""
     matches = int(j["match_id"].nunique()) if len(j) else 0
-    edge = j["p_B"] * j["entry_odds"] - 1 if len(j) else pd.Series(dtype=float)
+    edge = edge_of(j) if len(j) else pd.Series(dtype=float)
     rows = []
     for t in candidates:
         n = int((edge >= t).sum())
@@ -191,9 +194,14 @@ def t_volume(j: pd.DataFrame, candidates=T_CANDIDATES) -> dict:
     return {"matches": matches, "by_t": rows, "T": max(ok) if ok else T_FALLBACK, "rule": rule}
 
 
+def edge_of(j: pd.DataFrame, col: str = "p_B") -> pd.Series:
+    """The claimed edge: chance (rounded to P_DECIMALS) × best entry odds − 1."""
+    return j[col].round(P_DECIMALS) * j["entry_odds"] - 1
+
+
 def bets_at(j: pd.DataFrame, t: float, col: str = "p_B") -> pd.Series:
-    """True for the rule's bets: chance × best entry odds − 1 ≥ t."""
-    return j[col] * j["entry_odds"] - 1 >= t
+    """True for the rule's bets: edge_of ≥ t."""
+    return edge_of(j, col) >= t
 
 
 def band_edges(j: pd.DataFrame, t: float, col: str = "p_B", k: int = BAND_COUNT) -> list[float]:
