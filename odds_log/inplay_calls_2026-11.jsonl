@@ -92,3 +92,4 @@
 {"league":"E0","kinds":["inplay55"],"kickoffs":["2026-11-01T16:30:00+00:00"],"fetched_at":"2026-11-01T17:18:14+00:00","status":200,"cost":1,"credits_left":4999765,"events":13,"rows":8}
 {"league":"I2","kinds":["inplay75"],"kickoffs":["2026-11-01T16:15:00+00:00","2026-11-01T16:17:00+00:00"],"fetched_at":"2026-11-01T17:28:17+00:00","status":200,"cost":1,"credits_left":4999764,"events":11,"rows":0}
 {"league":"F1","kinds":["inplay75"],"kickoffs":["2026-11-01T16:15:00+00:00"],"fetched_at":"2026-11-01T17:28:17+00:00","status":200,"cost":1,"credits_left":4999763,"events":13,"rows":16}
+{"league":"RUS","kinds":["inplay55"],"kickoffs":["2026-11-01T16:45:00+00:00"],"fetched_at":"2026-11-01T17:33:15+00:00","status":200,"cost":1,"credits_left":4999762,"events":7,"rows":0}
