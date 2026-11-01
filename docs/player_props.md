@@ -1107,8 +1107,10 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
      and the result says so beside the verdict (the verdict itself is unchanged).
 
 - **T, the edge threshold**, is fixed from the 2025/26 development season by volume alone.
-  T is the smallest of 5%, 8%, 12%, 16% and 20% that gives at least 0.3 bets a match there.
-  It never uses a result or a CLV.
+  T is the **largest** of 5%, 8%, 12%, 16% and 20% that gives at least 0.3 bets a match
+  there, pooled over the five leagues' development matches; if none reaches 0.3, T = 5%. It
+  never uses a result or a CLV. (Corrected 1 Nov, before any development price was bought:
+  see the departure note below.)
   - If development is not bought, or fails the plumbing checks, T = 12%.
   - Development may set nothing else. Its c, CLV and ROI are reported as development and
     cannot change this section.
@@ -1149,6 +1151,16 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
 My prior for a pass is about 10–15%, or about 20% for c alone. Every price is Yes only, with
 an overround of roughly 50% (§6), so a profitable rule is unlikely even if B carries
 information.
+
+### Departure, 2026-11-01 (before any development price was bought or read)
+
+As merged, §16 said T is "the smallest of 5%, 8%, 12%, 16% and 20% that gives at least 0.3
+bets a match". A lower threshold always gives more bets, so that rule picks 5% whenever 5%
+reaches 0.3. It would never choose anything else, which was not the intent. The intent was
+the strictest threshold that still gives enough bets to reach 300 in the judged window. The
+rule now reads "the largest … that gives at least 0.3 bets a match, pooled over the five
+leagues; 5% if none does". Like the old rule, it uses volume only (no result, no CLV).
+Nothing had been bought for development when it was changed.
 
 ### Building the steps (2026-11-01, after the sign-off)
 
