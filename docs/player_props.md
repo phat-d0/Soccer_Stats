@@ -1104,8 +1104,8 @@ prices? And do its bets beat the closing price? Nothing goes live from this:
    - The baseline is the same best-to-best CLV over every judged starter priced at entry and
      close, with no rule, **reweighted to the rule's mix over five entry-price bands**: the
      baseline's mean CLV in each band, weighted by the rule's share of bets in that band.
-   - The bands are fixed now (decimal odds, lo < odds ≤ hi): {BANDS}. Their edges are
-     the odds quintiles of the 2025/26 development rule bets at T = 20% (run {BANDRUN};
+   - The bands are fixed now (decimal odds, lo < odds ≤ hi): up to 6.5, 6.5–11.5, 11.5–17.0, 17.0–23.0 and over 23.0. Their edges are
+     the odds quintiles of the 2025/26 development rule bets at T = 20% (run 41350946771;
      volume only, no result and no CLV used).
    - **The judged measure is the excess:** the rule's mean CLV minus the matched baseline's,
      both on the same judged matches. Its 95% range comes from one match bootstrap shared by
@@ -1210,7 +1210,15 @@ These numbers are development only. They are descriptive and cannot change this 
 - **No-rule baseline CLV (unweighted):** +2.85% (+2.63% to +3.06%) on 27,164 rows.
 - **The rule's CLV, best to best:** +7.61% (+6.85% to +8.40%) on 2,113 bets; same book
   +13.1% (+11.8% to +14.4%; it carries the selection bias of picking the best price).
-- **Price-matched excess (the amended judged measure, here descriptive):** {EXCESS}
+- **Price-matched excess (the amended judged measure, here descriptive; run 41350946771):**
+  +4.60% (+3.88% to +5.29%): the rule's +7.61% against a matched baseline of +3.01%. The
+  unweighted excess is +4.76%. The rule's bets spread evenly over the five bands (18–22% each);
+  the baseline drifts most on the longest prices (over 23.0: +4.5%; the other bands +2.2% to
+  +3.3%). Per league: E0 +2.9%, I1 +3.2%, F1 +3.8%, D1 +5.4%, SP1 +7.0%, every range above 0.
+- **Reproducibility note:** the second development run (41350946771, the same cached prices)
+  gave 2,115 rule bets at 20% where the first gave 2,113 (5%: 4,651 vs 4,649), with the same
+  27,167 rows. A few chances of B sit on the threshold and differ in the last digits between
+  runs; nothing that sets T or the bands changed.
 - **Hit rate:** 9.5%. **ROI** at the entry price: −3.8% (−20.3% to +14.0%).
 - **Gap** (the best price's chance minus the rate scored): +2.85 points; the best price still
   carries margin.

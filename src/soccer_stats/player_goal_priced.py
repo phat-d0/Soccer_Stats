@@ -47,8 +47,8 @@ LINK_HOURS = 3
 T_JUDGED = 0.20  # §16: fixed by the volume rule on 2025/26 development (run 41346853368)
 BAND_COUNT = 5
 # §16: inner edges of the five entry-price bands (decimal odds; lo < odds <= hi), the
-# 2025/26 development rule bets' odds quintiles at T_JUDGED. None until fixed.
-PRICE_BAND_EDGES: tuple[float, ...] | None = None
+# 2025/26 development rule bets' odds quintiles at T_JUDGED, fixed 1 Nov 2026.
+PRICE_BAND_EDGES: tuple[float, ...] | None = (6.5, 11.5, 17.0, 23.0)  # run 41350946771
 MIN_JUDGED_BETS = 300
 BOOT_DRAWS, BOOT_SEED = 2000, 0
 

@@ -186,3 +186,10 @@ def test_verdict_needs_c_and_the_matched_excess():
     assert gp.verdict(c_ok, ex_no) == "fail"
     assert gp.verdict(c_no, ex_ok) == "fail"
     assert gp.verdict(c_ok, {"bets": 200, "ci95": [0.01, 0.05]}) == "inconclusive"
+
+
+def test_judged_threshold_and_bands_stay_as_preregistered():
+    # §16, fixed 1 Nov 2026 from 2025/26 development (runs 41346853368 and 41350946771).
+    assert gp.T_JUDGED == 0.20
+    assert gp.PRICE_BAND_EDGES == (6.5, 11.5, 17.0, 23.0)
+    assert gp.MIN_JUDGED_BETS == 300 and (gp.BOOT_DRAWS, gp.BOOT_SEED) == (2000, 0)
