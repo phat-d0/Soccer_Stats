@@ -181,3 +181,36 @@ def test_forward_start_is_shared():
     from soccer_stats import player_goal_lab as gl
 
     assert pg.FORWARD_START == gl.FORWARD_START == pd.Timestamp("2026-10-10", tz="UTC")
+
+
+def test_recorded_opening_keeps_the_window_open_and_logs_why(apps):
+    """The 1 Nov opening is committed: a run with no reason includes the window, and its
+    log names the recorded time, reason and runs. Another window with no record stays
+    locked, and an explicit empty record restores the lock."""
+    feats = pg.goal_features(build_features(apps))
+    rec = pg.FORWARD_OPENED
+    assert rec["start"] == str(pg.FORWARD_START.date())
+    assert rec["reason"].startswith("Lead, 1 Nov 2026") and rec["runs"]["players"] == 41325826728
+
+    shifted = feats.copy()
+    shifted["kickoff"] = shifted["kickoff"] + (
+        pg.FORWARD_START - pd.Timestamp("2025-08-15", tz="UTC")
+    )
+    kept, info = pg.lock_forward(shifted)
+    assert len(kept) == len(shifted) and info["open"] is True and info["dropped"] == 0
+    assert info["opened"] == rec and len(info["log"]) == 1
+    line = info["log"][0]
+    assert line.startswith(f"HOLDOUT OPENED at {rec['opened_at']} (rows from 2026-10-10)")
+    assert rec["reason"] in line and "41325826728" in line and "41325824036" in line
+
+    locked, li = pg.lock_forward(shifted, record={})
+    assert li["open"] is False and li["log"] == [] and "opened" not in li
+    assert locked["kickoff"].max() < pg.FORWARD_START
+
+    other = pd.Timestamp("2027-02-01", tz="UTC")
+    _, oi = pg.lock_forward(shifted, start=other)
+    assert oi["open"] is False and oi["dropped"] == int((shifted["kickoff"] >= other).sum())
+
+    # An explicit reason still opens and logs a fresh line, not the recorded one.
+    _, ei = pg.lock_forward(shifted, "test reason")
+    assert ei["open"] is True and "opened" not in ei and ei["log"][0].endswith("test reason")
