@@ -251,6 +251,7 @@ the owner's baseball app, so the balance can drop without any run here.
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
 | `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
+| `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
@@ -808,6 +809,17 @@ the owner's baseball app, so the balance can drop without any run here.
   `calls.jsonl` and every body in `data/raw/player_odds_history/goalscorer_test/` (paid cache,
   never bought twice); cap 0 = dry run; resumable within `--minutes`. Log line
   `GOALSCORER_BACKFILL_JSON`; no result read.
+- `player_goal_priced.py` (§16): prices joined to B's chances, shared by the development and the
+  judged read; no API calls. `price_rows` (cached bodies → event, kind, book, player, Yes; "No
+  Scorer" dropped), `best` (best Yes over `JUDGED_BOOKS`, the exchange never judged), `link`
+  (event → match: both names via `odds_feed._team`, kickoff ±3 h), `join` (starters from
+  `player_goal_lab.scored_rows`, which now also carries `player_id`, `player`, `team`, `home`;
+  names by `match_in_fixture` within the two clubs; `entry_odds`, `entry_book`, `close_best`,
+  `close_same`), `t_volume` (bets per match at `T_CANDIDATES`; T = the largest with ≥ 0.3, else
+  5%), `blend_c` (c with a 2,000-draw match bootstrap), `describe` (development only: gap, c,
+  baseline and rule CLV best-to-best, same-book CLV, hit rate, ROI). CLI `goalscorer-dev --league`
+  (2025/26 rows from 2025-07-01, `--out judged_<league>.csv.gz`) and `goalscorer-dev-pool --dir`
+  (`GOALSCORER_DEV_JSON`), run by `goalscorer-test.yml`.
 - `player_goal_odds.py` (goalscorer probe and pilot; `CappedBudget`), `player_lab.py` (shot lines on
   the lab harness, development only), `player_segments.py` (segment search).
 
