@@ -1,7 +1,7 @@
 {
  "tag": "paid-odds-archive",
- "updated": "2026-11-01T19:05:03Z",
- "checked": "2026-11-01T19:05:03Z",
+ "updated": "2026-11-01T20:01:01Z",
+ "checked": "2026-11-01T20:01:01Z",
  "caches": {
   "archive-probe": {
    "name": "archive-probe",
@@ -27,7 +27,7 @@
     ]
    },
    "created": "2026-10-28T14:05:13Z",
-   "checked": "2026-11-01T19:05:03Z"
+   "checked": "2026-11-01T20:01:01Z"
   },
   "comeback-odds": {
    "name": "comeback-odds",
@@ -53,7 +53,7 @@
     ]
    },
    "created": "2026-10-28T20:35:19Z",
-   "checked": "2026-11-01T19:05:03Z"
+   "checked": "2026-11-01T20:01:01Z"
   },
   "odds-history": {
    "name": "odds-history",
@@ -79,33 +79,33 @@
     ]
    },
    "created": "2026-10-28T18:35:04Z",
-   "checked": "2026-11-01T19:05:03Z"
+   "checked": "2026-11-01T20:01:01Z"
   },
   "player-odds-history": {
    "name": "player-odds-history",
-   "key": "player-odds-history-41339771090",
+   "key": "player-odds-history-41342996136",
    "paths": [
     "data/raw/player_odds_history"
    ],
-   "files": 3576,
-   "bytes": 23216035,
+   "files": 5726,
+   "bytes": 47232131,
    "by_path": {
-    "data/raw/player_odds_history": 3576
+    "data/raw/player_odds_history": 5726
    },
-   "content_sha256": "60741574592f1e944ffd8a4bd475875e4400a2d14314dde0a0fe4726cbdc30b6",
+   "content_sha256": "569358b0dec849b9c6cdd2dea208977b36fbd4bcbc5495ac6ff9b2b6dba18673",
    "archive": {
-    "bytes": 1258381,
-    "sha256": "cfc90ef26c1a17bd3be348ab1166310b0ca3f50bd5d3bef6ad9afa5d287e2e30",
+    "bytes": 2445771,
+    "sha256": "7a346870f93a42808d4b3b4dfa0f3a14c6b06f43a3f24481235ad49acf534f2c",
     "parts": [
      {
       "asset": "player-odds-history.tar.zst",
-      "bytes": 1258381,
-      "sha256": "cfc90ef26c1a17bd3be348ab1166310b0ca3f50bd5d3bef6ad9afa5d287e2e30"
+      "bytes": 2445771,
+      "sha256": "7a346870f93a42808d4b3b4dfa0f3a14c6b06f43a3f24481235ad49acf534f2c"
      }
     ]
    },
-   "created": "2026-11-01T19:04:46Z",
-   "checked": "2026-11-01T19:05:03Z"
+   "created": "2026-11-01T20:00:42Z",
+   "checked": "2026-11-01T20:01:01Z"
   }
  },
  "note": "Paid odds caches packed as tar + zstd release assets on the `paid-odds-archive` tag; content_sha256 covers every file's path, size and sha256, archive.sha256 the whole archive, parts[].sha256 each asset."
