@@ -959,9 +959,11 @@ Fitted on each league's 2023/24–2025/26 starters from the locked rows, as regi
 - §12's reading applies: B passed, so nothing changes automatically. Whether B-cal
   replaces B, and whether a priced goalscorer test is proposed, are the owner's decisions.
 - The window has been opened once. It is not re-scored or opened again on this question.
-- Weekly `players.yml` runs on the schedule pass no reason, so they go back to the locked
-  `E0_goals.json` (live split to 9 Oct) until the lead decides to switch them (§ "Weekly
-  `E0_goals.json` stops at the forward window").
+- The weekly `E0_goals.json` keeps the window open from now on (lead, 1 Nov): the opening
+  is committed in `player_goals.FORWARD_OPENED` (start, time, reason, run ids), so
+  scheduled `players.yml` runs include the window without passing a reason, and each run's
+  `forward_window.log` repeats the recorded opening line. The lock code stays for any future
+  window; a window with no record is still locked.
 
 ## 15. Priced goalscorer test: step 0, the probe (lead-approved 2026-11-01, cap 250)
 

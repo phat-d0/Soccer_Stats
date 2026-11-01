@@ -81,27 +81,67 @@ def stage1_holdout(reason: str | None = STAGE1_REASON) -> Holdout:
 
 FORWARD_START = pd.Timestamp("2026-10-10", tz="UTC")
 
+# The forward window was opened once, with this reason, on 1 Nov 2026 (docs/player_props.md
+# §14). Recording it here keeps the window open on every later run (the scheduled weekly
+# players.yml passes no reason) while each run's log still says when and why it was opened.
+# It applies only to the window that starts at `start`; the lock code stays for any other.
+FORWARD_OPENED = {
+    "start": "2026-10-10",
+    "opened_at": "2026-11-01T16:22:54Z",
+    "reason": (
+        "Lead, 1 Nov 2026: 240 matches in E0/SP1/D1/I1/F1 since 10 Oct, past the "
+        "pre-registered 150 gate; open the forward window once."
+    ),
+    "runs": {"players": 41325826728, "goal_leagues": 41325824036},
+}
+
+
+def recorded_opening(start: pd.Timestamp, record: dict | None = None) -> dict | None:
+    """The committed opening of the window starting at `start`, or None (still locked)."""
+    record = FORWARD_OPENED if record is None else record
+    if record and record.get("start") == str(pd.Timestamp(start).date()):
+        return record
+    return None
+
+
+def opening_line(record: dict) -> str:
+    """The holdout log line for a recorded opening: when, from which rows, why, which runs."""
+    runs = ", ".join(f"{k} run {v}" for k, v in record.get("runs", {}).items())
+    return (
+        f"HOLDOUT OPENED at {record['opened_at']} (rows from {record['start']}): "
+        f"{record['reason']} [recorded opening; {runs}]"
+    )
+
 
 def lock_forward(
-    feats: pd.DataFrame, reason: str | None = None, start: pd.Timestamp | None = None
+    feats: pd.DataFrame,
+    reason: str | None = None,
+    start: pd.Timestamp | None = None,
+    record: dict | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """The goalscorer forward window (docs/player_props.md §10b, 2026/27 from 10 Oct):
     appearances from its start are dropped before any fit or score unless the window has
-    been opened with a reason (printed and logged). Goal features use earlier kickoffs
-    only, so dropping later rows leaves every earlier row unchanged."""
+    been opened with a reason (printed and logged) or its opening is recorded in
+    `FORWARD_OPENED` (`record` overrides it; {} = no record). Goal features use earlier
+    kickoffs only, so dropping later rows leaves every earlier row unchanged."""
     start = FORWARD_START if start is None else start
     h = Holdout(start)
+    opened = None if reason else recorded_opening(start, record)
     if reason:
         h.unlock(reason)
-        kept = feats
-    else:
-        kept = feats[feats["kickoff"] < start]
+    elif opened:
+        h.unlocked = True
+        h.events.append(opening_line(opened))
+    is_open = h.unlocked
+    kept = feats if is_open else feats[feats["kickoff"] < start]
     info = {
         "start": str(start.date()),
-        "open": bool(reason),
+        "open": is_open,
         "dropped": int(len(feats) - len(kept)),
         "log": h.events,
     }
+    if opened:
+        info["opened"] = opened
     return kept, info
 
 
@@ -113,7 +153,8 @@ def stage1_goals(
 ) -> dict:
     """The weekly E0_goals.json body: the stage-1 report with the 2025/26 holdout opened
     for its pre-registered scoring and the forward window locked unless `forward_reason`
-    is given, so nothing from that window is fitted, scored or saved while it is locked."""
+    is given or its opening is recorded (`FORWARD_OPENED`), so nothing from that window
+    is fitted, scored or saved while it is locked."""
     gfeats, fwd = lock_forward(gfeats, forward_reason, forward_start)
     hold = stage1_holdout()
     rep = report(
