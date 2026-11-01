@@ -862,6 +862,15 @@ model-quality result only: nothing goes live and nothing is bet unless the owner
 and it says nothing about beating bookmakers' prices (that needs priced data and its own
 pre-registered, costed test).
 
+**Caveats, read first:**
+- **The tail rule fails in three of the five leagues on their own.** For B: D1 (20–30%
+  bucket scored 16.7% vs 24.9% predicted), SP1 (19.2% vs 24.6%) and I1 (scored above
+  predicted in both buckets). B-cal fixes SP1's tail but not D1's or I1's. These buckets hold
+  only 35–81 starters each and the gate is pooled by design, but the pass is a pooled one.
+- **The sample is 179 matches, not the 240 in the lead's count.** 240 was played matches in
+  the odds logs; Understat had lineups for 179 of them when the run happened. 179 is still
+  above the 150 gate, but the forward sample is smaller than the opening note implies.
+
 ### Opening
 
 - **Reason (lead, 1 Nov), logged in both places:** "Lead, 1 Nov 2026: 240 matches in

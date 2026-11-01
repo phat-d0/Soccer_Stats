@@ -77,8 +77,9 @@ Bovada and Pinnacle; cap 20,000 a month since 28 Oct, 800 before). Nothing is sc
 matches for each anchor; `docs/totals.md` "Team totals against the main market").
 
 **Players:** Anytime goalscorer is testing. Its five-league forward check (2026/27 from 10 Oct)
-was opened once on 1 Nov (lead's reason; runs 41325824036 and 41325826728) and **passes**:
-179 matches, 3,840 starters, B beats season goals by +0.297 (+0.249 to +0.348) and season xG
+was opened once on 1 Nov (lead's reason; runs 41325824036 and 41325826728) and **passes**,
+pooled only (caveats: the tail rule fails in D1, SP1 and I1 alone; Understat had 179 of the 240
+matches the odds logs count): 179 matches, 3,840 starters, B beats season goals by +0.297 (+0.249 to +0.348) and season xG
 by +0.057 (+0.040 to +0.075) in log loss, tail rule ok; B-cal passes too, no log-loss
 difference from B (−0.00007) but better calibrated at 30%+ (`docs/player_props.md` §14).
 Model quality only, not a priced test; nothing live changes unless the owner decides.
