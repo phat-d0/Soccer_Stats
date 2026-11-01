@@ -83,6 +83,11 @@ matches the odds logs count): 179 matches, 3,840 starters, B beats season goals 
 by +0.057 (+0.040 to +0.075) in log loss, tail rule ok; B-cal passes too, no log-loss
 difference from B (−0.00007) but better calibrated at 30%+ (`docs/player_props.md` §14).
 Model quality only, not a priced test; nothing live changes unless the owner decides.
+A priced test of B against bookmakers' anytime-goalscorer prices is being set up: the step-0
+probe (1 Nov, run 41339771090, 235 credits) found all five leagues priced live and in 2025/26–2026/27
+history (DraftKings and FanDuel except in D1), no book with a "No" price, and 75–97% of names matching
+Understat; the pre-registration is `docs/player_props.md` §16 (B primary; c range and CLV range above 0
+on ≥300 bets; 600 matches or 31 Jan 2027, read once).
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
