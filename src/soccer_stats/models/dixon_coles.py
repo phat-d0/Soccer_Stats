@@ -38,6 +38,10 @@ class DixonColes:
     xg_weight: float = 0.0  # 0 = goals only, 1 = xG only
     max_goals: int = 10
     ridge: float = 0.0  # ridge on team ratings (0 = none, the domestic default)
+    # L-BFGS-B options; None keeps scipy's defaults (the live app). The goalscorer pipeline
+    # passes tight ones so its fits don't move with last-bit float differences between
+    # machines (player_goals.GOAL_DC_OPTIONS).
+    options: dict | None = None
     teams: list[str] = field(default_factory=list)
     params: dict[str, float] = field(default_factory=dict)
     attack: dict[str, float] = field(default_factory=dict)
@@ -80,8 +84,12 @@ class DixonColes:
             jac=True,
             method="L-BFGS-B",
             bounds=bounds,
+            **({"options": self.options} if self.options else {}),
         )
-        if not res.success:
+        # With tight options the line search can stop at the objective's precision floor,
+        # which is the optimum to machine precision, not a failure.
+        at_floor = bool(self.options) and "ABNORMAL" in str(res.message)
+        if not res.success and not at_floor:
             raise RuntimeError(f"Dixon-Coles fit failed: {res.message}")
 
         att, dfn = res.x[:n], res.x[n : 2 * n]

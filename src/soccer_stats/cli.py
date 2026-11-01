@@ -2390,6 +2390,7 @@ def _goal_league_feats(league: str, open_forward: str):
     from soccer_stats import player_goal_lab as gl
     from soccer_stats import player_goals as pg
     from soccer_stats.factors import build_features
+    from soccer_stats.models.player_goals import FIT_OPTIONS
     from soccer_stats.player_data import load_appearances
 
     years = range(2021, current_season() + 1 if open_forward else 2026)
@@ -2399,7 +2400,10 @@ def _goal_league_feats(league: str, open_forward: str):
     preds = backtest.walk_forward(
         matches,
         start="2022-07-01",
-        model_factory=functools.partial(DixonColes, xg_weight=0.7 if not err else 0.0),
+        # Tight options: the same inputs give the same chances on any machine (lead, 1 Nov).
+        model_factory=functools.partial(
+            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+        ),
     )
     mi = pb.match_info(preds, apps)
     feats = gl.extra_features(pg.goal_features(build_features(apps, mi)))

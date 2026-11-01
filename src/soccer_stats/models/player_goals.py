@@ -29,6 +29,13 @@ GOAL_FACTORS = [
 ]
 
 
+# Tight L-BFGS-B options for every goalscorer fit (lead, 1 Nov 2026): scipy's defaults stop
+# early enough that last-bit float differences between machines moved a few chances across
+# the priced test's threshold. ftol 0 leaves the stop to the gradient and the objective's
+# precision floor.
+FIT_OPTIONS = {"ftol": 0.0, "gtol": 1e-8, "maxiter": 20000}
+
+
 def p_zero(mean: np.ndarray, alpha: float) -> np.ndarray:
     """NB2 P(0) at `mean` (Poisson as alpha -> 0)."""
     m = np.asarray(mean, dtype=float)
@@ -41,7 +48,7 @@ def p_zero(mean: np.ndarray, alpha: float) -> np.ndarray:
 class GoalscorerModel:
     def __init__(self, factors: list[str] | None = None, l2: float = 2.0):
         self.factors = list(GOAL_FACTORS if factors is None else factors)
-        self.goals = NBRegression(self.factors, l2)
+        self.goals = NBRegression(self.factors, l2, options=FIT_OPTIONS)
 
     def fit(self, train: pd.DataFrame) -> GoalscorerModel:
         self.goals.fit(train, train["goals"].to_numpy(), train["minutes"].to_numpy() / 90)
