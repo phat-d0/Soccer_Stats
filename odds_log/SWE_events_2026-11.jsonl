@@ -11,3 +11,6 @@
 {"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"ab58741b9b48aa1526a2ac7f68135a61","home":"\u00d6rgryte IS","away":"V\u00e4ster\u00e5s SK","kickoff":"2026-11-07T16:30:00+00:00","fetched_at":"2026-10-31T18:30:51+00:00"}
 {"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"e78a3ac7140177e854d7b4fb9631b750","home":"Halmstads BK","away":"Djurgardens IF","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
 {"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"cf94c75a3ed8c815c4b1004630890dbd","home":"IFK Goteborg","away":"Malmo FF","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
+{"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"3a986ab890486c8a375ca00feed49131","home":"AIK","away":"BK Hacken","kickoff":"2026-11-08T15:30:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
+{"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"e6eb2081b5daf57e7c9ca26e37abe511","home":"IF Brommapojkarna","away":"Mj\u00e4llby AIF","kickoff":"2026-11-08T15:30:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
+{"league":"SWE","sport":"soccer_sweden_allsvenskan","event_id":"922c2dd253c81c2c53bcda1806eb7a09","home":"Kalmar FF","away":"IK Sirius","kickoff":"2026-11-08T15:30:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}

@@ -5,3 +5,6 @@
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"0b2d4e8e9b2bd4df8d782f6c34f21624","home":"FC Luzern","away":"BSC Young Boys","kickoff":"2026-11-07T17:00:00+00:00","fetched_at":"2026-11-01T11:15:40+00:00"}
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"c323662f3c6524f2ed1c293a7b4e8a46","home":"Grasshopper Z\u00fcrich","away":"FC Lausanne-Sport","kickoff":"2026-11-07T19:30:00+00:00","fetched_at":"2026-11-01T11:15:40+00:00"}
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"fd21768fc814cc2ea87163c4e037d86f","home":"BSC Young Boys","away":"FC Zurich","kickoff":"2026-11-01T13:02:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
+{"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"ce3bb7ec9b4377297d3cdf65732e87e8","home":"FC St Gallen","away":"FC Lugano","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
+{"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"c416b1740de57a63e252e3415f14a1b5","home":"FC Thun","away":"FC Basel","kickoff":"2026-11-08T15:30:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
+{"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"ee65ab84894b7ee61608fbf171dd53c4","home":"Servette","away":"FC Zurich","kickoff":"2026-11-08T15:30:00+00:00","fetched_at":"2026-11-01T17:15:49+00:00"}
