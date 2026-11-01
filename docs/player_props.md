@@ -1215,10 +1215,20 @@ These numbers are development only. They are descriptive and cannot change this 
   unweighted excess is +4.76%. The rule's bets spread evenly over the five bands (18–22% each);
   the baseline drifts most on the longest prices (over 23.0: +4.5%; the other bands +2.2% to
   +3.3%). Per league: E0 +2.9%, I1 +3.2%, F1 +3.8%, D1 +5.4%, SP1 +7.0%, every range above 0.
-- **Reproducibility note:** the second development run (41350946771, the same cached prices)
-  gave 2,115 rule bets at 20% where the first gave 2,113 (5%: 4,651 vs 4,649), with the same
-  27,167 rows. A few chances of B sit on the threshold and differ in the last digits between
-  runs; nothing that sets T or the bands changed.
+- **Reproducibility (fixed 1 Nov 2026, before any judged number):** the first two
+  development runs (41346853368, 41350946771) on the same cached prices and the same 27,167
+  rows gave 2,113 and 2,115 rule bets at 20%. The inputs matched; B's chances differed in
+  their last digits. scipy's default L-BFGS-B stop let last-bit float differences between
+  runner machines move the Dixon-Coles fits behind the goal features by up to ~1e-5
+  (reproduced locally by fitting on reordered rows). The goalscorer pipeline now fits
+  Dixon-Coles and the goal model with tight options (`models.player_goals.FIT_OPTIONS`:
+  ftol 0, gtol 1e-8), which brings that to ~1e-7, and rounds B's chance to 6 decimals
+  before the threshold test (`player_goal_priced.P_DECIMALS`). Two runs of the fixed code
+  started together (41354439416 and 41354442133) gave identical numbers in every league and
+  pooled: 2,112 rule bets at 20%, the matched excess +4.62% (+3.91% to +5.30%), c 0.49
+  (0.37 to 0.60), ROI −3.5% (−20.5% to +15.3%). T stays 20% (every candidate still clears
+  0.3 a match) and the bands' quintiles are unchanged (6.5, 11.5, 17.0, 23.0). The judged
+  read runs this code.
 - **Hit rate:** 9.5%. **ROI** at the entry price: −3.8% (−20.3% to +14.0%).
 - **Gap** (the best price's chance minus the rate scored): +2.85 points; the best price still
   carries margin.

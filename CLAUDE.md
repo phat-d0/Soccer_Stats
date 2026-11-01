@@ -829,6 +829,11 @@ the owner's baseball app, so the balance can drop without any run here.
   `band_edges`, `band_of`, `matched_excess` (rule CLV minus the no-rule baseline reweighted to
   the rule's band mix, one shared match bootstrap, 2,000 draws, seed 0; also the unweighted
   baseline and excess and `by_band`) and `verdict` (pass / inconclusive / fail, ≥ 300 bets).
+  Reproducible (lead, 1 Nov): `edge_of`/`bets_at` round B's chance to `P_DECIMALS` 6 before the
+  threshold, and the goalscorer pipeline fits with `models.player_goals.FIT_OPTIONS` (L-BFGS-B
+  ftol 0, gtol 1e-8): `GoalscorerModel` passes it to `NBRegression(options=)`, and
+  `cli._goal_league_feats` to `DixonColes(options=)` (both default None = scipy's defaults, so
+  the live app is unchanged); `tests/test_goal_reproducible.py` checks two runs give identical bets.
   CLI `goalscorer-dev --league` (2025/26 rows from 2025-07-01, `--out judged_<league>.csv.gz`)
   and `goalscorer-dev-pool --dir` (prints the band edges; `GOALSCORER_DEV_JSON`), run by
   `goalscorer-test.yml`.
