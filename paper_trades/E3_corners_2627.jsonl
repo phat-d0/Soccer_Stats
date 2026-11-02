@@ -25,3 +25,8 @@
 {"type":"update","id":"E3|2627|Shrewsbury|Gillingham|corners|home|5.5","at":"2026-10-31T17:15:46+00:00","status":"lost","actual":7,"push":false,"profit":-10.0,"score":"7-2 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Colchester|Walsall|corners|away|4.5","at":"2026-10-31T17:15:46+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"10-6 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Salford|Exeter|corners|home|5.5","at":"2026-10-31T17:15:46+00:00","status":"won","actual":3,"push":false,"profit":11.3,"score":"3-5 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Accrington|Northampton|corners|home|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"E3|2627|Shrewsbury|Gillingham|corners|home|5.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"7-2 corners"}
+{"type":"update","id":"E3|2627|Port Vale|Rochdale|corners|away|3.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E3|2627|Colchester|Walsall|corners|away|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"10-6 corners"}
+{"type":"update","id":"E3|2627|Salford|Exeter|corners|home|5.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"3-5 corners"}

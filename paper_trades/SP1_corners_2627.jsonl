@@ -96,3 +96,9 @@
 {"type":"update","id":"SP1|2627|Racing Santander|Real Madrid|corners|home|3.5","at":"2026-11-01T17:15:55+00:00","status":"won","actual":4,"push":false,"profit":9.8,"score":"4-6 corners","settled_at":"2026-11-01T17:15:55+00:00","result_source":"espn"}
 {"type":"update","id":"SP1|2627|Racing Santander|Real Madrid|corners|away|6.5|dk","at":"2026-11-01T17:15:55+00:00","status":"won","actual":6,"push":false,"profit":10.5,"score":"4-6 corners","settled_at":"2026-11-01T17:15:55+00:00","result_source":"espn"}
 {"type":"update","id":"SP1|2627|Elche|Valencia|corners|home|4.5","at":"2026-11-01T19:30:41+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"6-2 corners","settled_at":"2026-11-01T19:30:41+00:00","result_source":"espn"}
+{"type":"update","id":"SP1|2627|Barcelona|Alaves|corners|away|2.5","at":"2026-11-02T15:45:33+00:00","result_check":"mismatch","check_score":"3-3 corners"}
+{"type":"update","id":"SP1|2627|Betis|Malaga|corners|away|3.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"10-3 corners"}
+{"type":"update","id":"SP1|2627|Elche|Valencia|corners|home|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"6-2 corners"}
+{"type":"update","id":"SP1|2627|Betis|Malaga|corners|home|6.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"10-3 corners"}
+{"type":"update","id":"SP1|2627|Betis|Malaga|corners|away|3.5|dk","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"10-3 corners"}
+{"type":"update","id":"SP1|2627|Barcelona|Alaves|corners|away|2.5|dk","at":"2026-11-02T15:45:33+00:00","result_check":"mismatch","check_score":"3-3 corners"}

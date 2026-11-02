@@ -396,3 +396,6 @@
 {"type":"update","id":"D1|2627|Freiburg|Union Berlin","at":"2026-11-01T16:15:45+00:00","close_odds":5.5,"close_prices":{"home":1.48,"draw":4.3,"away":5.5},"close_fetched_at":"2026-11-01T16:15:03+00:00","close_minutes_before":10095.0,"clv_dk":-0.14290645421305292,"beat_close_dk":false}
 {"type":"update","id":"D1|2627|FC Koln|Leverkusen","at":"2026-11-01T16:15:45+00:00","pinnacle_live_close_prices":{"home":4.51,"draw":4.39,"away":1.65},"pinnacle_live_fetched_at":"2026-11-01T16:15:25+00:00","pinnacle_live_minutes_before":8534.6,"clv_pinnacle_live":-0.15963342239164713}
 {"type":"update","id":"D1|2627|Freiburg|Union Berlin","at":"2026-11-01T16:15:45+00:00","pinnacle_live_close_prices":{"home":1.51,"draw":4.5,"away":5.86},"pinnacle_live_fetched_at":"2026-11-01T16:15:25+00:00","pinnacle_live_minutes_before":10094.6,"clv_pinnacle_live":-0.14886082879600426}
+{"type":"update","id":"D1|2627|Elversberg|Mainz","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-1","clv_pinnacle":-0.18633259028418248}
+{"type":"update","id":"D1|2627|Augsburg|Freiburg","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"1-2","clv_pinnacle":0.08253130320791624}
+{"type":"update","id":"D1|2627|Bayern Munich|Dortmund","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"2-2","clv_pinnacle":-0.09040080355431146}

@@ -88,3 +88,9 @@
 {"type":"update","id":"E0|2627|Coventry|Sunderland|corners|away|4.5|dk","at":"2026-10-31T17:15:46+00:00","status":"won","actual":4,"push":false,"profit":8.3,"score":"4-4 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Hull|Ipswich|corners|away|4.5|dk","at":"2026-10-31T17:15:46+00:00","status":"won","actual":3,"push":false,"profit":9.1,"score":"6-3 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Hull|Ipswich|corners|home|4.5|dk","at":"2026-10-31T17:15:46+00:00","status":"won","actual":6,"push":false,"profit":8.3,"score":"6-3 corners","settled_at":"2026-10-31T17:15:46+00:00","result_source":"espn"}
+{"type":"update","id":"E0|2627|Coventry|Sunderland|corners|away|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Ipswich|corners|away|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"6-3 corners"}
+{"type":"update","id":"E0|2627|Hull|Ipswich|corners|home|4.5","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"6-3 corners"}
+{"type":"update","id":"E0|2627|Coventry|Sunderland|corners|away|4.5|dk","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Ipswich|corners|away|4.5|dk","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"6-3 corners"}
+{"type":"update","id":"E0|2627|Hull|Ipswich|corners|home|4.5|dk","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"6-3 corners"}
