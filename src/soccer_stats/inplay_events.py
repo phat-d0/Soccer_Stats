@@ -7,7 +7,8 @@ trades, no cards in the app, the feed's own team names.
 * `COMPETITIONS`: the six domestic cups and the Europa and Conference Leagues (heavy_more's
   CUPS), the ten football-data leagues the archive prices in play beyond our eight
   (heavy_favourites.OTHER), and heavy_more's extra leagues (EXTRA) less Romania, which The
-  Odds API doesn't list (`NOT_ON_THE_API`): 33 in all.
+  Odds API doesn't list (`NOT_ON_THE_API`), and Russia, which no book HF can use prices in
+  play (`DROPPED`): 32 in all.
 * We fetch none of their pre-match odds, so their kickoffs come from The Odds API's events
   list, which is free (0 credits: `x-requests-last` 0, checked on every call; a call that
   bills stops the step). `fetch` asks the free sports list (`all=true`: every key, with
@@ -66,6 +67,9 @@ FD_EXTRA = {
 # heavy_more's sixteen less Romania: The Odds API has no Romanian league ("Unknown sport" for
 # soccer_romania_liga_1, 28 Oct), so there is nothing to snapshot.
 NOT_ON_THE_API = {"ROU": ("Romania", "soccer_romania_liga_1", "rou.1")}
+# Listed, but not worth snapshotting (lead, 2 Nov): Russia's first weekend gave 10 rows from 12
+# calls, all Pinnacle's; HF judges at DraftKings' in-play price, so the rows can't be used.
+DROPPED = {"RUS": ("Russia", "soccer_russia_premier_league", "rus.1")}
 MORE_EXTRA = {
     "AUT": ("Austria", "soccer_austria_bundesliga", "aut.1"),
     "SWZ": ("Switzerland", "soccer_switzerland_superleague", "sui.1"),
@@ -75,7 +79,6 @@ MORE_EXTRA = {
     "POL": ("Poland", "soccer_poland_ekstraklasa", "pol.1"),
     "FIN": ("Finland", "soccer_finland_veikkausliiga", "fin.1"),
     "IRL": ("Ireland", "soccer_league_of_ireland", "irl.1"),
-    "RUS": ("Russia", "soccer_russia_premier_league", "rus.1"),
     "JPN": ("Japan", "soccer_japan_j_league", "jpn.1"),
     "CHN": ("China", "soccer_china_superleague", "chn.1"),
     "USA": ("USA", "soccer_usa_mls", "usa.1"),

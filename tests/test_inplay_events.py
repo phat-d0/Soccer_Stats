@@ -22,12 +22,15 @@ def test_registry_matches_research_lists():
     from soccer_stats.lab import heavy_favourites as hf
     from soccer_stats.lab import heavy_more as hm
 
-    assert len(ie.COMPETITIONS) == 6 + 2 + 10 + 15
+    assert len(ie.COMPETITIONS) == 6 + 2 + 10 + 14
     for code in hm.DOMESTIC + ("UEL", "UECL"):
         assert ie.sport_of(code) == hm.CUPS[code][2] and ie.slug_of(code) == hm.CUPS[code][1]
     for code, (_name, slug, sport) in hm.EXTRA.items():
         if code in ie.NOT_ON_THE_API:  # Romania: no such key on The Odds API
             assert code not in ie.COMPETITIONS and ie.NOT_ON_THE_API[code][1] == sport
+            continue
+        if code in ie.DROPPED:  # Russia: priced in play by Pinnacle only, not DraftKings
+            assert code not in ie.COMPETITIONS and ie.DROPPED[code][1] == sport
             continue
         assert ie.sport_of(code) == sport and ie.slug_of(code) == slug
     for code, (_name, sport) in hf.OTHER.items():
