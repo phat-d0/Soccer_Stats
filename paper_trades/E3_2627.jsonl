@@ -726,3 +726,5 @@
 {"type":"update","id":"E3|2627|Swindon|Rotherham","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"2-1","clv_pinnacle":0.02133220837022365}
 {"type":"update","id":"E3|2627|Salford|Exeter","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"2-1","clv_pinnacle":-0.1807842894281223}
 {"type":"update","id":"E3|2627|Newport County|Chesterfield","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"4-1","clv_pinnacle":0.009319566571305504}
+{"type":"update","id":"E3|2627|Northampton|Oldham","at":"2026-11-02T19:39:54+00:00","close_odds":3.25,"close_prices":{"home":2.35,"draw":3.25,"away":2.95},"close_fetched_at":"2026-11-02T19:33:53+00:00","close_minutes_before":1451.1,"clv_dk":-0.0753555688603258,"beat_close_dk":false}
+{"type":"update","id":"E3|2627|Northampton|Oldham","at":"2026-11-02T19:39:54+00:00","pinnacle_live_close_prices":{"home":2.42,"draw":3.17,"away":3.03},"pinnacle_live_fetched_at":"2026-11-02T19:35:56+00:00","pinnacle_live_minutes_before":1449.1,"clv_pinnacle_live":-0.03661146512413005}

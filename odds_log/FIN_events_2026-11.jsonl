@@ -1,3 +1,6 @@
 {"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"0fce048db9330264991f5b15105c0dc0","home":"AC Oulu","away":"KuPS Kuopio","kickoff":"2026-11-01T13:00:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
 {"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"b2b864cf9a409667964017eb1152e760","home":"FC Inter Turku","away":"IF Gnistan","kickoff":"2026-11-02T16:00:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
 {"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"11cac173c46d91f4909c91dd4210e5b8","home":"VPS Vaasa","away":"HJK Helsinki","kickoff":"2026-11-02T16:00:00+00:00","fetched_at":"2026-10-28T19:58:42+00:00"}
+{"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"603f5ad41b6eb7df9b6ec026f9e75f7c","home":"HJK Helsinki","away":"AC Oulu","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-02T19:39:13+00:00"}
+{"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"137b817a2943c02c105ee78447d6b56e","home":"KuPS Kuopio","away":"FC Inter Turku","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-02T19:39:13+00:00"}
+{"league":"FIN","sport":"soccer_finland_veikkausliiga","event_id":"b1fe8e09da73b05f802374b2bf5a3bd1","home":"IF Gnistan","away":"VPS Vaasa","kickoff":"2026-11-08T13:00:00+00:00","fetched_at":"2026-11-02T19:39:13+00:00"}

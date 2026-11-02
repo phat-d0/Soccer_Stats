@@ -732,3 +732,5 @@
 {"type":"update","id":"E2|2627|Bradford|Huddersfield","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"0-3","clv_pinnacle":-0.0674654546937351}
 {"type":"update","id":"E2|2627|Barnsley|Oxford|lean","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.055616576880165636}
 {"type":"update","id":"E2|2627|Plymouth|Reading","at":"2026-11-02T15:45:33+00:00","result_check":"ok","check_score":"0-0","clv_pinnacle":-0.05150970093721985}
+{"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-02T19:39:54+00:00","close_odds":2.6,"close_prices":{"home":2.6,"draw":3.6,"away":2.45},"close_fetched_at":"2026-11-02T19:33:52+00:00","close_minutes_before":2891.1,"clv_dk":-0.06242757385818176,"beat_close_dk":false}
+{"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-02T19:39:54+00:00","pinnacle_live_close_prices":{"home":2.63,"draw":3.67,"away":2.5},"pinnacle_live_fetched_at":"2026-11-02T19:35:54+00:00","pinnacle_live_minutes_before":2889.1,"clv_pinnacle_live":-0.05809336983502489}
