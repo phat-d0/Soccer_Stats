@@ -189,7 +189,7 @@ settled).
 (28 Oct, runs listed in `docs/leagues.md` "The buy: results"). Caps are no longer the
 constraint; the 3,000 reserve floor stays.
 The half-time in-play snapshots (`inplay.yml`) add about 580 a month, and the odds-only
-in-play competitions (lead-approved 28 Oct: domestic and UEFA cups, 25 extra leagues) about
+in-play competitions (lead-approved 28 Oct: domestic and UEFA cups, 24 extra leagues) about
 1,100 more (estimate; the first month's real spend per competition goes in the weekly line).
 Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on the 5th);
 10,978 on 25 Oct 14:52 UTC (after the 1-credit live in-play probe, run
@@ -598,7 +598,8 @@ the owner's baseball app, so the balance can drop without any run here.
   odds-only in-play competitions. `COMPETITIONS` = `DOMESTIC_CUPS` (FAC, EFLC, CDR, DFBP, CI,
   CDF), `UEFA_CUPS` (UEL, UECL), `FD_EXTRA` (N1, P1, SC0, B1, T1, G1, D2, I2, SP2, F2) and
   `MORE_EXTRA` (heavy_more's 16 less Romania: The Odds API lists no `soccer_romania_liga_1`,
-  `NOT_ON_THE_API`), 33 in all, each {name, Odds API sport, ESPN slug} (`GROUPS`,
+  `NOT_ON_THE_API`; less Russia, 2 Nov: only Pinnacle prices it in play, `DROPPED`), 32 in all,
+  each {name, Odds API sport, ESPN slug} (`GROUPS`,
   `sport_of`, `slug_of`, `group_of`). No model, no trades, no cards, feed names. `fetch` (CLI
   `log-inplay-events --log-dir`, publish.yml's data-log step): the free sports list
   (`all=true`; a configured key it doesn't list is recorded "unknown", `res["unknown"]`, and

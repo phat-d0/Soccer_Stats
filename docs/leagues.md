@@ -737,7 +737,7 @@ Nothing trades on it.
 ### Odds-only competitions (28 Oct, lead-approved; about 1,100 credits a month more)
 
 Research's 75%+ heavy-favourite idea needs in-play prices from more competitions, going
-forward (H2's forward sample). The same snapshots now also cover 33 odds-only competitions
+forward (H2's forward sample). The same snapshots now also cover 32 odds-only competitions
 (`inplay_events.COMPETITIONS`):
 
 - the six domestic cups: FA Cup, EFL Cup, Copa del Rey, DFB-Pokal, Coppa Italia, Coupe de
@@ -745,9 +745,12 @@ forward (H2's forward sample). The same snapshots now also cover 33 odds-only co
 - the Europa League and Conference League;
 - the ten football-data leagues the archive prices in play beyond our eight: N1, P1, SC0, B1,
   T1, G1, D2, I2, SP2, F2;
-- heavy_more's sixteen less Romania (The Odds API has no Romanian league: "Unknown sport" for
-  `soccer_romania_liga_1`, found by Research on 28 Oct): Austria, Switzerland, Denmark, Norway,
-  Sweden, Poland, Finland, Ireland, Russia, Japan, China, USA, Mexico, Brazil, Argentina.
+- heavy_more's sixteen less Romania and Russia: Austria, Switzerland, Denmark, Norway, Sweden,
+  Poland, Finland, Ireland, Japan, China, USA, Mexico, Brazil, Argentina.
+  - Romania: The Odds API has no Romanian league ("Unknown sport" for `soccer_romania_liga_1`,
+    found by Research on 28 Oct).
+  - Russia, dropped 2 Nov (lead): its first weekend gave 10 rows from 12 calls, all Pinnacle's.
+    HF judges at DraftKings' in-play price, so those rows can't be used (`DROPPED`).
 - **Sport keys checked** (28 Oct). 29 keys returned events in the first run (19:58 UTC, 0
   credits). The four domestic cups out of season then (FA Cup, Copa del Rey, Coppa Italia, Coupe
   de France) are known keys: Research's H2P bought 911 historical snapshots under them with no
