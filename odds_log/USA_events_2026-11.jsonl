@@ -24,3 +24,4 @@
 {"league":"USA","sport":"soccer_usa_mls","event_id":"0db0938ab636e18037e77f2375ade121","home":"San Diego FC","away":"Sporting Kansas City","kickoff":"2026-11-08T00:00:00+00:00","fetched_at":"2026-11-01T03:22:46+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"2bf8103627b1f0afe9f9b1b619ebbe61","home":"Atlanta United FC","away":"Toronto FC","kickoff":"2026-11-01T21:40:00+00:00","fetched_at":"2026-11-01T23:30:35+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"54bf2a52e2dd2f8b9212f4816dceaada","home":"Nashville SC","away":"New York Red Bulls","kickoff":"2026-11-01T21:40:00+00:00","fetched_at":"2026-11-01T23:30:35+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"1a27bec6400dba567344a86aee6fca4a","home":"Los Angeles FC","away":"Minnesota United FC","kickoff":"2026-11-02T01:40:00+00:00","fetched_at":"2026-11-02T02:43:07+00:00"}
