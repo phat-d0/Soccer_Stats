@@ -2843,6 +2843,17 @@ a **separate sample**: never pooled with H ∪ H2, and never used to change H's 
   (the scope's figure), plus the live leagues' share (about 9 a season). At roughly 33 a
   season, 136 would take about four seasons, close to the 31 May 2030 date. A slower pace
   ends "inconclusive" on that date.
+- **Amendment, 2 Nov (no HF outcome read; no rule changed):**
+  - Two of the 34 listed competitions add nothing new.
+  - **Romania (ROU)** was never snapshotted. The Odds API doesn't list
+    `soccer_romania_liga_1` (28 Oct), so it never entered `inplay_events.COMPETITIONS`.
+  - **Russia (RUS)** is dropped from the snapshots (lead, 2 Nov, through Moneyline). Its
+    first weekend logged 10 rows, all Pinnacle; DraftKings never priced it in play.
+    - Its rows logged before the drop stay on data-log and in the sample.
+    - Without a DraftKings in-play price they can't give a usable bet, so they change no
+      count.
+  - 32 competitions keep logging. The expected pace above is not re-estimated. It can only
+    fall a little, and a slower pace ends "inconclusive" on 31 May 2030, as already set.
 
 ## Strategy search with a locked holdout (owner via the lead, 28 Oct): design, written before any search runs
 
