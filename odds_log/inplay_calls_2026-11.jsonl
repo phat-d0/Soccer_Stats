@@ -186,3 +186,4 @@
 {"league":"ARG","kinds":["inplay75"],"kickoffs":["2026-11-02T22:00:00+00:00"],"fetched_at":"2026-11-02T23:18:19+00:00","status":200,"cost":1,"credits_left":4960537,"events":19,"rows":14}
 {"league":"BRA","kinds":["inplay55"],"kickoffs":["2026-11-02T23:00:00+00:00"],"fetched_at":"2026-11-02T23:58:17+00:00","status":200,"cost":1,"credits_left":4960531,"events":10,"rows":6}
 {"league":"BRA","kinds":["inplay75"],"kickoffs":["2026-11-02T23:00:00+00:00"],"fetched_at":"2026-11-03T00:18:16+00:00","status":200,"cost":1,"credits_left":4960530,"events":10,"rows":6}
+{"league":"ARG","kinds":["inplay55"],"kickoffs":["2026-11-03T00:15:00+00:00"],"fetched_at":"2026-11-03T01:13:17+00:00","status":200,"cost":1,"credits_left":4960529,"events":17,"rows":11}
