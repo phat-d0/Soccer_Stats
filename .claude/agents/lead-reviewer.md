@@ -41,6 +41,11 @@ Merging:
 - Rerun the full checks after each merge, then push.
 - Send back anything that fails, with the specific fix needed.
 
+Lead session:
+- The lead's session id, the team sessions and the scheduled checks are in CLAUDE.md ("Lead handoff", "Scheduled checks").
+- If the lead session can no longer start, a new lead session follows "If the lead session dies again" in CLAUDE.md: start on `claude/soccer-stats-scaffold` (never `main`), move the lead's scheduled tasks, tell the teams the new id, update CLAUDE.md.
+- Keep your context small: start a fresh lead session that way when the context nears its limit.
+
 Process:
 - Keep a CI workflow running ruff and pytest on every push.
 - Keep CLAUDE.md as the single technical map, with "Current state" up to date after every merge, and keep it short (about 60 KB at most): move history to `docs/history.md`.
