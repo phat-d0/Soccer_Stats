@@ -571,6 +571,8 @@ Five agents, each owning part of the code. Start a session's work by calling the
 
 The lead runs in the owner's main session ("Soccer stats prediction model"). If you are a new lead session, pick up from here.
 
+**4 Nov 2026, lead handover.** The first lead session (session_013C98kDhuk4rGAZntMJZxFT, 5 Oct to 3 Nov, last act: merging PR #172) could no longer start: it was created on a `main` branch that no longer exists. The lead moved to "Soccer model lead" (session_01UShqQuDALoVuRNteQppxqG). Its six scheduled checks (9 Nov, 12 Nov, 16 Nov, 8 Dec, 1 Feb, 3 Feb) were recreated there with refreshed prompts and the old ones deleted; the four team sessions were told the new id. The trigger ids above are the old ones; CLAUDE.md has the current ones and a restart runbook.
+
 **Team sessions** (cloud sessions; message them with claude-code-remote `send_message`, check them with `get_session`):
 
 | Session title | Session id | Branch |

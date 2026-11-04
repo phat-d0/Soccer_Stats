@@ -12,7 +12,7 @@ superseded results are in `docs/history.md`; research write-ups are in `docs/lab
 Portfolio Scope" (https://claude.ai/code/artifact/ff86c3e7-f90b-47a9-8474-28c7c7266e1d),
 section "Status and next steps".
 
-## Current state (26 Oct 2026)
+## Current state (26 Oct 2026; lead handover 4 Nov)
 
 Every team reads this first, from `origin/claude/soccer-stats-scaffold` (see "Before every
 task" under Agent team). If something here looks wrong, tell the lead.
@@ -200,20 +200,27 @@ Before the upgrade: 10,931 left on 25 Oct 17:38 UTC (publish log; plan resets on
 ~2,476 (with League One/Two and UCL ~86), team totals ~682, corners ~471 (up to ~676 with League One/Two). The key is shared with
 the owner's baseball app, so the balance can drop without any run here.
 
-**Scheduled checks** (send_later into the lead session; trigger ids):
-- 9 Nov 2026 (`trig_01RznLks8hbfhYeLHgWPQCR5`): Lean refit (`backfill.yml` `match_blends`, then
+**Scheduled checks** (one-shot scheduled tasks; the lead's fire into the lead session, moved there
+on 4 Nov; trigger ids):
+- 4 Nov 2026 (`trig_016gMQ6Y12ZgiepQdriGfta5`, Moneyline): the first week of in-play spend per
+  competition vs the estimate, sent to the lead.
+- 5 Nov 2026 (`trig_01BD81adxDq5AHTLKpsT34jo`, Moneyline): the VIKING FK duplicates voided, then
+  closes and results matched without case (PR).
+- 7 Nov 2026 (`trig_01W2Xvga5S7YcAnXE1w14fTj`, Player props): the first live goalscorer calls
+  (§16 step 2), sent to the lead.
+- 9 Nov 2026 (`trig_01NcdPu9HNaDgmjheEy8HFsY`): Lean refit (`backfill.yml` `match_blends`, then
   `lean_backtest`) and Lean live tracking by driver.
-- 12 Nov 2026 (`trig_01U5txZuqCkL1ZeB5ik3XAJK`): should Blend Lean extend to team corners and
+- 12 Nov 2026 (`trig_01L39tjFC9YJxpmZabB9QfkR`): should Blend Lean extend to team corners and
   team goals? Team goals wait for the round-13 gate; corners need a pre-registered blend and σ.
-- 16 Nov 2026 (`trig_01N4zsU1KdvQ66W9MZhGBDeK`): late team news vs the DraftKings odds log
+- 16 Nov 2026 (`trig_01NQ9nZxt3QWgmvdestPM8QG`): late team news vs the DraftKings odds log
   (Research lab; ≥100 logged matches). Measure how fast DraftKings reacts compared with
   Pinnacle after a lineup surprise; data-log `team_news/` has `first_confirmed_at` per match.
-- 7 Dec 2026 (`trig_01KakNWotv6GkGQUqhjTvtbT`): goalscorer forward check. Done 1 Nov (the
-  window opened at 179 matches; §14); delete the trigger.
-- 8 Dec 2026 (`trig_01SJk1xh2PSaKfKEe6VfHW2m`): live team-corners review: per league and pooled
-  trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from SP1/D1/E1, credit use vs the cap;
-  record in `docs/totals.md`.
-- 3 Feb 2027 (`trig_011PdvR6MJoUd3gRpLbJaie6`): corners bake-off 2's locked test (E0, I1, F1,
+- 8 Dec 2026 (`trig_01QomAS25ieAih4kV7hus35o`): live team-corners review: per league, book and
+  pooled trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from the rest, the "below 60%"
+  shadow filter's judged read, credit use vs the cap; record in `docs/totals.md`.
+- 1 Feb 2027 (`trig_01JLhecHvNxnrXML9gbg8Vor`): the priced goalscorer test's single judged read
+  (§16; Player props runs it, the lead checks the verdict).
+- 3 Feb 2027 (`trig_018i9jHT5e1Y5U1yBH9DnFBR`): corners bake-off 2's locked test (E0, I1, F1,
   finalist (f)); `odds-check.yml` `task=corners2`, `finalists=f`, `cap=3`, a logged `reason`.
 
 **Open decisions with the owner:**
@@ -1511,8 +1518,29 @@ Process:
 
 ## Lead handoff
 
-The lead runs in the owner's main session ("Soccer stats prediction model"). Past rounds are in
-`docs/history.md`.
+The lead is the cloud session **"Soccer model lead"**, `session_01UShqQuDALoVuRNteQppxqG` (from
+4 Nov 2026). Past rounds are in `docs/history.md`.
+
+The first lead (`session_013C98kDhuk4rGAZntMJZxFT`, 5 Oct to 3 Nov) can no longer start: it was
+created on a `main` branch that no longer exists (`ref_not_found`, not recoverable), after about
+730K tokens of context. Its last act was merging PR #172; nothing was left half done.
+
+**If the lead session dies again** (`get_session` shows a non-recoverable `last_init_error`, or
+it no longer answers):
+1. Start a new cloud session on `claude/soccer-stats-scaffold` (never `main`; the repo has no
+   `main`), title it "Soccer model lead" and have it read this file.
+2. `list_triggers`: for every scheduled task whose `persistent_session_id` is the old lead,
+   create the same one-shot task in the new session (same time, prompt brought up to date),
+   then delete the old one. A task bound to a team session can only have its prompt edited
+   from that session, so ask the team to edit any prompt that names the old lead.
+3. `send_message` each team session the new lead id (they report to the lead by id).
+4. Update the lead id here and the trigger ids under "Scheduled checks", and open a PR.
+5. Check that nothing was left open: `list_pull_requests` (open), the latest `publish.yml`,
+   `closes.yml` and `inplay.yml` runs, and the old lead's last `post_turn_summary`.
+
+Keep the lead's context small: read CLAUDE.md's "Current state" rather than old transcripts,
+delegate long reads to subagents, and start a fresh lead session (steps above) when the context
+nears its limit rather than letting it run on.
 
 **Team sessions** (message with claude-code-remote `send_message`, check with `get_session`):
 
