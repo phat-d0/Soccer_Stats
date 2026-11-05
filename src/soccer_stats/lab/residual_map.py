@@ -81,7 +81,10 @@ NOTE = (
     "and a walk-forward model chance. x = the market's Shin-fair chance, y = the model's chance "
     "minus the market's, z = won minus the market's chance, averaged per cell; z > 0 where the "
     "model liked an outcome (y > 0) means the model was right there. Ranges resample matches "
-    "within each cell (2,000 draws, seed 0). Cells under 200 rows are marked thin."
+    "within each cell (2,000 draws, seed 0). Cells under 200 rows are marked thin. Seasons "
+    "2019/20-2023/24; 2024/25 on is locked as the test season for anything the map suggests. "
+    "Two scope limits: 'after a European match' counts UEFA matches only (domestic cups are "
+    "not counted), and rest days count league matches only."
 )
 
 
