@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from soccer_stats.data import RAW_DIR, _fetch, current_season
+from soccer_stats.data import RAW_DIR, STALE, _fetch, current_season
 
 URL = "https://understat.com/getLeagueData/{league}/{season}"
 # Understat's AJAX endpoint only answers requests that look like they come from its site.
@@ -217,16 +217,65 @@ def attach_xg(matches: pd.DataFrame, xg: pd.DataFrame, max_day_gap: int = 2) -> 
 def with_xg(matches: pd.DataFrame, raw_dir: Path = RAW_DIR) -> tuple[pd.DataFrame, str | None]:
     """Attach xG for every league/season in `matches`. Never raises.
 
-    Returns (matches with home_xg/away_xg, error message or None). On failure the xG
-    columns are all NaN, so models silently fall back to goals.
+    Each league-season loads on its own, so one bad file (Understat down, a maintenance
+    page) costs only that season: the model then uses goals for those matches and xG for
+    the rest. Returns (matches with home_xg/away_xg, error message or None); the message
+    names every season without xG and every season served from an older cached file.
     """
     leagues = [lg for lg in matches["league"].dropna().unique() if lg in LEAGUES]
     years = sorted({2000 + int(s[:2]) for s in matches["season"].dropna().unique()})
+    frames, missing = [], []
+    start = len(STALE)
+    for league in leagues:
+        for year in years:
+            try:
+                frames.append(load_xg([league], [year], raw_dir))
+            except Exception as exc:  # network down, site changed, maintenance page
+                missing.append(f"{league} {year}/{(year + 1) % 100:02d} ({exc})")
+    xg = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    notes = []
+    if missing:
+        notes.append("Could not load xG from Understat for " + "; ".join(missing))
+    stale = STALE[start:]
+    if stale:
+        notes.append("Understat refresh failed, using the last good file for " + "; ".join(stale))
+    return attach_xg(matches, xg), (". ".join(notes) or None)
+
+
+def repair_from(old_dir: Path, raw_dir: Path = RAW_DIR) -> list[dict]:
+    """Copy good Understat league files from an older raw cache over bad current ones.
+
+    For each `understat_<league>_<year>.json` in `old_dir`: copied (mtime kept) only when
+    the old file is good league JSON and the current one is missing or bad, so a good
+    current file is never replaced. One dict per file: name, action (copied, kept_current,
+    old_bad), matches in the file used.
+    """
+    import shutil
+
+    out = []
+    for old in sorted(Path(old_dir).glob("understat_*_*.json")):
+        cur = Path(raw_dir) / old.name
+        row: dict = {"file": old.name}
+        if not _good(old):
+            row["action"] = "old_bad"
+        elif cur.exists() and _good(cur):
+            row["action"] = "kept_current"
+        else:
+            shutil.copy2(old, cur)
+            row["action"] = "copied"
+        used = cur if cur.exists() else old
+        if _good(used):
+            row["matches"] = len(json.loads(used.read_bytes())["dates"])
+        out.append(row)
+    return out
+
+
+def _good(path: Path) -> bool:
     try:
-        xg = load_xg(leagues, years, raw_dir)
-    except Exception as exc:  # network down, site changed, etc.
-        return attach_xg(matches, pd.DataFrame()), f"Could not load xG from Understat: {exc}"
-    return attach_xg(matches, xg), None
+        check_league_json(path.read_bytes())
+    except Exception:
+        return False
+    return True
 
 
 def probe(raw_dir: Path = RAW_DIR, seasons: Iterable[int] | None = None) -> list[dict]:

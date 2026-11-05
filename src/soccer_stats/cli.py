@@ -258,6 +258,20 @@ def cmd_understat_probe(args: argparse.Namespace) -> None:
         print("UNDERSTAT_PROBE " + json.dumps(row, default=str), flush=True)
 
 
+def cmd_understat_repair(args: argparse.Namespace) -> None:
+    """Put good Understat league files from an older raw cache over bad current ones."""
+    import json
+    from pathlib import Path
+
+    from soccer_stats.xg import repair_from
+
+    rows = repair_from(Path(args.old), Path(args.raw))
+    for row in rows:
+        print("UNDERSTAT_REPAIR " + json.dumps(row), flush=True)
+    copied = sum(r["action"] == "copied" for r in rows)
+    print(f"Understat repair: {copied} of {len(rows)} files copied from {args.old}")
+
+
 def cmd_espn_probe(args: argparse.Namespace) -> None:
     """Which ESPN league slugs answer, their team names and summary shape (no key)."""
     import json
@@ -3229,6 +3243,11 @@ def main(argv: list[str] | None = None) -> None:
 
     up = sub.add_parser("understat-probe", help="Understat endpoints and the cached xG files")
     up.set_defaults(func=cmd_understat_probe)
+
+    ur = sub.add_parser("understat-repair", help="good Understat files from an older raw cache")
+    ur.add_argument("--old", required=True, help="older raw-data folder")
+    ur.add_argument("--raw", default="data/raw", help="the current raw folder")
+    ur.set_defaults(func=cmd_understat_repair)
 
     ep = sub.add_parser("espn-probe", help="ESPN league slugs, team names and summary shape")
     ep.add_argument("--leagues", default="", help="comma-separated codes (blank = every slug)")
