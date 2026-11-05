@@ -84,7 +84,9 @@ NOTE = (
     "within each cell (2,000 draws, seed 0). Cells under 200 rows are marked thin. Seasons "
     "2019/20-2023/24; 2024/25 on is locked as the test season for anything the map suggests. "
     "Two scope limits: 'after a European match' counts UEFA matches only (domestic cups are "
-    "not counted), and rest days count league matches only."
+    "not counted), and rest days count league matches only. A slice level that holds every outcome of its "
+    "matches (league, month) has a total z of 0 by construction (each match's outcomes sum to "
+    "one win and to a chance of 1); read its bands, not its total."
 )
 
 
