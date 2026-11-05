@@ -141,6 +141,32 @@ def fetch_season(
     return out
 
 
+def backfill(
+    leagues: Iterable[str],
+    years: Iterable[int],
+    raw_dir: Path = RAW_DIR,
+    good_dir: Path | None = None,
+) -> list[dict]:
+    """Load every league-season into the good-copy folder (free; for Research's history,
+    which no cache holds since the old understat-<league>- caches were evicted). One dict
+    per season: league, season, status ("ok" with its matches, "kept" when the good copy
+    already had it, or "failed" with the error type); a bad answer is never written."""
+    good = Path(good_dir) if good_dir is not None else GOOD_DIR
+    out = []
+    for league in leagues:
+        for year in years:
+            row: dict = {"league": league, "season": year}
+            had = (good / f"understat_{LEAGUES[league]}_{year}.json").exists()
+            try:
+                path = fetch_season(league, year, raw_dir, good_dir=good)
+                n = len(json.loads(path.read_bytes())["dates"])
+                row.update(status="kept" if had else "ok", matches=n)
+            except Exception as exc:  # Understat down, a maintenance page, a network error
+                row.update(status="failed", error=type(exc).__name__, detail=str(exc)[:160])
+            out.append(row)
+    return out
+
+
 def restore_good(path: Path, good_dir: Path) -> bool:
     """Put the last good copy (mtime kept) over a missing or bad cached league file;
     True when it did."""

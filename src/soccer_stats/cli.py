@@ -272,6 +272,25 @@ def cmd_understat_repair(args: argparse.Namespace) -> None:
     print(f"Understat repair: {copied} of {len(rows)} files copied from {args.old}")
 
 
+def cmd_understat_backfill(args: argparse.Namespace) -> None:
+    """Every requested Understat league-season into the good-copy folder (no key)."""
+    import json
+
+    from soccer_stats.xg import LEAGUES, backfill
+
+    leagues = [c.strip() for c in (args.leagues or "").split(",") if c.strip()] or list(LEAGUES)
+    lo, _, hi = args.seasons.partition("-")
+    years = range(int(lo), int(hi or lo) + 1)
+    rows = backfill(leagues, years)
+    for r in rows:
+        print("UNDERSTAT_BACKFILL " + json.dumps(r), flush=True)
+    n = {k: sum(r["status"] == k for r in rows) for k in ("ok", "kept", "failed")}
+    print(
+        f"Understat backfill: {n['ok']} new, {n['kept']} already kept, {n['failed']} failed "
+        f"of {len(rows)} league-seasons"
+    )
+
+
 def cmd_espn_probe(args: argparse.Namespace) -> None:
     """Which ESPN league slugs answer, their team names and summary shape (no key)."""
     import json
@@ -3243,6 +3262,11 @@ def main(argv: list[str] | None = None) -> None:
 
     up = sub.add_parser("understat-probe", help="Understat endpoints and the cached xG files")
     up.set_defaults(func=cmd_understat_probe)
+
+    ub = sub.add_parser("understat-backfill", help="Understat seasons into the good-copy cache")
+    ub.add_argument("--leagues", default="", help="comma-separated codes (blank = the five)")
+    ub.add_argument("--seasons", default="2017-2026", help="start years, e.g. 2017-2023")
+    ub.set_defaults(func=cmd_understat_backfill)
 
     ur = sub.add_parser("understat-repair", help="good Understat files from an older raw cache")
     ur.add_argument("--old", required=True, help="older raw-data folder")

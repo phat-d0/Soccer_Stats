@@ -144,9 +144,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat or understat-restore"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat, understat-restore or understat-backfill"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat, understat-restore]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -155,7 +155,7 @@ on:
         description: "props: historical dates (comma-separated ISO times)"
         default: "2026-10-03T08:00:00Z,2025-03-15T08:00:00Z"
       seasons:
-        description: "match/signals: seasons to bet (start years); shots: seasons to load"
+        description: "match/signals: seasons to bet (start years); shots: seasons to load; understat-backfill: start years to keep, e.g. 2017-2025"
         default: "2017-2025"
       league:
         description: "lab/lab-holdout/lab-coverage/lab-edge/lineups/totals/corners/corners2/corner-recal: football-data division (E0-E3, SP1, D1, I1, F1)"
@@ -390,6 +390,14 @@ jobs:
       # understat-restore (5 Nov, Understat down since 2 Nov): the newest raw-data cache is
       # set aside, an older one restored beside it, and its good Understat league files
       # copied over the bad ones; saved as the newest raw-data cache on the default branch only.
+      # understat-backfill: the good-copy cache (publish.yml's xg-good-) gets every requested
+      # Understat league-season; saved on the default branch only.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'understat-backfill' }}
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
       - name: Set the newest raw cache aside
         if: ${{ inputs.task == 'understat-restore' }}
         run: mv data/raw "$RUNNER_TEMP/raw_new"
@@ -578,6 +586,12 @@ jobs:
             understat-restore)  # no key: good Understat files from raw-data-$RESTORE_KEY
               uv run soccer-stats understat-repair --old "$RUNNER_TEMP/raw_old"
               rm -rf data/raw/player_odds_history "$RUNNER_TEMP/raw_old" ;;  # paid: not raw-data's
+            understat-backfill)  # no key: Understat seasons into the good-copy cache
+              if [ -n "$LEAGUES" ]; then
+                uv run soccer-stats understat-backfill --leagues "$LEAGUES" --seasons "$SEASONS"
+              else
+                uv run soccer-stats understat-backfill --seasons "$SEASONS"
+              fi ;;
             understat)  # no key: Understat's answers, the cached files, the raw-data caches held
               uv run soccer-stats understat-probe
               curl -sS -H "Authorization: Bearer $GH_TOKEN" \
@@ -606,6 +620,12 @@ jobs:
               cat out/team_totals.json
               rm -rf out/log ;;
           esac
+      - uses: actions/cache/save@v4
+        if: ${{ inputs.task == 'understat-backfill' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' && hashFiles('data/understat_good/*.json') != '' }}
+        continue-on-error: true  # an unchanged copy's key exists already
+        with:
+          path: data/understat_good
+          key: xg-good-${{ hashFiles('data/understat_good/*.json') }}
       - uses: actions/cache/save@v4
         if: ${{ inputs.task == 'understat-restore' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' }}
         with:

@@ -381,3 +381,27 @@ def test_a_good_raw_file_is_never_replaced_by_the_copy(tmp_path, season_json):
     (good / name).write_bytes(MAINTENANCE)  # a bad copy is never used either
     (raw / name).unlink()
     assert not restore_good(raw / name, good)
+
+
+def test_backfill_keeps_every_good_season_and_reports_the_rest(tmp_path, monkeypatch, season_json):
+    from soccer_stats.xg import backfill
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    (good).mkdir()
+    (good / "understat_EPL_2017.json").write_text(json.dumps(season_json))  # kept from before
+
+    def get(url, headers=None, timeout=None):
+        return _Resp(MAINTENANCE if url.endswith("2019") else json.dumps(season_json).encode())
+
+    from soccer_stats import data
+
+    monkeypatch.setattr(data.requests, "get", get)
+    rows = {r["season"]: r for r in backfill(["E0"], range(2017, 2020), raw, good)}
+    assert rows[2017]["status"] == "kept" and rows[2018]["status"] == "ok"
+    assert rows[2018]["matches"] == len(season_json["dates"])
+    assert rows[2019]["status"] == "failed" and rows[2019]["error"] == "BadResponse"
+    assert sorted(p.name for p in good.iterdir()) == [
+        "understat_EPL_2017.json",
+        "understat_EPL_2018.json",
+    ]
