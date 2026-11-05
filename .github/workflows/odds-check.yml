@@ -409,7 +409,7 @@ jobs:
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
-          GH_TOKEN: ${{ inputs.task == 'understat' && github.token || '' }}
+          GH_TOKEN: ${{ (inputs.task == 'understat' || inputs.task == 'residual-map') && github.token || '' }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -422,7 +422,6 @@ jobs:
           AFTER: ${{ inputs.after }}
           LEAGUES: ${{ inputs.leagues }}
           RESTORE_KEY: ${{ inputs.restore_key }}
-          GH_TOKEN: ${{ inputs.task == 'residual-map' && github.token || '' }}
         run: |
           uv sync --frozen
           mkdir -p out
