@@ -202,11 +202,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 **Scheduled checks** (one-shot scheduled tasks; the lead's fire into the lead session, moved there
 on 4 Nov; trigger ids):
-- 4 Nov 2026 (`trig_016gMQ6Y12ZgiepQdriGfta5`, Moneyline): the first week of in-play spend per
-  competition vs the estimate, sent to the lead.
-- 5 Nov 2026 (`trig_01BD81adxDq5AHTLKpsT34jo`, Moneyline): the VIKING FK duplicates voided, then
-  closes and results matched without case (PR).
-- 7 Nov 2026 (`trig_01W2Xvga5S7YcAnXE1w14fTj`, Player props): the first live goalscorer calls
+- 7 Nov 2026 (`trig_01HeboZFRkoZgkXr5Wu7tjCv`, Player props): the first live goalscorer calls
   (§16 step 2), sent to the lead.
 - 9 Nov 2026 (`trig_01NcdPu9HNaDgmjheEy8HFsY`): Lean refit (`backfill.yml` `match_blends`, then
   `lean_backtest`) and Lean live tracking by driver.
@@ -1531,10 +1527,13 @@ it no longer answers):
    `main`), title it "Soccer model lead" and have it read this file.
 2. `list_triggers`: for every scheduled task whose `persistent_session_id` is the old lead,
    create the same one-shot task in the new session (same time, prompt brought up to date),
-   then delete the old one. A task bound to a team session can only have its prompt edited
-   from that session, so ask the team to edit any prompt that names the old lead.
-3. `send_message` each team session the new lead id (they report to the lead by id).
-4. Update the lead id here and the trigger ids under "Scheduled checks", and open a PR.
+   then delete the old one.
+3. Start each team session from the new lead with `create_session` (title "Soccer team: <Role>",
+   the default branch, `outcome_branch` its `team/<name>`, tags `soccer-team`,
+   `soccer-team:<role>`; the prompt names the lead's id and the agent file), so the app nests them
+   under the lead. Move each team's scheduled tasks to its new session (create there, delete the
+   old) and retire the old team sessions once their open work is pushed.
+4. Update the lead and team ids here and the trigger ids under "Scheduled checks", and open a PR.
 5. Check that nothing was left open: `list_pull_requests` (open), the latest `publish.yml`,
    `closes.yml` and `inplay.yml` runs, and the old lead's last `post_turn_summary`.
 
@@ -1542,14 +1541,17 @@ Keep the lead's context small: read CLAUDE.md's "Current state" rather than old 
 delegate long reads to subagents, and start a fresh lead session (steps above) when the context
 nears its limit rather than letting it run on.
 
-**Team sessions** (message with claude-code-remote `send_message`, check with `get_session`):
+**Team sessions** (message with claude-code-remote `send_message`, check with `get_session`). Since
+5 Nov they are created by the lead session (`create_session`), so the app lists them under it, as
+the baseball team does. The first team sessions (created by the first lead) were retired then.
+
 
 | Session title | Session id | Branch |
 | --- | --- | --- |
-| Soccer team: Moneyline | session_01SHL1YZ5knBRSduL7vurWN7 | team/moneyline |
-| Soccer team: Research lab | session_019c4cFKhKCuU6mdEtYqoUxp | team/research |
-| Soccer team: Player props | session_01C8B5tL2iAqVcZ7cYbz2bdc | team/player-props |
-| Soccer team: UI Design | session_01YUi3o1ueWm8BePMSWeB2hb | team/ui |
+| Soccer team: Moneyline | session_01UShqQynmnE1egcCsoeQvyq | team/moneyline |
+| Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
+| Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
+| Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub
