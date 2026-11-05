@@ -374,9 +374,15 @@ on 4 Nov; trigger ids):
   `check_match_json`), `stale_ok`. `with_xg` loads each league-season on its own: a missing
   season costs only its matches (goals there) and the error names it and any stale file.
   `GOOD_DIR` (`data/understat_good`, cache `xg-good-` in publish.yml, saved under a key of the
-  files' hash): `fetch_season` puts its copy over a missing or bad cached file
-  (`restore_good`) and mirrors every good file into it (`keep_good`); only files passing
-  `check_league_json` are ever written there. Used for the default raw folder only. Each
+  files' hash, under `always()`): `fetch_season` puts its copy over the cached file when
+  the copy is better (`restore_good`) and mirrors every better good file into it
+  (`keep_good`); better = the other is missing or bad, or more played results, or as many
+  and a newer modification time (`_better`). Only files passing `check_league_json` are ever
+  written there, and an empty match list is refused while a kept file has results. Every
+  workflow that loads Understat restores it (publish, players, goalscorer-test, backfill,
+  odds-check); only publish and `task=understat-backfill` save it. A backfill and a publish
+  saving it at the same moment can drop the other's additions: acceptable, since publish
+  re-mirrors from raw-data on its next run and the backfill can be rerun. Used for the default raw folder only. Each
   publish restores it, adds and saves the union, so it keeps every season ever loaded
   (keep-alive row in caches.yml). `backfill(leagues, years)` (CLI `understat-backfill
   --leagues --seasons`, `odds-check.yml` `task=understat-backfill` with `seasons`/`leagues`;

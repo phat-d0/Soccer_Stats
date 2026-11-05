@@ -355,32 +355,77 @@ def test_only_good_files_reach_the_good_copy_and_newer_ones_replace_it(
         fetch_season("E0", 2025, raw, good_dir=good)
     assert not (good / "understat_EPL_2025.json").exists()
     assert not keep_good(raw / "understat_EPL_2025.json", good)
-    # A newer good raw file replaces an older copy; an older one doesn't.
-    newer = {"dates": season_json["dates"][:1]}
-    (raw / name).write_text(json.dumps(newer))
+    # A raw file with as many results replaces the copy only when newer.
+    same = {**season_json, "teams": {}}
+    (raw / name).write_text(json.dumps(same))
     later = (good / name).stat().st_mtime + 60
     os.utime(raw / name, (later, later))
     assert keep_good(raw / name, good)
-    assert json.loads((good / name).read_text()) == newer
+    assert json.loads((good / name).read_text()) == same
     os.utime(raw / name, (later - 3600, later - 3600))
     assert not keep_good(raw / name, good)
+    # Fewer played results never replace the copy, however new the file.
+    fewer = {"dates": season_json["dates"][:1]}
+    (raw / name).write_text(json.dumps(fewer))
+    os.utime(raw / name, (later + 3600, later + 3600))
+    assert not keep_good(raw / name, good)
+    assert json.loads((good / name).read_text()) == same
 
 
-def test_a_good_raw_file_is_never_replaced_by_the_copy(tmp_path, season_json):
+def test_the_better_file_wins_between_the_raw_cache_and_the_copy(tmp_path, season_json):
+    """The review's point 2: an older good raw-data file must not beat a newer good copy;
+    more played results win, then the newer file. A bad copy is never used."""
+    import os
+
     from soccer_stats.xg import restore_good
 
     raw, good = tmp_path / "raw", tmp_path / "good"
     raw.mkdir()
     good.mkdir()
     name = "understat_EPL_2026.json"
-    mine = {"dates": season_json["dates"][:2]}
+    older = {"dates": season_json["dates"][:1]}  # one result
+    (raw / name).write_text(json.dumps(older))
+    (good / name).write_text(json.dumps(season_json))  # two results
+    assert restore_good(raw / name, good)
+    assert json.loads((raw / name).read_text()) == season_json
+    # As many results: the newer file stays.
+    mine = {**season_json, "teams": {}}
     (raw / name).write_text(json.dumps(mine))
-    (good / name).write_text(json.dumps(season_json))
+    t = (good / name).stat().st_mtime + 60
+    os.utime(raw / name, (t, t))
     assert not restore_good(raw / name, good)
     assert json.loads((raw / name).read_text()) == mine
-    (good / name).write_bytes(MAINTENANCE)  # a bad copy is never used either
+    os.utime(raw / name, (t - 3600, t - 3600))  # now the copy is newer
+    assert restore_good(raw / name, good)
+    (good / name).write_bytes(MAINTENANCE)  # a bad copy is never used
     (raw / name).unlink()
     assert not restore_good(raw / name, good)
+
+
+def test_an_empty_answer_never_replaces_a_file_with_results(tmp_path, monkeypatch, season_json):
+    """The review's point 3: {"dates": []} is valid JSON, but with results held it is
+    refused, and the kept file is used."""
+    import os
+
+    from soccer_stats import data
+    from soccer_stats.xg import fetch_season
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    name = "understat_EPL_2026.json"
+    (raw / name).write_text(json.dumps(season_json))
+    old = (raw / name).stat().st_mtime - 13 * 3600
+    os.utime(raw / name, (old, old))
+    _serve(monkeypatch, b'{"dates": []}')
+    monkeypatch.setattr(data, "STALE", [])
+    monkeypatch.setattr("soccer_stats.xg.STALE", data.STALE)
+    monkeypatch.setattr("soccer_stats.xg.current_season", lambda: 2026)
+    path = fetch_season("E0", 2026, raw, good_dir=good)
+    assert json.loads(path.read_text()) == season_json
+    assert "empty match list" in data.STALE[0]
+    # With nothing held, an empty season (before its schedule is out) is accepted.
+    path = fetch_season("E0", 2026, tmp_path / "fresh", good_dir=tmp_path / "good2")
+    assert json.loads(path.read_text()) == {"dates": []}
 
 
 def test_backfill_keeps_every_good_season_and_reports_the_rest(tmp_path, monkeypatch, season_json):

@@ -50,6 +50,13 @@ jobs:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
+      # The last good Understat league files (xg.GOOD_DIR, publish.yml saves them): a stale
+      # raw-data cache's bad Understat file is replaced from here before it's used or saved.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
 
       # Paid lines: restored here, saved right after the download, even when it fails.
       - uses: actions/cache/restore@v4
