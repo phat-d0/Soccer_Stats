@@ -12,7 +12,7 @@ superseded results are in `docs/history.md`; research write-ups are in `docs/lab
 Portfolio Scope" (https://claude.ai/code/artifact/ff86c3e7-f90b-47a9-8474-28c7c7266e1d),
 section "Status and next steps".
 
-## Current state (26 Oct 2026; lead handover 4 Nov)
+## Current state (5 Nov 2026)
 
 Every team reads this first, from `origin/claude/soccer-stats-scaffold` (see "Before every
 task" under Agent team). If something here looks wrong, tell the lead.
@@ -221,10 +221,13 @@ settlement runs after them.
   little less often than the price implies, so its win rate tracks the price, not the model
   (`docs/lab.md` "Price-band edge rule", step 1, and the "Model 12% filters" verdict).
 
-**Live paper record** (publish of 26 Oct 08:52 UTC; changes daily, so read the publish log or
-the app): Blend Lean (new rule) 7 trades (7 settled), all odds (old rule) 22 (20 settled), Model
-12% 196 (161 settled), Model 12% draw no bet 25 (all open), Lean draw no bet 0; corners 135 (134
-settled).
+**Live paper record** (publish of 5 Nov 11:43 UTC; changes daily, so read the publish log or
+the app): Blend Lean (new rule) 11 trades (10 settled), all odds (old rule) 33 (29 settled), Lean
+draw no bet 2 (1 settled), Model 12% 270 (235 settled), Model 12% draw no bet 197 (141 settled);
+corners 223 (all settled; DraftKings under 60% 16, Pinnacle under 60% 63); Line shop vs Pinnacle
+started 5 Nov 11:55 UTC (28 backcast trades at 2%, 47 at 1%, judged read 0 of 300). Owner's
+P/L check of 4 Nov 18:02: Lean +$13.50 (CLV −3.6%), Model 12% −$463.30 (CLV −6.0%), corners vs
+DraftKings +$133.60 but CLV −6.7% and 4% beat Pinnacle's close: the corner profit is luck.
 
 **Credits:** the owner upgraded the plan to about 5M a month (28 Oct): 4,938,760 left at the
 05:50 UTC publish that day; 4,589,590 after the 160,180-credit DraftKings history backfill
@@ -263,6 +266,17 @@ on 4 Nov; trigger ids):
 
 **Open decisions with the owner:**
 - Logging Champions League corner prices only, without a model (offered; recommended no for now).
+
+**Waiting on the owner:** the bet-alert set-up (`push/README.md`, seven steps: Cloudflare Worker,
+KV id in `push/wrangler.jsonc`, four Worker secrets, `ALERT_URL`/`ALERT_TOKEN` repo secrets, then
+"Turn on" in the home-screen app). Until then each publish logs "Bet alerts: off".
+
+**Waiting on Understat** (down since 2 Nov): Moneyline runs `odds-check.yml`
+`task=understat-backfill` (`seasons=2017-2025`) on the default branch when it returns, then
+Research reruns `task=residual-map` with all eight leagues and the lead republishes the owner's
+3D view, the "Model vs Market Map" artifact
+(https://claude.ai/artifact/B731FfXCrdhqJuYEdtqYdV, built from `lab/residual_map.json`; today
+four leagues: E0, E1–E3).
 
 ## Branches and where things run
 
