@@ -48,7 +48,7 @@ from soccer_stats.odds import devig_shin
 KEY = "lineshop"
 LABEL = "Line shop vs Pinnacle"
 SHADOW_KEY = "lineshop_1pct"
-SHADOW_LABEL = "Line shop vs Pinnacle, 1% gap (shadow)"
+SHADOW_LABEL = "Line shop vs Pinnacle, 1% gap (descriptive)"
 SHOP_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers")  # tie order too
 BOOK_NAMES = {
     "draftkings": "DraftKings",
@@ -621,7 +621,7 @@ def sections(
     now: pd.Timestamp | None = None,
     read: dict | None = None,
 ) -> list[dict]:
-    """The track's section (key "lineshop") and its 1% shadow (variant_of "lineshop",
+    """The track's section (key "lineshop") and its 1% line (variant_of "lineshop",
     adds "threshold", no bets of its own) for Moneyline -> live -> strategies:
     paper.strategy_section plus defined_at, note, age_note, `backcast` (backcast.block from
     28 Oct, `exception` explaining why), `judged` (the main line) or `compare` (the
