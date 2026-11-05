@@ -603,7 +603,7 @@ const STEPS = [
     // Each draw no bet track sits right after its parent in the main list (owner, 26 Oct).
     // Model 12% and its draw no bet track are archived (owner, 26 Oct), after the old Lean rule.
     // A failed pre-match study (the strategy search) joins the Archive last (owner, 28 Oct).
-    if (strats.join(",") !== "lean,lean_dnb,team_totals_log,lean_all_odds,edge12,edge12_dnb,strategy_search,goals_markets") throw new Error(`strategy folders: ${strats.join(",")}`);
+    if (strats.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct,team_totals_log,lean_all_odds,edge12,edge12_dnb,strategy_search,goals_markets") throw new Error(`strategy folders: ${strats.join(",")}`);
     const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
     if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
@@ -751,7 +751,7 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Lead: Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes("Lead: Blend Lean (new rule) · 2 more · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
     // The headline is the lead strategy's: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
@@ -1380,6 +1380,48 @@ const STEPS = [
   ["portfolio-comebacks-leave", async (p) => {
     await pfOpenPf(p, "moneyline"); await p.click('button[data-pfstrat="edge12"]');
     if (!(await p.locator('button[data-pf="live"].on').count())) throw new Error("Moneyline should fall back to Live paper after a study");
+  }],
+  // Line shop vs Pinnacle (owner-approved 5 Nov): the 2% judged line after Blend Lean in the
+  // main list, its 1% comparison right under it; book, quote age, gap, Pinnacle's fair chance
+  // and CLV vs Pinnacle's close on rows and the sheet; the judged count, then a stored verdict.
+  ["portfolio-lineshop", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "moneyline"); await p.click('.chip[data-league=""]');
+    const main = await p.locator('.section-title:has-text("Strategies") + .card button[data-pfstrat]').evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
+    if (main.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct,team_totals_log") throw new Error(`Moneyline main list: ${main.join(",")}`);
+    const row = (await p.locator('button[data-pfstrat="lineshop"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Line shop vs Pinnacle", "Live since Sep 27 · 2%+ over Pinnacle's fair price · best of 4 books", "Judged at 300 bets: 3 with a final close so far"]) if (!row.includes(w)) throw new Error(`line shop row lacks "${w}": ${row}`);
+    const row1 = (await p.locator('button[data-pfstrat="lineshop_1pct"]').innerText()).replace(/\s+/g, " ");
+    if (!row1.includes("Descriptive comparison · a 1% gap · never judged")) throw new Error(`1% row: ${row1}`);
+    await p.click('button[data-pfstrat="lineshop"]');
+    if (await p.locator('button[data-pf="backtest"]').count()) throw new Error("the line shop has no backtest view");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["No model: the best of DraftKings, FanDuel, BetMGM and BetRivers", "The judged test, from", "3 of 300 bets with a final close", "4 opened since", "Where the price was", "DraftKings 2 · FanDuel 2 · BetMGM 1 · BetRivers 1", "1 trade took a quote 10+ minutes old", "The age on each trade is how old", "Its backcast starts 28 Oct", "Avg gap", "gap +", "CLV +", "vs Pinnacle's close", "(old)"]) if (!text.includes(w)) throw new Error(`line shop view lacks "${w}"`);
+    if (text.includes("¼ Kelly") || text.includes("Kelly bet log")) throw new Error("the line shop shows Kelly sizing");
+    if ((await p.locator("#view .trade-row .chip-backcast").count()) !== 2) throw new Error("line shop backcast chips");
+    if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("line shop overlay legend");
+    const legend = await p.locator(".pf-curve .curve-legend").innerText();
+    if (!legend.includes("2% gap (judged)") || !legend.includes("1% gap")) throw new Error(`line shop legend: ${legend}`);
+    // The stored verdict replaces the count once the read is frozen.
+    await p.evaluate(() => {
+      const s = pfById("moneyline").live.strategies.find((x) => x.key === "lineshop");
+      s.judged = { ...s.judged, verdict: "fail", clv: -0.004, clv_ci95: [-0.011, 0.003], read: 300, read_at: "2027-03-15T10:00:00+00:00", frozen: true };
+      render();
+    });
+    const box = (await p.textContent(".ls-judged")).replace(/\s+/g, " ");
+    for (const w of ["Failed", "mean CLV against Pinnacle's close −0.4%", "95% range −1.1% to +0.3%", "on the first 300 bets", "it never changes"]) if (!box.includes(w)) throw new Error(`frozen verdict lacks "${w}": ${box}`);
+    await p.evaluate(() => { const s = pfById("moneyline").live.strategies.find((x) => x.key === "lineshop"); delete s.judged.verdict; s.judged.frozen = false; render(); });
+  }],
+  ["portfolio-lineshop-trade", async (p) => {
+    await p.click('button[data-trade="SP1|2627|Sevilla|Getafe|lineshop"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Line shop vs Pinnacle, 2% gap (judged)", "Bookmaker", "DraftKings", "Quote's age when logged", "Gap at entry", "over Pinnacle's fair price", "Pinnacle's fair chance at entry", "CLV vs Pinnacle's close (judged)", "The book's own close"]) if (!text.includes(w)) throw new Error(`line shop sheet lacks "${w}"`);
+    for (const w of ["Kelly", "Team news applied", "Model chance"]) if (text.includes(w)) throw new Error(`line shop sheet shows "${w}"`);
+  }, true],
+  ["portfolio-lineshop-1pct", async (p) => {
+    await closeSheet(p); await pfOpenStrat(p, "lineshop_1pct");
+    const box = (await p.textContent(".ls-compare")).replace(/\s+/g, " ");
+    for (const w of ["Compared with Line shop vs Pinnacle", "descriptive", "1% gap", "2% gap (judged)", "CLV vs Pinnacle", "Descriptive only: the 1% line enters"]) if (!box.includes(w)) throw new Error(`1% compare lacks "${w}": ${box}`);
+    if (await p.locator(".ls-judged").count()) throw new Error("the 1% line shows the judged box");
   }],
   // Bet alerts (owner, 5 Nov): the control at the foot of Portfolio's top level, in each
   // state (push itself can't run headless), and a tapped alert's link opening its trade.

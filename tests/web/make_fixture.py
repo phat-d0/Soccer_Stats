@@ -42,6 +42,7 @@ from conftest import simulate_league  # noqa: E402
 
 from soccer_stats import corners_live, paper  # noqa: E402
 from soccer_stats import paper_dnb as pdnb  # noqa: E402
+from soccer_stats import paper_lineshop as plsh  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
 from soccer_stats import publish as pub  # noqa: E402
 from soccer_stats import trades as tr  # noqa: E402
@@ -387,7 +388,7 @@ def build(src: Path, out: Path) -> dict:
     # (All's curves too since the real DraftKings files joined, 28 Oct.)
     for f in (sb.get("lean") or {}, sb.get("edge12") or {}):
         for code, part in (f.get("leagues") or {}).items():
-            if code not in FULL_LEAGUES and isinstance(part, dict):
+            if code not in CALIBRATION_LEAGUES and isinstance(part, dict):
                 part.pop("calibration", None)
         # Every fifth point outside FULL_LEAGUES (5 Nov: room for the Kelly bet log and the
         # bet-alert block, with headroom under the cap); every fourth under All and those.
@@ -1182,6 +1183,9 @@ DK_BETS = 20  # real DraftKings-price backtest rows kept
 # The leagues whose backtest parts the fixture keeps whole (the smoke test reads them); the
 # others drop their seasons, edge and CLV bands (DraftKings' files) or calibration (Pinnacle's).
 FULL_LEAGUES = ("E0", "SP1", "E3", "UCL")
+# Pinnacle's files keep calibration only where the Model view's charts are tested (5 Nov:
+# League Two's dropped for room under the cap; its Model view then says it's missing).
+CALIBRATION_LEAGUES = ("E0", "SP1", "UCL")
 
 
 def _trim_dk(f: dict) -> None:
@@ -1753,6 +1757,89 @@ def dnb_trades(rules: dict) -> list[dict]:
     return out
 
 
+# Line shop vs Pinnacle (owner-approved 5 Nov; paper_lineshop): its real start and backcast
+# (28 Oct) are after the fixture's NOW, so both move back (FIXTURE_DNB_FROM, 14 Sep) and the
+# trades are synthetic, built through paper_lineshop's own record: the 2% line (two backcast,
+# wins, losses, one with a stale-ish quote, one open) and its 1% comparison. Each row: track,
+# league, home, away, kickoff, market, book, Pinnacle's 1X2 at entry, gap, the book quote's age
+# in minutes, Pinnacle's close 1X2, the book's close on the side, score (None = open).
+plsh.BACKCAST_START = FIXTURE_DNB_STARTED
+LINESHOP_TRADES = [
+    ("lineshop", "E0", "Everton", "Wolves", "2026-09-19T14:00:00Z", "home", "fanduel")
+    + ((2.10, 3.40, 3.80), 0.024, 3.0, (2.02, 3.45, 3.95), 2.14, "2-0"),
+    ("lineshop", "SP1", "Betis", "Celta", "2026-09-22T19:00:00Z", "away", "betmgm")
+    + ((1.95, 3.50, 4.20), 0.031, 12.5, (1.92, 3.55, 4.30), 4.40, "1-0"),
+    ("lineshop", "E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "draw", "draftkings")
+    + ((1.80, 3.80, 4.80), 0.021, 1.5, (1.78, 3.70, 4.90), 3.90, "1-1"),
+    ("lineshop", "E0", "Brentford", "Leeds", "2026-10-01T19:00:00Z", "home", "betrivers")
+    + ((2.30, 3.30, 3.30), 0.027, 6.0, (2.40, 3.30, 3.15), 2.30, "0-1"),
+    ("lineshop", "SP1", "Sevilla", "Getafe", "2026-10-04T16:00:00Z", "home", "draftkings")
+    + ((1.85, 3.50, 4.80), 0.022, 2.0, (1.80, 3.60, 5.00), 1.90, "2-1"),
+    ("lineshop", "E0", "Man United", "Brighton", "2026-10-08T14:00:00Z", "away", "fanduel")
+    + ((2.20, 3.50, 3.30), 0.025, 4.0, (2.20, 3.50, 3.30), 3.45, None),
+    ("lineshop_1pct", "E0", "Everton", "Wolves", "2026-09-19T14:00:00Z", "home", "fanduel")
+    + ((2.10, 3.40, 3.80), 0.012, 2.0, (2.02, 3.45, 3.95), 2.14, "2-0"),
+    ("lineshop_1pct", "E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "draw", "betmgm")
+    + ((1.80, 3.80, 4.80), 0.013, 8.0, (1.78, 3.70, 4.90), 3.90, "1-1"),
+    ("lineshop_1pct", "E0", "Spurs", "Burnley", "2026-09-30T19:00:00Z", "home", "draftkings")
+    + ((1.60, 4.00, 5.80), 0.011, 1.0, (1.64, 3.95, 5.50), 1.66, "0-0"),
+    ("lineshop_1pct", "E0", "Man United", "Brighton", "2026-10-08T14:00:00Z", "away", "fanduel")
+    + ((2.20, 3.50, 3.30), 0.016, 3.0, (2.20, 3.50, 3.30), 3.45, None),
+]
+
+
+def lineshop_trades() -> list[dict]:
+    """The synthetic line-shop trades, through paper_lineshop.new_trade (moments before
+    FIXTURE_DNB_FROM are backcast entries), with closes and results as its ledger writes them."""
+    defined = pd.Timestamp(FIXTURE_DNB_FROM)
+    out = []
+    for (
+        key,
+        lg,
+        home,
+        away,
+        ko,
+        market,
+        book,
+        pin,
+        gap,
+        age,
+        close,
+        bclose,
+        score,
+    ) in LINESHOP_TRADES:
+        kick = pd.Timestamp(ko)
+        moment = kick - pd.Timedelta(hours=26)
+        pin_prices = dict(zip(plsh.OUTCOMES, pin, strict=True))
+        fair = plsh._fair(pin_prices)
+        odds = round((1 + gap) / fair[market], 2)
+        row = {"fetched_at": (moment - pd.Timedelta(minutes=age)).isoformat(),
+               "prices": {**pin_prices, market: odds}}  # fmt: skip
+        pin_row = {"fetched_at": (moment - pd.Timedelta(minutes=1)).isoformat(),
+                   "prices": pin_prices}  # fmt: skip
+        e = {"key": key, "moment": moment, "row": row, "pin_row": pin_row, "market": market,
+             "odds": odds, "fair": fair, "gap": odds * fair[market] - 1, "home": home,
+             "away": away, "kickoff": kick, "book": book}  # fmt: skip
+        t = plsh.new_trade(e, lg, defined)
+        close_prices = dict(zip(plsh.OUTCOMES, close, strict=True))
+        clv = tr.clv(t["odds"], market, close_prices)
+        quoted = (kick - pd.Timedelta(minutes=8)).isoformat()
+        t.update(close_odds=close_prices[market], close_prices=close_prices,
+                 close_fetched_at=quoted, close_minutes_before=8, clv_pinnacle=clv,
+                 beat_close_pinnacle=bool(clv > 0), book_close_odds=bclose,
+                 clv_book=round(t["odds"] / bclose - 1, 4))  # fmt: skip
+        if score:
+            h, a = (int(v) for v in score.split("-"))
+            res = "home" if h > a else "away" if a > h else "draw"
+            won = res == market
+            t.update(status="won" if won else "lost", score=score,
+                     profit=round(t["stake"] * (t["odds"] - 1), 2) if won else -t["stake"],
+                     settled_at=(kick + pd.Timedelta(hours=3)).isoformat(),
+                     result_source="football-data")  # fmt: skip
+        out.append(t)
+    return out
+
+
 def add_lean_strategy(data: dict) -> None:
     pub.add_lean(data, SYNTHETIC_BLENDS)
     codes = list(data["portfolio"]["rules"])
@@ -1879,8 +1966,16 @@ def add_lean_strategy(data: dict) -> None:
             )
             for track in tr.DNB_TRACKS.values()
         },
+        lineshop={"trades": lineshop_trades(), "defined_at": FIXTURE_DNB_FROM},
     )
     add_dnb_backcast(data)
+    # The app shows no Kelly sizing or calibration for the line shop (no model chance to
+    # size or calibrate on), so the fixture leaves them out (the 1.5 MB cap).
+    ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
+    for sec in ml["live"].get("strategies") or []:
+        if str(sec.get("key", "")).startswith(plsh.KEY):
+            sec.pop("sizing", None)
+            sec.pop("calibration", None)
 
 
 def add_dnb_backcast(data: dict) -> None:

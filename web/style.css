@@ -930,3 +930,12 @@ details.drv-fold { margin-top: 10px; }
 .alert-code { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
 .alert-code input { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary); max-width: 220px; }
 .alert-msg { color: var(--text-primary); }
+
+/* Line shop vs Pinnacle (owner-approved 5 Nov): the judged count and quote ages. */
+.ls-progress { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin: 6px 0 2px; }
+.ls-progress span { display: block; height: 100%; background: var(--pos); }
+.judged-count, .judged-verdict { margin: 6px 0 0; }
+.ls-old { color: var(--neg); }
+.ls-books { padding: 10px 14px; }
+.ls-book-line { margin: 0 0 4px; font-weight: 500; }
+.ls-compare .judged-tab td .meta { display: block; font-size: 11px; color: var(--text-muted); }
