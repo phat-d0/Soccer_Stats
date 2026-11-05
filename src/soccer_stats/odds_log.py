@@ -227,6 +227,19 @@ def load(root: Path, league: str = "E0", kind: str = "") -> pd.DataFrame:
     return df.sort_values(["fetched_at", "logged_at"]).reset_index(drop=True)
 
 
+def name_key(name) -> str:
+    """A team name compared without case: a case-only rename in a feed ("VIKING FK" vs
+    "Viking FK") still finds the same match's quotes and results."""
+    return str(name).casefold()
+
+
+def same_teams(df: pd.DataFrame, home, away, h: str = "home", a: str = "away") -> pd.Series:
+    """Rows of `df` whose home and away names match, ignoring case."""
+    return (df[h].astype(str).str.casefold() == name_key(home)) & (
+        df[a].astype(str).str.casefold() == name_key(away)
+    )
+
+
 def last_before(
     log: pd.DataFrame, home: str, away: str, kickoff, market: str, book: str | None = None
 ) -> dict | None:
@@ -241,8 +254,7 @@ def last_before(
     k = pd.Timestamp(kickoff)
     k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
     sel = (
-        (log["home"] == home)
-        & (log["away"] == away)
+        same_teams(log, home, away)
         & (log["market"] == market)
         & ((log["kickoff"] - k).abs() <= KICKOFF_TOLERANCE)
         & (log["fetched_at"] < k)

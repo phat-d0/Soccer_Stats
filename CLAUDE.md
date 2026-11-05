@@ -641,6 +641,12 @@ on 4 Nov; trigger ids):
     case: ESPN renamed a Champions League club only in case between builds ("VIKING FK", then
     "Viking FK", 18 Oct) and that opened a second trade. `publish.duplicate_fixtures` also
     compares names without case. Domestic cards take football-data's names and can't split.
+    Closes and results match names without case too (lead, 5 Nov; `odds_log.name_key`,
+    `same_teams`): `odds_log.last_before` (DraftKings and every-book closes), the entry
+    quote, the corner closes (`paper._quote_at`), `paper._result`, `_espn_result`,
+    `_corner_result`, `espn_results.match_events` and the moved-match check in `paper`
+    and `paper_dnb`, so a case-only rename after a trade opens neither loses its close
+    nor voids it.
   - `PAPER_RULE = "fixed_raw"` (`PAPER_RULES` also has `"learned"`; reverting is one line).
     `paper_threshold(dk, league)` under `fixed_raw` = `{threshold: 0.12, source: "owner_fixed",
     note: OWNER_FIXED_NOTE, rule: "fixed_raw", p_source: "model"}` in every league; the trade uses
