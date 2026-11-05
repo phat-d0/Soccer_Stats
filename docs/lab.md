@@ -3307,7 +3307,11 @@ reproduces. Beside the judged band it carries descriptive designs: the half-time
 B and C's matches put back (already read, not judged; they have half-time snapshots only),
 the frozen sample at half-time only, and 2025/26 alone.
 
-## DraftKings vs Pinnacle's fair price: DRAFT pre-registration (lead, 5 Nov; for the owner's approval; no outcome read)
+## DraftKings vs Pinnacle's fair price: drafted and withdrawn, untestable (lead, 5 Nov; no outcome read)
+
+**Status: withdrawn (owner and lead, 5 Nov), as recommended below.** The rule would bet about 15
+matches a year at DraftKings, so it can never reach the 300 bets needed. It was never run on
+outcomes. The line-shopping version below replaces it.
 
 **The idea.** Forget the model. Bet DraftKings when its price is better than Pinnacle's
 margin-free price for the same outcome at the same moment, by at least T. Gap = DraftKings'
@@ -3349,7 +3353,7 @@ tested before the ten-book history (28 Oct) and the every-book live log (from 28
 6. *If it passed:* a paper track beside Blend Lean on the every-book log, $10, backcast from
    14 Oct and judged from the day it is defined.
 
-**Recommendation: don't approve this rule; it can't be tested.** The locked seasons hold 30
+**Recommendation (accepted 5 Nov): don't approve this rule; it can't be tested.** The locked seasons hold 30
 bets at T = 0% and 5 at T = 1%, against the 300 needed, and a live track would wait decades.
 DraftKings' gaps were common only in 2021/22, which looks like a pricing regime it has since
 left.
@@ -3364,3 +3368,64 @@ needs:
 - a forward test on the live log, since the history holds no live timing;
 - first-moment entry, not the best moment, so that the counts above (the best moment of
   each match) don't flatter it.
+
+## Line shop vs Pinnacle: DRAFT pre-registration (lead, 5 Nov; for the owner's approval; no outcome, close or CLV read)
+
+**The idea.** Look at the four books the owner can bet at: DraftKings, FanDuel, BetMGM and
+BetRivers. Bet the best of them when its price beats Pinnacle's margin-free (Shin) price for the
+same outcome by at least T. Pinnacle is the reference only and is never bet. No model.
+
+**The rule (fixed now).**
+- *When:* at each moment the every-book log records, before kickoff only.
+- *Gap:* for each outcome (home, draw, away), the best price among the four × Pinnacle's
+  Shin-fair chance at that same logged moment − 1.
+- *Fresh quotes:* both the book's and Pinnacle's quote were updated within 15 minutes before
+  the logged moment. Today this filters nothing: paired quotes are 0.6 minutes old at the
+  median and 3 at the 99th percentile.
+- *Entry:* the first logged moment any outcome's gap reaches T, at that logged price. It is
+  never the best moment.
+- *One bet per match, first come.* If two outcomes qualify at the same moment, bet the larger
+  gap. If two books tie on price, take the first in the order DraftKings, FanDuel, BetMGM,
+  BetRivers. Neither happened in the live week.
+- *Stake:* $10 at the book named.
+- *T = 2%,* fixed now. There is no history at these four books' live timing to tune it on.
+  2% sits above the noise in Shin's margin removal and leaves enough bets. **T = 1% is a
+  descriptive shadow** (no bets of its own, never judged), as with the corners' 60% filter.
+
+**When it starts.** `defined_at` = the day Moneyline merges the track. It is backcast from 28
+Oct, when the every-book log began. The backcast is descriptive and never judged. This is a
+documented exception to the 14 Oct convention: there is no every-book data before 28 Oct.
+
+**How it is judged.**
+- *Measure:* CLV per bet = entry price × Pinnacle's Shin-fair close for the same outcome − 1.
+  The close is the every-book log's last Pinnacle quote before kickoff; a trade without one
+  has no CLV and is counted as missing.
+- *Pass:* the 95% range of mean CLV is above 0 (matches resampled, 2,000 draws, seed 0), on at
+  least 300 bets opened from `defined_at`, read once at 300.
+- ROI is reported, not judged.
+
+**Counts from the live week** (28 Oct–5 Nov, 138 matches in the nine live competitions; prices
+only):
+
+| T | Matches that qualify | BetRivers | BetMGM | FanDuel | DraftKings | A day |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1% (shadow) | 32 (23%) | 18 | 12 | 2 | 0 | 3.9 |
+| 2% (judged) | 19 (14%) | 14 | 3 | 2 | 0 | 2.3 |
+
+- At 2% the median gap at entry is 2.5%, about 24 hours before kickoff; 12 of 19 bets are away
+  sides and 6 are Champions League matches.
+- **300 bets at 2%** take about 130 days at the live week's rate: around mid-March 2027 if it
+  starts mid-November. International breaks will stretch that. At 1% it would take about 77
+  days.
+- One week is a small sample, so these rates are rough.
+
+**Practical notes.**
+- *Sampling:* the log records a match every 15 minutes near kickoff, but every 3 hours a day
+  out (a median of 170 minutes between logged moments in the live week). The owner may see a
+  gap after it has gone. The paper track records the logged price, and the app should show the
+  price's age.
+- *Limits:* books cut the stakes of accounts that keep beating the sharp price. BetRivers
+  (14 of the 19 bets) would likely limit first. A pass on paper doesn't mean the stakes can be
+  placed at scale.
+- *If approved:* Moneyline builds it after the Understat fix, as the paper track "Line shop vs
+  Pinnacle" in the Moneyline portfolio, with the 1% shadow beside it.
