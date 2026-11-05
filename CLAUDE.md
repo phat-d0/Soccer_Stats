@@ -110,7 +110,13 @@ Push through the owner's Cloudflare Worker (`push/`); off until he sets it up (K
 goals-only from 2 Nov (13 trades with `model_ref.xg_weight` 0). Fixed: bad answers are never
 cached, each season loads alone, and the good 2026/27 files (through 1 Nov) come back from the
 raw-data cache of 2 Nov 00:50 (`odds-check.yml` `task=understat-restore`, `restore_key`
-41369190298). Matches since then use goals until Understat returns; the cache heals itself then.
+41369190298; restored 5 Nov, rerun 10:20 after a publish's older cache won a race). Matches
+since then use goals until Understat returns; the cache heals itself then. Since 5 Nov the
+`xg-good-` cache keeps the last good copy of every league file (`xg.GOOD_DIR`), so a stale
+raw-data cache can't lose the season again. Promoted clubs map: "Racing Santander" → Santander,
+"Real Oviedo" → Oviedo (`tests/test_xg.py` lists every 2026/27 club per xG league). When
+Understat returns: `odds-check.yml` `task=understat-backfill`, `seasons=2017-2025` (free), then
+tell Research.
 
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
@@ -282,13 +288,13 @@ on 4 Nov; trigger ids):
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, espn, understat, understat-restore. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, espn, understat, understat-restore, understat-backfill. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`, and the bet-alert Worker's tests (`node --test push/test/*.test.mjs`, no Cloudflare account). Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
-- Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
+- Caches: `raw-data-*` (Understat), `xg-good-*` (the last good Understat league files), `odds-history-*`, `player-odds-history-*`,
   `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
   delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones
@@ -355,6 +361,16 @@ on 4 Nov; trigger ids):
   `check_league_json` (JSON with a `dates` list, not HTML; `player_data.fetch_match` uses
   `check_match_json`), `stale_ok`. `with_xg` loads each league-season on its own: a missing
   season costs only its matches (goals there) and the error names it and any stale file.
+  `GOOD_DIR` (`data/understat_good`, cache `xg-good-` in publish.yml, saved under a key of the
+  files' hash): `fetch_season` puts its copy over a missing or bad cached file
+  (`restore_good`) and mirrors every good file into it (`keep_good`); only files passing
+  `check_league_json` are ever written there. Used for the default raw folder only. Each
+  publish restores it, adds and saves the union, so it keeps every season ever loaded
+  (keep-alive row in caches.yml). `backfill(leagues, years)` (CLI `understat-backfill
+  --leagues --seasons`, `odds-check.yml` `task=understat-backfill` with `seasons`/`leagues`;
+  saves `xg-good-` on the default branch only) loads old seasons into it: Research needs
+  SP1/D1/I1/F1 2017/18–2023/24 and E0 2019–2021, which no cache holds since the
+  `understat-<league>-` caches were evicted. Run it once Understat is back.
   `probe` (CLI `understat-probe`, `odds-check.yml` `task=understat`, also lists the raw-data
   caches held) and `repair_from` (CLI `understat-repair`, `task=understat-restore` with
   `restore_key` = an older raw-data cache's run id: good league files copied over bad ones,
@@ -1213,7 +1229,7 @@ on 4 Nov; trigger ids):
   estimate-corners, estimate-cups, fit-match-blends, backtest-dk, backtest-lean, backtest-edge12,
   backtest-edge12-filters, backtest-band-edges, backtest-dnb, backtest-players, backfill-odds,
   backfill-player-odds, backfill-cup-odds, match-markets, team-totals-report, espn-probe,
-  goalscorer-pilot, understat-probe, understat-repair, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
+  goalscorer-pilot, understat-probe, understat-repair, understat-backfill, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
   player-segments, corner-history-probe, cup-corners). `cup_and_league_results` gives the
   paper step football-data and ESPN cup results (tagged `result_source`).
 

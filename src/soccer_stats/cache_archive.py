@@ -77,6 +77,7 @@ PAID = {
 FREE = {
     "raw-data-": "football-data, Understat and FPL downloads, plus the live odds answers "
     "whose parsed rows publish.yml logs on data-log (odds_log/)",
+    "xg-good-": "the last good copy of each Understat league file (free; xg.GOOD_DIR)",
     "cup-espn-": "ESPN's UEFA cup calendars and results (free)",
     "cup-corners-": "ESPN cup match summaries for the cup corner research (free)",
     "espn-timelines-": "ESPN goal timelines (free)",

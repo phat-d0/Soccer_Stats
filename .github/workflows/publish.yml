@@ -58,6 +58,16 @@ jobs:
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
+      # The last good copy of each Understat league file (xg.GOOD_DIR): only files that
+      # passed the JSON check are ever written there, so a stale raw-data cache holding
+      # Understat's maintenance page can't cost the season's xG. Saved below, under a key
+      # that changes only when a file does.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
+
       # The Champions League model's European results (ESPN days, final ones cached for
       # good), warmed by backfill.yml's match_blends run; saved again with data/raw above.
       - uses: actions/cache/restore@v4
@@ -231,6 +241,13 @@ jobs:
             if git -C ../log push origin data-log; then exit 0; fi
             echo "data-log moved on; retrying from the latest ($attempt)"
           done
+
+      - uses: actions/cache/save@v4
+        if: ${{ hashFiles('data/understat_good/*.json') != '' }}
+        continue-on-error: true  # an unchanged copy's key exists already
+        with:
+          path: data/understat_good
+          key: xg-good-${{ hashFiles('data/understat_good/*.json') }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
