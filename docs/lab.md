@@ -3306,3 +3306,61 @@ It is rebuilt from the same frozen code and cached snapshots, and fails unless r
 reproduces. Beside the judged band it carries descriptive designs: the half-time cash-out with
 B and C's matches put back (already read, not judged; they have half-time snapshots only),
 the frozen sample at half-time only, and 2025/26 alone.
+
+## DraftKings vs Pinnacle's fair price: DRAFT pre-registration (lead, 5 Nov; for the owner's approval; no outcome read)
+
+**The idea.** Forget the model. Bet DraftKings when its price is better than Pinnacle's
+margin-free price for the same outcome at the same moment, by at least T. Gap = DraftKings'
+decimal × Pinnacle's Shin-fair chance − 1. This was idea 3 after bake-off 1; it couldn't be
+tested before the ten-book history (28 Oct) and the every-book live log (from 28 Oct).
+
+**What the counts say (prices only; no result, close or CLV was read).**
+- History, the 48-hour look before kickoff, eight leagues, 16,133 matches with both books
+  priced (`odds-check.yml` `task=dk-gap-counts`, run 42006552522, 0 credits). DraftKings'
+  best side sits a median 3.6% *below* Pinnacle's fair price: that is its margin. Matches it
+  would bet:
+
+  | Season | T = 0% | T = 1% | T = 2% | T = 3% |
+  | --- | --- | --- | --- | --- |
+  | 2020/21 | 58 | 21 | 10 | 4 |
+  | 2021/22 | 264 | 130 | 63 | 46 |
+  | 2022/23 | 70 | 30 | 19 | 9 |
+  | 2023/24 | 17 | 2 | 0 | 0 |
+  | 2024/25 | 13 | 3 | 1 | 0 |
+
+- Live, every logged moment from 28 Oct to 5 Nov (138 matches, 5,115 paired snapshots, quotes
+  0.6 minutes old at the median): DraftKings beat Pinnacle's fair price on 4 matches, never by
+  1% or more.
+- Freshness can't separate anything here: The Odds API's `last_update` is at most 12 minutes
+  old in every snapshot (history and live), so a "both quotes fresh" rule removes nothing.
+
+**Draft rule, as the lead asked for it (1–6).**
+1. *Locked test season:* 2023/24–2024/25 of the bought history, read once. They are the newest
+   seasons, and the strategy search keeps 2024/25 locked. (The DraftKings backtest has read
+   these seasons, but only for the model's picks, not this rule.)
+2. *T:* chosen on 2020/21–2022/23 only, from 0%, 1%, 2%, 3%, by the lower end of the CLV range.
+3. *Freshness:* both quotes updated within 15 minutes before the snapshot. It costs nothing,
+   since every quote passes.
+4. *Judged measure:* CLV per bet against Pinnacle's Shin-fair close in the same close
+   snapshot, with a 95% range above 0 (matches resampled, 2,000 draws), on at least 300 bets.
+   ROI is reported, not judged.
+5. *Bets a year at DraftKings, live leagues:* about 15 at T = 0% and 2–3 at T = 1% in the last
+   two seasons; 0–4 in a week live.
+6. *If it passed:* a paper track beside Blend Lean on the every-book log, $10, backcast from
+   14 Oct and judged from the day it is defined.
+
+**Recommendation: don't approve this rule; it can't be tested.** The locked seasons hold 30
+bets at T = 0% and 5 at T = 1%, against the 300 needed, and a live track would wait decades.
+DraftKings' gaps were common only in 2021/22, which looks like a pricing regime it has since
+left.
+
+**What the data points to instead (for a separate draft, if the owner wants it).** The same
+rule at the **best US price** among the eight US books we log (FanDuel, BetMGM, Caesars,
+BetRivers, Fanatics, ESPN Bet, Bovada, BetOnline). In the live week, 50 of 138 matches (36%) had
+some US book at least 1% above Pinnacle's fair price at some moment, and 29 (21%) at least 2%,
+mostly BetRivers and BetOnline. That is about 1,400 and 800 a year in the live leagues. It
+needs:
+- accounts at several books (the owner's call);
+- a forward test on the live log, since the history holds no live timing;
+- first-moment entry, not the best moment, so that the counts above (the best moment of
+  each match) don't flatter it.
