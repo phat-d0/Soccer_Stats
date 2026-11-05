@@ -52,7 +52,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
   at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
   Backtests: Kelly loses more than flat for Lean and mostly declines Model 12%'s picks; Kelly on
-  the raw model goes broke (`docs/leagues.md` "Kelly sizing").
+  the raw model goes broke (`docs/leagues.md` "Kelly sizing"). Each live strategy has a Kelly
+  bet log in the app (owner, 5 Nov): how every stake was sized, with the flat $10 result beside it.
 
 **Team corners (portfolio "Team corners", testing), two paper tracks, model (f), 12%, $10:**
 - Model (f) 12% vs Pinnacle, in E0, SP1, D1, I1, F1, E1, and from 24 Oct E2 and E3 (Pinnacle only:
@@ -184,6 +185,14 @@ settlement runs after them.
   vs 72%), which a free cash-out uses and a 5% fee cancels. Holding lost −25.3% per $1, but the
   sample left out B/C/H's matches (underdogs leading at half-time), so the hold level is biased
   low; with B and C's put back −17.0%. App file `lab/cashout_research.json`.
+- DraftKings vs Pinnacle's fair price, model-free (lead, 5 Nov; `docs/lab.md`): **withdrawn,
+  untestable**. At the 48 h look DraftKings beats Pinnacle's fair price on about 15 matches a
+  year (2023/24–2024/25), 2–3 by 1%. It is replaced by **Line shop vs Pinnacle** (owner-approved
+  5 Nov, rules frozen; no outcome read): the best of DraftKings, FanDuel, BetMGM and BetRivers
+  at ≥ 2% over Pinnacle's Shin-fair price at the first logged moment, $10, one bet per match;
+  a 1% shadow; judged once at 300 bets on CLV against the every-book log's last Pinnacle quote
+  before kickoff. About 2.3 bets a day in the live week, so around mid-March 2027. Moneyline
+  builds the paper track after the Understat fix.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -268,7 +277,7 @@ on 4 Nov; trigger ids):
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, residual-map, espn, understat, understat-restore. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, espn, understat, understat-restore. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
@@ -486,7 +495,13 @@ on 4 Nov; trigger ids):
   bets_staked, bets_zero_stake, median_stake, curve [{date, bankroll}] (≤ `MAX_CURVE` 200),
   stakes}`; `block` adds `fraction, cap, stake (flat), p_source, p_note, bets_no_chance, note`.
   `live_sizing(trades, rule)` = `{flat, kelly, kelly_raw (Model 12%: raw model_p, "over-confident"),
-  blend_from (Model 12%: counts by p_blend_from)}`, only `kelly` keeps `stakes` {trade id: stake};
+  blend_from (Model 12%: counts by p_blend_from)}`, only `kelly` keeps `stakes` {trade id: stake}
+  and `log` (owner via the lead, 5 Nov; `kelly_log` on `simulate(..., log=True)`, which records
+  each bet's bankroll at open and after settlement and leaves every other number unchanged): one
+  row per trade, oldest first, `{id, opened_at, settled_at, league, match, pick, odds, chance,
+  kelly (full f*), fraction (min(¼ f*, 5%), 0 with no stake), capped?, bankroll_before, stake,
+  status, push?, profit, bankroll_after, reason? ("no edge on the chance" / "no chance" / "no
+  bankroll", only with no stake), flat_profit}` (flags and reason only when set);
   `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push).
   `backtest_sizing(df, p_col, p_source, raw_col=, lead=)` (open = kickoff − `BACKTEST_LEAD` 4
   days, 0 at the close; no stakes kept).
@@ -1091,6 +1106,12 @@ on 4 Nov; trigger ids):
   E0 with xG for 2022/23–2023/24 only; the other four wait for Understat files). `xg_status`
   prints each Understat league-season file as ok, missing or bad; a tenth slice splits home
   sides by league. The lead builds the owner's 3D view from it.
+- `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
+  Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
+  `report`; per league, season, T and freshness; no result, close or CLV read).
+  `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
+  It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
+  15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
@@ -1171,7 +1192,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v71) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v72) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1389,7 +1410,17 @@ on 4 Nov; trigger ids):
   flat past $0 or `max_drawdown_pct` > 1 reads "would have gone broke (fell $X below the
   $1,000 start)", Kelly under $1 "bust"; `p_note` and `note` folded; the trade sheet's
   `kellyStakeLine` from `sizing.kelly.stakes[id]`: "¼ Kelly stake: $x" or "Kelly: no stake
-  (no edge on the calibrated chance)"), "Where the bets sit on the odds" (owner, 24
+  (no edge on the calibrated chance)", plus "How it was sized" (`data-klrow`, on the open
+  strategy's live view) jumping to its row). Under it the folded "Kelly bet log" (v72; live
+  strategies only, `kellyLogHtml(x, kelly)`, `details#kl-<key>`): the formula line
+  (`KELLY_FORMULA`), the chance used (`KELLY_CHANCE` by `p_source`), then `kelly.log` newest
+  first, 25 rows then 50 more a tap (`state.kellyShown`, `data-klmore`), columns date, match
+  and pick, odds (American and decimal), chance, full Kelly, stake ($ and % of the bankroll,
+  "capped at 5%", or "No stake" with the reason), result, P/L (flat $10's beside it) and
+  bankroll after; a table on a laptop, one stacked block per bet under 700px (`.kl-table`,
+  cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
+  no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`).
+  "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
   `odds_bands.clv_field`; the ROI table; on Moneyline a table beside the same strategy's
