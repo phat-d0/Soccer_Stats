@@ -43,6 +43,7 @@ from soccer_stats import match_calibration as mc
 from soccer_stats import odds_feed
 from soccer_stats import odds_log as ol
 from soccer_stats import paper_dnb as pdnb
+from soccer_stats import paper_lineshop as plsh
 from soccer_stats import sizing as sz
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
@@ -99,10 +100,17 @@ def ledger_dir(log_dir: Path) -> Path:
 
 
 def _is_match_ledger(path: Path, league: str) -> bool:
-    """A league's match ledger file, not its corners ledger, Lean shadow or draw no bet
-    file."""
+    """A league's match ledger file, not its corners ledger, Lean shadow, draw no bet or
+    line-shop file."""
     name = path.name
-    return not name.startswith((f"{league}_corners_", f"{league}_lean_shadow_", f"{league}_dnb_"))
+    return not name.startswith(
+        (
+            f"{league}_corners_",
+            f"{league}_lean_shadow_",
+            f"{league}_dnb_",
+            f"{league}_lineshop_",
+        )
+    )
 
 
 def load_ledger(log_dir: Path, league: str = "E0") -> dict[str, dict]:
@@ -1256,7 +1264,10 @@ LIVE_BAND_NOTE = (
 
 def live_clv_field(rule: dict | None) -> str:
     """The CLV a live section is banded on: Pinnacle's close for the corner tracks and
-    their variants (rule p_source model_f, the judged measure), DraftKings' otherwise."""
+    their variants (rule p_source model_f, the judged measure), the rule's own `clv_field`
+    when it names one (the line shop: Pinnacle's), DraftKings' otherwise."""
+    if (rule or {}).get("clv_field"):
+        return rule["clv_field"]
     return "clv_pinnacle" if (rule or {}).get("p_source") == "model_f" else "clv_dk"
 
 
@@ -1775,6 +1786,7 @@ def portfolios_section(
     shadow_trades: list[dict] | None = None,
     dnb_trades: list[dict] | None = None,
     dnb_rules: dict[str, dict] | None = None,
+    lineshop: dict | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1795,7 +1807,9 @@ def portfolios_section(
     (lean_shadow_section). `dnb_trades` (the draw no bet tracks, paper_dnb) go on it as
     `dnb_trades`, also never in its `trades` or summary, and each track
     (tr.DNB_TRACKS) follows its parent's sections (paper_dnb.section, rule from
-    `dnb_rules`: track -> paper_dnb.overview).
+    `dnb_rules`: track -> paper_dnb.overview). `lineshop` ({trades, defined_at}: the
+    line-shop track, paper_lineshop) adds its two sections right after Blend Lean's and
+    goes on it as `lineshop_trades`, never in its `trades` or summary.
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1852,8 +1866,14 @@ def portfolios_section(
                     section["strategies"].append(
                         pdnb.safe_section(track, own, parent, dnb_rules[track], now)
                     )
+                if st["key"] == "lean" and lineshop is not None:
+                    section["strategies"] += plsh.safe_sections(
+                        lineshop["trades"], lineshop["defined_at"], now
+                    )
             section["shadow_trades"] = portfolio_section(shadow_trades or [])["trades"]
             section["dnb_trades"] = portfolio_section(dnb_trades or [])["trades"]
+            if lineshop is not None:
+                section["lineshop_trades"] = portfolio_section(lineshop["trades"])["trades"]
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
@@ -1989,6 +2009,7 @@ def run(
         for lg in codes
     }
     dnb_trades: list[dict] = []
+    lineshop: dict | None = None
     portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
@@ -2074,6 +2095,13 @@ def run(
                 written += n
             except Exception as exc:  # noqa: BLE001  never costs the match ledger
                 print(f"Draw no bet tracks not updated ({type(exc).__name__}: {exc})")
+            try:  # the line shop vs Pinnacle: its own ledger, never the match record
+                n, lineshop = _run_lineshop(
+                    data, log_dir, codes, league, now, results, espn_results
+                )
+                written += n
+            except Exception as exc:  # noqa: BLE001  never costs the match ledger
+                print(f"Line shop track not updated ({type(exc).__name__}: {exc})")
             live.update(portfolio_section(live_trades), note=note)
             try:  # the corners portfolio: its own ledger, rows and results
                 n, corner_trades = _run_corners(
@@ -2145,6 +2173,7 @@ def run(
             track: pdnb.overview({lg: r[track] for lg, r in dnb_rules.items()}, track)
             for track in tr.DNB_TRACKS.values()
         },
+        lineshop=lineshop,
     )
     return written
 
@@ -2191,6 +2220,28 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
     return n, trades
 
 
+def _run_lineshop(data, log_dir, codes, primary, now, results, espn) -> tuple[int, dict]:
+    """Update the line-shop ledger in every league in play (paper_lineshop.update_ledger on
+    the every-book log); returns (events written, {trades, defined_at})."""
+    defined = plsh.defined_at(log_dir, now)
+    events: list[dict] = []
+    trades: list[dict] = []
+    for lg in codes:
+        ledger = plsh.load_ledger(log_dir, lg)
+        books = ol.load(log_dir, lg, kind=ol.BOOKS) if ol.log_dir(log_dir).is_dir() else None
+        res = results
+        if res is not None and "league" in res and not res.empty:
+            res = res[res["league"] == lg]
+        cards = [c for c in data.get("fixtures", []) if (c.get("league") or primary) == lg]
+        events += plsh.update_ledger(
+            ledger, books, res, now, lg, _utc(defined), _league_rows(espn, lg), cards
+        )
+        trades += list(ledger.values())
+    n = plsh.append_events(log_dir, events)
+    print(plsh.summary_line(trades, events) + f"; defined_at {defined}")
+    return n, {"trades": trades, "defined_at": defined}
+
+
 def _league_rows(df: pd.DataFrame | None, league: str) -> pd.DataFrame | None:
     if df is None or df.empty or "league" not in df:
         return df
@@ -2214,6 +2265,7 @@ def awaiting_results(
             ("match", load_ledger(log_dir, lg)),
             ("match", load_lean_shadow(log_dir, lg)),
             ("match", pdnb.load_ledger(log_dir, lg)),
+            ("match", plsh.load_ledger(log_dir, lg)),
             ("corners", load_corner_ledger(log_dir, lg)),
         )
         for kind, ledger in books:

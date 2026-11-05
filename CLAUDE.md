@@ -46,6 +46,18 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   (`<code>_dnb_<season>.jsonl`), outside the record and Moneyline's totals. Backcast from 14 Oct
   on the odds log (owner, 28 Oct; `backcast: true`, never judged; Lean's at the 26 Oct refit's
   `sigma_dnb`).
+- **Line shop vs Pinnacle** (owner-approved 5 Nov; pre-registered in `docs/lab.md` "Line shop
+  vs Pinnacle"; `paper_lineshop.py`): paper, no model, $10, one per match. At each moment the
+  every-book log records, before kickoff, the best price among DraftKings, FanDuel, BetMGM and
+  BetRivers × Pinnacle's Shin-fair chance at that moment − 1; both quotes under 15 min old;
+  enters at the first moment the gap reaches 2%, at the book named. T = 1% runs as a
+  descriptive shadow (`lineshop_1pct`, its own entries). Judged once at 300 bets from
+  `defined_at` on CLV vs the log's last Pinnacle quote before kickoff (95% range above 0).
+  `defined_at` = the first paper run after the merge (data-log `paper_trades/lineshop_defined.json`);
+  backcast from 28 Oct (the every-book log's start, the documented exception to 14 Oct). Own
+  ledger `<code>_lineshop_<season>.jsonl`, outside Moneyline's record and totals. On the live
+  week's log the code finds Research's counts exactly (138 matches: 19 at 2%, 14 of them
+  BetRivers; 32 at 1%).
 - The Matches tab shows Lean only. Portfolio → Moneyline lists Blend Lean and its draw no bet
   track; Model 12%, its track and Lean's old rule sit in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
@@ -401,6 +413,36 @@ on 4 Nov; trigger ids):
   `backcast` block `{applied, started, until (= defined_at), defined_at, trades, settled (won, lost
   or a refunded push), from, to, note, descriptive: true, ...}` over the trades opened before
   `defined_at`. Used by `paper_dnb.backcast` and `paper.lean_backcast` (which adds `lean_started`).
+- `paper_lineshop.py` (owner-approved 5 Nov; `docs/lab.md` "Line shop vs Pinnacle"): the line
+  shop track. `SHOP_BOOKS` (draftkings, fanduel, betmgm, betrivers; also the tie order),
+  `THRESHOLDS` {lineshop 0.02, lineshop_1pct 0.01}, `FRESH_MINUTES` 15, `BACKCAST_START` 28 Oct.
+  - `evaluate(state, moment)`: per outcome the best fresh shop price × Pinnacle's Shin fair − 1,
+    the largest gap (ties home, draw, away); None when Pinnacle is missing or stale.
+  - `first_entries(books, thresholds, until)`: per match (home, away, kickoff) its moments
+    (each `logged_at` before kickoff), each book's quote = its latest row logged at or before
+    the moment (the log keeps changed quotes only), the first moment per track; nothing later
+    is read.
+  - `new_trade`: `trades.new_trade`'s shape with id + `|lineshop` / `|lineshop1`, `bet_type`
+    "lineshop", `portfolio` moneyline, `strategy`, `book`, `book_name`, `gap` (= `edge`),
+    `pinnacle_fair` (= `model_p`, Kelly's chance), `pinnacle_fair_prices`,
+    `pinnacle_entry_prices`, `pinnacle_fetched_at`, `pinnacle_age_min`, `entry_prices` (the
+    book's 1X2), `price_age_min` (logged_at − the book's last_update), `logged_at`; the shadow
+    adds `shadow`, `variant_of`; a moment before `defined_at` is marked backcast
+    (`backcast_from` "books_log").
+  - `update_ledger(ledger, books, results, now, league, defined, espn, fixtures)`: opens, closes
+    (`close_*`, `clv_pinnacle`, `beat_close_pinnacle` from Pinnacle's last logged quote;
+    `book_close_*`, `clv_book` from the entry book's), settles as the match trades
+    (football-data, else ESPN; moved or 14 days without a result voids; `result_check`).
+  - `defined_at(log_dir, now)` writes or reads `paper_trades/lineshop_defined.json`.
+  - `sections(trades, defined, now)`: `paper.strategy_section` for each track (rule
+    `clv_field` "clv_pinnacle", `p_source` "pinnacle_fair") plus `defined_at`, `note`,
+    `age_note`, `books` (trades per book), `lineshop_trades`, `backcast` (`backcast.block`
+    from 28 Oct with `exception`); the main line adds `judged` (`judged`: `{since, target 300,
+    bets, with_close, verdict}`, the CLV range only once 300 are in), the shadow `variant_of`
+    "lineshop", `adds` "threshold", `compare` (descriptive). `paper._run_lineshop` runs it
+    after the DNB tracks (a failure costs only the track); `portfolios_section(lineshop=)`
+    puts both sections right after Blend Lean's and the trades in Moneyline's live
+    `lineshop_trades`; `awaiting_results` includes them. Log line "Line shop vs Pinnacle: …".
 - `paper_dnb.py` (owner, 26 Oct; `docs/leagues.md` "Draw no bet tracks"): the live DNB tracks
   beside the match strategies. `trades.py` holds the maths and rules (`dnb_odds`, `dnb_prices`,
   `fair_dnb`, `without_draw`, `dnb_pick_12`, `dnb_pick_lean`, `settle_dnb`, which pushes on a draw,
@@ -465,7 +507,7 @@ on 4 Nov; trigger ids):
   stakes}`; `block` adds `fraction, cap, stake (flat), p_source, p_note, bets_no_chance, note`.
   `live_sizing(trades, rule)` = `{flat, kelly, kelly_raw (Model 12%: raw model_p, "over-confident"),
   blend_from (Model 12%: counts by p_blend_from)}`, only `kelly` keeps `stakes` {trade id: stake};
-  `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push).
+  `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push), the line shop Pinnacle's fair chance (`p_source` "pinnacle_fair" sizes on `model_p`).
   `backtest_sizing(df, p_col, p_source, raw_col=, lead=)` (open = kickoff − `BACKTEST_LEAD` 4
   days, 0 at the close; no stakes kept).
 - `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None,
