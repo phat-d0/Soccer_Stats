@@ -1381,6 +1381,38 @@ const STEPS = [
     await pfOpenPf(p, "moneyline"); await p.click('button[data-pfstrat="edge12"]');
     if (!(await p.locator('button[data-pf="live"].on').count())) throw new Error("Moneyline should fall back to Live paper after a study");
   }],
+  // Bet alerts (owner, 5 Nov): the control at the foot of Portfolio's top level, in each
+  // state (push itself can't run headless), and a tapped alert's link opening its trade.
+  ["portfolio-alerts", async (p) => {
+    await closeSheet(p); await pfHome(p);
+    await p.waitForSelector('.alerts-card[data-alerts-state="off"]', { timeout: 5000 });
+    let card = (await p.locator(".alerts-card").innerText()).replace(/\s+/g, " ");
+    for (const w of ["Phone alerts for new trades", "Off", "each time Blend Lean or Model (f) vs DraftKings corners (under 60% to win) opens a paper trade", "Pairing code", "Turn on"]) if (!card.includes(w)) throw new Error(`alerts (off) lack "${w}": ${card}`);
+    // Every other state renders from state.alerts.
+    const states = {
+      on: ["On", "You'll get one alert each time", "Send a test", "Turn off"],
+      unsupported: ["Not available", "On iPhone, alerts work only in the home-screen app (iOS 16.4 or later)"],
+      blocked: ["Blocked", "Notifications are blocked for this app"],
+      setup: ["Not set up", "Not set up yet"],
+    };
+    for (const [st, wants] of Object.entries(states)) {
+      await p.evaluate((st) => { state.alerts = { status: st, why: "On iPhone, alerts work only in the home-screen app (iOS 16.4 or later): in Safari tap Share, then Add to Home Screen, and open the app from there." }; render(); }, st);
+      card = (await p.locator(".alerts-card").innerText()).replace(/\s+/g, " ");
+      for (const w of wants) if (!card.includes(w)) throw new Error(`alerts (${st}) lack "${w}": ${card}`);
+    }
+    // Turning on without a code asks for it first (nothing is requested).
+    await p.evaluate(() => { state.alerts = { status: "off" }; render(); });
+    await p.click('button[data-alerts="on"]');
+    await p.waitForFunction(() => state.alerts?.msg === "Type the pairing code first.");
+    await p.evaluate(() => { state.alerts = null; render(); });
+  }],
+  ["portfolio-alerts-open-trade", async (p) => {
+    const id = await p.evaluate(() => pfById("corners").live.trades.find((t) => t.id.endsWith("|dk")).id);
+    await p.evaluate((id) => openTradeById(id), id);
+    await sheet(p);
+    if (!(await p.textContent("#sheet-body")).includes("DraftKings")) throw new Error("the alert's trade sheet");
+    await closeSheet(p);
+  }],
   // Team corners (in testing): live paper with Pinnacle CLV and a push, a league chip, the
   // trade sheet, then the research backtest (no money tiles) with a range-plot readout.
   ["portfolio-corners", async (p) => {

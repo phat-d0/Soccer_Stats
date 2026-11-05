@@ -420,6 +420,9 @@ def build(src: Path, out: Path) -> dict:
     sp1_stats = add_teams_by_league(data)
     add_models(data, src)  # after every block, SP1's and E1's fits included
     trim_kelly_logs(data)
+    # Bet alerts: a made-up Worker address, so the app shows its "off" state (the smoke test
+    # never calls it: push can't run headless).
+    data["bet_alerts"] = {"worker": "https://alerts.example.workers.dev"}
     (out / "players_stats_SP1.json").write_text(dump(sp1_stats))
     (out / "data.json").write_text(dump(data))  # again, with teams_by_league
     return data

@@ -134,6 +134,9 @@ jobs:
           # Free allowance assumed to reset on the 5th (key created 5 Oct); the code
           # learns the real day automatically the first time credits go back up.
           ODDS_API_RESET_DAY: "5"
+          # Bet alerts (owner, 5 Nov; push/README.md): the Worker's address only, for the
+          # app's "Bet alerts" control. Empty until the owner sets it up = the control says so.
+          ALERT_URL: ${{ secrets.ALERT_URL }}
         run: |
           uv sync --frozen
           uv run soccer-stats publish --out _site
@@ -152,6 +155,9 @@ jobs:
           # bills). No other command in this step gets the key, and the step returns
           # early off the default branch.
           EVENTS_KEY: ${{ secrets.ODDS_API_KEY }}
+          # Bet alerts (owner, 5 Nov): read by `bet-alerts` only. Empty = alerts off.
+          ALERT_URL: ${{ secrets.ALERT_URL }}
+          ALERT_TOKEN: ${{ secrets.ALERT_TOKEN }}
         run: |
           if [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]; then
             uv run soccer-stats paper --site _site  # no ledger off the default branch
@@ -198,6 +204,11 @@ jobs:
             ODDS_API_KEY="$EVENTS_KEY" uv run soccer-stats log-inplay-events --log-dir ../log/odds_log ||
               echo "in-play events lists failed; ledger continues"
             uv run soccer-stats paper --site _site --log-dir ../log
+            # Phone alerts for this run's new Blend Lean and DraftKings-corner (under 60%)
+            # trades; once per trade (alerts/sent.jsonl, plus a file outside the checkout
+            # for a retry after a push race). Never stops the ledger.
+            uv run soccer-stats bet-alerts --log-dir ../log --state "$RUNNER_TEMP/alerts_sent.jsonl" ||
+              echo "bet alerts failed; ledger continues"
             git -C ../log add -A
             if git -C ../log diff --cached --quiet; then exit 0; fi
             git -C ../log commit -q -m "Data log $(date -u +%Y-%m-%dT%H:%MZ)"

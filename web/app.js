@@ -42,7 +42,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v72";
+const APP_VERSION = "v73";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -4074,7 +4074,140 @@ function pfHomeHtml() {
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
     <p class="note">Each portfolio holds that market's paper strategies. Profit is each portfolio's lead strategy only (the first in its list), in every competition, $10 a trade; open a portfolio for its other strategies, draw no bet tracks and archive. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
-    ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
+    ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}
+    ${alertsHtml()}`;
+}
+// ---------- Bet alerts (owner, 5 Nov; push/README.md) ----------
+// A phone alert whenever a lead strategy opens a paper trade (Blend Lean; DraftKings corners
+// under 60%). Web Push through the owner's Cloudflare Worker (data.bet_alerts.worker): the
+// app subscribes with the Worker's VAPID public key and the pairing code (asked once, kept
+// on this device), sw.js shows each alert and a tap opens the trade's sheet. States:
+// "setup" (no Worker yet), "unsupported" (with why: iPhone needs the home-screen app, iOS
+// 16.4+), "blocked" (notifications denied), "off", "on", "busy" while a request runs.
+const ALERTS_WHAT = "Blend Lean or Model (f) vs DraftKings corners (under 60% to win)";
+const alertWorker = () => state.data?.bet_alerts?.worker || null;
+const isIos = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+function alertsSupport() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return isIos() && !isStandalone()
+      ? "On iPhone, alerts work only in the home-screen app (iOS 16.4 or later): in Safari tap Share, then Add to Home Screen, and open the app from there."
+      : isIos() ? "This iPhone can't show web alerts: they need iOS 16.4 or later." : "This browser can't show web alerts.";
+  }
+  return "";
+}
+async function alertsRefresh() {
+  const why = alertsSupport();
+  let st;
+  if (!alertWorker()) st = { status: "setup" };
+  else if (why) st = { status: "unsupported", why };
+  else if (Notification.permission === "denied") st = { status: "blocked" };
+  else {
+    let sub = null;
+    try {
+      // getRegistration, not ready: ready never settles where no worker registers.
+      const reg = await navigator.serviceWorker.getRegistration();
+      sub = reg ? await reg.pushManager.getSubscription() : null;
+    } catch { sub = null; }
+    st = { status: sub ? "on" : "off" };
+  }
+  const prev = state.alerts || {};
+  state.alerts = { ...st, msg: prev.status === st.status ? prev.msg : "" };
+  if (prev.status !== st.status && state.tab === "portfolio" && pfLevelOn() === "home") render();
+}
+function alertsHtml() {
+  if (!state.alerts) { state.alerts = { status: "checking" }; alertsRefresh(); }
+  const a = state.alerts, msg = a.msg ? `<p class="note alert-msg">${esc(a.msg)}</p>` : "";
+  const code = (() => { try { return localStorage.getItem("alertCode") || ""; } catch { return ""; } })();
+  let body;
+  if (a.status === "setup") body = `<p class="note">Not set up yet: the alert service hasn't been connected to this app.</p>`;
+  else if (a.status === "unsupported") body = `<p class="note">${esc(a.why)}</p>`;
+  else if (a.status === "blocked") body = `<p class="note">Notifications are blocked for this app. Turn them on in Settings (on iPhone: Settings → Notifications → Soccer Model), then come back here.</p>`;
+  else if (a.status === "on") body = `<p class="note">You'll get one alert each time ${ALERTS_WHAT} opens a paper trade. A tap opens the trade.</p>
+      <div class="alert-actions"><button class="btn" data-alerts="test">Send a test</button><button class="btn ghost" data-alerts="off">Turn off</button></div>`;
+  else if (a.status === "busy" || a.status === "checking") body = `<p class="note">${a.status === "busy" ? "Working…" : "Checking…"}</p>`;
+  else body = `<p class="note">Get one alert each time ${ALERTS_WHAT} opens a paper trade: the pick, the odds, the $10 stake and the kickoff.</p>
+      ${code ? "" : `<label class="alert-code">Pairing code <input id="alert-code" inputmode="numeric" autocomplete="off" placeholder="from the set-up notes"></label>`}
+      <div class="alert-actions"><button class="btn" data-alerts="on">Turn on</button></div>`;
+  const pill = { on: "On", off: "Off", blocked: "Blocked", unsupported: "Not available", setup: "Not set up" }[a.status];
+  return `
+    <div class="section-title">Bet alerts</div>
+    <div class="card alerts-card" data-alerts-state="${esc(a.status)}">
+      <div class="alerts-head"><b>Phone alerts for new trades</b>${pill ? ` <span class="pill ${a.status === "on" ? "st-live" : "st-retired"}">${pill}</span>` : ""}</div>
+      ${body}${msg}
+    </div>`;
+}
+async function alertsPost(path, body) {
+  const res = await fetch(`${alertWorker()}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  let j = {};
+  try { j = await res.json(); } catch { /* empty answer */ }
+  return { ok: res.ok, status: res.status, j };
+}
+const b64urlBytes = (s) => {
+  const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+};
+async function alertsAction(what) {
+  const done = (msg) => { state.alerts = { ...state.alerts, msg }; alertsRefresh().then(render); };
+  const store = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage blocked */ } };
+  try {
+    if (what === "on") {
+      const typed = $("#alert-code")?.value.trim();
+      let code = "";
+      try { code = localStorage.getItem("alertCode") || ""; } catch { /* storage blocked */ }
+      code = typed || code;
+      if (!code) return done("Type the pairing code first.");
+      // iOS asks only from a tap, so this comes first, before anything waits.
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") return done(perm === "denied" ? "" : "Alerts need permission to show notifications.");
+      state.alerts = { status: "busy" }; render();
+      const kr = await fetch(`${alertWorker()}/vapid-public-key`);
+      const key = (await kr.json()).key;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlBytes(key) }));
+      const r = await alertsPost("/subscribe", { code, subscription: sub.toJSON() });
+      if (!r.ok) {
+        await sub.unsubscribe().catch(() => {});
+        if (r.status === 403) store("alertCode", "");
+        return done(r.status === 403 ? "That pairing code didn't work. Check it and try again." : "The alert service didn't answer. Try again later.");
+      }
+      store("alertCode", code);
+      return done("Alerts are on. Tap Send a test to check one arrives.");
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (what === "off") {
+      if (sub) {
+        await alertsPost("/unsubscribe", { endpoint: sub.endpoint }).catch(() => {});
+        await sub.unsubscribe();
+      }
+      return done("Alerts are off on this device.");
+    }
+    if (what === "test" && sub) {
+      let code = "";
+      try { code = localStorage.getItem("alertCode") || ""; } catch { /* storage blocked */ }
+      const r = await alertsPost("/test", { code, endpoint: sub.endpoint });
+      return done(r.ok && r.j.ok ? "Test sent: it should arrive in a few seconds." : r.status === 404 ? "This device isn't registered any more: turn alerts off and on again." : "The test didn't go through. Try again later.");
+    }
+  } catch {
+    return done("Something went wrong setting up alerts. Try again.");
+  }
+}
+// A tapped alert opens the app on its trade: "?trade=<id>" on a cold start, a message from
+// sw.js when the app is already open.
+function openTradeById(id) {
+  const t = id && allTrades().find((x) => x.id === id);
+  if (!t) return false;
+  state.tab = "portfolio";
+  render();
+  openSheet(tradeHtml(t));
+  return true;
+}
+function openTradeFromUrl() {
+  const id = new URLSearchParams(location.search).get("trade");
+  if (!id) return;
+  openTradeById(id);
+  try { history.replaceState(null, "", location.pathname + location.hash); } catch { /* not allowed */ }
 }
 // One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
 // record, and its backtest headline underneath. A shadow test (corners' "below 60%") says so;
@@ -5035,6 +5168,8 @@ document.addEventListener("click", (ev) => {
   } else if (t.id === "pf-more") {
     state.pfShown += 25;
     render();
+  } else if (t.dataset.alerts !== undefined) {
+    alertsAction(t.dataset.alerts);
   } else if (t.dataset.trade !== undefined) {
     const tr = [...(pfSet()?.trades || []), ...allTrades()].find((x) => x.id === t.dataset.trade);
     if (tr) openSheet(tradeHtml(tr));
@@ -5083,6 +5218,7 @@ async function load(force = false) {
     state.data = await res.json();
     setUpdated();
     render();
+    if (!load.opened) { load.opened = true; openTradeFromUrl(); }
   } catch (err) {
     if (!state.data) $("#view").innerHTML = `<div class="empty">Couldn't load predictions.<br><span class="muted">${esc(err.message || err)}</span></div>`;
   } finally {
@@ -5128,6 +5264,7 @@ if ("serviceWorker" in navigator) {
   });
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").then((r) => { swReg = r; }).catch(() => {}));
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
+  navigator.serviceWorker.addEventListener("message", (ev) => { if (ev.data?.openTrade) openTradeById(ev.data.openTrade); });
 }
 load();
 

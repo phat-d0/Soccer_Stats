@@ -633,6 +633,16 @@ def bets_rows(preds: pd.DataFrame) -> list[list]:
     ]
 
 
+def bet_alerts_block(env=None) -> dict:
+    """The app's "Bet alerts" control (owner, 5 Nov; push/README.md): the Cloudflare
+    Worker's address from ALERT_URL (publish.yml), or None while it isn't set up. Only the
+    address: subscribing needs the pairing code and sending needs ALERT_TOKEN, neither of
+    which is ever written here."""
+    env = os.environ if env is None else env
+    url = (env.get("ALERT_URL") or "").strip().rstrip("/")
+    return {"worker": url if url.startswith("https://") else None}
+
+
 def build_data(
     matches: pd.DataFrame,
     fixtures: pd.DataFrame,
@@ -1332,6 +1342,7 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     except Exception as exc:  # noqa: BLE001
         print(f"Team totals shown: none ({type(exc).__name__})")
     add_corners(data)
+    data["bet_alerts"] = bet_alerts_block()
     try:  # Portfolio: every research study's committed result (file reads only)
         data["research_studies"] = _clean(research_studies())
         rs = data["research_studies"]

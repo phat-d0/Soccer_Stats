@@ -1,0 +1,22 @@
+// Cloudflare Worker for Soccer Model bet alerts (push/README.md has the set-up steps).
+// Secrets (set in the dashboard, never here): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
+// ALERT_TOKEN, PAIR_CODE.
+{
+  "name": "soccer-model-alerts",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    // Push services ask for a contact; the app's address is enough.
+    "VAPID_SUBJECT": "https://phat-d0.github.io/Soccer_Stats/",
+    // The app's origin (browsers send no path): only it may call the Worker from a page.
+    "ALLOW_ORIGIN": "https://phat-d0.github.io"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SUBS",
+      // Paste the id of the KV namespace you create (README step 3) in place of this.
+      "id": "PASTE_KV_NAMESPACE_ID_HERE"
+    }
+  ]
+}

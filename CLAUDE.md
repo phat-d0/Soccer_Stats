@@ -99,6 +99,11 @@ Weekly `players.yml` runs include the window without a reason: the opening is co
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
 
+**Bet alerts** (owner, 5 Nov; `push/README.md`): a phone alert, once per trade, when Blend
+Lean (rule_version 2) or Model (f) vs DraftKings corners under 60% opens a paper trade. Web
+Push through the owner's Cloudflare Worker (`push/`); off until he sets it up (KV id in
+`push/wrangler.jsonc`, Worker secrets, GitHub secrets `ALERT_URL` and `ALERT_TOKEN`).
+
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
 settlement runs after them.
@@ -260,7 +265,7 @@ on 4 Nov; trigger ids):
 
 | File | What | Credits |
 | --- | --- | --- |
-| `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Since 1 Nov it also logs live anytime-goalscorer prices (`log-goalscorer`, §16 step 2; `GOALSCORER_DIR`/`GOALSCORER_STATE`, default branch only). Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
+| `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Since 1 Nov it also logs live anytime-goalscorer prices (`log-goalscorer`, §16 step 2; `GOALSCORER_DIR`/`GOALSCORER_STATE`, default branch only). Since 5 Nov, right after `paper`, `bet-alerts --log-dir ../log --state $RUNNER_TEMP/alerts_sent.jsonl` sends the phone alerts (secrets `ALERT_URL`, `ALERT_TOKEN`; never fails the step), and the build gets `ALERT_URL` for `data.json` → `bet_alerts.worker`. Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
 | `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself every 5.5 h while a kickoff or settlement is due; cron every 3 h at :41. Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Default branch only; concurrency `closes`. | 0 extra (the call records never fetch twice) |
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
@@ -268,7 +273,7 @@ on 4 Nov; trigger ids):
 | `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
-| `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
+| `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`, and the bet-alert Worker's tests (`node --test push/test/*.test.mjs`, no Cloudflare account). Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
 - Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
@@ -1122,6 +1127,28 @@ on 4 Nov; trigger ids):
     (shown first, above the tiles: why the sample leaves matches out). The file shape is under
     "Research studies" in the research-lab code map. `comeback_research(path)` reads one file.
   - Every optional step is wrapped so it can't stop the build.
+- `bet_alerts.py` (owner, 5 Nov; CLI `bet-alerts --log-dir --state`, `push/README.md`): phone
+  alerts for new lead-strategy trades. `new_opens(log_dir)` = open events in the data-log
+  working tree's `paper_trades/*.jsonl` whose ids HEAD's don't hold (None without a HEAD);
+  `kind_of(t)` = `"lean"` (live, `strategy` lean, `rule_version` 2, in `LEAN_ODDS_RANGE`) or
+  `"corners_dk"` (DraftKings corners passing `DK_BELOW60`'s filter), else None (backcasts,
+  shadows, DNB, Model 12%, Pinnacle corners, updates); `message(t, kind)` = `{title, body,
+  kickoff, url "./?trade=<id>", tag}`; `run(log_dir, state, env, post)` POSTs each to
+  `ALERT_URL/alert` (Bearer `ALERT_TOKEN`, `TIMEOUT` 10 s, `BUDGET` 60 s, `MAX_ALERTS` 30),
+  records each sent id in data-log `alerts/sent.jsonl` and the `--state` file (a retried push
+  never re-sends), is off without the secrets or off the default branch, never raises; log line
+  "Bet alerts: N sent (Lean L, corners C), M skipped[, F failed (…)]". Only HTTP status or the
+  error type is logged. `publish.bet_alerts_block` gives `data.json` → `bet_alerts` =
+  `{worker}` (the Worker's https address from `ALERT_URL`, else None).
+- `push/` (owner, 5 Nov): the Cloudflare Worker `soccer-model-alerts` (Workers Builds, root
+  `push`, `npx wrangler deploy`, `wrangler.jsonc`: KV `SUBS`, vars `VAPID_SUBJECT`,
+  `ALLOW_ORIGIN`; secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `ALERT_TOKEN`, `PAIR_CODE`).
+  `src/webpush.js`: VAPID ES256 JWT and aes128gcm (RFC 8291) on WebCrypto only; `src/index.js`:
+  `GET /health`, `GET /vapid-public-key`, `POST /subscribe` (pairing code), `/unsubscribe`,
+  `/test` (pairing code), `/alert` (Bearer token; 404/410 drops the subscription).
+  `test/worker.test.mjs` (`node --test`, CI): RFC 8291 Appendix A byte for byte, the VAPID
+  signature, every route on a fake KV and push service. `scripts/vapid-keys.mjs` makes the keys,
+  token and pairing code once. Owner's set-up steps in `push/README.md`.
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
   `PAID` (name → key prefix, exact paths), `list_files`, `content_sha256`, `entry` (files, bytes,
   `by_path`, key, `content_sha256`, archive parts and sha256), `changed`, `merge` (an unchanged or
@@ -1140,7 +1167,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v72) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v73) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1443,6 +1470,19 @@ on 4 Nov; trigger ids):
   folded below it. Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
+- **Bet alerts** (owner, 5 Nov; v73; `push/README.md`): at the foot of Portfolio's top level
+  (`alertsHtml`, `.alerts-card[data-alerts-state]`), state in `state.alerts` (`alertsRefresh`):
+  "setup" (no `bet_alerts.worker`), "unsupported" (`alertsSupport`: no service worker, PushManager
+  or Notification; on iPhone outside the home-screen app it says alerts need the home-screen app
+  on iOS 16.4+), "blocked" (permission denied), "off" (pairing code field until one is kept in
+  localStorage `alertCode`, "Turn on"), "on" ("Send a test", "Turn off"), "busy". `alertsAction`
+  (`data-alerts`): "on" asks permission first (iOS needs the tap), fetches the Worker's
+  `/vapid-public-key`, subscribes and POSTs `/subscribe` with the code (a 403 forgets it); "off"
+  POSTs `/unsubscribe` and unsubscribes; "test" POSTs `/test`. `sw.js` shows each push (title,
+  body plus "kicks off …" in the phone's time from `kickoff`, `tag` = trade id) and on a tap
+  focuses the app and posts `{openTrade}` (`openTradeById` opens the sheet) or opens
+  `./?trade=<id>` (`openTradeFromUrl` after the first load, then drops the query). Push can't
+  run headless: the smoke test renders every state and opens a trade by id.
 - **Scrubbable charts** (owner, 23 Oct; every chart since v52): a wrapper with
   `data-scrub="<id>"` (role slider, focusable, `touch-action: pan-y` so vertical swipes still
   scroll the page); `scrubCharts[id]` = `{n?, readout(i), readoutId, at}` plus how a pointer
