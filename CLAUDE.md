@@ -1284,7 +1284,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v73) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v74) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1512,9 +1512,10 @@ on 4 Nov; trigger ids):
   bankroll after; a table on a laptop, one stacked block per bet under 700px (`.kl-table`,
   cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
   no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`), every judged
-  design-C bet of the comeback study but a third of design B's (the fixture test counts C), and
-  the backtest files' bankroll curves at every fourth point (All and `FULL_LEAGUES`) or fifth
-  (the rest): about 1.46 MB in all, 5 Nov.
+  design-C bet of the comeback study but a third of design B's (the fixture test counts C), the
+  backtest files' bankroll curves at every fourth point (All and `FULL_LEAGUES`) or fifth (the
+  rest), and Pinnacle's files' calibration only in `CALIBRATION_LEAGUES` (E0, SP1, UCL): about
+  1.49 MB in all, 5 Nov.
   "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
@@ -1590,6 +1591,29 @@ on 4 Nov; trigger ids):
   folded below it. Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
+- **Line shop vs Pinnacle** (owner-approved 5 Nov; v74; `paper_lineshop`): Moneyline's
+  `live.strategies` carries `lineshop` (the 2% judged line) and `lineshop_1pct` (`variant_of`
+  "lineshop", `adds: "threshold"`, a descriptive comparison), both right after Blend Lean in the
+  main list; their trades resolve against `live.lineshop_trades` (`isLineshopStrat`: rule
+  `rule: "lineshop"`; `strategyLiveSet`, `allTrades`). Rows: `stratMeta` ("Live since … · 2%+
+  over Pinnacle's fair price · best of 4 books · backcast from …"; the 1%: "Descriptive
+  comparison · a 1% gap · never judged") and, in place of a backtest line, `lsJudgedLine` ("Judged
+  at 300 bets: N with a final close so far", then the stored verdict). The page has Live paper
+  only (no model, no backtest), "Avg gap" in place of "Avg edge", no Kelly sizing; `lsJudgedHtml`
+  (`judged`: "N of 300 bets with a final close" and a bar until `verdict` is set, then
+  Passed/Failed with mean CLV vs Pinnacle's close and its 95% range, `read_at`, "never changes"
+  when `frozen`); the 1% line's `lsCompareHtml` (`compare`: trades, settled, profit, ROI, CLV vs
+  Pinnacle per line since `defined_at`); `lsBooksHtml` ("Where the price was": `books` counts and
+  `age_note`); the overlay "2% gap (judged)" / "1% gap" with the "rule set" marker at `defined_at`;
+  the generic backcast note plus the block's `exception`. Trade rows (`isLineshop`: `bet_type`
+  "lineshop") show the gap and book, "Quote N min old when logged" (`price_age_min`, flagged
+  `.ls-old` "(old)" from `LS_OLD_MIN` 10) and Pinnacle's fair chance; CLV is `clv_pinnacle`
+  (`tradeClv`, `tradeBeat`). The sheet adds the quote's age (the book under Bookmaker), Gap at entry, Pinnacle's
+  fair chance at entry (its 1X2 and age), "CLV vs Pinnacle's close (judged)" and the book's own
+  close (`clv_book`), and drops model-only rows and the Kelly line. The fixture adds ten
+  synthetic trades through `paper_lineshop.new_trade` (`LINESHOP_TRADES`, `lineshop_trades()`;
+  `defined_at` moved to 27 Sep and `BACKCAST_START` to 14 Sep), without the sections' `sizing`
+  and `calibration`, which the app doesn't show for it.
 - **Bet alerts** (owner, 5 Nov; v73; `push/README.md`): at the foot of Portfolio's top level
   (`alertsHtml`, `.alerts-card[data-alerts-state]`), state in `state.alerts` (`alertsRefresh`):
   "setup" (no `bet_alerts.worker`), "unsupported" (`alertsSupport`: no service worker, PushManager
