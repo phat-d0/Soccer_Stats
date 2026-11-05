@@ -2082,7 +2082,12 @@ shared within a league's 5-minute bucket; eight leagues, 2022/23–2024/25).
 - If the owner still wants it, it would need a new pre-registration on seasons not used here
   (2025/26 onward) and the owner's approval. Nothing here is a test.
 
-## Heavy favourites (75%+) trailing at half-time: free scope and DRAFT pre-registration (owner via the lead, 26 Oct)
+## Heavy favourites (75%+) trailing at half-time: free scope and draft pre-registration (owner via the lead, 26 Oct; superseded)
+
+**Superseded (note added 5 Nov).** The draft below was replaced by "Design H: final
+pre-registration" (frozen 28 Oct) and design H2; H ∪ H2 was run once and is
+**inconclusive** (114 usable bets under 136; run 40764816980; "Heavy favourites H ∪ H2: result").
+The free scope numbers stand as written.
 
 **Why this exists.** In design C's 75%+ band, 22 bets won 14 (64%, against the market's
 46%), ROI +51% (−3% to +114%). In B's 75%+ band, 17 bets won 8 (47% vs 41%), +5.7%. Pooled,
