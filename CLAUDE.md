@@ -1435,9 +1435,10 @@ on 4 Nov; trigger ids):
   "capped at 5%", or "No stake" with the reason), result, P/L (flat $10's beside it) and
   bankroll after; a table on a laptop, one stacked block per bet under 700px (`.kl-table`,
   cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
-  no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`), every other
-  bet of the comeback study and, outside `FULL_LEAGUES`, every fifth bankroll-curve point in the
-  backtest files (about 1.42 MB in all, 5 Nov).
+  no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`), every judged
+  design-C bet of the comeback study but a third of design B's (the fixture test counts C), and
+  the backtest files' bankroll curves at every fourth point (All and `FULL_LEAGUES`) or fifth
+  (the rest): about 1.46 MB in all, 5 Nov.
   "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's

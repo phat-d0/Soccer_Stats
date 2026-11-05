@@ -390,10 +390,10 @@ def build(src: Path, out: Path) -> dict:
             if code not in FULL_LEAGUES and isinstance(part, dict):
                 part.pop("calibration", None)
         # Every fifth point outside FULL_LEAGUES (5 Nov: room for the Kelly bet log and the
-        # bet-alert block, with headroom under the cap); every third under All and those.
+        # bet-alert block, with headroom under the cap); every fourth under All and those.
         parts = [("", f.get("all")), *(f.get("leagues") or {}).items()]
         for code, part in parts:
-            step = 3 if code in ("", *FULL_LEAGUES) else 5
+            step = 4 if code in ("", *FULL_LEAGUES) else 5
             for block in ((part or {}).get("sizing") or {}).values():
                 c = block.get("curve") if isinstance(block, dict) else None
                 if isinstance(c, list) and len(c) > 20:
@@ -865,7 +865,8 @@ def add_markets_research(data: dict) -> None:
 
 
 # Portfolio's research studies (owner, 28 Oct: every tested strategy shows in Portfolio):
-# the real committed comeback study through publish.research_studies (every other bet kept), plus
+# the real committed comeback study through publish.research_studies (every design-C bet, a
+# third of B), plus
 # synthetic studies for the states the real files don't have yet: one running (pre-registered,
 # prices being bought), one in-play that passed with cash-out returns and a generic Why, and
 # one pre-match that failed (Moneyline's Archive). The fixture stays under 1.5 MB.
@@ -1265,10 +1266,14 @@ def add_research_studies(data: dict) -> None:
         # (the app shows each study bet's `date`; its `kickoff` only adds bytes here)
         for b in st.get("bets") or []:
             b.pop("kickoff", None)
-        # The comeback study's 930 bets are ~135 KB: every other one is kept (5 Nov, for
-        # headroom under the cap), still over 150 for its list's "Show more" and both curves.
-        if st["id"] == "comeback_ht" and len(st.get("bets") or []) > 400:
-            st["bets"] = st["bets"][::2]
+        # The comeback study's 930 bets are ~135 KB. Every judged design-C bet stays (the
+        # fixture test counts them against designs.C.bets); the descriptive design-B ones
+        # are thinned to every third (5 Nov, for headroom under the cap).
+        if st["id"] == "comeback_ht":
+            bets = st.get("bets") or []
+            b_bets = [b for b in bets if b.get("design") != "C"]
+            keep_b = {id(b) for b in b_bets[::3]}
+            st["bets"] = [b for b in bets if b.get("design") == "C" or id(b) in keep_b]
         if st["id"] == "strategy_search":
             bets = st.get("bets") or []
             step = max(1, len(bets) // 60)
