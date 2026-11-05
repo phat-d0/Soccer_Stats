@@ -52,7 +52,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
   at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
   Backtests: Kelly loses more than flat for Lean and mostly declines Model 12%'s picks; Kelly on
-  the raw model goes broke (`docs/leagues.md` "Kelly sizing").
+  the raw model goes broke (`docs/leagues.md` "Kelly sizing"). Each live strategy has a Kelly
+  bet log in the app (owner, 5 Nov): how every stake was sized, with the flat $10 result beside it.
 
 **Team corners (portfolio "Team corners", testing), two paper tracks, model (f), 12%, $10:**
 - Model (f) 12% vs Pinnacle, in E0, SP1, D1, I1, F1, E1, and from 24 Oct E2 and E3 (Pinnacle only:
@@ -494,7 +495,13 @@ on 4 Nov; trigger ids):
   bets_staked, bets_zero_stake, median_stake, curve [{date, bankroll}] (≤ `MAX_CURVE` 200),
   stakes}`; `block` adds `fraction, cap, stake (flat), p_source, p_note, bets_no_chance, note`.
   `live_sizing(trades, rule)` = `{flat, kelly, kelly_raw (Model 12%: raw model_p, "over-confident"),
-  blend_from (Model 12%: counts by p_blend_from)}`, only `kelly` keeps `stakes` {trade id: stake};
+  blend_from (Model 12%: counts by p_blend_from)}`, only `kelly` keeps `stakes` {trade id: stake}
+  and `log` (owner via the lead, 5 Nov; `kelly_log` on `simulate(..., log=True)`, which records
+  each bet's bankroll at open and after settlement and leaves every other number unchanged): one
+  row per trade, oldest first, `{id, opened_at, settled_at, league, match, pick, odds, chance,
+  kelly (full f*), fraction (min(¼ f*, 5%), 0 with no stake), capped?, bankroll_before, stake,
+  status, push?, profit, bankroll_after, reason? ("no edge on the chance" / "no chance" / "no
+  bankroll", only with no stake), flat_profit}` (flags and reason only when set);
   `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push).
   `backtest_sizing(df, p_col, p_source, raw_col=, lead=)` (open = kickoff − `BACKTEST_LEAD` 4
   days, 0 at the close; no stakes kept).
@@ -1172,7 +1179,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v71) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v72) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1390,7 +1397,17 @@ on 4 Nov; trigger ids):
   flat past $0 or `max_drawdown_pct` > 1 reads "would have gone broke (fell $X below the
   $1,000 start)", Kelly under $1 "bust"; `p_note` and `note` folded; the trade sheet's
   `kellyStakeLine` from `sizing.kelly.stakes[id]`: "¼ Kelly stake: $x" or "Kelly: no stake
-  (no edge on the calibrated chance)"), "Where the bets sit on the odds" (owner, 24
+  (no edge on the calibrated chance)", plus "How it was sized" (`data-klrow`, on the open
+  strategy's live view) jumping to its row). Under it the folded "Kelly bet log" (v72; live
+  strategies only, `kellyLogHtml(x, kelly)`, `details#kl-<key>`): the formula line
+  (`KELLY_FORMULA`), the chance used (`KELLY_CHANCE` by `p_source`), then `kelly.log` newest
+  first, 25 rows then 50 more a tap (`state.kellyShown`, `data-klmore`), columns date, match
+  and pick, odds (American and decimal), chance, full Kelly, stake ($ and % of the bankroll,
+  "capped at 5%", or "No stake" with the reason), result, P/L (flat $10's beside it) and
+  bankroll after; a table on a laptop, one stacked block per bet under 700px (`.kl-table`,
+  cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
+  no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`).
+  "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
   `odds_bands.clv_field`; the ROI table; on Moneyline a table beside the same strategy's
