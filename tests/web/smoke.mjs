@@ -890,7 +890,8 @@ const STEPS = [
     const chip = await p.locator('button[data-trade="E0|2627|Wolves|Everton|lean"] .drv').innerText();
     if (chip !== "Model") throw new Error(`Wolves chip: ${chip}`);
     await p.click('button[data-pfdriver="model"]');
-    const only = await p.textContent("#view");
+    // The trade rows only: the Kelly bet log below lists every trade of the strategy.
+    const only = (await p.locator("#view button[data-trade]").allInnerTexts()).join(" ");
     if (!only.includes("Wolves v Everton") || only.includes("Spurs v Brentford")) throw new Error("model-driven filter");
   }],
   ["portfolio-live-lean-market", click('button[data-pfdriver="market"]')],
@@ -954,6 +955,7 @@ const STEPS = [
     await scrubCheck(p, "[data-scrub='lbroi']");
     await bandsCheck(p, "lean", "");
     await sizingCheck(p, "bz-lean-all", () => state.data.portfolio.strategy_backtests.lean.all.sizing);
+    if (!(await p.textContent("#view")).includes("The backtests don't keep each bet's stake, so there's no Kelly bet log here")) throw new Error("backtest Kelly log note");
   }],
   ["portfolio-lean-backtest-model", async (p) => {
     await p.click('button[data-pfdriver="model"]');
@@ -1128,6 +1130,35 @@ const STEPS = [
     await liveBandsCheck(p, "moneyline", "edge12", "");
     await sizingCheck(p, "kz-edge12", () => pfById("moneyline").live.strategies.find((s) => s.key === "edge12").sizing);
     if (!(await p.textContent("#view")).includes("Kelly on the raw model (over-confident):")) throw new Error("Model 12% lacks the raw-model Kelly line");
+  }],
+  // The Kelly bet log (owner via the lead, 5 Nov): folded under the bankroll chart, newest
+  // first, 25 rows then "Show more", the formula and the chance used above it; the trade
+  // sheet's ¼ Kelly line jumps to the trade's row.
+  ["portfolio-live-edge12-kelly-log", async (p) => {
+    const log = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "edge12").sizing.kelly.log);
+    if (!(log.length > 25)) throw new Error(`fixture Kelly log too short: ${log.length}`);
+    await p.click("details#kl-edge12 > summary");
+    const box = (await p.textContent("details#kl-edge12")).replace(/\s+/g, " ");
+    for (const w of [`Kelly bet log · ${log.length} bets`, "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.", "The chance used here is the blend's chance", "Newest first", "Show more (2 left)"]) if (!box.includes(w)) throw new Error(`Kelly log lacks "${w}": ${box.slice(0, 400)}`);
+    const rows = p.locator("details#kl-edge12 tbody tr");
+    if ((await rows.count()) !== 25) throw new Error(`Kelly log rows: ${await rows.count()}`);
+    // Newest first, and each row's numbers are the log's.
+    const want = await p.evaluate((r) => ({ id: kellyRowId("kl-edge12", r.id), odds: cbOdds(r.odds), stake: r.stake > 0 ? bankUsd(r.stake, 2) : "No stake", after: isNum(r.bankroll_after) ? bankUsd(r.bankroll_after, 2) : "open" }), log[log.length - 1]);
+    const first = rows.first();
+    if ((await first.getAttribute("id")) !== want.id) throw new Error("the Kelly log isn't newest first");
+    const ft = (await first.innerText()).replace(/\s+/g, " ");
+    for (const w of [want.odds, want.stake, want.after]) if (!ft.includes(w)) throw new Error(`first Kelly row lacks "${w}": ${ft}`);
+    const zero = log.find((r) => !(r.stake > 0));
+    if (zero && !(await p.textContent("details#kl-edge12")).includes(zero.reason)) throw new Error("a zero stake shows no reason");
+    await p.click('button[data-klmore="kl-edge12"]');
+    if ((await p.locator("details#kl-edge12 tbody tr").count()) !== log.length || !(await p.locator("details#kl-edge12[open]").count())) throw new Error("Show more on the Kelly log");
+    // From a trade's sheet to its row.
+    const id = await p.evaluate((ids) => ids.find((i) => document.querySelector(`#view button[data-trade="${CSS.escape(i)}"]`)), log.map((r) => r.id));
+    if (!id) throw new Error("no listed trade in the Kelly log");
+    await p.click(`#view button[data-trade="${id}"]`); await sheet(p);
+    await p.click('#sheet-body button[data-klrow]');
+    const sel = await p.evaluate((rid) => document.getElementById(rid)?.classList.contains("sel"), await p.evaluate((i) => kellyRowId("kl-edge12", i), id));
+    if (!sel || !(await p.locator("details#kl-edge12[open]").count())) throw new Error("the sheet's link didn't open the trade's Kelly row");
   }],
   ["portfolio-live-edge12-states", async (p) => {
     const text = await p.textContent("#view");

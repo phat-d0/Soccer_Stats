@@ -95,7 +95,7 @@ FALLBACK_MATCH_BLEND = {
 }
 PLAYER_BT_TRADES = 25  # Player shots (retired) backtest trades kept, newest first
 DK_BT_TRADES = 20  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
-LEAN_BETS = 30  # Lean backtest rows kept (the app pages them by 20)
+LEAN_BETS = 25  # Lean backtest rows kept (the app pages them by 20)
 EDGE12_BETS = 30  # Model 12% backtest rows kept (newest first; every league, the cup too)
 SAMPLE_PLAYERS = 35  # players kept from the real detail file (keeps fixtures < 1 MB)
 
@@ -419,6 +419,7 @@ def build(src: Path, out: Path) -> dict:
     (out / "players_stats.json").write_text(dump(stats))
     sp1_stats = add_teams_by_league(data)
     add_models(data, src)  # after every block, SP1's and E1's fits included
+    trim_kelly_logs(data)
     (out / "players_stats_SP1.json").write_text(dump(sp1_stats))
     (out / "data.json").write_text(dump(data))  # again, with teams_by_league
     return data
@@ -2036,6 +2037,19 @@ def add_champions_league(data: dict) -> None:
             "odds": "DraftKings",
         }  # fmt: skip
     )
+
+
+KELLY_LOG_ROWS = 27  # newest Kelly bet log rows kept per strategy (the app shows 25, then more)
+
+
+def trim_kelly_logs(data: dict) -> None:
+    """Keep each live strategy's newest KELLY_LOG_ROWS Kelly log rows (sizing.kelly_log is
+    oldest first), so the fixture stays under 1.5 MB with a "Show more" left to test."""
+    for p in data.get("portfolio", {}).get("portfolios", []):
+        for st in (p.get("live") or {}).get("strategies") or []:
+            k = (st.get("sizing") or {}).get("kelly")
+            if isinstance(k, dict) and isinstance(k.get("log"), list):
+                k["log"] = k["log"][-KELLY_LOG_ROWS:]
 
 
 def add_models(data: dict, src: Path) -> None:
