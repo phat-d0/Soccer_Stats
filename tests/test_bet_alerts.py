@@ -211,3 +211,28 @@ def test_the_app_gets_only_the_workers_address():
     }
     assert publish.bet_alerts_block({"ALERT_URL": "http://insecure"}) == {"worker": None}
     assert "ALERT_TOKEN" not in str(publish.bet_alerts_block({"ALERT_TOKEN": "x"}))
+
+
+def test_the_test_alert_says_how_many_phones_it_reached():
+    calls = []
+
+    def post(url, token, payload):
+        calls.append((url, token, payload))
+        return 200, {"ok": True, "sent": 1, "removed": 1, "failed": 0}
+
+    res = ba.send_test(ENV, post=post)
+    assert res["line"] == "Bet alerts: test sent to 1 phone (1 old subscription removed)"
+    assert (
+        calls[0][0] == "https://alerts.example.workers.dev/alert" and calls[0][2]["tag"] == "test"
+    )
+    none = ba.send_test(ENV, post=lambda *a: (200, {"sent": 0}))
+    assert none["line"].endswith("no phone has turned alerts on yet") and not none["ok"]
+    assert ba.send_test(ENV, post=lambda *a: (401, {}))["line"] == (
+        "Bet alerts: test failed (wrong ALERT_TOKEN)"
+    )
+    assert "not set" in ba.send_test({}, post=post)["line"]
+
+    def boom(*a):
+        raise ConnectionError("https://secret")
+
+    assert ba.send_test(ENV, post=boom)["line"] == "Bet alerts: test failed (ConnectionError)"

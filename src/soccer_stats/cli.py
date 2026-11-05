@@ -587,7 +587,12 @@ def cmd_bet_alerts(args: argparse.Namespace) -> None:
     from . import bet_alerts
 
     try:
-        res = bet_alerts.run(Path(args.log_dir), Path(args.state) if args.state else None)
+        if args.test:
+            res = bet_alerts.send_test()
+        elif not args.log_dir:
+            res = {"line": "Bet alerts: skipped (no --log-dir)"}
+        else:
+            res = bet_alerts.run(Path(args.log_dir), Path(args.state) if args.state else None)
     except Exception as e:  # noqa: BLE001 - alerts must never stop the publish
         print(f"Bet alerts: skipped ({type(e).__name__})")
         return
@@ -3353,7 +3358,10 @@ def main(argv: list[str] | None = None) -> None:
         help="send a phone alert for each new lead-strategy paper trade (needs ALERT_URL "
         "and ALERT_TOKEN; never fails)",
     )
-    ba.add_argument("--log-dir", required=True, help="data-log checkout, after `paper`")
+    ba.add_argument("--log-dir", help="data-log checkout, after `paper`")
+    ba.add_argument(
+        "--test", action="store_true", help="send one test alert to every subscribed phone"
+    )
     ba.add_argument("--state", help="sent-ids file outside the checkout, kept across retries")
     ba.set_defaults(func=cmd_bet_alerts)
 

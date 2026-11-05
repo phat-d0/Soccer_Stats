@@ -14,10 +14,11 @@ ALERT_TOKEN), which sends it to every subscribed phone. Never backcasts, shadows
 bet tracks, Model 12%, Pinnacle corners or settlements.
 
 One alert per trade id, ever: every id sent is recorded in data-log `alerts/sent.jsonl`
-and, for a retry within the same run (a data-log push race starts the step again from a
-fresh checkout), in a state file outside the worktree (`--state`). Skipped quietly without
-the secrets or off the default branch, and it never raises: a failing endpoint costs only
-the alert, and the publish goes on.
+(the record across runs) and, for a retry within the same run (a data-log push race starts
+the step again from a fresh checkout), in a state file outside the worktree (`--state`).
+Skipped quietly without the secrets or off the default branch, and it never raises: a
+failing endpoint costs only the alert, and the publish goes on. `send_test` sends one test
+alert (publish.yml's "Send a test alert" input).
 """
 
 from __future__ import annotations
@@ -249,6 +250,54 @@ def run(
             failed += 1
             errors.append(err)
     return _summary(counts=counts, skipped=skipped, failed=failed, errors=errors)
+
+
+TEST_MESSAGE = {
+    "title": "Test alert from Soccer Model",
+    "body": "Bet alerts work: a real one comes when Blend Lean or DraftKings corners "
+    "(under 60% to win) opens a paper trade.",
+    "url": "./",
+    "tag": "test",
+}
+
+
+def _post_json(url: str, token: str, payload: dict) -> tuple[int, dict]:
+    import requests
+
+    r = requests.post(
+        url,
+        json=payload,
+        headers={"Authorization": f"Bearer {token}", "User-Agent": "soccer-model-alerts"},
+        timeout=TIMEOUT,
+    )
+    try:
+        return r.status_code, r.json()
+    except ValueError:
+        return r.status_code, {}
+
+
+def send_test(env: dict | None = None, post=_post_json) -> dict:
+    """One test alert to every subscribed phone (publish.yml's "Send a test alert" input):
+    says how many phones the Worker reached. Never raises."""
+    env = os.environ if env is None else env
+    url, token = (env.get("ALERT_URL") or "").strip(), (env.get("ALERT_TOKEN") or "").strip()
+    if not url or not token:
+        return {"ok": False, "line": "Bet alerts: test not sent (ALERT_URL or ALERT_TOKEN not set)"}
+    try:
+        status, body = post(url.rstrip("/") + "/alert", token, TEST_MESSAGE)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "line": f"Bet alerts: test failed ({type(e).__name__})"}
+    if not 200 <= status < 300:
+        why = "wrong ALERT_TOKEN" if status == 401 else f"HTTP {status}"
+        return {"ok": False, "line": f"Bet alerts: test failed ({why})"}
+    n = body.get("sent", 0)
+    gone = body.get("removed", 0)
+    line = f"Bet alerts: test sent to {n} phone{'' if n == 1 else 's'}"
+    if gone:
+        line += f" ({gone} old subscription{'' if gone == 1 else 's'} removed)"
+    if not n:
+        line += "; no phone has turned alerts on yet"
+    return {"ok": bool(n), "sent": n, "line": line}
 
 
 def _summary(counts=None, skipped=0, failed=0, errors=(), off=None, error=None) -> dict:
