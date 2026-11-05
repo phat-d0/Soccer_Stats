@@ -174,6 +174,14 @@ settlement runs after them.
   vs 72%), which a free cash-out uses and a 5% fee cancels. Holding lost −25.3% per $1, but the
   sample left out B/C/H's matches (underdogs leading at half-time), so the hold level is biased
   low; with B and C's put back −17.0%. App file `lab/cashout_research.json`.
+- DraftKings vs Pinnacle's fair price, model-free (lead, 5 Nov; `docs/lab.md`): **withdrawn,
+  untestable**. At the 48 h look DraftKings beats Pinnacle's fair price on about 15 matches a
+  year (2023/24–2024/25), 2–3 by 1%. It is replaced by **Line shop vs Pinnacle** (owner-approved
+  5 Nov, rules frozen; no outcome read): the best of DraftKings, FanDuel, BetMGM and BetRivers
+  at ≥ 2% over Pinnacle's Shin-fair price at the first logged moment, $10, one bet per match;
+  a 1% shadow; judged once at 300 bets on CLV against the every-book log's last Pinnacle quote
+  before kickoff. About 2.3 bets a day in the live week, so around mid-March 2027. Moneyline
+  builds the paper track after the Understat fix.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -1056,6 +1064,12 @@ on 4 Nov; trigger ids):
   `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
   arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
   holdout still locked.
+- `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
+  Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
+  `report`; per league, season, T and freshness; no result, close or CLV read).
+  `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
+  It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
+  15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.

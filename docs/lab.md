@@ -3369,7 +3369,13 @@ needs:
 - first-moment entry, not the best moment, so that the counts above (the best moment of
   each match) don't flatter it.
 
-## Line shop vs Pinnacle: DRAFT pre-registration (lead, 5 Nov; for the owner's approval; no outcome, close or CLV read)
+## Line shop vs Pinnacle: pre-registration, approved (owner via the lead, 5 Nov 2026; no outcome, close or CLV read)
+
+**Status: approved by the owner via the lead on 5 Nov 2026, as drafted below. The rules are
+frozen:** T = 2% judged, T = 1% a descriptive shadow, the four books, first-moment entry, one
+bet per match, CLV against Pinnacle's fair close, judged once at 300 bets. Changing any of
+them needs a new pre-registration. The commit that merges this section is the
+pre-registration. Moneyline builds the paper track after the Understat fix.
 
 **The idea.** Look at the four books the owner can bet at: DraftKings, FanDuel, BetMGM and
 BetRivers. Bet the best of them when its price beats Pinnacle's margin-free (Shin) price for the
