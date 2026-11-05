@@ -213,7 +213,7 @@ def test_build_is_json_and_counts_cells():
     assert res["warning"].startswith("Exploratory")
     assert {f["key"] for f in res["factors"]} == {
         "side", "league", "month", "rest_diff", "europe", "xg_luck", "new_team",
-        "price_move", "driver",
+        "price_move", "driver", "home_league",
     }  # fmt: skip
 
 

@@ -84,9 +84,9 @@ NOTE = (
     "within each cell (2,000 draws, seed 0). Cells under 200 rows are marked thin. Seasons "
     "2019/20-2023/24; 2024/25 on is locked as the test season for anything the map suggests. "
     "Two scope limits: 'after a European match' counts UEFA matches only (domestic cups are "
-    "not counted), and rest days count league matches only. A slice level that holds every outcome of its "
-    "matches (league, month) has a total z of 0 by construction (each match's outcomes sum to "
-    "one win and to a chance of 1); read its bands, not its total."
+    "not counted), and rest days count league matches only. A slice level that holds every "
+    "outcome of its matches (league, month) has a total z of 0 by construction (each match's "
+    "outcomes sum to one win and to a chance of 1); read its bands, not its total."
 )
 
 
@@ -417,6 +417,7 @@ def add_factors(
     else:
         df["europe"] = None
 
+    df["home_league"] = df["league"].where(df["side"] == "home")
     df["driver"] = None
     has_fit = df["p_blend"].notna()
     df.loc[has_fit, "driver"] = DRIVER_LEVELS[0]
@@ -471,6 +472,10 @@ FACTORS = [
      "levels": list(MOVE_LABELS), "known": "at the close only",
      "note": "The outcome's fair close minus its fair early chance. Not known when a bet is "
      "taken."},
+    {"key": "home_league", "label": "Home sides, by league (a check)", "levels": list(LEAGUES),
+     "known": "before kickoff",
+     "note": "Home rows only, split by league: whether a home-side pattern comes from one "
+     "league."},
     {"key": "driver", "label": "Lean's driver", "levels": list(DRIVER_LEVELS),
      "known": "before kickoff",
      "note": "Lean's pick at Pinnacle's early price (lean_backtest.bets); rows with a blend fit "
@@ -510,6 +515,7 @@ def build(rows: pd.DataFrame, n_boot: int = N_BOOT, info: dict | None = None) ->
         "note": NOTE,
         "warning": WARNING,
         "league_reports": info.get("leagues", {}),
+        "xg_files": info.get("xg_files"),
         "europe": info.get("europe"),
         "runs": info.get("runs", {}),
     }
@@ -582,6 +588,30 @@ def load_europe(matches: pd.DataFrame, first: int, last: int, cutoff: pd.Timesta
     }
 
 
+def xg_status(codes, first: int, last: int) -> dict[str, dict[str, str]]:
+    """Each Understat league-season file the run needs: "ok", "missing" or why it is bad."""
+    from soccer_stats import xg
+    from soccer_stats.data import RAW_DIR
+
+    out: dict[str, dict[str, str]] = {}
+    for code in codes:
+        us = xg.LEAGUES.get(code)
+        if not us:
+            continue
+        out[code] = {}
+        for y in range(first - BURN_IN, last + 1):
+            path = RAW_DIR / f"understat_{us}_{y}.json"
+            if not path.exists():
+                out[code][str(y)] = "missing"
+                continue
+            try:
+                xg.check_league_json(path.read_bytes())
+                out[code][str(y)] = "ok"
+            except Exception as exc:  # noqa: BLE001 - reported, not raised
+                out[code][str(y)] = f"bad: {exc}"[:80]
+    return out
+
+
 def print_file(text: str) -> None:
     print(f"RESIDUAL_MAP_SHA256 {hashlib.sha256(text.encode()).hexdigest()} ({len(text)} bytes)")
     blob = base64.b64encode(gzip.compress(text.encode(), mtime=0)).decode()
@@ -617,9 +647,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--json", default="", help="write the file here too")
     args = p.parse_args(argv)
     cutoff = pd.Timestamp(f"{args.last + 1}-07-01")
+    codes = [c.strip() for c in args.leagues.split(",") if c.strip()]
+    status = xg_status(codes, args.first, args.last)
+    for code, seasons in status.items():
+        print(f"Understat files {code}: {seasons}", flush=True)
     holdout = Holdout(cutoff)
     frames, mats, leans, reps = [], [], [], {}
-    for code in [c.strip() for c in args.leagues.split(",") if c.strip()]:
+    for code in codes:
         try:
             rows, m, lean, rep = load_league(code, holdout, args.first, args.last)
             frames.append(rows)
@@ -651,6 +685,7 @@ def main(argv: list[str] | None = None) -> None:
         {
             "locked_from": str(cutoff.date()),
             "leagues": reps,
+            "xg_files": status,
             "europe": euro_rep,
             "runs": {"residual_map": run} if run else {},
         },

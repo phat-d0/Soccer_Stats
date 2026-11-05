@@ -422,6 +422,7 @@ jobs:
           AFTER: ${{ inputs.after }}
           LEAGUES: ${{ inputs.leagues }}
           RESTORE_KEY: ${{ inputs.restore_key }}
+          GH_TOKEN: ${{ inputs.task == 'residual-map' && github.token || '' }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -597,8 +598,13 @@ jobs:
             strategy-search) uv run python -m soccer_stats.lab.strategy_search \
                      --json out/strategy_search.json --arms-json out/strategy_search_arms.json \
                      --app-json out/strategy_search_research.json ;;
-            residual-map) uv run python -m soccer_stats.lab.residual_map \
-                     --json out/residual_map.json ;;
+            residual-map)
+              # Which Understat caches exist (read only; nothing is saved from this task).
+              for lg in SP1 D1 I1 F1; do
+                gh api "repos/$GITHUB_REPOSITORY/actions/caches?key=understat-$lg-&per_page=20" \
+                  --jq '.actions_caches[] | "cache \(.key) \(.ref) \(.created_at) \(.size_in_bytes)"' || true
+              done
+              uv run python -m soccer_stats.lab.residual_map --json out/residual_map.json ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log
