@@ -128,13 +128,21 @@ def fetch_season(
     good = good_dir if good_dir is not None else (GOOD_DIR if raw_dir == RAW_DIR else None)
     if good is not None:
         restore_good(path, Path(good))
+    # An empty match list is valid JSON, but never replaces a file that has matches.
+    held = max(_played(path), _played(Path(good) / path.name) if good is not None else -1)
+
+    def check(body: bytes) -> None:
+        check_league_json(body)
+        if held > 0 and _played_in(json.loads(body)) == 0:
+            raise ValueError("an empty match list where a kept file has results")
+
     out = _fetch(
         URL.format(league=us_league, season=start_year),
         path,
         max_age_hours=12 if start_year >= current_season() else None,
         headers=HEADERS,
         stale_ok=True,
-        validate=check_league_json,
+        validate=check,
     )
     if good is not None:
         keep_good(out, Path(good))
@@ -168,12 +176,13 @@ def backfill(
 
 
 def restore_good(path: Path, good_dir: Path) -> bool:
-    """Put the last good copy (mtime kept) over a missing or bad cached league file;
-    True when it did."""
+    """Put the last good copy (mtime kept) over the cached league file when the copy is
+    better: the cached file is missing or bad, or the copy has more played results (equal:
+    a newer modification time). True when it did."""
     import shutil
 
     copy = good_dir / path.name
-    if (path.exists() and _good(path)) or not copy.exists() or not _good(copy):
+    if not copy.exists() or not _good(copy) or not _better(copy, path):
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(copy, path)
@@ -182,18 +191,38 @@ def restore_good(path: Path, good_dir: Path) -> bool:
 
 
 def keep_good(path: Path, good_dir: Path) -> bool:
-    """Mirror a good league file into `good_dir` when its copy there is missing or older;
-    a bad file is never written. True when it copied."""
+    """Mirror a good league file into `good_dir` when it is better than the copy there
+    (missing, bad, fewer played results, or equal and older); a bad file is never
+    written. True when it copied."""
     import shutil
 
     copy = good_dir / path.name
-    if not path.exists() or not _good(path):
-        return False
-    if copy.exists() and copy.stat().st_mtime >= path.stat().st_mtime:
+    if not path.exists() or not _good(path) or not _better(path, copy):
         return False
     good_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, copy)
     return True
+
+
+def _played_in(data) -> int:
+    dates = data.get("dates") if isinstance(data, dict) else data
+    return sum(1 for d in dates or [] if isinstance(d, dict) and d.get("isResult"))
+
+
+def _played(path: Path) -> int:
+    """Played matches in a good league file; -1 when it's missing or bad."""
+    if not path.exists() or not _good(path):
+        return -1
+    return _played_in(json.loads(path.read_bytes()))
+
+
+def _better(a: Path, b: Path) -> bool:
+    """`a` (a good file) should replace `b`: b missing or bad, or a has more played
+    results, or as many and a newer modification time."""
+    pa, pb = _played(a), _played(b)
+    if pb < 0:
+        return True
+    return pa > pb or (pa == pb and a.stat().st_mtime > b.stat().st_mtime)
 
 
 def parse_season(data: dict | list) -> pd.DataFrame:

@@ -222,6 +222,13 @@ jobs:
           path: data/raw
           key: raw-data-none
           restore-keys: raw-data-
+      # The last good Understat league files (xg.GOOD_DIR, publish.yml saves them): a stale
+      # raw-data cache's bad Understat file is replaced from here before it's used or saved.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
       # Goalscorer leagues: each league's Understat files have their own cache prefix.
       - uses: actions/cache/restore@v4
         if: ${{ inputs.task == 'goal-league' || inputs.task == 'comebacks-fetch' }}
@@ -395,14 +402,6 @@ jobs:
       # understat-restore (5 Nov, Understat down since 2 Nov): the newest raw-data cache is
       # set aside, an older one restored beside it, and its good Understat league files
       # copied over the bad ones; saved as the newest raw-data cache on the default branch only.
-      # understat-backfill: the good-copy cache (publish.yml's xg-good-) gets every requested
-      # Understat league-season; saved on the default branch only.
-      - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'understat-backfill' }}
-        with:
-          path: data/understat_good
-          key: xg-good-none
-          restore-keys: xg-good-
       - name: Set the newest raw cache aside
         if: ${{ inputs.task == 'understat-restore' }}
         run: mv data/raw "$RUNNER_TEMP/raw_new"

@@ -155,6 +155,14 @@ jobs:
           path: data/raw
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
+      # The last good Understat league files (xg.GOOD_DIR, publish.yml saves them): a stale
+      # raw-data cache's bad Understat file is replaced from here before it's used or saved.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.print_only || inputs.match_markets || inputs.match_blends || inputs.lean_backtest || inputs.edge12_backtest || inputs.edge12_filters || inputs.dnb_backtest || inputs.dk_price_backtest || inputs.estimate_month != '' }}
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
 
       - uses: actions/cache/restore@v4
         if: ${{ !inputs.cup_odds && inputs.print_only && !inputs.match_markets && !inputs.match_blends && !inputs.lean_backtest && !inputs.edge12_backtest && !inputs.edge12_filters && !inputs.dnb_backtest && !inputs.dk_price_backtest && inputs.estimate_month == '' }}

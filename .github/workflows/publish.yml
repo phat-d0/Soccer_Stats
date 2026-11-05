@@ -216,8 +216,8 @@ jobs:
           done
 
       - uses: actions/cache/save@v4
-        if: ${{ hashFiles('data/understat_good/*.json') != '' }}
-        continue-on-error: true  # an unchanged copy's key exists already
+        if: ${{ always() && hashFiles('data/understat_good/*.json') != '' }}
+        continue-on-error: true  # an unchanged copy's key exists already; a failed build keeps its good files
         with:
           path: data/understat_good
           key: xg-good-${{ hashFiles('data/understat_good/*.json') }}
