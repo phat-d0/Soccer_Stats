@@ -204,7 +204,9 @@ def _paths(v) -> list[str]:
 
 def _prefix(w: dict) -> str:
     """The key prefix a cache step restores or saves under ({league} for a dynamic one)."""
-    key = w.get("restore-keys") or re.sub(r"(\$\{\{ github\.run_id \}\}|none)$", "", w["key"])
+    key = w.get("restore-keys") or re.sub(
+        r"(\$\{\{ (github\.run_id|inputs\.restore_key) \}\}|none)$", "", w["key"]
+    )
     return key.replace("${{ inputs.league }}", "*").replace("${{ matrix.league }}", "*")
 
 
