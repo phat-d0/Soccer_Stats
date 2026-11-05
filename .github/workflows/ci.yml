@@ -32,6 +32,8 @@ jobs:
         run: uv run pytest -q
       - name: App syntax
         run: node --check web/app.js && node --check web/sw.js
+      - name: Bet-alert Worker tests (no Cloudflare account, no network)
+        run: node --test push/test/*.test.mjs
 
   web:
     # Pinned: ubuntu-latest has started handing out Ubuntu 26.04, where Playwright 1.56.1

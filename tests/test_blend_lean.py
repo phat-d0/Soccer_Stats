@@ -360,7 +360,15 @@ def test_strategies_listed_lean_first(tmp_path):
     sts = ml["live"]["strategies"]
     # The old rule's shadow variant sits right after Lean (owner, 24 Oct), then each
     # strategy's draw no bet track (owner, 26 Oct).
-    assert [s["key"] for s in sts] == ["lean", "lean_all_odds", "lean_dnb", "edge12", "edge12_dnb"]
+    assert [s["key"] for s in sts] == [
+        "lean",
+        "lean_all_odds",
+        "lean_dnb",
+        "lineshop",  # Line shop vs Pinnacle and its 1% shadow, after Blend Lean (5 Nov)
+        "lineshop_1pct",
+        "edge12",
+        "edge12_dnb",
+    ]
     sts = [next(s for s in sts if s["key"] == k) for k in ("lean", "edge12")]
     assert sts[0]["label"] == "Blend Lean (new rule)" and sts[1]["label"].startswith("Model 12%")
     assert sts[0]["trade_ids"] == ["E0|2627|Arsenal|Leeds|lean"]

@@ -234,7 +234,8 @@ def _settled_at(t: dict):
 
 def chance(t: dict, p_source: str) -> float | None:
     """The chance a trade is sized on: Lean's p_bet, Model 12%'s p_blend (the blend's
-    chance for its side) or raw model_p, a corner's model_p given no push."""
+    chance for its side) or raw model_p, a corner's model_p given no push, the line shop's
+    Pinnacle fair chance (model_p there)."""
     if p_source == "blend":
         v = t.get("p_bet") if t.get("strategy") == "lean" else t.get("p_blend")
     elif p_source == "model_f":
@@ -263,7 +264,10 @@ def live_bets(trades: list[dict], p_source: str) -> list[dict]:
 def sizing_source(rule: dict | None) -> str:
     """What a live strategy sizes on, from its rule's p_source: the corners' model (f), else
     the blend (Lean trades on it; Model 12% gets its blend chance, p_blend)."""
-    return "model_f" if (rule or {}).get("p_source") == "model_f" else "blend"
+    src = (rule or {}).get("p_source")
+    if src == "pinnacle_fair":  # the line shop: Pinnacle's fair chance, stored as model_p
+        return "model"
+    return "model_f" if src == "model_f" else "blend"
 
 
 def live_sizing(trades: list[dict], rule: dict | None) -> dict:

@@ -919,3 +919,14 @@ details.drv-fold { margin-top: 10px; }
   .kl-table td.kl-bet::before { display: none; }
   .kl-table td.kl-bet .meta { font-weight: 400; }
 }
+
+/* Bet alerts (owner, 5 Nov): the control at the foot of Portfolio's top level. */
+.alerts-card { padding: 12px 14px; }
+.alerts-card .note { margin: 6px 0 0; }
+.alerts-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.alert-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.btn { font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+.alert-code { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+.alert-code input { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary); max-width: 220px; }
+.alert-msg { color: var(--text-primary); }
