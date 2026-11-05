@@ -247,6 +247,22 @@ def probe(raw_dir: Path = RAW_DIR, seasons: Iterable[int] | None = None) -> list
             else:
                 row["cached"] = None
             out.append(row)
+    # The same URL with other headers, to tell a header-based block from an IP block.
+    chrome = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/130.0.0.0 Safari/537.36"
+    )
+    url = URL.format(league="EPL", season=years[0])
+    variants = {
+        "chrome_ajax": {**HEADERS, "User-Agent": chrome, "Referer": "https://understat.com/"},
+        "plain": {},
+    }
+    for name, hdrs in variants.items():
+        try:
+            r = requests.get(url, headers=hdrs, timeout=30)
+            out.append({"variant": name, "status": r.status_code, **describe(r.content)})
+        except requests.RequestException as exc:
+            out.append({"variant": name, "error": type(exc).__name__})
     for page in (f"https://understat.com/league/EPL/{years[0]}", "https://understat.com/"):
         try:
             r = requests.get(page, headers={"User-Agent": HEADERS["User-Agent"]}, timeout=30)
@@ -259,6 +275,14 @@ def probe(raw_dir: Path = RAW_DIR, seasons: Iterable[int] | None = None) -> list
                     "has_datesData": "datesData" in body,
                     "getLeagueData": "getLeagueData" in body,
                     "head": body[:200],
+                    "text": re.sub(
+                        r"\s+",
+                        " ",
+                        re.sub(
+                            r"<[^>]+>", " ", re.sub(r"(?s)<(script|style)[^>]*>.*?</\1>", " ", body)
+                        ),
+                    )[:1500],
+                    "tail": body[-600:],
                     "scripts": sorted(set(re.findall(r'src="([^"]+\.js[^"]*)"', body)))[:15],
                 }
             )
