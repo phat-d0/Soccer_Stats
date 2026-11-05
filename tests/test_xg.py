@@ -136,8 +136,9 @@ def test_check_league_json_rejects_html_and_empty():
         check_league_json(MAINTENANCE)
     with pytest.raises(ValueError):
         check_league_json(b"")
-    with pytest.raises(ValueError, match="without any matches"):
-        check_league_json(b'{"dates": []}')
+    with pytest.raises(ValueError, match="without a match list"):
+        check_league_json(b'{"teams": {}}')
+    check_league_json(b'{"dates": []}')  # a season before its schedule is out
     check_league_json(json.dumps({"dates": [{"id": "1"}]}).encode())
 
 

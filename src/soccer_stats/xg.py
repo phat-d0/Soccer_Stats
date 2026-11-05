@@ -83,7 +83,7 @@ TEAM_NAMES = {
 
 
 def check_league_json(body: bytes) -> None:
-    """Raise unless `body` is Understat league data: JSON with a non-empty `dates` list.
+    """Raise unless `body` is Understat league data: JSON with a `dates` list.
 
     Understat has answered with an HTML page (status 200) since 2 Nov 2026; caching that
     page in place of the season's JSON is what turned xG off.
@@ -92,8 +92,8 @@ def check_league_json(body: bytes) -> None:
         raise ValueError(f"an HTML page ({len(body):,} bytes), not JSON")
     data = json.loads(body)
     dates = data.get("dates") if isinstance(data, dict) else data
-    if not isinstance(dates, list) or not dates:
-        raise ValueError("JSON without any matches")
+    if not isinstance(dates, list):
+        raise ValueError("JSON without a match list")
 
 
 def check_match_json(body: bytes) -> None:
