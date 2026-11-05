@@ -36,6 +36,7 @@ import requests
 
 from soccer_stats.data import RAW_DIR
 from soccer_stats.espn_news import BASE, SLUGS, team_name
+from soccer_stats.odds_log import name_key
 
 # Domestic leagues only: the Champions League already settles from ESPN (cup_model).
 DOMESTIC = {code: slug for code, slug in SLUGS.items() if not slug.startswith("uefa.")}
@@ -265,10 +266,11 @@ def match_events(match: dict, events: list[dict], known: set[str]) -> tuple[str,
     for mh, ma, e in mapped:
         by_club.setdefault(mh, set()).add(e["home"])
         by_club.setdefault(ma, set()).add(e["away"])
+    want = (name_key(match["home"]), name_key(match["away"]))
     near = [
         e
         for mh, ma, e in mapped
-        if (mh, ma) == (match["home"], match["away"])
+        if (name_key(mh), name_key(ma)) == want
         and abs(e["kickoff"] - match["kickoff"]) <= KICKOFF_TOLERANCE
     ]
     clash = any(len(by_club.get(c, ())) > 1 for c in (match["home"], match["away"]))

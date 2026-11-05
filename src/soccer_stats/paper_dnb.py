@@ -330,6 +330,8 @@ def update_ledger(
         and now - pd.Timestamp(fetched) <= pd.Timedelta(hours=paper.FRESH_HOURS)
     )
     cards = {(c["home"], c["away"]): c for c in fixtures if c.get("kickoff")}
+    # The moved-match check finds the card whatever the case of the names.
+    by_name = {(ol.name_key(h), ol.name_key(a)): c for (h, a), c in cards.items()}
 
     # 1. Open: one trade per match and track.
     if fresh:
@@ -360,7 +362,7 @@ def update_ledger(
                 events.append(ev)
             continue
         kickoff = pd.Timestamp(t["kickoff"])
-        c = cards.get((t["home"], t["away"]))
+        c = by_name.get((ol.name_key(t["home"]), ol.name_key(t["away"])))
         settled_at = now.isoformat(timespec="seconds")
         if c and abs(pd.Timestamp(c["kickoff"]) - kickoff) > pd.Timedelta(
             hours=paper.VOID_MOVED_HOURS
