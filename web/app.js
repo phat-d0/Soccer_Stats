@@ -21,6 +21,9 @@ const state = {
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
+  kellyShown: {}, // Kelly bet log rows shown per strategy (25, then 50 more a tap)
+  kellyOpen: "", // the Kelly bet log kept open across re-renders
+  kellyFocus: "", // the trade the sheet's "How it was sized" points at
   pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the lead, DraftKings under 60%)
   pfStratResearch: "", // In-play research: which study ("" = the first)
   btSource: store.get("btSource", "dk"), // Backtest: "dk" (DraftKings' prices, first when present) or "pin"
@@ -39,7 +42,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v71";
+const APP_VERSION = "v72";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3612,7 +3615,7 @@ function sizingReadout(series, rows, i) {
   return `<b>${esc(longSpan(dates) ? dayYear(rows[0][i].date) : dayName(rows[0][i].date))}</b>${rows[0][i].origin ? " · start" : ""} · ${parts.join(" · ")}`;
 }
 // The bankroll chart and tiles for one sizing block (live strategy or backtest part).
-function sizingHtml(id, sz, where = "") {
+function sizingHtml(id, sz, where = "", x = null) {
   if (!sz) return "";
   if (sz.error) return `<div class="section-title">Bankroll: flat $10 vs ¼ Kelly</div><p class="note">The Kelly comparison couldn't be worked out this time (${esc(sz.error)}).</p>`;
   const lines = SIZING_LINES.map(([k]) => [k, sz[k]]).filter(([, b]) => b && Array.isArray(b.curve));
@@ -3640,7 +3643,69 @@ function sizingHtml(id, sz, where = "") {
     <div class="card bank-card">${chart}</div>
     ${tiles}
     ${rawLine}
-    ${notes.length ? `<details class="fold mk-fold"><summary>How Kelly is sized here</summary>${notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</details>` : ""}`;
+    ${notes.length ? `<details class="fold mk-fold"><summary>How Kelly is sized here</summary>${notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</details>` : ""}
+    ${x ? kellyLogHtml(x, k) : `<p class="note kelly-bt-note">The backtests don't keep each bet's stake, so there's no Kelly bet log here; the live strategies have one.</p>`}`;
+}
+// ---------- the Kelly bet log (owner via the lead, 5 Nov; live strategies only) ----------
+// sizing.kelly.log = [{id, opened_at, settled_at, league, match, pick, odds, chance, kelly
+// (full f*), fraction (applied: min(¼ f*, 5%), 0 with no stake), capped, bankroll_before,
+// stake, status, push, profit, bankroll_after, reason, flat_stake, flat_profit}], oldest first.
+const KELLY_FORMULA = "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.";
+const KELLY_CHANCE = { blend: "the blend's chance (Blend Lean's p_bet; Model 12%'s blend chance for its side)", model_f: "model (f)'s chance to win, with pushes taken out", model: "the raw model's chance" };
+const kellyLogKey = (x) => `kl-${x.key}`;
+const kellyRowId = (key, id) => `${key}-r${[...String(id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
+function kellyResult(r) {
+  if (r.status === "won") return '<b class="pos-text">Won</b>';
+  if (r.status === "lost") return "Lost";
+  if (r.status === "void") return r.push ? "Push · stake back" : "Void · stake back";
+  return "Open";
+}
+function kellyLogHtml(x, k) {
+  const log = Array.isArray(k?.log) ? k.log : null;
+  if (!log) return "";
+  const key = kellyLogKey(x);
+  const rows = log.slice().reverse();
+  const shown = state.kellyShown[key] || 25;
+  const byId = new Map((allTrades() || []).map((t) => [t.id, t]));
+  const body = rows.slice(0, shown).map((r) => {
+    const t = byId.get(r.id);
+    const pick = t ? tradeLabel(t) : r.pick || "–";
+    const when = r.opened_at ? dayName(r.opened_at.slice(0, 10)) : "–";
+    const share = r.stake > 0 && r.bankroll_before > 0 ? r.stake / r.bankroll_before : null;
+    const stake = r.stake > 0
+      ? `${bankUsd(r.stake, 2)}<span class="meta">${pct(share, 1)} of ${bankUsd(r.bankroll_before, 0)}${r.capped ? " · capped at 5%" : ""}</span>`
+      : `<span class="muted">No stake</span><span class="meta">${esc(r.reason || "")}</span>`;
+    const pl = isNum(r.profit) ? `<span class="${signCls(r.profit)}">${usd(r.profit, 2)}</span><span class="meta">flat $10: ${usd(r.flat_profit, 2)}</span>` : `<span class="muted">–</span>`;
+    return `<tr id="${kellyRowId(key, r.id)}"${state.kellyFocus === r.id ? ' class="sel"' : ""}>
+      <td data-label="Date">${esc(when)}</td>
+      <td data-label="Bet" class="kl-bet">${esc(r.match || "")}<span class="meta">${esc(pick)}${r.league ? ` · ${esc(leagueShort(r.league))}` : ""}</span></td>
+      <td data-label="Odds" class="num">${cbOdds(r.odds)}</td>
+      <td data-label="Chance" class="num">${pct(r.chance, 1)}</td>
+      <td data-label="Full Kelly" class="num">${isNum(r.kelly) ? `${r.kelly < 0 ? "−" : ""}${pct(Math.abs(r.kelly), 1)}` : "–"}</td>
+      <td data-label="Stake" class="num">${stake}</td>
+      <td data-label="Result">${kellyResult(r)}</td>
+      <td data-label="P/L" class="num">${pl}</td>
+      <td data-label="Bankroll after" class="num">${isNum(r.bankroll_after) ? bankUsd(r.bankroll_after, 2) : '<span class="muted">open</span>'}</td>
+    </tr>`;
+  }).join("");
+  const chance = KELLY_CHANCE[k.p_source] || "the strategy's chance";
+  return `
+    <details class="fold mk-fold kelly-log" id="${key}"${state.kellyOpen === key ? " open" : ""}><summary>Kelly bet log · ${num(log.length)} bet${log.length === 1 ? "" : "s"}</summary>
+      <p class="note kl-formula">${esc(KELLY_FORMULA)}</p>
+      <p class="note">The chance used here is ${esc(chance)}. Each stake uses the bankroll from bets settled before it opened; P/L lands when the bet settles. Newest first.</p>
+      ${rows.length ? `<div class="card kl-card"><table class="kl-table"><thead><tr><th>Date</th><th>Match and pick</th><th>Odds</th><th>Chance</th><th>Full Kelly</th><th>Stake</th><th>Result</th><th>P/L</th><th>Bankroll after</th></tr></thead><tbody>${body}</tbody></table></div>
+      ${rows.length > shown ? `<button class="more" data-klmore="${esc(key)}">Show more (${num(rows.length - shown)} left)</button>` : ""}` : `<p class="muted">No trades yet.</p>`}
+    </details>`;
+}
+// The live strategy (on the open page) whose Kelly log holds a trade, for the sheet's link.
+function kellyLogOf(id) {
+  const cur = pfCurrent();
+  if (state.tab !== "portfolio" || pfLevelOn() !== "strategy" || (state.pfView && state.pfView !== "live") || !cur?.live?.strategies) return null;
+  const x = pfSelected(pfStrategies(cur), cur);
+  const log = x?.st?.sizing?.kelly?.log || [];
+  const at = log.findIndex((r) => r.id === id);
+  // The log shows newest first, so this row's place on the page counts from the end.
+  return at < 0 ? null : { key: kellyLogKey(x), index: log.length - 1 - at };
 }
 // A trade's quarter-Kelly stake: from whichever live strategy's sizing holds its id.
 function kellyStakeLine(t) {
@@ -3942,7 +4007,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card pf-curve">${chart}</div>
-    ${sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "")}
+    ${sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "", x)}
     ${liveOddsBandsHtml(cur, x, lg, drv)}
     <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk` : ""}</div>
     ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
@@ -4837,7 +4902,7 @@ function tradeHtml(t) {
       <div class="card" style="padding:8px 14px;margin-top:10px">
         <table class="kv"><tbody>${rows}</tbody></table>
       </div>
-      ${t.source === "live" && kellyStakeLine(t) ? `<p class="note kelly-line">${esc(kellyStakeLine(t))}. Shown for comparison only: flat $10 is the record.</p>` : ""}
+      ${t.source === "live" && kellyStakeLine(t) ? `<p class="note kelly-line">${esc(kellyStakeLine(t))}. Shown for comparison only: flat $10 is the record.${kellyLogOf(t.id) ? ` <button class="linkish" data-klrow="${esc(t.id)}">How it was sized</button>` : ""}</p>` : ""}
     </div>`;
 }
 
@@ -4898,6 +4963,20 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfdriver !== undefined) {
     state.pfDriver = t.dataset.pfdriver; state.pfShown = 15; state.lbShown = 20;
     render();
+  } else if (t.dataset.klmore !== undefined) {
+    state.kellyShown[t.dataset.klmore] = (state.kellyShown[t.dataset.klmore] || 25) + 50;
+    state.kellyOpen = t.dataset.klmore;
+    render();
+  } else if (t.dataset.klrow !== undefined) {
+    // From the trade sheet: open the strategy's Kelly log at this trade's row.
+    const at = kellyLogOf(t.dataset.klrow);
+    closeSheet();
+    if (at) {
+      state.kellyOpen = at.key; state.kellyFocus = t.dataset.klrow;
+      state.kellyShown[at.key] = Math.max(state.kellyShown[at.key] || 25, at.index + 1);
+      render();
+      document.getElementById(kellyRowId(at.key, t.dataset.klrow))?.scrollIntoView({ block: "center" });
+    }
   } else if (t.dataset.cbmore !== undefined) {
     state.cbShown = (state.cbShown || 50) + 100;
     render();

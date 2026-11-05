@@ -3306,3 +3306,257 @@ It is rebuilt from the same frozen code and cached snapshots, and fails unless r
 reproduces. Beside the judged band it carries descriptive designs: the half-time cash-out with
 B and C's matches put back (already read, not judged; they have half-time snapshots only),
 the frozen sample at half-time only, and 2025/26 alone.
+
+## DraftKings vs Pinnacle's fair price: drafted and withdrawn, untestable (lead, 5 Nov; no outcome read)
+
+**Status: withdrawn (owner and lead, 5 Nov), as recommended below.** The rule would bet about 15
+matches a year at DraftKings, so it can never reach the 300 bets needed. It was never run on
+outcomes. The line-shopping version below replaces it.
+
+**The idea.** Forget the model. Bet DraftKings when its price is better than Pinnacle's
+margin-free price for the same outcome at the same moment, by at least T. Gap = DraftKings'
+decimal × Pinnacle's Shin-fair chance − 1. This was idea 3 after bake-off 1; it couldn't be
+tested before the ten-book history (28 Oct) and the every-book live log (from 28 Oct).
+
+**What the counts say (prices only; no result, close or CLV was read).**
+- History, the 48-hour look before kickoff, eight leagues, 16,133 matches with both books
+  priced (`odds-check.yml` `task=dk-gap-counts`, run 42006552522, 0 credits). DraftKings'
+  best side sits a median 3.6% *below* Pinnacle's fair price: that is its margin. Matches it
+  would bet:
+
+  | Season | T = 0% | T = 1% | T = 2% | T = 3% |
+  | --- | --- | --- | --- | --- |
+  | 2020/21 | 58 | 21 | 10 | 4 |
+  | 2021/22 | 264 | 130 | 63 | 46 |
+  | 2022/23 | 70 | 30 | 19 | 9 |
+  | 2023/24 | 17 | 2 | 0 | 0 |
+  | 2024/25 | 13 | 3 | 1 | 0 |
+
+- Live, every logged moment from 28 Oct to 5 Nov (138 matches, 5,115 paired snapshots, quotes
+  0.6 minutes old at the median): DraftKings beat Pinnacle's fair price on 4 matches, never by
+  1% or more.
+- Freshness can't separate anything here: The Odds API's `last_update` is at most 12 minutes
+  old in every snapshot (history and live), so a "both quotes fresh" rule removes nothing.
+
+**Draft rule, as the lead asked for it (1–6).**
+1. *Locked test season:* 2023/24–2024/25 of the bought history, read once. They are the newest
+   seasons, and the strategy search keeps 2024/25 locked. (The DraftKings backtest has read
+   these seasons, but only for the model's picks, not this rule.)
+2. *T:* chosen on 2020/21–2022/23 only, from 0%, 1%, 2%, 3%, by the lower end of the CLV range.
+3. *Freshness:* both quotes updated within 15 minutes before the snapshot. It costs nothing,
+   since every quote passes.
+4. *Judged measure:* CLV per bet against Pinnacle's Shin-fair close in the same close
+   snapshot, with a 95% range above 0 (matches resampled, 2,000 draws), on at least 300 bets.
+   ROI is reported, not judged.
+5. *Bets a year at DraftKings, live leagues:* about 15 at T = 0% and 2–3 at T = 1% in the last
+   two seasons; 0–4 in a week live.
+6. *If it passed:* a paper track beside Blend Lean on the every-book log, $10, backcast from
+   14 Oct and judged from the day it is defined.
+
+**Recommendation (accepted 5 Nov): don't approve this rule; it can't be tested.** The locked seasons hold 30
+bets at T = 0% and 5 at T = 1%, against the 300 needed, and a live track would wait decades.
+DraftKings' gaps were common only in 2021/22, which looks like a pricing regime it has since
+left.
+
+**What the data points to instead (for a separate draft, if the owner wants it).** The same
+rule at the **best US price** among the eight US books we log (FanDuel, BetMGM, Caesars,
+BetRivers, Fanatics, ESPN Bet, Bovada, BetOnline). In the live week, 50 of 138 matches (36%) had
+some US book at least 1% above Pinnacle's fair price at some moment, and 29 (21%) at least 2%,
+mostly BetRivers and BetOnline. That is about 1,400 and 800 a year in the live leagues. It
+needs:
+- accounts at several books (the owner's call);
+- a forward test on the live log, since the history holds no live timing;
+- first-moment entry, not the best moment, so that the counts above (the best moment of
+  each match) don't flatter it.
+
+## Line shop vs Pinnacle: pre-registration, approved (owner via the lead, 5 Nov 2026; no outcome, close or CLV read)
+
+**Status: approved by the owner via the lead on 5 Nov 2026, as drafted below. The rules are
+frozen:** T = 2% judged, T = 1% a descriptive shadow, the four books, first-moment entry, one
+bet per match, CLV against Pinnacle's fair close, judged once at 300 bets. Changing any of
+them needs a new pre-registration. The commit that merges this section is the
+pre-registration. Moneyline builds the paper track after the Understat fix.
+
+**The idea.** Look at the four books the owner can bet at: DraftKings, FanDuel, BetMGM and
+BetRivers. Bet the best of them when its price beats Pinnacle's margin-free (Shin) price for the
+same outcome by at least T. Pinnacle is the reference only and is never bet. No model.
+
+**The rule (fixed now).**
+- *When:* at each moment the every-book log records, before kickoff only.
+- *Gap:* for each outcome (home, draw, away), the best price among the four × Pinnacle's
+  Shin-fair chance at that same logged moment − 1.
+- *Fresh quotes:* both the book's and Pinnacle's quote were updated within 15 minutes before
+  the logged moment. Today this filters nothing: paired quotes are 0.6 minutes old at the
+  median and 3 at the 99th percentile.
+- *Entry:* the first logged moment any outcome's gap reaches T, at that logged price. It is
+  never the best moment.
+- *One bet per match, first come.* If two outcomes qualify at the same moment, bet the larger
+  gap. If two books tie on price, take the first in the order DraftKings, FanDuel, BetMGM,
+  BetRivers. Neither happened in the live week.
+- *Stake:* $10 at the book named.
+- *T = 2%,* fixed now. There is no history at these four books' live timing to tune it on.
+  2% sits above the noise in Shin's margin removal and leaves enough bets. **T = 1% is a
+  descriptive shadow** (no bets of its own, never judged), as with the corners' 60% filter.
+
+**When it starts.** `defined_at` = the day Moneyline merges the track. It is backcast from 28
+Oct, when the every-book log began. The backcast is descriptive and never judged. This is a
+documented exception to the 14 Oct convention: there is no every-book data before 28 Oct.
+
+**How it is judged.**
+- *Measure:* CLV per bet = entry price × Pinnacle's Shin-fair close for the same outcome − 1.
+  The close is the every-book log's last Pinnacle quote before kickoff; a trade without one
+  has no CLV and is counted as missing.
+- *Pass:* the 95% range of mean CLV is above 0 (matches resampled, 2,000 draws, seed 0), on at
+  least 300 bets opened from `defined_at`, read once at 300.
+- ROI is reported, not judged.
+
+**Counts from the live week** (28 Oct–5 Nov, 138 matches in the nine live competitions; prices
+only):
+
+| T | Matches that qualify | BetRivers | BetMGM | FanDuel | DraftKings | A day |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1% (shadow) | 32 (23%) | 18 | 12 | 2 | 0 | 3.9 |
+| 2% (judged) | 19 (14%) | 14 | 3 | 2 | 0 | 2.3 |
+
+- At 2% the median gap at entry is 2.5%, about 24 hours before kickoff; 12 of 19 bets are away
+  sides and 6 are Champions League matches.
+- **300 bets at 2%** take about 130 days at the live week's rate: around mid-March 2027 if it
+  starts mid-November. International breaks will stretch that. At 1% it would take about 77
+  days.
+- One week is a small sample, so these rates are rough.
+
+**Practical notes.**
+- *Sampling:* the log records a match every 15 minutes near kickoff, but every 3 hours a day
+  out (a median of 170 minutes between logged moments in the live week). The owner may see a
+  gap after it has gone. The paper track records the logged price, and the app should show the
+  price's age.
+- *Limits:* books cut the stakes of accounts that keep beating the sharp price. BetRivers
+  (14 of the 19 bets) would likely limit first. A pass on paper doesn't mean the stakes can be
+  placed at scale.
+- *If approved:* Moneyline builds it after the Understat fix, as the paper track "Line shop vs
+  Pinnacle" in the Moneyline portfolio, with the 1% shadow beside it.
+
+## Residual map: where the model and the market disagree, and who was right (owner via the lead, 5 Nov; exploratory, 0 credits; method written before any run)
+
+**Why.** The owner wants to know whether the match model is missing factors, and to see the
+patterns as shapes (a 3D surface the lead builds in the app from this file). This is a
+**map, not a test**:
+- no verdict, no bets, no pass rule;
+- nothing goes live from it;
+- any pattern it suggests needs its own pre-registration on data it never read.
+
+**Already tested, so not new here** (each is a slice below, but descriptive only):
+- xG form, xG minus goals form, rest days, and the model vs the early price (`docs/edge.md`
+  round 2, "Free signals": none earns blend weight);
+- league, price band, side, favourite, day, kickoff slot, strength gap and Lean's driver as bet
+  filters (the strategy search, 11,857 arms: no strategy found);
+- the model against Pinnacle's early price in eight leagues (bake-offs 1–3: nothing passes).
+What is new is the joint view: where on the price scale, and under which condition, the
+model's disagreement with the market carries information.
+
+**Data.**
+- The eight domestic leagues (E0, SP1, D1, I1, F1, E1, E2, E3), football-data and Understat.
+- Seasons: those `lean_backtest` scores (Pinnacle's early and close both on ≥ 90% of
+  matches), **2019/20–2023/24**. 2024/25 stays locked: it is the strategy search's holdout and
+  the last season Pinnacle prices in full (2025/26 only about half), so it is the clean season
+  for testing anything this map suggests. `lab.harness.Holdout` from 2024-07-01 checks every
+  frame. 2025/26 and 2026/27 are never loaded.
+- Every outcome (home, draw, away) of every match with Pinnacle's full early and close 1X2
+  and a walk-forward model chance: about 16,300 matches and 49,000 rows.
+- Per row: the model's walk-forward chance (Dixon-Coles, weekly refits, xG weight 0.7, goals
+  only in E1–E3, as `lean_backtest`), the blend `p_bet` (`lean_backtest.walk_forward`, 28-day
+  refits, where a fit exists), Pinnacle's Shin-fair early and close chances, and the result.
+
+**The core surface** (the lead's 3D view):
+- x = the market's fair chance at Pinnacle's close; edges 0, 0.10, 0.20, …, 0.70, 1.
+- y = model minus market (the model's chance minus Pinnacle's fair close); edges −∞, −0.10,
+  −0.05, −0.02, +0.02, +0.05, +0.10, +∞.
+- z = won minus the market's chance, averaged in the cell. Positive z = the outcome happened
+  more often than the close said.
+- Read together: in a cell with y > 0 (the model liked the outcome more than the market), z > 0
+  means the model was right, z ≈ 0 the market was.
+- Each cell: n rows, matches, mean x, mean y, win rate, z with a 95% range (2,000 draws
+  resampling matches within the cell, seed 0), and won minus the model's chance. Cells under
+  200 rows are kept and marked `thin`.
+- A second surface uses Pinnacle's **early** price for x, y and z (the price a bet is taken at).
+
+**Slices.** Each is a 2D grid: the factor's levels × five bands of model minus market (the
+close; < −0.05, −0.05 to −0.02, −0.02 to +0.02, +0.02 to +0.05, > +0.05), plus each level's
+total. z is won minus the close in every cell. Every factor is known before kickoff, except
+the price move (marked).
+1. **Side:** home, draw, away.
+2. **League.**
+3. **Month of the season** (Aug … May; June and July folded into one level).
+4. **Rest days difference** (home and away rows): the team's days since its last league match
+   minus the opponent's, each capped at 14 (`lab.features`): ≤ −3, −2 to −1, 0, +1 to +2, ≥ +3.
+   League matches only.
+5. **After a European match** (home and away rows): the team, the opponent, both or neither
+   played a UEFA match (Champions League, Europa League, Conference League, qualifiers
+   included; ESPN, `cup_model.european_events`) one to four days before. Domestic cups are not
+   counted: there is no clean free history of them here.
+6. **xG luck** (home and away rows, the five Understat leagues): over the last 6 league
+   matches, (xG for − xG against) − (goals for − goals against) per game, the team's minus
+   the opponent's: ≤ −0.6, −0.6 to −0.2, −0.2 to +0.2, +0.2 to +0.6, ≥ +0.6. Positive = the
+   team's results have been worse than its chances (luck that may revert in its favour).
+   Needs 3 earlier matches each.
+7. **New to the division, first 10 league matches** (home and away rows): the team was promoted,
+   or relegated from the division above (England only; elsewhere every newcomer is promoted),
+   the opponent is new, both, or neither.
+8. **Price move, early to close** (descriptive only: it is not known when a bet is taken): the
+   outcome's fair close minus its fair early chance: ≤ −0.04, −0.04 to −0.01, −0.01 to +0.01,
+   +0.01 to +0.04, ≥ +0.04.
+9. **Lean's driver** (rows with a blend fit): not a Lean pick; a Lean pick, market-driven; a
+   Lean pick, model-driven (`lean_backtest.bets` at Pinnacle's early price).
+
+**Many cells, so some will look striking by chance.** The file counts the cells with ≥ 200
+rows and how many have a z range that excludes 0; with no real pattern about 5% would. The
+strategy search found 2% of its large rules beating the close under no skill, and its best
+rule was luck (p = 0.94). A cell standing out here is a lead to pre-register, not a finding.
+
+**Output.** `lab/residual_map.json`: `{kind: "residual_map", exploratory: true, seasons,
+leagues, rows, matches, edges, core: {close, early}, slices: {name: {label, levels, bands,
+cells, totals, rows, note}}, factors, multiplicity, note, warning, runs}`. Code
+`lab/residual_map.py`; `odds-check.yml` `task=residual-map` (no key, 0 credits). The file is
+printed in the log (`RESIDUAL_MAP_B64` chunks with its SHA-256) and committed from there.
+
+### Residual map: first file (2026-11-05; `odds-check.yml` `task=residual-map` run 42012978090, 0 credits, no key; the earlier run 42010585832 gave the same rows, before the home-by-league slice and the file check)
+
+**Partial: four leagues of eight, and E0 with xG only in its last two seasons.**
+- **Loaded:** E0, E1, E2 and E3: 9,454 matches and 28,362 outcome rows, 2019/20–2023/24.
+- **Not loaded: SP1, D1, I1 and F1.** No Understat file for 2017/18–2023/24 is reachable from
+  this branch:
+  - the `understat-SP1-`, `-D1-`, `-I1-` and `-F1-` caches are "not found";
+  - the newest `raw-data-` cache (42012653706) doesn't hold them;
+  - Understat itself still answers with its maintenance page (since 2 Nov).
+  The map uses the live model with xG, so these four were not run on goals only.
+- **E0's xG:** the run's file check (`xg_files` in the file) found E0's Understat files for
+  2022/23 and 2023/24 only. With the per-season loading from #178, E0's earlier seasons ran on
+  goals. E0 is the model with xG only for 2022/23–2023/24.
+- The file is rerun with all eight, and E0's full xG, when the Understat files can be had. The
+  2024/25 lock stays.
+- **Europe slice:** 16 of 419 UEFA clubs map to these four leagues, so it is thin: 235 rows
+  "after Europe".
+- **xG luck slice:** Premier League, 2022/23–2023/24 only.
+
+**What is in it.** `lab/residual_map.json` (SHA-256 b026a809…, 85 KB):
+- both core surfaces and ten slices (the nine planned, plus "home sides by league", a check the
+  lead asked for);
+- `factors`, `multiplicity`, `xg_files`, the note and the warning.
+
+**Multiplicity.** 397 cells, 225 with ≥ 200 rows. 14 have a z range that excludes 0, against
+about 11 expected by chance. The cells overlap, so this is a scale, not a test.
+
+**What stands out (descriptive; each is a lead to pre-register, not a finding):**
+- **Home sides the model rates more than 5 points below the close win a little more often than
+  the close says:** 2,463 rows, z = +0.022 (+0.004 to +0.040).
+  - It isn't one league: E0 +0.021, E1 +0.010, E2 +0.032, E3 +0.025, each on 495–682 rows,
+    and no league's range alone excludes 0.
+  - So where the model disagrees most, the market is, if anything, not strong enough in the
+    same direction. That doesn't help the model; it is consistent with the model's known
+    overconfidence (`docs/lab.md` "Price-band edge rule").
+- **Draws the model likes by 2–5 points** win less often than the close says: z = −0.033
+  (−0.057 to −0.009).
+- **Outcomes whose price shortened by 4+ points from early to close** won more than even the
+  close said: z = +0.030. Descriptive only: the move isn't known when a bet is taken.
+- **Promoted sides in their first 10 matches:** −0.034 (254 rows). **Against a newcomer:**
+  +0.038 (480 rows). Both ranges include 0 in the totals.
