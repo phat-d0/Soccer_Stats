@@ -137,6 +137,8 @@ def test_paper_run_keeps_shadows_out_of_the_real_record_and_settles_them(tmp_pat
         "lean",
         "lean_all_odds",
         "lean_dnb",
+        "lineshop",
+        "lineshop_1pct",
         "edge12",
         "edge12_dnb",
     ]

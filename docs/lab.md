@@ -3436,6 +3436,23 @@ only):
 - *If approved:* Moneyline builds it after the Understat fix, as the paper track "Line shop vs
   Pinnacle" in the Moneyline portfolio, with the 1% shadow beside it.
 
+**Implementation notes** (Moneyline, 5 Nov 2026, PR #183; written before any outcome, close or
+CLV was read). They settle what the rule above left open:
+- *`defined_at`* is the first default-branch paper run after the merge (it writes data-log
+  `paper_trades/lineshop_defined.json`), so the merge time to within one publish.
+- *Stale books* are dropped before the best price is chosen: the best price is the best among
+  the shop books whose quote is under 15 minutes old at that moment (a stale book never blocks
+  a fresh one).
+- *Equal gaps* across outcomes go home, then draw, then away.
+- *A logged moment's quotes:* each book's latest row logged at or before the moment (the log
+  keeps only changed quotes); nothing logged later is read.
+- *The read:* only bets whose close is final count (settled, or kickoff over an hour ago); the
+  verdict is computed once, when the first 300 bets opened from `defined_at` (not backcast,
+  voids left out) all have one, and stored with their ids in data-log
+  `paper_trades/lineshop_verdict.json`. It is never recomputed.
+- *The 1% line* has entries of its own (`variant_of: "lineshop"`, `descriptive: true`); it is
+  never judged.
+
 ## Residual map: where the model and the market disagree, and who was right (owner via the lead, 5 Nov; exploratory, 0 credits; method written before any run)
 
 **Why.** The owner wants to know whether the match model is missing factors, and to see the
