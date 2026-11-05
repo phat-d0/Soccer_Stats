@@ -53,6 +53,8 @@ TEAM_NAMES = {
     "Real Valladolid": "Valladolid",
     "SD Huesca": "Huesca",
     "Sporting Gijon": "Sp Gijon",
+    "Racing Santander": "Santander",  # promoted 2026/27 (5 Nov 2026)
+    "Real Oviedo": "Oviedo",  # 2025/26
     # Germany
     "Borussia Dortmund": "Dortmund",
     "Borussia M.Gladbach": "M'gladbach",
@@ -104,21 +106,68 @@ def check_match_json(body: bytes) -> None:
         raise ValueError("JSON that isn't a match")
 
 
-def fetch_season(league: str, start_year: int, raw_dir: Path = RAW_DIR) -> Path:
+# The last good copy of every Understat league file (the `xg-good-` cache,
+# publish.yml): only files that pass check_league_json are ever written here, so a stale
+# raw-data cache holding a maintenance page can't cost the season's xG (5 Nov 2026).
+GOOD_DIR = RAW_DIR.parent / "understat_good"
+
+
+def fetch_season(
+    league: str, start_year: int, raw_dir: Path = RAW_DIR, good_dir: Path | None = None
+) -> Path:
     """Download (and cache) Understat's league-season JSON. Live season refreshes every 12h.
 
     A bad answer (HTML, empty) is never cached: the last good file is kept and used,
-    and a cached file that isn't good league JSON is fetched again.
+    and a cached file that isn't good league JSON is fetched again. `good_dir` (GOOD_DIR
+    for the default raw folder) holds the last good copy of each file: a missing or bad
+    cached file is replaced by it before the refresh, and every good file is mirrored
+    into it.
     """
     us_league = LEAGUES[league]
-    return _fetch(
+    path = raw_dir / f"understat_{us_league}_{start_year}.json"
+    good = good_dir if good_dir is not None else (GOOD_DIR if raw_dir == RAW_DIR else None)
+    if good is not None:
+        restore_good(path, Path(good))
+    out = _fetch(
         URL.format(league=us_league, season=start_year),
-        raw_dir / f"understat_{us_league}_{start_year}.json",
+        path,
         max_age_hours=12 if start_year >= current_season() else None,
         headers=HEADERS,
         stale_ok=True,
         validate=check_league_json,
     )
+    if good is not None:
+        keep_good(out, Path(good))
+    return out
+
+
+def restore_good(path: Path, good_dir: Path) -> bool:
+    """Put the last good copy (mtime kept) over a missing or bad cached league file;
+    True when it did."""
+    import shutil
+
+    copy = good_dir / path.name
+    if (path.exists() and _good(path)) or not copy.exists() or not _good(copy):
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(copy, path)
+    STALE.append(f"{path.name} (restored from the last good copy)")
+    return True
+
+
+def keep_good(path: Path, good_dir: Path) -> bool:
+    """Mirror a good league file into `good_dir` when its copy there is missing or older;
+    a bad file is never written. True when it copied."""
+    import shutil
+
+    copy = good_dir / path.name
+    if not path.exists() or not _good(path):
+        return False
+    if copy.exists() and copy.stat().st_mtime >= path.stat().st_mtime:
+        return False
+    good_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, copy)
+    return True
 
 
 def parse_season(data: dict | list) -> pd.DataFrame:

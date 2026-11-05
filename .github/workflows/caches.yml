@@ -91,6 +91,7 @@ jobs:
           - { name: inplay-probe, prefix: inplay-probe-, paid: true, path: "data/raw/inplay_probe" }
           # Free (rebuilt from public sources, but slowly).
           - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
+          - { name: xg-good, prefix: xg-good-, paid: false, path: "data/understat_good" }
           - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
           - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }
           - { name: espn-timelines, prefix: espn-timelines-, paid: false, path: "data/raw/espn_timelines" }

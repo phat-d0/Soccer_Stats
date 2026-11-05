@@ -159,7 +159,8 @@ TEAM_NAMES = {
     "Málaga": "Malaga",
     "Rayo Vallecano": "Vallecano",
     "Real Betis": "Betis",
-    "Real Racing Club de Santander": "Racing Santander",
+    "Real Racing Club de Santander": "Santander",  # football-data's name (5 Nov 2026)
+    "Racing Santander": "Santander",
     "Real Sociedad": "Sociedad",
     # Germany
     "1. FC Köln": "FC Koln",

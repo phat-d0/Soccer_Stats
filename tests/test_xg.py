@@ -238,3 +238,146 @@ def test_repair_copies_only_good_old_files_over_bad_current_ones(tmp_path, seaso
     }
     assert rows["understat_Serie_A_2026.json"]["action"] == "old_bad"
     assert rows["understat_Ligue_1_2026.json"]["action"] == "copied"
+
+
+# Every club in each xG league's 2026/27 Understat file (titles from the cached files,
+# odds-check task=understat, 5 Nov 2026) and football-data's name for it (as on the cards).
+CURRENT_CLUBS = {
+    "E0": {
+        "Arsenal": "Arsenal", "Aston Villa": "Aston Villa", "Bournemouth": "Bournemouth",
+        "Brentford": "Brentford", "Brighton": "Brighton", "Chelsea": "Chelsea",
+        "Coventry": "Coventry", "Crystal Palace": "Crystal Palace", "Everton": "Everton",
+        "Fulham": "Fulham", "Hull": "Hull", "Ipswich": "Ipswich", "Leeds": "Leeds",
+        "Liverpool": "Liverpool", "Manchester City": "Man City",
+        "Manchester United": "Man United", "Newcastle United": "Newcastle",
+        "Nottingham Forest": "Nott'm Forest", "Sunderland": "Sunderland",
+        "Tottenham": "Tottenham",
+    },
+    "SP1": {
+        "Alaves": "Alaves", "Athletic Club": "Ath Bilbao", "Atletico Madrid": "Ath Madrid",
+        "Barcelona": "Barcelona", "Celta Vigo": "Celta", "Deportivo La Coruna": "La Coruna",
+        "Elche": "Elche", "Espanyol": "Espanol", "Getafe": "Getafe", "Levante": "Levante",
+        "Malaga": "Malaga", "Osasuna": "Osasuna", "Racing Santander": "Santander",
+        "Rayo Vallecano": "Vallecano", "Real Betis": "Betis", "Real Madrid": "Real Madrid",
+        "Real Sociedad": "Sociedad", "Sevilla": "Sevilla", "Valencia": "Valencia",
+        "Villarreal": "Villarreal",
+    },
+    "D1": {
+        "Augsburg": "Augsburg", "Bayer Leverkusen": "Leverkusen",
+        "Bayern Munich": "Bayern Munich", "Borussia Dortmund": "Dortmund",
+        "Borussia M.Gladbach": "M'gladbach", "Eintracht Frankfurt": "Ein Frankfurt",
+        "Elversberg": "Elversberg", "FC Cologne": "FC Koln", "Freiburg": "Freiburg",
+        "Hamburger SV": "Hamburg", "Hoffenheim": "Hoffenheim", "Mainz 05": "Mainz",
+        "Paderborn": "Paderborn", "RasenBallsport Leipzig": "RB Leipzig",
+        "Schalke 04": "Schalke 04", "Union Berlin": "Union Berlin",
+        "VfB Stuttgart": "Stuttgart", "Werder Bremen": "Werder Bremen",
+    },
+    "I1": {
+        "AC Milan": "Milan", "Atalanta": "Atalanta", "Bologna": "Bologna",
+        "Cagliari": "Cagliari", "Como": "Como", "Fiorentina": "Fiorentina",
+        "Frosinone": "Frosinone", "Genoa": "Genoa", "Inter": "Inter", "Juventus": "Juventus",
+        "Lazio": "Lazio", "Lecce": "Lecce", "Monza": "Monza", "Napoli": "Napoli",
+        "Parma Calcio 1913": "Parma", "Roma": "Roma", "Sassuolo": "Sassuolo",
+        "Torino": "Torino", "Udinese": "Udinese", "Venezia": "Venezia",
+    },
+    "F1": {
+        "Angers": "Angers", "Auxerre": "Auxerre", "Brest": "Brest", "Le Havre": "Le Havre",
+        "Le Mans": "Le Mans", "Lens": "Lens", "Lille": "Lille", "Lorient": "Lorient",
+        "Lyon": "Lyon", "Marseille": "Marseille", "Monaco": "Monaco", "Nice": "Nice",
+        "Paris FC": "Paris FC", "Paris Saint Germain": "Paris SG", "Rennes": "Rennes",
+        "Strasbourg": "Strasbourg", "Toulouse": "Toulouse", "Troyes": "Troyes",
+    },
+}  # fmt: skip
+
+
+def test_every_current_club_in_each_xg_league_maps_to_football_data():
+    from soccer_stats.xg import LEAGUES, TEAM_NAMES
+
+    assert set(CURRENT_CLUBS) == set(LEAGUES)
+    for league, clubs in CURRENT_CLUBS.items():
+        assert len(clubs) == (18 if league in ("D1", "F1") else 20), league
+        ours = [TEAM_NAMES.get(t, t) for t in clubs]
+        assert ours == list(clubs.values()), league
+        assert len(set(ours)) == len(ours), league  # no two clubs onto one name
+    assert TEAM_NAMES["Real Oviedo"] == "Oviedo"  # La Liga 2025/26, still in the fit window
+
+
+def test_the_odds_feed_sends_racing_santander_to_football_datas_name():
+    from soccer_stats.odds_feed import _team
+
+    assert _team("Real Racing Club de Santander") == "Santander"
+    assert _team("Racing Santander") == "Santander"
+
+
+def test_a_stale_raw_cache_with_the_maintenance_page_recovers_from_the_good_copy(
+    tmp_path, monkeypatch, season_json
+):
+    """The 5 Nov race: a publish restored a raw-data cache saved before the repair (its
+    2026/27 file is the maintenance page) while Understat is still down. The good-copy
+    folder brings the season back."""
+    from soccer_stats import data
+    from soccer_stats.xg import fetch_season
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    good.mkdir()
+    name = "understat_EPL_2026.json"
+    (raw / name).write_bytes(MAINTENANCE)
+    (good / name).write_text(json.dumps(season_json))
+    _serve(monkeypatch, MAINTENANCE)
+    monkeypatch.setattr(data, "STALE", [])
+    monkeypatch.setattr("soccer_stats.xg.STALE", data.STALE)
+    monkeypatch.setattr("soccer_stats.xg.current_season", lambda: 2026)
+
+    path = fetch_season("E0", 2026, raw, good_dir=good)
+    assert json.loads(path.read_text()) == season_json
+    assert any("restored from the last good copy" in s for s in data.STALE)
+
+
+def test_only_good_files_reach_the_good_copy_and_newer_ones_replace_it(
+    tmp_path, monkeypatch, season_json
+):
+    import os
+
+    from soccer_stats.data import BadResponse
+    from soccer_stats.xg import fetch_season, keep_good
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    name = "understat_EPL_2024.json"
+    # A good download is mirrored.
+    _serve(monkeypatch, json.dumps(season_json).encode())
+    fetch_season("E0", 2024, raw, good_dir=good)
+    assert json.loads((good / name).read_text()) == season_json
+    # A bad file never is: nothing good anywhere, so the season fails and good stays empty.
+    _serve(monkeypatch, MAINTENANCE)
+    with pytest.raises(BadResponse):
+        fetch_season("E0", 2025, raw, good_dir=good)
+    assert not (good / "understat_EPL_2025.json").exists()
+    assert not keep_good(raw / "understat_EPL_2025.json", good)
+    # A newer good raw file replaces an older copy; an older one doesn't.
+    newer = {"dates": season_json["dates"][:1]}
+    (raw / name).write_text(json.dumps(newer))
+    later = (good / name).stat().st_mtime + 60
+    os.utime(raw / name, (later, later))
+    assert keep_good(raw / name, good)
+    assert json.loads((good / name).read_text()) == newer
+    os.utime(raw / name, (later - 3600, later - 3600))
+    assert not keep_good(raw / name, good)
+
+
+def test_a_good_raw_file_is_never_replaced_by_the_copy(tmp_path, season_json):
+    from soccer_stats.xg import restore_good
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    good.mkdir()
+    name = "understat_EPL_2026.json"
+    mine = {"dates": season_json["dates"][:2]}
+    (raw / name).write_text(json.dumps(mine))
+    (good / name).write_text(json.dumps(season_json))
+    assert not restore_good(raw / name, good)
+    assert json.loads((raw / name).read_text()) == mine
+    (good / name).write_bytes(MAINTENANCE)  # a bad copy is never used either
+    (raw / name).unlink()
+    assert not restore_good(raw / name, good)

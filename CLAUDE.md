@@ -104,7 +104,11 @@ False`, so no player paper trades open.
 goals-only from 2 Nov (13 trades with `model_ref.xg_weight` 0). Fixed: bad answers are never
 cached, each season loads alone, and the good 2026/27 files (through 1 Nov) come back from the
 raw-data cache of 2 Nov 00:50 (`odds-check.yml` `task=understat-restore`, `restore_key`
-41369190298). Matches since then use goals until Understat returns; the cache heals itself then.
+41369190298; restored 5 Nov, rerun 10:20 after a publish's older cache won a race). Matches
+since then use goals until Understat returns; the cache heals itself then. Since 5 Nov the
+`xg-good-` cache keeps the last good copy of every league file (`xg.GOOD_DIR`), so a stale
+raw-data cache can't lose the season again. Promoted clubs map: "Racing Santander" → Santander,
+"Real Oviedo" → Oviedo (`tests/test_xg.py` lists every 2026/27 club per xG league).
 
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
@@ -274,7 +278,7 @@ on 4 Nov; trigger ids):
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
 
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
-- Caches: `raw-data-*` (Understat), `odds-history-*`, `player-odds-history-*`,
+- Caches: `raw-data-*` (Understat), `xg-good-*` (the last good Understat league files), `odds-history-*`, `player-odds-history-*`,
   `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
   delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones
@@ -341,6 +345,10 @@ on 4 Nov; trigger ids):
   `check_league_json` (JSON with a `dates` list, not HTML; `player_data.fetch_match` uses
   `check_match_json`), `stale_ok`. `with_xg` loads each league-season on its own: a missing
   season costs only its matches (goals there) and the error names it and any stale file.
+  `GOOD_DIR` (`data/understat_good`, cache `xg-good-` in publish.yml, saved under a key of the
+  files' hash): `fetch_season` puts its copy over a missing or bad cached file
+  (`restore_good`) and mirrors every good file into it (`keep_good`); only files passing
+  `check_league_json` are ever written there. Used for the default raw folder only.
   `probe` (CLI `understat-probe`, `odds-check.yml` `task=understat`, also lists the raw-data
   caches held) and `repair_from` (CLI `understat-repair`, `task=understat-restore` with
   `restore_key` = an older raw-data cache's run id: good league files copied over bad ones,
