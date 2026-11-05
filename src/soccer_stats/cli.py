@@ -605,6 +605,24 @@ def espn_settlement(
         return None
 
 
+def cmd_bet_alerts(args: argparse.Namespace) -> None:
+    """Phone alerts for this run's new Blend Lean and DraftKings-corner (under 60%) trades;
+    off without the secrets, and it never fails the publish."""
+    from . import bet_alerts
+
+    try:
+        if args.test:
+            res = bet_alerts.send_test()
+        elif not args.log_dir:
+            res = {"line": "Bet alerts: skipped (no --log-dir)"}
+        else:
+            res = bet_alerts.run(Path(args.log_dir), Path(args.state) if args.state else None)
+    except Exception as e:  # noqa: BLE001 - alerts must never stop the publish
+        print(f"Bet alerts: skipped ({type(e).__name__})")
+        return
+    print(res["line"])
+
+
 def cmd_paper(args: argparse.Namespace) -> None:
     import json
 
@@ -3366,6 +3384,18 @@ def main(argv: list[str] | None = None) -> None:
     pap.add_argument("--log-dir", help="data-log checkout holding paper_trades/")
     pap.add_argument("--league", default="E0")
     pap.set_defaults(func=cmd_paper)
+
+    ba = sub.add_parser(
+        "bet-alerts",
+        help="send a phone alert for each new lead-strategy paper trade (needs ALERT_URL "
+        "and ALERT_TOKEN; never fails)",
+    )
+    ba.add_argument("--log-dir", help="data-log checkout, after `paper`")
+    ba.add_argument(
+        "--test", action="store_true", help="send one test alert to every subscribed phone"
+    )
+    ba.add_argument("--state", help="sent-ids file outside the checkout, kept across retries")
+    ba.set_defaults(func=cmd_bet_alerts)
 
     bf = sub.add_parser("backfill-odds", help="download historical DraftKings odds (paid plan)")
     bf.add_argument("--league", default="E0")
