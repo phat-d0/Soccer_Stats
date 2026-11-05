@@ -1087,8 +1087,10 @@ on 4 Nov; trigger ids):
   month, rest days, after a UEFA match (`load_europe`, ESPN), xG luck, new to the division,
   price move (descriptive) and Lean's driver; `multiplicity`, `NOTE`, `WARNING`.
   `odds-check.yml` `task=residual-map` prints the file as `RESIDUAL_MAP_B64` chunks with its
-  SHA-256; the committed `lab/residual_map.json` is that text (run 42010585832: E0, E1–E3 only,
-  the other four wait for Understat). The lead builds the owner's 3D view from it.
+  SHA-256; the committed `lab/residual_map.json` is that text (run 42012978090: E0, E1–E3 only,
+  E0 with xG for 2022/23–2023/24 only; the other four wait for Understat files). `xg_status`
+  prints each Understat league-season file as ok, missing or bad; a tenth slice splits home
+  sides by league. The lead builds the owner's 3D view from it.
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.

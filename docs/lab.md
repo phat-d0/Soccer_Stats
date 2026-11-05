@@ -3390,34 +3390,44 @@ cells, totals, rows, note}}, factors, multiplicity, note, warning, runs}`. Code
 `lab/residual_map.py`; `odds-check.yml` `task=residual-map` (no key, 0 credits). The file is
 printed in the log (`RESIDUAL_MAP_B64` chunks with its SHA-256) and committed from there.
 
-### Residual map: first file (2026-11-05; `odds-check.yml` `task=residual-map` run 42010585832, 0 credits, no key)
+### Residual map: first file (2026-11-05; `odds-check.yml` `task=residual-map` run 42012978090, 0 credits, no key; the earlier run 42010585832 gave the same rows, before the home-by-league slice and the file check)
 
-**Partial: four leagues of eight.** E0, E1, E2 and E3 loaded: 9,454 matches and 28,362 outcome
-rows, 2019/20–2023/24. SP1, D1, I1 and F1 have no readable Understat file for any of these
-seasons in the caches (each answers with Understat's maintenance page, which it has served
-since 2 Nov). The map uses the live model with xG, so those four were not run on goals only.
-The file is rerun with all eight when Understat is back, and the 2024/25 lock stays.
+**Partial: four leagues of eight, and E0 with xG only in its last two seasons.**
+- **Loaded:** E0, E1, E2 and E3: 9,454 matches and 28,362 outcome rows, 2019/20–2023/24.
+- **Not loaded: SP1, D1, I1 and F1.** No Understat file for 2017/18–2023/24 is reachable from
+  this branch:
+  - the `understat-SP1-`, `-D1-`, `-I1-` and `-F1-` caches are "not found";
+  - the newest `raw-data-` cache (42012653706) doesn't hold them;
+  - Understat itself still answers with its maintenance page (since 2 Nov).
+  The map uses the live model with xG, so these four were not run on goals only.
+- **E0's xG:** the run's file check (`xg_files` in the file) found E0's Understat files for
+  2022/23 and 2023/24 only. With the per-season loading from #178, E0's earlier seasons ran on
+  goals. E0 is the model with xG only for 2022/23–2023/24.
+- The file is rerun with all eight, and E0's full xG, when the Understat files can be had. The
+  2024/25 lock stays.
 - **Europe slice:** 16 of 419 UEFA clubs map to these four leagues, so it is thin: 235 rows
   "after Europe".
-- **xG luck slice:** Premier League only.
+- **xG luck slice:** Premier League, 2022/23–2023/24 only.
 
-**What is in it.** `lab/residual_map.json` (SHA-256 f2691382…, 76 KB): both core surfaces,
-the nine slices, `factors`, `multiplicity`, the note and the warning.
+**What is in it.** `lab/residual_map.json` (SHA-256 b026a809…, 85 KB):
+- both core surfaces and ten slices (the nine planned, plus "home sides by league", a check the
+  lead asked for);
+- `factors`, `multiplicity`, `xg_files`, the note and the warning.
 
-**Multiplicity.** 357 cells, 205 with ≥ 200 rows. 14 of the 205 have a z range that excludes
-0, against about 10 expected by chance. The cells overlap, so this is a scale, not a test.
+**Multiplicity.** 397 cells, 225 with ≥ 200 rows. 14 have a z range that excludes 0, against
+about 11 expected by chance. The cells overlap, so this is a scale, not a test.
 
 **What stands out (descriptive; each is a lead to pre-register, not a finding):**
-- Where the model rates an outcome more than 5 points *below* the close, the outcome wins a
-  little *more* often than the close says. This holds for home sides: 2,462 rows, z = +0.022
-  (+0.003 to +0.041). It shows in several slices, because they share these rows.
-- So when the model disagrees most, the market is, if anything, not strong enough in the same
-  direction. That doesn't help the model, but it is consistent with the model's known
-  overconfidence (`docs/lab.md` "Price-band edge rule").
-- Draws the model likes by 2–5 points win less than the close says: 1,084 rows, z = −0.033
+- **Home sides the model rates more than 5 points below the close win a little more often than
+  the close says:** 2,463 rows, z = +0.022 (+0.004 to +0.040).
+  - It isn't one league: E0 +0.021, E1 +0.010, E2 +0.032, E3 +0.025, each on 495–682 rows,
+    and no league's range alone excludes 0.
+  - So where the model disagrees most, the market is, if anything, not strong enough in the
+    same direction. That doesn't help the model; it is consistent with the model's known
+    overconfidence (`docs/lab.md` "Price-band edge rule").
+- **Draws the model likes by 2–5 points** win less often than the close says: z = −0.033
   (−0.057 to −0.009).
-- Outcomes whose price shortened by 4+ points from the early price to the close won more than
-  even the close said: 1,315 rows, z = +0.030 overall. This is descriptive only: the move
-  isn't known when a bet is taken.
-- Promoted sides in their first 10 matches: −0.034 (254 rows); against a newcomer: +0.038
-  (480 rows). Both ranges include 0 in the totals.
+- **Outcomes whose price shortened by 4+ points from early to close** won more than even the
+  close said: z = +0.030. Descriptive only: the move isn't known when a bet is taken.
+- **Promoted sides in their first 10 matches:** −0.034 (254 rows). **Against a newcomer:**
+  +0.038 (480 rows). Both ranges include 0 in the totals.
