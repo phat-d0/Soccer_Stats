@@ -741,3 +741,4 @@
 {"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-03T06:41:35+00:00","close_odds":2.6,"close_prices":{"home":2.6,"draw":3.6,"away":2.45},"close_fetched_at":"2026-11-03T06:36:54+00:00","close_minutes_before":2228.1,"clv_dk":-0.06242757385818176,"beat_close_dk":false}
 {"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-03T06:41:35+00:00","pinnacle_live_close_prices":{"home":2.61,"draw":3.67,"away":2.52},"pinnacle_live_fetched_at":"2026-11-03T06:37:34+00:00","pinnacle_live_minutes_before":2227.4,"clv_pinnacle_live":-0.050386585041343745}
 {"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-04T22:01:00+00:00","status":"won","score":"2-0","profit":16.0,"clv_pinnacle":null,"settled_at":"2026-11-04T22:01:00+00:00","result_source":"espn"}
+{"type":"update","id":"E2|2627|Oxford|Reading","at":"2026-11-05T23:42:06+00:00","result_check":"ok","check_score":"2-0","clv_pinnacle":-0.11562056769608242}
