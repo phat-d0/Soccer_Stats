@@ -144,7 +144,9 @@ def test_the_backcast_flag_and_one_trade_per_match_and_track():
     assert a["backcast"] is True and a["backcast_from"] == "books_log"
     b = ids["E0|2627|Chelsea|Spurs|lineshop"]
     assert not b.get("backcast")
-    assert ids["E0|2627|Arsenal|Leeds|lineshop1"]["shadow"] is True
+    shadow = ids["E0|2627|Arsenal|Leeds|lineshop1"]
+    assert shadow["variant_of"] == ls.KEY and shadow["descriptive"] is True
+    assert "shadow" not in shadow  # the app reads `shadow` as "no trade opened" (Lean's)
     assert a["book"] == "betrivers" and a["book_name"] == "BetRivers"
     assert a["price_age_min"] == 1.0 and a["pinnacle_age_min"] == 1.0
     assert a["model_p"] == pytest.approx(fair_home(), abs=1e-4) == a["pinnacle_fair"]
@@ -220,17 +222,50 @@ def test_sections_follow_blend_lean_with_the_shadow_and_stay_out_of_the_totals()
     assert live["summary"]["trades"] == 0 and len(live["lineshop_trades"]) == len(trades)
 
 
-def test_the_judged_read_waits_for_300_bets():
-    def bet(i, clv):
-        return {"id": f"E0|2627|H{i}|A{i}|lineshop", "opened_at": "2026-11-10T00:00:00+00:00",
-                "clv_pinnacle": clv}  # fmt: skip
+DEFINED = "2026-11-06T00:00:00+00:00"
+KO = "2026-11-10T15:00:00+00:00"
 
-    few = ls.judged([bet(i, 0.02) for i in range(299)], "2026-11-06T00:00:00+00:00")
-    assert few["verdict"] is None and "clv" not in few
-    many = ls.judged(
-        [bet(i, 0.02 + i % 3 * 0.001) for i in range(300)], "2026-11-06T00:00:00+00:00"
+
+def bet(i, clv, kickoff=KO, status="open", opened="2026-11-08T00:00:00+00:00"):
+    return {"id": f"E0|2627|H{i}|A{i}|lineshop", "opened_at": opened, "kickoff": kickoff,
+            "status": status, "clv_pinnacle": clv}  # fmt: skip
+
+
+def test_an_interim_close_never_counts():
+    """Before kickoff the close is the newest quote so far (right after entry: the entry gap,
+    at least 2%), so no verdict is read until the first 300 bets' closes are final."""
+    before = pd.Timestamp("2026-11-10T12:00:00", tz="UTC")
+    many = [bet(i, 0.025) for i in range(300)]
+    r = ls.judged(many, DEFINED, before)
+    assert r["verdict"] is None and "clv" not in r
+    assert r["bets"] == 300 and r["final"] == 0
+    # Kicked off, but under an hour ago: still not final.
+    assert (
+        ls.judged(many, DEFINED, pd.Timestamp("2026-11-10T15:30:00", tz="UTC"))["verdict"] is None
     )
-    assert many["verdict"] == "pass" and many["clv_ci95"][0] > 0 and many["read"] == 300
+    # One of the first 300 still to kick off holds the read back.
+    late = [*many[:299], bet(299, 0.025, kickoff="2026-11-20T15:00:00+00:00")]
+    after = pd.Timestamp("2026-11-11T00:00:00", tz="UTC")
+    assert ls.judged(late, DEFINED, after)["verdict"] is None
+    # Backcast and voided bets are never part of it.
+    extra = [{**bet(900 + i, 0.5), "backcast": True} for i in range(5)]
+    voids = [bet(950, None, status="void")]
+    r = ls.judged([*many, *extra, *voids], DEFINED, after)
+    assert r["verdict"] == "pass" and r["read"] == 300 and r["clv"] == pytest.approx(0.025)
+
+
+def test_the_verdict_is_frozen_once_written(tmp_path):
+    after = pd.Timestamp("2026-11-11T00:00:00", tz="UTC")
+    vals = [bet(i, 0.02 + i % 3 * 0.001) for i in range(300)]
+    first = ls.judged(vals, DEFINED, after, tmp_path)
+    assert first["verdict"] == "pass" and first["frozen"]
+    rec = json.loads((tmp_path / "paper_trades" / ls.VERDICT_FILE).read_text())
+    assert len(rec["trades"]) == 300 and rec["read_at"] == after.isoformat(timespec="seconds")
+    # Later closes or bets change nothing: the stored read is returned as it is.
+    worse = [{**t, "clv_pinnacle": -0.5} for t in vals] + [bet(400, -0.9)]
+    again = ls.judged(worse, DEFINED, after + pd.Timedelta(days=30), tmp_path)
+    assert again["verdict"] == "pass" and again["clv"] == first["clv"] and again["frozen"]
+    assert "trades" not in again
 
 
 def test_defined_at_is_not_written_without_a_books_log(tmp_path):

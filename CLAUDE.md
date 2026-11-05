@@ -457,9 +457,10 @@ on 4 Nov; trigger ids):
     "lineshop", `portfolio` moneyline, `strategy`, `book`, `book_name`, `gap` (= `edge`),
     `pinnacle_fair` (= `model_p`, Kelly's chance), `pinnacle_fair_prices`,
     `pinnacle_entry_prices`, `pinnacle_fetched_at`, `pinnacle_age_min`, `entry_prices` (the
-    book's 1X2), `price_age_min` (logged_at − the book's last_update), `logged_at`; the shadow
-    adds `shadow`, `variant_of`; a moment before `defined_at` is marked backcast
-    (`backcast_from` "books_log").
+    book's 1X2), `price_age_min` (logged_at − the book's last_update), `logged_at`; the 1%
+    line adds `variant_of`, `descriptive: true` (never `shadow`, which the app reads as Lean's
+    "no trade opened"); a moment before `defined_at` is marked backcast (`backcast_from`
+    "books_log").
   - `update_ledger(ledger, books, results, now, league, defined, espn, fixtures)`: opens, closes
     (`close_*`, `clv_pinnacle`, `beat_close_pinnacle` from Pinnacle's last logged quote;
     `book_close_*`, `clv_book` from the entry book's), settles as the match trades
@@ -468,8 +469,12 @@ on 4 Nov; trigger ids):
   - `sections(trades, defined, now)`: `paper.strategy_section` for each track (rule
     `clv_field` "clv_pinnacle", `p_source` "pinnacle_fair") plus `defined_at`, `note`,
     `age_note`, `books` (trades per book), `lineshop_trades`, `backcast` (`backcast.block`
-    from 28 Oct with `exception`); the main line adds `judged` (`judged`: `{since, target 300,
-    bets, with_close, verdict}`, the CLV range only once 300 are in), the shadow `variant_of`
+    from 28 Oct with `exception`); the main line adds `judged` (`judged(trades, defined, now,
+    log_dir)`: `{since, target 300, bets, final, verdict}`; the first 300 bets from `defined_at`
+    (not backcast, no voids) are read only once every one has a final close (`_final`: settled,
+    or kickoff over `FINAL_AFTER` 1 h ago), then stored in data-log
+    `paper_trades/lineshop_verdict.json` with their ids and never recomputed: `frozen`,
+    `read`, `read_at`, `clv`, `clv_ci95`, `missing`), the shadow `variant_of`
     "lineshop", `adds` "threshold", `compare` (descriptive). `paper._run_lineshop` runs it
     after the DNB tracks (a failure costs only the track); `portfolios_section(lineshop=)`
     puts both sections right after Blend Lean's and the trades in Moneyline's live

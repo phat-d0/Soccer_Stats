@@ -262,6 +262,9 @@ def first_entries(
     latest row logged at or before the moment, so nothing later is ever read."""
     if books is None or books.empty or "logged_at" not in books:
         return []
+    # A match is (home, away, kickoff as logged): a corrected kickoff starts a new group
+    # without the earlier quotes, so its first moment needs fresh quotes of its own (the
+    # trade id, one per match, still keeps a second entry out).
     groups: dict[tuple, list[dict]] = {}
     for r in _records(books):
         groups.setdefault((r["home"], r["away"], r["kickoff"]), []).append(r)
@@ -342,8 +345,8 @@ def new_trade(e: dict, league: str, defined: pd.Timestamp) -> dict:
         price_age_min=_r(_age(moment, row), 1),
         logged_at=moment.isoformat(timespec="seconds"),
     )
-    if key == SHADOW_KEY:
-        t.update(shadow=True, variant_of=KEY)
+    if key == SHADOW_KEY:  # a descriptive variant with entries of its own, never judged
+        t.update(variant_of=KEY, descriptive=True)
     if moment < defined:
         bc.mark(t)
         t["backcast_from"] = BACKCAST_FROM
@@ -511,53 +514,100 @@ def _opened_from(trades: list[dict], since: pd.Timestamp) -> list[dict]:
     return out
 
 
-def judged(trades: list[dict], defined: str) -> dict:
-    """The pre-registered read: bets opened from defined_at, of JUDGE_BETS; the mean CLV vs
-    Pinnacle's close and its 95% range (matches resampled, 2,000 draws, seed 0) only once
-    JUDGE_BETS are in, read once; a bet without a Pinnacle close counts as missing."""
+VERDICT_FILE = "lineshop_verdict.json"
+# A close counts as final an hour after kickoff: by then no quote from before kickoff can
+# still be logged (log-odds skips quotes at or after kickoff).
+FINAL_AFTER = pd.Timedelta(hours=1)
+
+
+def _final(t: dict, now: pd.Timestamp) -> bool:
+    """A judged trade's close is final: settled won/lost, or its kickoff over FINAL_AFTER
+    ago (before kickoff the ledger's close is the newest quote so far, which right after
+    entry equals the entry gap). Voids are never final."""
+    if t.get("status") == "void":
+        return False
+    if t.get("status") in ("won", "lost"):
+        return True
+    try:
+        return _utc(t["kickoff"]) <= now - FINAL_AFTER
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _judged_pool(trades: list[dict], defined: str) -> list[dict]:
+    """The bets the read counts: opened from defined_at, not backcast, not voided (a moved
+    match refunds), oldest first."""
     since = _utc(defined)
     mine = [t for t in _opened_from(trades, since) if not t.get("backcast")]
-    out = {
-        "since": defined,
-        "target": JUDGE_BETS,
-        "bets": len(mine),
-        "with_close": sum(1 for t in mine if t.get("clv_pinnacle") is not None),
-        "verdict": None,
-        "note": (
-            f"Read once at {JUDGE_BETS} bets opened from the start: the 95% range of mean CLV "
-            "against Pinnacle's close must sit above 0. Until then only the count is shown."
-        ),
-    }
-    if len(mine) < JUDGE_BETS:
-        return out
-    first = sorted(mine, key=lambda t: str(t["opened_at"]))[:JUDGE_BETS]
-    vals = [
-        (t["id"].rsplit("|", 1)[0], t["clv_pinnacle"])
-        for t in first
-        if t.get("clv_pinnacle") is not None
-    ]
+    return sorted((t for t in mine if t.get("status") != "void"), key=lambda t: str(t["opened_at"]))
+
+
+def _verdict(first: list[dict]) -> dict:
+    """Mean CLV vs Pinnacle's close on `first` and its 95% range (matches resampled, 2,000
+    draws, seed 0); a bet without a close counts as missing."""
+    vals = [(t["id"].rsplit("|", 1)[0], float(t["clv_pinnacle"])) for t in first
+            if t.get("clv_pinnacle") is not None]  # fmt: skip
     if not vals:
-        return {**out, "verdict": "fail", "missing": JUDGE_BETS}
+        return {"verdict": "fail", "missing": len(first), "clv": None, "clv_ci95": None}
     by: dict[str, list[float]] = {}
     for k, v in vals:
-        by.setdefault(k, []).append(float(v))
+        by.setdefault(k, []).append(v)
     groups = list(by.values())
     rng = np.random.default_rng(0)
     means = []
     for _ in range(JUDGE_DRAWS):
         pick = rng.integers(0, len(groups), len(groups))
-        pooled = [v for i in pick for v in groups[i]]
-        means.append(float(np.mean(pooled)))
+        means.append(float(np.mean([v for i in pick for v in groups[i]])))
     lo, hi = np.quantile(means, [0.025, 0.975])
-    mean = float(np.mean([v for _, v in vals]))
     return {
-        **out,
-        "read": JUDGE_BETS,
-        "missing": JUDGE_BETS - len(vals),
-        "clv": mean,
-        "clv_ci95": [float(lo), float(hi)],
         "verdict": "pass" if lo > 0 else "fail",
+        "missing": len(first) - len(vals),
+        "clv": float(np.mean([v for _, v in vals])),
+        "clv_ci95": [float(lo), float(hi)],
     }
+
+
+def judged(
+    trades: list[dict],
+    defined: str,
+    now: pd.Timestamp | None = None,
+    log_dir: Path | None = None,
+) -> dict:
+    """The pre-registered read, once. The first JUDGE_BETS bets opened from defined_at (not
+    backcast, voids left out) are read only when every one of them has a final close
+    (_final); the verdict is then written to paper_trades/lineshop_verdict.json with the
+    trade ids and CLVs it used, and every later call returns that file unchanged (`frozen`).
+    Until then: the count toward JUDGE_BETS (`bets`, `final`) and no CLV."""
+    now = now or pd.Timestamp.now(tz="UTC")
+    out = {
+        "since": defined,
+        "target": JUDGE_BETS,
+        "verdict": None,
+        "note": (
+            f"Read once, when the first {JUDGE_BETS} bets opened from the start all have a "
+            "final close (an hour after kickoff): the 95% range of mean CLV against Pinnacle's "
+            "close must sit above 0. Until then only the count is shown."
+        ),
+    }
+    path = Path(log_dir) / "paper_trades" / VERDICT_FILE if log_dir is not None else None
+    if path is not None and path.exists():
+        try:
+            stored = json.loads(path.read_text())
+            return {**out, **{k: v for k, v in stored.items() if k != "trades"}, "frozen": True}
+        except ValueError:
+            pass
+    pool = _judged_pool(trades, defined)
+    first = pool[:JUDGE_BETS]
+    out.update(bets=len(pool), final=sum(1 for t in pool if _final(t, now)))
+    if len(first) < JUDGE_BETS or not all(_final(t, now) for t in first):
+        return out
+    res = {**_verdict(first), "read": JUDGE_BETS, "read_at": now.isoformat(timespec="seconds")}
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rec = {**res, "since": defined, "trades": [
+            {"id": t["id"], "clv_pinnacle": t.get("clv_pinnacle")} for t in first]}  # fmt: skip
+        path.write_text(json.dumps(rec, indent=1) + "\n")
+    return {**out, **res, "frozen": path is not None}
 
 
 def _clv_mean(trades: list[dict]) -> dict:
@@ -565,7 +615,12 @@ def _clv_mean(trades: list[dict]) -> dict:
     return {"trades": len(vals), "mean": float(np.mean(vals)) if vals else None}
 
 
-def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) -> list[dict]:
+def sections(
+    trades: list[dict],
+    defined: str,
+    now: pd.Timestamp | None = None,
+    read: dict | None = None,
+) -> list[dict]:
     """The track's section (key "lineshop") and its 1% shadow (variant_of "lineshop",
     adds "threshold", no bets of its own) for Moneyline -> live -> strategies:
     paper.strategy_section plus defined_at, note, age_note, `backcast` (backcast.block from
@@ -601,7 +656,7 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
             ),
         )
         if key == KEY:
-            sec["judged"] = judged(mine, defined)
+            sec["judged"] = read if read is not None else judged(mine, defined, now)
         else:
             since = _utc(defined)
             main = [t for t in trades if t.get("strategy") == KEY]
@@ -631,10 +686,10 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
     return out
 
 
-def safe_sections(trades: list[dict], defined: str, now=None) -> list[dict]:
+def safe_sections(trades: list[dict], defined: str, now=None, read=None) -> list[dict]:
     """sections() for display only: a failure costs only this track."""
     try:
-        return sections(trades, defined, now)
+        return sections(trades, defined, now, read)
     except Exception as exc:  # noqa: BLE001
         return [{"key": KEY, "label": LABEL, "defined_at": defined, "error": type(exc).__name__}]
 

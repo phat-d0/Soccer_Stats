@@ -1868,7 +1868,7 @@ def portfolios_section(
                     )
                 if st["key"] == "lean" and lineshop is not None:
                     section["strategies"] += plsh.safe_sections(
-                        lineshop["trades"], lineshop["defined_at"], now
+                        lineshop["trades"], lineshop["defined_at"], now, lineshop.get("judged")
                     )
             section["shadow_trades"] = portfolio_section(shadow_trades or [])["trades"]
             section["dnb_trades"] = portfolio_section(dnb_trades or [])["trades"]
@@ -2241,8 +2241,18 @@ def _run_lineshop(data, log_dir, codes, primary, now, results, espn) -> tuple[in
         )
         trades += list(ledger.values())
     n = plsh.append_events(log_dir, events)
-    print(plsh.summary_line(trades, events) + f"; defined_at {defined}")
-    return n, {"trades": trades, "defined_at": defined}
+    main = [t for t in trades if t.get("strategy") == plsh.KEY]
+    read = plsh.judged(main, defined, now, log_dir if has_books else None)
+    print(
+        plsh.summary_line(trades, events)
+        + f"; defined_at {defined}; judged read: "
+        + (
+            read["verdict"]
+            if read.get("verdict")
+            else f"{read.get('final', 0)} of {plsh.JUDGE_BETS} final"
+        )
+    )
+    return n, {"trades": trades, "defined_at": defined, "judged": read}
 
 
 def _league_rows(df: pd.DataFrame | None, league: str) -> pd.DataFrame | None:
