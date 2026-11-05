@@ -301,6 +301,10 @@ def probe(raw_dir: Path = RAW_DIR, seasons: Iterable[int] | None = None) -> list
         info["json"] = "ok"
         info["keys"] = sorted(data)[:10] if isinstance(data, dict) else "list"
         info["matches"] = len(dates) if isinstance(dates, list) else None
+        teams = data.get("teams") if isinstance(data, dict) else None
+        if isinstance(teams, dict):  # each club's Understat title -> our name
+            titles = sorted({str(t.get("title")) for t in teams.values() if isinstance(t, dict)})
+            info["teams"] = {t: TEAM_NAMES.get(t, t) for t in titles}
         return info
 
     for league, us in LEAGUES.items():
