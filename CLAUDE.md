@@ -68,7 +68,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   trades opened from 23 Oct 08:39 UTC (`trades.SHADOW_DEFINED_AT`), on the matched CLV difference
   vs Pinnacle's close, at the 8 Dec review; no live change unless the owner decides then.
 - In the app (v60, owner, 25 Oct) the two under-60% lines are the main corner strategies and the
-  plain 12% tracks sit in the Archive; every ledger is unchanged.
+  plain 12% tracks sit in the Archive; every ledger is unchanged. Since v71 (owner, 5 Nov: he bets
+  at DraftKings) DraftKings' line leads, in the list and the Archive, and its under-60% line is the
+  portfolio's headline; Pinnacle runs beside it and its close stays the judged CLV.
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -1136,7 +1138,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v70) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v71) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1225,15 +1227,21 @@ on 4 Nov; trigger ids):
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
-  legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
+  legends, readouts and the judged box). Since v71 (owner, 5 Nov) DraftKings leads Team corners:
+  `leadOrder` puts the DraftKings track (and so its under-60% line) before Pinnacle's, in the main
+  list and the Archive (`CORNER_LEAD`, display only; `trades.CORNER_STRATEGY_ORDER` and the
+  ledgers keep Pinnacle first), and with nothing chosen a portfolio opens on its lead
+  (`pfSelected` falls back to `pfLead`). Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
   (`PF_ARCHIVED.moneyline` {keys: edge12, since, note}; its ledger and paper trades unchanged),
   and a draw no bet track goes to the Archive with its parent (`archivedTrack` takes a
   DNB track's `variant_of`), so Moneyline's main list is Blend Lean and Lean's draw no bet track;
   the Archive note joins the old-rule sentence and the portfolio's `PF_ARCHIVED` note. The
-  top-level row's profit counts only active strategies (`activeTrades`: non-archived, non-DNB
-  sections' trades, each once; every trade when a portfolio has no sections), and the note says
-  so. **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
+  top-level row's profit and settled/open counts are the portfolio's lead strategy's
+  (`pfLead`: the first in its list that is not archived, a draw no bet track or a study;
+  `leadTrades`; every trade when a portfolio has no sections): Moneyline = Blend Lean, Team
+  corners = DraftKings under 60%; In-play research keeps its study headline. The meta names it
+  ("Lead: … · 1 more · 2 archived") and the note says "Profit is each portfolio's lead
+  strategy …". **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
   `edge12_dnb` (`adds: "dnb"`, `isDnbStrat`) each get their own row right after their parent in
   the main list (not the Archive), meta "Tracked beside the record · places no bets of its own ·
   a draw returns the stake" and, in place of a backtest line, the 24 Oct backtest's sentence from

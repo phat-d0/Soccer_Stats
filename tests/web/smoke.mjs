@@ -751,8 +751,8 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
-    // The headline counts the active strategies only: Lean's new-rule trades.
+    if (!home.includes("Lead: Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    // The headline is the lead strategy's: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
     await p.click('button[data-pfid="moneyline"]');
@@ -1158,7 +1158,7 @@ const STEPS = [
     if (await p.locator(".crumbs").count()) throw new Error("the Portfolio tab didn't go back to the top");
     if (await p.locator('#view button[data-pfid="goalscorer"]').count()) throw new Error("goalscorer folder should be hidden");
     const text = await p.textContent("#view");
-    for (const w of ["Moneyline", "Team corners", "2 strategies:", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
+    for (const w of ["Moneyline", "Team corners", "Lead: Model (f) vs DraftKings", "1 more", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
   }],
   // A retired portfolio, reached from the "Retired" link: its history, read-only. It has one
   // strategy, so it opens straight on its views.
@@ -1359,7 +1359,17 @@ const STEPS = [
     // The owner archived the two plain 12% tracks (25 Oct): the under-60% lines lead, the
     // tracks they are cut from sit in the Archive list.
     const order = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (order.join(",") !== "pinnacle_below60,draftkings_below60,pinnacle,draftkings") throw new Error(`corner rows: ${order.join(",")}`);
+    // DraftKings leads (owner, 5 Nov: the book he bets), in the main list and the Archive.
+    if (order.join(",") !== "draftkings_below60,pinnacle_below60,draftkings,pinnacle") throw new Error(`corner rows: ${order.join(",")}`);
+    const note = (await p.locator(".pf-head").innerText()).replace(/\s+/g, " ");
+    if (!note.includes("DraftKings is the book the owner bets") || !note.includes("Pinnacle's closing price stays the yardstick")) throw new Error(`corners note: ${note}`);
+    // The top-level row is the lead strategy's: DraftKings under 60%, named in the meta.
+    await pfHome(p);
+    const home = (await p.locator('button[data-pfid="corners"]').innerText()).replace(/\s+/g, " ");
+    const lead = await p.evaluate(() => { const cur = pfById("corners"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "draftkings_below60"), "").trades); return { profit: usd(m.profit, 2), n: m.n }; });
+    if (!home.includes("Lead: Model (f) vs DraftKings: 12% edge, under 60% to win · 1 more · 2 archived") || !home.includes(lead.profit) || !home.includes(`${lead.n} settled`)) throw new Error(`corners home row ${home} vs ${JSON.stringify(lead)}`);
+    if (!(await p.locator('#view p.note:has-text("Profit is each portfolio\'s lead strategy")').count())) throw new Error("home note");
+    await p.click('button[data-pfid="corners"]');
     if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="pinnacle"]').count())) throw new Error("the Pinnacle track isn't archived");
     await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");

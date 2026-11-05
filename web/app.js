@@ -21,7 +21,7 @@ const state = {
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
-  pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the first, Pinnacle)
+  pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the lead, DraftKings under 60%)
   pfStratResearch: "", // In-play research: which study ("" = the first)
   btSource: store.get("btSource", "dk"), // Backtest: "dk" (DraftKings' prices, first when present) or "pin"
   pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
@@ -39,7 +39,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v70";
+const APP_VERSION = "v71";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3194,11 +3194,23 @@ function pfStrategies(cur) {
     // Shadow-filter variants (variant_of) sit directly under their parent, whatever order
     // they arrive in; a variant whose parent is missing is dropped.
     const row = (x) => ({ key: x.key, label: stratLabel(x), st: x, rule: x.rule, variantOf: x.variant_of || null });
-    return [...st.filter((x) => !x.variant_of).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]), ...research];
+    return [...leadOrder(cur, st.filter((x) => !x.variant_of)).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]), ...research];
   }
   const label = cur.id === "corners" ? "Model (f) 12% vs Pinnacle" : cur.name;
   return [{ key: cur.id, label, st: null, rule: cur.live?.rule || (cur.id === "moneyline" ? state.data.portfolio?.rule : null) }];
 }
+// Team corners: the owner bets at DraftKings (5 Nov), so DraftKings' track leads and
+// Pinnacle's runs beside it, in the main list and the Archive alike. Display order only:
+// paper.py keeps tr.CORNER_STRATEGY_ORDER (Pinnacle first) and every ledger as it is.
+const CORNER_LEAD = ["draftkings", "pinnacle"];
+function leadOrder(cur, parents) {
+  if (cur.id !== "corners") return parents;
+  const rank = (x) => { const i = CORNER_LEAD.indexOf(x.key); return i < 0 ? CORNER_LEAD.length : i; };
+  return parents.map((x, i) => [x, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([x]) => x);
+}
+// A portfolio's lead strategy: the first active one in its list (not archived, not a draw no
+// bet track, not a study). Its trades are the portfolio's headline on the top level.
+const pfLead = (strats) => strats.find((x) => x.st && !archivedStrat(x) && !isDnbStrat(x) && !isStudy(x)) || null;
 // A filtered corner line named for what its cut is of (owner, 25 Oct): "Model (f) vs Pinnacle:
 // 12% edge, under 60% to win" = the track's 12%-edge picks that model (f) gives under a 60%
 // chance to win (pushes aside). Anything else keeps paper.py's label.
@@ -3210,7 +3222,8 @@ function stratLabel(x) {
 }
 // Each portfolio keeps its own selection (Moneyline: Lean / 12%; Team corners: the book).
 const pfStratKey = (cur) => (cur?.id === "corners" ? state.pfStratCorners : cur?.id === CB_ID ? state.pfStratResearch : state.pfStrat);
-const pfSelected = (strats, cur = pfCurrent()) => strats.find((x) => x.key === pfStratKey(cur)) || strats[0];
+// With nothing chosen yet, the lead strategy opens (else the first row).
+const pfSelected = (strats, cur = pfCurrent()) => strats.find((x) => x.key === pfStratKey(cur)) || pfLead(strats) || strats[0];
 // A strategy's parent (itself when it isn't a variant) and the variants filed under a parent.
 const pfParent = (strats, x) => (x.variantOf && strats.find((p) => p.key === x.variantOf)) || x;
 const pfVariants = (strats, x) => strats.filter((v) => v.variantOf === x.key);
@@ -3964,14 +3977,11 @@ function pfCrumbs(cur, toPortfolio) {
   return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
 }
 const pfPill = (cur) => (cur.id === CB_ID ? researchPill() : `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`);
-// A portfolio's headline counts its active strategies only (the 1X2 ones: draw no bet tracks
-// and archived rules are left out), each trade once; without strategy sections, every trade.
-function activeTrades(p, st) {
-  const active = st.filter((x) => x.st && !archivedStrat(x) && !isDnbStrat(x));
-  if (!active.length) return p.live?.trades || [];
-  const byId = new Map();
-  for (const x of active) for (const t of strategyLiveSet(p, x, "").trades || []) byId.set(t.id, t);
-  return [...byId.values()];
+// A portfolio's headline is its lead strategy's trades (owner, 5 Nov: Moneyline = Blend Lean,
+// Team corners = DraftKings under 60%); without strategy sections, every trade.
+function leadTrades(p, st) {
+  const lead = pfLead(st);
+  return lead ? strategyLiveSet(p, lead, "").trades || [] : p.live?.trades || [];
 }
 function pfHomeHtml() {
   const all = portfolios();
@@ -3980,24 +3990,25 @@ function pfHomeHtml() {
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
     const names = p.id === CB_ID ? [] : st.filter((x) => !archivedStrat(x) && !isDnbStrat(x) && !isStudy(x)).map((x) => x.label);
+    const lead = p.id === CB_ID ? null : pfLead(st);
     const running = p.id === CB_ID ? 0 : st.filter((x) => isStudy(x) && x.study.verdict === "pending").length;
     const old = st.filter(archivedStrat).length, dnb = st.filter((x) => isDnbStrat(x) && !archivedStrat(x)).length;
-    const extra = [dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", running ? `${running} stud${running === 1 ? "y" : "ies"} running` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
-    const m = tradeStats(activeTrades(p, st));
+    const extra = [lead && names.length > 1 ? `${names.length - 1} more` : "", dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", running ? `${running} stud${running === 1 ? "y" : "ies"} running` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
+    const m = tradeStats(leadTrades(p, st));
     const cbHead = p.id === CB_ID ? cbHeadline() : null;
     const right = cbHead ? cbHead.right : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     return `
       <button class="row-btn folder" data-pfid="${esc(p.id)}">
-        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${cbHead ? cbHead.meta : `${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}${extra ? ` · ${extra}` : ""}`}</span></span>
+        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${cbHead ? cbHead.meta : `${lead ? `Lead: ${esc(lead.label)}` : `${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}`}${extra ? ` · ${extra}` : ""}`}</span></span>
         <span class="vals">${right}</span>${CHEV}
       </button>`;
   }).join("");
   return `
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
-    <p class="note">Each portfolio holds that market's paper strategies. Profit is its active strategies together (archived ones and draw no bet tracks left out), in every competition, $10 a trade. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
+    <p class="note">Each portfolio holds that market's paper strategies. Profit is each portfolio's lead strategy only (the first in its list), in every competition, $10 a trade; open a portfolio for its other strategies, draw no bet tracks and archive. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
 }
 // One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
