@@ -260,3 +260,96 @@ def test_data_json_keeps_per_league_curves_short():
     assert len(out["E0"]["sizing"]["kelly"]["curve"]) == sz.APP_LEAGUE_CURVE
     assert out["E0"]["sizing"]["kelly"]["curve"][-1] == curve[-1] and out["D1"] == {"error": "down"}
     assert len(leagues["E0"]["sizing"]["flat"]["curve"]) == 200  # the file itself is untouched
+
+
+# ---------- the Kelly bet log (owner via the lead, 5 Nov) ----------
+
+
+def trade(i, open_h, settle_h, status, p_bet, odds, **kw):
+    t = {
+        "id": f"t{i}",
+        "strategy": "lean",
+        "league": "E0",
+        "home": f"Home{i}",
+        "away": f"Away{i}",
+        "market": "home",
+        "opened_at": h(open_h).isoformat(),
+        "kickoff": h(open_h + 2).isoformat(),
+        "settled_at": None if settle_h is None else h(settle_h).isoformat(),
+        "status": status,
+        "odds": odds,
+        "p_bet": p_bet,
+        "stake": 10.0,
+    }
+    t.update(kw)
+    return t
+
+
+def test_the_kelly_log_shows_how_every_stake_was_sized():
+    trades = [
+        trade(1, 0, 10, "won", 0.7, 2.0),  # f* 0.4: a quarter is 10%, capped at 5%
+        trade(2, 5, 12, "lost", 0.5, 2.5),  # f* 1/6: 4.17%, under the cap
+        trade(3, 11, 20, "lost", 0.3, 2.0),  # f* -0.4: no edge, no stake
+        trade(4, 13, None, "open", None, 2.0),  # no chance to size on
+        trade(5, 14, 21, "void", 0.6, 2.0, push=True),  # a push: stake back
+    ]
+    sizing = sz.live_sizing(trades, {"p_source": "blend"})
+    k = sizing["kelly"]
+    log = k["log"]
+    assert [r["id"] for r in log] == ["t1", "t2", "t3", "t4", "t5"]  # in open order
+    r1, r2, r3, r4, r5 = log
+    assert r1["kelly"] == pytest.approx(0.4) and r1["fraction"] == 0.05 and r1.get("capped")
+    assert r1["bankroll_before"] == 1000 and r1["stake"] == 50.0
+    assert r1["profit"] == 50.0 and r1["bankroll_after"] == 1050.0
+    assert r1["flat_profit"] == 10.0
+    assert r1["match"] == "Home1 v Away1" and r1["pick"] == "home" and r1["league"] == "E0"
+    # Opened before t1 settled: sized on the starting 1,000.
+    assert r2["bankroll_before"] == 1000 and r2["fraction"] == pytest.approx(0.25 / 6, abs=1e-4)
+    assert not r2.get("capped") and r2["stake"] == pytest.approx(41.67)
+    assert r2["bankroll_after"] == pytest.approx(1050 - 41.67)
+    assert r3["bankroll_before"] == 1050.0  # t1 settled before it opened, t2 not yet
+    assert r3["stake"] == 0 and r3["fraction"] == 0 and r3.get("reason") == "no edge on the chance"
+    assert r3["profit"] == 0 and r3["flat_profit"] == -10.0
+    assert r4.get("reason") == "no chance" and r4["chance"] is None and r4["stake"] == 0
+    assert r4["settled_at"] is None and r4["profit"] is None and r4["bankroll_after"] is None
+    assert r5["profit"] == 0 and r5["flat_profit"] == 0 and r5.get("push") is True
+    # Every stake is the stakes map's, and the last settlement is simulate's bankroll now.
+    assert {r["id"]: r["stake"] for r in log} == k["stakes"]
+    last = max((r for r in log if r["settled_at"]), key=lambda r: r["settled_at"])
+    assert last["bankroll_after"] == k["bankroll_now"]
+    assert all((r.get("reason") is None) == (r["stake"] > 0) for r in log)
+
+
+def test_the_log_leaves_simulates_numbers_unchanged_and_matches_its_curve():
+    bets = [bet(i, i * 3, i * 3 + 7, 1.0 if i % 3 else -1.0, p=0.55 + 0.01 * i) for i in range(12)]
+    plain = sz.simulate(bets, sz.kelly_fn())
+    logged = sz.simulate(bets, sz.kelly_fn(), log=True)
+    assert {k: v for k, v in logged.items() if k != "log"} == plain
+    # The bankroll after each settlement day's last bet is the curve's point for that day.
+    by_day = {}
+    for e in sorted(logged["log"], key=lambda e: (bets[e["i"]]["settle"], e["i"])):
+        by_day[bets[e["i"]]["settle"].date().isoformat()] = round(e["bankroll_after"], 2)
+    assert by_day == {c["date"]: c["bankroll"] for c in plain["curve"]}
+
+
+def test_a_bust_bankroll_says_no_bankroll_and_corners_log_their_line():
+    bets = [bet(1, 0, 1, -1.0, p=0.9), bet(2, 2, 3, 1.0, p=0.9)]
+    sim = sz.simulate(bets, lambda bank, b: bank if b["id"] == "b1" else 0.0, log=True)
+    rows = sz.kelly_log([{"id": "b1"}, {"id": "b2"}], bets, sim)
+    assert rows[1]["bankroll_before"] == 0 and rows[1].get("reason") == "no bankroll"
+    corner = trade(
+        1,
+        0,
+        5,
+        "won",
+        None,
+        2.1,
+        bet_type="corners",
+        team="Brighton",
+        side="over",
+        line=5.5,
+        model_p=0.5,
+        p_push=0.0,
+    )
+    log = sz.live_sizing([corner], {"p_source": "model_f"})["kelly"]["log"]
+    assert log[0]["pick"] == "Brighton over 5.5" and log[0]["chance"] == 0.5

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date
 from pathlib import Path
 
@@ -79,13 +79,20 @@ def _fetch(
     max_age_hours: float | None,
     headers: dict | None = None,
     stale_ok: bool = False,
+    validate: Callable[[bytes], None] | None = None,
 ) -> Path:
     """Download `url` to `path` unless a cached copy is fresh enough.
 
     max_age_hours=None means a cached file never expires (finished seasons). With
     stale_ok, a failed refresh falls back to the cached copy instead of raising.
+
+    `validate(body)` raises on a bad body (an HTML block page, an empty answer). A bad
+    download is never written, so it can't replace a good cached file: the good copy is
+    kept and returned (whatever `stale_ok` says), else `BadResponse` is raised. A cached
+    file that fails `validate` counts as missing and is fetched again.
     """
-    if path.exists() and (
+    cached_ok = path.exists() and _valid(path.read_bytes(), validate)
+    if cached_ok and (
         max_age_hours is None or time.time() - path.stat().st_mtime < max_age_hours * 3600
     ):
         return path
@@ -94,11 +101,37 @@ def _fetch(
         resp = requests.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
     except requests.RequestException:
-        if stale_ok and path.exists():  # source down: a stale copy beats nothing
+        if stale_ok and cached_ok:  # source down: a stale copy beats nothing
             return path
         raise
+    if validate is not None:
+        try:
+            validate(resp.content)
+        except Exception as exc:
+            if cached_ok:
+                STALE.append(f"{path.name} (bad answer: {exc})")
+                return path
+            raise BadResponse(f"{url} gave a bad answer: {exc}") from exc
     path.write_bytes(resp.content)
     return path
+
+
+class BadResponse(ValueError):
+    """A download that failed its `validate` check, with no good cached copy to fall back on."""
+
+
+# Files `_fetch` served stale because the refresh answered badly (read by the publish log).
+STALE: list[str] = []
+
+
+def _valid(body: bytes, validate: Callable[[bytes], None] | None) -> bool:
+    if validate is None:
+        return True
+    try:
+        validate(body)
+    except Exception:
+        return False
+    return True
 
 
 def download(

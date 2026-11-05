@@ -91,7 +91,7 @@ def downsample(points: list, n: int = MAX_CURVE) -> list:
     return [points[i] for i in idx]
 
 
-def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START) -> dict:
+def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START, log: bool = False) -> dict:
     """Replay `bets` in time order. Each bet: {id, open, settle (None while open), ret
     (profit per $1 staked: odds - 1 won, -1 lost, 0 push/void; None while open), p, odds}.
     `stake_fn(bankroll, bet)` sizes a bet from the bankroll at its open time (bets settled
@@ -99,7 +99,10 @@ def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START) -> dict:
     roi_on_staked, max_drawdown ($ from the running peak) and max_drawdown_pct,
     growth_per_bet (log(bankroll_now / start) per settled bet), bets_staked,
     bets_zero_stake, median_stake, curve [{date, bankroll}] (at each settlement day,
-    downsampled) and stakes {id: stake}."""
+    downsampled) and stakes {id: stake}. With `log`, also `log`: one entry per bet in the
+    order it opened, {i (index into `bets`), bankroll_before (the bankroll that sized it),
+    stake, profit and bankroll_after (at its settlement; None while open)}; the other
+    numbers are the same either way."""
     events = []
     for i, b in enumerate(bets):
         op = _ts(b.get("open"))
@@ -115,14 +118,25 @@ def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START) -> dict:
     staked = profit = 0.0
     settled = 0
     days: dict[str, float] = {}
+    entries: dict[int, dict] = {}
     for when, kind, i in events:
         b = bets[i]
         if kind == 1:
             stakes[i] = round(max(float(stake_fn(bankroll, b) or 0.0), 0.0), 2)
+            if log:
+                entries[i] = {
+                    "i": i,
+                    "bankroll_before": bankroll,
+                    "stake": stakes[i],
+                    "profit": None,
+                    "bankroll_after": None,
+                }
             continue
         s = stakes.get(i, 0.0)
         pnl = s * float(b["ret"])
         bankroll += pnl
+        if log and i in entries:
+            entries[i].update(profit=pnl, bankroll_after=bankroll)
         profit += pnl
         settled += 1
         if float(b["ret"]) != 0:  # a push or void returns the stake: nothing at risk
@@ -135,7 +149,7 @@ def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START) -> dict:
     curve = [{"date": d, "bankroll": round(v, 2)} for d, v in sorted(days.items())]
     opened = [stakes[i] for i in stakes]
     positive = [s for s in opened if s > 0]
-    return {
+    out = {
         "bankroll_start": start,
         "bankroll_now": round(bankroll, 2),
         "profit": round(profit, 2),
@@ -154,6 +168,9 @@ def simulate(bets: list[dict], stake_fn, start: float = BANKROLL_START) -> dict:
         "curve": downsample(curve),
         "stakes": {bets[i].get("id", i): s for i, s in stakes.items()},
     }
+    if log:
+        out["log"] = list(entries.values())  # dicts keep insertion (open) order
+    return out
 
 
 def flat_fn(bankroll: float, bet: dict) -> float:
@@ -256,12 +273,15 @@ def sizing_source(rule: dict | None) -> str:
 def live_sizing(trades: list[dict], rule: dict | None) -> dict:
     """A live strategy's `sizing`: {flat, kelly, kelly_raw (Model 12% only: on the raw
     model_p, over-confident), blend_from (Model 12%: where each trade's p_blend came
-    from)}. `kelly.stakes` = {trade id: stake}, for the trade sheet (flat is $10 each)."""
+    from)}. `kelly.stakes` = {trade id: stake}, for the trade sheet (flat is $10 each);
+    `kelly.log` = kelly_log, how each stake was sized (newest last)."""
     src = sizing_source(rule)
+    bets = live_bets(trades, src)
     out = {
-        "flat": block(live_bets(trades, src), "flat", keep_stakes=False),  # all $10
-        "kelly": block(live_bets(trades, src), "kelly", src),
+        "flat": block(bets, "flat", keep_stakes=False),  # all $10
+        "kelly": block(bets, "kelly", src),
     }
+    out["kelly"]["log"] = kelly_log(trades, bets, simulate(bets, kelly_fn(), log=True))
     if (rule or {}).get("p_source") == "model":  # Model 12%
         out["kelly_raw"] = block(live_bets(trades, "model"), "kelly", "model", keep_stakes=False)
         out["kelly_raw"]["label"] = "Kelly on the raw model (over-confident)"
@@ -351,3 +371,80 @@ def app_curves(leagues: dict, n: int = APP_LEAGUE_CURVE) -> dict:
             }
         out[code] = rep
     return out
+
+
+# ---------- the Kelly bet log (owner via the lead, 5 Nov; live strategies only) ----------
+
+LOG_REASONS = {
+    "chance": "no chance",
+    "edge": "no edge on the chance",
+    "bankroll": "no bankroll",
+}
+
+
+def _iso(v) -> str | None:
+    t = _ts(v)
+    return t.isoformat(timespec="seconds") if t is not None else None
+
+
+def _pick(t: dict) -> str:
+    """The bet in words: a corner's "Brighton over 5.5", else the side (home/draw/away)."""
+    if t.get("bet_type") == "corners":
+        team = t.get("team") or (t.get("away") if t.get("team_side") == "away" else t.get("home"))
+        return f"{team} {t.get('side')} {t.get('line')}"
+    return str(t.get("market") or "")
+
+
+def kelly_log(trades: list[dict], bets: list[dict], sim: dict) -> list[dict]:
+    """One row per sized trade, in the order simulate() opened them: how its quarter-Kelly
+    stake was worked out (chance, full Kelly f, the fraction applied after the 5% cap, the
+    bankroll that sized it), what it did (status, profit, bankroll after its settlement)
+    and the flat $10 result beside it; `capped`, `push` and `reason` appear only when set.
+    `sim` is simulate(..., log=True) on `bets`."""
+    by_id = {t["id"]: t for t in trades if "id" in t}
+    rows = []
+    for e in sim.get("log") or []:
+        b = bets[e["i"]]
+        t = by_id.get(b["id"], {})
+        f = kelly_f(b.get("p"), b.get("odds"))
+        if b.get("p") is None or f is None:
+            reason = LOG_REASONS["chance"]
+        elif f <= 0:
+            reason = LOG_REASONS["edge"]
+        elif not e["bankroll_before"] > 0:
+            reason = LOG_REASONS["bankroll"]
+        else:
+            reason = None
+        applied = min(KELLY_FRACTION * f, KELLY_CAP) if reason is None else 0.0
+        ret = b.get("ret")
+        rows.append(
+            {
+                "id": b["id"],
+                "opened_at": _iso(b.get("open")),
+                "settled_at": _iso(b.get("settle")) if ret is not None else None,
+                "league": t.get("league"),
+                "match": f"{t.get('home')} v {t.get('away')}" if t.get("home") else None,
+                "pick": _pick(t),
+                "odds": b.get("odds"),
+                "chance": round(b["p"], 4) if b.get("p") is not None else None,
+                "kelly": round(f, 4) if f is not None else None,
+                "fraction": round(applied, 4),
+                "capped": reason is None and KELLY_FRACTION * f > KELLY_CAP,
+                "bankroll_before": round(e["bankroll_before"], 2),
+                "stake": e["stake"],
+                "status": t.get("status"),
+                "push": bool(t.get("push")),
+                "profit": round(e["profit"], 2) if e["profit"] is not None else None,
+                "bankroll_after": round(e["bankroll_after"], 2)
+                if e["bankroll_after"] is not None
+                else None,
+                "reason": reason,
+                "flat_profit": round(FLAT_STAKE * ret, 2) if ret is not None else None,
+            }
+        )
+    # Keep data.json small: flags only when set, a reason only with no stake.
+    for r in rows:
+        for k in ("capped", "push", "reason"):
+            if not r[k]:
+                del r[k]
+    return rows

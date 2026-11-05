@@ -21,7 +21,10 @@ const state = {
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
-  pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the first, Pinnacle)
+  kellyShown: {}, // Kelly bet log rows shown per strategy (25, then 50 more a tap)
+  kellyOpen: "", // the Kelly bet log kept open across re-renders
+  kellyFocus: "", // the trade the sheet's "How it was sized" points at
+  pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the lead, DraftKings under 60%)
   pfStratResearch: "", // In-play research: which study ("" = the first)
   btSource: store.get("btSource", "dk"), // Backtest: "dk" (DraftKings' prices, first when present) or "pin"
   pfDriver: "", // Blend Lean: "" = every pick, "market" or "model" (live trades and backtest bets)
@@ -39,7 +42,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v70";
+const APP_VERSION = "v72";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3194,11 +3197,23 @@ function pfStrategies(cur) {
     // Shadow-filter variants (variant_of) sit directly under their parent, whatever order
     // they arrive in; a variant whose parent is missing is dropped.
     const row = (x) => ({ key: x.key, label: stratLabel(x), st: x, rule: x.rule, variantOf: x.variant_of || null });
-    return [...st.filter((x) => !x.variant_of).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]), ...research];
+    return [...leadOrder(cur, st.filter((x) => !x.variant_of)).flatMap((x) => [row(x), ...st.filter((v) => v.variant_of === x.key).map(row)]), ...research];
   }
   const label = cur.id === "corners" ? "Model (f) 12% vs Pinnacle" : cur.name;
   return [{ key: cur.id, label, st: null, rule: cur.live?.rule || (cur.id === "moneyline" ? state.data.portfolio?.rule : null) }];
 }
+// Team corners: the owner bets at DraftKings (5 Nov), so DraftKings' track leads and
+// Pinnacle's runs beside it, in the main list and the Archive alike. Display order only:
+// paper.py keeps tr.CORNER_STRATEGY_ORDER (Pinnacle first) and every ledger as it is.
+const CORNER_LEAD = ["draftkings", "pinnacle"];
+function leadOrder(cur, parents) {
+  if (cur.id !== "corners") return parents;
+  const rank = (x) => { const i = CORNER_LEAD.indexOf(x.key); return i < 0 ? CORNER_LEAD.length : i; };
+  return parents.map((x, i) => [x, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([x]) => x);
+}
+// A portfolio's lead strategy: the first active one in its list (not archived, not a draw no
+// bet track, not a study). Its trades are the portfolio's headline on the top level.
+const pfLead = (strats) => strats.find((x) => x.st && !archivedStrat(x) && !isDnbStrat(x) && !isStudy(x)) || null;
 // A filtered corner line named for what its cut is of (owner, 25 Oct): "Model (f) vs Pinnacle:
 // 12% edge, under 60% to win" = the track's 12%-edge picks that model (f) gives under a 60%
 // chance to win (pushes aside). Anything else keeps paper.py's label.
@@ -3210,7 +3225,8 @@ function stratLabel(x) {
 }
 // Each portfolio keeps its own selection (Moneyline: Lean / 12%; Team corners: the book).
 const pfStratKey = (cur) => (cur?.id === "corners" ? state.pfStratCorners : cur?.id === CB_ID ? state.pfStratResearch : state.pfStrat);
-const pfSelected = (strats, cur = pfCurrent()) => strats.find((x) => x.key === pfStratKey(cur)) || strats[0];
+// With nothing chosen yet, the lead strategy opens (else the first row).
+const pfSelected = (strats, cur = pfCurrent()) => strats.find((x) => x.key === pfStratKey(cur)) || pfLead(strats) || strats[0];
 // A strategy's parent (itself when it isn't a variant) and the variants filed under a parent.
 const pfParent = (strats, x) => (x.variantOf && strats.find((p) => p.key === x.variantOf)) || x;
 const pfVariants = (strats, x) => strats.filter((v) => v.variantOf === x.key);
@@ -3599,7 +3615,7 @@ function sizingReadout(series, rows, i) {
   return `<b>${esc(longSpan(dates) ? dayYear(rows[0][i].date) : dayName(rows[0][i].date))}</b>${rows[0][i].origin ? " · start" : ""} · ${parts.join(" · ")}`;
 }
 // The bankroll chart and tiles for one sizing block (live strategy or backtest part).
-function sizingHtml(id, sz, where = "") {
+function sizingHtml(id, sz, where = "", x = null) {
   if (!sz) return "";
   if (sz.error) return `<div class="section-title">Bankroll: flat $10 vs ¼ Kelly</div><p class="note">The Kelly comparison couldn't be worked out this time (${esc(sz.error)}).</p>`;
   const lines = SIZING_LINES.map(([k]) => [k, sz[k]]).filter(([, b]) => b && Array.isArray(b.curve));
@@ -3627,7 +3643,69 @@ function sizingHtml(id, sz, where = "") {
     <div class="card bank-card">${chart}</div>
     ${tiles}
     ${rawLine}
-    ${notes.length ? `<details class="fold mk-fold"><summary>How Kelly is sized here</summary>${notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</details>` : ""}`;
+    ${notes.length ? `<details class="fold mk-fold"><summary>How Kelly is sized here</summary>${notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</details>` : ""}
+    ${x ? kellyLogHtml(x, k) : `<p class="note kelly-bt-note">The backtests don't keep each bet's stake, so there's no Kelly bet log here; the live strategies have one.</p>`}`;
+}
+// ---------- the Kelly bet log (owner via the lead, 5 Nov; live strategies only) ----------
+// sizing.kelly.log = [{id, opened_at, settled_at, league, match, pick, odds, chance, kelly
+// (full f*), fraction (applied: min(¼ f*, 5%), 0 with no stake), capped, bankroll_before,
+// stake, status, push, profit, bankroll_after, reason, flat_stake, flat_profit}], oldest first.
+const KELLY_FORMULA = "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.";
+const KELLY_CHANCE = { blend: "the blend's chance (Blend Lean's p_bet; Model 12%'s blend chance for its side)", model_f: "model (f)'s chance to win, with pushes taken out", model: "the raw model's chance" };
+const kellyLogKey = (x) => `kl-${x.key}`;
+const kellyRowId = (key, id) => `${key}-r${[...String(id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
+function kellyResult(r) {
+  if (r.status === "won") return '<b class="pos-text">Won</b>';
+  if (r.status === "lost") return "Lost";
+  if (r.status === "void") return r.push ? "Push · stake back" : "Void · stake back";
+  return "Open";
+}
+function kellyLogHtml(x, k) {
+  const log = Array.isArray(k?.log) ? k.log : null;
+  if (!log) return "";
+  const key = kellyLogKey(x);
+  const rows = log.slice().reverse();
+  const shown = state.kellyShown[key] || 25;
+  const byId = new Map((allTrades() || []).map((t) => [t.id, t]));
+  const body = rows.slice(0, shown).map((r) => {
+    const t = byId.get(r.id);
+    const pick = t ? tradeLabel(t) : r.pick || "–";
+    const when = r.opened_at ? dayName(r.opened_at.slice(0, 10)) : "–";
+    const share = r.stake > 0 && r.bankroll_before > 0 ? r.stake / r.bankroll_before : null;
+    const stake = r.stake > 0
+      ? `${bankUsd(r.stake, 2)}<span class="meta">${pct(share, 1)} of ${bankUsd(r.bankroll_before, 0)}${r.capped ? " · capped at 5%" : ""}</span>`
+      : `<span class="muted">No stake</span><span class="meta">${esc(r.reason || "")}</span>`;
+    const pl = isNum(r.profit) ? `<span class="${signCls(r.profit)}">${usd(r.profit, 2)}</span><span class="meta">flat $10: ${usd(r.flat_profit, 2)}</span>` : `<span class="muted">–</span>`;
+    return `<tr id="${kellyRowId(key, r.id)}"${state.kellyFocus === r.id ? ' class="sel"' : ""}>
+      <td data-label="Date">${esc(when)}</td>
+      <td data-label="Bet" class="kl-bet">${esc(r.match || "")}<span class="meta">${esc(pick)}${r.league ? ` · ${esc(leagueShort(r.league))}` : ""}</span></td>
+      <td data-label="Odds" class="num">${cbOdds(r.odds)}</td>
+      <td data-label="Chance" class="num">${pct(r.chance, 1)}</td>
+      <td data-label="Full Kelly" class="num">${isNum(r.kelly) ? `${r.kelly < 0 ? "−" : ""}${pct(Math.abs(r.kelly), 1)}` : "–"}</td>
+      <td data-label="Stake" class="num">${stake}</td>
+      <td data-label="Result">${kellyResult(r)}</td>
+      <td data-label="P/L" class="num">${pl}</td>
+      <td data-label="Bankroll after" class="num">${isNum(r.bankroll_after) ? bankUsd(r.bankroll_after, 2) : '<span class="muted">open</span>'}</td>
+    </tr>`;
+  }).join("");
+  const chance = KELLY_CHANCE[k.p_source] || "the strategy's chance";
+  return `
+    <details class="fold mk-fold kelly-log" id="${key}"${state.kellyOpen === key ? " open" : ""}><summary>Kelly bet log · ${num(log.length)} bet${log.length === 1 ? "" : "s"}</summary>
+      <p class="note kl-formula">${esc(KELLY_FORMULA)}</p>
+      <p class="note">The chance used here is ${esc(chance)}. Each stake uses the bankroll from bets settled before it opened; P/L lands when the bet settles. Newest first.</p>
+      ${rows.length ? `<div class="card kl-card"><table class="kl-table"><thead><tr><th>Date</th><th>Match and pick</th><th>Odds</th><th>Chance</th><th>Full Kelly</th><th>Stake</th><th>Result</th><th>P/L</th><th>Bankroll after</th></tr></thead><tbody>${body}</tbody></table></div>
+      ${rows.length > shown ? `<button class="more" data-klmore="${esc(key)}">Show more (${num(rows.length - shown)} left)</button>` : ""}` : `<p class="muted">No trades yet.</p>`}
+    </details>`;
+}
+// The live strategy (on the open page) whose Kelly log holds a trade, for the sheet's link.
+function kellyLogOf(id) {
+  const cur = pfCurrent();
+  if (state.tab !== "portfolio" || pfLevelOn() !== "strategy" || (state.pfView && state.pfView !== "live") || !cur?.live?.strategies) return null;
+  const x = pfSelected(pfStrategies(cur), cur);
+  const log = x?.st?.sizing?.kelly?.log || [];
+  const at = log.findIndex((r) => r.id === id);
+  // The log shows newest first, so this row's place on the page counts from the end.
+  return at < 0 ? null : { key: kellyLogKey(x), index: log.length - 1 - at };
 }
 // A trade's quarter-Kelly stake: from whichever live strategy's sizing holds its id.
 function kellyStakeLine(t) {
@@ -3929,7 +4007,7 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${drvPanel}
     <div class="section-title">Profit over time</div>
     <div class="card pf-curve">${chart}</div>
-    ${sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "")}
+    ${sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "", x)}
     ${liveOddsBandsHtml(cur, x, lg, drv)}
     <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk` : ""}</div>
     ${open.length ? `<div class="card list">${open.map(pfTradeRow).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
@@ -3964,14 +4042,11 @@ function pfCrumbs(cur, toPortfolio) {
   return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
 }
 const pfPill = (cur) => (cur.id === CB_ID ? researchPill() : `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`);
-// A portfolio's headline counts its active strategies only (the 1X2 ones: draw no bet tracks
-// and archived rules are left out), each trade once; without strategy sections, every trade.
-function activeTrades(p, st) {
-  const active = st.filter((x) => x.st && !archivedStrat(x) && !isDnbStrat(x));
-  if (!active.length) return p.live?.trades || [];
-  const byId = new Map();
-  for (const x of active) for (const t of strategyLiveSet(p, x, "").trades || []) byId.set(t.id, t);
-  return [...byId.values()];
+// A portfolio's headline is its lead strategy's trades (owner, 5 Nov: Moneyline = Blend Lean,
+// Team corners = DraftKings under 60%); without strategy sections, every trade.
+function leadTrades(p, st) {
+  const lead = pfLead(st);
+  return lead ? strategyLiveSet(p, lead, "").trades || [] : p.live?.trades || [];
 }
 function pfHomeHtml() {
   const all = portfolios();
@@ -3980,24 +4055,25 @@ function pfHomeHtml() {
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
     const names = p.id === CB_ID ? [] : st.filter((x) => !archivedStrat(x) && !isDnbStrat(x) && !isStudy(x)).map((x) => x.label);
+    const lead = p.id === CB_ID ? null : pfLead(st);
     const running = p.id === CB_ID ? 0 : st.filter((x) => isStudy(x) && x.study.verdict === "pending").length;
     const old = st.filter(archivedStrat).length, dnb = st.filter((x) => isDnbStrat(x) && !archivedStrat(x)).length;
-    const extra = [dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", running ? `${running} stud${running === 1 ? "y" : "ies"} running` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
-    const m = tradeStats(activeTrades(p, st));
+    const extra = [lead && names.length > 1 ? `${names.length - 1} more` : "", dnb ? `${dnb} draw no bet track${dnb === 1 ? "" : "s"}` : "", running ? `${running} stud${running === 1 ? "y" : "ies"} running` : "", old ? `${old} archived` : ""].filter(Boolean).join(" · ");
+    const m = tradeStats(leadTrades(p, st));
     const cbHead = p.id === CB_ID ? cbHeadline() : null;
     const right = cbHead ? cbHead.right : m.n
       ? `<b class="${signCls(m.profit)}">${usd(m.profit, 2)}</b><small>${m.n} settled${m.open ? ` · ${m.open} open` : ""}</small>`
       : `<b class="muted">–</b><small>${m.open ? `${m.open} open` : "no trades"}</small>`;
     return `
       <button class="row-btn folder" data-pfid="${esc(p.id)}">
-        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${cbHead ? cbHead.meta : `${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}${extra ? ` · ${extra}` : ""}`}</span></span>
+        <span class="who"><b>${esc(p.name)}</b> ${pfPill(p)}<span class="meta">${cbHead ? cbHead.meta : `${lead ? `Lead: ${esc(lead.label)}` : `${names.length > 1 ? `${names.length} strategies: ` : ""}${esc(names.join(", "))}`}${extra ? ` · ${extra}` : ""}`}</span></span>
         <span class="vals">${right}</span>${CHEV}
       </button>`;
   }).join("");
   return `
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
-    <p class="note">Each portfolio holds that market's paper strategies. Profit is its active strategies together (archived ones and draw no bet tracks left out), in every competition, $10 a trade. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
+    <p class="note">Each portfolio holds that market's paper strategies. Profit is each portfolio's lead strategy only (the first in its list), in every competition, $10 a trade; open a portfolio for its other strategies, draw no bet tracks and archive. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}`;
 }
 // One row per strategy (owner, 25 Oct: each its own, none filed under another): its live
@@ -4826,7 +4902,7 @@ function tradeHtml(t) {
       <div class="card" style="padding:8px 14px;margin-top:10px">
         <table class="kv"><tbody>${rows}</tbody></table>
       </div>
-      ${t.source === "live" && kellyStakeLine(t) ? `<p class="note kelly-line">${esc(kellyStakeLine(t))}. Shown for comparison only: flat $10 is the record.</p>` : ""}
+      ${t.source === "live" && kellyStakeLine(t) ? `<p class="note kelly-line">${esc(kellyStakeLine(t))}. Shown for comparison only: flat $10 is the record.${kellyLogOf(t.id) ? ` <button class="linkish" data-klrow="${esc(t.id)}">How it was sized</button>` : ""}</p>` : ""}
     </div>`;
 }
 
@@ -4887,6 +4963,20 @@ document.addEventListener("click", (ev) => {
   } else if (t.dataset.pfdriver !== undefined) {
     state.pfDriver = t.dataset.pfdriver; state.pfShown = 15; state.lbShown = 20;
     render();
+  } else if (t.dataset.klmore !== undefined) {
+    state.kellyShown[t.dataset.klmore] = (state.kellyShown[t.dataset.klmore] || 25) + 50;
+    state.kellyOpen = t.dataset.klmore;
+    render();
+  } else if (t.dataset.klrow !== undefined) {
+    // From the trade sheet: open the strategy's Kelly log at this trade's row.
+    const at = kellyLogOf(t.dataset.klrow);
+    closeSheet();
+    if (at) {
+      state.kellyOpen = at.key; state.kellyFocus = t.dataset.klrow;
+      state.kellyShown[at.key] = Math.max(state.kellyShown[at.key] || 25, at.index + 1);
+      render();
+      document.getElementById(kellyRowId(at.key, t.dataset.klrow))?.scrollIntoView({ block: "center" });
+    }
   } else if (t.dataset.cbmore !== undefined) {
     state.cbShown = (state.cbShown || 50) + 100;
     render();

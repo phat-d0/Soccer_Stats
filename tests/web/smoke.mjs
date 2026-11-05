@@ -751,8 +751,8 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
-    // The headline counts the active strategies only: Lean's new-rule trades.
+    if (!home.includes("Lead: Blend Lean (new rule) · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    // The headline is the lead strategy's: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
     await p.click('button[data-pfid="moneyline"]');
@@ -890,7 +890,8 @@ const STEPS = [
     const chip = await p.locator('button[data-trade="E0|2627|Wolves|Everton|lean"] .drv').innerText();
     if (chip !== "Model") throw new Error(`Wolves chip: ${chip}`);
     await p.click('button[data-pfdriver="model"]');
-    const only = await p.textContent("#view");
+    // The trade rows only: the Kelly bet log below lists every trade of the strategy.
+    const only = (await p.locator("#view button[data-trade]").allInnerTexts()).join(" ");
     if (!only.includes("Wolves v Everton") || only.includes("Spurs v Brentford")) throw new Error("model-driven filter");
   }],
   ["portfolio-live-lean-market", click('button[data-pfdriver="market"]')],
@@ -954,6 +955,7 @@ const STEPS = [
     await scrubCheck(p, "[data-scrub='lbroi']");
     await bandsCheck(p, "lean", "");
     await sizingCheck(p, "bz-lean-all", () => state.data.portfolio.strategy_backtests.lean.all.sizing);
+    if (!(await p.textContent("#view")).includes("The backtests don't keep each bet's stake, so there's no Kelly bet log here")) throw new Error("backtest Kelly log note");
   }],
   ["portfolio-lean-backtest-model", async (p) => {
     await p.click('button[data-pfdriver="model"]');
@@ -1129,6 +1131,35 @@ const STEPS = [
     await sizingCheck(p, "kz-edge12", () => pfById("moneyline").live.strategies.find((s) => s.key === "edge12").sizing);
     if (!(await p.textContent("#view")).includes("Kelly on the raw model (over-confident):")) throw new Error("Model 12% lacks the raw-model Kelly line");
   }],
+  // The Kelly bet log (owner via the lead, 5 Nov): folded under the bankroll chart, newest
+  // first, 25 rows then "Show more", the formula and the chance used above it; the trade
+  // sheet's ¼ Kelly line jumps to the trade's row.
+  ["portfolio-live-edge12-kelly-log", async (p) => {
+    const log = await p.evaluate(() => pfById("moneyline").live.strategies.find((s) => s.key === "edge12").sizing.kelly.log);
+    if (!(log.length > 25)) throw new Error(`fixture Kelly log too short: ${log.length}`);
+    await p.click("details#kl-edge12 > summary");
+    const box = (await p.textContent("details#kl-edge12")).replace(/\s+/g, " ");
+    for (const w of [`Kelly bet log · ${log.length} bets`, "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.", "The chance used here is the blend's chance", "Newest first", "Show more (2 left)"]) if (!box.includes(w)) throw new Error(`Kelly log lacks "${w}": ${box.slice(0, 400)}`);
+    const rows = p.locator("details#kl-edge12 tbody tr");
+    if ((await rows.count()) !== 25) throw new Error(`Kelly log rows: ${await rows.count()}`);
+    // Newest first, and each row's numbers are the log's.
+    const want = await p.evaluate((r) => ({ id: kellyRowId("kl-edge12", r.id), odds: cbOdds(r.odds), stake: r.stake > 0 ? bankUsd(r.stake, 2) : "No stake", after: isNum(r.bankroll_after) ? bankUsd(r.bankroll_after, 2) : "open" }), log[log.length - 1]);
+    const first = rows.first();
+    if ((await first.getAttribute("id")) !== want.id) throw new Error("the Kelly log isn't newest first");
+    const ft = (await first.innerText()).replace(/\s+/g, " ");
+    for (const w of [want.odds, want.stake, want.after]) if (!ft.includes(w)) throw new Error(`first Kelly row lacks "${w}": ${ft}`);
+    const zero = log.find((r) => !(r.stake > 0));
+    if (zero && !(await p.textContent("details#kl-edge12")).includes(zero.reason)) throw new Error("a zero stake shows no reason");
+    await p.click('button[data-klmore="kl-edge12"]');
+    if ((await p.locator("details#kl-edge12 tbody tr").count()) !== log.length || !(await p.locator("details#kl-edge12[open]").count())) throw new Error("Show more on the Kelly log");
+    // From a trade's sheet to its row.
+    const id = await p.evaluate((ids) => ids.find((i) => document.querySelector(`#view button[data-trade="${CSS.escape(i)}"]`)), log.map((r) => r.id));
+    if (!id) throw new Error("no listed trade in the Kelly log");
+    await p.click(`#view button[data-trade="${id}"]`); await sheet(p);
+    await p.click('#sheet-body button[data-klrow]');
+    const sel = await p.evaluate((rid) => document.getElementById(rid)?.classList.contains("sel"), await p.evaluate((i) => kellyRowId("kl-edge12", i), id));
+    if (!sel || !(await p.locator("details#kl-edge12[open]").count())) throw new Error("the sheet's link didn't open the trade's Kelly row");
+  }],
   ["portfolio-live-edge12-states", async (p) => {
     const text = await p.textContent("#view");
     if (!text.includes("Awaiting result · 1")) throw new Error("12% awaiting group");
@@ -1158,7 +1189,7 @@ const STEPS = [
     if (await p.locator(".crumbs").count()) throw new Error("the Portfolio tab didn't go back to the top");
     if (await p.locator('#view button[data-pfid="goalscorer"]').count()) throw new Error("goalscorer folder should be hidden");
     const text = await p.textContent("#view");
-    for (const w of ["Moneyline", "Team corners", "2 strategies:", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
+    for (const w of ["Moneyline", "Team corners", "Lead: Model (f) vs DraftKings", "1 more", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
   }],
   // A retired portfolio, reached from the "Retired" link: its history, read-only. It has one
   // strategy, so it opens straight on its views.
@@ -1359,7 +1390,17 @@ const STEPS = [
     // The owner archived the two plain 12% tracks (25 Oct): the under-60% lines lead, the
     // tracks they are cut from sit in the Archive list.
     const order = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (order.join(",") !== "pinnacle_below60,draftkings_below60,pinnacle,draftkings") throw new Error(`corner rows: ${order.join(",")}`);
+    // DraftKings leads (owner, 5 Nov: the book he bets), in the main list and the Archive.
+    if (order.join(",") !== "draftkings_below60,pinnacle_below60,draftkings,pinnacle") throw new Error(`corner rows: ${order.join(",")}`);
+    const note = (await p.locator(".pf-head").innerText()).replace(/\s+/g, " ");
+    if (!note.includes("DraftKings is the book the owner bets") || !note.includes("Pinnacle's closing price stays the yardstick")) throw new Error(`corners note: ${note}`);
+    // The top-level row is the lead strategy's: DraftKings under 60%, named in the meta.
+    await pfHome(p);
+    const home = (await p.locator('button[data-pfid="corners"]').innerText()).replace(/\s+/g, " ");
+    const lead = await p.evaluate(() => { const cur = pfById("corners"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "draftkings_below60"), "").trades); return { profit: usd(m.profit, 2), n: m.n }; });
+    if (!home.includes("Lead: Model (f) vs DraftKings: 12% edge, under 60% to win · 1 more · 2 archived") || !home.includes(lead.profit) || !home.includes(`${lead.n} settled`)) throw new Error(`corners home row ${home} vs ${JSON.stringify(lead)}`);
+    if (!(await p.locator('#view p.note:has-text("Profit is each portfolio\'s lead strategy")').count())) throw new Error("home note");
+    await p.click('button[data-pfid="corners"]');
     if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="pinnacle"]').count())) throw new Error("the Pinnacle track isn't archived");
     await p.click('button[data-pfstrat="pinnacle"]'); await p.click('button[data-pf="live"]');
     const text = await p.textContent("#view");
