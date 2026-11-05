@@ -144,9 +144,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat or understat-restore"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat, understat-restore]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -180,6 +180,9 @@ on:
         type: choice
         options: [B, C, H, X, H2P, H2U, H2, dev, forward]
         default: B
+      restore_key:
+        description: "understat-restore: the run id of an older raw-data cache holding good Understat files (e.g. 41369190298)"
+        default: ""
       leagues:
         description: "markets / espn: comma-separated leagues, e.g. E2,E3 (blank = the six; markets also prints team names vs football-data's clubs, espn reads 21 days)"
         default: ""
@@ -384,10 +387,26 @@ jobs:
             data/raw/cups/espn
           key: cup-corners-none
           restore-keys: cup-corners-
+      # understat-restore (5 Nov, Understat down since 2 Nov): the newest raw-data cache is
+      # set aside, an older one restored beside it, and its good Understat league files
+      # copied over the bad ones; saved as the newest raw-data cache on the default branch only.
+      - name: Set the newest raw cache aside
+        if: ${{ inputs.task == 'understat-restore' }}
+        run: mv data/raw "$RUNNER_TEMP/raw_new"
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'understat-restore' }}
+        with:
+          path: data/raw
+          key: raw-data-${{ inputs.restore_key }}
+          fail-on-cache-miss: true
+      - name: Swap the older raw cache out
+        if: ${{ inputs.task == 'understat-restore' }}
+        run: mv data/raw "$RUNNER_TEMP/raw_old" && mv "$RUNNER_TEMP/raw_new" data/raw
       - name: Run
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
+          GH_TOKEN: ${{ inputs.task == 'understat' && github.token || '' }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -399,6 +418,7 @@ jobs:
           STACK_BASE: ${{ inputs.stack_base }}
           AFTER: ${{ inputs.after }}
           LEAGUES: ${{ inputs.leagues }}
+          RESTORE_KEY: ${{ inputs.restore_key }}
         run: |
           uv sync --frozen
           mkdir -p out
@@ -555,6 +575,15 @@ jobs:
               rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
+            understat-restore)  # no key: good Understat files from raw-data-$RESTORE_KEY
+              uv run soccer-stats understat-repair --old "$RUNNER_TEMP/raw_old"
+              rm -rf data/raw/player_odds_history "$RUNNER_TEMP/raw_old" ;;  # paid: not raw-data's
+            understat)  # no key: Understat's answers, the cached files, the raw-data caches held
+              uv run soccer-stats understat-probe
+              curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/caches?key=raw-data-&per_page=100&sort=created_at&direction=desc" |
+                jq -c '.actions_caches[] | {key, ref, created_at, last_accessed_at, size_in_bytes}' |
+                sed 's/^/RAW_DATA_CACHE /' ;;
             espn)  # no key: ESPN slugs, names (vs football-data's clubs), summary shape
               if [ -n "$LEAGUES" ]; then
                 uv run soccer-stats espn-probe --leagues "$LEAGUES" --back 21
@@ -577,6 +606,11 @@ jobs:
               cat out/team_totals.json
               rm -rf out/log ;;
           esac
+      - uses: actions/cache/save@v4
+        if: ${{ inputs.task == 'understat-restore' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' }}
+        with:
+          path: data/raw
+          key: raw-data-${{ github.run_id }}
       # The cup corner counts (final matches, a few bytes each) under their own prefix.
       - uses: actions/cache/save@v4
         if: ${{ always() && (inputs.task == 'cup-corner-coverage' || inputs.task == 'cup-corners') }}

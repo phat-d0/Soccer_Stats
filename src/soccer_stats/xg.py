@@ -8,13 +8,15 @@ team strength than goals: a team that wins 1-0 while conceding 2.5 xG got lucky.
 from __future__ import annotations
 
 import json
+import re
+import time
 import warnings
 from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
-from soccer_stats.data import RAW_DIR, _fetch, current_season
+from soccer_stats.data import RAW_DIR, STALE, _fetch, current_season
 
 URL = "https://understat.com/getLeagueData/{league}/{season}"
 # Understat's AJAX endpoint only answers requests that look like they come from its site.
@@ -80,14 +82,42 @@ TEAM_NAMES = {
 }
 
 
+def check_league_json(body: bytes) -> None:
+    """Raise unless `body` is Understat league data: JSON with a `dates` list.
+
+    Understat has answered with an HTML page (status 200) since 2 Nov 2026; caching that
+    page in place of the season's JSON is what turned xG off.
+    """
+    if body.lstrip()[:1] == b"<":
+        raise ValueError(f"an HTML page ({len(body):,} bytes), not JSON")
+    data = json.loads(body)
+    dates = data.get("dates") if isinstance(data, dict) else data
+    if not isinstance(dates, list):
+        raise ValueError("JSON without a match list")
+
+
+def check_match_json(body: bytes) -> None:
+    """Raise unless `body` is one Understat match's JSON (a dict, not an HTML page)."""
+    if body.lstrip()[:1] == b"<":
+        raise ValueError(f"an HTML page ({len(body):,} bytes), not JSON")
+    if not isinstance(json.loads(body), dict):
+        raise ValueError("JSON that isn't a match")
+
+
 def fetch_season(league: str, start_year: int, raw_dir: Path = RAW_DIR) -> Path:
-    """Download (and cache) Understat's league-season JSON. Live season refreshes every 12h."""
+    """Download (and cache) Understat's league-season JSON. Live season refreshes every 12h.
+
+    A bad answer (HTML, empty) is never cached: the last good file is kept and used,
+    and a cached file that isn't good league JSON is fetched again.
+    """
     us_league = LEAGUES[league]
     return _fetch(
         URL.format(league=us_league, season=start_year),
         raw_dir / f"understat_{us_league}_{start_year}.json",
         max_age_hours=12 if start_year >= current_season() else None,
         headers=HEADERS,
+        stale_ok=True,
+        validate=check_league_json,
     )
 
 
@@ -187,13 +217,152 @@ def attach_xg(matches: pd.DataFrame, xg: pd.DataFrame, max_day_gap: int = 2) -> 
 def with_xg(matches: pd.DataFrame, raw_dir: Path = RAW_DIR) -> tuple[pd.DataFrame, str | None]:
     """Attach xG for every league/season in `matches`. Never raises.
 
-    Returns (matches with home_xg/away_xg, error message or None). On failure the xG
-    columns are all NaN, so models silently fall back to goals.
+    Each league-season loads on its own, so one bad file (Understat down, a maintenance
+    page) costs only that season: the model then uses goals for those matches and xG for
+    the rest. Returns (matches with home_xg/away_xg, error message or None); the message
+    names every season without xG and every season served from an older cached file.
     """
     leagues = [lg for lg in matches["league"].dropna().unique() if lg in LEAGUES]
     years = sorted({2000 + int(s[:2]) for s in matches["season"].dropna().unique()})
+    frames, missing = [], []
+    start = len(STALE)
+    for league in leagues:
+        for year in years:
+            try:
+                frames.append(load_xg([league], [year], raw_dir))
+            except Exception as exc:  # network down, site changed, maintenance page
+                missing.append(f"{league} {year}/{(year + 1) % 100:02d} ({exc})")
+    xg = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    notes = []
+    if missing:
+        notes.append("Could not load xG from Understat for " + "; ".join(missing))
+    stale = STALE[start:]
+    if stale:
+        notes.append("Understat refresh failed, using the last good file for " + "; ".join(stale))
+    return attach_xg(matches, xg), (". ".join(notes) or None)
+
+
+def repair_from(old_dir: Path, raw_dir: Path = RAW_DIR) -> list[dict]:
+    """Copy good Understat league files from an older raw cache over bad current ones.
+
+    For each `understat_<league>_<year>.json` in `old_dir`: copied (mtime kept) only when
+    the old file is good league JSON and the current one is missing or bad, so a good
+    current file is never replaced. One dict per file: name, action (copied, kept_current,
+    old_bad), matches in the file used.
+    """
+    import shutil
+
+    out = []
+    for old in sorted(Path(old_dir).glob("understat_*_*.json")):
+        cur = Path(raw_dir) / old.name
+        row: dict = {"file": old.name}
+        if not _good(old):
+            row["action"] = "old_bad"
+        elif cur.exists() and _good(cur):
+            row["action"] = "kept_current"
+        else:
+            shutil.copy2(old, cur)
+            row["action"] = "copied"
+        used = cur if cur.exists() else old
+        if _good(used):
+            row["matches"] = len(json.loads(used.read_bytes())["dates"])
+        out.append(row)
+    return out
+
+
+def _good(path: Path) -> bool:
     try:
-        xg = load_xg(leagues, years, raw_dir)
-    except Exception as exc:  # network down, site changed, etc.
-        return attach_xg(matches, pd.DataFrame()), f"Could not load xG from Understat: {exc}"
-    return attach_xg(matches, xg), None
+        check_league_json(path.read_bytes())
+    except Exception:
+        return False
+    return True
+
+
+def probe(raw_dir: Path = RAW_DIR, seasons: Iterable[int] | None = None) -> list[dict]:
+    """Diagnose Understat (no key, 0 credits): what the endpoints answer and what is cached.
+
+    For each league and season, one raw request to the AJAX endpoint (status, content type,
+    size, the first bytes, whether it parses as JSON with matches) and the same for the
+    cached file. Also asks the public league page, to tell a block from a moved endpoint.
+    """
+    import requests
+
+    years = list(seasons) if seasons is not None else [current_season(), current_season() - 1]
+    out = []
+
+    def describe(body: bytes) -> dict:
+        info: dict = {"bytes": len(body), "head": body[:200].decode("utf-8", "replace")}
+        try:
+            data = json.loads(body)
+        except ValueError as exc:
+            info["json"] = f"not JSON ({exc})"
+            return info
+        dates = data.get("dates", []) if isinstance(data, dict) else data
+        info["json"] = "ok"
+        info["keys"] = sorted(data)[:10] if isinstance(data, dict) else "list"
+        info["matches"] = len(dates) if isinstance(dates, list) else None
+        return info
+
+    for league, us in LEAGUES.items():
+        for year in years:
+            row: dict = {"league": league, "season": year}
+            url = URL.format(league=us, season=year)
+            try:
+                r = requests.get(url, headers=HEADERS, timeout=30)
+                row["live"] = {
+                    "status": r.status_code,
+                    "type": r.headers.get("content-type"),
+                    "server": r.headers.get("server"),
+                    **describe(r.content),
+                }
+            except requests.RequestException as exc:
+                row["live"] = {"error": type(exc).__name__, "detail": str(exc)[:200]}
+            cached = raw_dir / f"understat_{us}_{year}.json"
+            if cached.exists():
+                age = (time.time() - cached.stat().st_mtime) / 3600
+                row["cached"] = {"age_hours": round(age, 1), **describe(cached.read_bytes())}
+            else:
+                row["cached"] = None
+            out.append(row)
+    # The same URL with other headers, to tell a header-based block from an IP block.
+    chrome = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/130.0.0.0 Safari/537.36"
+    )
+    url = URL.format(league="EPL", season=years[0])
+    variants = {
+        "chrome_ajax": {**HEADERS, "User-Agent": chrome, "Referer": "https://understat.com/"},
+        "plain": {},
+    }
+    for name, hdrs in variants.items():
+        try:
+            r = requests.get(url, headers=hdrs, timeout=30)
+            out.append({"variant": name, "status": r.status_code, **describe(r.content)})
+        except requests.RequestException as exc:
+            out.append({"variant": name, "error": type(exc).__name__})
+    for page in (f"https://understat.com/league/EPL/{years[0]}", "https://understat.com/"):
+        try:
+            r = requests.get(page, headers={"User-Agent": HEADERS["User-Agent"]}, timeout=30)
+            body = r.text
+            out.append(
+                {
+                    "page": page,
+                    "status": r.status_code,
+                    "bytes": len(body),
+                    "has_datesData": "datesData" in body,
+                    "getLeagueData": "getLeagueData" in body,
+                    "head": body[:200],
+                    "text": re.sub(
+                        r"\s+",
+                        " ",
+                        re.sub(
+                            r"<[^>]+>", " ", re.sub(r"(?s)<(script|style)[^>]*>.*?</\1>", " ", body)
+                        ),
+                    )[:1500],
+                    "tail": body[-600:],
+                    "scripts": sorted(set(re.findall(r'src="([^"]+\.js[^"]*)"', body)))[:15],
+                }
+            )
+        except requests.RequestException as exc:
+            out.append({"page": page, "error": type(exc).__name__})
+    return out
