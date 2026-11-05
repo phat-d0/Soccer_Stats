@@ -227,3 +227,4 @@
 {"league":"ARG","kinds":["inplay55"],"kickoffs":["2026-11-05T18:00:00+00:00"],"fetched_at":"2026-11-05T18:58:18+00:00","status":200,"cost":1,"credits_left":4960356,"events":15,"rows":7}
 {"league":"UECL","kinds":["inplay75"],"kickoffs":["2026-11-05T17:45:00+00:00"],"fetched_at":"2026-11-05T18:58:18+00:00","status":200,"cost":1,"credits_left":4960355,"events":18,"rows":51}
 {"league":"UEL","kinds":["inplay75"],"kickoffs":["2026-11-05T17:45:00+00:00"],"fetched_at":"2026-11-05T18:58:18+00:00","status":200,"cost":1,"credits_left":4960354,"events":17,"rows":64}
+{"league":"ARG","kinds":["inplay75"],"kickoffs":["2026-11-05T18:00:00+00:00"],"fetched_at":"2026-11-05T19:18:18+00:00","status":200,"cost":1,"credits_left":4960353,"events":15,"rows":6}
