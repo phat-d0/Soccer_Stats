@@ -104,6 +104,14 @@ Lean (rule_version 2) or Model (f) vs DraftKings corners under 60% opens a paper
 Push through the owner's Cloudflare Worker (`push/`); off until he sets it up (KV id in
 `push/wrangler.jsonc`, Worker secrets, GitHub secrets `ALERT_URL` and `ALERT_TOKEN`).
 
+**Understat outage** (since about 02:00 UTC 2 Nov 2026): every Understat URL answers 200 with a
+"We will come back soon" page (probe run 42002616096). The fetcher cached that page over each
+2026/27 league file and one bad file dropped every season's xG, so E0, SP1, D1, I1 and F1 ran
+goals-only from 2 Nov (13 trades with `model_ref.xg_weight` 0). Fixed: bad answers are never
+cached, each season loads alone, and the good 2026/27 files (through 1 Nov) come back from the
+raw-data cache of 2 Nov 00:50 (`odds-check.yml` `task=understat-restore`, `restore_key`
+41369190298). Matches since then use goals until Understat returns; the cache heals itself then.
+
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
 settlement runs after them.
@@ -182,6 +190,14 @@ settlement runs after them.
   vs 72%), which a free cash-out uses and a 5% fee cancels. Holding lost −25.3% per $1, but the
   sample left out B/C/H's matches (underdogs leading at half-time), so the hold level is biased
   low; with B and C's put back −17.0%. App file `lab/cashout_research.json`.
+- DraftKings vs Pinnacle's fair price, model-free (lead, 5 Nov; `docs/lab.md`): **withdrawn,
+  untestable**. At the 48 h look DraftKings beats Pinnacle's fair price on about 15 matches a
+  year (2023/24–2024/25), 2–3 by 1%. It is replaced by **Line shop vs Pinnacle** (owner-approved
+  5 Nov, rules frozen; no outcome read): the best of DraftKings, FanDuel, BetMGM and BetRivers
+  at ≥ 2% over Pinnacle's Shin-fair price at the first logged moment, $10, one bet per match;
+  a 1% shadow; judged once at 300 bets on CLV against the every-book log's last Pinnacle quote
+  before kickoff. About 2.3 bets a day in the live week, so around mid-March 2027. Moneyline
+  builds the paper track after the Understat fix.
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
@@ -210,11 +226,7 @@ the owner's baseball app, so the balance can drop without any run here.
 
 **Scheduled checks** (one-shot scheduled tasks; the lead's fire into the lead session, moved there
 on 4 Nov; trigger ids):
-- 4 Nov 2026 (`trig_016gMQ6Y12ZgiepQdriGfta5`, Moneyline): the first week of in-play spend per
-  competition vs the estimate, sent to the lead.
-- 5 Nov 2026 (`trig_01BD81adxDq5AHTLKpsT34jo`, Moneyline): the VIKING FK duplicates voided, then
-  closes and results matched without case (PR).
-- 7 Nov 2026 (`trig_01W2Xvga5S7YcAnXE1w14fTj`, Player props): the first live goalscorer calls
+- 7 Nov 2026 (`trig_01HeboZFRkoZgkXr5Wu7tjCv`, Player props): the first live goalscorer calls
   (§16 step 2), sent to the lead.
 - 9 Nov 2026 (`trig_01NcdPu9HNaDgmjheEy8HFsY`): Lean refit (`backfill.yml` `match_blends`, then
   `lean_backtest`) and Lean live tracking by driver.
@@ -270,7 +282,7 @@ on 4 Nov; trigger ids):
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, espn, understat, understat-restore. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`, and the bet-alert Worker's tests (`node --test push/test/*.test.mjs`, no Cloudflare account). Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
@@ -336,8 +348,20 @@ on 4 Nov; trigger ids):
   `test_off_leagues_stay_out_of_every_live_list_and_data_json`). How to switch one on and
   what it costs: `docs/leagues.md`.
 - `data.py`: football-data loaders; `pinnacle_closes`/`pinnacle_only` and `pinnacle_prices`
-  return Pinnacle's own prices (no average/Bet365 fallback). `xg.py`: Understat xG merged onto
-  football-data (`TEAM_NAMES`). `players.py`: FPL availability → team adjustments (E0).
+  return Pinnacle's own prices (no average/Bet365 fallback). `_fetch(..., validate=)`: a body
+  failing `validate` is never written, the good cached copy is kept (named in `data.STALE`), and
+  a cached file failing it counts as missing (`BadResponse` when there's no good copy).
+  `xg.py`: Understat xG merged onto football-data (`TEAM_NAMES`). `fetch_season` validates with
+  `check_league_json` (JSON with a `dates` list, not HTML; `player_data.fetch_match` uses
+  `check_match_json`), `stale_ok`. `with_xg` loads each league-season on its own: a missing
+  season costs only its matches (goals there) and the error names it and any stale file.
+  `probe` (CLI `understat-probe`, `odds-check.yml` `task=understat`, also lists the raw-data
+  caches held) and `repair_from` (CLI `understat-repair`, `task=understat-restore` with
+  `restore_key` = an older raw-data cache's run id: good league files copied over bad ones,
+  saved as the newest `raw-data-` on the default branch only). `publish.xg_status`/`xg_line`
+  print one line per Understat league ("xG La Liga: 81% of fit matches, this season 0%"), with
+  "WARNING: no xG, goals-only model" or "WARNING: xG missing for this season's matches".
+  `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
   off by default.
@@ -659,6 +683,12 @@ on 4 Nov; trigger ids):
     case: ESPN renamed a Champions League club only in case between builds ("VIKING FK", then
     "Viking FK", 18 Oct) and that opened a second trade. `publish.duplicate_fixtures` also
     compares names without case. Domestic cards take football-data's names and can't split.
+    Closes and results match names without case too (lead, 5 Nov; `odds_log.name_key`,
+    `same_teams`): `odds_log.last_before` (DraftKings and every-book closes), the entry
+    quote, the corner closes (`paper._quote_at`), `paper._result`, `_espn_result`,
+    `_corner_result`, `espn_results.match_events` and the moved-match check in `paper`
+    and `paper_dnb`, so a case-only rename after a trade opens neither loses its close
+    nor voids it.
   - `PAPER_RULE = "fixed_raw"` (`PAPER_RULES` also has `"learned"`; reverting is one line).
     `paper_threshold(dk, league)` under `fixed_raw` = `{threshold: 0.12, source: "owner_fixed",
     note: OWNER_FIXED_NOTE, rule: "fixed_raw", p_source: "model"}` in every league; the trade uses
@@ -959,11 +989,13 @@ on 4 Nov; trigger ids):
   comeback test (`MIN_FAV`; Pinnacle's close, else the average's close). Counts trailing at half-time,
   slots and credits for the eight leagues 2025/26–2026/27 (`EIGHT_YEARS`) and `OTHER` leagues with sport
   keys 2022/23–2025/26; `needed(gap)` sizes the sample. `odds-check.yml` `task=heavy-favourites`, log
-  line `HEAVY_FAVOURITES_JSON`; `docs/lab.md` "Heavy favourites (75%+)" (DRAFT, not approved).
+  line `HEAVY_FAVOURITES_JSON`; `docs/lab.md` "Heavy favourites (75%+)" (the free scope; the draft there was replaced by
+  design H's final pre-registration, frozen and run: H ∪ H2 inconclusive, run 40764816980).
 - `lab/heavy_more.py` (lead, 28 Oct; free, no key): counts for the 75%+ idea beyond design H. It
   covers the domestic and UEFA cups (ESPN half-times; `DOMESTIC` = FAC, EFLC, CDR, DFBP, CI, CDF),
   football-data's extra leagues joined to ESPN half-times, and earlier priced seasons. ESPN days
-  are cached in `heavy-espn-*`, and a run is resumable within `--minutes`. `why(exc)` names each
+  are cached in `heavy-espn-*` (saved on the `team/research` branch only, with no keep-alive
+  row; a new study needing these days caches them from the default branch), and a run is resumable within `--minutes`. `why(exc)` names each
   error's type and line. `cup_prematch_slots` builds design H2P: one pre-match snapshot per
   domestic cup kickoff slot holding a match not level at half-time, at kickoff − 5 min (no guard,
   no score kept). `--prematch-out` prints `CUP_PREMATCH_SHA256` and `CUP_PREMATCH_JSON`.
@@ -982,8 +1014,9 @@ on 4 Nov; trigger ids):
   (Shin-fair, Pinnacle else DraftKings) and how many trailed at half-time (`half_times`: the
   cached `heavy-espn-*` days, names, status and half-time only); H2U adds the held UCL closes
   (`ucl_closes`, data-log `odds_history/UCL_closes.jsonl`). `odds-check.yml`
-  `task=prematch-coverage` with `design`; run it on `team/research` (where `heavy-espn-*` is
-  saved). Log lines `PREMATCH_COVERAGE_JSON`, `PREMATCH_TRAILING_JSON`. H2P (run 40750915981):
+  `task=prematch-coverage` with `design`; dispatch it on the `team/research` branch itself
+  (`heavy-espn-*` lives only there; GitHub caches are per branch, so a `team/research-<topic>`
+  branch can't see it). Log lines `PREMATCH_COVERAGE_JSON`, `PREMATCH_TRAILING_JSON`. H2P (run 40750915981):
   359 of 911 snapshots held events; 722 of 1,686 matches priced, 697 of them FA Cup or EFL Cup.
   H2U (run 40753094483, 3,800 credits): 380 of 419 snapshots held events; 1,250 of 1,481 matches
   priced with the held UCL closes. `trailing` also returns `trailing_list` (the matches).
@@ -991,17 +1024,17 @@ on 4 Nov; trigger ids):
   H2"): the 75%+ favourites trailing at half-time from H2P, H2U (with the held UCL closes) and
   `heavy_more`'s extra leagues (`extra_league` now lists `trailing_list`; its KeyError in a
   season without a heavy favourite is fixed), one snapshot per slot at kickoff + 55 min, guard
-  on, nothing used by B, C, H or X. `odds-check.yml` `task=h2-slots` (run it on
-  `team/research`), log lines `H2_SLOTS_SHA256`, `H2_SLOTS_JSON`. The frozen file is
+  on, nothing used by B, C, H or X. `odds-check.yml` `task=h2-slots` (dispatch it on the
+  `team/research` branch itself, as above), log lines `H2_SLOTS_SHA256`, `H2_SLOTS_JSON`. The frozen file is
   `lab/comeback_h2_slots.json` (70 slots, 700 credits, SHA aeadf289…, run 40755843673), bought
-  by `comeback_fetch --slots H2` (cap 1,000) from the default branch after the plan merges.
+  by `comeback_fetch --slots H2` (cap 1,000) from the default branch: bought and analysed (below).
 - `lab/heavy_analysis.py` (lead, 28 Oct; no key): the 75%+ favourites' judged analysis, H ∪ H2
   (`docs/lab.md` "Design H2"). H's rows from `comebacks2.match_rows`; H2's (`h2_rows`) through the
   same quote checks (`quote_fields`), events by `prematch_coverage.find_side`, results from
   ESPN's 90-minute score (`espn_results`, cups) or football-data's extra file (`extra_result`).
   `verdict`: ≥ `MIN_BETS` 136 usable and the ROI range above 0, else fail, or "inconclusive" under
   136. `designs` pooled (judged), H, H2, cups, leagues; `app_file` → `lab/heavy_favourites_research.json`
-  (`RUNS`, `COST`). `odds-check.yml` `task=heavy-analysis` (run it once, on `team/research`),
+  (`RUNS`, `COST`). `odds-check.yml` `task=heavy-analysis` (run it once, on the `team/research` branch itself),
   log lines `HEAVY_ANALYSIS_JSON`, `HEAVY_RESEARCH_SHA256`, `HEAVY_RESEARCH_JSON`. Run once
   (40764816980): inconclusive, 114 bets.
 - Research studies (owner, 28 Oct; shown by the app under Portfolio, registered in
@@ -1065,6 +1098,12 @@ on 4 Nov; trigger ids):
   `lab/strategy_search_research.json` (comeback research shape). Result (run 40646880618): 11,857
   arms, best CLV +1.3% with reality-check p 0.94, 2% of large arms above 0: no strategy found,
   holdout still locked.
+- `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
+  Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
+  `report`; per league, season, T and freshness; no result, close or CLV read).
+  `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
+  It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
+  15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
@@ -1111,8 +1150,8 @@ on 4 Nov; trigger ids):
     reaches 50%"), `strategy_search` (`strategy_search_research.json`, Moneyline; committed, #131). A search
     study's judged design carries `arms`, `best_clv`, `best_roi`, `reality_check`,
     `positive_share`, `by_market`, `top_clv`, `top_roi`, `finalists` and `sizing`, and the file
-    `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`, still
-    buying on 28 Oct) is `lab/cashout_test.py`'s `analyse` output laid into the same file:
+    `bets_of`; the app gives it its own view. A cash-out study (`cashout_research.json`; the
+    test is closed: fail, rerun 40709968765) is `lab/cashout_test.py`'s `analyse` output laid into the same file:
     `kind: "cashout"`, `primary_rule` {t, m, s} (0.50, 0.05, 0.02), `test_verdict` (its `verdict`
     dict), `designs.primary` (judged, the 4.0+ band: `analyse_band`'s positions, won, avg_entry,
     quoted_ht, quoted_m70, `variants` [hold; cash T/m with decisions, at_ht, at_m70; kelly m/s],
@@ -1161,7 +1200,7 @@ on 4 Nov; trigger ids):
   estimate-corners, estimate-cups, fit-match-blends, backtest-dk, backtest-lean, backtest-edge12,
   backtest-edge12-filters, backtest-band-edges, backtest-dnb, backtest-players, backfill-odds,
   backfill-player-odds, backfill-cup-odds, match-markets, team-totals-report, espn-probe,
-  goalscorer-pilot, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
+  goalscorer-pilot, understat-probe, understat-repair, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
   player-segments, corner-history-probe, cup-corners). `cup_and_league_results` gives the
   paper step football-data and ESPN cup results (tagged `result_source`).
 
@@ -1578,7 +1617,7 @@ on 4 Nov; trigger ids):
 
 Process:
 - Specialists work as separate cloud sessions on `team/<name>` (`team/moneyline`,
-  `team/research`, `team/player-props`, `team/ui`). They push only their branch, never merge,
+  `team/research-<topic>`, `team/player-props`, `team/ui`). They push only their branch, never merge,
   never push `data-log` by hand, and open a pull request into `claude/soccer-stats-scaffold`.
 - Each PR updates the parts of CLAUDE.md it changes (code map, App, and "Current state" when a
   live fact or verdict changes). Dated round notes go in the PR body and, if worth keeping, in
@@ -1600,10 +1639,13 @@ it no longer answers):
    `main`), title it "Soccer model lead" and have it read this file.
 2. `list_triggers`: for every scheduled task whose `persistent_session_id` is the old lead,
    create the same one-shot task in the new session (same time, prompt brought up to date),
-   then delete the old one. A task bound to a team session can only have its prompt edited
-   from that session, so ask the team to edit any prompt that names the old lead.
-3. `send_message` each team session the new lead id (they report to the lead by id).
-4. Update the lead id here and the trigger ids under "Scheduled checks", and open a PR.
+   then delete the old one.
+3. Start each team session from the new lead with `create_session` (title "Soccer team: <Role>",
+   the default branch, `outcome_branch` its `team/<name>`, tags `soccer-team`,
+   `soccer-team:<role>`; the prompt names the lead's id and the agent file), so the app nests them
+   under the lead. Move each team's scheduled tasks to its new session (create there, delete the
+   old) and retire the old team sessions once their open work is pushed.
+4. Update the lead and team ids here and the trigger ids under "Scheduled checks", and open a PR.
 5. Check that nothing was left open: `list_pull_requests` (open), the latest `publish.yml`,
    `closes.yml` and `inplay.yml` runs, and the old lead's last `post_turn_summary`.
 
@@ -1611,14 +1653,17 @@ Keep the lead's context small: read CLAUDE.md's "Current state" rather than old 
 delegate long reads to subagents, and start a fresh lead session (steps above) when the context
 nears its limit rather than letting it run on.
 
-**Team sessions** (message with claude-code-remote `send_message`, check with `get_session`):
+**Team sessions** (message with claude-code-remote `send_message`, check with `get_session`). Since
+5 Nov they are created by the lead session (`create_session`), so the app lists them under it, as
+the baseball team does. The first team sessions (created by the first lead) were retired then.
+
 
 | Session title | Session id | Branch |
 | --- | --- | --- |
-| Soccer team: Moneyline | session_01SHL1YZ5knBRSduL7vurWN7 | team/moneyline |
-| Soccer team: Research lab | session_019c4cFKhKCuU6mdEtYqoUxp | team/research |
-| Soccer team: Player props | session_01C8B5tL2iAqVcZ7cYbz2bdc | team/player-props |
-| Soccer team: UI Design | session_01YUi3o1ueWm8BePMSWeB2hb | team/ui |
+| Soccer team: Moneyline | session_01UShqQynmnE1egcCsoeQvyq | team/moneyline |
+| Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
+| Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
+| Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub

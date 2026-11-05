@@ -102,6 +102,41 @@ def safe_fit_info(model, rows: pd.DataFrame, kind: str = "domestic") -> dict:
         return {"kind": kind, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def xg_status(league: str, matches: pd.DataFrame, error: str | None) -> dict | None:
+    """How much xG one Understat league's fit got, for the publish log (None elsewhere).
+
+    `coverage` = share of the fit's matches with xG, `season_coverage` = the same for the
+    current season (the matches the time weighting counts most), `error` = with_xg's.
+    """
+    if league not in XG_LEAGUES or matches.empty:
+        return None
+    has = matches["home_xg"].notna()
+    season = matches["date"] >= f"{current_season()}-07-01"
+    return {
+        "coverage": float(has.mean()),
+        "season_coverage": float(has[season].mean()) if season.any() else None,
+        "error": error,
+    }
+
+
+def xg_line(league: str, status: dict | None) -> str | None:
+    """'xG Premier League: 72% of fit matches, this season 0%' with a plain WARNING when
+    xG is missing or partial (the model then uses goals for those matches)."""
+    if status is None:
+        return None
+    season = status["season_coverage"]
+    line = f"xG {lgs.name(league)}: {status['coverage']:.0%} of fit matches" + (
+        f", this season {season:.0%}" if season is not None else ""
+    )
+    if status["coverage"] == 0:
+        line = "WARNING: no xG, goals-only model. " + line
+    elif season is not None and season < 0.9:
+        line = "WARNING: xG missing for this season's matches (goals used there). " + line
+    if status["error"]:
+        line += f". {status['error']}"
+    return line
+
+
 def fit_info(model: DixonColes, rows: pd.DataFrame, kind: str = "domestic") -> dict:
     """One league's match-model fit for Portfolio's model view (paper.models_section):
     its home advantage, rho, intercept, the time weight xi (and its half-life), the xG
@@ -1029,13 +1064,14 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
     season = current_season()
     try:
         matches = load_matches([league], range(season - TRAIN_SEASONS + 1, season + 1))
-        matches, _ = with_xg(matches)
+        matches, xg_error = with_xg(matches)
         fixtures = upcoming_fixtures(league, now=now)
         known = _season_teams(matches, season)
         fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
         weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
         model = dashboard.fit_model(matches, xg_weight=weight)
         source["model_fit"] = safe_fit_info(model, matches)
+        source["xg_status"] = xg_status(league, matches, xg_error)
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))
         counts = dashboard.match_counts(matches, teams or sorted(model.teams))
         cards = fixture_cards(model, fixtures, counts, league=league)
@@ -1298,6 +1334,9 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
             teams_by_league[code] = _clean(block)
         data["fixtures"] = sorted(data["fixtures"] + _clean(cards), key=lambda f: f["kickoff"])
         print(f"{lgs.name(code)}: {len(cards)} fixtures, odds {sources[code].get('name')}")
+        line = xg_line(code, sources[code].pop("xg_status", None))
+        if line:
+            print(line)
     for code, src in sources.items():
         if src.get("unmatched"):  # priced matches that joined no fixture
             print(
@@ -1446,6 +1485,9 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
         f"{data['matches_fit']} matches fit, xG coverage {data['xg_coverage']:.0%}"
         + (f", xG error: {xg_error}" if xg_error else "")
     )
+    line = xg_line(league, xg_status(league, matches, xg_error))
+    if line:
+        print(line)
     adjusted = [f for f in data["fixtures"] if f["news_applied"]]
     if news:
         unmatched = sorted(set(data["teams"]) - set(news))

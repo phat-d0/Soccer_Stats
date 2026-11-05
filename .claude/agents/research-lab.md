@@ -15,7 +15,9 @@ live since 10 Oct, and League One, League Two and the Champions League since 13 
 1. `git fetch origin claude/soccer-stats-scaffold`, then read "Current state" from
    `origin/claude/soccer-stats-scaffold` (`git show origin/claude/soccer-stats-scaffold:CLAUDE.md`),
    not from an old branch.
-2. Cut `team/research` fresh from the default branch (or merge the default branch into it first).
+2. Cut a fresh `team/research-<topic>` branch from the default branch for each task. The old
+   `team/research` branch stays only for the tasks that need its `heavy-espn-*` cache
+   (`prematch-coverage`, `h2-slots`, `heavy-analysis`; CLAUDE.md code map).
 3. In a long-running session, re-read it before each new task: your earlier context may be stale.
 4. If something in the notes looks wrong, tell the lead rather than acting on an older belief.
 
@@ -63,4 +65,4 @@ Don't edit live model code owned by moneyline or player-props. Hand a winner ove
 - **Dependencies:** new ones (e.g. LightGBM) go in `pyproject.toml` and `uv.lock` via `uv add`. Keep CI under about 5 minutes and tests fast, using synthetic data in tests.
 - **Docs:** results go in `docs/lab.md` / `docs/totals.md`; update CLAUDE.md's research code map and its "Current state" research verdicts when a verdict changes.
 - **Before you finish:** `uv run ruff format src tests && uv run ruff check src tests && uv run pytest -q` must all pass.
-- When done, push `team/research` and **open a pull request** into `claude/soccer-stats-scaffold` with the GitHub MCP tools: an imperative title; a body with what changed, results with sample sizes and ranges, the checks you ran and any handoffs; end the body with the attribution lines your session gives. Never merge it yourself: the lead-reviewer reviews and merges the PR. If the lead asks for changes, push them to the same branch and the PR updates.
+- When done, push your `team/research-<topic>` branch and **open a pull request** into `claude/soccer-stats-scaffold` with the GitHub MCP tools: an imperative title; a body with what changed, results with sample sizes and ranges, the checks you ran and any handoffs; end the body with the attribution lines your session gives. Never merge it yourself: the lead-reviewer reviews and merges the PR. If the lead asks for changes, push them to the same branch and the PR updates.

@@ -190,8 +190,7 @@ def _result(results: pd.DataFrame, trade: dict) -> dict | None:
     if results is None or results.empty:
         return None
     r = results[
-        (results["home"] == trade["home"])
-        & (results["away"] == trade["away"])
+        ol.same_teams(results, trade["home"], trade["away"])
         & (results["season"].astype(str) == trade["season"])
     ]
     return r.iloc[0].to_dict() if not r.empty else None
@@ -208,8 +207,7 @@ def _espn_result(espn: pd.DataFrame | None, trade: dict) -> dict | None:
     if espn is None or espn.empty:
         return None
     r = espn[
-        (espn["home"] == trade["home"])
-        & (espn["away"] == trade["away"])
+        ol.same_teams(espn, trade["home"], trade["away"])
         & (espn["season"].astype(str) == trade["season"])
     ]
     if "league" in r and trade.get("league"):
@@ -385,6 +383,8 @@ def update_ledger(
         note = f"DraftKings odds are over {FRESH_HOURS:g} hours old, so no new trades this update."
 
     cards = {(c["home"], c["away"]): c for c in fixtures if c.get("kickoff")}
+    # The moved-match check finds the card whatever the case of the names.
+    by_name = {(ol.name_key(h), ol.name_key(a)): c for (h, a), c in cards.items()}
 
     # 1. Open.
     sigma = (lean or {}).get("sigma")
@@ -483,7 +483,7 @@ def update_ledger(
         if t["status"] != "open" or t["source"] != "live":
             continue
         kickoff = pd.Timestamp(t["kickoff"])
-        c = cards.get((t["home"], t["away"]))
+        c = by_name.get((ol.name_key(t["home"]), ol.name_key(t["away"])))
         if c and abs(pd.Timestamp(c["kickoff"]) - kickoff) > pd.Timedelta(hours=VOID_MOVED_HOURS):
             events.append(
                 _update(
@@ -603,8 +603,7 @@ def _entry_quote(t: dict, log: pd.DataFrame) -> dict | None:
     k = pd.Timestamp(t["kickoff"])
     k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
     m = log[
-        (log["home"] == t["home"])
-        & (log["away"] == t["away"])
+        ol.same_teams(log, t["home"], t["away"])
         & (log["market"] == "h2h")
         & ((log["kickoff"] - k).abs() <= ol.KICKOFF_TOLERANCE)
     ]
@@ -899,8 +898,7 @@ def _corner_result(results: pd.DataFrame | None, t: dict) -> dict | None:
     if results is None or results.empty:
         return None
     r = results[
-        (results["home"] == t["home"])
-        & (results["away"] == t["away"])
+        ol.same_teams(results, t["home"], t["away"])
         & (results["season"].astype(str) == t["season"])
     ]
     if "league" in r and t.get("league"):
@@ -976,8 +974,9 @@ def _quote_at(quotes: dict, t: dict) -> dict | None:
 
     k = cl._ts(t["kickoff"])
     q = None
+    want = (ol.name_key(t["home"]), ol.name_key(t["away"]), t["team_side"], float(t["line"]))
     for (_, h, a, kq, side, line), r in quotes.items():
-        if (h, a, side, line) == (t["home"], t["away"], t["team_side"], float(t["line"])):
+        if (ol.name_key(h), ol.name_key(a), side, line) == want:
             if abs(kq - k) <= KICKOFF_TOLERANCE:
                 if q is None or cl._ts(r["downloaded_at"]) > cl._ts(q["downloaded_at"]):
                     q = r
