@@ -2223,7 +2223,10 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
 def _run_lineshop(data, log_dir, codes, primary, now, results, espn) -> tuple[int, dict]:
     """Update the line-shop ledger in every league in play (paper_lineshop.update_ledger on
     the every-book log); returns (events written, {trades, defined_at})."""
-    defined = plsh.defined_at(log_dir, now)
+    # The start is stamped once there is an every-book log to replay (always on data-log);
+    # a run with nothing to read writes nothing.
+    has_books = any(ol.log_dir(log_dir).glob(f"*_{ol.BOOKS}*.jsonl"))
+    defined = plsh.defined_at(log_dir, now, write=has_books)
     events: list[dict] = []
     trades: list[dict] = []
     for lg in codes:

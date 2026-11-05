@@ -164,10 +164,11 @@ def append_events(log_dir: Path, events: list[dict]) -> int:
     return len(events)
 
 
-def defined_at(log_dir: Path | None, now: pd.Timestamp) -> str:
+def defined_at(log_dir: Path | None, now: pd.Timestamp, write: bool = True) -> str:
     """When the track went live: read from paper_trades/lineshop_defined.json, written on
     the first call with a ledger directory (the first default-branch paper run after the
-    merge; branch runs never keep data-log). Without a ledger directory, `now`."""
+    merge; branch runs never keep data-log). Without a ledger directory, or with `write`
+    False (no every-book log to replay yet), `now`, and nothing is written."""
     stamp = pd.Timestamp(now).isoformat(timespec="seconds")
     if log_dir is None:
         return stamp
@@ -177,6 +178,8 @@ def defined_at(log_dir: Path | None, now: pd.Timestamp) -> str:
             return json.loads(path.read_text())["defined_at"]
         except (ValueError, KeyError):
             pass
+    if not write:
+        return stamp
     path.parent.mkdir(parents=True, exist_ok=True)
     rec = {
         "defined_at": stamp,

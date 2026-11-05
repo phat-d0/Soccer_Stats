@@ -231,3 +231,10 @@ def test_the_judged_read_waits_for_300_bets():
         [bet(i, 0.02 + i % 3 * 0.001) for i in range(300)], "2026-11-06T00:00:00+00:00"
     )
     assert many["verdict"] == "pass" and many["clv_ci95"][0] > 0 and many["read"] == 300
+
+
+def test_defined_at_is_not_written_without_a_books_log(tmp_path):
+    assert ls.defined_at(tmp_path, moment(0), write=False) == moment(0).isoformat(
+        timespec="seconds"
+    )
+    assert not (tmp_path / "paper_trades").exists()
