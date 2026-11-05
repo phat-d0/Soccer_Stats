@@ -388,6 +388,7 @@ jobs:
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
+          GH_TOKEN: ${{ inputs.task == 'understat' && github.token || '' }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -555,7 +556,12 @@ jobs:
               rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
-            understat) uv run soccer-stats understat-probe ;;  # no key: Understat's answers + cache
+            understat)  # no key: Understat's answers, the cached files, the raw-data caches held
+              uv run soccer-stats understat-probe
+              curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/caches?key=raw-data-&per_page=100&sort=created_at&direction=desc" |
+                jq -c '.actions_caches[] | {key, ref, created_at, last_accessed_at, size_in_bytes}' |
+                sed 's/^/RAW_DATA_CACHE /' ;;
             espn)  # no key: ESPN slugs, names (vs football-data's clubs), summary shape
               if [ -n "$LEAGUES" ]; then
                 uv run soccer-stats espn-probe --leagues "$LEAGUES" --back 21

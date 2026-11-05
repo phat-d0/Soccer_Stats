@@ -82,14 +82,42 @@ TEAM_NAMES = {
 }
 
 
+def check_league_json(body: bytes) -> None:
+    """Raise unless `body` is Understat league data: JSON with a non-empty `dates` list.
+
+    Understat has answered with an HTML page (status 200) since 2 Nov 2026; caching that
+    page in place of the season's JSON is what turned xG off.
+    """
+    if body.lstrip()[:1] == b"<":
+        raise ValueError(f"an HTML page ({len(body):,} bytes), not JSON")
+    data = json.loads(body)
+    dates = data.get("dates") if isinstance(data, dict) else data
+    if not isinstance(dates, list) or not dates:
+        raise ValueError("JSON without any matches")
+
+
+def check_match_json(body: bytes) -> None:
+    """Raise unless `body` is one Understat match's JSON (a dict, not an HTML page)."""
+    if body.lstrip()[:1] == b"<":
+        raise ValueError(f"an HTML page ({len(body):,} bytes), not JSON")
+    if not isinstance(json.loads(body), dict):
+        raise ValueError("JSON that isn't a match")
+
+
 def fetch_season(league: str, start_year: int, raw_dir: Path = RAW_DIR) -> Path:
-    """Download (and cache) Understat's league-season JSON. Live season refreshes every 12h."""
+    """Download (and cache) Understat's league-season JSON. Live season refreshes every 12h.
+
+    A bad answer (HTML, empty) is never cached: the last good file is kept and used,
+    and a cached file that isn't good league JSON is fetched again.
+    """
     us_league = LEAGUES[league]
     return _fetch(
         URL.format(league=us_league, season=start_year),
         raw_dir / f"understat_{us_league}_{start_year}.json",
         max_age_hours=12 if start_year >= current_season() else None,
         headers=HEADERS,
+        stale_ok=True,
+        validate=check_league_json,
     )
 
 
