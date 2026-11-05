@@ -28,7 +28,7 @@ from pathlib import Path
 import pandas as pd
 
 from soccer_stats.data import RAW_DIR, _fetch
-from soccer_stats.xg import HEADERS, TEAM_NAMES, fetch_season
+from soccer_stats.xg import HEADERS, TEAM_NAMES, check_match_json, fetch_season
 
 MATCH_URL = "https://understat.com/getMatchData/{id}"
 ON_TARGET = {"Goal", "SavedShot"}
@@ -83,7 +83,13 @@ def match_path(match_id: str, raw_dir: Path = RAW_DIR) -> Path:
 
 
 def fetch_match(match_id: str, raw_dir: Path = RAW_DIR) -> Path:
-    return _fetch(MATCH_URL.format(id=match_id), match_path(match_id, raw_dir), None, HEADERS)
+    return _fetch(
+        MATCH_URL.format(id=match_id),
+        match_path(match_id, raw_dir),
+        None,
+        HEADERS,
+        validate=check_match_json,
+    )
 
 
 def parse_match(data: dict, meta: dict) -> list[dict]:

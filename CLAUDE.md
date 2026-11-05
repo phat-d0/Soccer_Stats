@@ -68,7 +68,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   trades opened from 23 Oct 08:39 UTC (`trades.SHADOW_DEFINED_AT`), on the matched CLV difference
   vs Pinnacle's close, at the 8 Dec review; no live change unless the owner decides then.
 - In the app (v60, owner, 25 Oct) the two under-60% lines are the main corner strategies and the
-  plain 12% tracks sit in the Archive; every ledger is unchanged.
+  plain 12% tracks sit in the Archive; every ledger is unchanged. Since v71 (owner, 5 Nov: he bets
+  at DraftKings) DraftKings' line leads, in the list and the Archive, and its under-60% line is the
+  portfolio's headline; Pinnacle runs beside it and its close stays the judged CLV.
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -95,6 +97,14 @@ since 10 Oct 3,101 (bought, not read); live logging runs in `publish.yml`.
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
+
+**Understat outage** (since about 02:00 UTC 2 Nov 2026): every Understat URL answers 200 with a
+"We will come back soon" page (probe run 42002616096). The fetcher cached that page over each
+2026/27 league file and one bad file dropped every season's xG, so E0, SP1, D1, I1 and F1 ran
+goals-only from 2 Nov (13 trades with `model_ref.xg_weight` 0). Fixed: bad answers are never
+cached, each season loads alone, and the good 2026/27 files (through 1 Nov) come back from the
+raw-data cache of 2 Nov 00:50 (`odds-check.yml` `task=understat-restore`, `restore_key`
+41369190298). Matches since then use goals until Understat returns; the cache heals itself then.
 
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
@@ -266,7 +276,7 @@ on 4 Nov; trigger ids):
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, espn. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, espn, understat, understat-restore. Other inputs: `cap` (credit cap for coverage, props, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev or forward). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `ci.yml` | Every push and PR. Job `test`: `uv sync --frozen`, ruff format check, ruff check, pytest, `node --check web/app.js`. Job `web` (pinned to `ubuntu-24.04`: Playwright 1.56.1 can't install Chromium on the Ubuntu 26.04 image `ubuntu-latest` has started handing out): Playwright Chromium (cached; install step limited to 5 min) runs `tests/web/smoke.mjs`; a skip fails; screenshots uploaded on failure. No secrets. | 0 |
@@ -332,8 +342,20 @@ on 4 Nov; trigger ids):
   `test_off_leagues_stay_out_of_every_live_list_and_data_json`). How to switch one on and
   what it costs: `docs/leagues.md`.
 - `data.py`: football-data loaders; `pinnacle_closes`/`pinnacle_only` and `pinnacle_prices`
-  return Pinnacle's own prices (no average/Bet365 fallback). `xg.py`: Understat xG merged onto
-  football-data (`TEAM_NAMES`). `players.py`: FPL availability → team adjustments (E0).
+  return Pinnacle's own prices (no average/Bet365 fallback). `_fetch(..., validate=)`: a body
+  failing `validate` is never written, the good cached copy is kept (named in `data.STALE`), and
+  a cached file failing it counts as missing (`BadResponse` when there's no good copy).
+  `xg.py`: Understat xG merged onto football-data (`TEAM_NAMES`). `fetch_season` validates with
+  `check_league_json` (JSON with a `dates` list, not HTML; `player_data.fetch_match` uses
+  `check_match_json`), `stale_ok`. `with_xg` loads each league-season on its own: a missing
+  season costs only its matches (goals there) and the error names it and any stale file.
+  `probe` (CLI `understat-probe`, `odds-check.yml` `task=understat`, also lists the raw-data
+  caches held) and `repair_from` (CLI `understat-repair`, `task=understat-restore` with
+  `restore_key` = an older raw-data cache's run id: good league files copied over bad ones,
+  saved as the newest `raw-data-` on the default branch only). `publish.xg_status`/`xg_line`
+  print one line per Understat league ("xG La Liga: 81% of fit matches, this season 0%"), with
+  "WARNING: no xG, goals-only model" or "WARNING: xG missing for this season's matches".
+  `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
   off by default.
@@ -1142,7 +1164,7 @@ on 4 Nov; trigger ids):
   estimate-corners, estimate-cups, fit-match-blends, backtest-dk, backtest-lean, backtest-edge12,
   backtest-edge12-filters, backtest-band-edges, backtest-dnb, backtest-players, backfill-odds,
   backfill-player-odds, backfill-cup-odds, match-markets, team-totals-report, espn-probe,
-  goalscorer-pilot, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
+  goalscorer-pilot, understat-probe, understat-repair, player-lab, goal-lab, goal-league, goal-pool, player-odds-check,
   player-segments, corner-history-probe, cup-corners). `cup_and_league_results` gives the
   paper step football-data and ESPN cup results (tagged `result_source`).
 
@@ -1150,7 +1172,7 @@ on 4 Nov; trigger ids):
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v70) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v71) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1239,15 +1261,21 @@ on 4 Nov; trigger ids):
   is the two under-60% lines, renamed by `stratLabel` from the variant's `filter` and rule:
   "Model (f) vs Pinnacle: 12% edge, under 60% to win" (meta "Only the 12%-edge picks model (f)
   gives under a 60% chance to win · judged from …"; `variantShort` "Under 60% to win" in
-  legends, readouts and the judged box). The top level lists the active strategies and
-  "· N archived". Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
+  legends, readouts and the judged box). Since v71 (owner, 5 Nov) DraftKings leads Team corners:
+  `leadOrder` puts the DraftKings track (and so its under-60% line) before Pinnacle's, in the main
+  list and the Archive (`CORNER_LEAD`, display only; `trades.CORNER_STRATEGY_ORDER` and the
+  ledgers keep Pinnacle first), and with nothing chosen a portfolio opens on its lead
+  (`pfSelected` falls back to `pfLead`). Since v63 (owner, 26 Oct) Moneyline's Model 12% is archived too
   (`PF_ARCHIVED.moneyline` {keys: edge12, since, note}; its ledger and paper trades unchanged),
   and a draw no bet track goes to the Archive with its parent (`archivedTrack` takes a
   DNB track's `variant_of`), so Moneyline's main list is Blend Lean and Lean's draw no bet track;
   the Archive note joins the old-rule sentence and the portfolio's `PF_ARCHIVED` note. The
-  top-level row's profit counts only active strategies (`activeTrades`: non-archived, non-DNB
-  sections' trades, each once; every trade when a portfolio has no sections), and the note says
-  so. **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
+  top-level row's profit and settled/open counts are the portfolio's lead strategy's
+  (`pfLead`: the first in its list that is not archived, a draw no bet track or a study;
+  `leadTrades`; every trade when a portfolio has no sections): Moneyline = Blend Lean, Team
+  corners = DraftKings under 60%; In-play research keeps its study headline. The meta names it
+  ("Lead: … · 1 more · 2 archived") and the note says "Profit is each portfolio's lead
+  strategy …". **Draw no bet tracks** (owner via the lead, 26 Oct; v62): `lean_dnb` and
   `edge12_dnb` (`adds: "dnb"`, `isDnbStrat`) each get their own row right after their parent in
   the main list (not the Archive), meta "Tracked beside the record · places no bets of its own ·
   a draw returns the stake" and, in place of a backtest line, the 24 Oct backtest's sentence from

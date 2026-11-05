@@ -145,6 +145,9 @@ corners* (`trades.PORTFOLIOS` id `corners`, status testing), in six live leagues
 | Close | the newest quote at the trade's line before kickoff (the close snapshot), CLV against Pinnacle's de-margined close (`clv_pinnacle`) |
 | Settlement | football-data's corner counts: over wins at count > line; a whole line that lands exactly is a push (void, stake back); void if the match moves 48h+ or no result in 14 days |
 
+In the app DraftKings' track leads (owner, 5 Nov: the book he bets) and its under-60% line is
+the portfolio's headline; Pinnacle's runs beside it, and Pinnacle's close stays the judged CLV.
+
 **DraftKings track (owner, 20 Oct).** The same rule runs a second time against
 DraftKings' team-corner prices, as its own strategy (`strategy: "draftkings"`, trade ids
 ending `|dk`; Pinnacle's trades and ids are unchanged, and a corner trade without
