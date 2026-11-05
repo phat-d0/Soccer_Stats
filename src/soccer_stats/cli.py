@@ -248,6 +248,16 @@ def cmd_team_totals_report(args: argparse.Namespace) -> None:
     print("MARKET_TEST_JSON " + json.dumps(mm, default=str))
 
 
+def cmd_understat_probe(args: argparse.Namespace) -> None:
+    """What Understat's endpoints answer now and what the raw cache holds (no key)."""
+    import json
+
+    from soccer_stats.xg import probe
+
+    for row in probe():
+        print("UNDERSTAT_PROBE " + json.dumps(row, default=str), flush=True)
+
+
 def cmd_espn_probe(args: argparse.Namespace) -> None:
     """Which ESPN league slugs answer, their team names and summary shape (no key)."""
     import json
@@ -3216,6 +3226,9 @@ def main(argv: list[str] | None = None) -> None:
     lo.add_argument("--log-dir", required=True, help="data-log checkout")
     lo.add_argument("--league", default="E0")
     lo.set_defaults(func=cmd_log_odds)
+
+    up = sub.add_parser("understat-probe", help="Understat endpoints and the cached xG files")
+    up.set_defaults(func=cmd_understat_probe)
 
     ep = sub.add_parser("espn-probe", help="ESPN league slugs, team names and summary shape")
     ep.add_argument("--leagues", default="", help="comma-separated codes (blank = every slug)")

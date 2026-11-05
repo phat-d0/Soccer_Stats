@@ -144,9 +144,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history or espn"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn or understat"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, inplay-probe, dk-history, espn, understat]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -555,6 +555,7 @@ jobs:
               rm out/lines.csv.gz out/players.json ;;
             shots) uv run python -m soccer_stats.edge.run shots --seasons "$SEASONS" \
                      --json out/shots.json ;;
+            understat) uv run soccer-stats understat-probe ;;  # no key: Understat's answers + cache
             espn)  # no key: ESPN slugs, names (vs football-data's clubs), summary shape
               if [ -n "$LEAGUES" ]; then
                 uv run soccer-stats espn-probe --leagues "$LEAGUES" --back 21
