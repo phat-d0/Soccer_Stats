@@ -3389,3 +3389,35 @@ leagues, rows, matches, edges, core: {close, early}, slices: {name: {label, leve
 cells, totals, rows, note}}, factors, multiplicity, note, warning, runs}`. Code
 `lab/residual_map.py`; `odds-check.yml` `task=residual-map` (no key, 0 credits). The file is
 printed in the log (`RESIDUAL_MAP_B64` chunks with its SHA-256) and committed from there.
+
+### Residual map: first file (2026-11-05; `odds-check.yml` `task=residual-map` run 42010585832, 0 credits, no key)
+
+**Partial: four leagues of eight.** E0, E1, E2 and E3 loaded: 9,454 matches and 28,362 outcome
+rows, 2019/20–2023/24. SP1, D1, I1 and F1 have no readable Understat file for any of these
+seasons in the caches (each answers with Understat's maintenance page, which it has served
+since 2 Nov). The map uses the live model with xG, so those four were not run on goals only.
+The file is rerun with all eight when Understat is back, and the 2024/25 lock stays.
+- **Europe slice:** 16 of 419 UEFA clubs map to these four leagues, so it is thin: 235 rows
+  "after Europe".
+- **xG luck slice:** Premier League only.
+
+**What is in it.** `lab/residual_map.json` (SHA-256 f2691382…, 76 KB): both core surfaces,
+the nine slices, `factors`, `multiplicity`, the note and the warning.
+
+**Multiplicity.** 357 cells, 205 with ≥ 200 rows. 14 of the 205 have a z range that excludes
+0, against about 10 expected by chance. The cells overlap, so this is a scale, not a test.
+
+**What stands out (descriptive; each is a lead to pre-register, not a finding):**
+- Where the model rates an outcome more than 5 points *below* the close, the outcome wins a
+  little *more* often than the close says. This holds for home sides: 2,462 rows, z = +0.022
+  (+0.003 to +0.041). It shows in several slices, because they share these rows.
+- So when the model disagrees most, the market is, if anything, not strong enough in the same
+  direction. That doesn't help the model, but it is consistent with the model's known
+  overconfidence (`docs/lab.md` "Price-band edge rule").
+- Draws the model likes by 2–5 points win less than the close says: 1,084 rows, z = −0.033
+  (−0.057 to −0.009).
+- Outcomes whose price shortened by 4+ points from the early price to the close won more than
+  even the close said: 1,315 rows, z = +0.030 overall. This is descriptive only: the move
+  isn't known when a bet is taken.
+- Promoted sides in their first 10 matches: −0.034 (254 rows); against a newcomer: +0.038
+  (480 rows). Both ranges include 0 in the totals.
