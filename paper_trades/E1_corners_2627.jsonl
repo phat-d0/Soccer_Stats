@@ -124,3 +124,15 @@
 {"type":"update","id":"E1|2627|Bristol City|Wolves|corners|away|5.5","at":"2026-11-04T22:01:00+00:00","status":"won","actual":5,"push":false,"profit":7.9,"score":"2-5 corners","settled_at":"2026-11-04T22:01:00+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Cardiff|West Ham|corners|away|5.5","at":"2026-11-04T22:01:00+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"4-6 corners","settled_at":"2026-11-04T22:01:00+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Wrexham|Middlesbrough|corners|home|4.5","at":"2026-11-04T22:01:00+00:00","status":"lost","actual":3,"push":false,"profit":-10.0,"score":"3-2 corners","settled_at":"2026-11-04T22:01:00+00:00","result_source":"espn"}
+{"type":"update","id":"E1|2627|Portsmouth|Swansea|corners|away|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"5-5 corners"}
+{"type":"update","id":"E1|2627|QPR|Burnley|corners|home|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"8-1 corners"}
+{"type":"update","id":"E1|2627|Watford|Lincoln|corners|away|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"7-6 corners"}
+{"type":"update","id":"E1|2627|Watford|Lincoln|corners|home|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"7-6 corners"}
+{"type":"update","id":"E1|2627|West Brom|Southampton|corners|away|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"3-5 corners"}
+{"type":"update","id":"E1|2627|Bristol City|Wolves|corners|away|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"2-5 corners"}
+{"type":"update","id":"E1|2627|Cardiff|West Ham|corners|away|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"E1|2627|Wrexham|Middlesbrough|corners|home|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"3-2 corners"}
+{"type":"update","id":"E1|2627|Birmingham|Millwall|corners|away|4.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"6-2 corners"}
+{"type":"update","id":"E1|2627|Derby|Norwich|corners|away|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"4-5 corners"}
+{"type":"update","id":"E1|2627|Portsmouth|Swansea|corners|home|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"5-5 corners"}
+{"type":"update","id":"E1|2627|Watford|Lincoln|corners|home|5.5","at":"2026-11-05T10:10:23+00:00","result_check":"ok","check_score":"7-6 corners"}
