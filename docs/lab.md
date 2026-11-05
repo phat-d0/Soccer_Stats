@@ -3435,3 +3435,128 @@ only):
   placed at scale.
 - *If approved:* Moneyline builds it after the Understat fix, as the paper track "Line shop vs
   Pinnacle" in the Moneyline portfolio, with the 1% shadow beside it.
+
+## Residual map: where the model and the market disagree, and who was right (owner via the lead, 5 Nov; exploratory, 0 credits; method written before any run)
+
+**Why.** The owner wants to know whether the match model is missing factors, and to see the
+patterns as shapes (a 3D surface the lead builds in the app from this file). This is a
+**map, not a test**:
+- no verdict, no bets, no pass rule;
+- nothing goes live from it;
+- any pattern it suggests needs its own pre-registration on data it never read.
+
+**Already tested, so not new here** (each is a slice below, but descriptive only):
+- xG form, xG minus goals form, rest days, and the model vs the early price (`docs/edge.md`
+  round 2, "Free signals": none earns blend weight);
+- league, price band, side, favourite, day, kickoff slot, strength gap and Lean's driver as bet
+  filters (the strategy search, 11,857 arms: no strategy found);
+- the model against Pinnacle's early price in eight leagues (bake-offs 1–3: nothing passes).
+What is new is the joint view: where on the price scale, and under which condition, the
+model's disagreement with the market carries information.
+
+**Data.**
+- The eight domestic leagues (E0, SP1, D1, I1, F1, E1, E2, E3), football-data and Understat.
+- Seasons: those `lean_backtest` scores (Pinnacle's early and close both on ≥ 90% of
+  matches), **2019/20–2023/24**. 2024/25 stays locked: it is the strategy search's holdout and
+  the last season Pinnacle prices in full (2025/26 only about half), so it is the clean season
+  for testing anything this map suggests. `lab.harness.Holdout` from 2024-07-01 checks every
+  frame. 2025/26 and 2026/27 are never loaded.
+- Every outcome (home, draw, away) of every match with Pinnacle's full early and close 1X2
+  and a walk-forward model chance: about 16,300 matches and 49,000 rows.
+- Per row: the model's walk-forward chance (Dixon-Coles, weekly refits, xG weight 0.7, goals
+  only in E1–E3, as `lean_backtest`), the blend `p_bet` (`lean_backtest.walk_forward`, 28-day
+  refits, where a fit exists), Pinnacle's Shin-fair early and close chances, and the result.
+
+**The core surface** (the lead's 3D view):
+- x = the market's fair chance at Pinnacle's close; edges 0, 0.10, 0.20, …, 0.70, 1.
+- y = model minus market (the model's chance minus Pinnacle's fair close); edges −∞, −0.10,
+  −0.05, −0.02, +0.02, +0.05, +0.10, +∞.
+- z = won minus the market's chance, averaged in the cell. Positive z = the outcome happened
+  more often than the close said.
+- Read together: in a cell with y > 0 (the model liked the outcome more than the market), z > 0
+  means the model was right, z ≈ 0 the market was.
+- Each cell: n rows, matches, mean x, mean y, win rate, z with a 95% range (2,000 draws
+  resampling matches within the cell, seed 0), and won minus the model's chance. Cells under
+  200 rows are kept and marked `thin`.
+- A second surface uses Pinnacle's **early** price for x, y and z (the price a bet is taken at).
+
+**Slices.** Each is a 2D grid: the factor's levels × five bands of model minus market (the
+close; < −0.05, −0.05 to −0.02, −0.02 to +0.02, +0.02 to +0.05, > +0.05), plus each level's
+total. z is won minus the close in every cell. Every factor is known before kickoff, except
+the price move (marked).
+1. **Side:** home, draw, away.
+2. **League.**
+3. **Month of the season** (Aug … May; June and July folded into one level).
+4. **Rest days difference** (home and away rows): the team's days since its last league match
+   minus the opponent's, each capped at 14 (`lab.features`): ≤ −3, −2 to −1, 0, +1 to +2, ≥ +3.
+   League matches only.
+5. **After a European match** (home and away rows): the team, the opponent, both or neither
+   played a UEFA match (Champions League, Europa League, Conference League, qualifiers
+   included; ESPN, `cup_model.european_events`) one to four days before. Domestic cups are not
+   counted: there is no clean free history of them here.
+6. **xG luck** (home and away rows, the five Understat leagues): over the last 6 league
+   matches, (xG for − xG against) − (goals for − goals against) per game, the team's minus
+   the opponent's: ≤ −0.6, −0.6 to −0.2, −0.2 to +0.2, +0.2 to +0.6, ≥ +0.6. Positive = the
+   team's results have been worse than its chances (luck that may revert in its favour).
+   Needs 3 earlier matches each.
+7. **New to the division, first 10 league matches** (home and away rows): the team was promoted,
+   or relegated from the division above (England only; elsewhere every newcomer is promoted),
+   the opponent is new, both, or neither.
+8. **Price move, early to close** (descriptive only: it is not known when a bet is taken): the
+   outcome's fair close minus its fair early chance: ≤ −0.04, −0.04 to −0.01, −0.01 to +0.01,
+   +0.01 to +0.04, ≥ +0.04.
+9. **Lean's driver** (rows with a blend fit): not a Lean pick; a Lean pick, market-driven; a
+   Lean pick, model-driven (`lean_backtest.bets` at Pinnacle's early price).
+
+**Many cells, so some will look striking by chance.** The file counts the cells with ≥ 200
+rows and how many have a z range that excludes 0; with no real pattern about 5% would. The
+strategy search found 2% of its large rules beating the close under no skill, and its best
+rule was luck (p = 0.94). A cell standing out here is a lead to pre-register, not a finding.
+
+**Output.** `lab/residual_map.json`: `{kind: "residual_map", exploratory: true, seasons,
+leagues, rows, matches, edges, core: {close, early}, slices: {name: {label, levels, bands,
+cells, totals, rows, note}}, factors, multiplicity, note, warning, runs}`. Code
+`lab/residual_map.py`; `odds-check.yml` `task=residual-map` (no key, 0 credits). The file is
+printed in the log (`RESIDUAL_MAP_B64` chunks with its SHA-256) and committed from there.
+
+### Residual map: first file (2026-11-05; `odds-check.yml` `task=residual-map` run 42012978090, 0 credits, no key; the earlier run 42010585832 gave the same rows, before the home-by-league slice and the file check)
+
+**Partial: four leagues of eight, and E0 with xG only in its last two seasons.**
+- **Loaded:** E0, E1, E2 and E3: 9,454 matches and 28,362 outcome rows, 2019/20–2023/24.
+- **Not loaded: SP1, D1, I1 and F1.** No Understat file for 2017/18–2023/24 is reachable from
+  this branch:
+  - the `understat-SP1-`, `-D1-`, `-I1-` and `-F1-` caches are "not found";
+  - the newest `raw-data-` cache (42012653706) doesn't hold them;
+  - Understat itself still answers with its maintenance page (since 2 Nov).
+  The map uses the live model with xG, so these four were not run on goals only.
+- **E0's xG:** the run's file check (`xg_files` in the file) found E0's Understat files for
+  2022/23 and 2023/24 only. With the per-season loading from #178, E0's earlier seasons ran on
+  goals. E0 is the model with xG only for 2022/23–2023/24.
+- The file is rerun with all eight, and E0's full xG, when the Understat files can be had. The
+  2024/25 lock stays.
+- **Europe slice:** 16 of 419 UEFA clubs map to these four leagues, so it is thin: 235 rows
+  "after Europe".
+- **xG luck slice:** Premier League, 2022/23–2023/24 only.
+
+**What is in it.** `lab/residual_map.json` (SHA-256 b026a809…, 85 KB):
+- both core surfaces and ten slices (the nine planned, plus "home sides by league", a check the
+  lead asked for);
+- `factors`, `multiplicity`, `xg_files`, the note and the warning.
+
+**Multiplicity.** 397 cells, 225 with ≥ 200 rows. 14 have a z range that excludes 0, against
+about 11 expected by chance. The cells overlap, so this is a scale, not a test.
+
+**What stands out (descriptive; each is a lead to pre-register, not a finding):**
+- **Home sides the model rates more than 5 points below the close win a little more often than
+  the close says:** 2,463 rows, z = +0.022 (+0.004 to +0.040).
+  - It isn't one league: E0 +0.021, E1 +0.010, E2 +0.032, E3 +0.025, each on 495–682 rows,
+    and no league's range alone excludes 0.
+  - So where the model disagrees most, the market is, if anything, not strong enough in the
+    same direction. That doesn't help the model; it is consistent with the model's known
+    overconfidence (`docs/lab.md` "Price-band edge rule").
+- **Draws the model likes by 2–5 points** win less often than the close says: z = −0.033
+  (−0.057 to −0.009).
+- **Outcomes whose price shortened by 4+ points from early to close** won more than even the
+  close said: z = +0.030. Descriptive only: the move isn't known when a bet is taken.
+- **Promoted sides in their first 10 matches:** −0.034 (254 rows). **Against a newcomer:**
+  +0.038 (480 rows). Both ranges include 0 in the totals.
