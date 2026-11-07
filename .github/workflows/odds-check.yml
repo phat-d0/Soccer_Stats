@@ -113,7 +113,8 @@
 #             books, two-sided lines and Understat name matches. Bodies go into the paid
 #             player-odds-history cache (never bought twice). No result is read.
 #   goalscorer-backfill: the priced goalscorer test's history (docs/player_props.md §16):
-#             `design` dev (2025/26) or forward (2026/27 from 10 Oct); per league and match day
+#             `design` dev (2025/26), forward (2026/27 from 10 Oct) or gaps (from 1 Nov,
+#             only the snapshots the live log lacks); per league and match day
 #             one events list, then each event at kickoff - 50 and - 2 min (ten books, 10
 #             credits a snapshot); `cap` (0 = dry run), 120-minute budget, resumable, never
 #             buys twice; bodies in the paid player-odds-history cache. No result is read.
@@ -181,9 +182,9 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       design:
-        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development) or forward (2026/27 from 10 Oct)"
+        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov)"
         type: choice
-        options: [B, C, H, X, H2P, H2U, H2, dev, forward]
+        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps]
         default: B
       restore_key:
         description: "understat-restore: the run id of an older raw-data cache holding good Understat files (e.g. 41369190298)"
@@ -559,9 +560,16 @@ jobs:
                      --json out/goalscorer_pilot.json ;;
             goalscorer-probe)  # priced goalscorer step 0 (lead-approved 1 Nov, cap 250); no results read
               uv run soccer-stats goalscorer-probe --cap "$CAP" --json out/goalscorer_probe.json ;;
-            goalscorer-backfill)  # priced goalscorer test (§16): design dev or forward; resumable
+            goalscorer-backfill)  # priced goalscorer test (§16): design dev, forward or gaps; resumable
               mkdir -p data/raw/player_odds_history  # the save step always has a folder to save
+              mkdir -p "$RUNNER_TEMP/gs_live"  # gaps: the live call record, read from data-log
+              if [ "$DESIGN" = "gaps" ] && git fetch --depth=1 origin data-log; then
+                for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep -E '/goalscorer_calls_'); do
+                  git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/gs_live/$(basename "$f")"
+                done
+              fi
               uv run soccer-stats goalscorer-backfill --design "$DESIGN" --cap "$CAP" \
+                --live-calls "$RUNNER_TEMP/gs_live" \
                 --minutes 120 --json out/goalscorer_backfill.json ;;
             goal-lab)
               curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \

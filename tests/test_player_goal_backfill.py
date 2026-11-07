@@ -196,3 +196,69 @@ def test_forward_takes_only_matches_from_10_oct_that_have_kicked_off(tmp_path):
     assert days == ["2026-10-31"]  # 4 Oct is before the window; 1 Nov 11:00 not 3 h ago
     assert res["leagues"]["E0"]["events"] == 2
     assert gb.summary_lines(res)[0].startswith("Goalscorer backfill (forward")
+
+
+def gap_kickoffs(league, season):
+    return pd.Series(
+        pd.to_datetime(
+            [
+                "2026-10-31T15:00Z",
+                "2026-11-01T15:00Z",
+                "2026-11-01T17:30Z",
+                "2026-11-02T15:00Z",
+                "2026-11-02T17:30Z",
+            ]  # fmt: skip
+        )
+    )
+
+
+def live(eid, kind, status=200, day="2026-11-02", at="15:00"):
+    return {"league": "E0", "event_id": eid, "home": "A", "away": "B", "snapshot": kind,
+            "kickoff": f"{day}T{at}:00+00:00", "status": status}  # fmt: skip
+
+
+def test_gaps_buys_only_the_snapshots_the_live_log_lacks(tmp_path):
+    calls = []
+    record = [
+        live("2026-11-02a", "entry"),
+        live("2026-11-02a", "close"),
+        live("2026-11-02b", "entry", 502, at="17:30"),  # failed: still a gap
+        live("2026-11-02b", "close", at="17:30"),
+    ]
+    res = gb.run(
+        "gaps",
+        500,
+        api_key="k",
+        raw_dir=tmp_path,
+        leagues=("E0",),
+        get=fake_api(calls),
+        now=pd.Timestamp("2026-11-03T12:00:00Z"),
+        kickoffs=gap_kickoffs,
+        live_calls=record,
+    )
+    paid = [u for u, _ in calls if not u.endswith("/sports")]
+    # 31 Oct is before the live log (step 1 holds it); 1 Nov has no live call: its list and
+    # both snapshots of both matches; 2 Nov: no list (the live record has both matches),
+    # only 2 Nov b's entry.
+    assert sum(u.endswith("/events") for u in paid) == 1
+    odds = sorted(u.split("/")[-2] for u in paid if u.endswith("/odds"))
+    assert odds == ["2026-11-01a", "2026-11-01a", "2026-11-01b", "2026-11-01b", "2026-11-02b"]
+    assert res["spent"] == 1 + 5 * 10 and res["stopped"] is None
+    e0 = res["leagues"]["E0"]
+    assert e0["live_held"] == 3 and e0["gaps"] == 5 and e0["lists_from_live"] == 1
+    assert any("2026-11-02T17:30 A v B: entry" in g for g in res["gap_list"])
+    lines = gb.summary_lines(res)
+    assert any("history asked for 5" in x for x in lines)
+
+
+def test_gaps_dry_run_estimates_and_needs_the_live_record(tmp_path):
+    record = [live("2026-11-02a", "entry"), live("2026-11-02a", "close"),
+              live("2026-11-02b", "close", at="17:30")]  # fmt: skip
+    res = gb.run("gaps", 0, api_key="k", raw_dir=tmp_path, leagues=("E0",),
+                 get=fake_api([]), now=pd.Timestamp("2026-11-03T12:00:00Z"),
+                 kickoffs=gap_kickoffs, live_calls=record)  # fmt: skip
+    assert res["dry_run"] and res["estimate"] == 1 + 2 * 2 * 10 + 1 * 10
+    import pytest
+
+    with pytest.raises(ValueError):
+        gb.run("gaps", 0, raw_dir=tmp_path, leagues=("E0",), kickoffs=gap_kickoffs)

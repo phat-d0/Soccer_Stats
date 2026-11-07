@@ -193,3 +193,44 @@ def test_judged_threshold_and_bands_stay_as_preregistered():
     assert gp.T_JUDGED == 0.20
     assert gp.PRICE_BAND_EDGES == (6.5, 11.5, 17.0, 23.0)
     assert gp.MIN_JUDGED_BETS == 300 and (gp.BOOT_DRAWS, gp.BOOT_SEED) == (2000, 0)
+
+
+def test_live_close_replaces_history_and_each_side_keeps_its_source(tmp_path):
+    write_cache(tmp_path)
+    hist = gp.price_rows("E0", tmp_path)
+    assert set(hist["source"]) == {"history"}
+    live_rows = pd.DataFrame(
+        [
+            {
+                "league": "E0",
+                "event_id": "ev1",
+                "home": "Arsenal",
+                "away": "Chelsea",
+                "kickoff": "2025-11-01T15:00:00+00:00",
+                "snapshot": "close",
+                "book": b,
+                "player": n,
+                "yes": o,
+                "no": None,
+            }
+            for b, n, o in [
+                ("fanduel", "Bukayo Saka", 2.9),
+                ("fanduel", "Cole Palmer", 4.5),
+                ("fanduel", "No Scorer", 9.0),
+            ]
+        ]  # fmt: skip
+    )
+    live = gp.live_price_rows(live_rows, "E0")
+    assert set(live["source"]) == {"live"} and "No Scorer" not in set(live["player"])
+    assert gp.live_price_rows(live_rows, "SP1").empty
+    pr = gp.combine(hist, live)
+    # The close comes only from the live log; the entry (no live entry) from history.
+    assert set(pr.loc[pr["kind"] == "close", "source"]) == {"live"}
+    assert set(pr.loc[pr["kind"] == "entry", "source"]) == {"history"}
+    j, _ = gp.join(rows(), pr)
+    saka = j[j["player"] == "Bukayo Saka"].iloc[0]
+    assert saka["entry_odds"] == 3.2 and saka["close_best"] == 2.9
+    assert saka["entry_source"] == "history" and saka["close_source"] == "live"
+    assert gp.combine(hist, gp.live_price_rows(pd.DataFrame(), "E0")).equals(
+        hist.reset_index(drop=True)
+    )

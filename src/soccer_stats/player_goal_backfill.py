@@ -4,6 +4,12 @@ Two designs, each a fixed set of matches from football-data's kickoffs:
 - `dev`: step 3, the 2025/26 development season (sets the edge threshold T only).
 - `forward`: step 1, 2026/27 matches from 2026-10-10 that have kicked off (the judged window's
   history; the live log takes over from its start).
+- `gaps` (lead, 7 Nov 2026; §16 "History for what the live log lacks"): matches from the
+  live log's start (`LIVE_FROM`, 1 Nov) that have kicked off. Only the snapshots the live
+  log lacks are bought: an (event, kind) with no 2xx live call (`live_calls`, data-log's
+  `goalscorer_calls_*`). A day's events list is bought only when the live record holds
+  fewer events that day than football-data has matches; otherwise the events come from the
+  live record.
 
 Per league (E0, SP1, D1, I1, F1) and UTC match day: one historical events list (1 credit),
 taken 3 hours before that day's first football-data kickoff. Then, per event kicking off that
@@ -74,6 +80,12 @@ DESIGNS = {
         "note": "2026/27 from 10 Oct (the judged window's history)",
     },
 }
+DESIGNS["gaps"] = {
+    "season": 2026,
+    "since": "2026-11-01",
+    "note": "2026/27 from 1 Nov: only the snapshots the live log lacks",
+}
+LIVE_FROM = "2026-11-01"  # the live goalscorer log's first day (§16 step 2)
 CACHE = "goalscorer_test"
 SETTLED_AFTER = pd.Timedelta(hours=3)  # forward: only matches kicked off this long ago
 
@@ -117,7 +129,7 @@ def plan(
     """Per league and match day: {league, sport, day, first, matches, list_at}."""
     d = DESIGNS[design]
     now = now or pd.Timestamp.now(tz="UTC")
-    until = now - SETTLED_AFTER if design == "forward" else None
+    until = now - SETTLED_AFTER if design in ("forward", "gaps") else None
     out = []
     for lg in leagues:
         for row in match_days(kickoffs(lg, d["season"]), d["since"], until):
@@ -154,6 +166,38 @@ def priced(body: dict | None) -> bool:
     )
 
 
+def _answered(c: dict) -> bool:
+    try:
+        return 200 <= int(c.get("status")) < 300
+    except (TypeError, ValueError):
+        return False
+
+
+def live_index(live_calls: list[dict] | None) -> tuple[dict, set]:
+    """From the live call record: {(league, UTC day): {event id: event}} for every event the
+    live log asked about, and the (event id, kind) pairs it holds (answered 2xx)."""
+    events: dict[tuple, dict] = {}
+    held = set()
+    for c in live_calls or []:
+        if not c.get("event_id") or not c.get("kickoff"):
+            continue
+        k = pd.Timestamp(c["kickoff"]).tz_convert("UTC")
+        events.setdefault((c.get("league"), str(k.date())), {})[c["event_id"]] = {
+            "id": c["event_id"],
+            "home_team": c.get("home"),
+            "away_team": c.get("away"),
+            "commence_time": iso(k),
+        }
+        if _answered(c):
+            held.add((c["event_id"], c.get("snapshot")))
+    return events, held
+
+
+def gap_kinds(eid: str, held: set) -> list[str]:
+    """The snapshot kinds the live log lacks for one event, in SNAPSHOTS order."""
+    return [k for k in SNAPSHOTS if (eid, k) not in held]
+
+
 def run(
     design: str = "dev",
     cap: int = 0,
@@ -164,12 +208,17 @@ def run(
     minutes: float | None = None,
     now: pd.Timestamp | None = None,
     kickoffs: Callable[[str, int], pd.Series] = season_kickoffs,
+    live_calls: list[dict] | None = None,
 ) -> dict:
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     base = cache_dir(raw_dir)
     now = now or pd.Timestamp.now(tz="UTC")
-    until = now - SETTLED_AFTER if design == "forward" else None
+    until = now - SETTLED_AFTER if design in ("forward", "gaps") else None
     days = plan(design, leagues, now, kickoffs)
+    gaps = design == "gaps"
+    if gaps and live_calls is None:
+        raise ValueError("design gaps needs the live call record (live_calls)")
+    live_events, live_held = live_index(live_calls) if gaps else ({}, set())
     done = {
         c["key"]
         for c in read_calls(base)
@@ -194,6 +243,15 @@ def run(
     res["estimate"] = (len(days) - held_lists) * LIST_COST + 2 * HIST_COST * res[
         "matches_football_data"
     ]
+    if gaps:  # lists only where the live record is short, snapshots only where it lacks them
+        est = 0
+        for d in days:
+            known = live_events.get((d["league"], d["day"]), {})
+            listed = (base / d["league"] / f"events_{d['day'].replace('-', '')}.json").exists()
+            est += LIST_COST * int(len(known) < d["matches"] and not listed)
+            est += HIST_COST * len(SNAPSHOTS) * max(d["matches"] - len(known), 0)
+            est += HIST_COST * sum(len(gap_kinds(eid, live_held)) for eid in known)
+        res["estimate"] = est
     dry = cap <= 0 or not api_key
     res["dry_run"] = dry
     if dry:
@@ -268,22 +326,37 @@ def run(
         key = f"{lg}|events|{stem}"
         list_path = base / lg / f"events_{stem}.json"
         had_list = list_path.exists()
-        body, stopped = fetch(
-            list_path,
-            key,
-            f"{BASE}/historical/sports/{d['sport']}/events",
-            {"date": iso(d["list_at"]), "dateFormat": "iso"},
-            LIST_COST,
-            f"{lg} events {d['day']}",
-        )
-        if body is not None:
-            res["bought"]["lists"] += int(not had_list)
+        known = live_events.get((lg, d["day"]), {})
+        if gaps and len(known) >= d["matches"] and not had_list:
+            body = list(known.values())  # every match that day is in the live record
+            s["lists_from_live"] = s.get("lists_from_live", 0) + 1
+        else:
+            body, stopped = fetch(
+                list_path,
+                key,
+                f"{BASE}/historical/sports/{d['sport']}/events",
+                {"date": iso(d["list_at"]), "dateFormat": "iso"},
+                LIST_COST,
+                f"{lg} events {d['day']}",
+            )
+            if body is not None:
+                res["bought"]["lists"] += int(not had_list)
+            elif gaps and known:
+                body = list(known.values())
         evs = day_events(body, d["day"])
         if until is not None:
             evs = [e for e in evs if pd.Timestamp(e["commence_time"]) <= until]
         s["events"] += len(evs)
         for e in evs:
-            for kind in SNAPSHOTS:
+            kinds = gap_kinds(e["id"], live_held) if gaps else list(SNAPSHOTS)
+            if gaps:
+                s["live_held"] = s.get("live_held", 0) + (len(SNAPSHOTS) - len(kinds))
+                s["gaps"] = s.get("gaps", 0) + len(kinds)
+                res.setdefault("gap_list", []).extend(
+                    f"{lg} {e['commence_time'][:16]} {e['home_team']} v {e['away_team']}: {k}"
+                    for k in kinds
+                )
+            for kind in kinds:
                 if stopped:
                     break
                 path = base / lg / f"{e['id']}_{kind}.json"
@@ -340,5 +413,14 @@ def summary_lines(res: dict) -> list[str]:
             f"  {lg}: {s['matches_football_data']} matches on {s['days']} days, {s['events']} "
             f"events listed; entry held {s['entry']} (priced {s['entry_priced']}), close held "
             f"{s['close']} (priced {s['close_priced']})"
+            + (
+                f"; live log holds {s.get('live_held', 0)} snapshots, history asked for "
+                f"{s.get('gaps', 0)} ({s.get('lists_from_live', 0)} days listed from the "
+                "live record)"
+                if res["design"] == "gaps"
+                else ""
+            )
         )
+    for g in res.get("gap_list", []):
+        lines.append(f"  gap: {g}")
     return lines
