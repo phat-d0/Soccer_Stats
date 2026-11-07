@@ -1845,6 +1845,10 @@ try {
     const swVersion = readFileSync(join(site, "sw.js"), "utf8").match(/soccer-model-(v\d+)/)[1];
     const sub = await page.textContent("#updated");
     if (!sub.endsWith(`App ${swVersion}`)) failures.push(`${mode}/load: header "${sub}" should end "App ${swVersion}"`);
+    // The odds line names the refresh schedule since the plan upgrade (lead, 7 Nov), not the free plan.
+    const age = await page.evaluate(() => oddsAge());
+    if (age && (!age.includes("Refreshed hourly, and every 15 minutes near kickoff.") || /free (plan|allowance)/.test(age))) failures.push(`${mode}/load: odds line "${age}"`);
+    if (/free (plan|allowance)/.test(await page.textContent("#view"))) failures.push(`${mode}/load: the page still mentions the free plan`);
     for (const [name, run, isSheet] of STEPS) {
       step = name;
       try {

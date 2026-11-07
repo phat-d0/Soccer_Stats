@@ -1365,7 +1365,7 @@ four leagues: E0, E1–E3).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v76) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v77) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1788,6 +1788,10 @@ four leagues: E0, E1–E3).
   loss (`details.dk-sweep`) under its bets. **Player shots → Backtest**: the classic view, then
   "The strategies compared" (switch `data-recstrat`, tiles for a non-main strategy, the sweep,
   predicted vs actual, the shot model's checks).
+- The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
+  updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
+  the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the
+  odds source's `error` starts "paused"; the smoke test fails on any "free plan" wording.
 - Live trade fields the app reads (Moneyline contract): per trade `close_odds`,
   `close_fetched_at`, `close_minutes_before`, `clv_dk`, `beat_close_dk`; summary `clv_dk`,
   `beat_close_dk`, `close_early`. A close over 60 min before kickoff is "approx."
