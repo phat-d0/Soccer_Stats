@@ -43,6 +43,11 @@ jobs:
           path: data/understat_good
           key: xg-good-none
           restore-keys: xg-good-
+      # Rebuilt from the permanent archive when the cache missed (lead, 7 Nov; cache_archive.ARCHIVED_FREE).
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: xg-good
       - uses: actions/cache/restore@v4
         if: ${{ matrix.league != 'E0' }}
         with:

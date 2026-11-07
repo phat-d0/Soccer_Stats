@@ -242,12 +242,22 @@ def test_the_paid_caches_match_the_archive_registry():
         assert e["paid"] is True and e["prefix"] == spec["prefix"]
         assert _paths(e["path"]) == spec["paths"]
     assert {n for n, e in kept.items() if e["paid"]} == set(ca.PAID)
+    # Archived = paid plus ARCHIVED_FREE (lead, 7 Nov: xg-good-), packed and tested alike.
+    for name, spec in ca.ARCHIVED_FREE.items():
+        e = kept[name]
+        assert e["paid"] is False and e["prefix"] == spec["prefix"]
+        assert _paths(e["path"]) == spec["paths"]
+        assert spec["prefix"] in ca.FREE  # holds nothing bought
+    assert {n for n, e in kept.items() if e.get("archive")} == set(ca.ARCHIVED)
     wf = yaml.safe_load((WORKFLOWS / "caches.yml").read_text())
     test = {
         e["name"]: _paths(e["path"])
         for e in wf["jobs"]["fallback-test"]["strategy"]["matrix"]["include"]
     }
-    assert test == {n: s["paths"] for n, s in ca.PAID.items()}
+    assert test == {n: s["paths"] for n, s in ca.ARCHIVED.items()}
+    steps = wf["jobs"]["keepalive"]["steps"]
+    packing = [s for s in steps if "matrix.paid" in str(s.get("if", ""))]
+    assert not packing, "pack, upload and keep steps run on matrix.archive"
     assert not any("ODDS_API_KEY" in json.dumps(j) for j in wf["jobs"].values())
 
 
@@ -266,6 +276,28 @@ def test_every_paid_restore_is_followed_by_the_archive_fallback():
         assert nxt.get("if") == s.get("if"), f"{wf} {job}: the fallback's condition differs"
         found += 1
     assert found == 13
+
+
+def test_every_archived_free_restore_is_followed_by_a_soft_fallback():
+    """xg-good- (lead, 7 Nov): every restore is followed by the archive fallback with the
+    same condition; it never stops a job (continue-on-error), as the data is free."""
+    free = {s["prefix"]: n for n, s in ca.ARCHIVED_FREE.items()}
+    found = 0
+    for wf, job, i, s, steps in _steps():
+        if "actions/cache" not in s.get("uses", "") or "/save@" in s["uses"]:
+            continue
+        if wf == "caches.yml":
+            continue  # the keep-alive and the forced-miss test restore it on purpose
+        prefix = _prefix(s["with"])
+        if prefix not in free:
+            continue
+        nxt = steps[i + 1]
+        assert nxt.get("uses") == FALLBACK, f"{wf} {job}: no fallback after the {prefix} restore"
+        assert nxt["with"]["name"] == free[prefix]
+        assert nxt.get("if") == s.get("if")
+        assert nxt.get("continue-on-error") is True
+        found += 1
+    assert found == 5  # publish, players, goalscorer-test, backfill, odds-check
 
 
 # ---------- bought data can't be left out of the archive ----------

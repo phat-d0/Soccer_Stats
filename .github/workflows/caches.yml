@@ -83,15 +83,16 @@ jobs:
       matrix:
         include:
           # Paid (cache_archive.PAID): the paths exactly as saved, in the same order.
-          - { name: odds-history, prefix: odds-history-, paid: true, path: "data/raw/odds_history" }
-          - { name: player-odds-history, prefix: player-odds-history-, paid: true, path: "data/raw/player_odds_history" }
-          - { name: cup-odds-history, prefix: cup-odds-history-, paid: true, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
-          - { name: comeback-odds, prefix: comeback-odds-, paid: true, path: "data/raw/comeback_odds" }
-          - { name: archive-probe, prefix: archive-probe-, paid: true, path: "data/raw/archive_probe" }
-          - { name: inplay-probe, prefix: inplay-probe-, paid: true, path: "data/raw/inplay_probe" }
+          - { name: odds-history, prefix: odds-history-, paid: true, archive: true, path: "data/raw/odds_history" }
+          - { name: player-odds-history, prefix: player-odds-history-, paid: true, archive: true, path: "data/raw/player_odds_history" }
+          - { name: cup-odds-history, prefix: cup-odds-history-, paid: true, archive: true, path: "data/raw/cup_odds\ndata/raw/cups/espn" }
+          - { name: comeback-odds, prefix: comeback-odds-, paid: true, archive: true, path: "data/raw/comeback_odds" }
+          - { name: archive-probe, prefix: archive-probe-, paid: true, archive: true, path: "data/raw/archive_probe" }
+          - { name: inplay-probe, prefix: inplay-probe-, paid: true, archive: true, path: "data/raw/inplay_probe" }
+          # Free but archived too (cache_archive.ARCHIVED_FREE): packed and restored like the paid ones.
+          - { name: xg-good, prefix: xg-good-, paid: false, archive: true, path: "data/understat_good" }
           # Free (rebuilt from public sources, but slowly).
           - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
-          - { name: xg-good, prefix: xg-good-, paid: false, path: "data/understat_good" }
           - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
           - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }
           - { name: espn-timelines, prefix: espn-timelines-, paid: false, path: "data/raw/espn_timelines" }
@@ -139,8 +140,8 @@ jobs:
             fi
           fi
 
-      - name: Pack the paid cache
-        if: matrix.paid && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
+      - name: Pack the archived cache (paid, or free in ARCHIVED_FREE)
+        if: matrix.archive && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
         env:
           MATCHED: ${{ steps.cache.outputs.cache-matched-key }}
           PATHS: ${{ matrix.path }}
@@ -167,7 +168,7 @@ jobs:
             --manifest current.json --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --out "out/${{ matrix.name }}.json"
 
       - name: Upload the changed asset to the release (default branch)
-        if: matrix.paid && env.PUBLISH == 'true' && steps.cache.outputs.cache-matched-key != ''
+        if: matrix.archive && env.PUBLISH == 'true' && steps.cache.outputs.cache-matched-key != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -186,7 +187,7 @@ jobs:
           done
 
       - name: Keep the manifest entry
-        if: matrix.paid && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
+        if: matrix.archive && env.PACK == 'true' && steps.cache.outputs.cache-matched-key != ''
         uses: actions/upload-artifact@v4
         with:
           name: entry-${{ matrix.name }}
@@ -194,7 +195,7 @@ jobs:
           retention-days: 3
 
       - name: Keep the packed cache (branch dry run only, for the fallback test)
-        if: matrix.paid && github.event_name == 'push' && steps.cache.outputs.cache-matched-key != ''
+        if: matrix.archive && github.event_name == 'push' && steps.cache.outputs.cache-matched-key != ''
         uses: actions/upload-artifact@v4
         with:
           name: pack-${{ matrix.name }}
@@ -328,6 +329,7 @@ jobs:
           - { name: comeback-odds, path: "data/raw/comeback_odds" }
           - { name: archive-probe, path: "data/raw/archive_probe" }
           - { name: inplay-probe, path: "data/raw/inplay_probe" }
+          - { name: xg-good, path: "data/understat_good" }
     steps:
       - uses: actions/checkout@v4
       - name: Local archive from this run's packs (branch dry run)

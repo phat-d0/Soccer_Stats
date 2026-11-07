@@ -325,7 +325,8 @@ four leagues: E0, E1–E3).
 - Caches: `raw-data-*` (Understat), `xg-good-*` (the last good Understat league files), `odds-history-*`, `player-odds-history-*`,
   `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
-  delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones
+  delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones,
+  plus `xg-good-` (free, `cache_archive.ARCHIVED_FREE`, lead, 7 Nov),
   as release assets (`paid-odds-archive`, manifest on data-log `archive/manifest.json`); every
   step that restores a paid cache is followed by `.github/actions/paid-archive-restore`, which
   rebuilds a missed cache from the archive before anything can buy (`docs/caches.md`).
@@ -1308,7 +1309,10 @@ four leagues: E0, E1–E3).
   `PAID` (name → key prefix, exact paths), `list_files`, `content_sha256`, `entry` (files, bytes,
   `by_path`, key, `content_sha256`, archive parts and sha256), `changed`, `merge` (an unchanged or
   missed cache keeps its entry), `verify`, `missing`; subcommands `entry`, `merge`, `verify`,
-  `missing`.
+  `missing`. `ARCHIVED_FREE` (lead, 7 Nov): free caches archived like the paid ones,
+  today `xg-good-` (`ARCHIVED` = `PAID` | `ARCHIVED_FREE`): `caches.yml` packs every row with
+  `archive: true` into the same release and manifest and the fallback test covers it; each
+  `xg-good-` restore is followed by the fallback action with `continue-on-error: true`.
 - `cli.py`: `soccer-stats` commands (publish, log-odds, log-news, log-team-news, log-team-totals,
   log-corners, log-cup-odds, paper, close-plan, estimate-credits, estimate-team-totals,
   estimate-corners, estimate-cups, fit-match-blends, backtest-dk, backtest-lean, backtest-edge12,
