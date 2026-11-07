@@ -316,6 +316,25 @@ def cmd_understat_wayback(args: argparse.Namespace) -> None:
             f"Wayback compare: {len(rows)} held seasons, {n} matches differ, largest xG diff {top}"
         )
         return
+    if args.mode == "goals":  # every loaded copy's goals against football-data's
+        from soccer_stats.xg import GOOD_DIR
+
+        rows = wb.goals_check_loaded(GOOD_DIR)
+        for r in rows:
+            print("WAYBACK_GOALS " + json.dumps(r), flush=True)
+            print(
+                f"  {r['league']:4} {r['season']}/{(r['season'] + 1) % 100:02d}: "
+                + (
+                    r["error"]
+                    if "error" in r
+                    else f"football-data {r['fd']}, Understat {r['understat']}, "
+                    f"joined {r['joined']}, "
+                    f"goals disagree {r['disagree']}"
+                )
+            )
+        bad = sum(r.get("disagree", 0) for r in rows)
+        print(f"Wayback goals check: {len(rows)} loaded seasons, {bad} joined matches disagree")
+        return
     if args.mode == "load":  # step 2: complete copies into the good-copy folder
         import pandas as pd
 
@@ -3361,9 +3380,9 @@ def main(argv: list[str] | None = None) -> None:
     uw.add_argument("--minutes", type=float, default=40, help="time budget")
     uw.add_argument(
         "--mode",
-        choices=["probe", "compare", "load"],
+        choices=["probe", "compare", "load", "goals"],
         default="probe",
-        help="probe (counts), compare (copies vs the files held) or load (complete copies)",
+        help="probe, compare (vs held files), load, or goals (loaded vs football-data)",
     )
     uw.set_defaults(func=cmd_understat_wayback)
 

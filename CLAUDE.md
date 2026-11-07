@@ -431,6 +431,10 @@ four leagues: E0, E1–E3).
   over a better file), each logged in `data/understat_good/sources.jsonl` (`SOURCES`: league,
   season, source "wayback", url, captured, played, fd_matches, file, sha256, loaded_at); the
   run saves `xg-good-` and dispatches `caches.yml`.
+  `--mode goals` (`design=goals`, lead 7 Nov; read-only): every season in `sources.jsonl` joined
+  to football-data as `xg.attach_xg` joins them (home, away, date ±2 days; `goals_check`):
+  football-data and Understat matches, joined, goals disagreeing (with examples), Understat
+  teams that never joined. Log lines `WAYBACK_GOALS`.
   `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
