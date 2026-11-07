@@ -1,7 +1,7 @@
 {
  "tag": "paid-odds-archive",
- "updated": "2026-11-01T20:56:26Z",
- "checked": "2026-11-05T12:34:48Z",
+ "updated": "2026-11-07T22:42:36Z",
+ "checked": "2026-11-07T22:42:36Z",
  "caches": {
   "archive-probe": {
    "name": "archive-probe",
@@ -27,7 +27,7 @@
     ]
    },
    "created": "2026-10-28T14:05:13Z",
-   "checked": "2026-11-05T12:34:48Z"
+   "checked": "2026-11-07T22:42:36Z"
   },
   "comeback-odds": {
    "name": "comeback-odds",
@@ -53,7 +53,7 @@
     ]
    },
    "created": "2026-10-28T20:35:19Z",
-   "checked": "2026-11-05T12:34:48Z"
+   "checked": "2026-11-07T22:42:36Z"
   },
   "odds-history": {
    "name": "odds-history",
@@ -79,7 +79,7 @@
     ]
    },
    "created": "2026-10-28T18:35:04Z",
-   "checked": "2026-11-05T12:34:48Z"
+   "checked": "2026-11-07T22:42:36Z"
   },
   "player-odds-history": {
    "name": "player-odds-history",
@@ -105,7 +105,33 @@
     ]
    },
    "created": "2026-11-01T20:56:07Z",
-   "checked": "2026-11-05T12:34:48Z"
+   "checked": "2026-11-07T22:42:36Z"
+  },
+  "xg-good": {
+   "name": "xg-good",
+   "key": "xg-good-48adb9b1d922a46f580b433248b53b34f44fcc3296215b9e1fc97319b6f80828",
+   "paths": [
+    "data/understat_good"
+   ],
+   "files": 17,
+   "bytes": 7639653,
+   "by_path": {
+    "data/understat_good": 17
+   },
+   "content_sha256": "eeb7b40dd84f0daa5c0ed36fd7dab54baf648aaf0e3e88f7f571651cc8fdfc31",
+   "archive": {
+    "bytes": 1153583,
+    "sha256": "fb8b57936027800a6a3175c804ef372cfec9b4e794610faa2a9c9813dd94284f",
+    "parts": [
+     {
+      "asset": "xg-good.tar.zst",
+      "bytes": 1153583,
+      "sha256": "fb8b57936027800a6a3175c804ef372cfec9b4e794610faa2a9c9813dd94284f"
+     }
+    ]
+   },
+   "created": "2026-11-07T22:42:08Z",
+   "checked": "2026-11-07T22:42:36Z"
   }
  },
  "note": "Paid odds caches packed as tar + zstd release assets on the `paid-odds-archive` tag; content_sha256 covers every file's path, size and sha256, archive.sha256 the whole archive, parts[].sha256 each asset."
