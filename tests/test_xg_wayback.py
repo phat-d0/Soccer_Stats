@@ -196,3 +196,32 @@ def test_load_writes_only_complete_copies_through_keep_good_and_logs_the_source(
         again[0]["loaded"] is False
         and json.loads((good / "understat_EPL_2021.json").read_text()) == better
     )
+
+
+def test_goals_check_joins_like_attach_xg_and_counts_disagreements():
+    import pandas as pd
+
+    us = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(
+                ["2023-08-12 14:00", "2023-08-13 16:30", "2023-08-14 19:00"]
+            ),
+            "home": ["Arsenal", "Chelsea", "Ghost FC"],
+            "away": ["Leicester", "Burnley", "Arsenal"],
+            "us_home_goals": [2, 1, 0],
+            "us_away_goals": [0, 1, 0],
+        }
+    )
+    fd = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2023-08-12", "2023-08-14", "2023-08-20"]),
+            "home": ["Arsenal", "Chelsea", "Everton"],
+            "away": ["Leicester", "Burnley", "Wolves"],
+            "home_goals": [2, 2, 1],
+            "away_goals": [0, 1, 1],
+        }
+    )
+    r = wb.goals_check(us, fd)
+    assert r["fd"] == 3 and r["understat"] == 3 and r["joined"] == 2 and r["disagree"] == 1
+    assert r["examples"][0]["football_data"] == "2-1" and r["examples"][0]["understat"] == "1-1"
+    assert r["unjoined_teams"] == ["Ghost FC"]

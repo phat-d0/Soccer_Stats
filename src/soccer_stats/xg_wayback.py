@@ -25,6 +25,7 @@ import re
 import time
 from pathlib import Path
 
+import pandas as pd
 import requests
 
 from soccer_stats.xg import LEAGUES, URL, check_league_json
@@ -395,3 +396,62 @@ def table(rows: list[dict]) -> str:
             f"{r.get('fd_matches', '-')!s:>4}  {ok}"
         )
     return "\n".join(lines)
+
+
+# ---------- goals check: each loaded copy against football-data (lead, 7 Nov) ----------
+
+
+def goals_check(us: pd.DataFrame, fd: pd.DataFrame, max_day_gap: int = 2) -> dict:
+    """One season's Understat matches (xg.parse_season) joined to football-data's on home,
+    away and a date within `max_day_gap` days, as xg.attach_xg joins them: football-data's
+    matches, Understat's played ones, how many joined, how many joined matches disagree on
+    either team's goals (with up to five examples), and the Understat teams that never joined."""
+    out = {"fd": int(len(fd)), "understat": int(len(us))}
+    if us.empty or fd.empty:
+        return {**out, "joined": 0, "disagree": 0, "examples": [], "unjoined_teams": []}
+    key = us.assign(us_date=us["datetime"].dt.normalize())
+    m = fd.reset_index().merge(key, on=["home", "away"], how="inner")
+    m = m[(m["date"] - m["us_date"]).abs().dt.days <= max_day_gap].drop_duplicates("index")
+    bad = m[(m["home_goals"] != m["us_home_goals"]) | (m["away_goals"] != m["us_away_goals"])]
+    examples = [
+        {
+            "date": str(r["date"].date()),
+            "home": r["home"],
+            "away": r["away"],
+            "football_data": f"{r['home_goals']}-{r['away_goals']}",
+            "understat": f"{r['us_home_goals']}-{r['us_away_goals']}",
+        }
+        for _, r in bad.head(5).iterrows()
+    ]
+    return {
+        **out,
+        "joined": int(len(m)),
+        "disagree": int(len(bad)),
+        "examples": examples,
+        "unjoined_teams": sorted(set(us["home"]) - set(fd["home"])),
+    }
+
+
+def goals_check_loaded(good_dir: Path) -> list[dict]:
+    """The goals check for every season `load` wrote (good_dir/SOURCES)."""
+    from soccer_stats import data as fd_data
+    from soccer_stats.xg import parse_season
+
+    path = Path(good_dir) / SOURCES
+    rows = []
+    seen = set()
+    for line in path.read_text().splitlines() if path.exists() else []:
+        src = json.loads(line)
+        k = (src["league"], int(src["season"]))
+        if k in seen:
+            continue
+        seen.add(k)
+        row = {"league": k[0], "season": k[1], "sha256": src.get("sha256")}
+        try:
+            us = parse_season(json.loads((Path(good_dir) / src["file"]).read_bytes()))
+            fd = fd_data.load_matches([k[0]], [k[1]])
+            row.update(goals_check(us, fd))
+        except Exception as exc:  # noqa: BLE001  report it
+            row["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        rows.append(row)
+    return rows
