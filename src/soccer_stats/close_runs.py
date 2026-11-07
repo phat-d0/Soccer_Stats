@@ -53,7 +53,26 @@ SETTLE_MERGE = pd.Timedelta(minutes=20)
 INPLAY = {"inplay55": 55, "inplay75": 75}
 INPLAY_SHIFT = pd.Timedelta(minutes=3)
 INPLAY_LATE = pd.Timedelta(minutes=6)
-WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml"} | dict.fromkeys(INPLAY, "inplay.yml")
+
+# Goalscorer entry runs (lead, 7 Nov; player_goal_live, §16 step 2): the live entry snapshot
+# wants a publish 20-30 minutes before kickoff (ENTRY_LATEST takes it then even without
+# confirmed lineups), which the -15 close run misses, so 9 of the first 26 matches had no
+# entry. One more publish at the first kickoff of each cluster in GOALSCORER_LEAGUES minus
+# GOALSCORER_LEAD, the cluster spanning GOALSCORER_SPAN: with the usual 1-3 minute start
+# the fetch lands 22-29 minutes before every kickoff it covers. A publish already planned
+# from GOALSCORER_MERGE[0] before to GOALSCORER_MERGE[1] after that time takes the entry
+# instead (a later one would land too near kickoff). It never replaces a close run. A late
+# planner still dispatches while GOALSCORER_MIN_LEFT is left before the first kickoff.
+GOALSCORER_LEAGUES = ("E0", "SP1", "D1", "I1", "F1")  # player_goal_live.LEAGUES
+GOALSCORER_LEAD = pd.Timedelta(minutes=25)
+GOALSCORER_SPAN = pd.Timedelta(minutes=5)
+GOALSCORER_MERGE = (pd.Timedelta(minutes=5), pd.Timedelta(minutes=2))
+GOALSCORER_MIN_LEFT = pd.Timedelta(minutes=23)
+
+WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml", "goalscorer": "publish.yml"} | (
+    dict.fromkeys(INPLAY, "inplay.yml")
+)
+PUBLISH_KINDS = ("close", "settle", "goalscorer")
 
 
 def kickoffs(log_dir) -> list[pd.Timestamp]:
@@ -79,6 +98,27 @@ def kickoffs(log_dir) -> list[pd.Timestamp]:
     return sorted(out)
 
 
+def goalscorer_kickoffs(log_dir) -> list[pd.Timestamp]:
+    """Kickoffs in the goalscorer leagues: the DraftKings logs <code>_<YYYY-MM>.jsonl of
+    GOALSCORER_LEAGUES (every priced match there)."""
+    import re
+
+    d = Path(log_dir)
+    if not d.is_dir():
+        return []
+    name = re.compile(rf"^({'|'.join(GOALSCORER_LEAGUES)})_\d{{4}}-\d{{2}}\.jsonl$")
+    out = set()
+    for r in _read_jsonl([p for p in sorted(d.glob("*.jsonl")) if name.match(p.name)]):
+        k = r.get("kickoff") if isinstance(r, dict) else None
+        if not k:
+            continue
+        try:
+            out.add(_ts(k))
+        except (ValueError, TypeError):
+            continue
+    return sorted(out)
+
+
 def inplay_kickoffs(log_dir) -> list[pd.Timestamp]:
     """The odds-only competitions' kickoffs (inplay_events): in-play runs only, never a
     close or settlement run."""
@@ -88,7 +128,7 @@ def inplay_kickoffs(log_dir) -> list[pd.Timestamp]:
     return sorted({k for ks in event_kickoffs(d).values() for k in ks}) if d.is_dir() else []
 
 
-def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=()) -> dict:
+def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=(), goalscorer_ks=()) -> dict:
     """The dispatch times for kickoffs whose close falls in the next `horizon_hours`.
 
     Greedy over sorted kickoffs: a dispatch at the first uncovered kickoff minus
@@ -96,7 +136,9 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=()) -> dict:
     SPAN_MINUTES after that one. `continue` says whether a later kickoff is due within
     CONTINUE_HOURS, so the workflow starts the next planner run itself instead of waiting
     for a throttled cron. `inplay_ks` (the odds-only competitions' kickoffs) get in-play
-    runs and keep the planner going, but no close or settlement run.
+    runs and keep the planner going, but no close or settlement run. `goalscorer_ks` (the
+    goalscorer leagues' kickoffs, also in `ks`) get an entry publish GOALSCORER_LEAD before
+    each cluster unless a planned publish starts close enough to that time.
     """
     now = _ts(now)
     end = now + pd.Timedelta(hours=horizon_hours)
@@ -135,6 +177,19 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=()) -> dict:
             covered = [k for k in live[i:] if k <= first + span]
             i += len(covered)
             dispatch.append({"at": max(first + after, now), "kickoffs": covered, "kind": kind})
+    # Goalscorer entry runs: clusters of GOALSCORER_SPAN, merged into a nearby publish.
+    gks = sorted({_ts(k) for k in goalscorer_ks})
+    gdue = [k for k in gks if k - now >= GOALSCORER_MIN_LEFT and k - GOALSCORER_LEAD < end]
+    i = 0
+    while i < len(gdue):
+        first = gdue[i]
+        covered = [k for k in gdue[i:] if k <= first + GOALSCORER_SPAN]
+        i += len(covered)
+        at = max(first - GOALSCORER_LEAD, now)
+        lo, hi = at - GOALSCORER_MERGE[0], at + GOALSCORER_MERGE[1]
+        if any(lo <= d["at"] <= hi for d in dispatch if d["kind"] in PUBLISH_KINDS):
+            continue
+        dispatch.append({"at": at, "kickoffs": covered, "kind": "goalscorer"})
     dispatch.sort(key=lambda d: d["at"])
     later = [k for k in every if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
     # A cluster whose settlement falls after this window hands over to the next planner too.
@@ -187,7 +242,9 @@ def describe(p: dict) -> str:
                 f"(+{INPLAY[kind]} min) for kickoffs {ks}"
             )
             continue
-        why = "settle kickoffs" if kind == "settle" else "for kickoffs"
+        why = {"settle": "settle kickoffs", "goalscorer": "goalscorer entry for kickoffs"}.get(
+            kind, "for kickoffs"
+        )
         lines.append(f"  publish at {d['at']:%Y-%m-%d %H:%M} UTC {why} {ks}")
     if not p["dispatch"]:
         lines.append("  none (no kickoff in this window)")

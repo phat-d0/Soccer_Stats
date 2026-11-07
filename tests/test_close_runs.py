@@ -189,3 +189,82 @@ def test_in_play_snapshots_at_55_and_75_minutes_per_cluster():
         for d in cr.plan([T("2026-10-17 14:00")], T("2026-10-17 15:05"))["dispatch"]
         if d["kind"] == "inplay55"
     ]
+
+
+def goalscorers(p):
+    return [d for d in p["dispatch"] if d["kind"] == "goalscorer"]
+
+
+def test_a_goalscorer_entry_run_25_minutes_before_each_cluster():
+    """Lead, 7 Nov: the live goalscorer entry needs a publish 20-30 minutes before
+    kickoff; the -15 close run stays as it is."""
+    from soccer_stats import player_goal_live as gl
+
+    assert cr.GOALSCORER_LEAGUES == gl.LEAGUES
+    now = T("2026-10-17 10:00")
+    ks = [T("2026-10-17 14:00"), T("2026-10-17 14:05"), T("2026-10-17 14:10")]
+    p = cr.plan(ks, now, goalscorer_ks=ks)
+    g = goalscorers(p)
+    # 14:00 and 14:05 share 13:35; 14:10 is past the 5-minute span, so its own 13:45 run
+    # would fall on the 13:45 close run, which takes the entry instead.
+    assert [(d["at"], d["kickoffs"]) for d in g] == [
+        (T("2026-10-17 13:35"), [T("2026-10-17 14:00"), T("2026-10-17 14:05")])
+    ]
+    assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45")]  # unchanged
+    card = {"team_news": {}}
+    for d in g + closes(p):
+        for k in d["kickoffs"] if d["kind"] == "goalscorer" else [T("2026-10-17 14:10")]:
+            for delay in (1, 3):
+                at = d["at"] + pd.Timedelta(minutes=delay)
+                assert gl.due_snapshot({**card, "kickoff": k.isoformat()}, at) == "entry"
+    j = cr.to_json(p)
+    gj = [d for d in j["dispatch"] if d["kind"] == "goalscorer"]
+    assert gj[0]["workflow"] == "publish.yml"
+    assert gj[0]["epoch"] == int(T("2026-10-17 13:35").timestamp())
+    assert "publish at 2026-10-17 13:35 UTC goalscorer entry for kickoffs 14:00, 14:05" in (
+        cr.describe(p)
+    )
+    # Without goalscorer kickoffs the plan is as before.
+    assert goalscorers(cr.plan(ks, now)) == []
+
+
+def test_goalscorer_runs_merge_only_into_a_publish_just_before():
+    now = T("2026-10-17 10:00")
+    g = T("2026-10-17 15:00")  # entry run wanted at 14:35
+    # A close run at 14:31 (a 14:46 kickoff elsewhere) starts 4 minutes before: it serves.
+    assert goalscorers(cr.plan([g, T("2026-10-17 14:46")], now, goalscorer_ks=[g])) == []
+    # One at 14:40 (a 14:55 kickoff) would land too near 15:00: the entry run stays.
+    p = cr.plan([g, T("2026-10-17 14:55")], now, goalscorer_ks=[g])
+    assert [d["at"] for d in goalscorers(p)] == [T("2026-10-17 14:35")]
+
+
+def test_a_late_planner_still_sends_the_goalscorer_run_or_skips_it():
+    k = T("2026-10-17 15:00")
+    assert [
+        d["at"] for d in goalscorers(cr.plan([k], T("2026-10-17 14:36"), goalscorer_ks=[k]))
+    ] == [T("2026-10-17 14:36")]
+    assert goalscorers(cr.plan([k], T("2026-10-17 14:40"), goalscorer_ks=[k])) == []
+
+
+def test_goalscorer_kickoffs_come_from_the_five_leagues_draftkings_logs(tmp_path):
+    row = lambda k: json.dumps({"kickoff": k}) + "\n"  # noqa: E731
+    (tmp_path / "E0_2026-11.jsonl").write_text(row("2026-11-08T14:00:00Z"))
+    (tmp_path / "SP1_2026-11.jsonl").write_text(row("2026-11-08T15:15:00Z") + "bad\n")
+    (tmp_path / "E1_2026-11.jsonl").write_text(row("2026-11-08T12:30:00Z"))  # not a goal league
+    (tmp_path / "E0_corners_2026-11.jsonl").write_text(row("2026-11-08T17:30:00Z"))
+    (tmp_path / "UEL_events_2026-11.jsonl").write_text(row("2026-11-08T20:00:00Z"))
+    assert cr.goalscorer_kickoffs(tmp_path) == [T("2026-11-08 14:00"), T("2026-11-08 15:15")]
+    assert cr.goalscorer_kickoffs(tmp_path / "missing") == []
+
+
+def test_cli_plans_the_goalscorer_runs(tmp_path, capsys):
+    from soccer_stats.cli import main
+
+    logs = tmp_path / "odds_log"
+    logs.mkdir()
+    (logs / "D1_2026-10.jsonl").write_text(json.dumps({"kickoff": "2026-10-17T14:00:00Z"}) + "\n")
+    out = tmp_path / "plan.json"
+    main(["close-plan", "--log-dir", str(logs), "--out", str(out), "--now", "2026-10-17T10:00Z"])
+    kinds = [d["kind"] for d in json.loads(out.read_text())["dispatch"]]
+    assert kinds[:2] == ["goalscorer", "close"]
+    assert "goalscorer entry for kickoffs 14:00" in capsys.readouterr().out
