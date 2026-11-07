@@ -12,3 +12,4 @@
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"8fafa425728aa8e7d2c23956ba4c2553","home":"Chapecoense","away":"Vasco da Gama","kickoff":"2026-11-14T23:30:00+00:00","fetched_at":"2026-11-05T03:26:24+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"8c090da10644d01073571175eb7a7426","home":"Cruzeiro","away":"Palmeiras","kickoff":"2026-11-18T23:30:00+00:00","fetched_at":"2026-11-06T17:25:05+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"2a054ad1a9985edb5db37136cf40a382","home":"Vasco da Gama","away":"Internacional","kickoff":"2026-11-19T22:30:00+00:00","fetched_at":"2026-11-06T17:25:05+00:00"}
+{"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"fa3ad7ccd23c6fe47c3062a2b69d3ddd","home":"Vitoria","away":"Bragantino-SP","kickoff":"2026-11-19T22:30:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}

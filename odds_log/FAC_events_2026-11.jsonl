@@ -38,3 +38,12 @@
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"4eb79fa9b03661a5e16addb93f8ca61e","home":"Gillingham","away":"Barrow AFC","kickoff":"2026-11-07T15:00:00+00:00","fetched_at":"2026-11-02T19:39:13+00:00"}
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"8b3289c2c6ddd9b85f95e1d569aea292","home":"Plymouth Parkway FC","away":"Berkhamsted FC","kickoff":"2026-11-09T19:30:00+00:00","fetched_at":"2026-11-02T23:33:42+00:00"}
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"2bf110ae63e77d8bf2550215dd936dcd","home":"Wimborne Town FC","away":"Crawley Town","kickoff":"2026-11-08T15:00:00+00:00","fetched_at":"2026-11-03T15:07:39+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"33f8b0cf4bb1122bace8eff0cac4e53b","home":"Barnsley","away":"Aldershot Town FC","kickoff":"2026-11-07T15:01:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"ca82afcbf53e63dbbdd3c5d77d8e3b64","home":"Boreham Wood FC","away":"Wigan Athletic","kickoff":"2026-11-07T15:01:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"ad3b84c613ba9e6536347a743b9e91e2","home":"Cheltenham Town","away":"FC Halifax Town","kickoff":"2026-11-07T15:01:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"7260ba7fdba6afb8cfdf17e1d9ee7acf","home":"Port Vale","away":"Scunthorpe United","kickoff":"2026-11-07T15:01:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"e5caf2fc06a824b6e8d7f29f9ec4809c","home":"Salisbury FC","away":"Sholing FC","kickoff":"2026-11-07T15:01:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"223ee579af6d52020487330258793b05","home":"Burton Albion","away":"AFC Rushden and Diamonds","kickoff":"2026-11-07T15:02:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"4d284d4ab3d3c83412130ea2a467970f","home":"Hornchurch FC","away":"Blackpool","kickoff":"2026-11-07T15:02:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"f4a57f5b8ec8cf8eb4606ec168205bfc","home":"Luton Town","away":"Forest Green Rovers","kickoff":"2026-11-07T15:02:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"c68b9b8ec959d5469ed391fb5c83b9e9","home":"Dover Athletic FC","away":"Wealdstone FC","kickoff":"2026-11-07T15:03:00+00:00","fetched_at":"2026-11-07T16:01:05+00:00"}
