@@ -43,7 +43,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v75";
+const APP_VERSION = "v76";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2450,8 +2450,19 @@ function lbBetList(bt, lg, key = "lean") {
   const shown = all.slice(0, state.lbShown);
   // ¼ Kelly per bet: only when the backtest file stores it (kelly_stake, kelly_profit, bankroll_before).
   const hasKelly = (bt.bet_fields || []).includes("kelly_stake");
-  const kNote = kellyOn() && !hasKelly ? `<p class="note bt-no-kelly">This backtest keeps no per-bet ¼ Kelly stakes yet, so the bets below are at $1 each; the bankroll chart above is the ¼ Kelly replay.</p>` : "";
-  const kMeta = (b) => (kellyOn() && hasKelly && isNum(b.kelly_stake) ? `<div class="meta kelly-row">${b.kelly_stake > 0 ? `¼ Kelly ${bankUsd(b.kelly_stake, 2)}${isNum(b.bankroll_before) ? ` of ${bankUsd(b.bankroll_before, 0)}` : ""}${isNum(b.kelly_profit) ? ` · ${usd(b.kelly_profit, 2)}` : ""}` : "¼ Kelly: no stake"}</div>` : "");
+  // Which bankroll sized the bets (Moneyline #191): "pooled" = one $1,000 bankroll over every
+  // domestic league in date order (the chart under All); a league code = that league's own.
+  const froms = [...new Set(shown.map((b) => b.kelly_from).filter(Boolean))];
+  const fromText = froms.length === 1 && froms[0] !== "pooled" ? `${leagueName(froms[0])}'s own $1,000 bankroll` : "one $1,000 bankroll shared by every domestic league, in date order (the bankroll chart under All)";
+  const kNote = !kellyOn() ? "" : hasKelly
+    ? `<p class="note bt-kelly">Each bet's ¼ Kelly stake comes from ${esc(fromText)}; the units on the right are the same bet at $1. A bet with no stake had no edge on the chance Kelly uses (the blend's).</p>`
+    : `<p class="note bt-no-kelly">This backtest keeps no per-bet ¼ Kelly stakes yet, so the bets below are at $1 each; the bankroll chart above is the ¼ Kelly replay.</p>`;
+  const kMeta = (b) => {
+    if (!kellyOn() || !hasKelly || !isNum(b.kelly_stake)) return "";
+    if (!(b.kelly_stake > 0)) return `<div class="meta kelly-row muted">¼ Kelly: no stake</div>`;
+    const share = isNum(b.bankroll_before) && b.bankroll_before > 0 ? ` (${pct(b.kelly_stake / b.bankroll_before, 1)} of ${bankUsd(b.bankroll_before, 0)})` : "";
+    return `<div class="meta kelly-row">¼ Kelly ${bankUsd(b.kelly_stake, 2)}${share}${isNum(b.kelly_profit) ? ` · <span class="${plClass(b.kelly_profit)}">${usd(b.kelly_profit, 2)}</span>` : ""}</div>`;
+  };
   const rows = shown.map((b) => `
     <div class="bet-row">
       <span>${esc(b.home)} v ${esc(b.away)}${lean ? driverChip(b) : ""}<div class="meta">${esc(shortDate(b.date))}${!lg ? ` · ${esc(leagueShort(b.league))}` : ""} · ${esc(PICK_LABEL[b.market] || b.market)} @ ${american(b.odds)} (${Number(b.odds).toFixed(2)}) · ${lean ? `${sigmaText(b.z)}${b.tier === "strong" ? " Strong" : ""}` : `edge ${signedPct(b.edge, 0)}`}</div><div class="meta">${lean ? `Blend ${pct(b.p_bet, 1)} · model ${pct(b.p_model, 1)}` : `Model ${pct(b.model_p, 1)}`} · CLV <span class="${plClass(b.clv)}">${signedPct(b.clv)}</span></div>${kMeta(b)}</span>

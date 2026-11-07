@@ -1363,7 +1363,7 @@ four leagues: E0, E1–E3).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v75) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v76) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1698,9 +1698,12 @@ four leagues: E0, E1–E3).
   - Trade sheet: the Kelly line (`kellyStakeLine`, now with its share of the bankroll and the
     cap; the line shop's chance is Pinnacle's fair one) leads, above the table.
   - Backtest: the bankroll chart (`sizingHtml` on the part's `sizing`) leads, above the tiles;
-    the bet list shows each bet's ¼ Kelly stake, bankroll and P/L only when the file's
-    `bet_fields` carry `kelly_stake` (`kelly_profit`, `bankroll_before`), else one line says the
-    backtest keeps no per-bet stakes yet.
+    since v76 (data-log's files carry them from 7 Nov) each bet in the list has a ¼ Kelly line
+    (`kMeta`: "¼ Kelly $x (y% of $B) · ±$P" from `kelly_stake`, `bankroll_before`,
+    `kelly_profit`, or "¼ Kelly: no stake"), under a note naming the bankroll from `kelly_from`
+    (`.bt-kelly`: "pooled" = one $1,000 bankroll over every domestic league in date order, a
+    league code = that league's own). A file without `kelly_stake` in `bet_fields` keeps the
+    "no per-bet stakes yet" note (`.bt-no-kelly`).
   - Matches: the open Lean trade's badge adds "¼ Kelly stake $X" (`openBadge` via `kellyHome`).
   - The line shop sizes on Pinnacle's fair chance (`sizing` on its sections); the Kelly bet log
     names it.
