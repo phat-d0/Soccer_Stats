@@ -235,3 +235,26 @@ def test_print_file_round_trips(capsys):
     lines = capsys.readouterr().out.splitlines()
     blob = "".join(ln.split(" ", 2)[2] for ln in lines if ln.startswith("RESIDUAL_MAP_B64"))
     assert gzip.decompress(base64.b64decode(blob)).decode() == text
+
+
+def test_xg_status_names_archived_and_goals_only_seasons(tmp_path, monkeypatch):
+    from soccer_stats import data as fd
+
+    raw, good = tmp_path / "raw", tmp_path / "good"
+    raw.mkdir()
+    good.mkdir()
+    monkeypatch.setattr(fd, "RAW_DIR", raw)
+    body = json.dumps({"dates": []}).encode()
+    (good / "understat_Serie_A_2019.json").write_bytes(body)  # archived copy
+    (raw / "understat_Serie_A_2020.json").write_bytes(body)  # the cached file
+    (raw / "understat_Serie_A_2021.json").write_bytes(b"<html>down</html>")
+    (good / "sources.jsonl").write_text(json.dumps({"file": "understat_Serie_A_2019.json"}) + "\n")
+    st = rm.xg_status(["I1", "E1"], 2021, 2022, good_dir=good)
+    assert "E1" not in st  # no Understat league
+    assert st["I1"]["2019"] == "ok (archived copy)"
+    assert st["I1"]["2020"] == "ok"
+    assert st["I1"]["2021"].startswith("bad") and st["I1"]["2021"].endswith("goals-only")
+    assert st["I1"]["2022"] == "missing: goals-only"
+    note = rm.xg_note(st, 2021)
+    assert "2019/20 seasons came from archived copies" in note
+    assert "I1 2021/22" in note and "I1 2022/23" in note

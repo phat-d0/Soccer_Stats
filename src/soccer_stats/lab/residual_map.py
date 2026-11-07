@@ -512,7 +512,7 @@ def build(rows: pd.DataFrame, n_boot: int = N_BOOT, info: dict | None = None) ->
         "slices": slices,
         "factors": FACTORS,
         "multiplicity": multiplicity(core, slices),
-        "note": NOTE,
+        "note": " ".join(x for x in (NOTE, info.get("xg_note")) if x),
         "warning": WARNING,
         "league_reports": info.get("leagues", {}),
         "xg_files": info.get("xg_files"),
@@ -588,11 +588,15 @@ def load_europe(matches: pd.DataFrame, first: int, last: int, cutoff: pd.Timesta
     }
 
 
-def xg_status(codes, first: int, last: int) -> dict[str, dict[str, str]]:
-    """Each Understat league-season file the run needs: "ok", "missing" or why it is bad."""
+def xg_status(codes, first: int, last: int, good_dir=None) -> dict[str, dict[str, str]]:
+    """Each Understat league-season file the run needs: "ok" (the cached file), "ok (archived
+    copy)" (the good copy came from an archive, xg_wayback.SOURCES), "ok (good copy)",
+    "missing: goals-only" (no file anywhere: that season runs on goals), or why it is bad."""
     from soccer_stats import xg
     from soccer_stats.data import RAW_DIR
 
+    good = Path(good_dir) if good_dir is not None else xg.GOOD_DIR
+    archived = archived_files(good)
     out: dict[str, dict[str, str]] = {}
     for code in codes:
         us = xg.LEAGUES.get(code)
@@ -600,16 +604,70 @@ def xg_status(codes, first: int, last: int) -> dict[str, dict[str, str]]:
             continue
         out[code] = {}
         for y in range(first - BURN_IN, last + 1):
-            path = RAW_DIR / f"understat_{us}_{y}.json"
-            if not path.exists():
-                out[code][str(y)] = "missing"
-                continue
-            try:
-                xg.check_league_json(path.read_bytes())
-                out[code][str(y)] = "ok"
-            except Exception as exc:  # noqa: BLE001 - reported, not raised
-                out[code][str(y)] = f"bad: {exc}"[:80]
+            name = f"understat_{us}_{y}.json"
+            out[code][str(y)] = _file_status(RAW_DIR / name, good / name, name in archived)
     return out
+
+
+def _file_status(raw: Path, copy: Path, archived: bool) -> str:
+    from soccer_stats import xg
+
+    def ok(path: Path) -> bool:
+        try:
+            xg.check_league_json(path.read_bytes())
+            return True
+        except Exception:  # noqa: BLE001 - reported, not raised
+            return False
+
+    if copy.exists() and ok(copy):
+        if archived:
+            return "ok (archived copy)"
+        return "ok" if raw.exists() and ok(raw) else "ok (good copy)"
+    if raw.exists():
+        return "ok" if ok(raw) else "bad: not Understat league JSON; goals-only"
+    return "missing: goals-only"
+
+
+def archived_files(good_dir: Path) -> set[str]:
+    """File names the good-copy folder's sources log says came from an archive."""
+    path = Path(good_dir) / "sources.jsonl"
+    if not path.exists():
+        return set()
+    names = set()
+    for line in path.read_text().splitlines():
+        try:
+            names.add(json.loads(line)["file"])
+        except (ValueError, KeyError, TypeError):
+            continue
+    return names
+
+
+def _years(ys: list[int]) -> str:
+    first, last = ys[0], ys[-1]
+    span = f"{first}/{(first + 1) % 100:02d}"
+    return span if first == last else f"{span}-{last}/{(last + 1) % 100:02d}"
+
+
+def xg_note(status: dict[str, dict[str, str]], first: int) -> str:
+    """One sentence on where the xG came from: archived seasons and goals-only seasons
+    (scored seasons only; the burn-in seasons are named apart)."""
+    arch = sorted({int(y) for s in status.values() for y, v in s.items() if "archived" in v})
+    gaps = [
+        f"{c} {int(y)}/{(int(y) + 1) % 100:02d}"
+        for c, s in status.items()
+        for y, v in s.items()
+        if v.startswith(("missing", "bad"))
+    ]
+    parts = []
+    if arch:
+        parts.append(
+            f"Understat's {_years(arch)} seasons came from archived copies "
+            "(Wayback Machine, data/understat_good/sources.jsonl): Understat was down from 2 "
+            "Nov and the old caches were evicted."
+        )
+    if gaps:
+        parts.append(f"Goals-only (no Understat file): {', '.join(gaps)}.")
+    return " ".join(parts)
 
 
 def print_file(text: str) -> None:
@@ -686,6 +744,7 @@ def main(argv: list[str] | None = None) -> None:
             "locked_from": str(cutoff.date()),
             "leagues": reps,
             "xg_files": status,
+            "xg_note": xg_note(status, args.first),
             "europe": euro_rep,
             "runs": {"residual_map": run} if run else {},
         },

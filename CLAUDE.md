@@ -1246,10 +1246,12 @@ four leagues: E0, E1–E3).
   month, rest days, after a UEFA match (`load_europe`, ESPN), xG luck, new to the division,
   price move (descriptive) and Lean's driver; `multiplicity`, `NOTE`, `WARNING`.
   `odds-check.yml` `task=residual-map` prints the file as `RESIDUAL_MAP_B64` chunks with its
-  SHA-256; the committed `lab/residual_map.json` is that text (run 42012978090: E0, E1–E3 only,
-  E0 with xG for 2022/23–2023/24 only; the other four wait for Understat files). `xg_status`
-  prints each Understat league-season file as ok, missing or bad; a tenth slice splits home
-  sides by league. The lead builds the owner's 3D view from it.
+  SHA-256; the committed `lab/residual_map.json` is that text (run 42424591226: all eight leagues,
+  16,276 matches; Understat's older seasons from the archived copies in `xg-good-`, I1 2022/23
+  goals-only). `xg_status` names each Understat league-season file (ok, archived copy,
+  goals-only) and `xg_note` puts that in the file's note; a tenth slice splits home sides by
+  league. Result: 7 of 331 cells with 200+ rows exclude 0, fewer than chance; the four-league
+  home-side cell did not hold (+0.9 points, −0.6 to +2.5). The lead builds the owner's 3D view from it.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
