@@ -574,7 +574,15 @@ four leagues: E0, E1–E3).
   domestic bets): `{flat, kelly}` on `p_bet` in the Lean file; `{flat, kelly, kelly_raw}` in the
   Model 12% file, Kelly on `p_blend` (`edge12_backtest.with_blend`: the Lean backtest's own
   per-block blend for the bet's side, NaN before a league's first fit, so no stake) and
-  `kelly_raw` on `model_p`. Log lines `LEAN_SIZING_JSON` / `EDGE12_SIZING_JSON` (no curves).
+  `kelly_raw` on `model_p`. Log lines `LEAN_SIZING_JSON` / `EDGE12_SIZING_JSON` (no curves). Per-bet stakes (owner via the lead, 7 Nov; display only, for the app's Flat/¼ Kelly
+  switch): each compact bet row ends with `sizing.KELLY_BET_FIELDS` = `kelly_stake`,
+  `kelly_profit`, `bankroll_before`, `kelly_from` (`sizing.with_kelly_bets`: the same
+  `simulate(..., log=True)` on the same rows, order and chance as the `kelly` block, so the
+  stakes add up to its profit). The early-price leagues come from the pooled simulation
+  (`kelly_from` "pooled" = `all.sizing.kelly`), a `kind: "close"` league (UCL) from its own
+  (`kelly_from` = its code, decided at the close); `lean_backtest.kelly_rows` builds them for
+  both files and the DraftKings ones (`build_files` reuses the builders). Model 12%'s are Kelly
+  on `p_blend` (stake 0 before a league's first fit); `app_section` passes them through.
 - `sizing.py` (owner, 24 Oct; display only): Kelly sizing tracked beside flat $10 over the same
   trades or backtest bets. `KELLY_FRACTION` 0.25, `KELLY_CAP` 0.05, `BANKROLL_START` 1,000,
   `FLAT_STAKE` 10; `kelly_f(p, d)` = (p·d − 1)/(d − 1), `kelly_stake(bankroll, p, d)` (0 when f ≤ 0,

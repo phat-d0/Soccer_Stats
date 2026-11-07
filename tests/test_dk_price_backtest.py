@@ -173,6 +173,11 @@ def test_build_files_are_app_ready_and_pool_every_league(tmp_path):
         assert lb.OUTCOMES not in rep  # outcome rows are never saved
     sec = eb.app_section(json.loads(json.dumps(ef, default=str)))
     assert sec["available"] and sec["bets_shown"] == 2
+    # Per-bet Kelly stakes ride through to the app (owner via the lead, 7 Nov).
+    row = dict(zip(sec["bet_fields"], sec["bets"][0], strict=True))
+    assert row["kelly_from"] == "pooled" and "kelly_stake" in row and "bankroll_before" in row
+    lsec = lb.app_section(json.loads(json.dumps(lf, default=str)))
+    assert "kelly_profit" in lsec["bet_fields"]
     assert paper._dk_section({"available": False, "note": "x"})["note"] == paper.DK_MISSING_NOTE
 
 
