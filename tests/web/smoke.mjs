@@ -1475,7 +1475,18 @@ const STEPS = [
     await pfOpenStrat(p, "lean"); await p.click('button[data-pf="backtest"]');
     const order = await p.evaluate(() => { const b = document.querySelector("[data-scrub^='bz-lean']"), t = document.querySelector("#view .tiles"); return b && t ? !!(b.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) : false; });
     if (!order) throw new Error("the bankroll chart should lead the backtest in Kelly mode");
-    if (!(await p.textContent("#view")).includes("keeps no per-bet ¼ Kelly stakes yet")) throw new Error("backtest bet list Kelly note");
+    // Per-bet ¼ Kelly from the file's bet_fields (Moneyline #191): one line a bet, each with its
+    // own stake, share of the bankroll and P/L; the "no per-bet stakes" note is gone.
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (text.includes("keeps no per-bet ¼ Kelly stakes yet")) throw new Error("the backtest still says it has no per-bet stakes");
+    if (!text.includes("Each bet's ¼ Kelly stake comes from one $1,000 bankroll shared by every domestic league")) throw new Error("backtest Kelly bankroll note");
+    const want = await p.evaluate(() => lbBets(btSourceOn("lean", leagueOn()).bt).filter((b) => (!leagueOn() || b.league === leagueOn()) && (!state.pfDriver || b.driver === state.pfDriver)).slice(0, state.lbShown).map((b) => (b.kelly_stake > 0 ? `¼ Kelly ${bankUsd(b.kelly_stake, 2)} (${pct(b.kelly_stake / b.bankroll_before, 1)} of ${bankUsd(b.bankroll_before, 0)}) · ${usd(b.kelly_profit, 2)}` : "¼ Kelly: no stake")));
+    const got = (await p.locator("#view .kelly-row").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+    if (!want.length || got.length !== want.length || got.some((g, i) => g !== want[i])) throw new Error(`backtest Kelly rows ${JSON.stringify(got.slice(0, 2))} vs ${JSON.stringify(want.slice(0, 2))}`);
+    // Model 12%: most bets have no stake (no edge on the blend), shown as such.
+    await pfOpenStrat(p, "edge12"); await p.click('button[data-pf="backtest"]');
+    if (!(await p.locator("#view .kelly-row").count())) throw new Error("Model 12% backtest lacks its ¼ Kelly lines");
+    await pfOpenStrat(p, "lean");
     await p.click('button[data-pf="live"]');
   }],
   ["matches-kelly", async (p) => {
