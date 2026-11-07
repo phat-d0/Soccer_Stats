@@ -390,11 +390,16 @@ def build(src: Path, out: Path) -> dict:
         for code, part in (f.get("leagues") or {}).items():
             if code not in CALIBRATION_LEAGUES and isinstance(part, dict):
                 part.pop("calibration", None)
-        # Every fifth point outside FULL_LEAGUES (5 Nov: room for the Kelly bet log and the
-        # bet-alert block, with headroom under the cap); every fourth under All and those.
+            # Outside FULL_LEAGUES the edge and CLV bands go too, as in DraftKings' files
+            # (7 Nov: room for the sizing switch; the smoke test reads them in those leagues only).
+            if code not in FULL_LEAGUES and isinstance(part, dict):
+                part.pop("by_edge_band", None)
+                part.pop("by_clv_band", None)
+        # Every eighth point outside FULL_LEAGUES (5 Nov: fifth; 7 Nov: eighth, room for the
+        # sizing switch); every fourth under All and those.
         parts = [("", f.get("all")), *(f.get("leagues") or {}).items()]
         for code, part in parts:
-            step = 4 if code in ("", *FULL_LEAGUES) else 5
+            step = 4 if code in ("", *FULL_LEAGUES) else 8
             for block in ((part or {}).get("sizing") or {}).values():
                 c = block.get("curve") if isinstance(block, dict) else None
                 if isinstance(c, list) and len(c) > 20:
@@ -1969,13 +1974,15 @@ def add_lean_strategy(data: dict) -> None:
         lineshop={"trades": lineshop_trades(), "defined_at": FIXTURE_DNB_FROM},
     )
     add_dnb_backcast(data)
-    # The app shows no Kelly sizing or calibration for the line shop (no model chance to
-    # size or calibrate on), so the fixture leaves them out (the 1.5 MB cap).
+    # The line shop has no Model view, so its calibration is left out (the 1.5 MB cap). The 2%
+    # line keeps its ¼ Kelly sizing (on Pinnacle's fair chance); the 1% line's is dropped so
+    # the app's "Kelly not tracked" state is in the fixture too.
     ml = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "moneyline")
     for sec in ml["live"].get("strategies") or []:
         if str(sec.get("key", "")).startswith(plsh.KEY):
-            sec.pop("sizing", None)
             sec.pop("calibration", None)
+            if sec.get("key") != plsh.KEY:
+                sec.pop("sizing", None)
 
 
 def add_dnb_backcast(data: dict) -> None:

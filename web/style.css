@@ -939,3 +939,11 @@ details.drv-fold { margin-top: 10px; }
 .ls-books { padding: 10px 14px; }
 .ls-book-line { margin: 0 0 4px; font-weight: 500; }
 .ls-compare .judged-tab td .meta { display: block; font-size: 11px; color: var(--text-muted); }
+
+/* The sizing switch (owner, 7 Nov): Flat $10 | ¼ Kelly at the top of every Portfolio level. */
+.sizing-switch { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.sizing-switch .ss-label { font-size: 13px; color: var(--text-muted); }
+.sizing-switch .segmented { margin: 0; flex: 0 0 auto; }
+.sizing-switch .segmented button { white-space: nowrap; padding-left: 14px; padding-right: 14px; }
+.kelly-framing { margin: -4px 0 12px; }
+.kelly-row { color: var(--text-secondary); }
