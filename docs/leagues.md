@@ -1483,9 +1483,25 @@ Machine's copies of the old league page, whose HTML holds the same data the fetc
 | Lean at Pinnacle, Kelly pooled | −$743.33 | −$723.57 |
 | Model 12% at Pinnacle, I1 | 856 bets, ROI −23.4%, CLV −4.8% | 878 bets, ROI −18.1%, CLV −4.7% |
 | Model 12% at Pinnacle, pooled | 8,912 bets, ROI −5.6%, CLV −4.6% | 8,934 bets, ROI −5.1%, CLV −4.6% |
+| Model 12% at Pinnacle, Kelly on p_blend pooled | −$326.24 (1,840 staked) | −$343.24 (1,845 staked) |
+| Model 12% at Pinnacle, E0 | 1,140 bets, ROI +4.15% | 1,139 bets, ROI +4.24% |
+| Model 12% at Pinnacle, E3 | 1,399 bets, ROI −5.9% | 1,400 bets, ROI −5.8% |
+| Model 12% at Pinnacle, UCL | 163 bets, ROI −2.9%, CLV −9.4% | 161 bets, ROI −1.7%, CLV −9.3% |
 | Lean at DraftKings, I1 | 76 bets | 74 bets |
 | Model 12% at DraftKings, I1 | 427 bets | 428 bets |
 
-  Elsewhere: E0, SP1, D1, E2 identical in Lean at Pinnacle; F1 431 → 430 and E1 412 → 411; Model 12%
-  at Pinnacle E0 1,140 → 1,139, E3 1,399 → 1,400, UCL 163 → 161. Every verdict is unchanged. I1
-  can't match October until I1 2022/23 has xG: rerun the three backtests when Understat returns.
+  Why the numbers moved, October → now (accepted by the lead, 7 Nov; no verdict moves):
+  - **I1:** I1 2022/23 is goals-only now (xG in October). I1 can't match October until it has xG:
+    rerun the three backtests when Understat returns.
+  - **E0, E3:** one bet each at the 12% edge boundary in Model 12% at Pinnacle (E3 is goals-only:
+    football-data's files have changed since October).
+  - **F1:** one Lean bet (431 → 430), most likely the F1 2017/18 match whose two sources' dates are
+    more than 2 days apart, now goals-only.
+  - **E1, E2:** one bet each (Lean at Pinnacle E1 412 → 411; Lean at DraftKings E2 215 → 216; Model
+    12% at DraftKings E1 1,083 → 1,084): goals-only leagues, football-data's updated files.
+  - **UCL:** 163 → 161 bets in Model 12%, from new ESPN and football-data results feeding the
+    cross-league model; UCL is kept out of the pooled numbers.
+  - Identical: Lean at Pinnacle in E0, SP1, D1, E2, E3; Model 12% at Pinnacle in SP1, D1, F1, E1,
+    E2; every league but I1 and E2 in Lean at DraftKings, and but I1 and E1 in Model 12% at
+    DraftKings. Kelly moves by cents where the bets are identical (refit noise in the chance).
+  Written to data-log after the lead's go (7 Nov).
