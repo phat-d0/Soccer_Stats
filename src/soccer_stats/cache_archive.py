@@ -5,12 +5,12 @@ the odds bought with credits live only in caches. Two safeguards (.github/workfl
 
 * Keep-alive: twice a week each cache is restored with its exact key prefix and paths (a
   restore counts as a use), its hit or miss and size logged.
-* Archive: each paid cache (PAID) packed as a deterministic tar + zstd into the GitHub
-  Release `paid-odds-archive` (assets up to 2 GB, split into parts above PART_BYTES), with a
-  manifest (files, bytes, sha256, the source cache key, date) on data-log
-  `archive/manifest.json`. An asset is replaced only when the cache's contents changed
-  (`content_sha256`, from every file's path, size and sha256, so a repacked tar of the same
-  files changes nothing).
+* Archive: each paid cache (PAID), and the free ones in ARCHIVED_FREE, packed as a
+  deterministic tar + zstd into the GitHub Release `paid-odds-archive` (assets up to 2 GB,
+  split into parts above PART_BYTES), with a manifest (files, bytes, sha256, the source
+  cache key, date) on data-log `archive/manifest.json`. An asset is replaced only when the
+  cache's contents changed (`content_sha256`, from every file's path, size and sha256, so a
+  repacked tar of the same files changes nothing).
 
 On a miss (fewer files on disk than the manifest lists for a path), the composite action
 .github/actions/paid-archive-restore fills the paid cache back in from the archive before
@@ -69,6 +69,22 @@ PAID = {
         "what": "in-play probe answers, live and historical (odds-check.yml inplay-probe)",
     },
 }
+
+# Free caches archived like the paid ones (lead, 7 Nov): nothing bought, but losing them
+# costs work that can't be redone quickly. xg-good- holds the last good copy of each
+# Understat league file; when Understat went down (2 Nov) the older seasons had already been
+# evicted from every cache, so a backtest rerun had to wait. Packed into the same release and
+# manifest by caches.yml, rebuilt by the same fallback action (continue-on-error there: a
+# failed rebuild of free data never stops a job), but not under PAID's rules for key-holding
+# jobs (they need not save it, and saving it starts no archive run).
+ARCHIVED_FREE = {
+    "xg-good": {
+        "prefix": "xg-good-",
+        "paths": ["data/understat_good"],
+        "what": "the last good Understat league file per league-season (xg.GOOD_DIR; free)",
+    },
+}
+ARCHIVED = PAID | ARCHIVED_FREE  # every cache with a release asset and a manifest entry
 
 # Caches a job holding ODDS_API_KEY saves that hold no bought data: prefix (fnmatch, as
 # the workflow's key with ${{ inputs.league }} as *) -> why it is free. A cache saved in a

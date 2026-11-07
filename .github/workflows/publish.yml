@@ -67,6 +67,11 @@ jobs:
           path: data/understat_good
           key: xg-good-none
           restore-keys: xg-good-
+      # Rebuilt from the permanent archive when the cache missed (lead, 7 Nov; cache_archive.ARCHIVED_FREE).
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: xg-good
 
       # The Champions League model's European results (ESPN days, final ones cached for
       # good), warmed by backfill.yml's match_blends run; saved again with data/raw above.

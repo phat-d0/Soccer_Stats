@@ -23,6 +23,19 @@ snapshots alone were about 8,000).
 | `archive-probe-` | `data/raw/archive_probe` | in-play archive probes, one snapshot per league-season | `odds-check.yml` `archive-probe` |
 | `inplay-probe-` | `data/raw/inplay_probe` | in-play probe answers, live and historical (from 28 Oct) | `odds-check.yml` `inplay-probe` |
 
+**Free but archived** (`cache_archive.ARCHIVED_FREE`; lead, 7 Nov): packed into the same release
+and manifest as the paid caches and rebuilt by the same fallback action after each restore, with
+`continue-on-error` (free data: a failed rebuild never stops a job). The rules for paid caches in
+key-holding jobs (save under `always()`, dispatch an archive run) don't apply to them.
+
+| Cache (key prefix) | Paths, as saved | What | Saved by |
+| --- | --- | --- | --- |
+| `xg-good-` | `data/understat_good` | the last good Understat league file per league-season (`xg.GOOD_DIR`) | `publish.yml`, `odds-check.yml` `understat-backfill` |
+
+Why: when Understat went down (2 Nov) the older seasons' files had already been evicted from every
+cache, so a backtest rerun had to wait for the site. The archive keeps what `xg-good-` holds from the
+next `caches.yml` run on.
+
 **What the first run found** (28 Oct, `caches.yml` dry run 40640065501, before any archive):
 
 | Cache | State | Files | On disk | Packed (tar + zstd) |
