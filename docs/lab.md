@@ -3577,3 +3577,37 @@ about 11 expected by chance. The cells overlap, so this is a scale, not a test.
   close said: z = +0.030. Descriptive only: the move isn't known when a bet is taken.
 - **Promoted sides in their first 10 matches:** −0.034 (254 rows). **Against a newcomer:**
   +0.038 (480 rows). Both ranges include 0 in the totals.
+
+### Residual map: all eight leagues (2026-11-07; `odds-check.yml` `task=residual-map` run 42424591226, 0 credits, no key)
+
+This rerun replaces the four-league file. The missing Understat seasons came back on 7 Nov:
+Moneyline restored 32 of 33 league-seasons from archived copies (Wayback Machine, into
+`xg-good-`, run 42422761677; `data/understat_good/sources.jsonl`).
+- **xG files:** the run's file check (`xg_files`) shows every needed Understat file for
+  2017/18–2023/24 present, except I1 2022/23, which runs on goals only (said in the file's
+  note).
+- **Size:** 16,276 matches, 48,828 outcome rows, eight leagues, 2019/20–2023/24. 2024/25 is
+  still locked.
+- **Europe slice:** 64 UEFA clubs map, giving 1,140 rows "after Europe".
+- **File:** `lab/residual_map.json` (SHA-256 345f6609…, 87 KB), same shape as before.
+
+**Multiplicity: nothing clears the noise.** 397 cells, 331 with ≥ 200 rows. Only 7 have a z
+range that excludes 0, *fewer* than the ~17 expected by chance. The seven are scattered,
+with no common thread:
+- the close's 50–60% outcomes the model rated 10+ points lower: z +0.047 (573 rows);
+- the early price's 30–40% outcomes the model rated 2–5 points higher: −0.036 (1,442);
+- Ligue 1 outcomes the model liked by 2–5 points: −0.029 (902);
+- equal rest, model 5+ points below: +0.019 (4,129);
+- no European match, model 5+ points below: +0.013 (6,456);
+- home sides by league: Serie A, model 5+ points above, −0.057 (298); Ligue 1, model 2–5
+  points above, −0.076 (258).
+
+**The four-league home-side finding did not hold.** Home sides the model rates 5+ points below
+the close now win +0.9 points more than priced (−0.6 to +2.5) on 3,997 rows, against +2.2
+(+0.4 to +4.0) on the four English leagues alone. It came mostly from League One and League
+Two (+3.2 and +2.5, neither's range clear of 0). Across the five xG leagues the cell sits near
+0 (E0 +1.2, SP1 −2.0, D1 +0.3, I1 −1.1, F1 −0.3; every range includes 0). With xG for every
+season, E0's own value fell from +2.1 to +1.2.
+
+**Reading.** On free, pre-kickoff information the close is right where the model disagrees
+with it. No cell gives a pattern to pre-register.
