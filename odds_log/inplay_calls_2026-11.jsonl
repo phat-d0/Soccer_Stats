@@ -292,3 +292,4 @@
 {"league":"JPN","kinds":["inplay75"],"kickoffs":["2026-11-07T04:00:00+00:00"],"fetched_at":"2026-11-07T05:18:17+00:00","status":200,"cost":1,"credits_left":4960112,"events":10,"rows":18}
 {"league":"JPN","kinds":["inplay55"],"kickoffs":["2026-11-07T05:00:00+00:00"],"fetched_at":"2026-11-07T05:58:14+00:00","status":200,"cost":1,"credits_left":4960110,"events":10,"rows":18}
 {"league":"JPN","kinds":["inplay75"],"kickoffs":["2026-11-07T05:00:00+00:00"],"fetched_at":"2026-11-07T06:18:16+00:00","status":200,"cost":1,"credits_left":4960109,"events":9,"rows":24}
+{"league":"JPN","kinds":["inplay55"],"kickoffs":["2026-11-07T06:00:00+00:00"],"fetched_at":"2026-11-07T06:58:17+00:00","status":200,"cost":1,"credits_left":4960108,"events":9,"rows":18}
