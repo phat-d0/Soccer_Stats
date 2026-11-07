@@ -836,7 +836,7 @@ const STEPS = [
     if (!(await p.locator(".pf-title").innerText()).includes("all odds (old rule)")) throw new Error("old rule not opened");
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const kl = await p.textContent("#sheet-body .kelly-line");
-    if (!/^(¼ Kelly stake: \$[\d,.]+|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
+    if (!/^(¼ Kelly stake: \$[\d,.]+( \([\d.]+% of a \$[\d,]+ bankroll(, capped at 5%)?\))?|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
     const text = await p.textContent("#sheet-body");
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
   }, true],
@@ -1148,7 +1148,8 @@ const STEPS = [
     if ((await first.getAttribute("id")) !== want.id) throw new Error("the Kelly log isn't newest first");
     const ft = (await first.innerText()).replace(/\s+/g, " ");
     for (const w of [want.odds, want.stake, want.after]) if (!ft.includes(w)) throw new Error(`first Kelly row lacks "${w}": ${ft}`);
-    const zero = log.find((r) => !(r.stake > 0));
+    // The newest zero stake, so it is among the 25 rows shown before "Show more".
+    const zero = [...log].reverse().find((r) => !(r.stake > 0));
     if (zero && !(await p.textContent("details#kl-edge12")).includes(zero.reason)) throw new Error("a zero stake shows no reason");
     await p.click('button[data-klmore="kl-edge12"]');
     if ((await p.locator("details#kl-edge12 tbody tr").count()) !== log.length || !(await p.locator("details#kl-edge12[open]").count())) throw new Error("Show more on the Kelly log");
@@ -1237,7 +1238,7 @@ const STEPS = [
   }],
   ["portfolio-comebacks-result", async (p) => {
     await p.click('button[data-pfstrat="comeback_ht"]');
-    const views = await p.locator("#view .segmented button").allInnerTexts();
+    const views = await p.locator("#view .segmented button:not([data-sizing])").allInnerTexts();
     if (views.join(",") !== "Result,Why") throw new Error(`comebacks views: ${views}`);
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     const vt = await p.evaluate(() => studies().find((x) => x.id === "comeback_ht").verdict_text);
@@ -1381,6 +1382,111 @@ const STEPS = [
     await pfOpenPf(p, "moneyline"); await p.click('button[data-pfstrat="edge12"]');
     if (!(await p.locator('button[data-pf="live"].on').count())) throw new Error("Moneyline should fall back to Live paper after a study");
   }],
+  // The sizing switch (owner, 7 Nov): Flat $10 | ¼ Kelly at the top of Portfolio, remembered in
+  // localStorage. In Kelly mode every level reads the sections' ¼ Kelly blocks; switched back
+  // to flat at the end so the other steps see the record.
+  // ¼ Kelly beside flat $10 on every live trade row, whatever the switch says (owner, 7 Nov):
+  // two columns headed once per list, the lists' headers carrying the ¼ Kelly totals.
+  ["portfolio-kelly-rows", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "corners"); await p.click('.chip[data-league=""]');
+    await p.click('button[data-pfstrat="draftkings_below60"]');
+    if ((await p.evaluate(() => state.sizing)) !== "flat") throw new Error("rows check runs at flat $10");
+    const heads = await p.locator("#view .kcols-head").count();
+    const lists = await p.locator("#view .card.list").count();
+    if (!heads || heads !== lists) throw new Error(`Kelly column heads ${heads} for ${lists} lists`);
+    const rows = await p.locator("#view .trade-row").count();
+    if ((await p.locator("#view .trade-row .vals.two .kcol").count()) !== rows) throw new Error("every trade row should carry a ¼ Kelly column");
+    // Nothing in a row is cut off (lead, 7 Nov): every text line fits its box, the DraftKings
+    // CLV line included, which wraps instead of ending in "…".
+    const cut = await p.evaluate(() => [...document.querySelectorAll("#view .trade-row .meta, #view .trade-row .meta .nowrap, #view .trade-row .vals small")].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > e.closest(".trade-row").getBoundingClientRect().right + 1).map((e) => e.textContent.trim()));
+    if (cut.length) throw new Error(`trade row text cut off: ${cut.slice(0, 3).join(" | ")}`);
+    const want = await p.evaluate(() => {
+      const cur = pfById("corners"), x = pfStrategies(cur).find((s) => s.key === "draftkings_below60");
+      const kl = kellyOf(x.st), ts = strategyLiveSet(cur, x, "").trades;
+      const open = ts.filter((t) => t.status === "open"), done = ts.filter((t) => t.status !== "open");
+      const risk = open.reduce((a, t) => a + (kellyTrade(t, kl)?.stake || 0), 0);
+      const pl = done.reduce((a, t) => a + (kellyTrade(t, kl)?.profit || 0), 0);
+      const t = ts.find((t) => t.status === "won" && kellyTrade(t, kl)?.stake > 0);
+      return { risk: `¼ Kelly ${bankUsd(risk, 0)} at risk`, pl: `¼ Kelly ${usd(pl, 2)}`, id: t?.id, tp: t ? usd(kellyTrade(t, kl).profit, 2) : null, open: open.length, done: done.length };
+    });
+    const titles = (await p.locator("#view .section-title").allInnerTexts()).join(" | ").replace(/\s+/g, " ");
+    if (want.open && !titles.toLowerCase().includes(want.risk.toLowerCase())) throw new Error(`Open header lacks "${want.risk}": ${titles}`);
+    if (want.done && !titles.toLowerCase().includes(want.pl.toLowerCase())) throw new Error(`Settled header lacks "${want.pl}": ${titles}`);
+    if (want.id) {
+      const k = await p.locator(`#view button[data-trade="${want.id}"] .kcol`).innerText();
+      if (!k.includes(want.tp)) throw new Error(`settled Kelly cell ${k} vs ${want.tp}`);
+    }
+    // The 1% line shop line has no Kelly block: flat alone.
+    await pfOpenPf(p, "moneyline"); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="lineshop_1pct"]');
+    if (await p.locator("#view .kcol, #view .kcols-head").count()) throw new Error("the 1% line shop line shows a Kelly column");
+    // Model 12% and its draw no bet track get the column too.
+    for (const key of ["edge12", "edge12_dnb"]) {
+      await pfOpenStrat(p, key);
+      const n = await p.locator("#view .trade-row").count();
+      if (n && (await p.locator("#view .trade-row .kcol").count()) !== n) throw new Error(`${key} rows lack the Kelly column`);
+    }
+  }],
+  ["portfolio-kelly-home", async (p) => {
+    await closeSheet(p); await pfHome(p);
+    if ((await p.locator(".sizing-switch button.on").innerText()) !== "Flat $10") throw new Error("sizing should start at flat $10");
+    await p.click('.sizing-switch button[data-sizing="kelly"]');
+    if ((await p.evaluate(() => localStorage.getItem("sizing"))) !== '"kelly"') throw new Error("sizing not remembered");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!text.includes("Flat $10 is the record; ¼ Kelly is shown beside it and only helps once a strategy beats the closing price.")) throw new Error("Kelly framing line");
+    if (!text.includes("at ¼ Kelly on its own $1,000 paper bankroll")) throw new Error("home note in Kelly mode");
+    for (const id of ["moneyline", "corners"]) {
+      const row = (await p.locator(`button[data-pfid="${id}"]`).innerText()).replace(/\s+/g, " ");
+      const want = await p.evaluate((id) => { const cur = pfById(id); const lead = pfLead(pfStrategies(cur)); const kl = kellyOf(lead.st); return { profit: usd(kl.k.profit, 2), bank: `bankroll ${bankUsd(kl.k.bankroll_now, 0)} of $1,000` }; }, id);
+      if (!row.includes(want.bank) || !row.includes(want.profit) || !row.includes("¼ Kelly")) throw new Error(`${id} Kelly row ${row} vs ${JSON.stringify(want)}`);
+    }
+  }],
+  ["portfolio-kelly-lean", async (p) => {
+    await p.click('button[data-pfid="moneyline"]'); await p.click('.chip[data-league=""]');
+    const row = (await p.locator('button[data-pfstrat="lean"]').innerText()).replace(/\s+/g, " ");
+    if (!row.includes("¼ Kelly")) throw new Error(`Lean row in Kelly mode: ${row}`);
+    if (!(await p.locator('button[data-pfstrat="lineshop_1pct"]').innerText()).includes("Kelly not tracked")) throw new Error("1% line row should say Kelly not tracked");
+    await p.click('button[data-pfstrat="lean"]');
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Bankroll now, ¼ Kelly", "Profit, ¼ Kelly", "Max drawdown, ¼ Kelly", "Bets staked", "Bankroll over time, ¼ Kelly", "with flat $10's dashed beside it", "How each ¼ Kelly stake was sized", "Kelly bet log"]) if (!text.includes(w)) throw new Error(`Lean Kelly view lacks "${w}"`);
+    if (!(await p.locator("[data-scrub='kv-lean'] path.line.ser").count())) throw new Error("no Kelly bankroll chart");
+    if (await p.locator("[data-scrub='kz-lean']").count()) throw new Error("the bankroll chart shows twice in Kelly mode");
+    // An open trade's right side is its stake taken at open.
+    const want = await p.evaluate(() => { const st = pfById("moneyline").live.strategies.find((s) => s.key === "lean"); const kl = kellyOf(st); const t = strategyLiveSet(pfById("moneyline"), pfStrategies(pfById("moneyline")).find((x) => x.key === "lean"), "").trades.find((t) => t.status === "open" && kellyTrade(t, kl)?.stake > 0); return t ? { id: t.id, stake: bankUsd(kellyTrade(t, kl).stake, 2) } : null; });
+    if (want) {
+      const r = (await p.locator(`#view button[data-trade="${want.id}"] .vals .kcol`).innerText()).replace(/\s+/g, " ");
+      if (!r.includes(want.stake) || !r.includes("to win $")) throw new Error(`open Kelly row ${r} vs ${want.stake}`);
+    }
+    await scrubCheck(p, "[data-scrub='kv-lean']");
+  }],
+  ["portfolio-kelly-trade", async (p) => {
+    await p.locator("#view button[data-trade]").first().click(); await sheet(p);
+    const first = await p.locator("#sheet-body .kelly-first").count();
+    const order = await p.evaluate(() => { const k = document.querySelector("#sheet-body .kelly-first"), tab = document.querySelector("#sheet-body table.kv"); return k && tab ? !!(k.compareDocumentPosition(tab) & Node.DOCUMENT_POSITION_FOLLOWING) : false; });
+    if (!first || !order) throw new Error("the Kelly line should come first on the sheet in Kelly mode");
+  }, true],
+  ["portfolio-kelly-lineshop", async (p) => {
+    await closeSheet(p); await pfOpenStrat(p, "lineshop_1pct");
+    if (!(await p.textContent("#view")).includes("Kelly not tracked for")) throw new Error("1% line: Kelly not tracked");
+    await pfOpenStrat(p, "lineshop");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!text.includes("Bankroll now, ¼ Kelly") || !text.includes("Pinnacle's fair chance at entry")) throw new Error("line shop Kelly view");
+  }],
+  ["portfolio-kelly-backtest", async (p) => {
+    await pfOpenStrat(p, "lean"); await p.click('button[data-pf="backtest"]');
+    const order = await p.evaluate(() => { const b = document.querySelector("[data-scrub^='bz-lean']"), t = document.querySelector("#view .tiles"); return b && t ? !!(b.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) : false; });
+    if (!order) throw new Error("the bankroll chart should lead the backtest in Kelly mode");
+    if (!(await p.textContent("#view")).includes("keeps no per-bet ¼ Kelly stakes yet")) throw new Error("backtest bet list Kelly note");
+    await p.click('button[data-pf="live"]');
+  }],
+  ["matches-kelly", async (p) => {
+    await tab("matches")(p);
+    const badges = (await p.locator(".badge.paper").allInnerTexts()).join(" | ");
+    const want = await p.evaluate(() => [...openMatchTrades().values()].some((t) => stratOf(t) === "lean" && tradePhase(t) === "upcoming" && kellyHome(t)));
+    if (want && !/¼ Kelly (stake \$[\d.,]+|: no stake)/.test(badges)) throw new Error(`Matches badge lacks the Kelly stake: ${badges}`);
+    await tab("portfolio")(p); await pfHome(p);
+    await p.click('.sizing-switch button[data-sizing="flat"]');
+    if ((await p.evaluate(() => localStorage.getItem("sizing"))) !== '"flat"') throw new Error("sizing back to flat");
+  }],
   // Line shop vs Pinnacle (owner-approved 5 Nov): the 2% judged line after Blend Lean in the
   // main list, its 1% comparison right under it; book, quote age, gap, Pinnacle's fair chance
   // and CLV vs Pinnacle's close on rows and the sheet; the judged count, then a stored verdict.
@@ -1396,7 +1502,8 @@ const STEPS = [
     if (await p.locator('button[data-pf="backtest"]').count()) throw new Error("the line shop has no backtest view");
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     for (const w of ["No model: the best of DraftKings, FanDuel, BetMGM and BetRivers", "The judged test, from", "3 of 300 bets with a final close", "4 opened since", "Where the price was", "DraftKings 2 · FanDuel 2 · BetMGM 1 · BetRivers 1", "1 trade took a quote 10+ minutes old", "The age on each trade is how old", "Its backcast starts 28 Oct", "Avg gap", "gap +", "CLV +", "vs Pinnacle's close", "(old)"]) if (!text.includes(w)) throw new Error(`line shop view lacks "${w}"`);
-    if (text.includes("¼ Kelly") || text.includes("Kelly bet log")) throw new Error("the line shop shows Kelly sizing");
+    // Since v75 the line shop's own ¼ Kelly sizing (on Pinnacle's fair chance) shows like any strategy's.
+    for (const w of ["Bankroll: flat $10 vs ¼ Kelly", "Kelly bet log", "Pinnacle's fair chance at entry"]) if (!text.includes(w)) throw new Error(`line shop sizing lacks "${w}"`);
     if ((await p.locator("#view .trade-row .chip-backcast").count()) !== 2) throw new Error("line shop backcast chips");
     if (await p.locator(".pf-curve .curve-legend .lg-item").count() !== 2) throw new Error("line shop overlay legend");
     const legend = await p.locator(".pf-curve .curve-legend").innerText();
@@ -1415,7 +1522,8 @@ const STEPS = [
     await p.click('button[data-trade="SP1|2627|Sevilla|Getafe|lineshop"]'); await sheet(p);
     const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
     for (const w of ["Line shop vs Pinnacle, 2% gap (judged)", "Bookmaker", "DraftKings", "Quote's age when logged", "Gap at entry", "over Pinnacle's fair price", "Pinnacle's fair chance at entry", "CLV vs Pinnacle's close (judged)", "The book's own close"]) if (!text.includes(w)) throw new Error(`line shop sheet lacks "${w}"`);
-    for (const w of ["Kelly", "Team news applied", "Model chance"]) if (text.includes(w)) throw new Error(`line shop sheet shows "${w}"`);
+    for (const w of ["Team news applied", "Model chance"]) if (text.includes(w)) throw new Error(`line shop sheet shows "${w}"`);
+    if (!/¼ Kelly stake: \$[\d.,]+|Kelly: no stake/.test(text)) throw new Error("line shop sheet lacks its ¼ Kelly line");
   }, true],
   ["portfolio-lineshop-1pct", async (p) => {
     await closeSheet(p); await pfOpenStrat(p, "lineshop_1pct");

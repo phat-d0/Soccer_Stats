@@ -1322,7 +1322,7 @@ four leagues: E0, E1–E3).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v74) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v75) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1551,9 +1551,9 @@ four leagues: E0, E1–E3).
   cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
   no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`), every judged
   design-C bet of the comeback study but a third of design B's (the fixture test counts C), the
-  backtest files' bankroll curves at every fourth point (All and `FULL_LEAGUES`) or fifth (the
-  rest), and Pinnacle's files' calibration only in `CALIBRATION_LEAGUES` (E0, SP1, UCL): about
-  1.49 MB in all, 5 Nov.
+  backtest files' bankroll curves at every fourth point (All and `FULL_LEAGUES`) or eighth (the
+  rest), Pinnacle's files' calibration only in `CALIBRATION_LEAGUES` (E0, SP1, UCL) and their
+  edge and CLV bands only in `FULL_LEAGUES`: about 1.48 MB in all, 7 Nov.
   "Where the bets sit on the odds" (owner, 24
   Oct; `liveOddsBandsHtml`: the backtest's `oddsBandChart` on the section's `by_odds_band`, or
   `by_league[lg].by_odds_band`, rows `lob-<key>-<lg|all>`, CLV on the section's
@@ -1629,6 +1629,40 @@ four leagues: E0, E1–E3).
   folded below it. Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
+- **Sizing switch** (owner, 7 Nov; v75): "Sizing: Flat $10 | ¼ Kelly" at the top of every
+  Portfolio level (`sizingSwitchHtml`, `data-sizing`, `state.sizing`, localStorage `sizing`
+  through `store`, default flat; `kellyOn`). Flat $10 stays the record; in Kelly mode the framing
+  line `KELLY_FRAMING` shows under the switch, and every figure reads the section's
+  `sizing.kelly` (`kellyOf`: the block, `flat` and its `log` rows by trade id; `kellyTrade(t, kl)`:
+  the log row, else `stakes[id]` with P/L from the result; `kellyStats`; `kellyText`;
+  `kellyHome(t)`: the first live section sizing a trade). Never invented: a section without
+  `sizing.kelly` reads "Kelly not tracked" (today the line shop's 1% line in the fixture).
+  - Portfolio home: the lead strategy's ¼ Kelly profit, "· ¼ Kelly", and "bankroll $X of
+    $1,000" in the meta; the note says "at ¼ Kelly on its own $1,000 paper bankroll".
+  - Strategy rows: ¼ Kelly profit and ROI on staked beside the won–lost record.
+  - Live paper: tiles (bankroll now, ¼ Kelly profit and ROI on staked with flat's beside it, max
+    drawdown, bets staked / no stake / open at risk; bankroll and drawdown are for every
+    competition); "Bankroll over time, ¼ Kelly" (`kellyCurveHtml`, scrub id `kv-<key>`, Kelly
+    solid, flat dashed) in place of "Profit over time"; `sizingHtml(..., compact)` keeps only the
+    notes and the Kelly bet log; paper.py's flat ROI range is hidden.
+  - Trade rows, in both modes (owner, 7 Nov): every live row of a section with `sizing.kelly`
+    (`pfTradeRow(t, kl)`, `kellyCell`) shows ¼ Kelly beside flat $10: the stake and its share of
+    the bankroll with "to win $X" while open, the ¼ Kelly P/L with the stake and share once
+    settled, "capped" at 5%, or "No stake" with a short reason (`KELLY_SHORT`), in two
+    right-hand columns (`.vals.two`: `.vcol` Flat 74px, `.kcol` ¼ Kelly 84px; owner via the lead,
+    7 Nov: chosen over a stacked line) headed once per list by `kellyColsHead`. Nothing in a
+    trade row is truncated: its `.meta` lines wrap, and a `.nowrap` phrase (the DraftKings CLV
+    line) moves to its own line and wraps if still too wide. The Open and Settled headers add "¼ Kelly $X at risk" and "¼ Kelly ±$X". A section without
+    `sizing.kelly` (the line shop's 1% line in the fixture) keeps flat alone.
+  - Trade sheet: the Kelly line (`kellyStakeLine`, now with its share of the bankroll and the
+    cap; the line shop's chance is Pinnacle's fair one) leads, above the table.
+  - Backtest: the bankroll chart (`sizingHtml` on the part's `sizing`) leads, above the tiles;
+    the bet list shows each bet's ¼ Kelly stake, bankroll and P/L only when the file's
+    `bet_fields` carry `kelly_stake` (`kelly_profit`, `bankroll_before`), else one line says the
+    backtest keeps no per-bet stakes yet.
+  - Matches: the open Lean trade's badge adds "¼ Kelly stake $X" (`openBadge` via `kellyHome`).
+  - The line shop sizes on Pinnacle's fair chance (`sizing` on its sections); the Kelly bet log
+    names it.
 - **Line shop vs Pinnacle** (owner-approved 5 Nov; v74; `paper_lineshop`): Moneyline's
   `live.strategies` carries `lineshop` (the 2% judged line) and `lineshop_1pct` (`variant_of`
   "lineshop", `adds: "threshold"`, a descriptive comparison), both right after Blend Lean in the
@@ -1648,10 +1682,11 @@ four leagues: E0, E1–E3).
   `.ls-old` "(old)" from `LS_OLD_MIN` 10) and Pinnacle's fair chance; CLV is `clv_pinnacle`
   (`tradeClv`, `tradeBeat`). The sheet adds the quote's age (the book under Bookmaker), Gap at entry, Pinnacle's
   fair chance at entry (its 1X2 and age), "CLV vs Pinnacle's close (judged)" and the book's own
-  close (`clv_book`), and drops model-only rows and the Kelly line. The fixture adds ten
-  synthetic trades through `paper_lineshop.new_trade` (`LINESHOP_TRADES`, `lineshop_trades()`;
-  `defined_at` moved to 27 Sep and `BACKCAST_START` to 14 Sep), without the sections' `sizing`
-  and `calibration`, which the app doesn't show for it.
+  close (`clv_book`), and drops model-only rows. Since v75 its sections' `sizing` (on Pinnacle's
+  fair chance) shows like any other strategy's. The fixture adds ten synthetic trades through
+  `paper_lineshop.new_trade` (`LINESHOP_TRADES`, `lineshop_trades()`; `defined_at` moved to
+  27 Sep and `BACKCAST_START` to 14 Sep), without the sections' `calibration` (no Model view),
+  and drops the 1% line's `sizing` so "Kelly not tracked" is tested.
 - **Bet alerts** (owner, 5 Nov; v73; `push/README.md`): at the foot of Portfolio's top level
   (`alertsHtml`, `.alerts-card[data-alerts-state]`), state in `state.alerts` (`alertsRefresh`):
   "setup" (no `bet_alerts.worker`), "unsupported" (`alertsSupport`: no service worker, PushManager
