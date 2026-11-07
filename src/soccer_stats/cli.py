@@ -291,6 +291,33 @@ def cmd_understat_backfill(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_understat_wayback(args: argparse.Namespace) -> None:
+    """Which missing Understat seasons the Wayback Machine holds (counts only; no key, writes
+    nothing into the good-copy folder)."""
+    import json
+
+    from soccer_stats import xg_wayback as wb
+
+    leagues = [c.strip() for c in (args.leagues or "").split(",") if c.strip()]
+    wanted = {c: y for c, y in wb.WANTED.items() if not leagues or c in leagues}
+    if args.seasons:
+        lo, _, hi = args.seasons.partition("-")
+        years = range(int(lo), int(hi or lo) + 1)
+        wanted = {c: [y for y in years] for c in (leagues or wb.WANTED)}
+    out = Path(args.out) if args.out else None
+    rows = wb.probe(wanted, out, minutes=args.minutes)
+    for r in rows:
+        print("WAYBACK_PROBE " + json.dumps(r), flush=True)
+    print(wb.table(rows))
+    n = {k: sum(r["status"] == k for r in rows) for k in ("ok", "no capture", "no good capture")}
+    full = sum(1 for r in rows if r.get("complete"))
+    print(
+        f"Wayback probe: {n['ok']} of {len(rows)} league-seasons with a good capture "
+        f"({full} with every football-data match played), {n['no capture']} without a capture, "
+        f"{n['no good capture']} with captures that don't pass"
+    )
+
+
 def cmd_espn_probe(args: argparse.Namespace) -> None:
     """Which ESPN league slugs answer, their team names and summary shape (no key)."""
     import json
@@ -3296,6 +3323,15 @@ def main(argv: list[str] | None = None) -> None:
     ub.add_argument("--leagues", default="", help="comma-separated codes (blank = the five)")
     ub.add_argument("--seasons", default="2017-2026", help="start years, e.g. 2017-2023")
     ub.set_defaults(func=cmd_understat_backfill)
+
+    uw = sub.add_parser(
+        "understat-wayback", help="missing Understat seasons in the Wayback Machine"
+    )
+    uw.add_argument("--leagues", default="", help="comma-separated codes (blank = every wanted)")
+    uw.add_argument("--seasons", default="", help="start years, e.g. 2017-2023 (blank = wanted)")
+    uw.add_argument("--out", default="", help="folder for the decoded captures (never xg-good)")
+    uw.add_argument("--minutes", type=float, default=40, help="time budget")
+    uw.set_defaults(func=cmd_understat_wayback)
 
     ur = sub.add_parser("understat-repair", help="good Understat files from an older raw cache")
     ur.add_argument("--old", required=True, help="older raw-data folder")

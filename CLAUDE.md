@@ -411,6 +411,16 @@ four leagues: E0, E1–E3).
   saved as the newest `raw-data-` on the default branch only). `publish.xg_status`/`xg_line`
   print one line per Understat league ("xG La Liga: 81% of fit matches, this season 0%"), with
   "WARNING: no xG, goals-only model" or "WARNING: xG missing for this season's matches".
+  `xg_wayback.py` (lead, 7 Nov; CLI `understat-wayback --leagues --out --minutes`, `odds-check.yml`
+  `task=understat-wayback`; free, no key, counts only): for each missing season (`WANTED`: E0
+  2017–2021, SP1/D1/I1/F1 2017–2023) the Wayback Machine's CDX captures (status 200) of the JSON
+  endpoint (`xg.URL`) and of the league page (`PAGE`, whose HTML embedded `datesData`/`teamsData`/
+  `playersData` as `JSON.parse('\xHH…')`); the latest capture after 1 July of the season's end
+  first, at most four downloads (`id_` raw bytes), `parse` into the fetcher's {dates, teams,
+  players}, `check_league_json`; one `WAYBACK_PROBE` row per league-season (captures, status,
+  kind, captured, after_season, matches, played, teams, players, sha256, `source: "wayback"`,
+  football-data's `fd_matches`, `complete`) and a table. `--out` keeps the decoded files (the
+  artifact), never `xg-good-`. `PAUSE` 1.5 s between requests, retries on 429/5xx.
   `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
