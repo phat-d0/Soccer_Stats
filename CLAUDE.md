@@ -1648,10 +1648,11 @@ four leagues: E0, E1–E3).
   - Trade rows, in both modes (owner, 7 Nov): every live row of a section with `sizing.kelly`
     (`pfTradeRow(t, kl)`, `kellyCell`) shows ¼ Kelly beside flat $10: the stake and its share of
     the bankroll with "to win $X" while open, the ¼ Kelly P/L with the stake and share once
-    settled, "capped" at 5%, or "No stake" with a short reason (`KELLY_SHORT`). Layout
-    `state.kellyRows`: "cols" (default; `.vals.two`, `.vcol` Flat 74px and `.kcol` ¼ Kelly 84px,
-    headed once per list by `kellyColsHead`) or "stack" (`.kelly-sub` lines under flat's). The
-    Open and Settled headers add "¼ Kelly $X at risk" and "¼ Kelly ±$X". A section without
+    settled, "capped" at 5%, or "No stake" with a short reason (`KELLY_SHORT`), in two
+    right-hand columns (`.vals.two`: `.vcol` Flat 74px, `.kcol` ¼ Kelly 84px; owner via the lead,
+    7 Nov: chosen over a stacked line) headed once per list by `kellyColsHead`. Nothing in a
+    trade row is truncated: its `.meta` lines wrap, and a `.nowrap` phrase (the DraftKings CLV
+    line) moves to its own line and wraps if still too wide. The Open and Settled headers add "¼ Kelly $X at risk" and "¼ Kelly ±$X". A section without
     `sizing.kelly` (the line shop's 1% line in the fixture) keeps flat alone.
   - Trade sheet: the Kelly line (`kellyStakeLine`, now with its share of the bankroll and the
     cap; the line shop's chance is Pinnacle's fair one) leads, above the table.

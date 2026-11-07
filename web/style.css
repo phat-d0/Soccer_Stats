@@ -955,7 +955,8 @@ details.drv-fold { margin-top: 10px; }
 .kcols-head { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 30px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--text-muted); text-transform: uppercase; }
 .kcols-head span { width: 74px; text-align: right; }
 .kcols-head .kh-kelly { width: 84px; }
-.row-btn .vals small.kelly-sub { color: var(--text-secondary); }
-.row-btn .vals small.kelly-sub b { font-size: 13px; }
-.row-btn .vals small.kelly-sub.ks1 { margin-top: 3px; }
+/* Nothing in a trade row is cut off: a phrase kept together moves to its own line, and wraps
+   when even that is too narrow (the narrower bet text beside the two columns). */
+.row-btn.trade-row .meta { text-overflow: clip; }
+.row-btn.trade-row .meta .nowrap { display: inline-block; max-width: 100%; white-space: normal; }
 .kelly-row { color: var(--text-secondary); }

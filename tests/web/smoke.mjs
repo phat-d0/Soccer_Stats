@@ -1396,6 +1396,10 @@ const STEPS = [
     if (!heads || heads !== lists) throw new Error(`Kelly column heads ${heads} for ${lists} lists`);
     const rows = await p.locator("#view .trade-row").count();
     if ((await p.locator("#view .trade-row .vals.two .kcol").count()) !== rows) throw new Error("every trade row should carry a ¼ Kelly column");
+    // Nothing in a row is cut off (lead, 7 Nov): every text line fits its box, the DraftKings
+    // CLV line included, which wraps instead of ending in "…".
+    const cut = await p.evaluate(() => [...document.querySelectorAll("#view .trade-row .meta, #view .trade-row .meta .nowrap, #view .trade-row .vals small")].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > e.closest(".trade-row").getBoundingClientRect().right + 1).map((e) => e.textContent.trim()));
+    if (cut.length) throw new Error(`trade row text cut off: ${cut.slice(0, 3).join(" | ")}`);
     const want = await p.evaluate(() => {
       const cur = pfById("corners"), x = pfStrategies(cur).find((s) => s.key === "draftkings_below60");
       const kl = kellyOf(x.st), ts = strategyLiveSet(cur, x, "").trades;
@@ -1421,14 +1425,6 @@ const STEPS = [
       const n = await p.locator("#view .trade-row").count();
       if (n && (await p.locator("#view .trade-row .kcol").count()) !== n) throw new Error(`${key} rows lack the Kelly column`);
     }
-  }],
-  // The other layout: ¼ Kelly stacked under flat's figures in a muted line.
-  ["portfolio-kelly-rows-stack", async (p) => {
-    await p.evaluate(() => { state.kellyRows = "stack"; render(); });
-    if (await p.locator("#view .kcols-head, #view .vals.two").count()) throw new Error("stack layout shows columns");
-    const n = await p.locator("#view .trade-row").count();
-    if (n && (await p.locator("#view .trade-row .kelly-sub.ks1").count()) !== n) throw new Error("stack layout: a row lacks its ¼ Kelly line");
-    await p.evaluate(() => { state.kellyRows = "cols"; render(); });
   }],
   ["portfolio-kelly-home", async (p) => {
     await closeSheet(p); await pfHome(p);

@@ -21,10 +21,7 @@ const state = {
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
-  sizing: store.get("sizing", "flat") === "kelly" ? "kelly" : "flat",
-  // How each live trade row shows its ¼ Kelly figures beside flat $10's (owner, 7 Nov):
-  // "cols" = two right-hand columns headed once per list, "stack" = a muted line under flat's.
-  kellyRows: "cols", // Portfolio's sizing switch (owner, 7 Nov)
+  sizing: store.get("sizing", "flat") === "kelly" ? "kelly" : "flat", // Portfolio's sizing switch (owner, 7 Nov)
   kellyShown: {}, // Kelly bet log rows shown per strategy (25, then 50 more a tap)
   kellyOpen: "", // the Kelly bet log kept open across re-renders
   kellyFocus: "", // the trade the sheet's "How it was sized" points at
@@ -3406,15 +3403,13 @@ function pfTradeRow(t, kl = null) {
   // The ¼ Kelly figures sit beside flat $10's on every row of a strategy that sizes (owner,
   // 7 Nov), whichever way the switch is set; a track without a Kelly block keeps flat alone.
   const kt = kl ? kellyTrade(t, kl) : null;
-  const k = !!kl;
-  const stack = state.kellyRows === "stack";
-  const right = !k ? flat : stack ? `${flat}${kellyCell(t, kt, true)}` : `<span class="vcol">${flat}</span><span class="vcol kcol">${kellyCell(t, kt, false)}</span>`;
+  const right = !kl ? flat : `<span class="vcol">${flat}</span><span class="vcol kcol">${kellyCell(t, kt)}</span>`;
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
       <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}${shadowChip(t)}${bcChip(t)}
         <span class="meta">${open && ph !== "upcoming" ? `<b class="phase-tag ${ph}">${PHASE_LABEL[ph]}</b> · ` : ""}${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
         <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span>${pinLine}</span>
-      <span class="vals${k && state.kellyRows !== "stack" ? " two" : ""}">${right}</span>
+      <span class="vals${kl ? " two" : ""}">${right}</span>
     </button>`;
 }
 // Settled profit by day (settled date, else kickoff), cumulative from $0.
@@ -3665,28 +3660,25 @@ function kellyStats(trades, kl) {
   o.roi = o.staked ? o.profit / o.staked : null;
   return o;
 }
-// A trade row's ¼ Kelly cell (owner, 7 Nov), in either layout: the stake and its share of the
+// A trade row's ¼ Kelly column (owner, 7 Nov): the stake and its share of the
 // bankroll that sized it while open (with "to win"), the ¼ Kelly P/L once settled, "capped"
 // at the 5% cap, or "No stake" with a short reason.
 const KELLY_SHORT = { "no edge on the chance": "no edge", "no chance": "no chance", "no bankroll": "no bankroll" };
-function kellyCell(t, kt, stack) {
-  const wrap = (main, lines) => stack
-    ? `<small class="kelly-sub ks1">¼ Kelly ${main}</small>${lines.length ? `<small class="kelly-sub">${lines.join(" · ")}</small>` : ""}`
-    : `${main}${lines.map((l) => `<small>${l}</small>`).join("")}`;
+function kellyCell(t, kt) {
+  const wrap = (main, lines) => `${main}${lines.map((l) => `<small>${l}</small>`).join("")}`;
   if (!kt) return wrap(`<b class="muted">–</b>`, ["not sized"]);
   if (!(kt.stake > 0)) return wrap(`<b class="muted">No stake</b>`, [esc(KELLY_SHORT[kt.reason] || kt.reason || "no edge")]);
   const share = kt.share != null ? pct(kt.share, 1) : "";
   const cap = kt.capped ? "capped" : "";
   if (t.status === "open") {
     const win = `to win ${bankUsd(kt.stake * (Number(t.odds) - 1), 2)}`;
-    return stack ? wrap(`<b>${bankUsd(kt.stake, 2)}</b>${share ? ` · ${share}` : ""}`, [win, cap].filter(Boolean))
-      : wrap(`<b>${bankUsd(kt.stake, 2)}</b>`, [share, win, cap].filter(Boolean));
+    return wrap(`<b>${bankUsd(kt.stake, 2)}</b>`, [share, win, cap].filter(Boolean));
   }
   if (t.status === "void") return wrap(`<b>${bankUsd(kt.stake, 2)} back</b>`, []);
-  return wrap(`<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(kt.profit, 2)}</b>`, [[bankUsd(kt.stake, 2), share].filter(Boolean).join(" · "), stack ? "" : cap].filter(Boolean).map((l, i) => (stack && !i && cap ? `${l} · capped` : l)));
+  return wrap(`<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(kt.profit, 2)}</b>`, [[bankUsd(kt.stake, 2), share].filter(Boolean).join(" · "), cap].filter(Boolean));
 }
 // "Flat | ¼ Kelly" over a list's two right-hand columns, once per list.
-const kellyColsHead = (kl) => (kl && state.kellyRows !== "stack" ? `<div class="kcols-head" aria-hidden="true"><span class="kh-flat">Flat</span><span class="kh-kelly">¼ Kelly</span></div>` : "");
+const kellyColsHead = (kl) => (kl ? `<div class="kcols-head" aria-hidden="true"><span class="kh-flat">Flat</span><span class="kh-kelly">¼ Kelly</span></div>` : "");
 // The live strategy section holding a trade, with its Kelly figures (first match: a parent before its variants).
 function kellyHome(t) {
   for (const p of portfolios()) {
