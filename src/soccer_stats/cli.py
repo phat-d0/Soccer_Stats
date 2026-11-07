@@ -481,6 +481,7 @@ def cmd_close_plan(args: argparse.Namespace) -> None:
         now,
         args.horizon_hours,
         inplay_ks=close_runs.inplay_kickoffs(args.log_dir),
+        goalscorer_ks=close_runs.goalscorer_kickoffs(args.log_dir),
     )
     print(close_runs.describe(p))
     if args.out:
