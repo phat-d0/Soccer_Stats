@@ -130,7 +130,14 @@ since then use goals until Understat returns; the cache heals itself then. Since
 raw-data cache can't lose the season again. Promoted clubs map: "Racing Santander" → Santander,
 "Real Oviedo" → Oviedo (`tests/test_xg.py` lists every 2026/27 club per xG league). When
 Understat returns: `odds-check.yml` `task=understat-backfill`, `seasons=2017-2025` (free), then
-tell Research.
+tell Research. The old seasons no cache held came back from the Wayback Machine on 7 Nov
+(`xg_wayback.py`; lead): 32 of the 33 missing league-seasons (E0 2017–2021, SP1/D1/F1 2017–2023,
+I1 2017–2021 and 2023) loaded into `xg-good-` (odds-check run 42422761677; each one complete,
+played matches = football-data's; their values matched the files held on 1,446 matches, run
+42422182409; goals matched football-data on every joined match, run 42423411824), each listed
+with its capture URL and sha256 in `data/understat_good/sources.jsonl`. I1 2022/23 stays
+goals-only: its only archived copies are mid-season (270 of 380). `xg-good-` is in the permanent
+archive since 7 Nov (`cache_archive.ARCHIVED_FREE`; manifest 50 files after the load).
 
 **Settlement:** football-data's result when it has one, else ESPN's (`espn_results.py`), a
 few hours after full time. `closes.yml` plans close-snapshot runs before kickoffs and
@@ -145,6 +152,11 @@ settlement runs after them.
   historical prices (the ten-book history bought 28 Oct, 160,180 credits), eight domestic
   leagues 2020/21–2024/25, CLV vs Pinnacle's close in the same snapshot (`dk_price_backtest`).
 - `match_blends.json`: the live Lean fits.
+- I1 2022/23 has no xG in any backtest (goals-only; see "Understat outage"), so I1 can't match the
+  October files. Check runs of 7 Nov with the Wayback seasons (backfill 42423225697 and
+  42423998519) reproduce October elsewhere (one bet apart in F1, E1, E0, E3; UCL two). I1: Lean
+  at Pinnacle's early price 274 → 288 bets, ROI +5.4% → +8.5%, CLV −3.6% both; Model 12% 856 → 878,
+  ROI −23.4% → −18.1%, CLV −4.8% → −4.7%; at DraftKings' prices Lean 76 → 74, Model 12% 427 → 428.
 
 **Research verdicts to date** (nothing beats Pinnacle's close):
 - 1X2 bake-offs (rounds 4, 5, 7), lineup surprises, free signals: `docs/lab.md`, `docs/edge.md`.
@@ -274,7 +286,9 @@ KV id in `push/wrangler.jsonc`, four Worker secrets, `ALERT_URL`/`ALERT_TOKEN` r
 "Turn on" in the home-screen app). Until then each publish logs "Bet alerts: off".
 
 **Waiting on Understat** (down since 2 Nov): Moneyline runs `odds-check.yml`
-`task=understat-backfill` (`seasons=2017-2025`) on the default branch when it returns, then
+`task=understat-backfill` (`seasons=2017-2025`) on the default branch when it returns, then reruns
+the three backtests (`backfill.yml` `lean_backtest`, `edge12_backtest` (a run of its own: it is
+skipped when `lean_backtest` is set) and `dk_price_backtest`) for I1 2022/23's xG, then
 Research reruns `task=residual-map` with all eight leagues and the lead republishes the owner's
 3D view, the "Model vs Market Map" artifact
 (https://claude.ai/artifact/B731FfXCrdhqJuYEdtqYdV, built from `lab/residual_map.json`; today

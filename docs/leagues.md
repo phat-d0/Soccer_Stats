@@ -1454,3 +1454,54 @@ How to run (Actions, `backfill.yml`, on `claude/soccer-stats-scaffold`):
    DraftKings, credits left X` and `CUP_ODDS_JSON` (per season: matches on the calendar,
    snapshots held, cached, bought, planned and skipped, matches priced per book). A rerun
    costs nothing for slots already held.
+
+## Understat's old seasons from the Wayback Machine (7 Nov, lead; 0 credits)
+
+Understat has answered every URL with a maintenance page since 2 Nov, and the older league files
+(E0 2017–2021, SP1/D1/I1/F1 2017–2023) had already been evicted from every cache, so a backtest
+rerun would have gone goals-only for those seasons. `xg_wayback.py` takes them from the Wayback
+Machine's copies of the old league page, whose HTML holds the same data the fetcher reads:
+
+- **Probe** (odds-check run 42421503317): a good copy for all 33 league-seasons.
+- **Values** (run 42422182409): four seasons we hold from Understat's own endpoint (E0 2022 and
+  2023, SP1 2024, D1 2024) against their copies, match by match on id, teams, datetime, goals and
+  xG: 1,446 matches, 0 differ, largest xG difference 0. Seasons before 2022 can't be checked this
+  way (none is held); the backtest reproduction below is the check there.
+- **Load** (run 42422761677): the most complete copy of each season, loaded only when its played
+  matches equal football-data's: 32 of 33. I1 2022/23 is left out (its only copies are mid-season,
+  270 of 380 played). Each file's capture URL and sha256 are in `data/understat_good/sources.jsonl`.
+- **Goals** (run 42423411824): every loaded season joined to football-data as the model joins
+  them (home, away, date ±2 days): 0 matches disagree on goals; I1 2023/24 and F1 2017/18 join
+  379 of 380 (one match each dated more than 2 days apart in the two sources, so goals-only).
+- **Backtests** (check runs on a team branch, backfill 42423225697 and 42423998519): October's
+  files reproduce except I1 and a bet here and there:
+
+| | October | Now |
+| --- | --- | --- |
+| Lean at Pinnacle, I1 | 274 bets, ROI +5.4%, CLV −3.6% | 288 bets, ROI +8.5%, CLV −3.6% |
+| Lean at Pinnacle, pooled | 2,629 bets, ROI −2.2%, CLV −3.1% | 2,641 bets, ROI −1.8%, CLV −3.1% |
+| Lean at Pinnacle, Kelly pooled | −$743.33 | −$723.57 |
+| Model 12% at Pinnacle, I1 | 856 bets, ROI −23.4%, CLV −4.8% | 878 bets, ROI −18.1%, CLV −4.7% |
+| Model 12% at Pinnacle, pooled | 8,912 bets, ROI −5.6%, CLV −4.6% | 8,934 bets, ROI −5.1%, CLV −4.6% |
+| Model 12% at Pinnacle, Kelly on p_blend pooled | −$326.24 (1,840 staked) | −$343.24 (1,845 staked) |
+| Model 12% at Pinnacle, E0 | 1,140 bets, ROI +4.15% | 1,139 bets, ROI +4.24% |
+| Model 12% at Pinnacle, E3 | 1,399 bets, ROI −5.9% | 1,400 bets, ROI −5.8% |
+| Model 12% at Pinnacle, UCL | 163 bets, ROI −2.9%, CLV −9.4% | 161 bets, ROI −1.7%, CLV −9.3% |
+| Lean at DraftKings, I1 | 76 bets | 74 bets |
+| Model 12% at DraftKings, I1 | 427 bets | 428 bets |
+
+  Why the numbers moved, October → now (accepted by the lead, 7 Nov; no verdict moves):
+  - **I1:** I1 2022/23 is goals-only now (xG in October). I1 can't match October until it has xG:
+    rerun the three backtests when Understat returns.
+  - **E0, E3:** one bet each at the 12% edge boundary in Model 12% at Pinnacle (E3 is goals-only:
+    football-data's files have changed since October).
+  - **F1:** one Lean bet (431 → 430), most likely the F1 2017/18 match whose two sources' dates are
+    more than 2 days apart, now goals-only.
+  - **E1, E2:** one bet each (Lean at Pinnacle E1 412 → 411; Lean at DraftKings E2 215 → 216; Model
+    12% at DraftKings E1 1,083 → 1,084): goals-only leagues, football-data's updated files.
+  - **UCL:** 163 → 161 bets in Model 12%, from new ESPN and football-data results feeding the
+    cross-league model; UCL is kept out of the pooled numbers.
+  - Identical: Lean at Pinnacle in E0, SP1, D1, E2, E3; Model 12% at Pinnacle in SP1, D1, F1, E1,
+    E2; every league but I1 and E2 in Lean at DraftKings, and but I1 and E1 in Model 12% at
+    DraftKings. Kelly moves by cents where the bets are identical (refit noise in the chance).
+  Written to data-log after the lead's go (7 Nov).
