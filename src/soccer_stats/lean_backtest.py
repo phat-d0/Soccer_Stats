@@ -70,6 +70,7 @@ BET_FIELDS = [
     "won",
     "profit",
     "clv",
+    *sz.KELLY_BET_FIELDS,
 ]
 NOTE = (
     "Blend Lean replayed on Pinnacle's early prices from football-data, not on DraftKings: "
@@ -491,6 +492,7 @@ def compact(df: pd.DataFrame) -> list[list]:
                 int(bool(r["won"])),
                 round(float(r["profit"]), 3),
                 None if clv is None or not np.isfinite(clv) else round(float(clv), 4),
+                *sz.kelly_cells(r),
             ]
         )
     return rows
@@ -518,8 +520,7 @@ def build(
     ]
     frames = [b for _, b in early if len(b)]
     pooled = pd.concat(frames, ignore_index=True) if frames else bets(pd.DataFrame(), "")
-    every = [b for b in all_bets if len(b)]
-    rows = compact(pd.concat(every, ignore_index=True)) if every else []
+    rows = compact(kelly_rows(reports, all_bets, pooled))
     by_league = {code: summary(b)["lean"] for code, b in early}
     calib = pooled_calibration(reports, pooled, SERIES, "p_bet", [c for c, _ in early])
     claimed = {code: bd.with_claimed(b, "p_bet") for code, b in zip(reports, all_bets, strict=True)}
@@ -572,6 +573,17 @@ def build(
         "bets_total": len(rows),
         "bets": rows[:max_bets],
     }
+
+
+def kelly_rows(reports: dict, all_bets: list, pooled: pd.DataFrame, p_col="p_bet") -> pd.DataFrame:
+    """Every bet with its quarter-Kelly stake (sizing.with_kelly_bets): the early-price
+    leagues from the pooled simulation (`all.sizing.kelly`), a `kind: "close"` league (the
+    Champions League) from its own (its league's `sizing.kelly`, decided at the close)."""
+    parts = [sz.with_kelly_bets(pooled, p_col, "pooled")] if len(pooled) else []
+    for (code, rep), b in zip(reports.items(), all_bets, strict=True):
+        if rep.get("kind") == CLOSE_KIND and len(b):
+            parts.append(sz.with_kelly_bets(b, p_col, code, lead=pd.Timedelta(0)))
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
 
 def sizing(b: pd.DataFrame, rep: dict) -> dict:

@@ -43,6 +43,7 @@ BET_FIELDS = [
     "won",
     "profit",
     "clv",
+    *sz.KELLY_BET_FIELDS,
 ]
 NOTE = (
     "Model 12% replayed on Pinnacle's early prices from football-data, not on DraftKings: "
@@ -212,6 +213,7 @@ def compact(df: pd.DataFrame) -> list[list]:
             int(bool(r["won"])),
             round(float(r["profit"]), 3),
             _clv(r["clv"]),
+            *sz.kelly_cells(r),
         ]
         for r in df.to_dict("records")
     ]
@@ -234,8 +236,11 @@ def build(
     early = [c for c, r in reports.items() if r.get("kind") != cb.KIND]
     frames = [league_bets[c] for c in early if len(league_bets.get(c, []))]
     pooled = pd.concat(frames, ignore_index=True) if frames else empty_bets()
-    every = [b for b in league_bets.values() if len(b)]
-    rows = compact(pd.concat(every, ignore_index=True)) if every else []
+    rows = compact(
+        lb.kelly_rows(
+            reports, [league_bets.get(c, empty_bets()) for c in reports], pooled, "p_blend"
+        )
+    )
     calib = lb.pooled_calibration(reports, pooled, SERIES, "model_p", early)
     band_cuts = bd.cuts(bd.with_claimed(pooled, "model_p"))
     return {

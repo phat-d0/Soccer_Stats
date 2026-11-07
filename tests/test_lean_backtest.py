@@ -458,7 +458,7 @@ def test_build_pools_leagues_and_keeps_compact_rows():
     assert len(out["bets"]) == 10 and out["bet_fields"] == lb.BET_FIELDS
     row = dict(zip(lb.BET_FIELDS, out["bets"][0], strict=True))
     assert row["date"] == max(b["date"]) and row["driver"] in ("market", "model")
-    assert len(json.dumps(out["bets"][0])) < 130
+    assert len(json.dumps(out["bets"][0])) < 175
     assert out["draftkings_replay"]["book"] == "DraftKings"
     assert "DraftKings replay" in out["draftkings_replay"]["label"]
     assert out["draftkings_replay"]["lean"]["roi"] == 0.4
@@ -486,3 +486,36 @@ def test_publish_trims_the_backtest_and_says_when_it_is_missing(tmp_path):
     small = lb.app_section(out, max_bets=3)
     assert len(small["bets"]) == 3 and small["bets"] == out["bets"][:3]
     assert lb.app_section({"something": "else"})["available"] is False
+
+
+def test_each_bet_carries_its_kelly_stake_from_the_pooled_simulation():
+    """Owner via the lead, 7 Nov: per-bet quarter-Kelly stakes from the same simulation as
+    the curves, so they add up to the pooled Kelly block's profit."""
+    preds, pins = synth()
+    rep, b = lb.league_report("E0", preds, pins)
+    cup = b.head(6).assign(league="UCL")
+    out = lb.build(
+        {"E0": rep, "UCL": {"kind": "close", **lb.summary(cup)}},
+        [b, cup],
+        from_season=2021,
+        max_bets=100_000,
+    )
+    rows = [dict(zip(out["bet_fields"], r, strict=True)) for r in out["bets"]]
+    pooled = [r for r in rows if r["kelly_from"] == "pooled"]
+    ucl = [r for r in rows if r["kelly_from"] == "UCL"]
+    assert len(pooled) == len(b) and len(ucl) == 6
+    assert {r["league"] for r in ucl} == {"UCL"}
+    kelly = out["all"]["sizing"]["kelly"]
+    assert sum(r["kelly_profit"] for r in pooled) == pytest.approx(kelly["profit"], abs=0.01)
+    assert sum(1 for r in pooled if r["kelly_stake"] > 0) == kelly["bets_staked"]
+    ucl_kelly = out["leagues"]["UCL"]["sizing"]["kelly"]
+    assert sum(r["kelly_profit"] for r in ucl) == pytest.approx(ucl_kelly["profit"], abs=0.01)
+    for r in pooled:
+        assert r["bankroll_before"] > 0
+        assert r["kelly_stake"] <= 0.05 * r["bankroll_before"] + 0.01  # the 5% cap
+        assert r["kelly_profit"] == pytest.approx(
+            r["kelly_stake"] * r["profit"], abs=0.05
+        )  # profit rounded to 3 dp
+    # No look-ahead: the first bet decided is sized on the $1,000 start.
+    first = min(pooled, key=lambda r: r["date"])
+    assert first["bankroll_before"] == 1000
