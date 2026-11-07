@@ -1187,6 +1187,43 @@ read. Pass now needs that excess's range above 0 on at least 300 bets, and c's r
 as before. Nothing had been computed on the judged window (prices, CLV or results) when this
 was changed; its history was bought (step 1) but not read.
 
+### Note, 2026-11-07: history for what the live log lacks (lead-approved; before any purchase or outcome read)
+
+The first week of live logging (2–7 Nov; 43 calls, 26 matches) left gaps:
+- the 17 five-league matches on 1 Nov, before the first live call (2 Nov 17:21), have
+  neither snapshot;
+- 9 matches have a live close but no live entry, because no publish run fell in the entry
+  window (20–75 min with ESPN's lineups, or 20–30 min without them);
+- 1 live close call got a 502 (Espanyol v La Coruna, 7 Nov).
+
+**Rule.** §16 already buys history for what the live log lacks. That is now applied per
+snapshot, not per match. For every judged match from 1 Nov, an (event, snapshot kind) with
+no successful (2xx) live call is bought from history at §16's history times (entry kickoff
+− 50 min, close kickoff − 2 min, the same ten books). It is paired with whatever the live
+log holds for the other snapshot. So a close-only match gets the history entry plus its live
+close, a match with neither gets both from history, and the 502 close is bought from
+history. Where both exist, the live snapshot is used.
+
+**Why not drop them.** Dropping matches without a live entry would bias the sample toward
+matches whose lineups ESPN shows early. That depends on league, kickoff time and the
+schedule, not on chance.
+
+**Source recorded.** Every judged row records the source of its entry and its close
+(`entry_source`, `close_source`: "live" or "history"; `player_goal_priced.combine` and
+`join`). Live and history counts are reported beside the verdict. A per-source breakdown is
+descriptive only.
+
+**What runs it.** The rule is applied by `player_goal_backfill` design `gaps`
+(`odds-check.yml` `task=goalscorer-backfill`, `design=gaps`), with data-log's live call
+record. It is bought from the default branch inside §16's step-1 approval, with a cap of
+500 credits (lead, 7 Nov). From the same date the live log retries a call that isn't
+answered 2xx, at most 3 attempts per (event, snapshot), each one recorded with its cost.
+closes.yml is to add a publish run at kickoff − 25 min (Moneyline), so later gaps should be
+rare. The rule covers any that remain.
+
+This note was committed before any of these snapshots was bought and before any outcome in
+the judged window was read. It changes neither the measures nor the pass rule.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes

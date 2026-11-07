@@ -11,7 +11,10 @@ Each snapshot is one live event-odds call: `player_goal_scorer_anytime`, §16's 
 (one `bookmakers=` list, 1 credit). Event ids come from the league's cached DraftKings body
 (`team_totals.event_index`). An (event, snapshot) in the call record is never fetched again.
 Before each call: the freshest balance minus 1 stays ≥ 3,000, and this month's goalscorer
-calls stay ≤ `MONTHLY_CAP`. Logging stops after `LIVE_UNTIL` (the judged window's last day)
+calls stay ≤ `MONTHLY_CAP`. A call that isn't answered 2xx (a 502, say) doesn't count as done:
+the next run inside the same window asks again, at most `MAX_ATTEMPTS` times per (event,
+snapshot) so a billing error can't loop; every attempt keeps its call record and cost
+(lead, 7 Nov 2026). Logging stops after `LIVE_UNTIL` (the judged window's last day)
 until the lead decides. An error part-way keeps the calls already made and logs only the
 error type, never a URL or the key. No result is read here.
 
@@ -52,6 +55,7 @@ COST_PER_CALL = 1  # one market, one bookmakers= list
 MONTHLY_CAP = 3000  # §16 step 2
 LIVE_UNTIL = pd.Timestamp("2027-02-01T00:00:00Z")  # §16: the judged window ends 31 Jan 2027
 LOCAL_CALLS = "goalscorer_calls.jsonl"
+MAX_ATTEMPTS = 3  # per (event, snapshot), answered or not (lead, 7 Nov 2026)
 
 
 def lineups_confirmed(card: dict) -> bool:
@@ -81,11 +85,35 @@ def load_calls(*dirs) -> list[dict]:
         paths += sorted(d.glob("goalscorer_calls_*.jsonl")) + [d / LOCAL_CALLS]
     seen, out = set(), []
     for c in _read_jsonl(paths):
-        key = (c.get("event_id"), c.get("snapshot"))
+        key = _call_key(c)
         if key not in seen:
             seen.add(key)
             out.append(c)
     return out
+
+
+def _call_key(c: dict) -> tuple:
+    """One attempt: a retried snapshot keeps every attempt's record."""
+    return (c.get("event_id"), c.get("snapshot"), c.get("fetched_at"))
+
+
+def answered(c: dict) -> bool:
+    try:
+        return 200 <= int(c.get("status")) < 300
+    except (TypeError, ValueError):
+        return False
+
+
+def done_keys(calls: list[dict]) -> set[tuple]:
+    """(event, snapshot) pairs never to ask again: answered 2xx, or tried MAX_ATTEMPTS times."""
+    tries: dict[tuple, int] = {}
+    done = set()
+    for c in calls:
+        key = (c.get("event_id"), c.get("snapshot"))
+        tries[key] = tries.get(key, 0) + 1
+        if answered(c) or tries[key] >= MAX_ATTEMPTS:
+            done.add(key)
+    return done
 
 
 def month_spend(calls: list[dict], now: pd.Timestamp) -> int:
@@ -139,7 +167,7 @@ def run(
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     raw_dir = Path(raw_dir)
     calls = load_calls(*state_dirs, raw_dir)
-    done = {(c.get("event_id"), c.get("snapshot")) for c in calls}
+    done = done_keys(calls)
     spent = month_spend(calls, now)
     credits = freshest_credits(raw_dir, calls)
     summary = {"calls": 0, "credits": 0, "rows": 0, "due": 0, "month_spent": spent, "stop": None}
@@ -218,7 +246,7 @@ def run(
                         "rows": len(rows),
                     }
                 )
-                done.add((eid, snap))
+                done.add((eid, snap))  # one attempt per run; a non-2xx is retried next run
                 new_rows += rows
             if summary["stop"]:
                 break
@@ -277,10 +305,10 @@ def log(pending: Path, log_root: Path) -> tuple[int, int]:
         d.mkdir(parents=True, exist_ok=True)
         _append(path, keep)
         n_rows += len(keep)
-    done = {(c.get("event_id"), c.get("snapshot")) for c in load_calls(d)}
+    done = {_call_key(c) for c in load_calls(d)}
     by_month: dict[Path, list[dict]] = {}
     for c in calls:
-        key = (c.get("event_id"), c.get("snapshot"))
+        key = _call_key(c)
         if key in done:
             continue
         done.add(key)

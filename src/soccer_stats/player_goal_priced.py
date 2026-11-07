@@ -6,6 +6,11 @@ and, later, the judged read. Nothing here calls The Odds API: it reads the bodie
 
 - `price_rows`: every cached entry and close body → one row per event, snapshot kind, book
   and player (Yes price; "No Scorer" dropped).
+  Each row carries `source` "history".
+- `live_price_rows` / `combine` (lead, 7 Nov 2026): the live log's rows (`source` "live")
+  and, per event and snapshot kind, the live prices where the live log holds them, else the
+  history bought for the gap (`player_goal_backfill` design `gaps`). A judged row's entry and
+  close each keep their own source.
 - `best`: per event, player and kind, the best Yes price over §16's nine bookmakers (the
   Betfair exchange is logged but never judged) and the book that offered it.
 - `link`: each event to one football-data/Understat match (both teams' names through
@@ -54,6 +59,7 @@ MIN_JUDGED_BETS = 300
 # differs only in its last digits between runs can't flip a bet (lead, 1 Nov 2026).
 P_DECIMALS = 6
 BOOT_DRAWS, BOOT_SEED = 2000, 0
+PRICE_COLS = ["event_id", "kind", "home", "away", "kickoff", "book", "player", "yes", "source"]
 
 
 def price_rows(league: str, base: Path | None = None) -> pd.DataFrame:
@@ -83,11 +89,36 @@ def price_rows(league: str, base: Path | None = None) -> pd.DataFrame:
                 kickoff=pd.Timestamp(e["commence_time"]),
             )
             frames.append(p[~p["player"].str.lower().str.strip().isin(NOT_A_PLAYER)])
-    cols = ["event_id", "kind", "home", "away", "kickoff", "book", "player", "yes"]
     if not frames:
-        return pd.DataFrame(columns=cols)
-    out = pd.concat(frames, ignore_index=True)
-    return out[out["yes"].notna() & (out["yes"] > 1)][cols]
+        return pd.DataFrame(columns=PRICE_COLS)
+    out = pd.concat(frames, ignore_index=True).assign(source="history")
+    return out[out["yes"].notna() & (out["yes"] > 1)][PRICE_COLS]
+
+
+def live_price_rows(rows: pd.DataFrame, league: str) -> pd.DataFrame:
+    """The live log's rows (`player_goal_live.load_rows`) for one league, as price rows."""
+    if rows is None or rows.empty or "league" not in rows:
+        return pd.DataFrame(columns=PRICE_COLS)
+    x = rows[rows["league"] == league]
+    x = x[~x["player"].astype(str).str.lower().str.strip().isin(NOT_A_PLAYER)]
+    x = x[x["yes"].notna() & (pd.to_numeric(x["yes"], errors="coerce") > 1)]
+    out = x.assign(
+        kind=x["snapshot"],
+        kickoff=pd.to_datetime(x["kickoff"], utc=True),
+        yes=x["yes"].astype(float),
+        source="live",
+    )
+    return out[PRICE_COLS].reset_index(drop=True)
+
+
+def combine(history: pd.DataFrame, live: pd.DataFrame) -> pd.DataFrame:
+    """Per event and kind: the live rows where the live log holds that snapshot, else the
+    history rows. Every row keeps its `source`."""
+    if live is None or live.empty:
+        return history.reset_index(drop=True)
+    have = set(zip(live["event_id"], live["kind"], strict=True))
+    keep = [(e, k) not in have for e, k in zip(history["event_id"], history["kind"], strict=True)]
+    return pd.concat([live, history[keep]], ignore_index=True)[PRICE_COLS]
 
 
 def best(pr: pd.DataFrame, books=JUDGED_BOOKS) -> pd.DataFrame:
@@ -139,6 +170,11 @@ def join(rows: pd.DataFrame, pr: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     ev_to_match = link(ev, matches_of(rows))
     entry, close = best(pr[pr["kind"] == "entry"]), best(pr[pr["kind"] == "close"])
     close_by_book = pr[pr["kind"] == "close"].set_index(["event_id", "player", "book"])["yes"]
+    src = (
+        pr.groupby(["event_id", "kind"])["source"].first().to_dict()
+        if "source" in pr
+        else {}
+    )  # fmt: skip
     counts = {"events": len(ev), "events_linked": len(ev_to_match), "names": 0, "names_matched": 0}
     out = []
     for eid, mid in ev_to_match.items():
@@ -173,6 +209,8 @@ def join(rows: pd.DataFrame, pr: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
                     if name in c_best.index
                     else np.nan,
                     "close_same": float(close_by_book.get((eid, name, book), np.nan)),
+                    "entry_source": src.get((eid, "entry"), "history"),
+                    "close_source": src.get((eid, "close")) if name in c_best.index else None,
                 }
             )
     j = pd.DataFrame(out)

@@ -117,3 +117,49 @@ def test_reserve_cap_and_end_date_stop_calls(tmp_path):
     late = gl.LIVE_UNTIL + pd.Timedelta(minutes=1)
     s = gl.run([card(15)], tmp_path / "o3", raw_dir=raw, api_key="k", now=late, get=get)
     assert "judged window ended" in s["stop"] and not seen
+
+
+def test_a_502_is_retried_next_run_up_to_three_attempts(tmp_path):
+    cards = [card(15)]
+    raw = raw_with_events(tmp_path, cards)
+    status = {"code": 502}
+    seen = []
+
+    def get(url, params=None, timeout=None):
+        seen.append(url)
+        return Resp(None if status["code"] != 200 else body("ev0"), cost=0, status=status["code"])
+
+    out = tmp_path / "out"
+    s = gl.run(cards, out, raw_dir=raw, api_key="k", now=NOW, get=get)
+    assert s["calls"] == 1 and s["rows"] == 0  # the 502 is recorded, with its cost
+    # Two more attempts in the same close window, each recorded; then never again.
+    for i in (1, 2):
+        later = NOW + pd.Timedelta(minutes=i)
+        gl.run(cards, out, raw_dir=raw, api_key="k", now=later, get=get)
+    assert len(seen) == 3
+    gl.run(cards, out, raw_dir=raw, api_key="k", now=NOW + pd.Timedelta(minutes=3), get=get)
+    assert len(seen) == 3  # MAX_ATTEMPTS reached
+    recs = gl.load_calls(raw)
+    assert [c["status"] for c in recs] == [502, 502, 502]
+    # data-log keeps every attempt (deduplicated by attempt, not by snapshot).
+    log = tmp_path / "log"
+    assert gl.log(out, log)[1] == 3
+    assert gl.log(out, log)[1] == 0
+
+
+def test_a_retry_that_succeeds_stops_further_calls(tmp_path):
+    cards = [card(15)]
+    raw = raw_with_events(tmp_path, cards)
+    codes = iter([502, 200])
+    seen = []
+
+    def get(url, params=None, timeout=None):
+        code = next(codes)
+        seen.append(code)
+        return Resp(body("ev0") if code == 200 else None, status=code)
+
+    for i in range(3):
+        gl.run(cards, tmp_path / "o", raw_dir=raw, api_key="k",
+               now=NOW + pd.Timedelta(minutes=i), get=get)  # fmt: skip
+    assert seen == [502, 200]
+    assert gl.done_keys(gl.load_calls(raw)) == {("ev0", "close")}

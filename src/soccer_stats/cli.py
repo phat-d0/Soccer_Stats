@@ -2818,13 +2818,23 @@ def cmd_goalscorer_probe(args: argparse.Namespace) -> None:
 
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
-    at the entry and close for the dev (2025/26) or forward (2026/27 from 10 Oct) design."""
+    at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
+    the live log lacks since 1 Nov) design."""
     import json
 
     from soccer_stats import player_goal_backfill as gb
+    from soccer_stats import player_goal_live as live
     from soccer_stats.publish import _clean
 
-    res = gb.run(args.design, args.cap, minutes=args.minutes or None)
+    live_calls = None
+    if args.design == "gaps":
+        if not args.live_calls:
+            raise SystemExit("--design gaps needs --live-calls (data-log's odds_log copy)")
+        live_calls = live.load_calls(Path(args.live_calls))
+        if not live_calls:  # an empty record would make every snapshot since 1 Nov a gap
+            raise SystemExit("--design gaps: no live goalscorer calls found; nothing bought")
+        print(f"Live goalscorer call record: {len(live_calls)} calls")
+    res = gb.run(args.design, args.cap, minutes=args.minutes or None, live_calls=live_calls)
     for line in res["log"][-15:]:
         print(f"  {line}")
     for line in gb.summary_lines(res):
@@ -3676,7 +3686,10 @@ def main(argv: list[str] | None = None) -> None:
         "goalscorer-backfill",
         help="priced goalscorer test: historical prices at the entry and close (dev or forward)",
     )
-    gbf.add_argument("--design", choices=["dev", "forward"], default="dev")
+    gbf.add_argument("--design", choices=["dev", "forward", "gaps"], default="dev")
+    gbf.add_argument(
+        "--live-calls", help="gaps: folder holding data-log's goalscorer_calls_*.jsonl"
+    )
     gbf.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = dry run)")
     gbf.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
     gbf.add_argument("--json", help="write the results as JSON")
