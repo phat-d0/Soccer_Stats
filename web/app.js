@@ -43,7 +43,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v76";
+const APP_VERSION = "v77";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -285,7 +285,9 @@ function oddsAge() {
   if (!s || !isDK() || !s.fetched_at) return "";
   const mins = Math.round((Date.now() - Date.parse(s.fetched_at)) / 60000);
   const ago = mins < 60 ? `${mins} min` : mins < 1440 ? `${Math.round(mins / 60)} h` : `${Math.round(mins / 1440)} days`;
-  const every = s.refresh_hours ? ` Refreshing about every ${s.refresh_hours < 1.5 ? "hour" : `${Math.round(s.refresh_hours)} h`} to stay on the free plan.` : s.error && s.error.startsWith("paused") ? " Paused until the free allowance resets." : "";
+  // Since the 28 Oct plan upgrade refreshes follow the policy floor (odds_feed.policy_floor):
+  // the Premier League's odds (this line's source) hourly, every 15 minutes within 2 h of a kickoff.
+  const every = s.error && s.error.startsWith("paused") ? " Paused while the odds credits are at their reserve." : " Refreshed hourly, and every 15 minutes near kickoff.";
   return `DraftKings odds updated ${ago} ago.${every}`;
 }
 
