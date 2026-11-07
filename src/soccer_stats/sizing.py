@@ -353,6 +353,51 @@ def backtest_sizing(
     return out
 
 
+KELLY_BET_FIELDS = ["kelly_stake", "kelly_profit", "bankroll_before", "kelly_from"]
+
+
+def with_kelly_bets(
+    df: pd.DataFrame, p_col: str | None, kelly_from: str, lead: pd.Timedelta = BACKTEST_LEAD
+) -> pd.DataFrame:
+    """`df` with each bet's quarter-Kelly stake, its P/L and the bankroll that sized it
+    (owner via the lead, 7 Nov; display only): the same simulate() run on the same rows,
+    order and chance column as backtest_sizing's `kelly` block, with log=True, so the
+    stakes add up to that block's profit. `kelly_from` names the simulation ("pooled" or a
+    league code). No chance (e.g. before a league's first blend fit) = stake 0."""
+    out = df.copy()
+    for c in KELLY_BET_FIELDS:
+        out[c] = None
+    if df is None or not len(df):
+        return out
+    sim = simulate(backtest_bets(df, p_col, lead), kelly_fn(), log=True)
+    stake = [0.0] * len(df)
+    pnl: list[float | None] = [None] * len(df)
+    before: list[float | None] = [None] * len(df)
+    for e in sim["log"]:
+        stake[e["i"]] = e["stake"]
+        pnl[e["i"]] = e["profit"]
+        before[e["i"]] = e["bankroll_before"]
+    out["kelly_stake"] = stake
+    out["kelly_profit"] = pnl
+    out["bankroll_before"] = before
+    out["kelly_from"] = kelly_from
+    return out
+
+
+def kelly_cells(r: dict) -> list:
+    """A compact row's KELLY_BET_FIELDS cells (cents, $ for the bankroll)."""
+
+    def money(v, nd=2):
+        return None if v is None or not np.isfinite(float(v)) else round(float(v), nd)
+
+    return [
+        money(r.get("kelly_stake")),
+        money(r.get("kelly_profit"), 4),
+        money(r.get("bankroll_before")),
+        r.get("kelly_from"),
+    ]
+
+
 def app_curves(leagues: dict, n: int = APP_LEAGUE_CURVE) -> dict:
     """A backtest file's `leagues` for data.json: each league's sizing curves downsampled to
     `n` points (the file and the pooled `all` keep MAX_CURVE)."""

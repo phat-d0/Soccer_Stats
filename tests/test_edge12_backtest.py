@@ -80,7 +80,7 @@ def test_build_pools_the_early_leagues_and_keeps_the_cup_apart():
     assert out["bets_total"] == len(b) + 5 and len(out["bets"]) == 20
     rows = [dict(zip(e12b.BET_FIELDS, r, strict=True)) for r in out["bets"]]
     assert [r["date"] for r in rows] == sorted((r["date"] for r in rows), reverse=True)
-    assert len(json.dumps(out["bets"][0])) < 120
+    assert len(json.dumps(out["bets"][0])) < 165
     rep_dk = out["draftkings_replay"]
     assert rep_dk["book"] == "DraftKings" and "E0_dk.json" in rep_dk["source"]
     assert rep_dk["summary"] == {"trades": 173, "roi": -0.1343, "clv_dk": -0.0617}
@@ -147,3 +147,28 @@ def test_command_runs_every_league_and_never_buys_cup_prices(monkeypatch, tmp_pa
     assert out["leagues"]["E0"]["edge12"]["bets"] == out["leagues"]["SP1"]["edge12"]["bets"] > 0
     printed = capsys.readouterr().out
     assert "EDGE12_BACKTEST_JSON " in printed and "Model 12% backtest written" in printed
+
+
+def test_each_bet_carries_its_kelly_stake_on_the_blend():
+    """Model 12%'s per-bet stakes are Kelly on p_blend (no stake without a fit), from the
+    pooled simulation; the cup's from its own."""
+    (rep, b), _, _ = report()
+    b = b.assign(p_blend=np.where(np.arange(len(b)) < 5, np.nan, b["model_p"] * 0.97))
+    cup = b.tail(4).assign(league="UCL")
+    out = e12b.build(
+        {"E0": rep, "UCL": {"kind": "close", **e12b.summary(cup)}},
+        {"E0": b, "UCL": cup},
+        from_season=2021,
+        max_bets=100_000,
+    )
+    rows = [dict(zip(out["bet_fields"], r, strict=True)) for r in out["bets"]]
+    pooled = [r for r in rows if r["kelly_from"] == "pooled"]
+    kelly = out["all"]["sizing"]["kelly"]
+    assert len(pooled) == len(b)
+    assert sum(r["kelly_profit"] for r in pooled) == pytest.approx(kelly["profit"], abs=0.01)
+    no_fit = b.head(5)
+    keys = set(zip(no_fit["date"].astype(str), no_fit["home"], no_fit["away"], strict=True))
+    for r in pooled:
+        if (str(r["date"]), r["home"], r["away"]) in keys:
+            assert r["kelly_stake"] == 0
+    assert {r["kelly_from"] for r in rows if r["league"] == "UCL"} == {"UCL"}
