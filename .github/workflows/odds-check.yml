@@ -150,9 +150,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, inplay-probe, dk-history, espn, understat, understat-restore or understat-backfill"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -182,9 +182,9 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       design:
-        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov)"
+        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov); understat-wayback: probe (counts), compare (copies vs the files held) or load (complete copies into xg-good-, default branch only)"
         type: choice
-        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps]
+        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps, probe, compare, load]
         default: B
       restore_key:
         description: "understat-restore: the run id of an older raw-data cache holding good Understat files (e.g. 41369190298)"
@@ -603,6 +603,18 @@ jobs:
             understat-restore)  # no key: good Understat files from raw-data-$RESTORE_KEY
               uv run soccer-stats understat-repair --old "$RUNNER_TEMP/raw_old"
               rm -rf data/raw/player_odds_history "$RUNNER_TEMP/raw_old" ;;  # paid: not raw-data's
+            understat-wayback)  # no key: the missing seasons in the Wayback Machine, counts only
+              # (decoded captures go to the artifact under out/wayback, never to xg-good-)
+              # (the missing seasons only, xg_wayback.WANTED; `seasons` is not read here)
+              case "$DESIGN" in
+                compare) uv run soccer-stats understat-wayback --mode compare ;;
+                load)
+                  if [ "$GITHUB_REF_NAME" != "claude/soccer-stats-scaffold" ]; then
+                    echo "understat-wayback load writes the good-copy cache: default branch only"; exit 1
+                  fi
+                  uv run soccer-stats understat-wayback --mode load --leagues "$LEAGUES" ;;
+                *) uv run soccer-stats understat-wayback --leagues "$LEAGUES" --out out/wayback ;;
+              esac ;;
             understat-backfill)  # no key: Understat seasons into the good-copy cache
               if [ -n "$LEAGUES" ]; then
                 uv run soccer-stats understat-backfill --leagues "$LEAGUES" --seasons "$SEASONS"
@@ -646,7 +658,7 @@ jobs:
               rm -rf out/log ;;
           esac
       - uses: actions/cache/save@v4
-        if: ${{ inputs.task == 'understat-backfill' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' && hashFiles('data/understat_good/*.json') != '' }}
+        if: ${{ (inputs.task == 'understat-backfill' || (inputs.task == 'understat-wayback' && inputs.design == 'load')) && github.ref == 'refs/heads/claude/soccer-stats-scaffold' && hashFiles('data/understat_good/*.json') != '' }}
         continue-on-error: true  # an unchanged copy's key exists already
         with:
           path: data/understat_good
@@ -735,7 +747,7 @@ jobs:
   # default branch.
   archive:
     needs: check
-    if: ${{ always() && github.ref_name == github.event.repository.default_branch && inputs.cap != '0' }}
+    if: ${{ always() && github.ref_name == github.event.repository.default_branch && (inputs.cap != '0' || (inputs.task == 'understat-wayback' && inputs.design == 'load')) }}
     runs-on: ubuntu-24.04
     permissions:
       actions: write # dispatch caches.yml
