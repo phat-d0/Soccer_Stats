@@ -21,7 +21,10 @@ const state = {
   pfId: store.get("pfId", "moneyline"), // Portfolio tab: which strategy's portfolio
   pfLevel: "home", // Portfolio tab: "home" (the folders), "portfolio" (its strategies) or "strategy"
   pfStrat: store.get("pfStrat", ""), // Moneyline live: which match strategy ("" = the first, Blend Lean)
-  sizing: store.get("sizing", "flat") === "kelly" ? "kelly" : "flat", // Portfolio's sizing switch (owner, 7 Nov)
+  sizing: store.get("sizing", "flat") === "kelly" ? "kelly" : "flat",
+  // How each live trade row shows its ¼ Kelly figures beside flat $10's (owner, 7 Nov):
+  // "cols" = two right-hand columns headed once per list, "stack" = a muted line under flat's.
+  kellyRows: "cols", // Portfolio's sizing switch (owner, 7 Nov)
   kellyShown: {}, // Kelly bet log rows shown per strategy (25, then 50 more a tap)
   kellyOpen: "", // the Kelly bet log kept open across re-renders
   kellyFocus: "", // the trade the sheet's "How it was sized" points at
@@ -3395,26 +3398,23 @@ function pfTradeRow(t, kl = null) {
   // A DraftKings corner trade's second yardstick: Pinnacle's close at the same team line.
   const pinLine = isDkCorner(t) && t.clv_pinnacle != null && !open ? `<span class="meta">CLV ${signedPct(t.clv_pinnacle)} vs Pinnacle's close</span>`
     : isLineshop(t) ? `<span class="meta${lsOld(t) ? " ls-old" : ""}">Quote ${lsAge(t)} when logged${lsOld(t) ? " (old)" : ""} · Pinnacle's fair chance ${pct(t.pinnacle_fair, 1)}</span>` : "";
-  // Kelly mode (the sizing switch): the trade's ¼ Kelly stake and P/L in place of $10's.
-  const kt = kl ? kellyTrade(t, kl) : null;
-  const right = kl
-    ? !kt ? `<b class="muted">–</b><small>no Kelly figure</small>`
-      : !(kt.stake > 0) ? `<b class="muted">No stake</b><small>¼ Kelly</small>`
-      : open ? `<b>${bankUsd(kt.stake, 2)}</b><small>¼ Kelly${kt.share != null ? ` · ${pct(kt.share, 1)}` : ""}</small>`
-      : t.status === "void" ? `<b>${isDraw(t) ? "Draw" : t.push ? "Push" : "Void"}</b><small>${bankUsd(kt.stake, 2)} back</small>`
-      : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(kt.profit, 2)}</b><small>${t.status} · ${bankUsd(kt.stake, 2)} staked</small>`
-    : open
+  const flat = open
     ? `<b>$${Number(t.stake).toFixed(0)}</b><small>to win $${(t.stake * (dec - 1)).toFixed(2)}</small>`
     : t.status === "void"
       ? `<b>${isDraw(t) ? "Draw" : t.push ? "Push" : "Void"}</b><small>stake back</small>`
       : `<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(t.profit, 2)}</b><small>${t.status}</small>`;
-  const kLine = kl ? `<span class="meta kelly-row${kt && !(kt.stake > 0) ? " muted" : ""}">${esc(kellyText(kt))}</span>` : "";
+  // The ¼ Kelly figures sit beside flat $10's on every row of a strategy that sizes (owner,
+  // 7 Nov), whichever way the switch is set; a track without a Kelly block keeps flat alone.
+  const kt = kl ? kellyTrade(t, kl) : null;
+  const k = !!kl;
+  const stack = state.kellyRows === "stack";
+  const right = !k ? flat : stack ? `${flat}${kellyCell(t, kt, true)}` : `<span class="vcol">${flat}</span><span class="vcol kcol">${kellyCell(t, kt, false)}</span>`;
   return `
     <button class="row-btn trade-row" data-trade="${esc(t.id)}">
       <span class="who"><b>${esc(betName(t))}</b>${isLean(t) ? driverChip(t) : ""}${shadowChip(t)}${bcChip(t)}
         <span class="meta">${open && ph !== "upcoming" ? `<b class="phase-tag ${ph}">${PHASE_LABEL[ph]}</b> · ` : ""}${esc(t.home)} v ${esc(t.away)} · ${esc(rowKickoff(t.kickoff))}</span>
-        <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span>${pinLine}${kLine}</span>
-      <span class="vals">${right}</span>
+        <span class="meta">${american(dec)} (${dec.toFixed(2)})${how ? ` · ${how}` : ""}${extra}</span>${pinLine}</span>
+      <span class="vals${k && state.kellyRows !== "stack" ? " two" : ""}">${right}</span>
     </button>`;
 }
 // Settled profit by day (settled date, else kickoff), cumulative from $0.
@@ -3665,12 +3665,28 @@ function kellyStats(trades, kl) {
   o.roi = o.staked ? o.profit / o.staked : null;
   return o;
 }
-// "¼ Kelly: $7.86 (0.8% of $984, capped at 5%)" or "¼ Kelly: no stake (no edge on the chance)".
-function kellyText(kt) {
-  if (!kt) return "¼ Kelly: –";
-  if (!(kt.stake > 0)) return `¼ Kelly: no stake (${kt.reason || "no edge on the chance"})`;
-  return `¼ Kelly: ${bankUsd(kt.stake, 2)}${kt.share != null ? ` (${pct(kt.share, 1)} of ${bankUsd(kt.before, 0)}${kt.capped ? ", capped at 5%" : ""})` : kt.capped ? " (capped at 5%)" : ""}`;
+// A trade row's ¼ Kelly cell (owner, 7 Nov), in either layout: the stake and its share of the
+// bankroll that sized it while open (with "to win"), the ¼ Kelly P/L once settled, "capped"
+// at the 5% cap, or "No stake" with a short reason.
+const KELLY_SHORT = { "no edge on the chance": "no edge", "no chance": "no chance", "no bankroll": "no bankroll" };
+function kellyCell(t, kt, stack) {
+  const wrap = (main, lines) => stack
+    ? `<small class="kelly-sub ks1">¼ Kelly ${main}</small>${lines.length ? `<small class="kelly-sub">${lines.join(" · ")}</small>` : ""}`
+    : `${main}${lines.map((l) => `<small>${l}</small>`).join("")}`;
+  if (!kt) return wrap(`<b class="muted">–</b>`, ["not sized"]);
+  if (!(kt.stake > 0)) return wrap(`<b class="muted">No stake</b>`, [esc(KELLY_SHORT[kt.reason] || kt.reason || "no edge")]);
+  const share = kt.share != null ? pct(kt.share, 1) : "";
+  const cap = kt.capped ? "capped" : "";
+  if (t.status === "open") {
+    const win = `to win ${bankUsd(kt.stake * (Number(t.odds) - 1), 2)}`;
+    return stack ? wrap(`<b>${bankUsd(kt.stake, 2)}</b>${share ? ` · ${share}` : ""}`, [win, cap].filter(Boolean))
+      : wrap(`<b>${bankUsd(kt.stake, 2)}</b>`, [share, win, cap].filter(Boolean));
+  }
+  if (t.status === "void") return wrap(`<b>${bankUsd(kt.stake, 2)} back</b>`, []);
+  return wrap(`<b class="${t.status === "won" ? "pos-text" : "neg-text"}">${usd(kt.profit, 2)}</b>`, [[bankUsd(kt.stake, 2), share].filter(Boolean).join(" · "), stack ? "" : cap].filter(Boolean).map((l, i) => (stack && !i && cap ? `${l} · capped` : l)));
 }
+// "Flat | ¼ Kelly" over a list's two right-hand columns, once per list.
+const kellyColsHead = (kl) => (kl && state.kellyRows !== "stack" ? `<div class="kcols-head" aria-hidden="true"><span class="kh-flat">Flat</span><span class="kh-kelly">¼ Kelly</span></div>` : "");
 // The live strategy section holding a trade, with its Kelly figures (first match: a parent before its variants).
 function kellyHome(t) {
   for (const p of portfolios()) {
@@ -4079,9 +4095,10 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
   const trades = set.trades || [];
   const m = tradeStats(trades);
   // The sizing switch: in Kelly mode the tiles, curve and rows read the section's ¼ Kelly block.
-  const kl = kellyOn() ? kellyOf(x.st) : null;
+  const kRow = kellyOf(x.st); // every row shows ¼ Kelly beside flat when the section sizes
+  const kl = kellyOn() ? kRow : null;
   const ks = kl ? kellyStats(trades, kl) : null;
-  const row = (t) => pfTradeRow(t, kl);
+  const row = (t) => pfTradeRow(t, kRow);
   const dkCorners = cur.id === "corners" && (x.variantOf || x.key) === "draftkings";
   const ls = isLineshopStrat(x);
   const book = ls ? "Pinnacle's" : cur.id === "corners" ? BOOK_POSS[dkCorners ? "draftkings" : "pinnacle"] : trades.length && trades.every(isPlayer) ? `${playerBook()}'s` : "DraftKings'";
@@ -4184,8 +4201,11 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     : `<p class="note backcast-note"><b>Backcast before ${esc(dayName(bcSet))}:</b> this line starts ${bcStart(bc) ? esc(dayName(bcStart(bc).slice(0, 10))) : "at the portfolio's start"}, ${bc.trades ? `with the ${bc.trades} trade${bc.trades === 1 ? "" : "s"} (${bc.settled} settled) the rule would have opened before it was set, worked out from the logged prices${bc.sigma_from ? ` (σ from the ${esc(bc.sigma_from)})` : ""} and marked Backcast below.${bc.exception ? ` Its backcast ${esc(bc.exception)}.` : ""} That part is descriptive only: the rule wasn't fixed yet.` : `but on the logged prices${bc.sigma_from ? ` (σ from the ${esc(bc.sigma_from)})` : ""} the rule would have opened no trades before it was set.`} From ${esc(dayName(bcSet))} on, the trades were opened live; the judged comparison counts only those.</p>`;
   const done = trades.filter((t) => t.status !== "open");
   const shown = done.slice(0, state.pfShown);
-  const doneProfit = kl ? done.reduce((a, t) => a + (kellyTrade(t, kl)?.profit || 0), 0) : done.reduce((a, t) => a + (t.profit || 0), 0);
-  const openRiskShown = kl ? ks.atRisk : openRisk;
+  const doneProfit = done.reduce((a, t) => a + (t.profit || 0), 0);
+  // The lists' ¼ Kelly totals beside flat's (owner, 7 Nov).
+  const kSum = (list, f) => list.reduce((a, t) => { const kt = kellyTrade(t, kRow); return a + (kt ? f(kt) || 0 : 0); }, 0);
+  const kOpenRisk = kRow ? kSum(open, (kt) => (kt.stake > 0 ? kt.stake : 0)) : 0;
+  const kDone = kRow ? kSum(done, (kt) => kt.profit) : 0;
   // Kelly mode without a Kelly block (a track that doesn't size): say so, and show $10.
   const noKelly = kellyOn() && !kl ? `<p class="note kelly-none">Kelly not tracked for ${esc(x.label)}: it has no sized stakes, so this view stays at flat $10.</p>` : "";
   const sizingPart = kl ? sizingHtml(`kz-${x.key}`, x.st?.sizing, lg ? "every competition" : "", x, true)
@@ -4208,10 +4228,10 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
     ${ls ? lsBooksHtml(x, trades) : ""}
     ${sizingPart}
     ${liveOddsBandsHtml(cur, x, lg, drv)}
-    <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRiskShown.toFixed(0)} at risk${kl ? " (¼ Kelly)" : ""}` : ""}</div>
-    ${open.length ? `<div class="card list">${open.map(row).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
-    ${awaiting.length ? `<div class="section-title">Awaiting result · ${awaiting.length}</div><p class="note await-note">These matches have finished. ${AWAIT_NOTE} Their close and CLV are final.</p><div class="card list">${awaiting.map(row).join("")}</div>` : ""}
-    ${done.length ? `<div class="section-title">Settled · ${done.length} · <span class="${signCls(doneProfit)}">${usd(doneProfit, 2)}</span>${kl ? ` <span class="muted nocase">¼ Kelly</span>` : ""}</div><div class="card list">${shown.map(row).join("")}</div>${done.length > shown.length ? `<button class="more" id="pf-more">Show more (${done.length - shown.length} left)</button>` : ""}` : ""}
+    <div class="section-title">Open · ${open.length}${open.length ? ` · $${openRisk.toFixed(0)} at risk${kRow ? ` · ¼ Kelly ${bankUsd(kOpenRisk, 0)} at risk` : ""}` : ""}</div>
+    ${open.length ? `<div class="card list">${kellyColsHead(kRow)}${open.map(row).join("")}</div>` : `<div class="card"><span class="muted">${awaiting.length ? "No upcoming or in-play trades." : "No open trades."}</span></div>`}
+    ${awaiting.length ? `<div class="section-title">Awaiting result · ${awaiting.length}</div><p class="note await-note">These matches have finished. ${AWAIT_NOTE} Their close and CLV are final.</p><div class="card list">${kellyColsHead(kRow)}${awaiting.map(row).join("")}</div>` : ""}
+    ${done.length ? `<div class="section-title">Settled · ${done.length} · <span class="${signCls(doneProfit)}">${usd(doneProfit, 2)}</span>${kRow ? ` · ¼ Kelly <span class="${signCls(kDone)}">${usd(kDone, 2)}</span>` : ""}</div><div class="card list">${kellyColsHead(kRow)}${shown.map(row).join("")}</div>${done.length > shown.length ? `<button class="more" id="pf-more">Show more (${done.length - shown.length} left)</button>` : ""}` : ""}
     ${impliedVsRealizedHtml(trades)}
     ${pfBreakdowns(set.breakdowns || {})}
     ${rules}`;

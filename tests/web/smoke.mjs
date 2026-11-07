@@ -1385,6 +1385,51 @@ const STEPS = [
   // The sizing switch (owner, 7 Nov): Flat $10 | ¼ Kelly at the top of Portfolio, remembered in
   // localStorage. In Kelly mode every level reads the sections' ¼ Kelly blocks; switched back
   // to flat at the end so the other steps see the record.
+  // ¼ Kelly beside flat $10 on every live trade row, whatever the switch says (owner, 7 Nov):
+  // two columns headed once per list, the lists' headers carrying the ¼ Kelly totals.
+  ["portfolio-kelly-rows", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "corners"); await p.click('.chip[data-league=""]');
+    await p.click('button[data-pfstrat="draftkings_below60"]');
+    if ((await p.evaluate(() => state.sizing)) !== "flat") throw new Error("rows check runs at flat $10");
+    const heads = await p.locator("#view .kcols-head").count();
+    const lists = await p.locator("#view .card.list").count();
+    if (!heads || heads !== lists) throw new Error(`Kelly column heads ${heads} for ${lists} lists`);
+    const rows = await p.locator("#view .trade-row").count();
+    if ((await p.locator("#view .trade-row .vals.two .kcol").count()) !== rows) throw new Error("every trade row should carry a ¼ Kelly column");
+    const want = await p.evaluate(() => {
+      const cur = pfById("corners"), x = pfStrategies(cur).find((s) => s.key === "draftkings_below60");
+      const kl = kellyOf(x.st), ts = strategyLiveSet(cur, x, "").trades;
+      const open = ts.filter((t) => t.status === "open"), done = ts.filter((t) => t.status !== "open");
+      const risk = open.reduce((a, t) => a + (kellyTrade(t, kl)?.stake || 0), 0);
+      const pl = done.reduce((a, t) => a + (kellyTrade(t, kl)?.profit || 0), 0);
+      const t = ts.find((t) => t.status === "won" && kellyTrade(t, kl)?.stake > 0);
+      return { risk: `¼ Kelly ${bankUsd(risk, 0)} at risk`, pl: `¼ Kelly ${usd(pl, 2)}`, id: t?.id, tp: t ? usd(kellyTrade(t, kl).profit, 2) : null, open: open.length, done: done.length };
+    });
+    const titles = (await p.locator("#view .section-title").allInnerTexts()).join(" | ").replace(/\s+/g, " ");
+    if (want.open && !titles.toLowerCase().includes(want.risk.toLowerCase())) throw new Error(`Open header lacks "${want.risk}": ${titles}`);
+    if (want.done && !titles.toLowerCase().includes(want.pl.toLowerCase())) throw new Error(`Settled header lacks "${want.pl}": ${titles}`);
+    if (want.id) {
+      const k = await p.locator(`#view button[data-trade="${want.id}"] .kcol`).innerText();
+      if (!k.includes(want.tp)) throw new Error(`settled Kelly cell ${k} vs ${want.tp}`);
+    }
+    // The 1% line shop line has no Kelly block: flat alone.
+    await pfOpenPf(p, "moneyline"); await p.click('.chip[data-league=""]'); await p.click('button[data-pfstrat="lineshop_1pct"]');
+    if (await p.locator("#view .kcol, #view .kcols-head").count()) throw new Error("the 1% line shop line shows a Kelly column");
+    // Model 12% and its draw no bet track get the column too.
+    for (const key of ["edge12", "edge12_dnb"]) {
+      await pfOpenStrat(p, key);
+      const n = await p.locator("#view .trade-row").count();
+      if (n && (await p.locator("#view .trade-row .kcol").count()) !== n) throw new Error(`${key} rows lack the Kelly column`);
+    }
+  }],
+  // The other layout: ¼ Kelly stacked under flat's figures in a muted line.
+  ["portfolio-kelly-rows-stack", async (p) => {
+    await p.evaluate(() => { state.kellyRows = "stack"; render(); });
+    if (await p.locator("#view .kcols-head, #view .vals.two").count()) throw new Error("stack layout shows columns");
+    const n = await p.locator("#view .trade-row").count();
+    if (n && (await p.locator("#view .trade-row .kelly-sub.ks1").count()) !== n) throw new Error("stack layout: a row lacks its ¼ Kelly line");
+    await p.evaluate(() => { state.kellyRows = "cols"; render(); });
+  }],
   ["portfolio-kelly-home", async (p) => {
     await closeSheet(p); await pfHome(p);
     if ((await p.locator(".sizing-switch button.on").innerText()) !== "Flat $10") throw new Error("sizing should start at flat $10");
@@ -1406,14 +1451,14 @@ const STEPS = [
     if (!(await p.locator('button[data-pfstrat="lineshop_1pct"]').innerText()).includes("Kelly not tracked")) throw new Error("1% line row should say Kelly not tracked");
     await p.click('button[data-pfstrat="lean"]');
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
-    for (const w of ["Bankroll now, ¼ Kelly", "Profit, ¼ Kelly", "Max drawdown, ¼ Kelly", "Bets staked", "Bankroll over time, ¼ Kelly", "with flat $10's dashed beside it", "How each ¼ Kelly stake was sized", "Kelly bet log", "¼ Kelly: $"]) if (!text.includes(w)) throw new Error(`Lean Kelly view lacks "${w}"`);
+    for (const w of ["Bankroll now, ¼ Kelly", "Profit, ¼ Kelly", "Max drawdown, ¼ Kelly", "Bets staked", "Bankroll over time, ¼ Kelly", "with flat $10's dashed beside it", "How each ¼ Kelly stake was sized", "Kelly bet log"]) if (!text.includes(w)) throw new Error(`Lean Kelly view lacks "${w}"`);
     if (!(await p.locator("[data-scrub='kv-lean'] path.line.ser").count())) throw new Error("no Kelly bankroll chart");
     if (await p.locator("[data-scrub='kz-lean']").count()) throw new Error("the bankroll chart shows twice in Kelly mode");
     // An open trade's right side is its stake taken at open.
     const want = await p.evaluate(() => { const st = pfById("moneyline").live.strategies.find((s) => s.key === "lean"); const kl = kellyOf(st); const t = strategyLiveSet(pfById("moneyline"), pfStrategies(pfById("moneyline")).find((x) => x.key === "lean"), "").trades.find((t) => t.status === "open" && kellyTrade(t, kl)?.stake > 0); return t ? { id: t.id, stake: bankUsd(kellyTrade(t, kl).stake, 2) } : null; });
     if (want) {
-      const r = (await p.locator(`#view button[data-trade="${want.id}"] .vals`).innerText()).replace(/\s+/g, " ");
-      if (!r.includes(want.stake) || !r.includes("¼ Kelly")) throw new Error(`open Kelly row ${r} vs ${want.stake}`);
+      const r = (await p.locator(`#view button[data-trade="${want.id}"] .vals .kcol`).innerText()).replace(/\s+/g, " ");
+      if (!r.includes(want.stake) || !r.includes("to win $")) throw new Error(`open Kelly row ${r} vs ${want.stake}`);
     }
     await scrubCheck(p, "[data-scrub='kv-lean']");
   }],

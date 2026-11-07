@@ -946,4 +946,16 @@ details.drv-fold { margin-top: 10px; }
 .sizing-switch .segmented { margin: 0; flex: 0 0 auto; }
 .sizing-switch .segmented button { white-space: nowrap; padding-left: 14px; padding-right: 14px; }
 .kelly-framing { margin: -4px 0 12px; }
+/* ¼ Kelly beside flat $10 on every live trade row (owner, 7 Nov) */
+.row-btn .vals.two { display: flex; gap: 8px; min-width: 0; }
+.row-btn .vals.two .vcol { display: block; width: 74px; }
+.row-btn .vals.two .vcol small { white-space: nowrap; }
+.row-btn .vals.two .vcol.kcol { width: 84px; }
+.row-btn .vals.two b { font-size: 14px; }
+.kcols-head { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 30px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--text-muted); text-transform: uppercase; }
+.kcols-head span { width: 74px; text-align: right; }
+.kcols-head .kh-kelly { width: 84px; }
+.row-btn .vals small.kelly-sub { color: var(--text-secondary); }
+.row-btn .vals small.kelly-sub b { font-size: 13px; }
+.row-btn .vals small.kelly-sub.ks1 { margin-top: 3px; }
 .kelly-row { color: var(--text-secondary); }
