@@ -421,6 +421,15 @@ four leagues: E0, E1–E3).
   kind, captured, after_season, matches, played, teams, players, sha256, `source: "wayback"`,
   football-data's `fd_matches`, `complete`) and a table. `--out` keeps the decoded files (the
   artifact), never `xg-good-`. `PAUSE` 1.5 s between requests, retries on 429/5xx.
+  `best_capture` keeps the most complete good copy (stops at one with every football-data
+  match played, else the most played, `MAX_DOWNLOADS` 10). `--mode compare` (`design=compare`,
+  step 1, lead 7 Nov): each held season in `COMPARE` (E0 2022–2023, SP1 2024, D1 2024) against
+  its copy, match by match on id, teams, datetime, goals and xG (`compare`: differ, fields,
+  `max_xg_diff`, `XG_TOL` 1e-6). `--mode load` (`design=load`, default branch only, step 2):
+  every wanted season's best copy, loaded only when `complete` through `xg.keep_good` (never
+  over a better file), each logged in `data/understat_good/sources.jsonl` (`SOURCES`: league,
+  season, source "wayback", url, captured, played, fd_matches, file, sha256, loaded_at); the
+  run saves `xg-good-` and dispatches `caches.yml`.
   `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,

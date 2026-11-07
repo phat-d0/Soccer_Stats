@@ -304,6 +304,34 @@ def cmd_understat_wayback(args: argparse.Namespace) -> None:
         lo, _, hi = args.seasons.partition("-")
         years = range(int(lo), int(hi or lo) + 1)
         wanted = {c: [y for y in years] for c in (leagues or wb.WANTED)}
+    if args.mode == "compare":  # step 1: archived copies against the files we hold
+        from soccer_stats.xg import GOOD_DIR
+
+        rows = wb.compare_held(wb.COMPARE, GOOD_DIR)
+        for r in rows:
+            print("WAYBACK_COMPARE " + json.dumps(r), flush=True)
+        n = sum(r.get("differ", 0) for r in rows)
+        top = max((r.get("max_xg_diff", 0) for r in rows), default=0)
+        print(
+            f"Wayback compare: {len(rows)} held seasons, {n} matches differ, largest xG diff {top}"
+        )
+        return
+    if args.mode == "load":  # step 2: complete copies into the good-copy folder
+        import pandas as pd
+
+        from soccer_stats.xg import GOOD_DIR
+
+        now = pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds")
+        rows = wb.load_wanted(wanted, GOOD_DIR, now, minutes=args.minutes)
+        for r in rows:
+            print("WAYBACK_LOAD " + json.dumps(r), flush=True)
+        print(wb.table(rows))
+        n = sum(1 for r in rows if r.get("loaded"))
+        print(f"Wayback load: {n} of {len(rows)} league-seasons loaded into the good-copy folder")
+        for r in rows:
+            if r.get("loaded"):
+                print(f"  {r['league']} {r['season']}: sha256 {r['sha256']} from {r['url']}")
+        return
     out = Path(args.out) if args.out else None
     rows = wb.probe(wanted, out, minutes=args.minutes)
     for r in rows:
@@ -3331,6 +3359,12 @@ def main(argv: list[str] | None = None) -> None:
     uw.add_argument("--seasons", default="", help="start years, e.g. 2017-2023 (blank = wanted)")
     uw.add_argument("--out", default="", help="folder for the decoded captures (never xg-good)")
     uw.add_argument("--minutes", type=float, default=40, help="time budget")
+    uw.add_argument(
+        "--mode",
+        choices=["probe", "compare", "load"],
+        default="probe",
+        help="probe (counts), compare (copies vs the files held) or load (complete copies)",
+    )
     uw.set_defaults(func=cmd_understat_wayback)
 
     ur = sub.add_parser("understat-repair", help="good Understat files from an older raw cache")

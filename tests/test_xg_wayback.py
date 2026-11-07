@@ -86,7 +86,113 @@ def test_probe_one_reports_the_capture_and_writes_only_to_out(tmp_path, monkeypa
     assert row["matches"] == 2 and row["played"] == 1 and row["complete"] is True
     assert row["json_captures"] == 0 and row["page_captures"] == 1
     saved = tmp_path / "out" / "understat_EPL_2018.json"
+    assert json.loads(saved.read_bytes())["dates"] == DATES
     assert saved.exists() and len(row["sha256"]) == 64
     none = wb.probe_one("E0", 2019, None, s)
     assert none["status"] == "no capture" and none["captures"] == 0
     assert "E0" in wb.table([row, none]) and "no capture" in wb.table([row, none])
+
+
+def _m(i, xg_h="1.2", goals_h="2", result=True, home="Arsenal"):
+    return {
+        "id": i,
+        "isResult": result,
+        "h": {"title": home},
+        "a": {"title": "Leicester"},
+        "goals": {"h": goals_h, "a": "0"},
+        "xG": {"h": xg_h, "a": "0.4"},
+        "datetime": "2022-08-05 19:00:00",
+    }
+
+
+def test_compare_counts_matches_that_differ_and_the_largest_xg_gap():
+    held = {"dates": [_m("1"), _m("2"), _m("3")]}
+    same = wb.compare(held, {"dates": [_m("1", xg_h=1.2), _m("2", goals_h=2), _m("3")]})
+    assert same["differ"] == 0 and same["max_xg_diff"] == 0 and same["both"] == 3
+    moved = wb.compare(held, {"dates": [_m("1", xg_h="1.25"), _m("2", home="Chelsea"), _m("4")]})
+    assert moved["differ"] == 2 and moved["only_held"] == 1 and moved["only_copy"] == 1
+    assert moved["fields"] == {"xg_h": 1, "h": 1}
+    assert moved["max_xg_diff"] == pytest.approx(0.05)
+
+
+class _Copies:
+    """A fake Wayback with several page copies of one season, each with its own played count."""
+
+    def __init__(self, copies):  # {timestamp: played}
+        self.copies = copies
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if url == wb.CDX:
+            if "/league/" not in params["url"]:
+                return _Resp(200, "[]")
+            rows = [["timestamp", "original", "mimetype", "length"]]
+            rows += [
+                [t, "https://understat.com/league/EPL/2018", "text/html", "9"] for t in self.copies
+            ]
+            return _Resp(200, json.dumps(rows))
+        ts = url.split("/web/")[1].split("id_")[0]
+        n = self.copies[ts]
+        dates = [_m(str(i), result=i < n) for i in range(4)]
+        return _Resp(
+            200,
+            content=("<script>var datesData = JSON.parse('" + _js(dates) + "');</script>").encode(),
+        )
+
+
+def test_the_most_complete_copy_wins_and_the_search_stops_at_a_complete_one(monkeypatch):
+    monkeypatch.setattr(wb, "PAUSE", 0)
+    s = _Copies({"20190801000000": 3, "20190901000000": 2, "20190101000000": 4})
+    row, data = wb.best_capture("E0", 2018, 4, s)
+    assert row["timestamp"] == "20190101000000" and row["played"] == 4 and row["complete"]
+    s = _Copies({"20190801000000": 4, "20190901000000": 2})
+    row, _ = wb.best_capture("E0", 2018, 4, s)
+    assert row["timestamp"] == "20190801000000" and len(row["tried"]) == 2  # stopped there
+
+
+def test_load_writes_only_complete_copies_through_keep_good_and_logs_the_source(tmp_path):
+    good = tmp_path / "good"
+    data = {"dates": [_m("1"), _m("2")]}
+    ok = {
+        "league": "E0",
+        "season": 2018,
+        "status": "ok",
+        "complete": True,
+        "played": 2,
+        "fd_matches": 2,
+        "sha256": "ab" * 32,
+        "source": "wayback",
+        "url": "u",
+        "captured": "2019-08-01",
+    }
+    partial = {**ok, "season": 2019, "complete": False, "played": 1}
+    res = wb.load(
+        [
+            (ok, data),
+            (partial, data),
+            ({"league": "E0", "season": 2020, "status": "no capture"}, None),
+        ],
+        good,
+        "now",
+    )
+    assert [r["loaded"] for r in res] == [True, False, False]
+    assert res[1]["reason"].startswith("partial") and res[2]["reason"] == "no capture"
+    assert (good / "understat_EPL_2018.json").exists()
+    assert not (good / "understat_EPL_2019.json").exists()
+    src = [json.loads(line) for line in (good / wb.SOURCES).read_text().splitlines()]
+    assert src == [
+        {
+            **{k: ok[k] for k in ("league", "season", "source", "url", "captured", "played")},
+            "file": "understat_EPL_2018.json",
+            "sha256": ok["sha256"],
+            "fd_matches": 2,
+            "loaded_at": "now",
+        }
+    ]
+    # A better file held (more played results) is never replaced.
+    better = {"dates": [_m("1"), _m("2"), _m("3")]}
+    (good / "understat_EPL_2021.json").write_text(json.dumps(better))
+    again = wb.load([({**ok, "season": 2021}, data)], good, "now")
+    assert (
+        again[0]["loaded"] is False
+        and json.loads((good / "understat_EPL_2021.json").read_text()) == better
+    )
