@@ -529,3 +529,9 @@
 {"league":"I2","kinds":["inplay75"],"kickoffs":["2026-11-08T16:15:00+00:00"],"fetched_at":"2026-11-08T17:28:19+00:00","status":200,"cost":1,"credits_left":4959309,"events":2,"rows":7}
 {"league":"POL","kinds":["inplay55"],"kickoffs":["2026-11-08T16:34:00+00:00"],"fetched_at":"2026-11-08T17:28:19+00:00","status":200,"cost":1,"credits_left":4959308,"events":2,"rows":6}
 {"league":"F1","kinds":["inplay75"],"kickoffs":["2026-11-08T16:15:00+00:00"],"fetched_at":"2026-11-08T17:28:19+00:00","status":200,"cost":1,"credits_left":4959307,"events":14,"rows":32}
+{"league":"DNK","kinds":["inplay55"],"kickoffs":["2026-11-08T17:00:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959302,"events":1,"rows":5}
+{"league":"G1","kinds":["inplay55","inplay75"],"kickoffs":["2026-11-08T16:30:00+00:00","2026-11-08T17:00:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959301,"events":7,"rows":5}
+{"league":"POL","kinds":["inplay75"],"kickoffs":["2026-11-08T16:30:00+00:00","2026-11-08T16:34:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959300,"events":2,"rows":6}
+{"league":"D1","kinds":["inplay75"],"kickoffs":["2026-11-08T16:30:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959299,"events":11,"rows":8}
+{"league":"E0","kinds":["inplay75"],"kickoffs":["2026-11-08T16:30:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959298,"events":11,"rows":8}
+{"league":"I1","kinds":["inplay55"],"kickoffs":["2026-11-08T17:00:00+00:00"],"fetched_at":"2026-11-08T17:48:18+00:00","status":200,"cost":1,"credits_left":4959297,"events":12,"rows":8}
