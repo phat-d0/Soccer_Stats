@@ -705,7 +705,7 @@ def fd_coverage(code: str, years) -> list[dict]:
     return out
 
 
-def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500, cups=None) -> list[dict]:
+def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500, only=None) -> list[dict]:
     """Per domestic cup and season: ESPN events and those with a club of its leagues."""
     import time
 
@@ -715,7 +715,7 @@ def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500, cups=None)
     teams = {lg: set(g["home"]) | set(g["away"]) for lg, g in matches.groupby("league")}
     out = []
     for code, (slug, lgs) in DOMESTIC_CUPS.items():
-        if cups and code not in cups:
+        if only and code not in only:
             continue
         tm = {lg: t for lg, t in teams.items() if lg in lgs}
         stats: dict = {}

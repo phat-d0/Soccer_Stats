@@ -182,3 +182,20 @@ def test_report_and_gate():
     assert res["gate"]["passes"] is False
     assert res["rule"]["bets"] == 0
     assert lr.summary_lines(res)
+
+
+def test_cup_coverage_counts_only_the_cups_asked(monkeypatch):
+    from soccer_stats import cups
+
+    asked = []
+
+    def fake_calendar(slug, start, end, **kw):
+        asked.append(slug)
+        return {"events": [{"home": "A FC", "away": "B FC"}], "mode": "test", "failures": 0}
+
+    monkeypatch.setattr(cups, "season_calendar", fake_calendar)
+    monkeypatch.setattr(cups, "match_team", lambda n, teams: {"league": "D1", "name": n})
+    m = pd.DataFrame({"league": ["D1"], "home": ["A"], "away": ["B"]})
+    rows = lr.cup_coverage(m, [2020], 60, ["DFBP"])
+    assert asked == ["ger.dfb_pokal"]
+    assert rows[0]["cup"] == "DFBP" and rows[0]["events_with_club"] == 1
