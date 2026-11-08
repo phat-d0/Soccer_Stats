@@ -421,3 +421,4 @@
 {"league":"USA","kinds":["inplay55"],"kickoffs":["2026-11-07T21:00:00+00:00"],"fetched_at":"2026-11-07T21:48:16+00:00","status":200,"cost":1,"credits_left":4959668,"events":15,"rows":63}
 {"league":"USA","kinds":["inplay75"],"kickoffs":["2026-11-07T21:00:00+00:00"],"fetched_at":"2026-11-07T22:18:17+00:00","status":200,"cost":1,"credits_left":4959666,"events":15,"rows":56}
 {"league":"MEX","kinds":["inplay55"],"kickoffs":["2026-11-07T23:00:00+00:00"],"fetched_at":"2026-11-07T23:58:17+00:00","status":200,"cost":1,"credits_left":4959650,"events":7,"rows":5}
+{"league":"MEX","kinds":["inplay75"],"kickoffs":["2026-11-07T23:00:00+00:00"],"fetched_at":"2026-11-08T00:18:17+00:00","status":200,"cost":1,"credits_left":4959649,"events":7,"rows":5}
