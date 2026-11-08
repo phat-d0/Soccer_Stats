@@ -77,7 +77,14 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   DraftKings' profit is on the same bets as Pinnacle's twins (+$121 vs +$126), so it is the
   matches', not the book's. Corner-market discovery (8 Nov, run 42461964987, 20 credits): no book beats Pinnacle's fair price consistently; FanDuel is nearest (about 1–2% behind it; DraftKings 5–7%); first-half and 1X2 corners have no Pinnacle price; handicaps only at DraftKings and Pinnacle. "Corner price moves" (pre-registered; run 42461462462): pass but tiny, Pinnacle moves +0.18 pts (+0.02 to +0.35) toward (f)'s side, about +0.35% against a 6% margin. No live change.
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
-- One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
+- Logged only (lead, 8 Nov; `corners_live.SHOP_BOOKS`): FanDuel, BetMGM, BetRivers and Bovada
+  in the same corner call (`bookmakers=` six books, one region, still 1 credit; not in E2/E3),
+  rows on data-log's corner log with `book`. No paper track reads them; they are dropped for
+  the month if a call with them bills more than 1 (`shop_off`). For the pre-registered "Corner
+  line shop vs Pinnacle" (`docs/totals.md`: look snapshot, 2% judged / 1% shadow, CLV vs
+  Pinnacle's close, read once at 300 bets or 31 May 2027); the track isn't built (owner first).
+- One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit; plus the
+  four logged-only books since 8 Nov);
   corner cap 20,000 credits a month since 28 Oct (750 before, 550 until 24 Oct; estimate 676 a month with E2/E3,
   `backfill.yml` run 40089304166).
 - Shadow filter "below 60%" (owner, 23 Oct; pre-registered in `docs/totals.md` "Shadow filter:
@@ -735,15 +742,18 @@ four leagues: E0, E1–E3).
   cdf}}` (P(corners ≤ k), k = 0..15) and returns `data.corners_model` per league (or `{error}`).
   `side_probs`, `pick(cdf, line, over, under, threshold)` (the better side if P(win) × odds +
   P(push) − 1 ≥ threshold; whole lines push). `run`: one call per (event, snapshot, group
-  "team_corners") for `books_for(league)`: `BOOKS` pinnacle, draftkings, or Pinnacle alone in
+  "team_corners") for `books_for(league, shop)`: `LOG_BOOKS` = `BOOKS` (pinnacle, draftkings; the
+  tracks' books) + `SHOP_BOOKS` (fanduel, betmgm, betrivers, bovada; logged only, ≤ `MAX_BOOKS`
+  10 = one region), `BOOKS` alone when `shop_off(calls, now)` (a call with the extra books
+  billed > 1 this month; summary `shop_books`, `shop_note`), or Pinnacle alone in
   `PINNACLE_ONLY` (E2, E3); cap `CORNERS_MONTHLY_CAP` 20,000 (750 until 28 Oct) and the reserve checked at
   `expected_cost` (dearest corner call this month, ≥ 1); `LEAGUES` = E0, SP1, D1, I1, F1, E1, E2,
   E3. `paused_leagues(calls, now)`: in a `PINNACLE_ONLY` league, a snapshot kind ("look"/"close",
   counted apart) whose last `EMPTY_PAUSE` 6 answered calls logged no rows, over ≥ 2 runs or
   kickoff days, makes no call for `EMPTY_PAUSE_DAYS` 7 after the last (summary `paused` =
   `{"E2 look": until}`); never in the other leagues (the Championship's looks are often empty
-  while its closes are priced). Rows: Pinnacle's two-sided lines, then DraftKings' (`book: "draftkings"`,
-  one-sided lines kept with the missing side and `fair_*`/`margin` None). `newest_quotes(rows,
+  while its closes are priced). Rows: Pinnacle's two-sided lines, then DraftKings' and each
+  `SHOP_BOOKS` book's (`book` names it; one-sided lines kept with the missing side and `fair_*`/`margin` None). `newest_quotes(rows,
   book=)`, `add_quotes(cards, dirs, book=, rows=)` → card `corners.pinnacle` / `corners.draftkings`
   = `{book, fetched_at, home/away: [{line, over, under, fair_over, margin, snapshot,
   downloaded_at, p_over, p_under, p_push, pick}]}`. `log` (CLI `log-corners`), `corner_results`
