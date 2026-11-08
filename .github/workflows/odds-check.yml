@@ -672,7 +672,12 @@ jobs:
                   || echo "TUNING_BIAS_ERROR $lg"
               done
               uv run python -m soccer_stats.lab.tuning_bias --pool out/bias --out out ;;
-            lasso-coverage) uv run python -m soccer_stats.lab.lasso_residual --coverage ;;
+            lasso-coverage)  # `leagues` = domestic cups only (e.g. DFBP,CI,CDF,CDL), else everything
+              if [ -n "$LEAGUES" ]; then
+                uv run python -m soccer_stats.lab.lasso_residual --cups "$LEAGUES"
+              else
+                uv run python -m soccer_stats.lab.lasso_residual --coverage
+              fi ;;
             dk-gap-counts) uv run python -m soccer_stats.lab.dk_gap_counts ;;
             auc)  # no key: the corner price logs from data-log, goalscorer rows from run 41346853368
               git fetch -q --depth=1 origin data-log

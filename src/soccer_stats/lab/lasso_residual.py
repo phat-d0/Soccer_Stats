@@ -705,7 +705,7 @@ def fd_coverage(code: str, years) -> list[dict]:
     return out
 
 
-def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500) -> list[dict]:
+def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500, cups=None) -> list[dict]:
     """Per domestic cup and season: ESPN events and those with a club of its leagues."""
     import time
 
@@ -715,6 +715,8 @@ def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500) -> list[di
     teams = {lg: set(g["home"]) | set(g["away"]) for lg, g in matches.groupby("league")}
     out = []
     for code, (slug, lgs) in DOMESTIC_CUPS.items():
+        if cups and code not in cups:
+            continue
         tm = {lg: t for lg, t in teams.items() if lg in lgs}
         stats: dict = {}
         for y in years:
@@ -736,6 +738,17 @@ def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500) -> list[di
                         "clubs_mapped": len(mapped), "events_with_club": with_club,
                         "mode": cal.get("mode"), "failures": cal.get("failures")})  # fmt: skip
     return out
+
+
+def cups_only(codes: list[str], cups: list[str], seconds: float = 100 * 60) -> None:
+    """Domestic-cup coverage alone (football-data names for the mapping; no xG, no UEFA)."""
+    from soccer_stats.data import load_matches
+
+    years = range(FIRST_ROWS - 1, LAST_YEAR + 1)
+    m = pd.concat([load_matches([c], years).assign(league=c) for c in codes], ignore_index=True)
+    m = m[pd.to_datetime(m["date"]) < LOCK]
+    for r in cup_coverage(m, list(years), seconds, cups):
+        print("COVERAGE_CUP " + json.dumps(r), flush=True)
 
 
 def coverage_main(codes: list[str]) -> None:
@@ -788,8 +801,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--no-europe", action="store_true", help="skip the ESPN UEFA results")
     p.add_argument("--json", default="", help="write the result here too")
     p.add_argument("--coverage", action="store_true", help="counts only: no model is fitted")
+    p.add_argument("--cups", default="", help="coverage of these domestic cups only (counts)")
     args = p.parse_args(argv)
     codes = [c.strip() for c in args.leagues.split(",") if c.strip()]
+    if args.cups:
+        cups_only(codes, [c.strip() for c in args.cups.split(",") if c.strip()])
+        return
     if args.coverage:
         coverage_main(codes)
         return
