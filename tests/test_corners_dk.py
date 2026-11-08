@@ -103,10 +103,11 @@ def test_no_draftkings_in_the_body_means_pinnacle_rows_only(tmp_path):
     raw.mkdir()
     dk_cache(raw)
     s = cl.run([card()], out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get([]))
-    assert s["rows"] == 2 and s["rows_by_book"] == {"pinnacle": 2, "draftkings": 0}
+    assert s["rows"] == 2
+    assert {b: s["rows_by_book"][b] for b in cl.BOOKS} == {"pinnacle": 2, "draftkings": 0}
     assert "(2 Pinnacle, 0 DraftKings)" in cl.summary_line(s)
     rec = json.loads((out / "calls.jsonl").read_text())
-    assert rec["books"] == "pinnacle,draftkings" and rec["cost"] == 1
+    assert rec["books"] == cl.LOG_BOOKS_PARAM and rec["cost"] == 1
 
 
 def test_one_call_asks_both_books_and_logs_both(tmp_path):
@@ -115,9 +116,10 @@ def test_one_call_asks_both_books_and_logs_both(tmp_path):
     dk_cache(raw)
     calls = []
     s = cl.run([card()], out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls, both_body()))
-    assert len(calls) == 1 and calls[0][1]["bookmakers"] == "pinnacle,draftkings"
+    assert len(calls) == 1 and calls[0][1]["bookmakers"] == cl.LOG_BOOKS_PARAM
     assert calls[0][1]["markets"] == cl.MARKET
-    assert s["credits"] == 1 and s["rows_by_book"] == {"pinnacle": 2, "draftkings": 4}
+    assert s["credits"] == 1
+    assert {b: s["rows_by_book"][b] for b in cl.BOOKS} == {"pinnacle": 2, "draftkings": 4}
     assert cl.log(out, root) == (6, 1)
     assert cl.log(out, root) == (0, 0)
     rows = cl.load_rows(root / "odds_log")
