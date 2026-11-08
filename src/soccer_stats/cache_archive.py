@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -101,6 +102,16 @@ FREE = {
     "comebacks-*-": "Understat match files for the comeback research (free)",
     "heavy-espn-": "ESPN cup and extra-league days for the 75%+ counting (free)",
 }
+
+
+def key_prefix(key: str, kept=()) -> str:
+    """The prefix a cache key belongs to, for caches.yml's usage job: the longest kept-alive
+    prefix the key starts with, else the key without its trailing run id, content hash
+    (e.g. xg-good-<sha256>) or `keepalive-none`."""
+    best = max((p for p in kept if key.startswith(p)), key=len, default=None)
+    if best:
+        return best
+    return re.sub(r"(keepalive-none|none|[0-9a-f]{16,}|\d+)$", "", key)
 
 
 def sha256_file(path: Path) -> str:

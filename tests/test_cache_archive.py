@@ -397,3 +397,16 @@ def test_a_workflow_that_saves_paid_data_archives_it_right_away():
         assert "archive=true" in run["run"]
         found += 1
     assert found == 3  # backfill.yml, players.yml, odds-check.yml
+
+
+def test_key_prefix_maps_run_ids_and_content_hashes_to_their_prefix():
+    kept = ["xg-good-", "raw-data-", "understat-SP1-", "odds-history-"]
+    sha = "0937f3311ac0823cd2f8606f1046f51f159c965ce2fd9508a97008ee3e11baaa"
+    assert ca.key_prefix(f"xg-good-{sha}", kept) == "xg-good-"
+    assert ca.key_prefix("raw-data-42475953351", kept) == "raw-data-"
+    assert ca.key_prefix("understat-SP1-123", kept) == "understat-SP1-"
+    assert ca.key_prefix("odds-history-keepalive-none", kept) == "odds-history-"
+    # Not kept alive: still reduced to its prefix, so the usage job can flag it.
+    assert ca.key_prefix(f"heavy-espn-{sha}", kept) == "heavy-espn-"
+    assert ca.key_prefix("heavy-espn-40723506826", kept) == "heavy-espn-"
+    assert ca.key_prefix(f"xg-good-{sha}") == "xg-good-"
