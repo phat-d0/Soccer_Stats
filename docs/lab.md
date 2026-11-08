@@ -4480,7 +4480,7 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   lowest log loss over all of 2017/18–2023/24, computed by the judged-read code, so this
   season-by-season table does not set it.
 
-## Model settings: the judged read on 2025/26 (DRAFT for the lead, 8 Nov; not frozen, nothing read)
+## Model settings: the judged read on 2025/26 (FROZEN 2026-11-08 with the lead's approval, before any 2025/26 result is read)
 
 **What is judged.**
 - **Candidate R:** today's match model with a per-league ratings ridge. Each league's value is the
@@ -4488,9 +4488,8 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   seasons 2017/18–2023/24.
   - This is set after development showed ridge 3 (block R) and then 10 (block R2) doing best.
   - It is legitimate only because 2025/26 has never been used to choose or compare anything.
-- **Candidate P:** included only if block P passes in development (its run is pending), with its
-  ρ setting chosen the same way.
-- If both are in, they are judged as one combined setting (one hypothesis).
+- **Candidate P: not included.** Block P failed in development (below), so the candidate is the
+  ridge alone: one hypothesis, 95% ranges, no Bonferroni.
 
 **The season.**
 - 2025/26, 2025-07-01 to 2026-06-30, eight leagues; results are complete.
@@ -4498,8 +4497,9 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   training data only. 2024/25 is never scored here; it stays locked for strategy-level reads (a
   betting rule's CLV), as the strategy search kept it. It was opened once for model comparisons
   in October (bake-offs 1 and 3, corners bake-off 1).
-- **Data check before freezing:** 2025/26 Understat coverage in `xg-good-` for E0, SP1, D1, I1 and
-  F1 (run pending), naming any gap. Goalscorer development used 2025/26 player rows; that is a
+- **Data check (run 42464974995, counts only):** 2025/26 Understat xG is attached to every
+  match in all five xG leagues: E0 380/380, SP1 380/380, D1 306/306, I1 380/380, F1 306/306.
+  No gap, so no league runs goals-only for this reason. E1–E3 are goals-only as always. Goalscorer development used 2025/26 player rows; that is a
   different model and doesn't bear on these settings.
 
 **Measure and pass rule.**
@@ -4515,8 +4515,8 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
 **Multiple testing.**
 - The programme has logged 545 configurations in development: phase 1 72, phase 2 12, phase 3
   373 + P 48 + R2 40.
-- Development only chose. The judged read tests one pre-specified hypothesis (two if R and P
-  are judged separately, in which case 97.5% ranges, Bonferroni).
+- Development only chose. The judged read tests one pre-specified hypothesis (the ridge),
+  at 95%.
 
 **What a pass would mean for live.**
 - Moneyline adds the per-league ridge to the live fit (`DixonColes(ridge=)` already exists).
@@ -4527,3 +4527,16 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   make Lean profitable.
 
 **A fail** changes nothing, and the settings stay as they are.
+
+**Block P's development result** (`tuning.yml` `phase=grid-rho` run 42464660129, attempt 4 after
+uv download outages; 48 configurations, all eight leagues):
+- **Pooled gain:** −0.00002 (−0.00043 to +0.00042). **Fails.**
+- **Per league:** E0 +0.0006, E1 +0.0002, E2 +0.0005, E3 +0.0002, F1 +0.0003, D1 −0.0005,
+  I1 −0.0008, SP1 −0.0011. Every range includes 0.
+- **The choices waver** between fixed 0 and the penalties, and E0 picks ρ = 0 every season.
+- **Reading:** the 0-0 over-prediction stage 1 found is real but costs too little log loss for
+  shrinking ρ to help out of sample. ρ stays as it is, and the named candidate is closed.
+
+**Run.** `tuning.yml` `phase=judged` (`lab/tuning_judged.py`: per league the ridge chosen on
+2017/18–2023/24, then default vs candidate over 2025/26, weekly refits; a pool job gives the
+verdict). Run once, from team/model-tuning after the PR that holds this frozen text is open.
