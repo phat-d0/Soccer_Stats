@@ -465,7 +465,10 @@ four leagues: E0, E1–E3).
   `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
-  off by default.
+  off by default. `rho_option` (research only, Model evaluation and tuning, 8 Nov): None =
+  today's free ρ in [−0.3, 0.3]; `{"fixed": v}` holds ρ at v (`{"fixed": 0.0}` = no low-score
+  correction); `{"penalty": k}` adds k·ρ² to the loss; `tests/test_dixon_coles.py` pins the
+  default fit.
 - `backtest.py`: `walk_forward` (weekly refits on earlier matches; the final partial week is
   predicted too), the DraftKings backtest (`dk_trades`, `dk_strategies` raw/blend sweeps with
   bootstrap ranges, `dk_log_loss`) and `dk_tiers` (Lean replayed on it; `E0_dk.json` → `tiers`).
