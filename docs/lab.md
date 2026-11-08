@@ -5103,6 +5103,13 @@ convention, and it is earlier than both designs' early price.
   - λ path: 20 values from λ_max down to 10⁻³·λ_max. λ is chosen as in LASSO: fit on the window
     before its last 365 days, score squared error on those days, then refit the whole window at
     the chosen λ.
+  - *Amended 8 Nov, before any code ran:* design B's first blocks have only 2020/21 before
+    them, so nothing precedes the 365-day cut. When fewer than 1,000 training rows precede the
+    cut, the validation uses the last third of the window's rows by kickoff instead. This
+    applies to both designs and to the ridge baseline.
+  - *Implementation note:* before 2019/20, football-data's aggregate columns are Betbrain's
+    (`BbAv*`, `BbMx*`). b-fd's average and maximum use them for 2017/18–2018/19 training rows.
+    Only 2019/20 onward is scored.
 - **Beside it, descriptive: a ridge baseline** with the same validation. α is chosen from
   {0.1, 1, 10, 100, 1,000, 10,000} × the number of rows / 1,000.
 - **Walk-forward:** 28-day blocks of decision days (kickoff − 4 days). Each block's fit uses
