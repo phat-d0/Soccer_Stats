@@ -1325,6 +1325,13 @@ four leagues: E0, E1–E3).
   the configuration with the lowest log loss on earlier seasons and scores it against the
   default on the same rows; pass = pooled gain range above 0. `tuning.yml` `phase=grid`, log
   line `TUNING_GRID_JSON`.
+  Block P (ρ via `DixonColes(rho_option=)`, `Config.rho`) and R2 (ridge {0, 1, 3, 10, 30}) run
+  alone with `--blocks` (`phase=grid-rho`, `grid-ridge`). `tuning_base --xg-check` counts a
+  season's xG coverage (`phase=xg-2025`). `lab/tuning_judged.py`: the frozen 2025/26 judged read
+  (`dev_choice` picks each league's ridge on 2017/18–2023/24; `judged_rows` runs default and
+  candidate over 2025/26 only, unlocking `Holdout` from 2025-07-01 with the logged reason and
+  refusing any 2024/25 or 2026/27 row; `pool` gives the verdict); `phase=judged`, log line
+  `TUNING_JUDGED_JSON`.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).

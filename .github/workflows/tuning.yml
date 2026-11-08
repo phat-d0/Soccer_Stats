@@ -3,6 +3,7 @@
 # One job per league, then a pool job. No API key, no credits, never pushes. Results in the
 # log (TUNING_<PHASE>_JSON) and a 7-day artifact.
 #   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+#   phase=judged: the frozen 2025/26 judged read of the model settings (run once; docs/lab.md).
 #   phase=xg-2025: 2025/26 Understat coverage per league (counts only, for the judged read).
 #   phase=grid-ridge: block R2, the ratings ridge on a wider grid (the judged read's choice).
 #   phase=grid-rho: phase 3's rho block alone (DixonColes.rho_option).
@@ -15,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts)"
+        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once)"
         type: choice
-        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025]
+        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged]
         default: bias
 
 permissions:
@@ -82,6 +83,7 @@ jobs:
             grid-rho) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
                         --blocks P ;;
             xg-2025) uv run python -m soccer_stats.lab.tuning_base --xg-check 2025 --league "$LEAGUE" ;;
+            judged) uv run python -m soccer_stats.lab.tuning_judged --league "$LEAGUE" --out out ;;
             grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
                         --blocks R2 ;;
           esac
@@ -112,6 +114,7 @@ jobs:
           mkdir -p out
           case "$PHASE" in
             xg-2025) echo "counts are in the league jobs' logs (XG_COVERAGE)" ;;
+            judged) uv run python -m soccer_stats.lab.tuning_judged --pool in --out out ;;
             bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
             ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --pool in --out out ;;
             grid|grid-rho|grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
