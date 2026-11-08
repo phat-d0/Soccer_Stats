@@ -3611,3 +3611,53 @@ season, E0's own value fell from +2.1 to +1.2.
 
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
+
+## ROC AUC: how well each model ranks outcomes (owner via the lead, 8 Nov; exploratory, 0 credits; method written before any run)
+
+**Why.** The owner asked: "can we run ROC AUC on our models?" AUC is the chance that a random
+outcome that happened had been given a higher chance than a random one that didn't: 0.5 is a
+coin, 1 is perfect. It measures **ranking only**, not calibration, so it sits beside the
+calibration numbers already reported. Exploratory: no verdict, no bets, nothing goes live.
+
+**Common rules.**
+- Every series in a comparison is scored on the same rows, one row per outcome (the
+  `calibration.outcome_rows` shape).
+- 95% ranges come from one match-level bootstrap (2,000 draws, seed 0), shared by every series,
+  so a difference between two series has a paired range.
+- 2024/25 onward stays locked (`Holdout`). No row from §16's judged goalscorer window and none
+  from bake-off 2's locked corner test is read.
+
+**1. Match 1X2, eight leagues, 2019/20–2023/24** (`residual_map.load_league`'s walk-forward rows):
+- series: the raw model, the blend (`p_bet`; rows before a league's first blend fit are left
+  out so every series has the same rows), Pinnacle's Shin-fair early price and its fair close;
+- AUC pooled over outcome rows, per outcome (home, draw, away) and per league;
+- paired differences: model − Pinnacle early, blend − Pinnacle early, close − early;
+- on the matches the bought ten-book history covers (2020/21–2023/24; `dk_price_backtest.candidates`,
+  DraftKings' quote at the 48 h look ≤ 6 h old), the same series plus DraftKings' Shin-fair 48 h
+  price, with DraftKings − Pinnacle early and model − DraftKings.
+
+**2. Does the model add ranking beyond the price?**
+- Rows are cut into 5-point bands of Pinnacle's early fair chance (bands with ≥ 50 rows and both
+  classes). Inside a band the price barely varies, so a series that still ranks outcomes there
+  carries information the price lacks.
+- AUC of the model, the blend, the residual (model − price), the early price itself and the close,
+  inside each band, averaged by band size, with paired ranges.
+- A range including 0.5 means no ranking beyond the price. This is the ranking twin of the blend
+  weight c and of the residual map.
+
+**3. Corners model (f)** (`corners_live`'s live log; no historical corner prices exist):
+- each team half line's newest pre-kickoff quote, per book (Pinnacle, DraftKings), where both
+  sides are priced and the corner count is known; whole lines are left out;
+- model (f)'s over chance vs the book's fair over, model − price paired;
+- leagues SP1, D1, E1, E2, E3 only. E0, I1 and F1 are left out because their 2026/27 corners are
+  bake-off 2's locked test (read once on 3 Feb 2027).
+
+**4. Goalscorer B** (2025/26 development only):
+- the joined starters `goalscorer-test.yml` wrote in run 41346853368 (`judged_<league>.csv.gz`,
+  five leagues);
+- series: B, the season-goals and season-xG benchmarks, and the best bookmaker's Yes price as
+  1/odds (no book offers a No price, so its margin can't be removed; AUC only needs the ranking);
+- pooled and per league, B − price, B − xG and B − goals paired.
+
+**Output.** `odds-check.yml` `task=auc` (no key) prints `AUC_JSON` and the file as `AUC_B64`
+chunks with its SHA-256; the committed `lab/auc_research.json` is that text.
