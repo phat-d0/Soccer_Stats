@@ -4477,6 +4477,26 @@ and (b), and was not read. This run is the read.
 It goes beside part 1's file by the same route as part 1 (the lead decodes and commits it).
 
 
+### Stage 2 extras: the bake-off candidates, from recorded results (no new runs)
+
+The retired shots model is skipped (lead, 8 Nov). Every line below is copied from the verdict
+already on record; nothing was re-run.
+
+| Study | Candidates | Recorded verdict | Where |
+| --- | --- | --- | --- |
+| 1X2 bake-off 1 (E0) | (a) live DC + xG, (b) hierarchical Poisson, (c) LightGBM, (d) multinomial logistic, (e) stack with the early price | None adds to Pinnacle's early price, on development or holdout; picks' CLV −3.6% to −5.1% | "Verdict (bake-off 1)" |
+| 1X2 bake-off 2 (E1–E3) | goals-only versions of a–e | Log loss 0.016–0.021 worse than the early price; no blend weight above 0; CLV −3.8% to −4.9% | "Verdict (bake-off 2)" |
+| 1X2 bake-off 3 (SP1, D1, I1, F1) | a–e with xG | None passes; picks give up 3–7% against the close; Serie A's stack the one near miss | "Verdict (bake-off 3)" |
+| Corners bake-off 1 (round 11) | match-total and team-corner models | Total: the league average is as good. Team: gain over the average, but over-confident (slopes below 0.80); none passes | `docs/totals.md` |
+| Corners bake-off 2 (round 13) | (f) and rivals | (f) is the finalist in E0, I1 and F1 (locked test 3 Feb 2027); no finalist in SP1, D1 or E1 | `docs/totals.md` |
+| Goalscorer (A–H) | B, B-cal and benchmarks | B passes the pooled forward model-quality check (log loss vs season xG +0.057, +0.040 to +0.075); the priced test runs to 1 Feb 2027 | `docs/player_props.md` §14, §16 |
+| Model settings (tuning) | ratings ridge, ρ, ξ, window, xG weight, blend refits | Only the per-league ridge passes (2025/26 judged read); live since 8 Nov | "Model settings: the judged read on 2025/26" |
+| LASSO on the residual | 13 pre-match factors | No edge; the study closes and 2024/25 is not opened | "LASSO on the market residual" |
+
+**Reading:** every model family tried improves on a no-skill baseline and none adds to
+Pinnacle's price. The only change that passed a judged test (the ridge) is a prediction-quality
+gain in the goals-only leagues, not a price edge.
+
 ### Corner dispersion f-oos: scoring for the corners team
 
 The pre-registration is the corners team's (`docs/totals.md` "Corner dispersion: candidate
