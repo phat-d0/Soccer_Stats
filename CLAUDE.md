@@ -17,6 +17,14 @@ section "Status and next steps".
 Every team reads this first, from `origin/claude/soccer-stats-scaffold` (see "Before every
 task" under Agent team). If something here looks wrong, tell the lead.
 
+**Match model ratings ridge** (owner-approved 8 Nov; `leagues.MATCH_RIDGE`): the live fit,
+the Lean blends and the match backtests use a per-league ridge on team ratings (D1 3, F1 1,
+E1 10, E2 3, E3 10; E0, SP1, I1 0; UCL keeps the cup model's own), from Model evaluation and
+tuning's judged read on 2025/26 (passed, run 42467772606; `docs/lab.md` "Model settings: the
+judged read on 2025/26"). Live trades use it from the first publish after the merge, and
+`model_ref` records each league's own fit (`xg_weight`, `ridge`, `matches_fit`, `league`).
+Trades before it recorded the Premier League's `xg_weight` and `matches_fit` for every league.
+
 **Live leagues** (`leagues.py`, `live=True`): E0 Premier League, SP1 La Liga, D1 Bundesliga,
 I1 Serie A, F1 Ligue 1, E1 Championship, E2 League One, E3 League Two, UCL Champions League.
 E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
@@ -463,6 +471,12 @@ four leagues: E0, E1–E3).
   football-data and Understat matches, joined, goals disagreeing (with examples), Understat
   teams that never joined. Log lines `WAYBACK_GOALS`.
   `players.py`: FPL availability → team adjustments (E0).
+  `MATCH_RIDGE` / `match_ridge(code)` in `leagues.py` (8 Nov; `tests/test_leagues.py` pins
+  them) and `dashboard.match_model(league, xg_weight)`: the live match model, used by
+  `dashboard.fit_model(..., league=)` (publish's live fits and E0's replay), `fit-match-blends`
+  and `cli._early_preds` (backtest-lean, backtest-edge12, backtest-dk-prices, backtest-dnb).
+  Research and lab paths (edge12_filters, band edges, match-markets, goalscorer, tuning) keep
+  their own settings.
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
   off by default. `rho_option` (research only, Model evaluation and tuning, 8 Nov): None =

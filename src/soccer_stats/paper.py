@@ -172,12 +172,23 @@ def append_events(log_dir: Path, events: list[dict], league: str = "E0") -> int:
     return len(events)
 
 
-def model_ref(data: dict) -> dict:
-    return {
+def model_ref(data: dict, league: str | None = None) -> dict:
+    """What a new trade records about the match model that priced it. With `league`, that
+    league's own fit (data.json -> match_model[league]: xG weight, ratings ridge, matches);
+    trades opened before 8 Nov 2026 recorded the top-level (Premier League) xg_weight and
+    matches_fit for every league. Without a league, or without its fit, the top level."""
+    fit = (data.get("match_model") or {}).get(league) if league else None
+    if not isinstance(fit, dict) or "error" in fit:
+        fit = None
+    ref = {
         "commit": (os.environ.get("GITHUB_SHA") or "")[:7] or None,
-        "xg_weight": data.get("xg_weight"),
-        "matches_fit": data.get("matches_fit"),
+        "xg_weight": fit.get("xg_weight") if fit else data.get("xg_weight"),
+        "matches_fit": fit.get("matches") if fit else data.get("matches_fit"),
     }
+    if fit:
+        ref["ridge"] = fit.get("ridge")
+        ref["league"] = league
+    return ref
 
 
 def _base_probs(card: dict) -> dict | None:
@@ -2056,7 +2067,7 @@ def run(
                     res,
                     now,
                     lg,
-                    model_ref(data),
+                    model_ref(data, lg),
                     apps=apps if lg == league else None,
                     players_on=players_on and lg == league,
                     odds_log=log,
@@ -2182,10 +2193,10 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
     """Update the draw no bet ledger in every league in play (paper_dnb.update_ledger on
     the same cards, odds, odds log and results as the match trades); returns (events
     written, every DNB trade)."""
-    ref = model_ref(data)
     events: list[dict] = []
     trades: list[dict] = []
     for lg in codes:
+        ref = model_ref(data, lg)
         ledger = pdnb.load_ledger(log_dir, lg)
         cards = [c for c in data.get("fixtures", []) if (c.get("league") or primary) == lg]
         res = results
