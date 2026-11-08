@@ -4273,6 +4273,121 @@ matches per league):
   search) but not untouched for model comparisons. The tuning programme's judged read must say
   so.
 
+## Model evaluation, stage 2: scorecards (owner via the lead, 8 Nov; method written before any run)
+
+**What it is.** One out-of-sample scorecard for each model, each set beside the market's price on
+the same rows. It is descriptive: there is no pass rule, and nothing live changes because of it.
+The file is `lab/model_scorecard.json`. 2024/25 stays locked. This first part covers:
+
+- the 1X2 match model;
+- the Lean blend;
+- Pinnacle's fair early and close prices;
+- the corner model (f).
+
+The cup model, goalscorer B, the goal distributions, the retired shots model and the bake-off
+candidates come in later parts. Each part's method is written here before it runs.
+
+**1X2: model, blend, Pinnacle early, Pinnacle close.**
+- **Rows:** `residual_map.load_league`'s outcome rows.
+  - Eight leagues, 2019/20–2023/24, in the seasons the Lean backtest scores (90%+ coverage).
+  - Weekly walk-forward model, as live: xG weight 0.7, goals only where there is no xG.
+  - Blend refitted every 28 days.
+  - Only matches that all four series price are used.
+- **Per series, pooled and per league:**
+  - **Log loss:** 1X2, per match. Its 95% range resamples matches (2,000 draws, seed 0), and
+    so does the paired difference against Pinnacle's early price.
+  - **Brier score:** the sum over the three outcomes.
+  - **ROC AUC:** with `lab/auc.py`'s `compare` (imported, not edited), over every outcome row,
+    with a paired difference against the early price.
+  - **Calibration:** intercept and slope, with ranges clustered by match (`calibration.reliability`).
+  - **Argmax confusion matrix:** 3 × 3, actual by the outcome each series makes most likely,
+    and its accuracy.
+- **Confusion matrices at each live strategy's threshold.** Each outcome row is "picked" when the
+  strategy would bet that side.
+  - **Model 12%:** the side with the largest p_model × Pinnacle early odds − 1, when that is at
+    least 0.12.
+  - **Lean:** `lean_backtest.bets`' picks: z ≥ 1 on the blend, all odds.
+  - Reported:
+    - the 2 × 2 counts (picked or not, won or lost);
+    - the picks' win rate, set beside their mean implied chance (1/odds) and their mean
+      Pinnacle fair early chance;
+    - the picks' recall, as the share of all winning outcomes.
+  - This shows whether a strategy's picks win more often than the price says. It is the
+    classification view of the CLV results already on record.
+
+**Corners: model (f), team corners.**
+- **Rows:** `model_assumptions.corner_walk` (model (f), refitted every 28 days on the 730 days
+  before), eight leagues, 2017/18–2023/24. That is stage 1's sample. There is no corner price
+  history, so there is no market column.
+- **Baseline:** each block's league mean home and away corners over the same 730 training days.
+- **Per series, pooled and per league:**
+  - RMSE and MAE of the mean against the count;
+  - the NB2 log score (model (f): its fitted α; baseline: Poisson);
+  - the coverage of the central 80% and 90% intervals (NB2 for (f), Poisson for the baseline),
+    as the share of counts inside each interval.
+  - (f) minus baseline, with match-resampled 95% ranges, for RMSE and the log score.
+
+**Run.** `tuning.yml` `phase=scorecard`: a job per league, then a pool job that writes the file and
+prints it in base64 chunks with its SHA-256, as `residual_map` does. No key, 0 credits.
+
+### Stage 2, part 1: results (run 42470580721, descriptive)
+
+Run note: attempt 1 lost four league jobs to the uv download outage before any code ran. "Re-run
+failed jobs" completed them on the same commit (1171b4a0).
+
+**1X2, 2019/20–2023/24.** 13,667 matches priced by all four series. Log loss (lower is better)
+and ROC AUC (higher is better):
+
+| | Model | Blend | Pinnacle early | Pinnacle close |
+| --- | --- | --- | --- | --- |
+| Log loss, pooled | 1.0225 | 1.0062 | 1.0051 | 1.0020 |
+| AUC, pooled | 0.662 | 0.679 | 0.680 | 0.683 |
+
+- **Per league:** the model is behind Pinnacle's early price in every league, by 0.007 (D1) to
+  0.022 (E2). The blend is within 0.003 of the early price everywhere. It is level with or ahead of
+  the early price only in I1 (0.9650 vs 0.9653), SP1 (0.9734 vs 0.9743) and E1 (1.0406 vs 1.0405),
+  where Pinnacle's close is no better than its early price either.
+- **Model 12%'s picks:** 6,333 outcome rows. They won 27.0%, against 28.7% implied by the odds
+  and 27.7% by Pinnacle's fair early price. The picks win less often than even the fair price
+  says, so the 12% "edge" is the model's over-confidence. This agrees with the CLV record.
+- **Lean's picks:** 2,461. They won 40.4%, against 41.0% implied and 40.0% fair. Their win rate
+  tracks the fair price: the blend adds nothing the price lacks.
+- Calibration slopes, Brier scores, the paired log-loss ranges and the 3 × 3 argmax confusion
+  matrices are only in the JSON file (below), not in the run's summary lines.
+
+**Corners: model (f) against the league-mean baseline, 2017/18–2023/24.**
+- Pooled RMSE: 2.666 for (f) against 2.745 for the baseline.
+- Pooled log score: −2.352 against −2.427.
+- (f) beats the baseline in every league. The gain is largest in E0 (RMSE 2.730 vs 2.938) and I1
+  (2.716 vs 2.851), and smallest in E3 (2.647 vs 2.668).
+- (f)'s central 80% interval covers 84–86% of counts in every league. That is slightly wide:
+  whole-number counts make a central interval cover more than its nominal level, so this is
+  consistent with the NB2 fit, not a sign that it is too wide.
+
+**The committed file** (`lab/model_scorecard.json`; SHA-256 `3c815c30…c29212`, matching the
+run's) adds two things to the summary lines.
+
+Paired log-loss differences against Pinnacle's early price (positive = worse than the early price):
+
+| Series | Difference | 95% range |
+| --- | --- | --- |
+| Model | +0.0174 | +0.0145 to +0.0201 |
+| Blend | +0.0011 | −0.0000 to +0.0023 |
+| Close | −0.0030 | −0.0043 to −0.0019 |
+
+The close is the only series that beats the early price.
+
+Calibration slopes (1 = calibrated, below 1 = over-confident):
+
+| Series | Slope | 95% range |
+| --- | --- | --- |
+| Model | 0.93 | 0.88 to 0.97 |
+| Blend | 0.98 | 0.94 to 1.03 |
+| Early | 1.01 | 0.97 to 1.06 |
+| Close | 1.02 | 0.97 to 1.06 |
+
+The model is over-confident: its range is below 1. The blend fixes that.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)

@@ -1350,6 +1350,15 @@ four leagues: E0, E1–E3).
   candidate over 2025/26 only, unlocking `Holdout` from 2025-07-01 with the logged reason and
   refusing any 2024/25 or 2026/27 row; `pool` gives the verdict); `phase=judged`, log line
   `TUNING_JUDGED_JSON`.
+  `lab/model_scorecard.py` (model evaluation stage 2, part 1; descriptive, `docs/lab.md` "Model
+  evaluation, stage 2"): on `residual_map.load_league`'s outcome rows (2019/20–2023/24) the
+  model, blend and Pinnacle's early and close (`series_card`: log loss and Brier with paired
+  ranges vs the early price, calibration, argmax confusion; `auc_card` via `lab/auc.py`'s
+  `compare`; `threshold_card`: the Model 12% (`pick_12`) and Lean picks' 2 × 2 counts, win rate
+  vs implied and fair early), and model (f)'s corners vs a league-mean baseline (`corner_card`:
+  RMSE, MAE, log score, 80%/90% coverage; `corner_baseline`), 2017/18–2023/24. `tuning.yml`
+  `phase=scorecard`; the pool prints `lab/model_scorecard.json` as `MODEL_SCORECARD_B64` chunks
+  with `MODEL_SCORECARD_SHA256`.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
