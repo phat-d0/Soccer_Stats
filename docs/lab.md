@@ -3826,3 +3826,65 @@ per league, then a pool job), log line `TUNING_BIAS_JSON`, every file in the art
 
 In-sample is measured per refit, so a variance range resamples the scored matches for the
 out-of-sample term and the refits for the in-sample term, independently.
+
+### Phase 1: results (2026-11-08; `odds-check.yml` `task=tuning-bias` run 42460226305, 0 credits, no key)
+
+All eight leagues ran. 2024/25 was never loaded.
+- **Rows:** 16,038 matches predicted by all four windows and priced early and close. The
+  blend's 12,717 are those with a fit under every cap.
+- **Configurations:** 72 (32 model, 40 blend). The running count is in the file.
+- **Files:** in the run's artifact (`tuning_bias.json`, per-league row files).
+
+**The match model** (log loss per match, pooled; ranges 95%, resampling matches):
+
+| Window | Out of sample | In sample (last 365 days) | Bias (− close) | Variance (out − in) |
+| --- | --- | --- | --- | --- |
+| 365 days | 1.0236 | 0.9774 | +0.0229 (+0.0198 to +0.0261) | +0.0462 (+0.0382 to +0.0536) |
+| **730 (today)** | **1.0207** | **0.9834** | **+0.0200 (+0.0171 to +0.0230)** | **+0.0373 (+0.0297 to +0.0446)** |
+| 1,095 | 1.0204 | 0.9859 | +0.0198 (+0.0169 to +0.0226) | +0.0346 (+0.0270 to +0.0415) |
+| 1,460 | 1.0201 | 0.9870 | +0.0194 (+0.0166 to +0.0222) | +0.0331 (+0.0255 to +0.0401) |
+
+Reference levels on the same rows: Pinnacle's fair close 1.0007, its early price 1.0039. The
+730-day model is 0.0168 (+0.0141 to +0.0195) worse than the early price.
+
+**Per league** (730 days; bias / variance; the larger one wins by the pre-registered rule):
+
+| League | Bias | Variance | Larger |
+| --- | --- | --- | --- |
+| E0 | +0.019 | +0.032 | variance |
+| SP1 | +0.012 | +0.011 | bias |
+| D1 | +0.013 | +0.034 | variance |
+| I1 | +0.019 | +0.029 | variance |
+| F1 | +0.016 | +0.022 | variance |
+| E1 | +0.021 | +0.044 | variance |
+| E2 | +0.028 | +0.042 | variance |
+| E3 | +0.026 | +0.040 | variance |
+
+**The blend** (live form, 28-day refits; the close as input on both sides):
+
+| Training rows | Out of sample (close input) | Out of sample (early, as bet) | In sample | Variance |
+| --- | --- | --- | --- | --- |
+| last season | 1.0070 | 1.0096 | 0.9937 | +0.0133 (+0.0044 to +0.0219) |
+| last 2 | 1.0056 | 1.0085 | 0.9954 | +0.0102 (+0.0020 to +0.0180) |
+| last 3 | 1.0046 | 1.0075 | 0.9967 | +0.0080 (−0.0001 to +0.0160) |
+| last 4 | 1.0043 | 1.0071 | 0.9970 | +0.0073 (−0.0010 to +0.0152) |
+| **all (today)** | **1.0044** | **1.0073** | **0.9973** | **+0.0071 (−0.0011 to +0.0150)** |
+
+**Team ratings** (730 days, weekly refits): the median week-to-week change in a rating is about
+0.016, and 28 days apart all teams' ratings correlate about 0.86–0.92 (E2 and E3 shown in the
+log; every league is in the file).
+
+**Reading.**
+- By the pre-registered rule, the model's error is mostly **variance** in seven leagues of eight;
+  La Liga is the exception, where bias and variance are about equal.
+- But the learning curve qualifies this. Four times more data (365 → 1,460 days) moves out of
+  sample by only 0.0035, and 730 → 1,460 by 0.0006. The in-sample gap shrinks because in-sample
+  gets worse, not because out of sample gets better.
+- So the gap is mostly the optimism of fitting about 40 team ratings on the window. More data
+  won't close it; shrinking the ratings might. Phase 3's grid will therefore add the ratings
+  ridge (`DixonColes(ridge=)`, today 0) beside xi, a change made before that phase is
+  pre-registered.
+- The 0.020 gap to Pinnacle's close is the information the market has and the model doesn't.
+  That is the LASSO's and the ceiling analysis's question.
+- **The blend** has low variance and gains a little from more rows; uncapped (today) is as good
+  as any cap. Nothing to tune there.
