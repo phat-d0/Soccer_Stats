@@ -1282,8 +1282,12 @@ four leagues: E0, E1–E3).
 - `lab/lasso_residual.py` (owner, 8 Nov; `docs/lab.md` "LASSO on the market residual",
   pre-registered before any fit; development only, no key): one row per match, eight leagues,
   a multinomial logistic (draw reference) with Pinnacle's Shin-fair early 1X2 as a fixed
-  offset and an L1 penalty on eight frozen factor groups (`FACTORS`: rest, europe, xg_luck,
-  form_vs_market, newcomer, season_phase, model_gap, price_shape), fitted by FISTA in numpy
+  offset and an L1 penalty on 13 frozen factor groups, 46 features (`FACTORS`: rest, europe,
+  xg_luck, form_vs_market, newcomer, season_phase, model_gap, price_shape, and from the frozen
+  list of 8 Nov motivation (`places`, the frozen place table; `table_features`, the table from
+  results before the decision day), congestion (league, UEFA and `load_cups`' domestic cups,
+  `LEAGUE_CUPS`, `CUPS_COMPLETE` and the `cups_covered` flag), last_match, red_card and sot_form
+  (football-data's HST/AST/HR/AR via `fd_extra`, `data.COLUMNS` untouched)), fitted by FISTA in numpy
   (`fit_l1`, `lambda_max`; scikit-learn takes no offset). `walk`: 28-day blocks of decision
   days (kickoff − 4 days) from 2019-07-01, each fitted on matches kicked off before the block;
   `choose_lambda` picks λ on the window's last 365 days and refits the whole window.

@@ -3821,13 +3821,20 @@ The app's tab can follow it or not; the file is the contract.
 - studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
   search, line shop) link to it.
 
-## LASSO on the market residual (owner, 8 Nov; DRAFT, not frozen)
+## LASSO on the market residual (owner, 8 Nov; FROZEN 2026-11-08, before any fit)
 
-> **Draft, not frozen (8 Nov).** The lead asked for the factor list to be agreed with the
-> owner before it is frozen. The owner is adding factors. This section was committed before
-> that request arrived. A development run (42457953990) was started from it and cancelled
-> within seconds, during setup: no model was fitted, and no output was read. The frozen version
-> will replace this section once the list is agreed.
+> **Frozen 8 Nov.** The lead ruled on the factor list: keep 1–11, add 14 and 15, drop 12
+> (travel distance) and 13 (referee). The list was to freeze when the owner had added his ideas,
+> or once phases 2 and 3 were done, whichever came first. Phases 2 and 3 finished first, with no
+> further additions, so the list freezes as ruled.
+>
+> The domestic-cup coverage was rerun before freezing (run 42462857463, counts only). DFB-Pokal,
+> Coppa Italia and the Coupe de France are complete in every season from 2016/17 to 2023/24. The
+> Coupe de la Ligue ended after 2019/20.
+>
+> An earlier draft of this section was committed before the hold. Its one development run
+> (42457953990) was cancelled during setup: no model was fitted and no output was read. Nothing
+> has been fitted since.
 
 **Question.** Start from the market's price. Does any extra pre-match factor explain, out of
 sample, where that price is wrong? Earlier work says probably not:
@@ -3869,7 +3876,7 @@ sample, where that price is wrong? Earlier work says probably not:
   scikit-learn's logistic regression takes no offset, so it is not used.
 - Pure L1. No elastic net is run.
 
-**Frozen candidate factors.** Every factor is a match-level number seen from the home side, and
+**Frozen candidate factors** (numbered as in the agreed list; 12 and 13 dropped). Every factor is a match-level number seen from the home side, and
 each enters both the home and the away score. A factor is "selected" in a refit when any of its
 coefficients is non-zero. Results-based factors use only matches that kicked off before the
 decision day. Fixture-based facts (rest days, a UEFA match before kickoff) count as known, since
@@ -3885,8 +3892,55 @@ fixtures are published in advance.
 | 6 | `season_phase` | three 0/1 features for the kickoff month: Aug–Sep, Jan–Feb, Mar–Jul. Oct–Dec is the reference. |
 | 7 | `model_gap` | log p_model,k − log q_k for home, draw and away. p_model is the walk-forward Dixon-Coles chance: weekly refits, xG weight 0.7, goals only where there is no xG, as in `lean_backtest`. |
 | 8 | `price_shape` | log(q_home / q_draw) and log(q_away / q_draw). This allows a favourite–longshot recalibration (the blend's b ≠ 1), so that no other factor can pass simply by standing in for it. |
+| 9 | `motivation` | for each side, from the league table on the decision day (this season's league results before it): `gap_hi`, `gap_mid` and `gap_rel` = (own points − points of the club now at the target place) / (3 × games left + 3), clipped to [−2, 2]; `games_left`; and `nothing` (0/1). The target places are in the place table below. `nothing` = the club is below the mid place and can't reach its points (own points + 3 × games left < that club's points), and is more than 3 × games left points above the first relegation place. Missing before a club's 3rd league match of the season. |
+| 10 | `congestion` | for each side, `cong` = that club's matches (league, UEFA, and covered domestic cups) kicking off in the 14 days before kickoff, plus its league matches in the 4 days after. Plus one match-level flag, `cups_covered` (1 where the league-season's domestic cups are complete in the data, below). |
+| 11 | `last_match` | for each side, from its last league match kicked off before the decision day: `big_win` (won by 3+, 0/1), `big_loss` (lost by 3+, 0/1) and `shock` = points − expected points from that match's price (Pinnacle's Shin-fair close, else its early price, as in `form_vs_market`). |
+| 14 | `red_card` | for each side, `red_last` (0/1): the club had a red card (football-data HR/AR) in that same last league match. A suspension proxy. |
+| 15 | `sot_form` | for each side, the mean over its last 6 league matches before the decision day (at least 3 with any shots on target) of: shots-on-target share (HST/AST: for ÷ (for + against)) − (the price's win chance + half its draw chance). Full in all eight leagues, so it is a form signal for E1–E3, where there is no xG. |
+
+**Place table (frozen; per league-season, 2017/18–2023/24).** `gap_hi` and `gap_mid` measure the
+gap to fixed places, not to actual European entries (those change with cup winners). `gap_rel` is
+measured to the first place that relegates or leads to a relegation play-off.
+
+| League | Clubs | `gap_hi` place | `gap_mid` place | First relegation place |
+| --- | --- | --- | --- | --- |
+| E0, SP1, I1 | 20 | 4th | 6th | 18th |
+| D1 | 18 | 4th | 6th | 16th (play-off) |
+| F1 2017/18–2021/22 | 20 | 4th | 6th | 18th (play-off) |
+| F1 2022/23 | 20 | 4th | 6th | 17th (four down) |
+| F1 2023/24 | 18 | 4th | 6th | 16th (play-off) |
+| E1 | 24 | 2nd (last automatic) | 6th (last play-off) | 22nd |
+| E2 | 24 (23 in 2019/20) | 2nd | 6th | 21st |
+| E3 | 24 | 3rd | 7th | 23rd |
+
+- The table is ranked by points, then goal difference, then goals scored.
+- Points deductions are not in football-data, so they are ignored.
+- 2019/20 seasons are counted as played, before any curtailment.
+
+**Domestic cups and `cups_covered`.** Cup matches come from ESPN's scoreboards, as in the
+coverage run, and are mapped to football-data names with `cups.match_team`:
+
+| League | Cups counted | `cups_covered` |
+| --- | --- | --- |
+| E0, E1 | FA Cup, EFL Cup | 1 |
+| E2, E3 | FA Cup, EFL Cup (ESPN has no EFL Trophy) | 0 |
+| SP1 | Copa del Rey (partial) | 0 |
+| D1 | DFB-Pokal | 1 |
+| I1 | Coppa Italia | 1 |
+| F1 | Coupe de France, and the Coupe de la Ligue until 2019/20 | 1 |
+
+- If a cup-season's fetch does not complete in the run, its league-season's `cups_covered` is set
+  to 0, and the log says so.
+- Cup and UEFA fixtures in the 14 days before kickoff count as known, as rest days do. A cup
+  replay arranged after the decision day is a small leak, so it is named here.
+- Football-data's shots and cards are read from its own files for these factors only. The shared
+  `data.COLUMNS` is not changed.
+
+There are 13 factors and 46 features in all.
 
 **Dropped, with the reason:**
+- *Travel distance (12):* there are no stadium coordinates. "UEFA match played away" (factor 2) stands in for it.
+- *Referee (13):* it is in English leagues only, and would need learned ratings. It could be an English-only study later.
 - *Manager change:* the repo has no free history of it.
 - *Derby / same city:* there is no club-location data here. Building it by hand is not cheap,
   and a hand list would risk mistakes.
@@ -3945,7 +3999,9 @@ Otherwise the study closes as **"no edge in these factors"** and the holdout is 
 **Code.** `src/soccer_stats/lab/lasso_residual.py`, tests in `tests/test_lab_lasso_residual.py`.
 The tests cover:
 - a planted factor is kept, and pure noise is dropped;
-- no look-ahead in any factor.
+- no look-ahead in any factor, including the league table, last-match and shots-on-target
+  factors (a test changes later results and checks nothing earlier moves);
+- the place table.
 
 `odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
 
