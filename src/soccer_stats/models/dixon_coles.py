@@ -17,6 +17,12 @@ Two options for the cross-league cup model (cup_model.py), both off by default s
 domestic fit is unchanged: `ridge` > 0 adds ridge * sum(attack^2 + defence^2) to the loss
 (keeps a club with a handful of matches finite), and a `neutral` column (1 = neutral
 venue, e.g. a cup final) drops the home advantage for that match.
+
+`rho_option` (research only, off by default; Model evaluation and tuning, stage 1) changes
+how the low-score correction's rho is fitted, so a tuning grid can test alternatives:
+None = today's fit (rho free in [-0.3, 0.3]); {"fixed": v} = rho held at v ({"fixed": 0.0}
+switches the correction off, a plain double Poisson); {"penalty": k} = rho fitted with
+k * rho^2 added to the loss, shrinking it toward 0 (k = 0 is the same as None).
 """
 
 from __future__ import annotations
@@ -42,6 +48,9 @@ class DixonColes:
     # passes tight ones so its fits don't move with last-bit float differences between
     # machines (player_goals.GOAL_DC_OPTIONS).
     options: dict | None = None
+    # Low-score correction: None = rho fitted freely (the live app); {"fixed": v} or
+    # {"penalty": k}, see the module note. Research only.
+    rho_option: dict | None = None
     teams: list[str] = field(default_factory=list)
     params: dict[str, float] = field(default_factory=dict)
     attack: dict[str, float] = field(default_factory=dict)
@@ -75,12 +84,18 @@ class DixonColes:
         if "neutral" in matches.columns:
             home = 1.0 - matches["neutral"].fillna(0).to_numpy(dtype=float)
 
-        x0 = np.concatenate([np.zeros(2 * n), [0.2, 0.3, -0.05]])  # att, def, intercept, home, rho
-        bounds = [(None, None)] * (2 * n + 2) + [(-0.3, 0.3)]
+        fixed, rho_penalty = _rho_settings(self.rho_option)
+        rho0 = -0.05 if fixed is None else fixed
+        x0 = np.concatenate([np.zeros(2 * n), [0.2, 0.3, rho0]])  # att, def, intercept, home, rho
+        rho_bounds = (-0.3, 0.3) if fixed is None else (fixed, fixed)
+        bounds = [(None, None)] * (2 * n + 2) + [rho_bounds]
+        args = (hi, ai, x, y, w, n, tx, ty, home, self.ridge)
+        if rho_penalty:
+            args = (*args, rho_penalty)
         res = minimize(
             _neg_loglik,
             x0,
-            args=(hi, ai, x, y, w, n, tx, ty, home, self.ridge),
+            args=args,
             jac=True,
             method="L-BFGS-B",
             bounds=bounds,
@@ -141,13 +156,30 @@ class DixonColes:
         return m / m.sum()
 
 
-def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None, home=None, ridge=0.0):
+def _rho_settings(option: dict | None) -> tuple[float | None, float]:
+    """(fixed rho or None, penalty on rho^2) from `DixonColes.rho_option`."""
+    if option is None:
+        return None, 0.0
+    if not isinstance(option, dict) or len(option) != 1 or not {"fixed", "penalty"} >= set(option):
+        raise ValueError('rho_option must be None, {"fixed": v} or {"penalty": k}')
+    if "fixed" in option:
+        v = float(option["fixed"])
+        if not -0.3 <= v <= 0.3:
+            raise ValueError("rho_option fixed must be within [-0.3, 0.3]")
+        return v, 0.0
+    k = float(option["penalty"])
+    if k < 0:
+        raise ValueError("rho_option penalty must be >= 0")
+    return None, k
+
+
+def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None, home=None, ridge=0.0, rho_penalty=0.0):
     """Weighted negative log-likelihood and gradient.
 
     x, y are real goals (they select the low-score correction); tx, ty are the
     Poisson targets (goals, or a goals/xG blend). Defaults to tx, ty = x, y. `home`
     (optional, per match) scales the home advantage: 0 at a neutral venue, else 1.
-    `ridge` adds ridge * sum(attack^2 + defence^2).
+    `ridge` adds ridge * sum(attack^2 + defence^2); `rho_penalty` adds rho_penalty * rho^2.
     """
     tx = x if tx is None else tx
     ty = y if ty is None else ty
@@ -205,4 +237,7 @@ def _neg_loglik(theta, hi, ai, x, y, w, n, tx=None, ty=None, home=None, ridge=0.
         obj += ridge * (att @ att + dfn @ dfn)
         grad[:n] += 2 * ridge * att
         grad[n : 2 * n] += 2 * ridge * dfn
+    if rho_penalty:
+        obj += rho_penalty * rho**2
+        grad[2 * n + 2] += 2 * rho_penalty * rho
     return obj, grad
