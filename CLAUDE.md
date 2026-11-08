@@ -1327,6 +1327,11 @@ four leagues: E0, E1–E3).
   price moves", pre-registered): does model (f)'s side predict Pinnacle's look → close move,
   on the price log's half lines (`p_model_over` as logged); primary = mean sign(r) × m with a
   match-resampled range; log line `CORNER_MOVES_JSON`.
+  `corner_alpha.py` (corners team, 8 Nov; `docs/totals.md` "Corner dispersion: candidate
+  f-oos"): `CandidateFOos` = (f)'s means with α moment-matched on out-of-sample residuals (the
+  last `OOS_DAYS` 365 before the fit, 28-day inner blocks; in-sample α under `MIN_OOS` 200,
+  `alpha_source`); development only, scored by Model evaluation through
+  `lab.model_assumptions.corner_walk(..., model=)`; judged once on 2025/26 (pre-registered).
 - Data warnings: football-data's average/maximum Asian handicap columns are unreliable (use
   `match_markets.clean_prices`; Pinnacle's are fine). football-data's 2025/26 files have Pinnacle
   1X2 prices for only about half the season (E0 52%, E1 47%, E2/E3 30%): check coverage before

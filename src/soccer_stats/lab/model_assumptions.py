@@ -92,10 +92,16 @@ def goals_checks(preds: pd.DataFrame, n_boot: int = N_BOOT) -> dict:
     }
 
 
-def corner_walk(cm: pd.DataFrame, start, end, refit: str = REFIT_CORNERS) -> pd.DataFrame:
+def corner_walk(
+    cm: pd.DataFrame, start, end, refit: str = REFIT_CORNERS, model=None
+) -> pd.DataFrame:
     """Model (f)'s out-of-sample means and alpha for matches in [start, end): refitted every
-    `refit` on matches before the block (TeamCornersF keeps the 730 days before)."""
+    `refit` on matches before the block (TeamCornersF keeps the 730 days before). `model`
+    is any class with TeamCornersF's fit/rates/alpha_ interface (default TeamCornersF; the
+    corners team's candidates, e.g. edge.corner_alpha.CandidateFOos)."""
     from soccer_stats.corners_live import TeamCornersF
+
+    model = model or TeamCornersF
     from soccer_stats.lab.harness import blocks
 
     cm = cm.sort_values("date").reset_index(drop=True)
@@ -106,7 +112,7 @@ def corner_walk(cm: pd.DataFrame, start, end, refit: str = REFIT_CORNERS) -> pd.
         if test.empty:
             continue
         try:
-            f = TeamCornersF().fit(cm[d < lo])
+            f = model().fit(cm[d < lo])
         except ValueError:
             continue
         lh, la = f.rates(test["home"], test["away"])
