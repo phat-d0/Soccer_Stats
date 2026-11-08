@@ -312,9 +312,11 @@ def _kickoffs(events: list[dict] | None) -> list[pd.Timestamp]:
 def policy_floor(league: str, kickoffs, now: pd.Timestamp) -> float | None:
     """Minimum hours between refreshes for a league's policy; None = don't fetch now.
 
-    "always" (the Premier League): as floor_hours. "matchday": nothing unless a kickoff
-    is within MATCHDAY_HOURS; then every MATCHDAY_FAR_HOURS, hourly within
-    MATCHDAY_NEAR_WINDOW hours, and every 30 minutes within KICKOFF_WINDOW_HOURS.
+    "always" (the Premier League): hourly (MIN_INTERVAL_HOURS), every
+    KICKOFF_INTERVAL_HOURS (15 minutes since 28 Oct) within KICKOFF_WINDOW_HOURS of a
+    kickoff. "matchday": nothing unless a kickoff is within MATCHDAY_HOURS; then every
+    MATCHDAY_FAR_HOURS, hourly within MATCHDAY_NEAR_WINDOW hours, and every
+    KICKOFF_INTERVAL_HOURS (15 minutes) within KICKOFF_WINDOW_HOURS.
     """
     ahead = [k - now for k in kickoffs if k >= now]
     lg = LEAGUES.get(league)
