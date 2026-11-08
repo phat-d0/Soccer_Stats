@@ -3611,3 +3611,39 @@ season, E0's own value fell from +2.1 to +1.2.
 
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
+
+## Research overview: every study in one file (owner, 8 Nov; for the app's Research tab)
+
+The owner asked to see the research results mapped out, then in the app under a Research tab.
+Research keeps one committed file of every study, and UI Design builds the tab from it (the
+owner chose to route the tab to UI Design).
+
+**The file.** `src/soccer_stats/lab/research_overview.json` = `{kind: "research_overview",
+generated, note, areas [{id, name}], verdicts {pass, fail, inconclusive, running, exploratory,
+withdrawn → label}, studies [...]}`. Each study has:
+- always: `id`, `area`, `name`, `when` (ISO date), `verdict`, `question`, `sample`, `result`
+  (one plain sentence) and `doc` (the write-up);
+- where recorded: `measure` ("clv" or "roi") with `value`, `lo`, `hi` (per $1, a 95% range
+  resampling matches) and `bets`; a backtest's `roi`, `roi_lo`, `roi_hi`; `luck: true` (the
+  strategy search's best rule, beaten by chance at p 0.94);
+- running tests only: `due` (words) and `due_date` (ISO).
+
+The figures are copied from the recorded verdicts, never recomputed: CLAUDE.md "Research verdicts
+to date", `docs/lab.md`, `docs/edge.md`, `docs/totals.md`, `docs/leagues.md` and
+`docs/player_props.md`. Research updates the file whenever a verdict changes; the 27 studies of
+8 Nov are the first version.
+
+**A first map** (Research, 8 Nov): https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8. It shows:
+- a verdict tally;
+- one CLV axis with Pinnacle's close as zero, and a return-per-$1 axis;
+- the studies as cards by area, each card's edge coloured by its verdict;
+- the tests still to be read, by due date.
+The app's tab can follow it or not; the file is the contract.
+
+**Suggested for the tab (UI Design decides):**
+- `publish.py` passes the file through as `data.json` → `research_overview`, in its own try;
+- a fifth tab, "Research", or Research inside Explore;
+- the tally and the two axes first, then the cards by area with the competition-free layout,
+  then "Still to be read";
+- studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
+  search, line shop) link to it.
