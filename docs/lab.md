@@ -4511,6 +4511,39 @@ f-oos"), and is followed exactly. Code: `lab/corner_foos.py`, `tuning.yml`
 - Discrete central intervals over-cover by construction, so coverage is compared between the two
   models, not against the nominal level.
 
+**Development result** (also in `docs/totals.md`):
+
+- **Run:** `tuning.yml` `phase=foos-dev`, run 42477403136, frozen code 94e7be2f.
+- **Sample:** 23,934 matches in the eight corner leagues, 2017/18–2023/24. (f) and f-oos were
+  refitted on identical 28-day blocks.
+- **Half-line log loss** (summed over both teams' lines 2.5–8.5, per match): (f) 7.3999, f-oos
+  7.3975. Difference **−0.0025 (−0.0041 to −0.0009)**; f-oos is better, and the range is below 0.
+- **NB2 dispersion:** 1.085 for (f), 1.023 for f-oos. f-oos is near 1 in every league:
+  1.015–1.037, against 1.069–1.124 for (f).
+- **PIT deciles:**
+  - (f) is U-shaped: 0.107 in the bottom decile, 0.105 in the top, and down to 0.096 in the
+    middle. Its chances are too narrow.
+  - f-oos is flat at 0.099–0.102.
+- **Coverage:** 50% interval 59.8% → 61.0%; 90% interval 92.7% → 93.3%. Whole-number counts
+  over-cover by construction, so this is read between the two models, not against the nominal
+  level.
+- **Per league** (difference, 95% range):
+
+  | League | Difference | 95% range |
+  | --- | --- | --- |
+  | E0 | −0.0068 | −0.0118 to −0.0022 |
+  | E2 | −0.0040 | −0.0068 to −0.0010 |
+  | F1 | −0.0039 | −0.0093 to +0.0015 |
+  | I1 | −0.0032 | −0.0087 to +0.0022 |
+  | SP1 | −0.0021 | −0.0078 to +0.0034 |
+  | E1 | −0.0019 | −0.0056 to +0.0017 |
+  | E3 | −0.0009 | −0.0037 to +0.0020 |
+  | D1 | +0.0033 | −0.0040 to +0.0113 |
+
+  Seven leagues point the same way; D1 points the other way, with a range that includes 0.
+- **Verdict:** development shows an improvement, so the pre-registered single 2025/26 judged
+  read is warranted. It is dispatched only after this record is merged and the lead says go.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
