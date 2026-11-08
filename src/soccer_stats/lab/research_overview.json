@@ -94,6 +94,44 @@
    "doc": "docs/lab.md: Residual map"
   },
   {
+   "id": "lasso_residual",
+   "area": "model",
+   "name": "LASSO on the market residual",
+   "when": "2026-11-08",
+   "verdict": "fail",
+   "question": "Do match factors chosen by LASSO explain where Pinnacle's early price is wrong, enough to bet?",
+   "sample": "16,935 matches, eight leagues, 2019/20–2023/24 (2024/25 not opened)",
+   "measure": "clv",
+   "value": -0.036,
+   "lo": -0.042,
+   "hi": -0.031,
+   "bets": 1116,
+   "result": "No gain on the price: log loss −0.00010 (−0.00055 to +0.00037). The rule at a 3% threshold: 1,116 bets, CLV −3.6%. The study closes.",
+   "doc": "docs/lab.md: LASSO on the market residual"
+  },
+  {
+   "id": "tuning_ridge",
+   "area": "model",
+   "name": "Model tuning: a per-league ratings ridge",
+   "when": "2026-11-08",
+   "verdict": "pass",
+   "question": "Does shrinking team ratings (a ridge chosen per league on 2017/18–2023/24) improve the match model's log loss on 2025/26?",
+   "sample": "3,284 matches, eight leagues, 2025/26, read once",
+   "result": "Passed: log loss gain +0.00278 (+0.00040 to +0.00532), mostly in the goals-only leagues. Live from 8 Nov: D1 3, F1 1, E1 10, E2 3, E3 10 (E0, SP1, I1 unchanged). It improves the model, not a bet against the price.",
+   "doc": "docs/lab.md: Model settings: the judged read on 2025/26"
+  },
+  {
+   "id": "scorecards",
+   "area": "model",
+   "name": "Model scorecards",
+   "when": "2026-11-08",
+   "verdict": "exploratory",
+   "question": "How does each model score on log loss, ranking, calibration and its picks, beside the price?",
+   "sample": "Match model 13,667 matches (2019/20–2023/24); corners 2017/18–2023/24; goalscorer B 2025/26 development",
+   "result": "Match model log loss 1.0225 vs Pinnacle early 1.0051, AUC 0.662 vs 0.680. Model 12%'s picks won 27.0% vs 27.7% fair. Corners (f) beats the league mean everywhere. Goalscorer B log loss 0.2913 vs the best price's 0.2953 (margin included).",
+   "doc": "docs/lab.md: Model evaluation, stage 2: scorecards"
+  },
+  {
    "id": "lean_bt",
    "area": "rules",
    "name": "Blend Lean at Pinnacle's early price",

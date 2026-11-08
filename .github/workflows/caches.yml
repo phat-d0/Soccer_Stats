@@ -299,7 +299,9 @@ jobs:
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" -q '.actions_caches[]' > caches.jsonl
           kept=$(grep -E '^ *- [{] name: .*prefix:' .github/workflows/caches.yml | sed -E 's/.*prefix: ([^,]+),.*/\1/' | sort -u | tr '\n' ' ')
           python3 - "$kept" <<'PY'
-          import json, re, sys
+          import json, sys
+          sys.path.insert(0, "src/soccer_stats")
+          from cache_archive import key_prefix
           kept = sys.argv[1].split()
           usage = json.load(open("usage.json"))
           rows = [json.loads(l) for l in open("caches.jsonl") if l.strip()]
@@ -310,7 +312,7 @@ jobs:
               print("::warning::Caches use over 80% of the 10 GB limit: the least recently used ones will be evicted")
           groups = {}
           for r in rows:
-              prefix = re.sub(r"(keepalive-none|none|\d+)$", "", r["key"])
+              prefix = key_prefix(r["key"], kept)
               g = groups.setdefault(prefix, {"n": 0, "bytes": 0, "last": "", "refs": set()})
               g["n"] += 1
               g["bytes"] += r["size_in_bytes"]

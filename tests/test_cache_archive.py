@@ -446,3 +446,16 @@ def test_the_extra_assets_are_listed_with_their_checksums_and_verified():
     wf = yaml.safe_load((WORKFLOWS / "caches.yml").read_text())
     runs = " ".join(str(s.get("run", "")) for s in wf["jobs"]["verify"]["steps"])
     assert "archive/extra_assets.json" in runs and "sha256sum" in runs
+
+
+def test_key_prefix_maps_run_ids_and_content_hashes_to_their_prefix():
+    kept = ["xg-good-", "raw-data-", "understat-SP1-", "odds-history-"]
+    sha = "0937f3311ac0823cd2f8606f1046f51f159c965ce2fd9508a97008ee3e11baaa"
+    assert ca.key_prefix(f"xg-good-{sha}", kept) == "xg-good-"
+    assert ca.key_prefix("raw-data-42475953351", kept) == "raw-data-"
+    assert ca.key_prefix("understat-SP1-123", kept) == "understat-SP1-"
+    assert ca.key_prefix("odds-history-keepalive-none", kept) == "odds-history-"
+    # Not kept alive: still reduced to its prefix, so the usage job can flag it.
+    assert ca.key_prefix(f"heavy-espn-{sha}", kept) == "heavy-espn-"
+    assert ca.key_prefix("heavy-espn-40723506826", kept) == "heavy-espn-"
+    assert ca.key_prefix(f"xg-good-{sha}") == "xg-good-"

@@ -4005,6 +4005,56 @@ The tests cover:
 
 `odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
 
+
+### Result: no edge in these factors; the study closes (run 42470336372, read once)
+
+`odds-check.yml` `task=lasso-residual` ran at commit 3c4efc6b, the frozen code, in 87 minutes.
+- Every domestic cup-season fetched completely (no `LASSO_CUP` failures), so `cups_covered`
+  follows the frozen table.
+- 16,935 matches were scored, 2019/20–2023/24, over 57 refits. 2024/25 was never loaded.
+
+**Log loss.**
+- Pinnacle's early price alone scores 1.00356. The L1 model on top of it scores 1.00366.
+- The improvement is **−0.00010 (−0.00055 to +0.00037)**: no gain, and the range straddles 0.
+- For scale, Pinnacle's close scores 1.00065 on the same matches.
+- No season's range is above 0.
+- By league, only F1's range is above 0: +0.00147 (+0.00007 to +0.00285), the one league of
+  eight, which is what chance would give. D1 is −0.00113 and E3 −0.00102, both ranges including 0.
+
+**Selection** (share of refits keeping the factor):
+
+| Factor | Kept in |
+| --- | --- |
+| form_vs_market | 75% |
+| last_match | 75% |
+| congestion | 72% |
+| newcomer | 63% |
+| motivation | 61% |
+| europe | 60% |
+| model_gap | 60% |
+| rest | 46% |
+| price_shape | 32% |
+| season_phase | 28% |
+| red_card | 25% |
+| sot_form | 14% |
+| xg_luck | 12% |
+
+λ is chosen on each window's last year. There, keeping several small coefficients looked a
+little better in-window, but it did not carry out of sample. Frequent selection here is fitting
+noise, not signal.
+
+**The rule at T = 0.03** (1,116 bets): CLV **−3.6% (−4.2% to −3.1%)** against Pinnacle's close,
+below 0 in every league. ROI is +2.2% (−7.1% to +12.1%); that is luck, since the price moved
+against the bets.
+
+**Gate:**
+1. Log-loss range above 0: **no**.
+2. A factor kept in most refits: yes (seven).
+
+Both were required, so the study closes as **"no edge in these factors"**, and the 2024/25
+holdout is not spent. This agrees with the residual map, the strategy search and the free-signals
+round: none of these pre-match factors explains where Pinnacle's early price is wrong.
+
 ## Model tuning programme (owner via the lead, 8 Nov)
 
 The owner asked "How do I make it better?". The lead gave Research lab 2 four phases, run in
@@ -4387,6 +4437,162 @@ Calibration slopes (1 = calibrated, below 1 = over-confident):
 | Close | 1.02 | 0.97 to 1.06 |
 
 The model is over-confident: its range is below 1. The blend fixes that.
+
+
+### Stage 2, part 2: method (written before any run; descriptive, no pass rule)
+
+**(a) The goal distributions** (the score matrix behind the Goals rows and the team totals):
+- **Rows:** the same walk-forward as part 1, eight leagues, 2019/20–2023/24, with the score
+  matrix kept. It uses the live model as it now stands, with each league's ratings ridge
+  (`leagues.match_ridge`, merged after part 1 ran). Amended before any run: part 1 scored the
+  model without the ridge.
+- **Total goals over/under 2.5:**
+  - log loss, Brier, AUC and the calibration slope for the model's chance, set beside Pinnacle's
+    Shin-fair early and close O/U 2.5 (football-data P>2.5, PC>2.5);
+  - only matches all three price are used;
+  - the paired log-loss difference against the early price, with a match-resampled 95% range.
+- **Total goals as a distribution (0 to 6+):**
+  - the ranked probability score of the model's distribution, against a baseline: Poisson at
+    the league's mean total over the same 730 training days;
+  - the share of matches inside the model's central 80% interval.
+- **Each team's goals:** RMSE and MAE of the expected goals; the log score against the
+  baseline's Poisson at the league mean for home and away goals.
+
+**(b) The cup model (UCL):**
+- **Rows:** `cup_model.history`'s walk-forward chances (Monday refits on matches before them)
+  on the Champions League matches with a bought close (2024/25 and 2025/26, `EVAL_SEASONS`).
+- **Reported:** log loss, Brier, AUC and the calibration slope beside Pinnacle's Shin-fair close
+  and DraftKings' close on the same matches, and the paired log-loss difference against
+  Pinnacle's close.
+- These seasons are the closes already read by `cup_backtest` (published since October). No new
+  data is opened, and the domestic 2024/25 lock is not touched.
+
+**(c) Goalscorer B:**
+- **Rows:** the 2025/26 development starters that `goalscorer-test.yml` (`design=dev`, no key,
+  0 credits) joins to cached prices. These are the rows `lab/auc.py` read. Their artifacts have
+  a 7-day retention, so they are rebuilt by one dispatch.
+- **Reported:** log loss, Brier, AUC and calibration for B beside the season-goals and season-xG
+  benchmarks and the best price (1/odds, margin included: no book quotes a No price).
+- **At the priced test's threshold T = 20%:** the picks' win rate beside their mean 1/odds
+  (picked = B × best odds − 1 ≥ 0.20).
+- §16's judged forward window is not read.
+- **Source (amended before (c) ran, lead 8 Nov):** the per-match Understat player files for SP1,
+  D1, I1 and F1 were lost from the cache before 1 Nov, so the rows cannot be rebuilt (run
+  42474646236 failed for those four). B is scored instead from Player props' rescue of the 1 Nov
+  development artifacts: artifact 13615572896, "goalscorer-1nov-rescued", which holds
+  `judged_<league>.csv.gz` for all five leagues, 2025/26, from dev run 41346853368. Those rows
+  were built at commit 182a2c3, before `FIT_OPTIONS` made the fit reproducible, so a rebuild
+  could differ slightly in B's chances.
+
+**Run.**
+- (a) and (b): `tuning.yml` `phase=scorecard2` (a job per league for (a), one cup job, a pool
+  job).
+- (c): the pool job fetches the rescued artifact by id (input `goal_artifact`, through the
+  artifacts API with the workflow token; `goal_run` remains for a whole run's
+  `goalscorer-dev-*` artifacts).
+- All three are added to `lab/model_scorecard.json` as `goals`, `cup` and `goalscorer`.
+
+
+### Stage 2, part 2: results (run 42476689024, descriptive)
+
+An earlier run (42476331121, at the commit before the goalscorer input existed) scored only (a)
+and (b), and was not read. This run is the read.
+
+**(a) Goal distributions** (the live model with its ridge, eight leagues, 2019/20–2023/24).
+- **O/U 2.5:** log loss 0.6836 for the model, 0.6765 for Pinnacle's early price and 0.6745 for
+  its close; AUC 0.582, 0.603 and 0.608.
+  - The model is worse than the early price by +0.0071 (+0.0053 to +0.0087).
+  - As in 1X2, the model trails the price on totals.
+- **Total goals (0 to 6+):**
+  - ranked probability score 0.1439, against 0.1452 for the league-mean Poisson baseline;
+  - the model's central 80% interval covers 88.6% of matches. With whole-number goals and few
+    classes a central interval over-covers, so this is not a sign that the spread is too wide.
+- **Each team's goals:** RMSE 1.147 against the baseline's 1.200; log score −1.448 against −1.490.
+- So the model clearly beats a no-skill baseline, and is clearly behind the market.
+
+**(b) Cup model, UCL** (302 matches with a bought close, 2024/25–2025/26).
+- Log loss: 0.9535 for the model, against 0.9449 for Pinnacle's close.
+- The ranges, the DraftKings close and the calibration are in the JSON file.
+
+**(c) Goalscorer B** (the rescued 1 Nov development rows, five leagues, 2025/26 starters).
+- **Log loss:** 0.2913 for B, 0.3181 for the season-xG benchmark, 0.4603 for season goals and
+  0.2953 for the best price as 1/odds.
+- **B beating 1/odds is not an edge.** No book offers a No price, so 1/odds keeps the bookmaker's
+  margin and overstates every chance; it is not a fair price. The fair-price comparison is the
+  priced test's (§16).
+- **At T = 20%:** 2,113 picks. They won 9.5%, against 10.1% implied by 1/odds. Even at a price
+  that includes the margin, the picks win less often than the price says.
+
+**The committed file.** The pool log prints `model_scorecard2.json` (SHA-256 `9ee625d1…97c8db`).
+It goes beside part 1's file by the same route as part 1 (the lead decodes and commits it).
+
+
+### Stage 2 extras: the bake-off candidates, from recorded results (no new runs)
+
+The retired shots model is skipped (lead, 8 Nov). Every line below is copied from the verdict
+already on record; nothing was re-run.
+
+| Study | Candidates | Recorded verdict | Where |
+| --- | --- | --- | --- |
+| 1X2 bake-off 1 (E0) | (a) live DC + xG, (b) hierarchical Poisson, (c) LightGBM, (d) multinomial logistic, (e) stack with the early price | None adds to Pinnacle's early price, on development or holdout; picks' CLV −3.6% to −5.1% | "Verdict (bake-off 1)" |
+| 1X2 bake-off 2 (E1–E3) | goals-only versions of a–e | Log loss 0.016–0.021 worse than the early price; no blend weight above 0; CLV −3.8% to −4.9% | "Verdict (bake-off 2)" |
+| 1X2 bake-off 3 (SP1, D1, I1, F1) | a–e with xG | None passes; picks give up 3–7% against the close; Serie A's stack the one near miss | "Verdict (bake-off 3)" |
+| Corners bake-off 1 (round 11) | match-total and team-corner models | Total: the league average is as good. Team: gain over the average, but over-confident (slopes below 0.80); none passes | `docs/totals.md` |
+| Corners bake-off 2 (round 13) | (f) and rivals | (f) is the finalist in E0, I1 and F1 (locked test 3 Feb 2027); no finalist in SP1, D1 or E1 | `docs/totals.md` |
+| Goalscorer (A–H) | B, B-cal and benchmarks | B passes the pooled forward model-quality check (log loss vs season xG +0.057, +0.040 to +0.075); the priced test runs to 1 Feb 2027 | `docs/player_props.md` §14, §16 |
+| Model settings (tuning) | ratings ridge, ρ, ξ, window, xG weight, blend refits | Only the per-league ridge passes (2025/26 judged read); live since 8 Nov | "Model settings: the judged read on 2025/26" |
+| LASSO on the residual | 13 pre-match factors | No edge; the study closes and 2024/25 is not opened | "LASSO on the market residual" |
+
+**Reading:** every model family tried improves on a no-skill baseline and none adds to
+Pinnacle's price. The only change that passed a judged test (the ridge) is a prediction-quality
+gain in the goals-only leagues, not a price edge.
+
+### Corner dispersion f-oos: scoring for the corners team
+
+The pre-registration is the corners team's (`docs/totals.md` "Corner dispersion: candidate
+f-oos"), and is followed exactly. Code: `lab/corner_foos.py`, `tuning.yml`
+`phase=foos-dev` then `phase=foos-judged`.
+- **Development (2017/18–2023/24):** (f) and f-oos through `corner_walk` on identical blocks.
+  Reported: NB2 dispersion, PIT deciles, 50%/90% coverage, and the per-match summed binary log
+  loss at both teams' half lines 2.5–8.5, with the paired difference f-oos − (f) and its range.
+- **The judged read (2025/26, once):** only if development shows an improvement. The holdout is
+  unlocked from 2025-07-01 with a logged reason. Any row outside 2025/26 is refused; 2024/25 is
+  training only; no season after 2025/26 is loaded.
+- Discrete central intervals over-cover by construction, so coverage is compared between the two
+  models, not against the nominal level.
+
+**Development result** (also in `docs/totals.md`):
+
+- **Run:** `tuning.yml` `phase=foos-dev`, run 42477403136, frozen code 94e7be2f.
+- **Sample:** 23,934 matches in the eight corner leagues, 2017/18–2023/24. (f) and f-oos were
+  refitted on identical 28-day blocks.
+- **Half-line log loss** (summed over both teams' lines 2.5–8.5, per match): (f) 7.3999, f-oos
+  7.3975. Difference **−0.0025 (−0.0041 to −0.0009)**; f-oos is better, and the range is below 0.
+- **NB2 dispersion:** 1.085 for (f), 1.023 for f-oos. f-oos is near 1 in every league:
+  1.015–1.037, against 1.069–1.124 for (f).
+- **PIT deciles:**
+  - (f) is U-shaped: 0.107 in the bottom decile, 0.105 in the top, and down to 0.096 in the
+    middle. Its chances are too narrow.
+  - f-oos is flat at 0.099–0.102.
+- **Coverage:** 50% interval 59.8% → 61.0%; 90% interval 92.7% → 93.3%. Whole-number counts
+  over-cover by construction, so this is read between the two models, not against the nominal
+  level.
+- **Per league** (difference, 95% range):
+
+  | League | Difference | 95% range |
+  | --- | --- | --- |
+  | E0 | −0.0068 | −0.0118 to −0.0022 |
+  | E2 | −0.0040 | −0.0068 to −0.0010 |
+  | F1 | −0.0039 | −0.0093 to +0.0015 |
+  | I1 | −0.0032 | −0.0087 to +0.0022 |
+  | SP1 | −0.0021 | −0.0078 to +0.0034 |
+  | E1 | −0.0019 | −0.0056 to +0.0017 |
+  | E3 | −0.0009 | −0.0037 to +0.0020 |
+  | D1 | +0.0033 | −0.0040 to +0.0113 |
+
+  Seven leagues point the same way; D1 points the other way, with a range that includes 0.
+- **Verdict:** development shows an improvement, so the pre-registered single 2025/26 judged
+  read is warranted. It is dispatched only after this record is merged and the lead says go.
 
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
