@@ -4097,3 +4097,50 @@ log; every league is in the file).
   That is the LASSO's and the ceiling analysis's question.
 - **The blend** has low variance and gains a little from more rows; uncapped (today) is as good
   as any cap. Nothing to tune there.
+
+### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
+
+**Question.** Where in the pipeline is the upside? The pipeline runs: data → match model →
+blend → bet rule → execution (which book, when). For each stage in turn, swap in a perfect
+or best-available version and measure how much the Lean rule's results improve. **Every
+oracle is descriptive and never tradable.** No verdict and no bet comes from this phase.
+
+**The base.**
+- The Lean backtest as `backtest-lean` builds it (`lean_backtest.league_report`): the model
+  walk-forward from 2019-07-01 (two-season burn-in), the blend's 28-day fits, σ per fit, Lean's
+  1σ rule on every side at every price (the all-odds replay), entry at Pinnacle's early price.
+- Eight domestic leagues, scored seasons 2019/20–2023/24 (coverage ≥ 90%). 2024/25 is never
+  loaded.
+- End metrics: bets; CLV against Pinnacle's Shin-fair close (per $1); ROI per $1. Each comes
+  with a 95% range from 2,000 bootstrap draws, seed 0, resampling bets (one bet per match).
+
+**Stages** (each changes one thing from the base):
+- **(a) Information ceiling.** The blend's chance is replaced by Pinnacle's fair close for that
+  match. Same σ, same rule, same early entry. This is how much the Lean rule earns if it knew
+  the close.
+- **(b) Better form data, upper bound.** The model's chance is replaced, in training rows and
+  targets, by independent Poisson 1X2 on the match's own post-match xG. The blend is then
+  refitted walk-forward as usual. The five Understat leagues only (I1 2022/23 has no xG), so
+  (b) is compared with the base on the same leagues.
+- **(c) Rule tuning ceiling.** Lean's z cut swept over {0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3}. The
+  best CLV is chosen in hindsight on the same rows. Reported with every cut, so the
+  hindsight gain is visible.
+- **(d) Execution: line shop.** Base picks on the matches the bought ten-book history covers
+  (2020/21–2023/24, `dk_price_backtest`'s bodies). The pick is entered at the best price among
+  the ten books at the 48 h look (each quote ≤ 6 h old, `dk_price_backtest.quote`) instead of
+  Pinnacle's early price.
+- **(e) Timing.** The same picks on the same matches, entered at Pinnacle's early price (the
+  base), DraftKings' 48 h price, the best price at 48 h, and Pinnacle's quoted close (whose
+  CLV is minus its margin by construction; ROI is the comparison there).
+
+**Output.** One table: stage, bets, CLV and ROI with ranges, and the gain over its
+reference:
+- (a), (b) and (c) are compared with the base (on the same leagues for (b));
+- (d) and (e) are compared with the base picks' Pinnacle-early entry on the same matches,
+  paired by bet.
+
+**Configurations counted:** 8 z cuts + 4 other stages = 12 toward the programme's count.
+
+**Code.** `lab/tuning_ceiling.py`; `tuning.yml` `phase=ceiling`. The league jobs restore the
+paid `odds-history-` cache (read only, with the archive fallback); no key, 0 credits. Log line
+`TUNING_CEILING_JSON`.
