@@ -3664,8 +3664,9 @@ was read on in-sample for that setting: a backtest over those seasons flatters i
 
 - **Lean odds range**: pooled CLV by band, 2019/20–2024/25: ≤1.50 −1.9% (232 bets), 1.50–2.00
   −2.7% (632), 2.00–3.00 −3.1% (712), 3.00–5.00 −3.8% (790), >5.00 −3.0% (261). The range keeps
-  the middle bands; every band is below 0, so the range can't turn the rule positive. The
-  flattering is at most about a point of CLV, against −3.1% overall.
+  the middle bands (about −2.9% pooled, against −3.1% at every price) and drops the best band
+  (≤1.50); every band is below 0, so the range can't turn the rule positive. The flattering is
+  about 0.2 points of CLV.
 - **Edge threshold**: at DraftKings, E0 2025/26, every threshold from 2% to 20% loses (ROI −8%
   to −21%); E0 line shopping 2017/18–2025/26 shows flat CLV across 2–20%; the price-band sweep
   (2–30% per band) has every band's best CLV below 0. The 12% choice is not what makes Model 12%
@@ -3682,6 +3683,6 @@ was read on in-sample for that setting: a backtest over those seasons flatters i
 Most of the model's settings were never tuned on results: they are defaults, so the backtests
 don't flatter them. Two settings were chosen after looking at results: Blend Lean's 1.50–3.00
 odds range (on the 2019/20–2024/25 backtest) and the corners' under-60% cut (on October's live
-trades). Lean's live-rule backtest is therefore a little flattering, by about a point of CLV at
-most, and it still loses; the 60% cut is judged only on trades after it was set. No setting we
+trades). Lean's live-rule backtest is therefore slightly flattering, by about 0.2 points of CLV,
+and it still loses; the 60% cut is judged only on trades after it was set. No setting we
 have swept turns a strategy positive, so the losses are not a tuning problem.
