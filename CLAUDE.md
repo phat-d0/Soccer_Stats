@@ -1252,6 +1252,13 @@ four leagues: E0, E1–E3).
   goals-only) and `xg_note` puts that in the file's note; a tenth slice splits home sides by
   league. Result: 7 of 331 cells with 200+ rows exclude 0, fewer than chance; the four-league
   home-side cell did not hold (+0.9 points, −0.6 to +2.5). The lead builds the owner's 3D view from it.
+- `lab/auc.py` (owner via the lead, 8 Nov; exploratory, no key; `docs/lab.md` "ROC AUC"): ROC AUC
+  (weighted, tie-aware, one shared match bootstrap) of the match model, blend, Pinnacle's early and
+  close and DraftKings' 48 h price (eight leagues 2019/20–2023/24), within 5-point price bands,
+  live corner lines (SP1, D1, E1–E3; E0/I1/F1 locked) and goalscorer B's 2025/26 development rows
+  (run 41346853368's artifacts). `odds-check.yml` `task=auc`, log lines `AUC_JSON`, `AUC_B64`;
+  committed `lab/auc_research.json` (run 42457943922): model 0.662 vs Pinnacle early 0.680, no
+  ranking beyond the price (within-band 0.499); goalscorer B 0.746 = the best price 0.746.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
