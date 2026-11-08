@@ -217,3 +217,37 @@ def load_league(code: str, first_year: int, holdout: Holdout, last: int = LAST_Y
 
 def config_dict(cfg: Config) -> dict:
     return asdict(cfg)
+
+
+def xg_coverage(code: str, year: int) -> dict:
+    """Counts only (no result is scored): one season's football-data matches and the share
+    with Understat xG attached, for checking a judged read's data before it is
+    pre-registered."""
+    from soccer_stats.data import load_matches
+    from soccer_stats.xg import with_xg
+
+    m = load_matches([code], [year])
+    m, err = with_xg(m)
+    return {
+        "league": code,
+        "season": f"{year % 100:02d}{(year + 1) % 100:02d}",
+        "matches": int(len(m)),
+        "with_xg": int(m["home_xg"].notna().sum()),
+        "share": round(float(m["home_xg"].notna().mean()), 4) if len(m) else 0.0,
+        "error": err or None,
+    }
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    import json
+
+    p = argparse.ArgumentParser(description="Tuning base: data checks (counts only)")
+    p.add_argument("--xg-check", type=int, required=True, help="season start year to count")
+    p.add_argument("--league", required=True, help="football-data code")
+    a = p.parse_args(argv)
+    print(f"XG_COVERAGE {json.dumps(xg_coverage(a.league, a.xg_check), default=str)}")
+
+
+if __name__ == "__main__":
+    main()
