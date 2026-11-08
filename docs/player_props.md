@@ -1257,6 +1257,17 @@ caches.yml's verify job checks. Nothing in them was read.
 
 Measures, thresholds and the pass rule are unchanged.
 
+**Wayback Machine, checked 8 Nov** (free CDX count, run 42477795332, one-off; the tool was
+not kept). Played matches from 2021/22 with any 200 capture of the getMatchData endpoint or
+the match page:
+- all five leagues: 1,320 of 8,960 (14.7%); the endpoint our fetcher uses only 25 times;
+- E0 521 of 1,988, SP1 496 of 2,004 (378 of them 2024/25), D1 204 of 1,600, I1 51 of
+  1,614, F1 48 of 1,754;
+- the 2026/27 window: I1 0, F1 0, D1 4 of 70.
+
+B needs each player's run of earlier matches, so this can't rebuild the four leagues:
+we wait for Understat.
+
 **Protection from now on** (same PR as this note): the Understat match files are kept in
 five shards (`understat-E0-` … `understat-F1-`, path `data/raw/understat_matches`). Every run
 that works on a league restores all five, which together hold every file any run kept. A run
