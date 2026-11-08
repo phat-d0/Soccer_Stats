@@ -4005,6 +4005,56 @@ The tests cover:
 
 `odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
 
+
+### Result: no edge in these factors; the study closes (run 42470336372, read once)
+
+`odds-check.yml` `task=lasso-residual` ran at commit 3c4efc6b, the frozen code, in 87 minutes.
+- Every domestic cup-season fetched completely (no `LASSO_CUP` failures), so `cups_covered`
+  follows the frozen table.
+- 16,935 matches were scored, 2019/20–2023/24, over 57 refits. 2024/25 was never loaded.
+
+**Log loss.**
+- Pinnacle's early price alone scores 1.00356. The L1 model on top of it scores 1.00366.
+- The improvement is **−0.00010 (−0.00055 to +0.00037)**: no gain, and the range straddles 0.
+- For scale, Pinnacle's close scores 1.00065 on the same matches.
+- No season's range is above 0.
+- By league, only F1's range is above 0: +0.00147 (+0.00007 to +0.00285), the one league of
+  eight, which is what chance would give. D1 is −0.00113 and E3 −0.00102, both ranges including 0.
+
+**Selection** (share of refits keeping the factor):
+
+| Factor | Kept in |
+| --- | --- |
+| form_vs_market | 75% |
+| last_match | 75% |
+| congestion | 72% |
+| newcomer | 63% |
+| motivation | 61% |
+| europe | 60% |
+| model_gap | 60% |
+| rest | 46% |
+| price_shape | 32% |
+| season_phase | 28% |
+| red_card | 25% |
+| sot_form | 14% |
+| xg_luck | 12% |
+
+λ is chosen on each window's last year. There, keeping several small coefficients looked a
+little better in-window, but it did not carry out of sample. Frequent selection here is fitting
+noise, not signal.
+
+**The rule at T = 0.03** (1,116 bets): CLV **−3.6% (−4.2% to −3.1%)** against Pinnacle's close,
+below 0 in every league. ROI is +2.2% (−7.1% to +12.1%); that is luck, since the price moved
+against the bets.
+
+**Gate:**
+1. Log-loss range above 0: **no**.
+2. A factor kept in most refits: yes (seven).
+
+Both were required, so the study closes as **"no edge in these factors"**, and the 2024/25
+holdout is not spent. This agrees with the residual map, the strategy search and the free-signals
+round: none of these pre-match factors explains where Pinnacle's early price is wrong.
+
 ## Model tuning programme (owner via the lead, 8 Nov)
 
 The owner asked "How do I make it better?". The lead gave Research lab 2 four phases, run in
