@@ -4217,6 +4217,63 @@ matches per league):
   search) but not untouched for model comparisons. The tuning programme's judged read must say
   so.
 
+## Model evaluation, stage 2: scorecards (owner via the lead, 8 Nov; method written before any run)
+
+**What it is.** One out-of-sample scorecard for each model, each set beside the market's price on
+the same rows. It is descriptive: there is no pass rule, and nothing live changes because of it.
+The file is `lab/model_scorecard.json`. 2024/25 stays locked. This first part covers:
+
+- the 1X2 match model;
+- the Lean blend;
+- Pinnacle's fair early and close prices;
+- the corner model (f).
+
+The cup model, goalscorer B, the goal distributions, the retired shots model and the bake-off
+candidates come in later parts. Each part's method is written here before it runs.
+
+**1X2: model, blend, Pinnacle early, Pinnacle close.**
+- **Rows:** `residual_map.load_league`'s outcome rows.
+  - Eight leagues, 2019/20–2023/24, in the seasons the Lean backtest scores (90%+ coverage).
+  - Weekly walk-forward model, as live: xG weight 0.7, goals only where there is no xG.
+  - Blend refitted every 28 days.
+  - Only matches that all four series price are used.
+- **Per series, pooled and per league:**
+  - **Log loss:** 1X2, per match. Its 95% range resamples matches (2,000 draws, seed 0), and
+    so does the paired difference against Pinnacle's early price.
+  - **Brier score:** the sum over the three outcomes.
+  - **ROC AUC:** with `lab/auc.py`'s `compare` (imported, not edited), over every outcome row,
+    with a paired difference against the early price.
+  - **Calibration:** intercept and slope, with ranges clustered by match (`calibration.reliability`).
+  - **Argmax confusion matrix:** 3 × 3, actual by the outcome each series makes most likely,
+    and its accuracy.
+- **Confusion matrices at each live strategy's threshold.** Each outcome row is "picked" when the
+  strategy would bet that side.
+  - **Model 12%:** the side with the largest p_model × Pinnacle early odds − 1, when that is at
+    least 0.12.
+  - **Lean:** `lean_backtest.bets`' picks: z ≥ 1 on the blend, all odds.
+  - Reported:
+    - the 2 × 2 counts (picked or not, won or lost);
+    - the picks' win rate, set beside their mean implied chance (1/odds) and their mean
+      Pinnacle fair early chance;
+    - the picks' recall, as the share of all winning outcomes.
+  - This shows whether a strategy's picks win more often than the price says. It is the
+    classification view of the CLV results already on record.
+
+**Corners: model (f), team corners.**
+- **Rows:** `model_assumptions.corner_walk` (model (f), refitted every 28 days on the 730 days
+  before), eight leagues, 2017/18–2023/24. That is stage 1's sample. There is no corner price
+  history, so there is no market column.
+- **Baseline:** each block's league mean home and away corners over the same 730 training days.
+- **Per series, pooled and per league:**
+  - RMSE and MAE of the mean against the count;
+  - the NB2 log score (model (f): its fitted α; baseline: Poisson);
+  - the coverage of the central 80% and 90% intervals (NB2 for (f), Poisson for the baseline),
+    as the share of counts inside each interval.
+  - (f) minus baseline, with match-resampled 95% ranges, for RMSE and the log score.
+
+**Run.** `tuning.yml` `phase=scorecard`: a job per league, then a pool job that writes the file and
+prints it in base64 chunks with its SHA-256, as `residual_map` does. No key, 0 credits.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
