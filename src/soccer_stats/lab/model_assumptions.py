@@ -160,7 +160,7 @@ def run_league(code: str, n_boot: int = N_BOOT) -> dict:
     from soccer_stats import backtest
     from soccer_stats import leagues as lgs
     from soccer_stats.corners_live import corner_matches
-    from soccer_stats.data import load_matches, season_code
+    from soccer_stats.data import load_matches
     from soccer_stats.models import DixonColes
     from soccer_stats.publish import XG_WEIGHT
     from soccer_stats.xg import with_xg
@@ -188,7 +188,7 @@ def run_league(code: str, n_boot: int = N_BOOT) -> dict:
         "goals": goals_checks(preds, n_boot),
     }
     try:
-        cm = corner_matches(code, seasons=[season_code(y) for y in range(FIRST - 2, LAST + 1)])
+        cm = corner_matches(code, seasons=range(FIRST - 2, LAST + 1))
         cm = cm[pd.to_datetime(cm["date"]) < LOCK]
         holdout.check(cm["date"])
         cw = corner_walk(cm, f"{FIRST}-07-01", LOCK)
