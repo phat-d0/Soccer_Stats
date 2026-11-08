@@ -4144,3 +4144,55 @@ reference:
 **Code.** `lab/tuning_ceiling.py`; `tuning.yml` `phase=ceiling`. The league jobs restore the
 paid `odds-history-` cache (read only, with the archive fallback); no key, 0 credits. Log line
 `TUNING_CEILING_JSON`.
+
+### Phase 3: grid search on the never-tuned settings (pre-registered 2026-11-08, before any run)
+
+**Question.** Do better values exist for the settings nobody ever tuned (settings audit), when
+each one is chosen only on earlier seasons?
+
+**Blocks.** Each block is varied one at a time from today's defaults, so the count stays honest
+and every block's gain is its own:
+- **A. Time decay × xG weight.** xi ∈ {0.0010, 0.0015, 0.0019, 0.0025, 0.0035} × xG weight ∈
+  {0, 0.3, 0.5, 0.7, 0.85, 1} in the five xG leagues (30 configurations each). xi alone in E1–E3,
+  which have no xG (5 each).
+- **R. Ratings ridge** (added after phase 1, before this registration): ridge ∈ {0, 0.1, 0.3, 1,
+  3} on `DixonColes`' attack and defence, at today's xi and xG weight (5 each).
+- **B. Window × minimum team matches.** Window ∈ {365, 540, 730, 1,095} days × minimum ∈ {4, 6, 8}
+  (12 each).
+- **C. The blend's cadence.** Refit ∈ {14, 28, 56} days × minimum rows ∈ {200, 300, 500} (9 each),
+  on today's model.
+- **Not in this phase:**
+  - Corners' 300-match minimum: Corners own model (f); asked before any work.
+  - A goals-only ρ: stage 1's 0-0 finding needs a model change (`DixonColes` fits ρ with the
+    rest), which is Moneyline's to build; noted for them.
+
+**Method.**
+- Every configuration is run walk-forward from 2017-07-01 to 2024-07-01: weekly model refits;
+  for C, the blend's own cadence on the default model.
+- **Nested choice:** for each season S from 2019/20 to 2023/24, the configuration with the lowest
+  1X2 log loss over the seasons before S (from 2017/18; for C, from the blend's first fits) is
+  used to predict S. The choice is made per league. S never chooses anything.
+- Scored against today's default on the same rows: each block's rows are those every
+  configuration in it predicts.
+- 2024/25 is never loaded.
+
+**Measures**, per block, per league and pooled:
+- the nested configuration's out-of-sample log loss and the default's;
+- the **gain** = default − nested per match, with a 95% range (2,000 draws resampling matches,
+  seed 0);
+- the configuration chosen for each season (stability: the same value chosen every season, or
+  not);
+- the best configuration in hindsight, as a descriptive upper bound only.
+
+**Pass rule** (to recommend a change): a block's pooled gain has its range above 0. CLV and ROI
+are descriptive and are computed only for a block that passes, with the Lean backtest re-run
+on the nested setting. Any change goes into the single judged 2024/25 read at the end; nothing
+goes live from development alone.
+
+**Configurations counted:**
+- per xG league: 30 + 5 + 12 + 9 = 56;
+- per E1–E3 league: 5 + 5 + 12 + 9 = 31;
+- 373 in all, toward the programme's count (with phase 1's 72 and phase 2's 12: 457).
+
+**Code.** `lab/tuning_grid.py`; `tuning.yml` `phase=grid` (a job per league, then a pool job;
+no key, 0 credits). Log line `TUNING_GRID_JSON`.

@@ -36,9 +36,11 @@ class Config:
     xg_weight: float = 0.7
     window: int = 730
     min_team: int = 6
+    ridge: float = 0.0  # DixonColes' ratings ridge (0 = none, the live model)
 
     def key(self) -> str:
-        return f"xi{self.xi:g}_xg{self.xg_weight:g}_w{self.window}_m{self.min_team}"
+        return (f"xi{self.xi:g}_xg{self.xg_weight:g}_w{self.window}_m{self.min_team}"
+                f"_r{self.ridge:g}")  # fmt: skip
 
 
 DEFAULT = Config()
@@ -96,7 +98,7 @@ def walk(
         if train.empty:  # nothing to fit (a gap longer than the window)
             continue
         counts = pd.concat([train["home"], train["away"]]).value_counts()
-        model = DixonColes(xi=cfg.xi, xg_weight=cfg.xg_weight).fit(train, as_of=lo)
+        model = DixonColes(xi=cfg.xi, xg_weight=cfg.xg_weight, ridge=cfg.ridge).fit(train, as_of=lo)
         ok = [
             min(counts.get(h, 0), counts.get(a, 0)) >= cfg.min_team
             for h, a in zip(test["home"], test["away"], strict=True)
