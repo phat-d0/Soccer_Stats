@@ -1888,6 +1888,12 @@ the baseball team does. The first team sessions (created by the first lead) were
 | Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
 | Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
 | Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
+| Soccer team: Research lab 2 | session_01UShqQvgsVwKSXpXgieEppK | team/research-lasso |
+
+Research lab 2 (owner, 8 Nov) is a second session in the `research-lab` role, so research can run two
+studies at once. Each research session keeps to its own files and docs/lab.md section; the lead
+routes work between them. Its first study is LASSO on the market residual (pre-registration and
+development on 2019/20–2023/24; 2024/25 stays locked until the owner approves).
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub
