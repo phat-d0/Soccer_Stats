@@ -53,12 +53,52 @@ jobs:
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: xg-good
+      # Understat match files (lead, 8 Nov): the five shards together, restore only.
       - uses: actions/cache/restore@v4
-        if: ${{ contains(fromJSON('["SP1","D1","I1","F1"]'), matrix.league) }}
         with:
-          path: data/raw
-          key: understat-${{ matrix.league }}-none
-          restore-keys: understat-${{ matrix.league }}-
+          path: data/raw/understat_matches
+          key: understat-E0-none
+          restore-keys: understat-E0-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-E0
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-SP1-none
+          restore-keys: understat-SP1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-SP1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-D1-none
+          restore-keys: understat-D1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-D1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-I1-none
+          restore-keys: understat-I1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-I1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-F1-none
+          restore-keys: understat-F1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-F1
       # Paid odds (restore only): the ten-book history for phase 2's line-shop stages.
       - uses: actions/cache/restore@v4
         if: ${{ inputs.phase == 'ceiling' }}

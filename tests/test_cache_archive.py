@@ -297,7 +297,10 @@ def test_every_archived_free_restore_is_followed_by_a_soft_fallback():
         assert nxt.get("if") == s.get("if")
         assert nxt.get("continue-on-error") is True
         found += 1
-    assert found == 6  # publish, players, goalscorer-test, backfill, odds-check, tuning
+    # xg-good: publish, players, goalscorer-test, backfill, odds-check, tuning (6); the
+    # Understat match-file shards (lead, 8 Nov): five each in goalscorer-test, odds-check
+    # and tuning, the E0 shard in players (16).
+    assert found == 22
 
 
 # ---------- bought data can't be left out of the archive ----------
@@ -397,3 +400,49 @@ def test_a_workflow_that_saves_paid_data_archives_it_right_away():
         assert "archive=true" in run["run"]
         found += 1
     assert found == 3  # backfill.yml, players.yml, odds-check.yml
+
+
+def test_an_understat_shard_is_saved_only_from_main_and_only_when_it_grew():
+    """Lead, 8 Nov: the understat-<league>- shards were lost before the Understat outage. A
+    save must never keep fewer match files than were restored, only from the default
+    branch, and only after every shard was restored (so a shard is the union kept)."""
+    saves = 0
+    for wf, job, i, s, steps in _steps():
+        if "/save@" not in s.get("uses", ""):
+            continue
+        prefix = _prefix(s["with"])
+        if not prefix.startswith("understat-"):
+            continue
+        cond = s.get("if", "")
+        assert "steps.um.outputs.save == 'true'" in cond, f"{wf} {job}: unguarded shard save"
+        assert "refs/heads/claude/soccer-stats-scaffold" in cond, f"{wf} {job}: not main only"
+        assert _paths(s["with"]["path"]) == ["data/raw/understat_matches"]
+        um = [x for x in steps[:i] if x.get("id") == "um"]
+        assert um and '-gt "$before"' in um[-1]["run"], f"{wf} {job}: no growth check"
+        before = [x for x in steps[:i] if "UM_BEFORE=" in str(x.get("run", ""))]
+        assert before, f"{wf} {job}: restored count not taken"
+        first_count = steps.index(before[0])
+        restored = {
+            _prefix(x["with"])
+            for x in steps[:first_count]
+            if "/restore@" in x.get("uses", "") and _prefix(x["with"]).startswith("understat-")
+        }
+        if prefix == "understat-*-":  # a run on any league restores all five shards first
+            assert restored == {f"understat-{lg}-" for lg in ("E0", "SP1", "D1", "I1", "F1")}
+        else:
+            assert prefix in restored
+        saves += 1
+    assert saves == 3  # goalscorer-test, odds-check (goal-league/goal-leagues), players
+
+
+def test_the_extra_assets_are_listed_with_their_checksums_and_verified():
+    """Files on the archive release that no cache holds (lead, 8 Nov): each listed with its
+    sha256 in archive/extra_assets.json, and caches.yml's verify job checks every one."""
+    extra = json.loads((WORKFLOWS.parent.parent / "archive" / "extra_assets.json").read_text())
+    names = [a["asset"] for a in extra["assets"]]
+    assert "goalscorer-1nov-rescued.zip" in names and len(set(names)) == len(names)
+    for a in extra["assets"]:
+        assert re.fullmatch(r"[0-9a-f]{64}", a["sha256"]) and a["bytes"] > 0
+    wf = yaml.safe_load((WORKFLOWS / "caches.yml").read_text())
+    runs = " ".join(str(s.get("run", "")) for s in wf["jobs"]["verify"]["steps"])
+    assert "archive/extra_assets.json" in runs and "sha256sum" in runs

@@ -84,6 +84,18 @@ ARCHIVED_FREE = {
         "what": "the last good Understat league file per league-season (xg.GOOD_DIR; free)",
     },
 }
+# Understat match files (lead, 8 Nov): understat-<league>- caches were evicted before the
+# outage of 2 Nov, and with Understat down nothing could fetch them again, so B lost four
+# leagues. Five shards with one path: each run that worked on a league restores all five
+# (the union of every file kept) and saves its own shard back only when it added files.
+for _lg in ("E0", "SP1", "D1", "I1", "F1"):
+    ARCHIVED_FREE[f"understat-{_lg}"] = {
+        "prefix": f"understat-{_lg}-",
+        "paths": ["data/raw/understat_matches"],
+        "what": f"Understat match files, the {_lg} shard (all shards together hold every "
+        "match file any run kept; free)",
+    }
+del _lg
 ARCHIVED = PAID | ARCHIVED_FREE  # every cache with a release asset and a manifest entry
 
 # Caches a job holding ODDS_API_KEY saves that hold no bought data: prefix (fnmatch, as
@@ -97,7 +109,11 @@ FREE = {
     "cup-espn-": "ESPN's UEFA cup calendars and results (free)",
     "cup-corners-": "ESPN cup match summaries for the cup corner research (free)",
     "espn-timelines-": "ESPN goal timelines (free)",
-    "understat-*-": "Understat downloads for one league (free)",
+    "understat-*-": "Understat match files, one shard per league (free)",
+    **{
+        f"understat-{lg}-": f"Understat match files, the {lg} shard (free)"
+        for lg in ("E0", "SP1", "D1", "I1", "F1")
+    },
     "comebacks-*-": "Understat match files for the comeback research (free)",
     "heavy-espn-": "ESPN cup and extra-league days for the 75%+ counting (free)",
 }
