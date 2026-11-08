@@ -4353,3 +4353,92 @@ Stage 1 found the fitted ρ over-predicts 0-0 in every league. Moneyline's `Dixo
   as a descriptive check. This run computes log loss only.
 - **Judged read:** on 2025/26 if it passes (the lead's decision above).
 - **Run:** `tuning.yml` `phase=grid-rho` (`tuning_grid --blocks P`).
+
+### Phase 2: results (2026-11-08; `tuning.yml` `phase=ceiling` run 42463207351, 0 credits, no key)
+
+Descriptive. Every oracle is labelled never tradable.
+- **Seasons:** eight leagues, 2019/20–2023/24.
+- **The base reproduces the recorded Lean backtest:** 2,462 bets, CLV −3.1% (−3.4% to −2.8%),
+  ROI −1.3%. (`lean_backtest.json`'s −3.1% includes 2024/25.)
+
+| Stage | Bets | CLV vs Pinnacle's close | ROI | CLV gain over its reference |
+| --- | --- | --- | --- | --- |
+| Base (Lean, z ≥ 1, Pinnacle early) | 2,462 | −3.1% (−3.4 to −2.8) | −1.3% | – |
+| (a) the chance = Pinnacle's fair close | 3,475 | **+9.8%** (+9.6 to +10.1) | +13.6% | **+12.9 points** |
+| (b) the model = Poisson on post-match xG (5 leagues) | 2,812 | −1.3% (−1.6 to −1.0) | +80%* | +1.2 (+0.6 to +1.7) vs −2.5% on the same leagues |
+| (c) z cut in hindsight (best: 1.25) | 1,233 | −3.0% (−3.4 to −2.5) | −1.2% | +0.15 (−0.4 to +0.7) |
+| (d) same picks, best of ten books at 48 h | 2,171 | −2.1% (−2.5 to −1.7) | −0.4% | **+1.0** (+0.9 to +1.2), paired |
+| (e) same picks, DraftKings at 48 h | 2,171 | −4.9% | −3.2% | −1.8 (−1.9 to −1.6), paired |
+| (e) same picks, Pinnacle's quoted close | 2,171 | −2.8% | −0.5% | +0.3 (−0.0 to +0.6), paired |
+
+\* (b)'s ROI uses the match's own outcome-linked xG, so it is not a measure of anything tradable.
+Its CLV is the meaningful number.
+
+**z cuts:** CLV is flat across every cut:
+- 0.5: −3.1% (6,266 bets)
+- 0.75: −3.1%
+- 1: −3.1%
+- 1.25: −3.0%
+- 1.5: −3.1%
+- 2: −3.6% (177)
+- 2.5: −2.6% (56)
+- 3: −0.6% (21)
+
+The rule's threshold is not where the loss is.
+
+**Best book at the 48 h look:** Pinnacle on 1,127 of 2,171 picks, then DraftKings 284, BetRivers
+184, Caesars 160, BetMGM 140, BetOnline 109, FanDuel 100, Bovada 61, ESPN Bet 6.
+
+**Reading: where the ceiling is.**
+- **Information:** knowing what the close knows is worth about 13 points of CLV. Every other
+  stage is worth 1 point or less. The loss is not in the rule, the timing or the book; it is
+  that the model and blend don't know what the market learns by kickoff.
+- **Better form data:** even the match's own post-match xG lifts CLV by only 1.2 points. Form
+  data alone, however good, does not reach the close.
+- **Line shopping:** across ten books at 48 h it gains 1.0 point, leaving −2.1%. It narrows the
+  loss and does not close it. Line shop vs Pinnacle (the live track) is the test of whether the
+  best price alone, without the model, beats Pinnacle.
+- **Implication for the programme:** stage 3's remaining effort is best spent on information the
+  market prices before the close (the LASSO's factors, team news), not on rule tuning.
+
+### Phase 3: results (2026-11-08; `tuning.yml` `phase=grid` run 42463376432, 0 credits, no key)
+
+373 configurations; eight leagues; nested per league and season, 2019/20–2023/24; gains are
+the default's log loss minus the nested choice's, per match.
+
+| Block | Matches | Default | Nested | Gain (95% range) | Pass |
+| --- | --- | --- | --- | --- | --- |
+| A: xi × xG weight | 16,300 | 1.02135 | 1.02139 | −0.00005 (−0.00063 to +0.00051) | no |
+| **R: ratings ridge** | 16,300 | 1.02135 | **1.01894** | **+0.00240 (+0.00167 to +0.00314)** | **yes** |
+| B: window × minimum | 15,778 | 1.02030 | 1.02003 | +0.00028 (−0.00056 to +0.00108) | no |
+| C: blend refit × minimum rows | 16,270 | 1.00444 | 1.00443 | +0.00002 (−0.00005 to +0.00008) | no |
+
+**Block R, per league** (gain; the ridge chosen each season):
+- **E1** +0.0042 (+0.0019 to +0.0065), **E2** +0.0054 (+0.0025 to +0.0086), **E3** +0.0055
+  (+0.0032 to +0.0080): ridge 3 every season.
+- D1 +0.0008 (ridge 3, range across 0); F1 +0.00004 (ridge 1–3).
+- E0, I1 and SP1 about 0 (0 to 0.3 chosen).
+- **Caution: 3 is the top of the grid.** In E1–E3 the best value may be larger. The judged read
+  uses the frozen grid's rule as is (no new values are added after reading this).
+
+**The other blocks:**
+- **A:** the nested picks lean toward faster decay (xi 0.0025–0.0035), but gain nothing pooled.
+- **B:** E1 alone gains +0.0027 (+0.0008 to +0.0048) with 1,095 days and minimum 4. F1 loses
+  −0.0019 (−0.0035 to −0.0004). Pooled is about 0: one league of eight in each direction is
+  what chance gives.
+- **C:** the blend's cadence doesn't matter.
+
+**Reading.** Shrinking the team ratings toward average improves the model's log loss by 0.0024
+pooled, about an eighth of its 0.020 gap to Pinnacle's close. Almost all of it is in the three
+goals-only English leagues, where the model has no xG to steady the ratings; there the gain is
+0.004–0.005, about a fifth of their gap. This is phase 1's diagnosis confirmed: the model's
+error is fitting optimism, and shrinkage is the lever. No other never-tuned setting matters.
+
+**Next, as pre-registered.**
+- The Lean backtest is re-run on the nested ridge for its CLV and ROI (descriptive).
+- R becomes a named candidate for the single judged read on 2025/26, with the rule frozen:
+  - per league, the ridge with the lowest log loss over the development seasons 2017/18–2023/24
+    (2024/25 is not used, and 2025/26 never chooses);
+  - 2025/26 log loss against today's default, pass = range above 0;
+  - Pinnacle's fair price on the priced matches as the benchmark, with coverage reported;
+  - 2025/26 Understat coverage checked first.
