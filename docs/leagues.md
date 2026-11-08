@@ -37,8 +37,8 @@ was; the leagues still never refresh more often than the floors below.
 
 | League | Rule |
 | --- | --- |
-| Premier League (live) | Unchanged: every hour, around the clock, and every 30 minutes within 2 hours of a kickoff (budget permitting). |
-| SP1, D1, I1, F1, E1, E2, E3 | Nothing unless the league has a match within 48 hours. Then every 3 hours, hourly from 6 hours before kickoff, and every 30 minutes in the last 2 hours. |
+| Premier League (live) | Unchanged: every hour, around the clock, and every 15 minutes within 2 hours of a kickoff (30 until 28 Oct; budget permitting). |
+| SP1, D1, I1, F1, E1, E2, E3 | Nothing unless the league has a match within 48 hours. Then every 3 hours, hourly from 6 hours before kickoff, and every 15 minutes in the last 2 hours (30 until 28 Oct). |
 
 ### Who gets the budget when credits run low
 

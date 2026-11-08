@@ -665,7 +665,7 @@ four leagues: E0, E1–E3).
   close at the same moment (it mostly measures the gap between the books). Lean needs 300
   earlier rows, so it scores few blocks; `note` says how many. No closes file = `{kind, error}`.
 - `match_markets.py`: research only. 1X2, O/U 2.5 and Asian handicap vs Pinnacle; `clean_prices`.
-- `odds_feed.py`: live DraftKings odds and the credit budget. `policy_floor`: E0 every 1 h (30 min
+- `odds_feed.py`: live DraftKings odds and the credit budget. `policy_floor`: E0 every 1 h (15 min
   within 2 h of a kickoff); matchday leagues nothing without a kickoff within 48 h, then 3 h,
   1 h within 6 h, 15 min within 2 h (`KICKOFF_INTERVAL_HOURS` 0.25 since 28 Oct; 30 min
   before). `refresh_interval_hours` can split the budget, but since the ~5M plan (owner, 28 Oct)
