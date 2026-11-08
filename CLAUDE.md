@@ -77,7 +77,14 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   DraftKings' profit is on the same bets as Pinnacle's twins (+$121 vs +$126), so it is the
   matches', not the book's. Corner-market discovery (8 Nov, run 42461964987, 20 credits): no book beats Pinnacle's fair price consistently; FanDuel is nearest (about 1–2% behind it; DraftKings 5–7%); first-half and 1X2 corners have no Pinnacle price; handicaps only at DraftKings and Pinnacle. "Corner price moves" (pre-registered; run 42461462462): pass but tiny, Pinnacle moves +0.18 pts (+0.02 to +0.35) toward (f)'s side, about +0.35% against a 6% margin. No live change.
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
-- One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
+- Logged only (lead, 8 Nov; `corners_live.SHOP_BOOKS`): FanDuel, BetMGM, BetRivers and Bovada
+  in the same corner call (`bookmakers=` six books, one region, still 1 credit; not in E2/E3),
+  rows on data-log's corner log with `book`. No paper track reads them; they are dropped for
+  the month if a call with them bills more than 1 (`shop_off`). For the pre-registered "Corner
+  line shop vs Pinnacle" (`docs/totals.md`: look snapshot, 2% judged / 1% shadow, CLV vs
+  Pinnacle's close, read once at 300 bets or 31 May 2027); the track isn't built (owner first).
+- One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit; plus the
+  four logged-only books since 8 Nov);
   corner cap 20,000 credits a month since 28 Oct (750 before, 550 until 24 Oct; estimate 676 a month with E2/E3,
   `backfill.yml` run 40089304166).
 - Shadow filter "below 60%" (owner, 23 Oct; pre-registered in `docs/totals.md` "Shadow filter:
@@ -335,7 +342,7 @@ four leagues: E0, E1–E3).
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, lasso-coverage, tuning-bias, espn, understat, understat-restore, understat-backfill. Other inputs: `cap` (credit cap for coverage, props, corner-markets, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev, forward or gaps). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, lasso-coverage, tuning-bias, model-assumptions, espn, understat, understat-restore, understat-backfill. Other inputs: `cap` (credit cap for coverage, props, corner-markets, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev, forward or gaps). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `tuning.yml` | Model tuning programme (Research lab 2, 8 Nov; `docs/lab.md`): dispatch with `phase` (`bias` = phase 1, `ceiling` = phase 2, `grid` = phase 3); a job per league (restores `raw-data-`, `xg-good-` with the archive fallback and `understat-<league>-`; `ceiling` also the paid `odds-history-`, restore only, with the archive fallback), then a pool job. No key, never pushes; results in the log and a 7-day artifact. | 0 |
@@ -458,7 +465,10 @@ four leagues: E0, E1–E3).
   `players.py`: FPL availability → team adjustments (E0).
   `markets.py`: score matrix → market chances. `odds.py`: odds conversion, margin removal.
 - `models/dixon_coles.py`: the match model; `ridge` and `neutral` options for the cup model,
-  off by default.
+  off by default. `rho_option` (research only, Model evaluation and tuning, 8 Nov): None =
+  today's free ρ in [−0.3, 0.3]; `{"fixed": v}` holds ρ at v (`{"fixed": 0.0}` = no low-score
+  correction); `{"penalty": k}` adds k·ρ² to the loss; `tests/test_dixon_coles.py` pins the
+  default fit.
 - `backtest.py`: `walk_forward` (weekly refits on earlier matches; the final partial week is
   predicted too), the DraftKings backtest (`dk_trades`, `dk_strategies` raw/blend sweeps with
   bootstrap ranges, `dk_log_loss`) and `dk_tiers` (Lean replayed on it; `E0_dk.json` → `tiers`).
@@ -735,15 +745,18 @@ four leagues: E0, E1–E3).
   cdf}}` (P(corners ≤ k), k = 0..15) and returns `data.corners_model` per league (or `{error}`).
   `side_probs`, `pick(cdf, line, over, under, threshold)` (the better side if P(win) × odds +
   P(push) − 1 ≥ threshold; whole lines push). `run`: one call per (event, snapshot, group
-  "team_corners") for `books_for(league)`: `BOOKS` pinnacle, draftkings, or Pinnacle alone in
+  "team_corners") for `books_for(league, shop)`: `LOG_BOOKS` = `BOOKS` (pinnacle, draftkings; the
+  tracks' books) + `SHOP_BOOKS` (fanduel, betmgm, betrivers, bovada; logged only, ≤ `MAX_BOOKS`
+  10 = one region), `BOOKS` alone when `shop_off(calls, now)` (a call with the extra books
+  billed > 1 this month; summary `shop_books`, `shop_note`), or Pinnacle alone in
   `PINNACLE_ONLY` (E2, E3); cap `CORNERS_MONTHLY_CAP` 20,000 (750 until 28 Oct) and the reserve checked at
   `expected_cost` (dearest corner call this month, ≥ 1); `LEAGUES` = E0, SP1, D1, I1, F1, E1, E2,
   E3. `paused_leagues(calls, now)`: in a `PINNACLE_ONLY` league, a snapshot kind ("look"/"close",
   counted apart) whose last `EMPTY_PAUSE` 6 answered calls logged no rows, over ≥ 2 runs or
   kickoff days, makes no call for `EMPTY_PAUSE_DAYS` 7 after the last (summary `paused` =
   `{"E2 look": until}`); never in the other leagues (the Championship's looks are often empty
-  while its closes are priced). Rows: Pinnacle's two-sided lines, then DraftKings' (`book: "draftkings"`,
-  one-sided lines kept with the missing side and `fair_*`/`margin` None). `newest_quotes(rows,
+  while its closes are priced). Rows: Pinnacle's two-sided lines, then DraftKings' and each
+  `SHOP_BOOKS` book's (`book` names it; one-sided lines kept with the missing side and `fair_*`/`margin` None). `newest_quotes(rows,
   book=)`, `add_quotes(cards, dirs, book=, rows=)` → card `corners.pinnacle` / `corners.draftkings`
   = `{book, fetched_at, home/away: [{line, over, under, fair_over, margin, snapshot,
   downloaded_at, p_over, p_under, p_push, pick}]}`. `log` (CLI `log-corners`), `corner_results`
@@ -1290,6 +1303,15 @@ four leagues: E0, E1–E3).
   capped training rows, bias (out of sample − the close) and variance (out of sample − in
   sample) per league and pooled, team-rating stability. Workflow `tuning.yml` (`phase`, a job
   per league then a pool job; log lines `TUNING_BIAS_LEAGUE`, `TUNING_BIAS_JSON`).
+
+- `lab/model_assumptions.py` (owner via the lead, 8 Nov; Model evaluation and tuning;
+  `docs/lab.md` "Model evaluation, stage 1"; descriptive, no key): out-of-sample assumption
+  checks on 2017/18–2023/24 per league. Goals: dispersion given the walk-forward model's means,
+  home–away residual correlation, the 0-0/1-0/0-1/1-1 cells vs the model and vs independent
+  Poisson (`goals_checks`). Corners: model (f) refitted every 28 days (`corner_walk`), dispersion
+  under Poisson and the fitted NB2 (`corner_checks`). `odds-check.yml` `task=model-assumptions`,
+  log line `MODEL_ASSUMPTIONS_JSON`.
+
   `lab/tuning_ceiling.py` (phase 2, descriptive, every oracle never tradable): the Lean backtest
   (all odds, Pinnacle early) against (a) the blend's chance replaced by Pinnacle's fair close,
   (b) the model's by Poisson on the match's own post-match xG (refitted blend; xG leagues),

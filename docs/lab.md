@@ -4098,6 +4098,127 @@ log; every league is in the file).
 - **The blend** has low variance and gains a little from more rows; uncapped (today) is as good
   as any cap. Nothing to tune there.
 
+## Model evaluation, stage 1: method selection (owner via the lead, 8 Nov; checks written before any run)
+
+The owner's framework for every model has three stages: which method, how good it is, and how
+to make it better. This stage asks, for each model, whether the method suits the target, the
+type of data and the size of the data, and whether its assumptions hold on development data.
+It is descriptive: no verdict on any strategy, no bets, 0 credits. 2024/25 stays locked, and
+so do the goalscorer judged window and corners' 2026/27 test.
+
+**Assumption checks.** These are out of sample, on 2017/18–2023/24 (`lab/model_assumptions.py`,
+`odds-check.yml` `task=model-assumptions`).
+- **Goals** (match model, Dixon-Coles + xG, walk-forward as live: weekly refits, 730 days, xG
+  weight 0.7, goals only in E1–E3):
+  - raw variance-to-mean, home, away and total;
+  - dispersion given the model's own means: the mean of (y − λ)²/λ over both sides. It is 1
+    when the counts are Poisson around the model's means;
+  - the correlation of the home and away residuals (y − λ). The model assumes independence
+    apart from the low-score correction;
+  - the 0-0, 1-0, 0-1 and 1-1 cells: observed share vs the model's matrix (with ρ) vs
+    independent Poisson on the same means.
+- **Corners** (model (f), refitted every 28 days on the 730 days before, as live):
+  - dispersion under Poisson, and under the fitted NB2 (1 when NB2 is right);
+  - the mean α;
+  - the residual correlation between home and away corners.
+- Every figure has a 95% range from 2,000 draws resampling matches, seed 0, per league.
+- Data size per league-season.
+
+**Not recomputed (cited):**
+- the 1X2 bake-offs (rounds 1–3, and rounds 4, 5 and 7: ML vs Dixon-Coles);
+- corners bake-offs 1 and 2;
+- goalscorer candidates A–H;
+- the player shots model's stage-1 checks (`players.yml`, `E0_players.json` on data-log).
+
+Their recorded run ids go in the table.
+
+**Output.** One table:
+- model, target type, method, data and size;
+- assumptions checked with the result;
+- alternatives tried, with where they were recorded;
+- a one-line verdict on the method.
+
+### Stage 1: results (2026-11-08; `odds-check.yml` `task=model-assumptions` run 42461482443, 0 credits, no key)
+
+The first run (42460421494) gave the same goals numbers. Its corner part failed on a
+season-code bug, fixed before this run. Out of sample, 2017/18–2023/24; ranges are 95%,
+resampling matches.
+
+**Goals** (match model; matches per league from 2,089 in D1 to 3,713 in E1):
+
+| League | Dispersion given the model (Poisson = 1) | Home–away residual corr. | 0-0: observed − model | 0-0: observed − independent Poisson | 1-1: observed − model |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 1.004 (0.957–1.056) | −0.044 (−0.079 to −0.007) | −0.009 (−0.018 to −0.000) | −0.005 | −0.003 |
+| SP1 | 0.926 (0.886–0.968) | +0.075 (+0.037 to +0.114) | −0.001 | +0.003 | +0.007 |
+| D1 | 1.033 (0.982–1.087) | −0.084 (−0.123 to −0.046) | −0.015 (−0.024 to −0.005) | +0.000 | +0.010 |
+| I1 | 0.919 (0.880–0.959) | +0.058 (+0.020 to +0.095) | −0.006 | +0.001 | +0.006 |
+| F1 | 0.978 (0.933–1.028) | −0.003 | −0.010 (−0.020 to +0.000) | −0.005 | +0.006 |
+| E1 | 1.029 (0.991–1.068) | +0.000 | −0.007 | −0.006 | +0.004 |
+| E2 | 1.061 (1.017–1.109) | +0.014 | −0.006 | −0.004 | +0.003 |
+| E3 | 1.083 (1.040–1.130) | +0.021 | −0.007 | −0.004 | +0.006 |
+
+- **Poisson is a fair assumption around the model's means.** Dispersion is 0.92–1.08: slightly
+  under-dispersed in La Liga and Serie A, slightly over in League One and Two.
+- **Independence holds roughly.** The home–away residual correlation is within ±0.08,
+  negative in E0 and D1 and positive in SP1 and I1.
+- **The low-score correction over-corrects 0-0.** The fitted model expects more 0-0 draws than
+  happen in every league: 0.1–1.5 points too many, with the range below 0 in E0 and D1.
+  Independent Poisson on the same means is closer at 0-0. At 1-1 the model is nearer than
+  independent Poisson, and 1-1 is a little more frequent than either. The correction helps 1-1
+  but costs 0-0. A candidate for phase 3 is ρ fitted on goals only, not the xG blend; to be
+  pre-registered there.
+
+**Corners** (model (f), refitted every 28 days on the 730 days before, as live; 2,142–3,863
+matches per league):
+
+| League | Dispersion, Poisson | Dispersion, fitted NB2 (= 1 if right) | Mean α (home / away) | Home–away residual corr. |
+| --- | --- | --- | --- | --- |
+| E0 | 1.42 | 1.107 (1.062–1.152) | 0.051 / 0.063 | −0.22 (−0.25 to −0.18) |
+| SP1 | 1.42 | 1.090 (1.041–1.140) | 0.057 / 0.076 | −0.22 |
+| D1 | 1.43 | 1.124 (1.070–1.177) | 0.061 / 0.053 | −0.18 |
+| I1 | 1.43 | 1.079 (1.035–1.123) | 0.063 / 0.067 | −0.18 |
+| F1 | 1.44 | 1.072 (1.022–1.123) | 0.065 / 0.083 | −0.21 |
+| E1 | 1.39 | 1.089 (1.051–1.127) | 0.048 / 0.064 | −0.18 |
+| E2 | 1.42 | 1.072 (1.033–1.110) | 0.054 / 0.074 | −0.19 |
+| E3 | 1.40 | 1.069 (1.032–1.108) | 0.063 / 0.065 | −0.19 |
+
+- **Corners are clearly over-dispersed** (Poisson 1.39–1.44), so NB2 is the right family.
+- **NB2's α, moment-matched in sample, is still too small out of sample.** It leaves 7–12% more
+  variance than allowed, with every range above 1. Out of sample the means carry their own
+  error, which an in-sample α can't see. The intervals are a little too narrow, so a line far
+  from the mean is priced a little too confidently.
+- **Home and away corners are negatively correlated given the means** (−0.18 to −0.22 in every
+  league): when one side wins more corners the other wins fewer. Model (f) treats them as
+  independent. That does not affect a team line, but it would misprice a match-total corner line
+  built by adding the two (too wide). For Corners, who own model (f).
+
+**Method table** (the models in scope; "verdict" is on the method, not on profit):
+
+| Model | Target | Method | Data and size | Assumptions checked | Alternatives tried (recorded) | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| Match model | 1X2, 3 classes (via a score matrix) | Dixon-Coles: Poisson goals with a low-score correction, xG-blended targets, time decay | football-data + Understat; 306–552 matches a league-season, 730-day windows (about 600–1,100 matches) | Poisson around the means holds (0.92–1.08); independence roughly; 0-0 over-corrected | ML on Elo/xG/form/rest, a tuned DC, a DC+price blend: bake-offs 1–3 (runs 37542756710, 37543374450; lower leagues and big four: `docs/lab.md`): nothing beats the price | Right family; the 0-0 cell and shrinkage (phase 1) are the levers |
+| Blend (Lean's p_bet) | 1X2 | Multinomial logit on log price and log model, 28-day refits | Pinnacle close + model, from 2019/20; about 1,000+ rows a fit | Calibration in the backtest files | Learned edge thresholds, filters, price bands (`docs/lab.md`) | Right method; at its data limit (phase 1) |
+| Cup model (UCL) | 1X2 | Cross-league goals-only DC with ridge | ESPN UEFA + football-data leagues; about 120 UCL matches a season | Not checked here (stage 2 scores it) | None recorded | Never compared with an alternative: an open gap |
+| Corners model (f) | Corners per team, counts | Shrunk team ratios, NB2 per side | football-data HC/AC; 730 days | Over-dispersed (NB2 right), α a little small out of sample, home–away correlation −0.2 ignored | Corners bake-offs 1 and 2 (`docs/totals.md`), recalibration, cup corners: (f) chosen, nothing beats the price | Right family; α and the joint model are the levers |
+| Goals distributions (totals) | Team and total goals, counts | The match model's score matrix | As the match model | As goals above | Totals bake-off (`docs/totals.md` "Verdict (totals)") | As the match model |
+| Goalscorer B | Scores (binary) | NB regression per player on factors, Dixon-Coles team means | Understat players, five leagues | Calibration recorded (`docs/player_props.md` §14) | Candidates A–H, B-cal (§9, §14): B kept | Right method; ranks like the books (AUC 0.746) |
+| Player shots (parked) | Shots / on target, counts | NB2 with a start/sub mixture | Understat shots, E0 | Stage-1 checks in `E0_players.json` (data-log) | Blend with the line, segments (`docs/player_props.md` §7) | Parked; no new work |
+
+**What stage 1 says.**
+- Every live model uses a method that fits its target type, and the counting assumptions mostly
+  hold.
+- Three specific fixes are worth testing, and the grid in phase 3 can take them:
+  - the match model's 0-0 cell (ρ fitted on goals);
+  - its rating shrinkage (phase 1);
+  - corners' out-of-sample α and the home–away correlation (Corners' call).
+- The cup model is the one never compared with an alternative.
+- **A note on the holdout:** the 1X2 bake-offs (1 and 3) and corners bake-off 1 each opened their
+  2024/25 holdout once in October. 2024/25 is therefore locked for strategies (the strategy
+  search) but not untouched for model comparisons. The tuning programme's judged read must say
+  so.
+
+## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
+
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
 
 **Question.** Where in the pipeline is the upside? The pipeline runs: data → match model →
@@ -4214,3 +4335,21 @@ of its results were read).**
   corners bake-off 1); the final write-up states both.
 - **Named candidates for that read, if development supports them:** ρ (the 0-0 correction),
   and corners' α and home–away correlation (Corners' model).
+
+### Phase 3, block P: the low-score correction ρ (pre-registered 2026-11-08, before it runs)
+
+Stage 1 found the fitted ρ over-predicts 0-0 in every league. Moneyline's `DixonColes(rho_option=)`
+(PR #213; off by default, so the live model is unchanged) now allows ρ to be fixed or shrunk.
+- **Block P:** ρ ∈ {free (today), fixed at 0 (no correction), penalty k·ρ² with k ∈ {1, 10, 100,
+  1,000}}, at today's xi, xG weight, window and minimum. That is 6 configurations per league,
+  48 in all (the programme's count rises to 505).
+- **Penalty scale:** the penalty is added to the weighted log-likelihood, which sums about a few
+  hundred decayed matches. So k = 1 barely moves ρ, and k = 1,000 holds it near 0. The grid
+  spans that range.
+- **Method, measures and pass rule:** exactly as the other blocks: nested per league and season
+  on earlier seasons, scored against the default on the same rows, pass = pooled gain range
+  above 0.
+- **Follow-up, only if P passes:** the 0-0 and 1-1 cells under the chosen ρ (stage 1's measure),
+  as a descriptive check. This run computes log loss only.
+- **Judged read:** on 2025/26 if it passes (the lead's decision above).
+- **Run:** `tuning.yml` `phase=grid-rho` (`tuning_grid --blocks P`).

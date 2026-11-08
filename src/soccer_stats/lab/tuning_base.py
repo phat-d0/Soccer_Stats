@@ -37,10 +37,17 @@ class Config:
     window: int = 730
     min_team: int = 6
     ridge: float = 0.0  # DixonColes' ratings ridge (0 = none, the live model)
+    rho: str = ""  # "" = the live free rho; "fixed:<v>" or "penalty:<k>" (DixonColes.rho_option)
 
     def key(self) -> str:
         return (f"xi{self.xi:g}_xg{self.xg_weight:g}_w{self.window}_m{self.min_team}"
-                f"_r{self.ridge:g}")  # fmt: skip
+                f"_r{self.ridge:g}" + (f"_rho{self.rho}" if self.rho else ""))  # fmt: skip
+
+    def rho_option(self) -> dict | None:
+        if not self.rho:
+            return None
+        kind, value = self.rho.split(":")
+        return {kind: float(value)}
 
 
 DEFAULT = Config()
@@ -98,7 +105,9 @@ def walk(
         if train.empty:  # nothing to fit (a gap longer than the window)
             continue
         counts = pd.concat([train["home"], train["away"]]).value_counts()
-        model = DixonColes(xi=cfg.xi, xg_weight=cfg.xg_weight, ridge=cfg.ridge).fit(train, as_of=lo)
+        model = DixonColes(
+            xi=cfg.xi, xg_weight=cfg.xg_weight, ridge=cfg.ridge, rho_option=cfg.rho_option()
+        ).fit(train, as_of=lo)
         ok = [
             min(counts.get(h, 0), counts.get(a, 0)) >= cfg.min_team
             for h, a in zip(test["home"], test["away"], strict=True)

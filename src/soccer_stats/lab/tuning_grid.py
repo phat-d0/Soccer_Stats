@@ -28,6 +28,7 @@ XG_WEIGHTS = (0.0, 0.3, 0.5, 0.7, 0.85, 1.0)
 RIDGES = (0.0, 0.1, 0.3, 1.0, 3.0)
 WINDOWS = (365, 540, 730, 1095)
 MIN_TEAMS = (4, 6, 8)
+RHOS = ("", "fixed:0", "penalty:1", "penalty:10", "penalty:100", "penalty:1000")
 REFITS = (14, 28, 56)
 MIN_ROWS = (200, 300, 500)
 FIRST_SCORED = "1920"
@@ -57,7 +58,12 @@ def model_configs(code: str) -> dict[str, dict[str, tb.Config]]:
         for mt in MIN_TEAMS:
             c = tb.Config(xi=base.xi, xg_weight=base.xg_weight, window=win, min_team=mt)
             b[name(c)] = c
-    return {"A": a, "R": r, "B": b}
+    p = {}
+    for rho in RHOS:
+        c = tb.Config(xi=base.xi, xg_weight=base.xg_weight, window=base.window,
+                      min_team=base.min_team, rho=rho)  # fmt: skip
+        p[name(c)] = c
+    return {"A": a, "R": r, "B": b, "P": p}
 
 
 def blend_configs() -> dict[str, tuple[str, int]]:
@@ -93,7 +99,7 @@ def blend_rows(preds: pd.DataFrame, pins: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
-def run_league(code: str, out_dir: Path) -> dict:
+def run_league(code: str, out_dir: Path, blocks: tuple[str, ...] = ("A", "R", "B", "C")) -> dict:
     from soccer_stats.data import pinnacle_prices
 
     holdout = Holdout(tb.LOCK)
@@ -101,6 +107,7 @@ def run_league(code: str, out_dir: Path) -> dict:
     parts, default_preds = [], None
     cfgs = model_configs(code)
     done: dict[str, pd.DataFrame] = {}
+    cfgs = {b: c for b, c in cfgs.items() if b in blocks or (b == "A" and "C" in blocks)}
     for block, configs in cfgs.items():
         for name, cfg in configs.items():
             k = cfg.key()
@@ -109,22 +116,27 @@ def run_league(code: str, out_dir: Path) -> dict:
                                keep_ratings=False, holdout=holdout)  # fmt: skip
                 done[k] = p
                 print(f"{code} {block} {name}: {len(p)} predictions", flush=True)
-            part = ll_rows(done[k])
-            part["block"], part["config"] = block, name
-            parts.append(part)
+            if block in blocks:
+                part = ll_rows(done[k])
+                part["block"], part["config"] = block, name
+                parts.append(part)
             if name == "default":
                 default_preds = done[k]
     pins = pinnacle_prices(code, range(2017, tb.LAST_YEAR + 1))
     pins = pins[pd.to_datetime(pins["date"]) < tb.LOCK]
     holdout.check(pins["date"])
-    parts.append(blend_rows(default_preds, pins))
+    if "C" in blocks:
+        parts.append(blend_rows(default_preds, pins))
     rows = pd.concat(parts, ignore_index=True)
     rows.insert(0, "league", code)
     out_dir.mkdir(parents=True, exist_ok=True)
-    rows.to_csv(out_dir / f"grid_{code}.csv.gz", index=False)
-    n = {b: len(c) for b, c in cfgs.items()} | {"C": len(blend_configs())}
+    tag = "" if set(blocks) == {"A", "R", "B", "C"} else "_" + "".join(blocks)
+    rows.to_csv(out_dir / f"grid_{code}{tag}.csv.gz", index=False)
+    n = {b: len(c) for b, c in cfgs.items() if b in blocks}
+    if "C" in blocks:
+        n["C"] = len(blend_configs())
     res = {"league": code, "load": info, "configs": n, "rows": int(len(rows))}
-    (out_dir / f"grid_{code}.json").write_text(json.dumps(res, default=str))
+    (out_dir / f"grid_{code}{tag}.json").write_text(json.dumps(res, default=str))
     return res
 
 
@@ -224,9 +236,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--pool", default="", help="pool every league's files under this folder")
     p.add_argument("--out", default="out", help="output folder")
     p.add_argument("--boot", type=int, default=tb.N_BOOT, help="bootstrap draws")
+    p.add_argument("--blocks", default="A,R,B,C", help="comma list of blocks (A, R, B, C, P)")
     a = p.parse_args(argv)
     if a.league:
-        print(f"TUNING_GRID_LEAGUE {json.dumps(run_league(a.league, Path(a.out)), default=str)}")
+        blocks = tuple(b.strip() for b in a.blocks.split(",") if b.strip())
+        res = run_league(a.league, Path(a.out), blocks)
+        print(f"TUNING_GRID_LEAGUE {json.dumps(res, default=str)}")
         return
     res = pool(Path(a.pool or a.out), a.boot)
     print("\n".join(summary_lines(res)))

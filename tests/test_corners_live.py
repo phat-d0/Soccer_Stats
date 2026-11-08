@@ -219,7 +219,7 @@ def test_run_fetches_each_snapshot_once_in_every_league(tmp_path):
     s = cl.run(cards, out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
     assert s["calls"] == 2 and s["credits"] == 2 and s["stop"] is None
     url, params = calls[0]
-    assert "/events/ev1/odds" in url and params["bookmakers"] == "pinnacle,draftkings"
+    assert "/events/ev1/odds" in url and params["bookmakers"] == cl.LOG_BOOKS_PARAM
     assert params["markets"] == "alternate_team_totals_corners"
     assert "/soccer_efl_champ/events/ev9/odds" in calls[1][0]  # E1: its own call
     rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
@@ -653,11 +653,11 @@ def test_league_one_and_two_ask_pinnacle_alone_and_the_rest_both_books(tmp_path)
     s = cl.run(cards, out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
     assert s["calls"] == 3 and s["credits"] == 3
     books = {url.split("/events/")[1].split("/")[0]: p["bookmakers"] for url, p in calls}
-    assert books == {"ev1": "pinnacle,draftkings", "ev2": "pinnacle", "ev3": "pinnacle"}
+    assert books == {"ev1": cl.LOG_BOOKS_PARAM, "ev2": "pinnacle", "ev3": "pinnacle"}
     assert "/soccer_england_league1/events/ev2/odds" in calls[1][0]
     rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
     assert {c["league"]: c["books"] for c in rec} == {
-        "E0": "pinnacle,draftkings",
+        "E0": cl.LOG_BOOKS_PARAM,
         "E2": "pinnacle",
         "E3": "pinnacle",
     }

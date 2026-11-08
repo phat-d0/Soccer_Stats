@@ -15,6 +15,9 @@ def test_config_counts_match_the_pre_registration():
     for block in ("A", "R", "B"):
         assert "default" in a[block] and a[block]["default"] == tb.default_for("E0")
     assert a["R"]["default"].ridge == 0
+    assert len(a["P"]) == 6 and a["P"]["default"].rho_option() is None
+    opts = {c.rho for c in a["P"].values()}
+    assert {"fixed:0", "penalty:1000"} <= opts
 
 
 def _rows(seed=0):
@@ -57,3 +60,10 @@ def test_pool_flags_a_pass_only_with_a_range_above_zero(tmp_path):
     assert res["blocks"]["A"]["pooled"]["passes"] is False
     assert res["configs"] == 3
     assert tg.summary_lines(res)
+
+
+def test_rho_config_reaches_the_model():
+    c = tb.Config(rho="fixed:0")
+    assert c.rho_option() == {"fixed": 0.0}
+    assert c.key().endswith("_rhofixed:0")
+    assert tb.Config().key() == tb.DEFAULT.key() and "rho" not in tb.Config().key()
