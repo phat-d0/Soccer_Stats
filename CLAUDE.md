@@ -1252,12 +1252,25 @@ four leagues: E0, E1–E3).
   goals-only) and `xg_note` puts that in the file's note; a tenth slice splits home sides by
   league. Result: 7 of 331 cells with 200+ rows exclude 0, fewer than chance; the four-league
   home-side cell did not hold (+0.9 points, −0.6 to +2.5). The lead builds the owner's 3D view from it.
+- `lab/auc.py` (owner via the lead, 8 Nov; exploratory, no key; `docs/lab.md` "ROC AUC"): ROC AUC
+  (weighted, tie-aware, one shared match bootstrap) of the match model, blend, Pinnacle's early and
+  close and DraftKings' 48 h price (eight leagues 2019/20–2023/24), within 5-point price bands,
+  live corner lines (SP1, D1, E1–E3; E0/I1/F1 locked) and goalscorer B's 2025/26 development rows
+  (run 41346853368's artifacts). `odds-check.yml` `task=auc`, log lines `AUC_JSON`, `AUC_B64`;
+  committed `lab/auc_research.json` (run 42457943922): model 0.662 vs Pinnacle early 0.680, no
+  ranking beyond the price (within-band 0.499); goalscorer B 0.746 = the best price 0.746.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
   `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
   It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
   15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
+- `lab/research_overview.json` (owner, 8 Nov; `docs/lab.md` "Research overview"): every study to
+  date in one file for the app's Research tab (UI Design builds it): `areas`, `verdicts`, and per
+  study `area`, `name`, `when`, `verdict`, `question`, `sample`, `result`, `doc`, plus `measure`
+  (clv/roi) with `value`/`lo`/`hi`/`bets`, a backtest's `roi` range, `luck`, and `due`/`due_date`
+  for running tests. Copied from the recorded verdicts; Research updates it when one changes.
+  Map: https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8.
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
@@ -1888,6 +1901,12 @@ the baseball team does. The first team sessions (created by the first lead) were
 | Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
 | Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
 | Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
+| Soccer team: Research lab 2 | session_01UShqQvgsVwKSXpXgieEppK | team/research-lasso |
+
+Research lab 2 (owner, 8 Nov) is a second session in the `research-lab` role, so research can run two
+studies at once. Each research session keeps to its own files and docs/lab.md section; the lead
+routes work between them. Its first study is LASSO on the market residual (pre-registration and
+development on 2019/20–2023/24; 2024/25 stays locked until the owner approves).
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub

@@ -3661,3 +3661,87 @@ calibration numbers already reported. Exploratory: no verdict, no bets, nothing 
 
 **Output.** `odds-check.yml` `task=auc` (no key) prints `AUC_JSON` and the file as `AUC_B64`
 chunks with its SHA-256; the committed `lab/auc_research.json` is that text.
+
+## ROC AUC: results (run 42457943922, 8 Nov; exploratory, 0 credits)
+
+File `lab/auc_research.json` (SHA-256 2d7c3856…, 22,630 bytes). Ranges are 95%, resampling
+matches; differences are paired.
+
+**1. Match 1X2, eight leagues, 2019/20–2023/24** (13,667 matches, 41,001 outcome rows):
+
+| Series | AUC | vs Pinnacle early |
+| --- | --- | --- |
+| Raw model | 0.662 | −0.017 (−0.020 to −0.014) |
+| Blend (`p_bet`) | 0.679 | −0.001 (−0.002 to +0.000) |
+| Pinnacle early (fair) | 0.680 | – |
+| Pinnacle close (fair) | 0.683 | +0.0035 (+0.002 to +0.005) |
+
+- The raw model ranks worse than the price in every outcome (home −0.024, draw −0.013, away
+  −0.021) and every league (−0.010 in D1 and SP1 to −0.024 in E3), each range below 0.
+- DraftKings subset (2020/21–2023/24, 36,663 rows): DraftKings' 48 h price 0.682, Pinnacle early
+  0.684 (DraftKings − Pinnacle −0.0014, −0.0022 to −0.0006), the model 0.668 (model − DraftKings
+  −0.015, −0.018 to −0.012).
+
+**2. Ranking beyond the price** (inside 5-point bands of Pinnacle's early chance; 18 bands,
+40,987 rows): the model 0.499 (0.492 to 0.507) and the residual (model − price) 0.494 (0.486 to
+0.501) include 0.5: **the model adds no ranking beyond the price**. The blend 0.518 (0.510 to
+0.525) is above 0.5 only as much as the early price itself, 0.520 (0.514 to 0.526): both rank
+a little inside a 5-point band because the band still holds some spread. Pinnacle's close 0.539
+(0.531 to 0.546) does: it knows what happened between the early price and kickoff. This agrees
+with the blend weight c, the residual map and every bake-off.
+
+**3. Corners model (f), live log, SP1, D1, E1, E2, E3** (half lines, settled): small samples.
+Against Pinnacle (369 lines, 175 matches) model (f) 0.499 (0.438 to 0.563), Pinnacle's fair over
+0.559 (0.506 to 0.614), difference −0.060 (−0.120 to +0.006). Against DraftKings (77 lines, 37
+matches) 0.511 vs 0.481, difference +0.029 (−0.089 to +0.156). Model (f) ranks these lines no
+better than a coin so far; too few to say more.
+
+**4. Goalscorer B, 2025/26 development** (27,167 starters, 1,704 matches, five leagues): B 0.746
+(0.737 to 0.756), the best Yes price 0.746 (0.736 to 0.756), season xG 0.709, season goals 0.663.
+B − price +0.0002 (−0.004 to +0.004); B − xG +0.037 (+0.031 to +0.044); B − goals +0.083 (+0.074
+to +0.093). Per league B − price runs −0.003 (F1) to +0.002 (E0), every range across 0. B ranks
+scorers as well as the bookmakers and clearly better than season form; whether its chances beat
+the price is the §16 priced test's question, not this one.
+
+**For the owner.** AUC asks how well each model sorts what happened from what didn't (0.5 a coin,
+1 perfect). The match model scores 0.66, a little below Pinnacle's price at 0.68; the blend
+matches the price, and inside a narrow price band the model sorts no better than a coin, so it
+adds nothing the price doesn't already know. The goalscorer model ties the bookmakers at 0.75
+and beats season goals and xG clearly. The live corner model can't be judged yet (a few hundred
+lines, ranking near 0.5).
+
+## Research overview: every study in one file (owner, 8 Nov; for the app's Research tab)
+
+The owner asked to see the research results mapped out, then in the app under a Research tab.
+Research keeps one committed file of every study, and UI Design builds the tab from it (the
+owner chose to route the tab to UI Design).
+
+**The file.** `src/soccer_stats/lab/research_overview.json` = `{kind: "research_overview",
+generated, note, areas [{id, name}], verdicts {pass, fail, inconclusive, running, exploratory,
+withdrawn → label}, studies [...]}`. Each study has:
+- always: `id`, `area`, `name`, `when` (ISO date), `verdict`, `question`, `sample`, `result`
+  (one plain sentence) and `doc` (the write-up);
+- where recorded: `measure` ("clv" or "roi") with `value`, `lo`, `hi` (per $1, a 95% range
+  resampling matches) and `bets`; a backtest's `roi`, `roi_lo`, `roi_hi`; `luck: true` (the
+  strategy search's best rule, beaten by chance at p 0.94);
+- running tests only: `due` (words) and `due_date` (ISO).
+
+The figures are copied from the recorded verdicts, never recomputed: CLAUDE.md "Research verdicts
+to date", `docs/lab.md`, `docs/edge.md`, `docs/totals.md`, `docs/leagues.md` and
+`docs/player_props.md`. Research updates the file whenever a verdict changes; the 27 studies of
+8 Nov are the first version.
+
+**A first map** (Research, 8 Nov): https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8. It shows:
+- a verdict tally;
+- one CLV axis with Pinnacle's close as zero, and a return-per-$1 axis;
+- the studies as cards by area, each card's edge coloured by its verdict;
+- the tests still to be read, by due date.
+The app's tab can follow it or not; the file is the contract.
+
+**Suggested for the tab (UI Design decides):**
+- `publish.py` passes the file through as `data.json` → `research_overview`, in its own try;
+- a fifth tab, "Research", or Research inside Explore;
+- the tally and the two axes first, then the cards by area with the competition-free layout,
+  then "Still to be read";
+- studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
+  search, line shop) link to it.
