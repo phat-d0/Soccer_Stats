@@ -84,6 +84,10 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   every league at both books (Pinnacle −5.8%, DraftKings −6.6%), almost all of it the margin;
   DraftKings' profit is on the same bets as Pinnacle's twins (+$121 vs +$126), so it is the
   matches', not the book's. Corner-market discovery (8 Nov, run 42461964987, 20 credits): no book beats Pinnacle's fair price consistently; FanDuel is nearest (about 1–2% behind it; DraftKings 5–7%); first-half and 1X2 corners have no Pinnacle price; handicaps only at DraftKings and Pinnacle. "Corner price moves" (pre-registered; run 42461462462): pass but tiny, Pinnacle moves +0.18 pts (+0.02 to +0.35) toward (f)'s side, about +0.35% against a 6% margin. No live change.
+- Corner dispersion f-oos (α from out-of-sample residuals; pre-registered in `docs/totals.md`):
+  development 2017/18–2023/24 better (−0.0025, −0.0041 to −0.0009; run 42477403136), but the
+  single 2025/26 judged read **fails**: half-line log loss −0.0027 (−0.0069 to +0.0011), 3,408
+  matches (run 42478718647). (f) keeps its α; no live change.
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
 - Logged only (lead, 8 Nov; `corners_live.SHOP_BOOKS`): FanDuel, BetMGM, BetRivers and Bovada
   in the same corner call (`bookmakers=` six books, one region, still 1 credit; not in E2/E3),
