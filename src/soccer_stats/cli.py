@@ -291,6 +291,26 @@ def cmd_understat_backfill(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_match_wayback(args: argparse.Namespace) -> None:
+    """Wayback Machine coverage of Understat's match files, per league-season (counts only;
+    no key, nothing downloaded beyond the CDX index, nothing written)."""
+    import json
+
+    from soccer_stats import player_wayback as pw
+    from soccer_stats.xg import GOOD_DIR
+
+    rep = pw.report(GOOD_DIR)
+    for r in rep["rows"]:
+        print(
+            f"{r['league']} {r['season']}: {r['played']} played, archived API {r['api']}, "
+            f"page {r['page']}, either {r['either']}"
+        )
+    print(f"League files not held: {', '.join(rep['league_files_missing']) or 'none'}")
+    print("MATCH_WAYBACK_JSON " + json.dumps(rep))
+    if args.json:
+        Path(args.json).write_text(json.dumps(rep, indent=1))
+
+
 def cmd_understat_wayback(args: argparse.Namespace) -> None:
     """Which missing Understat seasons the Wayback Machine holds (counts only; no key, writes
     nothing into the good-copy folder)."""
@@ -3371,6 +3391,12 @@ def main(argv: list[str] | None = None) -> None:
     ub.add_argument("--leagues", default="", help="comma-separated codes (blank = the five)")
     ub.add_argument("--seasons", default="2017-2026", help="start years, e.g. 2017-2023")
     ub.set_defaults(func=cmd_understat_backfill)
+
+    mw = sub.add_parser(
+        "match-wayback", help="Wayback Machine coverage of Understat's match files (counts)"
+    )
+    mw.add_argument("--json", help="write the report as JSON")
+    mw.set_defaults(func=cmd_match_wayback)
 
     uw = sub.add_parser(
         "understat-wayback", help="missing Understat seasons in the Wayback Machine"
