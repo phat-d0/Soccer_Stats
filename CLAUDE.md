@@ -12,7 +12,7 @@ superseded results are in `docs/history.md`; research write-ups are in `docs/lab
 Portfolio Scope" (https://claude.ai/code/artifact/ff86c3e7-f90b-47a9-8474-28c7c7266e1d),
 section "Status and next steps".
 
-## Current state (5 Nov 2026)
+## Current state (8 Nov 2026)
 
 Every team reads this first, from `origin/claude/soccer-stats-scaffold` (see "Before every
 task" under Agent team). If something here looks wrong, tell the lead.
@@ -257,12 +257,32 @@ settlement runs after them.
   5 Nov, rules frozen; no outcome read): the best of DraftKings, FanDuel, BetMGM and BetRivers
   at ≥ 2% over Pinnacle's Shin-fair price at the first logged moment, $10, one bet per match;
   a 1% shadow; judged once at 300 bets on CLV against the every-book log's last Pinnacle quote
-  before kickoff. About 2.3 bets a day in the live week, so around mid-March 2027. Moneyline
-  builds the paper track after the Understat fix.
+  before kickoff. About 2.3 bets a day in the live week, so around mid-March 2027. The paper
+  track is live (`paper_lineshop.py`, see Match strategies above).
 - The model overrates the side it likes in every price band, favourites included (favourites:
   model 63.1%, won 57.1%, price 58.7%), most of all on long shots: the side it likes wins a
   little less often than the price implies, so its win rate tracks the price, not the model
   (`docs/lab.md` "Price-band edge rule", step 1, and the "Model 12% filters" verdict).
+- Model evaluation and tuning (8 Nov; `docs/lab.md` "Model tuning programme", "Model evaluation,
+  stage 2"; development 2019/20–2023/24, 2024/25 still locked). **Closed** after one change:
+  - Ratings ridge per league: **pass** on the single 2025/26 read (+0.00278 log loss, +0.00040
+    to +0.00532; run 42467772606), live since 8 Nov (see "Match model ratings ridge"). ρ options
+    (fixed 0, penalty): fail. Bias vs variance: variance dominates; window length doesn't matter.
+  - Ceiling (Lean, all odds): knowing Pinnacle's close is worth about +12.9 points of CLV; a
+    perfect post-match xG +1.2, best-of-books entry about +1.0, timing or the z cut ≤ 0.3. Further
+    1X2 tuning can't plausibly move CLV; the one open lead is late team news (16 Nov check).
+  - LASSO on the market residual (13 frozen factor groups, 16,935 matches; run 42470336372):
+    **fail**, log loss −0.00010 (−0.00055 to +0.00037) vs the early price; rule CLV −3.6%.
+    2024/25 not opened.
+  - Scorecards (`lab/model_scorecard.json`, `lab/model_scorecard2.json`; descriptive): 1X2 log
+    loss model 1.0225, blend 1.0062, Pinnacle early 1.0051, close 1.0020; AUC 0.662 / 0.679 /
+    0.680 / 0.683 (`lab/auc_research.json`: within 5-point price bands the model's AUC is 0.499).
+    Model 12%'s picks won 27.0% vs 27.7% at the fair price (over-confidence); Lean's 40.4% vs
+    40.0%. O/U 2.5 model 0.6836 vs early 0.6765. Cup model 0.9535 vs Pinnacle's close 0.9449.
+    Corners (f) beats a league-mean baseline in every league (RMSE 2.666 vs 2.745). Goalscorer B
+    0.2913 vs 1/odds 0.2953 (margin included, so not an edge).
+  - Corner dispersion f-oos: development better (−0.0025), the single 2025/26 read **fails**
+    (−0.0027, −0.0069 to +0.0011; run 42478718647). (f) keeps its α.
 
 **Live paper record** (publish of 5 Nov 11:43 UTC; changes daily, so read the publish log or
 the app): Blend Lean (new rule) 11 trades (10 settled), all odds (old rule) 33 (29 settled), Lean
@@ -314,14 +334,16 @@ on 4 Nov; trigger ids):
 KV id in `push/wrangler.jsonc`, four Worker secrets, `ALERT_URL`/`ALERT_TOKEN` repo secrets, then
 "Turn on" in the home-screen app). Until then each publish logs "Bet alerts: off".
 
-**Waiting on Understat** (down since 2 Nov): Moneyline runs `odds-check.yml`
-`task=understat-backfill` (`seasons=2017-2025`) on the default branch when it returns, then reruns
-the three backtests (`backfill.yml` `lean_backtest`, `edge12_backtest` (a run of its own: it is
-skipped when `lean_backtest` is set) and `dk_price_backtest`) for I1 2022/23's xG, then
-Research reruns `task=residual-map` with all eight leagues and the lead republishes the owner's
-3D view, the "Model vs Market Map" artifact
-(https://claude.ai/artifact/B731FfXCrdhqJuYEdtqYdV, built from `lab/residual_map.json`; today
-four leagues: E0, E1–E3).
+**Waiting on Understat** (down since 2 Nov; Moneyline checks daily, next 9 Nov 11:31 UTC): when it
+returns, Moneyline runs `odds-check.yml` `task=understat-backfill` (`seasons=2017-2025`) on the
+default branch, then reruns the three backtests (`backfill.yml` `lean_backtest`, `edge12_backtest`
+(a run of its own: it is skipped when `lean_backtest` is set) and `dk_price_backtest`) for I1
+2022/23's xG, and dispatches `task=goal-league` for SP1, D1, I1 and F1 on the default branch so
+Player props has goalscorer B's match files again (they fill the `understat-<league>-` shards).
+The residual map already covers all eight leagues (run 42424591226) and the owner's "Model vs
+Market Map" (https://claude.ai/artifact/B731FfXCrdhqJuYEdtqYdV) shows them; only I1 2022/23
+there is goals-only. The Wayback Machine can't rebuild the match files (14.7% of played matches
+since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 ## Branches and where things run
 
@@ -1408,7 +1430,9 @@ four leagues: E0, E1–E3).
   f-oos"): `CandidateFOos` = (f)'s means with α moment-matched on out-of-sample residuals (the
   last `OOS_DAYS` 365 before the fit, 28-day inner blocks; in-sample α under `MIN_OOS` 200,
   `alpha_source`); development only, scored by Model evaluation through
-  `lab.model_assumptions.corner_walk(..., model=)`; judged once on 2025/26 (pre-registered).
+  `lab.model_assumptions.corner_walk(..., model=)`; judged once on 2025/26 (pre-registered):
+  failed (run 42478718647; `lab/corner_foos.py`, `tuning.yml` `phase=foos-dev`/`foos-judged`), so
+  it stays research code and (f) keeps its α.
 - Data warnings: football-data's average/maximum Asian handicap columns are unreliable (use
   `match_markets.clean_prices`; Pinnacle's are fine). football-data's 2025/26 files have Pinnacle
   1X2 prices for only about half the season (E0 52%, E1 47%, E2/E3 30%): check coverage before
