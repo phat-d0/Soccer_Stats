@@ -4308,10 +4308,29 @@ and ROC AUC (higher is better):
   whole-number counts make a central interval cover more than its nominal level, so this is
   consistent with the NB2 fit, not a sign that it is too wide.
 
-**The committed file.** `lab/model_scorecard.json` is printed in the pool job's log as one
-base64 chunk with SHA-256 `3c815c30…c29212`. This sandbox cannot download logs or artifacts, so
-the file is committed by whoever can fetch it (the residual map's route). The numbers above are
-from the same run's summary lines.
+**The committed file** (`lab/model_scorecard.json`; SHA-256 `3c815c30…c29212`, matching the
+run's) adds two things to the summary lines.
+
+Paired log-loss differences against Pinnacle's early price (positive = worse than the early price):
+
+| Series | Difference | 95% range |
+| --- | --- | --- |
+| Model | +0.0174 | +0.0145 to +0.0201 |
+| Blend | +0.0011 | −0.0000 to +0.0023 |
+| Close | −0.0030 | −0.0043 to −0.0019 |
+
+The close is the only series that beats the early price.
+
+Calibration slopes (1 = calibrated, below 1 = over-confident):
+
+| Series | Slope | 95% range |
+| --- | --- | --- |
+| Model | 0.93 | 0.88 to 0.97 |
+| Blend | 0.98 | 0.94 to 1.03 |
+| Early | 1.01 | 0.97 to 1.06 |
+| Close | 1.02 | 0.97 to 1.06 |
+
+The model is over-confident: its range is below 1. The blend fixes that.
 
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
