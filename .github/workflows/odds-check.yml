@@ -136,6 +136,12 @@
 #   residual-map: where the model and the market disagree, and who was right (docs/lab.md
 #            "Residual map"; exploratory, 2019/20-2023/24, no key). Prints the file as
 #            RESIDUAL_MAP_B64 chunks with its SHA-256.
+#   corner-markets: corner-market discovery (docs/totals.md "Corner-market discovery";
+#            corners team, lead's cap 20): which books quote team corners, match total
+#            corners, corner handicaps and first-half corners, their margins and how often
+#            the better side beats Pinnacle's Shin-fair price. Prices only; cap 0 = events.
+#   corner-moves: does model (f)'s side predict Pinnacle's look -> close move (docs/totals.md
+#            "Corner price moves"; pre-registered)? data-log's corner price logs, no key.
 #   auc: ROC AUC for the match model, blend and prices, corners model (f) and goalscorer B
 #            (docs/lab.md "ROC AUC"; exploratory, 2019/20-2023/24, no key).
 #   dk-gap-counts: DraftKings vs Pinnacle's fair price at the bought 48 h looks, counts only
@@ -152,12 +158,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
         default: coverage
       cap:
-        description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -434,7 +440,7 @@ jobs:
           github-token: ${{ github.token }}
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || (inputs.task == 'corner-markets' && inputs.cap != '0') || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           GH_TOKEN: ${{ (inputs.task == 'understat' || inputs.task == 'residual-map') && github.token || '' }}
           DESIGN: ${{ inputs.design }}
@@ -569,6 +575,9 @@ jobs:
                 uv run python -m soccer_stats.edge.market_probe --cap "$CAP" \
                   --json out/markets.json --bodies out/market_bodies
               fi ;;
+            corner-markets)  # corner-market discovery (docs/totals.md); prices only, cap 0 = events only
+              uv run python -m soccer_stats.edge.corner_markets --cap "$CAP" \
+                --json out/corner_markets.json --bodies out/corner_market_bodies ;;
             corner-history)  # bodies cached in data/raw/corner_history, copied to the artifact
               uv run soccer-stats corner-history-probe --cap "$CAP" \
                 --json out/corner_history.json
@@ -658,6 +667,14 @@ jobs:
               done
               uv run python -m soccer_stats.lab.residual_map --json out/residual_map.json ;;
             dk-gap-counts) uv run python -m soccer_stats.lab.dk_gap_counts ;;
+            corner-moves)  # no key, prices only: data-log's corner price logs (docs/totals.md "Corner price moves")
+              git fetch -q --depth=1 origin data-log
+              mkdir -p out/log/odds_log
+              for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '_corners_2' ); do
+                git show "FETCH_HEAD:$f" > "out/log/odds_log/$(basename "$f")"
+              done
+              uv run python -m soccer_stats.edge.corner_moves --log-dir out/log \
+                --json out/corner_moves.json ;;
             auc)  # no key: the corner price logs from data-log, goalscorer rows from run 41346853368
               git fetch -q --depth=1 origin data-log
               mkdir -p out/log/odds_log
