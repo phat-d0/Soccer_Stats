@@ -4456,3 +4456,26 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   development seasons 2017/18–2023/24 in this block.
 - **Run:** `tuning.yml` `phase=grid-ridge` (`tuning_grid --blocks R2`).
 - **Count:** the programme's configuration count rises to 545.
+
+### Phase 3, block R2: results (`tuning.yml` `phase=grid-ridge` run 42464940851, attempt 2 after a uv download outage; 0 credits)
+
+- **Pooled gain:** +0.00270 (+0.00151 to +0.00389) over 16,300 matches, 40 configurations.
+- **No league chose 30**, the new top value, so the optimum is now inside the grid.
+
+| League | Gain (95% range) | Ridge chosen, season by season (2019/20–2023/24) |
+| --- | --- | --- |
+| E3 | +0.0079 (+0.0036 to +0.0125) | 10, 10, 10, 10, 10 |
+| E1 | +0.0048 (+0.0006 to +0.0093) | 3, 10, 10, 10, 10 |
+| E2 | +0.0043 (+0.0006 to +0.0083) | 3, 3, 10, 10, 3 |
+| D1 | +0.0008 (−0.0018 to +0.0034) | 3 every season |
+| F1 | +0.00004 | 3, 3, 1, 1, 1 |
+| E0 | −0.0002 | default ×4, then 1 |
+| I1 | 0 | default every season |
+| SP1 | −0.0002 | 1, then default ×4 |
+
+**Reading.**
+- Among the goals-only leagues, the stronger ridge (10) beats 3 in E1 and E3.
+- The xG leagues need little or none: the xG targets already steady the ratings.
+- The judged read's per-league ridge is chosen by the rule pre-registered for R2. That is the
+  lowest log loss over all of 2017/18–2023/24, computed by the judged-read code, so this
+  season-by-season table does not set it.
