@@ -4596,3 +4596,44 @@ uv download outages; 48 configurations, all eight leagues):
 **Run.** `tuning.yml` `phase=judged` (`lab/tuning_judged.py`: per league the ridge chosen on
 2017/18–2023/24, then default vs candidate over 2025/26, weekly refits; a pool job gives the
 verdict). Run once, from team/model-tuning after the PR that holds this frozen text is open.
+
+### Result: PASS (run 42467772606, read once)
+
+`tuning.yml` `phase=judged` run 42467772606. In attempt 1, D1's job failed at the uv download
+(the GitHub 504 outage) before any code ran, and the pool then ran on seven leagues; that pool
+was not the frozen read and was not read. "Re-run failed jobs" ran D1 on the same commit
+(9db60d88), and attempt 2's pool, with all eight leagues, is the read.
+
+**Primary:** 3,284 matches. Default 1.02344, candidate 1.02066, gain **+0.00278 (+0.00040 to
++0.00532)**. The lower end is above 0, so it **passes**.
+
+**The ridge chosen per league on 2017/18–2023/24, and its 2025/26 gain (descriptive):**
+
+| League | Ridge | Gain | 95% range | Priced |
+| --- | --- | --- | --- | --- |
+| E0 | 0 (default) | 0 | – | 198 of 368 |
+| SP1 | 0 (default) | 0 | – | 170 of 362 |
+| I1 | 0 (default) | 0 | – | 186 of 368 |
+| D1 | 3 | −0.00234 | −0.00661 to +0.00217 | 143 of 300 |
+| F1 | 1 | −0.00029 | −0.00197 to +0.00144 | 147 of 300 |
+| E1 | 10 | +0.00496 | −0.00107 to +0.01128 | 259 of 540 |
+| E2 | 3 | +0.00976 | +0.00181 to +0.01899 | 135 of 522 |
+| E3 | 10 | +0.00408 | −0.00588 to +0.01536 | 139 of 524 |
+
+- **E1–E3 together:** 1,586 matches, +0.00625 (+0.00181 to +0.01132).
+- **The gain is the goals-only leagues'.** In the five xG leagues the ridge is 0 in three. It is
+  slightly worse in D1 and F1, with both ranges including 0, as in development.
+- **Against Pinnacle, on the 1,377 matches priced at the close:**
+  - Default 1.0204, candidate 1.0119; Pinnacle early 0.9955, close 0.9961.
+  - In E1–E3 (533 priced): default 1.0882, candidate 1.0654, close 1.0513.
+  - The ridge closes about a third of the model's gap to the price overall, and about 60% of it
+    in the lower leagues. The model is still behind Pinnacle everywhere.
+
+**What happens next** (as frozen above):
+- Moneyline can add the per-league ridge to the live fit: E1 10, E2 3, E3 10, D1 3, F1 1, E0, SP1
+  and I1 0. Setting D1 and F1 to 0 would also be defensible, since their development gains were
+  tiny and both 2025/26 gains are negative; but the judged candidate is the rule as frozen, so
+  any change is the owner's call.
+- The owner decides whether it goes live. If it does, the Lean blends are refitted and the
+  backtests re-run.
+- This is a log-loss result, not a profit result.
