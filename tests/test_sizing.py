@@ -28,7 +28,7 @@ def test_the_formula_with_its_cap_and_the_zero_stake():
     assert sz.kelly_f(0.5, 2.5) == pytest.approx((0.5 * 2.5 - 1) / 1.5)
     # Quarter Kelly: 1,000 x 0.25 x 0.1667 = 41.67.
     assert sz.kelly_stake(1000, 0.5, 2.5) == pytest.approx(41.67)
-    # f* = 0.8: a quarter is 20%, capped at 5% of the bankroll.
+    # f* = 0.8: a quarter is 20%, capped at $50 (5% of the $1,000 start).
     assert sz.kelly_stake(1000, 0.9, 2.0) == 50.0
     # No edge (f* <= 0), no chance, no price, no bankroll: no stake.
     assert sz.kelly_stake(1000, 0.3, 2.0) == 0.0
@@ -37,6 +37,21 @@ def test_the_formula_with_its_cap_and_the_zero_stake():
     assert sz.kelly_stake(0, 0.9, 2.0) == 0.0 and sz.kelly_stake(-5, 0.9, 2.0) == 0.0
     assert sz.kelly_f(float("nan"), 2) is None and sz.kelly_f(1.2, 2) is None
     assert (sz.KELLY_FRACTION, sz.KELLY_CAP, sz.BANKROLL_START) == (0.25, 0.05, 1000.0)
+    assert sz.KELLY_CAP_USD == 50.0
+
+
+def test_the_cap_is_fifty_dollars_whatever_the_bankroll():
+    # Owner, 8 Nov: 5% of the $1,000 start, not of the current bankroll.
+    assert sz.kelly_stake(1726, 0.9, 2.0) == 50.0  # was 86.30 under 5% of the bankroll
+    assert sz.kelly_stake(5000, 0.6, 2.0) == 50.0  # quarter Kelly 250, capped
+    assert sz.kelly_stake(1100, 0.55, 2.0) == pytest.approx(27.5)  # f* 0.1: under the cap
+    # Below $1,000, quarter Kelly as before (the cap never binds harder than 5% did).
+    assert sz.kelly_stake(800, 0.6, 2.0) == 40.0
+    assert sz.kelly_stake(600, 0.9, 2.0) == 50.0
+    assert sz.kelly_stake(400, 0.9, 2.0) == 50.0  # 20% of 400 = 80, capped at 50
+    # Never more than the bankroll.
+    assert sz.kelly_stake(30, 0.9, 2.0) == 6.0
+    assert sz.kelly_stake(30, 0.99, 100.0, fraction=2.0) == 30.0
 
 
 def bet(i, open_h, settle_h, ret, p=0.6, odds=2.0):
@@ -51,19 +66,19 @@ def bet(i, open_h, settle_h, ret, p=0.6, odds=2.0):
 
 
 def test_a_stake_never_uses_later_profit_or_loss():
-    # p 0.6 at 2.0: f* = 0.2, a quarter is 5% (at the cap).
+    # p 0.6 at 2.0: f* = 0.2, a quarter is 5%: $50 on 1,000, the $50 cap above it.
     bets = [
         bet(1, 0, 10, 1.0),  # wins +50 at hour 10
         bet(2, 5, 12, -1.0),  # opened before bet 1 settled: sized on 1,000
-        bet(3, 11, 20, 1.0),  # opened after: sized on 1,050
-        bet(4, 13, None, None),  # still open: staked on 1,050 - 52.50
+        bet(3, 11, 20, 1.0),  # opened after: sized on 1,050, so capped at $50
+        bet(4, 13, None, None),  # still open: sized on 1,050 - 50 = 1,000
     ]
     out = sz.simulate(bets, sz.kelly_fn())
     st = out["stakes"]
     assert st["b1"] == 50.0 and st["b2"] == 50.0
-    assert st["b3"] == pytest.approx(52.5) and st["b4"] == pytest.approx(0.05 * (1050 - 50))
-    assert out["bankroll_now"] == pytest.approx(1000 + 50 - 50 + 52.5)
-    assert out["bets"] == 4 and out["bets_settled"] == 3 and out["staked"] == pytest.approx(152.5)
+    assert st["b3"] == 50.0 and st["b4"] == pytest.approx(0.05 * (1050 - 50))
+    assert out["bankroll_now"] == pytest.approx(1000 + 50 - 50 + 50)
+    assert out["bets"] == 4 and out["bets_settled"] == 3 and out["staked"] == pytest.approx(150.0)
     # Reordering the input changes nothing: the path follows the clock.
     assert sz.simulate(list(reversed(bets)), sz.kelly_fn())["stakes"] == st
     # A later loss can't reach back into an earlier stake.
@@ -84,7 +99,7 @@ def test_drawdown_growth_curve_and_zero_stakes():
     bets = [bet(1, 0, 1, 1.0), bet(2, 2, 3, -1.0), bet(3, 4, 5, -1.0), bet(4, 6, 7, 1.0, p=0.3)]
     out = sz.simulate(bets, sz.kelly_fn())
     peak = 1050.0
-    low = peak - 52.5 - 0.05 * (peak - 52.5)
+    low = peak - 50 - 0.05 * (peak - 50)  # $50 capped on 1,050, then 5% of 1,000
     assert out["max_drawdown"] == pytest.approx(peak - low, abs=0.01)
     assert out["max_drawdown_pct"] == pytest.approx((peak - low) / peak, abs=1e-4)
     assert out["bets_zero_stake"] == 1 and out["bets_staked"] == 3
@@ -353,3 +368,20 @@ def test_a_bust_bankroll_says_no_bankroll_and_corners_log_their_line():
     )
     log = sz.live_sizing([corner], {"p_source": "model_f"})["kelly"]["log"]
     assert log[0]["pick"] == "Brighton over 5.5" and log[0]["chance"] == 0.5
+
+
+def test_the_kelly_log_reports_the_fixed_cap():
+    # A winning run lifts the bankroll past $1,000: the next stake stops at $50, `capped`
+    # is set, and `fraction` is the stake's real share of the bankroll at open.
+    trades = [
+        trade(1, 0, 1, "won", 0.9, 5.0),  # f* 0.875: quarter 21.9% of 1,000, capped at $50
+        trade(2, 2, 3, "won", 0.55, 2.0),  # f* 0.1: quarter 2.5% of 1,200 = $30, under the cap
+        trade(3, 4, 5, "lost", 0.6, 2.0),  # f* 0.2: quarter 5% of 1,230 = $61.50, capped
+    ]
+    log = sz.live_sizing(trades, {"p_source": "blend"})["kelly"]["log"]
+    r1, r2, r3 = log
+    assert r1["stake"] == 50.0 and r1.get("capped") and r1["fraction"] == 0.05
+    assert r1["bankroll_after"] == 1200.0
+    assert r2["stake"] == 30.0 and not r2.get("capped") and r2["fraction"] == 0.025
+    assert r3["bankroll_before"] == 1230.0 and r3["stake"] == 50.0 and r3.get("capped")
+    assert r3["fraction"] == pytest.approx(50 / 1230, abs=1e-4)

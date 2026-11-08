@@ -70,7 +70,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   track; Model 12%, its track and Lean's old rule sit in the Archive.
 - Kelly sizing tracked as an alternative; flat $10 is the record (owner, 24 Oct; `sizing.py`,
   `docs/leagues.md` "Kelly sizing"): $1,000 paper bankroll per strategy, quarter Kelly capped
-  at 5%, on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
+  at $50 a bet (5% of the $1,000 start, a fixed amount since 8 Nov, owner; before, 5% of the
+  current bankroll), on the blend's chance (Lean, Model 12%) or model (f)'s (corners); no new bets.
   Backtests: Kelly loses more than flat for Lean and mostly declines Model 12%'s picks; Kelly on
   the raw model goes broke (`docs/leagues.md` "Kelly sizing"). Each live strategy has a Kelly
   bet log in the app (owner, 5 Nov): how every stake was sized, with the flat $10 result beside it.
@@ -684,8 +685,10 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   on `p_blend` (stake 0 before a league's first fit); `app_section` passes them through.
 - `sizing.py` (owner, 24 Oct; display only): Kelly sizing tracked beside flat $10 over the same
   trades or backtest bets. `KELLY_FRACTION` 0.25, `KELLY_CAP` 0.05, `BANKROLL_START` 1,000,
-  `FLAT_STAKE` 10; `kelly_f(p, d)` = (p·d − 1)/(d − 1), `kelly_stake(bankroll, p, d)` (0 when f ≤ 0,
-  no p or no bankroll); `simulate(bets, stake_fn)` (events in time order: a stake uses the
+  `KELLY_CAP_USD` 50 (= 5% of the start; owner, 8 Nov: a fixed $50, not 5% of the current
+  bankroll), `FLAT_STAKE` 10; `kelly_f(p, d)` = (p·d − 1)/(d − 1), `kelly_stake(bankroll, p, d)`
+  = min(¼ f*·bankroll, $50, bankroll) (0 when f ≤ 0, no p or no bankroll); the log's `capped` =
+  the $50 bound and `fraction` = the stake's share of the bankroll at open; `simulate(bets, stake_fn)` (events in time order: a stake uses the
   bankroll from bets settled at or before its open, P/L at settlement, pushes/voids return the
   stake) → `{bankroll_start, bankroll_now, profit, staked, roi_on_staked, max_drawdown,
   max_drawdown_pct, growth_per_bet (log(end/start) per settled bet), bets, bets_settled,
@@ -696,7 +699,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   and `log` (owner via the lead, 5 Nov; `kelly_log` on `simulate(..., log=True)`, which records
   each bet's bankroll at open and after settlement and leaves every other number unchanged): one
   row per trade, oldest first, `{id, opened_at, settled_at, league, match, pick, odds, chance,
-  kelly (full f*), fraction (min(¼ f*, 5%), 0 with no stake), capped?, bankroll_before, stake,
+  kelly (full f*), fraction (the stake ÷ the bankroll at open, 0 with no stake), capped?, bankroll_before, stake,
   status, push?, profit, bankroll_after, reason? ("no edge on the chance" / "no chance" / "no
   bankroll", only with no stake), flat_profit}` (flags and reason only when set);
   `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push), the line shop Pinnacle's fair chance (`p_source` "pinnacle_fair" sizes on `model_p`).

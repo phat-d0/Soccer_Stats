@@ -328,7 +328,10 @@ $10 stays the record (`sizing.py`).
 
 **Defaults** (stated in every `sizing` block so the owner can change them): a $1,000 paper
 bankroll at each strategy's first trade; quarter Kelly (`KELLY_FRACTION` 0.25) with the stake
-capped at 5% of the bankroll (`KELLY_CAP`), nothing when f* <= 0; f* = (p x d - 1) / (d - 1)
+capped at $50, 5% of the $1,000 start (`KELLY_CAP_USD`; owner, 8 Nov: a fixed amount, so a
+winning run can't inflate the stakes; until then the cap was 5% of the current bankroll, which
+let the DraftKings corners stakes reach $86 on a $1,726 bankroll), never more than the
+bankroll, nothing when f* <= 0; f* = (p x d - 1) / (d - 1)
 for the decimal odds d taken and a calibrated chance p:
 - Blend Lean: `p_bet` (the blend).
 - Model 12%: the blend's chance for the trade's side (`p_blend`), recorded at open from 24 Oct;
