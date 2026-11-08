@@ -451,3 +451,11 @@
 {"league":"B1","kinds":["inplay55"],"kickoffs":["2026-11-08T12:30:00+00:00"],"fetched_at":"2026-11-08T13:18:15+00:00","status":200,"cost":1,"credits_left":4959524,"events":4,"rows":5}
 {"league":"D2","kinds":["inplay55"],"kickoffs":["2026-11-08T12:30:00+00:00"],"fetched_at":"2026-11-08T13:18:15+00:00","status":200,"cost":1,"credits_left":4959523,"events":3,"rows":19}
 {"league":"FAC","kinds":["inplay75"],"kickoffs":["2026-11-08T12:00:00+00:00"],"fetched_at":"2026-11-08T13:18:15+00:00","status":200,"cost":1,"credits_left":4959522,"events":5,"rows":5}
+{"league":"B1","kinds":["inplay75"],"kickoffs":["2026-11-08T12:30:00+00:00","2026-11-08T12:31:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959471,"events":4,"rows":5}
+{"league":"D2","kinds":["inplay75"],"kickoffs":["2026-11-08T12:30:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959470,"events":3,"rows":20}
+{"league":"DNK","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959469,"events":3,"rows":5}
+{"league":"FIN","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959468,"events":3,"rows":15}
+{"league":"SWE","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959467,"events":5,"rows":10}
+{"league":"SWZ","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959466,"events":3,"rows":4}
+{"league":"T1","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00","2026-11-08T13:01:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959465,"events":3,"rows":5}
+{"league":"SP1","kinds":["inplay55"],"kickoffs":["2026-11-08T13:00:00+00:00"],"fetched_at":"2026-11-08T13:48:16+00:00","status":200,"cost":1,"credits_left":4959464,"events":15,"rows":7}
