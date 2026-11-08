@@ -3612,6 +3612,81 @@ season, E0's own value fell from +2.1 to +1.2.
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
 
+## Settings audit: which settings were tuned, on what, and which backtests are out of sample (owner via the lead, 8 Nov; read-only, 0 credits, no outcome read)
+
+Every fixed number in the live code was traced through the git history and the docs to say who
+chose it, when, and on what data. A setting chosen after reading outcomes makes the seasons it
+was read on in-sample for that setting: a backtest over those seasons flatters it.
+
+### The settings
+
+| Setting | Value | Where | Chosen | On what | Outcomes read when chosen? |
+| --- | --- | --- | --- | --- | --- |
+| Dixon-Coles time decay `xi` | 0.0019 a day (half-life about a year) | `models/dixon_coles.py` | 5 Oct, scaffold | Default; the README's "tune xi by out-of-sample log loss" was never done | No |
+| xG weight | 0.7 (0 for goals-only leagues) | `publish.XG_WEIGHT` | 5 Oct, scaffold | Default; a sweep 0/0.5/0.7/1 was suggested in the code, no result is recorded | Unknown (no record) |
+| Walk-forward window, min team matches, refit | 730 days, 6, weekly | `backtest.py` | 5 Oct | Default | No |
+| Blend burn-in | 2 seasons | `fit-match-blends`, `backtest-lean` | 10 Oct | Default | No |
+| Cup model ridge, decay, window | 0.1, 0.0019, 730 days | `cup_model.py` | 13 Oct | "A small ridge"; decay as the domestic model | No (UCL log loss read after) |
+| Blend form, refit, minimum rows | logit on log price and log model, 28 days, 300 | `match_calibration.py` | 6 Oct | Ported from the player calibration | No |
+| σ | sd of (blend − price) on the fit rows | `match_calibration.sigma` | 10 Oct | Definition | No |
+| Lean z, Strong z | 1σ, 2σ | `trades.LEAN_Z`, `STRONG_Z` | 10 Oct | Owner, from the baseball app | No soccer outcomes |
+| **Lean odds range** | 1.50 < odds ≤ 3.00 | `trades.LEAN_ODDS_RANGE` | 24 Oct | Owner, after reading live paper (22 trades) **and** `lean_backtest.json`'s odds bands | **Yes: 2019/20–2024/25, eight leagues** |
+| Model 12% edge | 12%, raw model | `trades.PAPER_EDGE`, `PAPER_RULE` | 5 Oct (12%), 10 Oct (fixed_raw) | Original scope; re-adopted by the owner knowing the backtest lost | No (basis not recorded) |
+| Early price lead | 4 days before kickoff | `lean_backtest.EARLY_LEAD` | 10 Oct | football-data's early price is 2–3 days out | No |
+| Corner model (f) | shrunk team ratios, NB2 | `corners_live.TeamCornersF` | Pre-registered 10 Oct | Bake-off 2, nothing tuned; selected on 2017/18–2023/24 (six leagues) | Yes, by design: dev seasons; 2026/27 locked |
+| Corner window, minimum | 730 days, 300 matches | `corners_live` | 10 Oct | 730 = bake-off 2's window; 300 has no recorded reason (the bake-off required 1,000) | No |
+| Corner edge | 12% | `trades.CORNERS_EDGE` | 10 Oct | Copied from the match rule | No |
+| **Corners "below 60%" cut** | 0.60 | `trades.CORNER_VARIANTS` | 23 Oct (pre-registered) | Owner, after the first 55 settled live Pinnacle corner trades | **Yes: live trades before 23 Oct 08:39**; judged only after |
+| Goalscorer factors (B) | `GOAL_FACTORS` | `models/player_goals.py` | 6 Oct | Spec fixed before data was scored; stayed primary when C–H failed on E0 2023/24–2024/25 | Dev seasons; E0 2025/26 seen weekly |
+| Goalscorer threshold T | 20% of {5, 8, 12, 16, 20%} | `player_goal_priced.T_JUDGED` | 1 Nov | Volume rule (≥ 0.3 bets a match) on 2025/26 | No (counts only) |
+| Kelly fraction, cap | ¼, 5% | `sizing.py` | 24 Oct | Defaults; display only | No |
+
+### Which backtests are out of sample
+
+- **Blend Lean at Pinnacle's early price** (`lean_backtest.json`, 2019/20–2024/25): **partly**.
+  The model, blend, σ and z cuts were set before these seasons were read and are refitted walk
+  forward. The **odds range** was chosen on this file's odds bands, so the live rule's backtest
+  ("−1.8%, 1,345 bets, −200 to +200") is in-sample for the range. The all-odds replay is clean.
+- **Model 12%** (`edge12_backtest.json`, same seasons): **fully** out of sample. 12% predates any
+  backtest, and the later sweeps changed nothing.
+- **Both rules at DraftKings' prices** (2020/21–2024/25): Model 12% fully; Lean's live rule
+  partly (the same odds range, read on the same seasons through the Pinnacle file).
+- **Draw no bet, strategy search, price bands, comeback, cash-out, line shop**: their rules were
+  pre-registered, and the strategy search kept 2024/25 locked. Out of sample as stated in each
+  section.
+- **Corners**: the research view's numbers are development seasons (model (f) was chosen on
+  2017/18–2023/24); the clean test is the locked 2026/27 read on 3 Feb 2027. The 60% cut is
+  judged only on trades from 23 Oct 08:39, so its verdict will be clean.
+- **Goalscorer**: the 2025/26 development is in-sample for T (by volume, not results); the
+  judged §16 window is clean.
+
+### How much the tuned settings could matter (from sweeps already logged)
+
+- **Lean odds range**: pooled CLV by band, 2019/20–2024/25: ≤1.50 −1.9% (232 bets), 1.50–2.00
+  −2.7% (632), 2.00–3.00 −3.1% (712), 3.00–5.00 −3.8% (790), >5.00 −3.0% (261). The range keeps
+  the middle bands (about −2.9% pooled, against −3.1% at every price) and drops the best band
+  (≤1.50); every band is below 0, so the range can't turn the rule positive. The flattering is
+  about 0.2 points of CLV.
+- **Edge threshold**: at DraftKings, E0 2025/26, every threshold from 2% to 20% loses (ROI −8%
+  to −21%); E0 line shopping 2017/18–2025/26 shows flat CLV across 2–20%; the price-band sweep
+  (2–30% per band) has every band's best CLV below 0. The 12% choice is not what makes Model 12%
+  lose.
+- **Strategy search**: 11,857 rules over thresholds, z cuts and filters, best CLV +1.3% with a
+  luck-check p of 0.94. Tuning these settings on 2019/20–2023/24 finds nothing either.
+- **Never varied** (no record): `xi`, the xG weight, burn-in, the 28-day refit and 300-row
+  minimum, the 730-day windows, min team matches, the cup ridge, corners' 300-match minimum,
+  Kelly's ¼ and 5%. Being untuned, they can't be over-fitted, but nobody knows whether better
+  values exist.
+
+### For the owner
+
+Most of the model's settings were never tuned on results: they are defaults, so the backtests
+don't flatter them. Two settings were chosen after looking at results: Blend Lean's 1.50–3.00
+odds range (on the 2019/20–2024/25 backtest) and the corners' under-60% cut (on October's live
+trades). Lean's live-rule backtest is therefore slightly flattering, by about 0.2 points of CLV,
+and it still loses; the 60% cut is judged only on trades after it was set. No setting we
+have swept turns a strategy positive, so the losses are not a tuning problem.
+
 ## ROC AUC: how well each model ranks outcomes (owner via the lead, 8 Nov; exploratory, 0 credits; method written before any run)
 
 **Why.** The owner asked: "can we run ROC AUC on our models?" AUC is the chance that a random
