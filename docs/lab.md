@@ -4476,6 +4476,21 @@ and (b), and was not read. This run is the read.
 **The committed file.** The pool log prints `model_scorecard2.json` (SHA-256 `9ee625d1…97c8db`).
 It goes beside part 1's file by the same route as part 1 (the lead decodes and commits it).
 
+
+### Corner dispersion f-oos: scoring for the corners team
+
+The pre-registration is the corners team's (`docs/totals.md` "Corner dispersion: candidate
+f-oos"), and is followed exactly. Code: `lab/corner_foos.py`, `tuning.yml`
+`phase=foos-dev` then `phase=foos-judged`.
+- **Development (2017/18–2023/24):** (f) and f-oos through `corner_walk` on identical blocks.
+  Reported: NB2 dispersion, PIT deciles, 50%/90% coverage, and the per-match summed binary log
+  loss at both teams' half lines 2.5–8.5, with the paired difference f-oos − (f) and its range.
+- **The judged read (2025/26, once):** only if development shows an improvement. The holdout is
+  unlocked from 2025-07-01 with a logged reason. Any row outside 2025/26 is refused; 2024/25 is
+  training only; no season after 2025/26 is loaded.
+- Discrete central intervals over-cover by construction, so coverage is compared between the two
+  models, not against the nominal level.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)

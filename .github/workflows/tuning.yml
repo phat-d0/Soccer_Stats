@@ -3,6 +3,8 @@
 # One job per league, then a pool job. No API key, no credits, never pushes. Results in the
 # log (TUNING_<PHASE>_JSON) and a 7-day artifact.
 #   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+#   phase=foos-dev / foos-judged: Corners' f-oos candidate beside model (f) (lab/corner_foos.py;
+#   docs/totals.md "Corner dispersion: candidate f-oos"; the judged read once, after development).
 #   phase=scorecard2: stage 2, part 2 (lab/model_scorecard2.py: goal distributions per league,
 #   the cup model in its own job, goalscorer B from goal_run's goalscorer-test artifacts).
 #   phase=scorecard: model evaluation stage 2, the scorecards (lab/model_scorecard.py;
@@ -20,9 +22,9 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once); scorecard = model evaluation stage 2 (descriptive); scorecard2 = stage 2 part 2"
+        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once); scorecard = model evaluation stage 2 (descriptive); scorecard2 = stage 2 part 2; foos-dev / foos-judged = corner f-oos (judged once)"
         type: choice
-        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged, scorecard, scorecard2]
+        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged, scorecard, scorecard2, foos-dev, foos-judged]
         default: bias
       goal_run:
         description: "scorecard2: the goalscorer-test.yml run whose goalscorer-dev-* artifacts to score (blank = skip)"
@@ -99,6 +101,8 @@ jobs:
             judged) uv run python -m soccer_stats.lab.tuning_judged --league "$LEAGUE" --out out ;;
             scorecard) uv run python -m soccer_stats.lab.model_scorecard --league "$LEAGUE" --out out ;;
             scorecard2) uv run python -m soccer_stats.lab.model_scorecard2 --league "$LEAGUE" --out out ;;
+            foos-dev) uv run python -m soccer_stats.lab.corner_foos --mode dev --league "$LEAGUE" --out out ;;
+            foos-judged) uv run python -m soccer_stats.lab.corner_foos --mode judged --league "$LEAGUE" --out out ;;
             grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
                         --blocks R2 ;;
           esac
@@ -184,6 +188,8 @@ jobs:
             judged) uv run python -m soccer_stats.lab.tuning_judged --pool in --out out ;;
             scorecard) uv run python -m soccer_stats.lab.model_scorecard --pool in --out out ;;
             scorecard2) uv run python -m soccer_stats.lab.model_scorecard2 --pool in --goal-dir goal --out out ;;
+            foos-dev) uv run python -m soccer_stats.lab.corner_foos --mode dev --pool in --out out ;;
+            foos-judged) uv run python -m soccer_stats.lab.corner_foos --mode judged --pool in --out out ;;
             bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
             ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --pool in --out out ;;
             grid|grid-rho|grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
