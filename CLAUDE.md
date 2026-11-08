@@ -1534,7 +1534,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v78) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v79) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1758,7 +1758,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   (`KELLY_FORMULA`), the chance used (`KELLY_CHANCE` by `p_source`), then `kelly.log` newest
   first, 25 rows then 50 more a tap (`state.kellyShown`, `data-klmore`), columns date, match
   and pick, odds (American and decimal), chance, full Kelly, stake ($ and % of the bankroll,
-  "capped at 5%", or "No stake" with the reason), result, P/L (flat $10's beside it) and
+  "capped at $50", or "No stake" with the reason), result, P/L (flat $10's beside it) and
   bankroll after; a table on a laptop, one stacked block per bet under 700px (`.kl-table`,
   cells labelled from `data-label`). Backtest sizing says in one line that the backtests keep
   no per-bet stakes. The fixture keeps each log's newest 27 rows (`trim_kelly_logs`), every judged
@@ -1860,7 +1860,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   - Trade rows, in both modes (owner, 7 Nov): every live row of a section with `sizing.kelly`
     (`pfTradeRow(t, kl)`, `kellyCell`) shows ¼ Kelly beside flat $10: the stake and its share of
     the bankroll with "to win $X" while open, the ¼ Kelly P/L with the stake and share once
-    settled, "capped" at 5%, or "No stake" with a short reason (`KELLY_SHORT`), in two
+    settled, "capped at $50" at the cap, or "No stake" with a short reason (`KELLY_SHORT`), in two
     right-hand columns (`.vals.two`: `.vcol` Flat 74px, `.kcol` ¼ Kelly 84px; owner via the lead,
     7 Nov: chosen over a stacked line) headed once per list by `kellyColsHead`. Nothing in a
     trade row is truncated: its `.meta` lines wrap, and a `.nowrap` phrase (the DraftKings CLV
@@ -1868,6 +1868,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     `sizing.kelly` (the line shop's 1% line in the fixture) keeps flat alone.
   - Trade sheet: the Kelly line (`kellyStakeLine`, now with its share of the bankroll and the
     cap; the line shop's chance is Pinnacle's fair one) leads, above the table.
+  - The cap (owner, 8 Nov; v79): a fixed $50, 5% of the $1,000 start, not 5% of the current
+    bankroll. `KELLY_CAP_TEXT` "$50 (5% of the $1,000 start)" in `KELLY_FORMULA` and the trade
+    sheet's Kelly line, `KELLY_CAP_SHORT` "$50" in the trade-row column and the Kelly bet log
+    ("capped at $50"); each stake still shows its share of the bankroll that sized it. The labels
+    read only `capped`; the data fields keep their names (`fraction` = the stake's actual share).
   - Backtest: the bankroll chart (`sizingHtml` on the part's `sizing`) leads, above the tiles;
     since v76 (data-log's files carry them from 7 Nov) each bet in the list has a ¼ Kelly line
     (`kMeta`: "¼ Kelly $x (y% of $B) · ±$P" from `kelly_stake`, `bankroll_before`,
