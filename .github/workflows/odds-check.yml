@@ -139,7 +139,7 @@
 #   corner-markets: corner-market discovery (docs/totals.md "Corner-market discovery";
 #            corners team, lead's cap 20): which books quote team corners, match total
 #            corners, corner handicaps and first-half corners, their margins and how often
-#            the better side beats Pinnacle's Shin-fair price. Prices only; cap 0 = events.
+#            the better side beats Pinnacle's Shin-fair price. Prices only; cap 0 = nothing fetched (no key).
 #   corner-moves: does model (f)'s side predict Pinnacle's look -> close move (docs/totals.md
 #            "Corner price moves"; pre-registered)? data-log's corner price logs, no key.
 #   auc: ROC AUC for the match model, blend and prices, corners model (f) and goalscorer B
@@ -575,7 +575,7 @@ jobs:
                 uv run python -m soccer_stats.edge.market_probe --cap "$CAP" \
                   --json out/markets.json --bodies out/market_bodies
               fi ;;
-            corner-markets)  # corner-market discovery (docs/totals.md); prices only, cap 0 = events only
+            corner-markets)  # corner-market discovery (docs/totals.md); prices only, cap 0 = nothing fetched (no key)
               uv run python -m soccer_stats.edge.corner_markets --cap "$CAP" \
                 --json out/corner_markets.json --bodies out/corner_market_bodies ;;
             corner-history)  # bodies cached in data/raw/corner_history, copied to the artifact

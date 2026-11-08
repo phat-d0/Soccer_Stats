@@ -75,7 +75,7 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
 - Task 1 read (corners team, 8 Nov; `docs/totals.md` "Corners: Task 1 read"): CLV below 0 in
   every league at both books (Pinnacle −5.8%, DraftKings −6.6%), almost all of it the margin;
   DraftKings' profit is on the same bets as Pinnacle's twins (+$121 vs +$126), so it is the
-  matches', not the book's. Next: corner-market discovery (cap 20) and "Corner price moves".
+  matches', not the book's. Corner-market discovery (8 Nov, run 42461964987, 20 credits): no book beats Pinnacle's fair price consistently; FanDuel is nearest (about 1–2% behind it; DraftKings 5–7%); first-half and 1X2 corners have no Pinnacle price; handicaps only at DraftKings and Pinnacle. "Corner price moves" (pre-registered; run 42461462462): pass but tiny, Pinnacle moves +0.18 pts (+0.02 to +0.35) toward (f)'s side, about +0.35% against a 6% margin. No live change.
 - Model (f) 12% vs DraftKings, from 20 Oct (DraftKings lists no team corners in E1).
 - One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit);
   corner cap 20,000 credits a month since 28 Oct (750 before, 550 until 24 Oct; estimate 676 a month with E2/E3,

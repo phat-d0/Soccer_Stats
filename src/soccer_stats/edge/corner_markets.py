@@ -194,7 +194,8 @@ def run(
     get: Callable = requests.get,
     out_dir: Path | None = None,
 ) -> dict:
-    """The discovery, never past `cap` credits (0 = events lists only)."""
+    """The discovery, never past `cap` credits. At 0 only the free events lists are
+    asked, and only with a key: the workflow passes none at cap 0, so nothing is fetched."""
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     now = now or pd.Timestamp.now(tz="UTC")
     budget = CappedBudget(cap)
@@ -333,7 +334,9 @@ def main(argv: list[str] | None = None) -> None:
     import argparse
 
     ap = argparse.ArgumentParser(prog="python -m soccer_stats.edge.corner_markets")
-    ap.add_argument("--cap", type=int, default=0, help="credits (0 = events lists only)")
+    ap.add_argument(
+        "--cap", type=int, default=0, help="credits (0 = free events lists only, with a key)"
+    )
     ap.add_argument("--odds-leagues", type=int, default=ODDS_LEAGUES)
     ap.add_argument("--json")
     ap.add_argument("--bodies", default="out/corner_market_bodies")
