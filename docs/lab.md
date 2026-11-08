@@ -4393,7 +4393,9 @@ The model is over-confident: its range is below 1. The blend fixes that.
 
 **(a) The goal distributions** (the score matrix behind the Goals rows and the team totals):
 - **Rows:** the same walk-forward as part 1, eight leagues, 2019/20–2023/24, with the score
-  matrix kept.
+  matrix kept. It uses the live model as it now stands, with each league's ratings ridge
+  (`leagues.match_ridge`, merged after part 1 ran). Amended before any run: part 1 scored the
+  model without the ridge.
 - **Total goals over/under 2.5:**
   - log loss, Brier, AUC and the calibration slope for the model's chance, set beside Pinnacle's
     Shin-fair early and close O/U 2.5 (football-data P>2.5, PC>2.5);
@@ -4428,7 +4430,8 @@ The model is over-confident: its range is below 1. The blend fixes that.
 **Run.**
 - (a) and (b): `tuning.yml` `phase=scorecard2` (a job per league for (a), one cup job, a pool
   job).
-- (c): read from the `goalscorer-test.yml` run's artifacts.
+- (c): the pool job downloads the `goalscorer-test.yml` run's artifacts (input `goal_run`, the
+  run id).
 - All three are added to `lab/model_scorecard.json` as `goals`, `cup` and `goalscorer`.
 
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
