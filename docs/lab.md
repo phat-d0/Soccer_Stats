@@ -4296,8 +4296,8 @@ and ROC AUC (higher is better):
   says, so the 12% "edge" is the model's over-confidence. This agrees with the CLV record.
 - **Lean's picks:** 2,461. They won 40.4%, against 41.0% implied and 40.0% fair. Their win rate
   tracks the fair price: the blend adds nothing the price lacks.
-- The full file is described in the next section, which also covers calibration and the 3 × 3
-  argmax confusion matrices.
+- Calibration slopes, Brier scores, the paired log-loss ranges and the 3 × 3 argmax confusion
+  matrices are only in the JSON file (below), not in the run's summary lines.
 
 **Corners: model (f) against the league-mean baseline, 2017/18–2023/24.**
 - Pooled RMSE: 2.666 for (f) against 2.745 for the baseline.
