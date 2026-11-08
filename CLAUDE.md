@@ -1359,6 +1359,13 @@ four leagues: E0, E1–E3).
   RMSE, MAE, log score, 80%/90% coverage; `corner_baseline`), 2017/18–2023/24. `tuning.yml`
   `phase=scorecard`; the pool prints `lab/model_scorecard.json` as `MODEL_SCORECARD_B64` chunks
   with `MODEL_SCORECARD_SHA256`.
+  `lab/model_scorecard2.py` (stage 2, part 2; method in `docs/lab.md` before any run): the goal
+  distributions on the live model with its ridge (`goal_rows`, `goals_card`: O/U 2.5 beside
+  Pinnacle's own P>2.5/PC>2.5 (`pinnacle_ou`, no average fallback), total-goals RPS and 80%
+  coverage and team goals beside a league-mean Poisson baseline, `goal_baseline`), the cup
+  model beside the UCL closes (`cup_rows`, `cup_card`) and goalscorer B's 2025/26 development
+  rows (`goalscorer_card`, T 20% confusion). `tuning.yml` `phase=scorecard2` (a `cup` job reads
+  data-log's `UCL_closes.jsonl`; input `goal_run` = a `goalscorer-test.yml` run to score).
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).

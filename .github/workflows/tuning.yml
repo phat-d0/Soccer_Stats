@@ -3,6 +3,8 @@
 # One job per league, then a pool job. No API key, no credits, never pushes. Results in the
 # log (TUNING_<PHASE>_JSON) and a 7-day artifact.
 #   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+#   phase=scorecard2: stage 2, part 2 (lab/model_scorecard2.py: goal distributions per league,
+#   the cup model in its own job, goalscorer B from goal_run's goalscorer-test artifacts).
 #   phase=scorecard: model evaluation stage 2, the scorecards (lab/model_scorecard.py;
 #   descriptive; the pool prints lab/model_scorecard.json in base64 chunks).
 #   phase=judged: the frozen 2025/26 judged read of the model settings (run once; docs/lab.md).
@@ -18,13 +20,18 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once); scorecard = model evaluation stage 2 (descriptive)"
+        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once); scorecard = model evaluation stage 2 (descriptive); scorecard2 = stage 2 part 2"
         type: choice
-        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged, scorecard]
+        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged, scorecard, scorecard2]
         default: bias
+      goal_run:
+        description: "scorecard2: the goalscorer-test.yml run whose goalscorer-dev-* artifacts to score (blank = skip)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
+  actions: read  # scorecard2 downloads another run's artifacts
 
 jobs:
   league:
@@ -87,6 +94,7 @@ jobs:
             xg-2025) uv run python -m soccer_stats.lab.tuning_base --xg-check 2025 --league "$LEAGUE" ;;
             judged) uv run python -m soccer_stats.lab.tuning_judged --league "$LEAGUE" --out out ;;
             scorecard) uv run python -m soccer_stats.lab.model_scorecard --league "$LEAGUE" --out out ;;
+            scorecard2) uv run python -m soccer_stats.lab.model_scorecard2 --league "$LEAGUE" --out out ;;
             grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
                         --blocks R2 ;;
           esac
@@ -98,8 +106,40 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  cup:  # scorecard2 only: the cross-league cup model beside data-log's bought UCL closes
+    if: ${{ inputs.phase == 'scorecard2' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-data-none
+          restore-keys: raw-data-
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/cups/espn
+          key: cup-espn-none
+          restore-keys: cup-espn-
+      - name: Score the cup model
+        run: |
+          uv sync --frozen
+          mkdir -p out data/raw/cups/espn
+          git fetch --depth=1 origin data-log
+          git show FETCH_HEAD:odds_history/UCL_closes.jsonl > "$RUNNER_TEMP/UCL_closes.jsonl"
+          uv run python -m soccer_stats.lab.model_scorecard2 --cup "$RUNNER_TEMP/UCL_closes.jsonl" --out out
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: tuning-scorecard2-cup
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
+
   pool:
-    needs: league
+    needs: [league, cup]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
@@ -109,6 +149,14 @@ jobs:
         with:
           pattern: tuning-${{ inputs.phase }}-*
           path: in
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.phase == 'scorecard2' && inputs.goal_run != '' }}
+        continue-on-error: true
+        with:
+          pattern: goalscorer-dev-*
+          path: goal
+          run-id: ${{ inputs.goal_run }}
+          github-token: ${{ github.token }}
       - name: Pool the leagues
         env:
           PHASE: ${{ inputs.phase }}
@@ -119,6 +167,7 @@ jobs:
             xg-2025) echo "counts are in the league jobs' logs (XG_COVERAGE)" ;;
             judged) uv run python -m soccer_stats.lab.tuning_judged --pool in --out out ;;
             scorecard) uv run python -m soccer_stats.lab.model_scorecard --pool in --out out ;;
+            scorecard2) uv run python -m soccer_stats.lab.model_scorecard2 --pool in --goal-dir goal --out out ;;
             bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
             ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --pool in --out out ;;
             grid|grid-rho|grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
