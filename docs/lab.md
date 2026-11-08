@@ -3745,3 +3745,43 @@ The app's tab can follow it or not; the file is the contract.
   then "Still to be read";
 - studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
   search, line shop) link to it.
+
+## Model evaluation, stage 1: method selection (owner via the lead, 8 Nov; checks written before any run)
+
+The owner's framework for every model has three stages: which method, how good it is, and how
+to make it better. This stage asks, for each model, whether the method suits the target, the
+type of data and the size of the data, and whether its assumptions hold on development data.
+It is descriptive: no verdict on any strategy, no bets, 0 credits. 2024/25 stays locked, and
+so do the goalscorer judged window and corners' 2026/27 test.
+
+**Assumption checks.** These are out of sample, on 2017/18–2023/24 (`lab/model_assumptions.py`,
+`odds-check.yml` `task=model-assumptions`).
+- **Goals** (match model, Dixon-Coles + xG, walk-forward as live: weekly refits, 730 days, xG
+  weight 0.7, goals only in E1–E3):
+  - raw variance-to-mean, home, away and total;
+  - dispersion given the model's own means: the mean of (y − λ)²/λ over both sides. It is 1
+    when the counts are Poisson around the model's means;
+  - the correlation of the home and away residuals (y − λ). The model assumes independence
+    apart from the low-score correction;
+  - the 0-0, 1-0, 0-1 and 1-1 cells: observed share vs the model's matrix (with ρ) vs
+    independent Poisson on the same means.
+- **Corners** (model (f), refitted every 28 days on the 730 days before, as live):
+  - dispersion under Poisson, and under the fitted NB2 (1 when NB2 is right);
+  - the mean α;
+  - the residual correlation between home and away corners.
+- Every figure has a 95% range from 2,000 draws resampling matches, seed 0, per league.
+- Data size per league-season.
+
+**Not recomputed (cited):**
+- the 1X2 bake-offs (rounds 1–3, and rounds 4, 5 and 7: ML vs Dixon-Coles);
+- corners bake-offs 1 and 2;
+- goalscorer candidates A–H;
+- the player shots model's stage-1 checks (`players.yml`, `E0_players.json` on data-log).
+
+Their recorded run ids go in the table.
+
+**Output.** One table:
+- model, target type, method, data and size;
+- assumptions checked with the result;
+- alternatives tried, with where they were recorded;
+- a one-line verdict on the method.

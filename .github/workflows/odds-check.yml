@@ -138,6 +138,9 @@
 #            RESIDUAL_MAP_B64 chunks with its SHA-256.
 #   auc: ROC AUC for the match model, blend and prices, corners model (f) and goalscorer B
 #            (docs/lab.md "ROC AUC"; exploratory, 2019/20-2023/24, no key).
+#   model-assumptions: model evaluation stage 1 (docs/lab.md): goals' and corners'
+#            dispersion, residual correlation and Dixon-Coles' low-score cells, out of sample,
+#            2017/18-2023/24 (no key). Log line MODEL_ASSUMPTIONS_JSON.
 #   dk-gap-counts: DraftKings vs Pinnacle's fair price at the bought 48 h looks, counts only
 #            (docs/lab.md draft; no result, close or CLV read; no key).
 #   band-edges: a minimum edge per price band for the match rule (docs/lab.md, "Price-band
@@ -152,9 +155,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -328,25 +331,25 @@ jobs:
           key: comebacks-${{ inputs.league }}-none
           restore-keys: comebacks-${{ inputs.league }}-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'model-assumptions' }}
         with:
           path: data/raw
           key: understat-SP1-none
           restore-keys: understat-SP1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'model-assumptions' }}
         with:
           path: data/raw
           key: understat-D1-none
           restore-keys: understat-D1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'model-assumptions' }}
         with:
           path: data/raw
           key: understat-I1-none
           restore-keys: understat-I1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'model-assumptions' }}
         with:
           path: data/raw
           key: understat-F1-none
@@ -657,6 +660,8 @@ jobs:
                   --jq '.actions_caches[] | "cache \(.key) \(.ref) \(.created_at) \(.size_in_bytes)"' || true
               done
               uv run python -m soccer_stats.lab.residual_map --json out/residual_map.json ;;
+            model-assumptions) uv run python -m soccer_stats.lab.model_assumptions \
+                     --json out/model_assumptions.json ;;
             dk-gap-counts) uv run python -m soccer_stats.lab.dk_gap_counts ;;
             auc)  # no key: the corner price logs from data-log, goalscorer rows from run 41346853368
               git fetch -q --depth=1 origin data-log
