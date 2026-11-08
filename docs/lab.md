@@ -4479,3 +4479,51 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
 - The judged read's per-league ridge is chosen by the rule pre-registered for R2. That is the
   lowest log loss over all of 2017/18–2023/24, computed by the judged-read code, so this
   season-by-season table does not set it.
+
+## Model settings: the judged read on 2025/26 (DRAFT for the lead, 8 Nov; not frozen, nothing read)
+
+**What is judged.**
+- **Candidate R:** today's match model with a per-league ratings ridge. Each league's value is the
+  one in {0, 1, 3, 10, 30} (block R2's grid) with the lowest mean log loss over the development
+  seasons 2017/18–2023/24.
+  - This is set after development showed ridge 3 (block R) and then 10 (block R2) doing best.
+  - It is legitimate only because 2025/26 has never been used to choose or compare anything.
+- **Candidate P:** included only if block P passes in development (its run is pending), with its
+  ρ setting chosen the same way.
+- If both are in, they are judged as one combined setting (one hypothesis).
+
+**The season.**
+- 2025/26, 2025-07-01 to 2026-06-30, eight leagues; results are complete.
+- The model is refitted weekly as live. Its 730-day training windows include 2024/25's results as
+  training data only. 2024/25 is never scored here; it stays locked for strategy-level reads (a
+  betting rule's CLV), as the strategy search kept it. It was opened once for model comparisons
+  in October (bake-offs 1 and 3, corners bake-off 1).
+- **Data check before freezing:** 2025/26 Understat coverage in `xg-good-` for E0, SP1, D1, I1 and
+  F1 (run pending), naming any gap. Goalscorer development used 2025/26 player rows; that is a
+  different model and doesn't bear on these settings.
+
+**Measure and pass rule.**
+- **Primary:** the pooled per-match difference in 1X2 log loss, today's default minus the
+  candidate, over every 2025/26 match both predict. 95% range from 2,000 bootstrap draws
+  resampling matches, seed 0. **Pass: the range's lower end above 0.**
+- **Descriptive:**
+  - per league;
+  - E1–E3 together;
+  - both models against Pinnacle's fair early and close on the matches football-data prices,
+    with coverage per league (2025/26 is only about half priced in some leagues).
+
+**Multiple testing.**
+- The programme has logged 545 configurations in development: phase 1 72, phase 2 12, phase 3
+  373 + P 48 + R2 40.
+- Development only chose. The judged read tests one pre-specified hypothesis (two if R and P
+  are judged separately, in which case 97.5% ranges, Bonferroni).
+
+**What a pass would mean for live.**
+- Moneyline adds the per-league ridge to the live fit (`DixonColes(ridge=)` already exists).
+- The Lean blends are refitted (`fit-match-blends`), and the backtests re-run.
+- The owner decides whether it goes live.
+- A pass is about prediction accuracy (log loss), not profit. The ceiling analysis shows the
+  model's gap to the close is information, so a better-calibrated model is unlikely on its own to
+  make Lean profitable.
+
+**A fail** changes nothing, and the settings stay as they are.
