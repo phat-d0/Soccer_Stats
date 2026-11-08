@@ -199,3 +199,24 @@ def test_research_studies_read_the_registry_and_skip_missing_files(tmp_path):
     ids = [e["id"] for e in publish.RESEARCH_STUDIES]
     assert len(ids) == len(set(ids))
     assert {e["portfolio"] for e in publish.RESEARCH_STUDIES} <= publish.STUDY_PORTFOLIOS
+
+
+def test_research_overview_passes_the_committed_file_through(tmp_path):
+    from soccer_stats import publish
+
+    # The Research tab's file (owner, 8 Nov): passed through whole, display only.
+    real = publish.research_overview()
+    assert real["kind"] == "research_overview" and len(real["studies"]) >= 27
+    assert {s["area"] for s in real["studies"]} <= {a["id"] for a in real["areas"]}
+    assert {s["verdict"] for s in real["studies"]} <= set(real["verdicts"])
+    # A missing, unreadable or wrong-shaped file gives None (the tab says so), never raises.
+    assert publish.research_overview(tmp_path / "missing.json") is None
+    bad = tmp_path / "bad.json"
+    bad.write_text("not json")
+    assert publish.research_overview(bad) is None
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps({"kind": "something", "studies": []}))
+    assert publish.research_overview(other) is None
+    no_list = tmp_path / "no_list.json"
+    no_list.write_text(json.dumps({"kind": "research_overview", "studies": {}}))
+    assert publish.research_overview(no_list) is None

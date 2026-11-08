@@ -3612,6 +3612,81 @@ season, E0's own value fell from +2.1 to +1.2.
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
 
+## Settings audit: which settings were tuned, on what, and which backtests are out of sample (owner via the lead, 8 Nov; read-only, 0 credits, no outcome read)
+
+Every fixed number in the live code was traced through the git history and the docs to say who
+chose it, when, and on what data. A setting chosen after reading outcomes makes the seasons it
+was read on in-sample for that setting: a backtest over those seasons flatters it.
+
+### The settings
+
+| Setting | Value | Where | Chosen | On what | Outcomes read when chosen? |
+| --- | --- | --- | --- | --- | --- |
+| Dixon-Coles time decay `xi` | 0.0019 a day (half-life about a year) | `models/dixon_coles.py` | 5 Oct, scaffold | Default; the README's "tune xi by out-of-sample log loss" was never done | No |
+| xG weight | 0.7 (0 for goals-only leagues) | `publish.XG_WEIGHT` | 5 Oct, scaffold | Default; a sweep 0/0.5/0.7/1 was suggested in the code, no result is recorded | Unknown (no record) |
+| Walk-forward window, min team matches, refit | 730 days, 6, weekly | `backtest.py` | 5 Oct | Default | No |
+| Blend burn-in | 2 seasons | `fit-match-blends`, `backtest-lean` | 10 Oct | Default | No |
+| Cup model ridge, decay, window | 0.1, 0.0019, 730 days | `cup_model.py` | 13 Oct | "A small ridge"; decay as the domestic model | No (UCL log loss read after) |
+| Blend form, refit, minimum rows | logit on log price and log model, 28 days, 300 | `match_calibration.py` | 6 Oct | Ported from the player calibration | No |
+| σ | sd of (blend − price) on the fit rows | `match_calibration.sigma` | 10 Oct | Definition | No |
+| Lean z, Strong z | 1σ, 2σ | `trades.LEAN_Z`, `STRONG_Z` | 10 Oct | Owner, from the baseball app | No soccer outcomes |
+| **Lean odds range** | 1.50 < odds ≤ 3.00 | `trades.LEAN_ODDS_RANGE` | 24 Oct | Owner, after reading live paper (22 trades) **and** `lean_backtest.json`'s odds bands | **Yes: 2019/20–2024/25, eight leagues** |
+| Model 12% edge | 12%, raw model | `trades.PAPER_EDGE`, `PAPER_RULE` | 5 Oct (12%), 10 Oct (fixed_raw) | Original scope; re-adopted by the owner knowing the backtest lost | No (basis not recorded) |
+| Early price lead | 4 days before kickoff | `lean_backtest.EARLY_LEAD` | 10 Oct | football-data's early price is 2–3 days out | No |
+| Corner model (f) | shrunk team ratios, NB2 | `corners_live.TeamCornersF` | Pre-registered 10 Oct | Bake-off 2, nothing tuned; selected on 2017/18–2023/24 (six leagues) | Yes, by design: dev seasons; 2026/27 locked |
+| Corner window, minimum | 730 days, 300 matches | `corners_live` | 10 Oct | 730 = bake-off 2's window; 300 has no recorded reason (the bake-off required 1,000) | No |
+| Corner edge | 12% | `trades.CORNERS_EDGE` | 10 Oct | Copied from the match rule | No |
+| **Corners "below 60%" cut** | 0.60 | `trades.CORNER_VARIANTS` | 23 Oct (pre-registered) | Owner, after the first 55 settled live Pinnacle corner trades | **Yes: live trades before 23 Oct 08:39**; judged only after |
+| Goalscorer factors (B) | `GOAL_FACTORS` | `models/player_goals.py` | 6 Oct | Spec fixed before data was scored; stayed primary when C–H failed on E0 2023/24–2024/25 | Dev seasons; E0 2025/26 seen weekly |
+| Goalscorer threshold T | 20% of {5, 8, 12, 16, 20%} | `player_goal_priced.T_JUDGED` | 1 Nov | Volume rule (≥ 0.3 bets a match) on 2025/26 | No (counts only) |
+| Kelly fraction, cap | ¼, 5% | `sizing.py` | 24 Oct | Defaults; display only | No |
+
+### Which backtests are out of sample
+
+- **Blend Lean at Pinnacle's early price** (`lean_backtest.json`, 2019/20–2024/25): **partly**.
+  The model, blend, σ and z cuts were set before these seasons were read and are refitted walk
+  forward. The **odds range** was chosen on this file's odds bands, so the live rule's backtest
+  ("−1.8%, 1,345 bets, −200 to +200") is in-sample for the range. The all-odds replay is clean.
+- **Model 12%** (`edge12_backtest.json`, same seasons): **fully** out of sample. 12% predates any
+  backtest, and the later sweeps changed nothing.
+- **Both rules at DraftKings' prices** (2020/21–2024/25): Model 12% fully; Lean's live rule
+  partly (the same odds range, read on the same seasons through the Pinnacle file).
+- **Draw no bet, strategy search, price bands, comeback, cash-out, line shop**: their rules were
+  pre-registered, and the strategy search kept 2024/25 locked. Out of sample as stated in each
+  section.
+- **Corners**: the research view's numbers are development seasons (model (f) was chosen on
+  2017/18–2023/24); the clean test is the locked 2026/27 read on 3 Feb 2027. The 60% cut is
+  judged only on trades from 23 Oct 08:39, so its verdict will be clean.
+- **Goalscorer**: the 2025/26 development is in-sample for T (by volume, not results); the
+  judged §16 window is clean.
+
+### How much the tuned settings could matter (from sweeps already logged)
+
+- **Lean odds range**: pooled CLV by band, 2019/20–2024/25: ≤1.50 −1.9% (232 bets), 1.50–2.00
+  −2.7% (632), 2.00–3.00 −3.1% (712), 3.00–5.00 −3.8% (790), >5.00 −3.0% (261). The range keeps
+  the middle bands (about −2.9% pooled, against −3.1% at every price) and drops the best band
+  (≤1.50); every band is below 0, so the range can't turn the rule positive. The flattering is
+  about 0.2 points of CLV.
+- **Edge threshold**: at DraftKings, E0 2025/26, every threshold from 2% to 20% loses (ROI −8%
+  to −21%); E0 line shopping 2017/18–2025/26 shows flat CLV across 2–20%; the price-band sweep
+  (2–30% per band) has every band's best CLV below 0. The 12% choice is not what makes Model 12%
+  lose.
+- **Strategy search**: 11,857 rules over thresholds, z cuts and filters, best CLV +1.3% with a
+  luck-check p of 0.94. Tuning these settings on 2019/20–2023/24 finds nothing either.
+- **Never varied** (no record): `xi`, the xG weight, burn-in, the 28-day refit and 300-row
+  minimum, the 730-day windows, min team matches, the cup ridge, corners' 300-match minimum,
+  Kelly's ¼ and 5%. Being untuned, they can't be over-fitted, but nobody knows whether better
+  values exist.
+
+### For the owner
+
+Most of the model's settings were never tuned on results: they are defaults, so the backtests
+don't flatter them. Two settings were chosen after looking at results: Blend Lean's 1.50–3.00
+odds range (on the 2019/20–2024/25 backtest) and the corners' under-60% cut (on October's live
+trades). Lean's live-rule backtest is therefore slightly flattering, by about 0.2 points of CLV,
+and it still loses; the 60% cut is judged only on trades after it was set. No setting we
+have swept turns a strategy positive, so the losses are not a tuning problem.
+
 ## ROC AUC: how well each model ranks outcomes (owner via the lead, 8 Nov; exploratory, 0 credits; method written before any run)
 
 **Why.** The owner asked: "can we run ROC AUC on our models?" AUC is the chance that a random
@@ -3746,6 +3821,283 @@ The app's tab can follow it or not; the file is the contract.
 - studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
   search, line shop) link to it.
 
+## LASSO on the market residual (owner, 8 Nov; DRAFT, not frozen)
+
+> **Draft, not frozen (8 Nov).** The lead asked for the factor list to be agreed with the
+> owner before it is frozen. The owner is adding factors. This section was committed before
+> that request arrived. A development run (42457953990) was started from it and cancelled
+> within seconds, during setup: no model was fitted, and no output was read. The frozen version
+> will replace this section once the list is agreed.
+
+**Question.** Start from the market's price. Does any extra pre-match factor explain, out of
+sample, where that price is wrong? Earlier work says probably not:
+- the residual map (above) found no more striking cells than chance would give;
+- the strategy search (11,857 arms) found no strategy;
+- the free-signals round (`docs/edge.md` round 2) found no blend weight.
+
+"LASSO keeps nothing" is a valid, useful result. This is development only. 2024/25 stays locked
+(below).
+
+**Unit.**
+- One row per match, with its three outcomes (home, draw, away), in eight leagues: E0, SP1, D1,
+  I1, F1, E1, E2, E3.
+- Source is football-data, with Pinnacle's own early and close 1X2 (`data.pinnacle_prices`).
+- A match counts if it has a full early price.
+- Where the walk-forward model has no chance (a team with under 6 matches in its 730-day
+  window, mostly newcomers early in a season), `model_gap` is missing (0). The match is kept, so
+  that the newcomer factor keeps its first matches. (Amended 8 Nov, before any fit: the first
+  draft required a model chance.)
+
+**Decision time and the baseline.**
+- A bet is decided at Pinnacle's early price, so the decision day is kickoff − 4 days
+  (`lean_backtest.EARLY_LEAD`).
+- Baseline: the Shin-fair early chances q_k. They enter as a fixed offset: log q_k with its
+  coefficient held at 1.
+- Pinnacle's Shin-fair close is shown only as a descriptive comparison (its log loss on the
+  same matches), and as the reference for CLV.
+
+**The model.**
+- A multinomial logistic regression with the draw as reference:
+  - score_draw = log q_draw;
+  - score_home = log q_home + a_home + Σ_j β_home,j · x_j;
+  - score_away = log q_away + a_away + Σ_j β_away,j · x_j.
+- The two intercepts are not penalised. Every β has an L1 penalty λ · |β|.
+- Each feature is standardised with the mean and standard deviation of that refit's training
+  rows only. A missing value is set to 0 after standardising (the training mean).
+- Fit: proximal gradient with FISTA (numpy, `lab/lasso_residual.py`), warm-started along the λ
+  path, run until the step changes the objective by less than 1e-9 or 5,000 iterations.
+  scikit-learn's logistic regression takes no offset, so it is not used.
+- Pure L1. No elastic net is run.
+
+**Frozen candidate factors.** Every factor is a match-level number seen from the home side, and
+each enters both the home and the away score. A factor is "selected" in a refit when any of its
+coefficients is non-zero. Results-based factors use only matches that kicked off before the
+decision day. Fixture-based facts (rest days, a UEFA match before kickoff) count as known, since
+fixtures are published in advance.
+
+| # | Factor | Features |
+| --- | --- | --- |
+| 1 | `rest` | home rest days, away rest days, home minus away. Days since each team's previous league match, capped at 14 (`lab.features`). |
+| 2 | `europe` | for each side: a UEFA match 1–4 days before kickoff (0/1), and that match played away and not at a neutral ground (0/1, the travel). From ESPN's UEFA results via `residual_map.load_europe`'s mapping; qualifiers count. |
+| 3 | `xg_luck` | for each side: (xG for − xG against) − (goals for − goals against) per game over its last 6 league matches finished before the decision day, at least 3. Understat leagues only; 0 (missing) in E1–E3 and in I1 2022/23. |
+| 4 | `form_vs_market` | for each side: mean of (points − the points expected from Pinnacle's Shin-fair close, else its early price where the file has no close) over its last 6 league matches finished before the decision day, at least 3. |
+| 5 | `newcomer` | for each side: new to the division this season (promoted or relegated) (0/1), and new and within its first 10 league matches (0/1). |
+| 6 | `season_phase` | three 0/1 features for the kickoff month: Aug–Sep, Jan–Feb, Mar–Jul. Oct–Dec is the reference. |
+| 7 | `model_gap` | log p_model,k − log q_k for home, draw and away. p_model is the walk-forward Dixon-Coles chance: weekly refits, xG weight 0.7, goals only where there is no xG, as in `lean_backtest`. |
+| 8 | `price_shape` | log(q_home / q_draw) and log(q_away / q_draw). This allows a favourite–longshot recalibration (the blend's b ≠ 1), so that no other factor can pass simply by standing in for it. |
+
+**Dropped, with the reason:**
+- *Manager change:* the repo has no free history of it.
+- *Derby / same city:* there is no club-location data here. Building it by hand is not cheap,
+  and a hand list would risk mistakes.
+- *Line movement from the early price to 48 h:* at the early-price decision time, the 48 h
+  price is still in the future, so using it would be look-ahead. football-data holds no earlier
+  price. The residual map already describes the early-to-close move.
+- *FPL/ESPN team-news counts:* there is no history before October 2026.
+
+**Splits.**
+- Rows run from 2017/18. The Dixon-Coles walk-forward starts on 2017-07-01, using 2015/16–2016/17
+  as its own burn-in.
+- Scored rows: 2019/20–2023/24. 2017/18 and 2018/19 are burn-in: they are used for training only.
+- Walk-forward:
+  - Decision-day blocks are 28 days long, starting on 2019-07-01.
+  - Each block is predicted by a fit on every match that kicked off before the block's first
+    decision day (so every training result was known when the block's first bet was decided).
+  - Leagues are pooled into one model.
+- λ is chosen inside each training window only:
+  - the window's last 365 days (by kickoff) are the validation part;
+  - the path is fitted on the rows before them, on 20 values log-spaced from λ_max (the smallest
+    λ that keeps nothing) down to λ_max / 1,000;
+  - the λ with the lowest validation log loss is kept, with no one-standard-error rule;
+  - the model is then refitted on the whole window at that λ.
+  - The scored block never chooses anything.
+- **2024/25 stays locked.** `lab.harness.Holdout` from 2024-07-01 checks every frame. 2025/26
+  and later are never loaded. Opening 2024/25 needs the owner's approval through the lead.
+
+**Development read** (2019/20–2023/24, out of sample):
+- For each factor:
+  - the share of refits in which it is selected;
+  - its standardised coefficients and the chosen λ in every refit (the paths).
+- Log loss:
+  - the mean per-match difference, log loss of the price alone minus log loss of the L1 model
+    (positive means the model is better);
+  - a 95% range from 2,000 bootstrap draws that resample matches, seed 0;
+  - pooled and per league.
+- The close's log loss on the same matches, for scale (descriptive).
+- A simple rule:
+  - in each match, bet the outcome with the largest p_L1 × early odds − 1, provided that is more
+    than **T = 0.03** (fixed now);
+  - $1 a bet;
+  - CLV = early odds × Pinnacle's Shin-fair close − 1, with a match-resampled 95% range;
+  - ROI is shown last.
+
+**The gate to the holdout.** Both of these must hold on development:
+1. the pooled log-loss improvement's 95% range lies above 0;
+2. at least one factor is selected in more than half of the refits.
+
+If both hold, the lead asks the owner to open 2024/25 for **one** judged read, using the same
+code, the same frozen factor list and walk-forward. The pass rule is fixed now:
+- the 2024/25 log-loss improvement's 95% range is above 0;
+- the rule's CLV range at T = 0.03 is above 0, on at least 300 bets.
+
+Otherwise the study closes as **"no edge in these factors"** and the holdout is not spent.
+
+**Code.** `src/soccer_stats/lab/lasso_residual.py`, tests in `tests/test_lab_lasso_residual.py`.
+The tests cover:
+- a planted factor is kept, and pure noise is dropped;
+- no look-ahead in any factor.
+
+`odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
+
+## Model tuning programme (owner via the lead, 8 Nov)
+
+The owner asked "How do I make it better?". The lead gave Research lab 2 four phases, run in
+order: bias vs variance, ceiling analysis, grid search, then LASSO on the market residual.
+
+Rules for every phase:
+- Development data only: 2019/20–2023/24 scored, 2017/18–2018/19 burn-in. 2024/25 is locked
+  (`Holdout` from 2024-07-01); opening it needs the owner's approval through the lead.
+- Time-ordered walk-forward and nested validation only; no random splits.
+- Ranges are 95%, from 2,000 draws resampling matches, seed 0.
+- Every configuration tried is logged with a running count, for the final read's
+  multiple-testing note.
+- 0 credits.
+
+Only a phase with a development gain whose range is above 0 feeds a single pre-registered
+judged read on 2024/25. That read covers everything that survived, states the count, and goes
+to the owner through the lead.
+
+Shared base: `lab/tuning_base.py`. It runs the walk-forward Dixon-Coles for any configuration
+(xi, xG weight, window, minimum team matches). It reproduces `backtest.walk_forward` exactly at
+today's defaults, which a test checks. Beside the out-of-sample chances it keeps each refit's
+in-sample log loss and team ratings.
+
+### Phase 1: bias vs variance (pre-registered 2026-11-08, before any run)
+
+**Question.** Is the match model's gap to the market mostly bias (too simple, or missing
+information) or variance (overfitting)?
+
+**Rows.**
+- The eight domestic leagues (E0, SP1, D1, I1, F1, E1, E2, E3), football-data plus Understat.
+- Scored kickoffs from 2019-07-01 to 2024-07-01 (2019/20–2023/24).
+- Comparisons use only the rows every compared series predicts. A shorter window drops more
+  teams under the 6-match minimum, so each league's learning curve is scored on the matches all
+  four windows predict.
+
+**Model learning curves.**
+- Windows of 365, 730 (today), 1,095 and 1,460 days. Everything else stays at today's settings:
+  xi 0.0019, xG weight 0.7 (0 in E1–E3), minimum 6 team matches, weekly refits.
+- Loaded data starts five seasons before 2019/20, so the 1,460-day window is full.
+- Per window, league, and pooled:
+  - **out-of-sample** 1X2 log loss on the scored rows;
+  - **in-sample** log loss, computed every fourth refit (every 28 days) and averaged over those
+    refits. Primary: on the training matches of the window's last 365 days, unweighted, the
+    rows the decayed fit leans on most. Also shown: on the whole window;
+  - training size: the mean number of matches in the window.
+
+**Blend learning curves.**
+- The live blend (`match_calibration.fit`, 28-day refits), fitted on Pinnacle's fair close as
+  live, beside the 730-day model.
+- Training rows capped at the last 1, 2, 3 and 4 seasons (365 × k days), and uncapped (today).
+- In-sample and out-of-sample log loss both apply the blend to the fair **close**, so the two
+  sides of the variance measure use the same input. The early-price version (as bet) is also
+  shown.
+- Blend rows start in 2019/20, since Pinnacle's close in football-data starts there. So the
+  blend's 3- and 4-season caps are only reached late in the period, and the read says so.
+
+**Reference levels** on the same rows: Pinnacle's Shin-fair close (the best achievable, the
+"human-level" line) and its fair early price.
+
+**Measures**, per league and pooled, each with a match-bootstrap range:
+- **bias** = out-of-sample log loss − the close's log loss;
+- **variance** = out-of-sample − in-sample;
+- also out-of-sample − the early price's log loss.
+
+**Reading.** Decided by which measure is larger in each league:
+- bias > variance, with variance's range including 0 or below 0.005: the model lacks
+  information or flexibility (more factors, or a richer model);
+- variance > bias: overfitting (more regularisation, a longer window, more data).
+- If out-of-sample log loss falls as the window grows, more data helps (a variance sign). If it
+  is flat while in-sample stays near out-of-sample, the error is bias.
+
+**Team-rating stability** (730-day window):
+- for each team, attack and defence ratings at successive weekly refits: the median
+  week-to-week change, and the correlation of all teams' ratings between refits 28 days apart;
+- per league and season.
+- Descriptive. A rating that moves a lot week to week while out-of-sample log loss doesn't
+  improve is a variance sign.
+
+**Configurations logged:** 8 leagues × 4 windows (32 model configurations) and 8 × 5 blend caps
+(40), so 72 toward the programme's count. No bets, no CLV.
+
+**Code.** `lab/tuning_base.py`, `lab/tuning_bias.py`; workflow `tuning.yml` `phase=bias` (a job
+per league, then a pool job), log line `TUNING_BIAS_JSON`, every file in the artifact.
+
+In-sample is measured per refit, so a variance range resamples the scored matches for the
+out-of-sample term and the refits for the in-sample term, independently.
+
+### Phase 1: results (2026-11-08; `odds-check.yml` `task=tuning-bias` run 42460226305, 0 credits, no key)
+
+All eight leagues ran. 2024/25 was never loaded.
+- **Rows:** 16,038 matches predicted by all four windows and priced early and close. The
+  blend's 12,717 are those with a fit under every cap.
+- **Configurations:** 72 (32 model, 40 blend). The running count is in the file.
+- **Files:** in the run's artifact (`tuning_bias.json`, per-league row files).
+
+**The match model** (log loss per match, pooled; ranges 95%, resampling matches):
+
+| Window | Out of sample | In sample (last 365 days) | Bias (− close) | Variance (out − in) |
+| --- | --- | --- | --- | --- |
+| 365 days | 1.0236 | 0.9774 | +0.0229 (+0.0198 to +0.0261) | +0.0462 (+0.0382 to +0.0536) |
+| **730 (today)** | **1.0207** | **0.9834** | **+0.0200 (+0.0171 to +0.0230)** | **+0.0373 (+0.0297 to +0.0446)** |
+| 1,095 | 1.0204 | 0.9859 | +0.0198 (+0.0169 to +0.0226) | +0.0346 (+0.0270 to +0.0415) |
+| 1,460 | 1.0201 | 0.9870 | +0.0194 (+0.0166 to +0.0222) | +0.0331 (+0.0255 to +0.0401) |
+
+Reference levels on the same rows: Pinnacle's fair close 1.0007, its early price 1.0039. The
+730-day model is 0.0168 (+0.0141 to +0.0195) worse than the early price.
+
+**Per league** (730 days; bias / variance; the larger one wins by the pre-registered rule):
+
+| League | Bias | Variance | Larger |
+| --- | --- | --- | --- |
+| E0 | +0.019 | +0.032 | variance |
+| SP1 | +0.012 | +0.011 | bias |
+| D1 | +0.013 | +0.034 | variance |
+| I1 | +0.019 | +0.029 | variance |
+| F1 | +0.016 | +0.022 | variance |
+| E1 | +0.021 | +0.044 | variance |
+| E2 | +0.028 | +0.042 | variance |
+| E3 | +0.026 | +0.040 | variance |
+
+**The blend** (live form, 28-day refits; the close as input on both sides):
+
+| Training rows | Out of sample (close input) | Out of sample (early, as bet) | In sample | Variance |
+| --- | --- | --- | --- | --- |
+| last season | 1.0070 | 1.0096 | 0.9937 | +0.0133 (+0.0044 to +0.0219) |
+| last 2 | 1.0056 | 1.0085 | 0.9954 | +0.0102 (+0.0020 to +0.0180) |
+| last 3 | 1.0046 | 1.0075 | 0.9967 | +0.0080 (−0.0001 to +0.0160) |
+| last 4 | 1.0043 | 1.0071 | 0.9970 | +0.0073 (−0.0010 to +0.0152) |
+| **all (today)** | **1.0044** | **1.0073** | **0.9973** | **+0.0071 (−0.0011 to +0.0150)** |
+
+**Team ratings** (730 days, weekly refits): the median week-to-week change in a rating is about
+0.016, and 28 days apart all teams' ratings correlate about 0.86–0.92 (E2 and E3 shown in the
+log; every league is in the file).
+
+**Reading.**
+- By the pre-registered rule, the model's error is mostly **variance** in seven leagues of eight;
+  La Liga is the exception, where bias and variance are about equal.
+- But the learning curve qualifies this. Four times more data (365 → 1,460 days) moves out of
+  sample by only 0.0035, and 730 → 1,460 by 0.0006. The in-sample gap shrinks because in-sample
+  gets worse, not because out of sample gets better.
+- So the gap is mostly the optimism of fitting about 40 team ratings on the window. More data
+  won't close it; shrinking the ratings might. Phase 3's grid will therefore add the ratings
+  ridge (`DixonColes(ridge=)`, today 0) beside xi, a change made before that phase is
+  pre-registered.
+- The 0.020 gap to Pinnacle's close is the information the market has and the model doesn't.
+  That is the LASSO's and the ceiling analysis's question.
+- **The blend** has low variance and gains a little from more rows; uncapped (today) is as good
+  as any cap. Nothing to tune there.
+
 ## Model evaluation, stage 1: method selection (owner via the lead, 8 Nov; checks written before any run)
 
 The owner's framework for every model has three stages: which method, how good it is, and how
@@ -3785,3 +4137,82 @@ Their recorded run ids go in the table.
 - assumptions checked with the result;
 - alternatives tried, with where they were recorded;
 - a one-line verdict on the method.
+
+### Stage 1: results (2026-11-08; `odds-check.yml` `task=model-assumptions` run 42461482443, 0 credits, no key)
+
+The first run (42460421494) gave the same goals numbers. Its corner part failed on a
+season-code bug, fixed before this run. Out of sample, 2017/18–2023/24; ranges are 95%,
+resampling matches.
+
+**Goals** (match model; matches per league from 2,089 in D1 to 3,713 in E1):
+
+| League | Dispersion given the model (Poisson = 1) | Home–away residual corr. | 0-0: observed − model | 0-0: observed − independent Poisson | 1-1: observed − model |
+| --- | --- | --- | --- | --- | --- |
+| E0 | 1.004 (0.957–1.056) | −0.044 (−0.079 to −0.007) | −0.009 (−0.018 to −0.000) | −0.005 | −0.003 |
+| SP1 | 0.926 (0.886–0.968) | +0.075 (+0.037 to +0.114) | −0.001 | +0.003 | +0.007 |
+| D1 | 1.033 (0.982–1.087) | −0.084 (−0.123 to −0.046) | −0.015 (−0.024 to −0.005) | +0.000 | +0.010 |
+| I1 | 0.919 (0.880–0.959) | +0.058 (+0.020 to +0.095) | −0.006 | +0.001 | +0.006 |
+| F1 | 0.978 (0.933–1.028) | −0.003 | −0.010 (−0.020 to +0.000) | −0.005 | +0.006 |
+| E1 | 1.029 (0.991–1.068) | +0.000 | −0.007 | −0.006 | +0.004 |
+| E2 | 1.061 (1.017–1.109) | +0.014 | −0.006 | −0.004 | +0.003 |
+| E3 | 1.083 (1.040–1.130) | +0.021 | −0.007 | −0.004 | +0.006 |
+
+- **Poisson is a fair assumption around the model's means.** Dispersion is 0.92–1.08: slightly
+  under-dispersed in La Liga and Serie A, slightly over in League One and Two.
+- **Independence holds roughly.** The home–away residual correlation is within ±0.08,
+  negative in E0 and D1 and positive in SP1 and I1.
+- **The low-score correction over-corrects 0-0.** The fitted model expects more 0-0 draws than
+  happen in every league: 0.1–1.5 points too many, with the range below 0 in E0 and D1.
+  Independent Poisson on the same means is closer at 0-0. At 1-1 the model is nearer than
+  independent Poisson, and 1-1 is a little more frequent than either. The correction helps 1-1
+  but costs 0-0. A candidate for phase 3 is ρ fitted on goals only, not the xG blend; to be
+  pre-registered there.
+
+**Corners** (model (f), refitted every 28 days on the 730 days before, as live; 2,142–3,863
+matches per league):
+
+| League | Dispersion, Poisson | Dispersion, fitted NB2 (= 1 if right) | Mean α (home / away) | Home–away residual corr. |
+| --- | --- | --- | --- | --- |
+| E0 | 1.42 | 1.107 (1.062–1.152) | 0.051 / 0.063 | −0.22 (−0.25 to −0.18) |
+| SP1 | 1.42 | 1.090 (1.041–1.140) | 0.057 / 0.076 | −0.22 |
+| D1 | 1.43 | 1.124 (1.070–1.177) | 0.061 / 0.053 | −0.18 |
+| I1 | 1.43 | 1.079 (1.035–1.123) | 0.063 / 0.067 | −0.18 |
+| F1 | 1.44 | 1.072 (1.022–1.123) | 0.065 / 0.083 | −0.21 |
+| E1 | 1.39 | 1.089 (1.051–1.127) | 0.048 / 0.064 | −0.18 |
+| E2 | 1.42 | 1.072 (1.033–1.110) | 0.054 / 0.074 | −0.19 |
+| E3 | 1.40 | 1.069 (1.032–1.108) | 0.063 / 0.065 | −0.19 |
+
+- **Corners are clearly over-dispersed** (Poisson 1.39–1.44), so NB2 is the right family.
+- **NB2's α, moment-matched in sample, is still too small out of sample.** It leaves 7–12% more
+  variance than allowed, with every range above 1. Out of sample the means carry their own
+  error, which an in-sample α can't see. The intervals are a little too narrow, so a line far
+  from the mean is priced a little too confidently.
+- **Home and away corners are negatively correlated given the means** (−0.18 to −0.22 in every
+  league): when one side wins more corners the other wins fewer. Model (f) treats them as
+  independent. That does not affect a team line, but it would misprice a match-total corner line
+  built by adding the two (too wide). For Corners, who own model (f).
+
+**Method table** (the models in scope; "verdict" is on the method, not on profit):
+
+| Model | Target | Method | Data and size | Assumptions checked | Alternatives tried (recorded) | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| Match model | 1X2, 3 classes (via a score matrix) | Dixon-Coles: Poisson goals with a low-score correction, xG-blended targets, time decay | football-data + Understat; 306–552 matches a league-season, 730-day windows (about 600–1,100 matches) | Poisson around the means holds (0.92–1.08); independence roughly; 0-0 over-corrected | ML on Elo/xG/form/rest, a tuned DC, a DC+price blend: bake-offs 1–3 (runs 37542756710, 37543374450; lower leagues and big four: `docs/lab.md`): nothing beats the price | Right family; the 0-0 cell and shrinkage (phase 1) are the levers |
+| Blend (Lean's p_bet) | 1X2 | Multinomial logit on log price and log model, 28-day refits | Pinnacle close + model, from 2019/20; about 1,000+ rows a fit | Calibration in the backtest files | Learned edge thresholds, filters, price bands (`docs/lab.md`) | Right method; at its data limit (phase 1) |
+| Cup model (UCL) | 1X2 | Cross-league goals-only DC with ridge | ESPN UEFA + football-data leagues; about 120 UCL matches a season | Not checked here (stage 2 scores it) | None recorded | Never compared with an alternative: an open gap |
+| Corners model (f) | Corners per team, counts | Shrunk team ratios, NB2 per side | football-data HC/AC; 730 days | Over-dispersed (NB2 right), α a little small out of sample, home–away correlation −0.2 ignored | Corners bake-offs 1 and 2 (`docs/totals.md`), recalibration, cup corners: (f) chosen, nothing beats the price | Right family; α and the joint model are the levers |
+| Goals distributions (totals) | Team and total goals, counts | The match model's score matrix | As the match model | As goals above | Totals bake-off (`docs/totals.md` "Verdict (totals)") | As the match model |
+| Goalscorer B | Scores (binary) | NB regression per player on factors, Dixon-Coles team means | Understat players, five leagues | Calibration recorded (`docs/player_props.md` §14) | Candidates A–H, B-cal (§9, §14): B kept | Right method; ranks like the books (AUC 0.746) |
+| Player shots (parked) | Shots / on target, counts | NB2 with a start/sub mixture | Understat shots, E0 | Stage-1 checks in `E0_players.json` (data-log) | Blend with the line, segments (`docs/player_props.md` §7) | Parked; no new work |
+
+**What stage 1 says.**
+- Every live model uses a method that fits its target type, and the counting assumptions mostly
+  hold.
+- Three specific fixes are worth testing, and the grid in phase 3 can take them:
+  - the match model's 0-0 cell (ρ fitted on goals);
+  - its rating shrinkage (phase 1);
+  - corners' out-of-sample α and the home–away correlation (Corners' call).
+- The cup model is the one never compared with an alternative.
+- **A note on the holdout:** the 1X2 bake-offs (1 and 3) and corners bake-off 1 each opened their
+  2024/25 holdout once in October. 2024/25 is therefore locked for strategies (the strategy
+  search) but not untouched for model comparisons. The tuning programme's judged read must say
+  so.

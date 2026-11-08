@@ -1597,3 +1597,214 @@ in the middle of the range; a per-cup recalibration (as round 12 tried domestica
 fewer, larger-sample offsets would be a new pre-registered idea, judged on a 2026/27
 forward window (cup corner counts from July 2026 were not scored here), and is for the
 lead and owner to decide.
+
+## Corners: Task 1 read (corners team, 8 Nov 2026; read-only, 0 credits)
+
+The live record from data-log at 2026-11-08 07:18 UTC (`paper_trades/*_corners_2627.jsonl`,
+open plus update events; `odds_log/*_corners_2026-1*.jsonl`). Ranges are 95%, resampling
+matches (2,000 draws). CLV = entry odds × Pinnacle's Shin-fair close − 1. "Luck" = P/L minus
+the P/L the CLV implies (stake × CLV). Descriptive throughout; the under-60% filter's judged
+read stays the 8 Dec review.
+
+| Track | Trades | Settled (W–L) | P/L | ROI | CLV vs Pinnacle's close | Beat close | P/L the CLV implies | Luck |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Pinnacle, all (from 10 Oct) | 193 | 186 (96–90) | −$37.50 | −2.0% (−16.6 to +12.5) | −5.8% (−6.2 to −5.4) | 2% | −$108 | +$71 |
+| DraftKings, all (from 20 Oct) | 71 | 64 (41–23) | +$139.00 | +21.7% (−1.7 to +43.2) | −6.6% (−7.5 to −5.7) | 3% | −$41 | +$162 |
+| Pinnacle under 60%, since 23 Oct | 45 | 43 (14–29) | −$138.90 | −32.3% (−61.5 to −1.3) | −6.1% (−6.8 to −5.2) | 2% | −$26 | −$113 |
+| DraftKings under 60%, since 23 Oct | 21 | 19 (12–7) | +$58.60 | +30.8% (−13.6 to +74.7) | −7.0% (−8.8 to −4.9) | 6% | −$13 | +$60 |
+
+- **Every league's CLV range is below 0 at both books:** −5.1% (E1) to −7.0% (E2) at
+  Pinnacle, −5.6% (E0) to −7.1% (SP1) at DraftKings.
+- **P/L by league at Pinnacle:** E0 +$51.5, F1 +$60.9, D1 +$35.2, I1 +$12.6, SP1 −$31.4,
+  E1 −$72.0, E2 −$81.7 (1–9) and E3 −$12.6.
+- **P/L by league at DraftKings:** E0 +$60.9 (9–2), SP1 +$33.6, D1 +$24.3, I1 +$11.1 and
+  F1 +$9.1.
+- **The DraftKings profit is the matches', not the book's.**
+  - 58 of DraftKings' 64 settled trades are the same team, line and side as a Pinnacle
+    trade, with the same result every time.
+  - On those 58, DraftKings made +$121.3 and the Pinnacle twins +$125.9. DraftKings' price
+    was 1.3 cents worse on average.
+  - The Pinnacle track trails only because it also bets E1–E3 (−$166) and started ten days
+    earlier.
+- **CLV = margin + movement.** Against Pinnacle's fair price at entry, the bets start at
+  −6.2% (Pinnacle's overround is about 6.5%) or −6.8% (DraftKings' is about 8.2%). By
+  kickoff Pinnacle's price has moved our way:
+  - by +0.37% (−0.00% to +0.75%) on Pinnacle trades; 31% moved our way and 17% against;
+  - by +0.2% (−0.6% to +1.0%) on DraftKings trades.
+  This was seen on the trades before "Corner price moves" (below) was written, so that test
+  is not blind to it.
+- **DraftKings never beats Pinnacle's fair price.** On 535 lines both books quote:
+  - DraftKings' better side beats Pinnacle's fair chance on 0.9% of lines, and never by 2%;
+  - its over is worse than Pinnacle's 84% of the time, and its under 57%;
+  - no DraftKings line in the log is one-sided.
+- **Splits** (every range crosses 0):
+  - unders 169 trades, overs 81;
+  - home sides +$167, away −$67;
+  - look snapshot +$146, close −$44;
+  - no pattern by odds or model-chance band;
+  - CLV is flat at −5% to −7% in every cut.
+- **Volume:**
+  - about 45 Pinnacle and 20 DraftKings trades a week;
+  - 182 settled team-match outcomes in 148 matches (DraftKings: 51 matches);
+  - 634 corner calls, 581 credits in 29 days.
+  A +5% ROI would need about 1,500 bets to show.
+- **Not used for development:** these figures read E0/I1/F1 2026/27 paper results, which
+  are already in the app. Bake-off 2's test is frozen, so they change nothing there, and no
+  model or filter is tuned on them before 3 Feb 2027.
+
+**For the owner.** The DraftKings corner profit is real on paper, but it isn't coming from
+DraftKings or from the model: the Pinnacle track placed the same bets and won the same amount
+on them. Every corner bet starts about 6% behind because of the margin, and the model's picks
+win back only about 0.4% of that before kickoff. A real edge needs a bookmaker that pays more
+than Pinnacle's fair price.
+
+## Corner-market discovery (corners team; lead's cap 20 credits, 8 Nov; written before any call)
+
+**Question.** Which books on The Odds API quote corner markets, at what margins, and how often
+does a book's better side beat Pinnacle's Shin-fair price at the same line at the same
+moment? Markets: team corners, match total corners, corner handicaps and first-half corners.
+This is the only route past the margin above. Prices only; no result is read.
+
+**Design** (`edge/corner_markets.py`; `odds-check.yml` `task=corner-markets`, `cap`; run from
+the default branch):
+- **Discovery.** For each corner league (E0, SP1, D1, I1, F1, E1, E2, E3): the free events
+  list, then one markets-discovery call on the soonest upcoming match (regions us, uk, eu, au;
+  1 credit each; 9 Oct's probe billed 1).
+- **Priced calls.** In the first three leagues whose discovery lists a corner key, one odds
+  call on that match:
+  - every corner key, in this order: team, match total, handicap, then the first-half ones;
+    trimmed to an even share of the credits left;
+  - at Pinnacle, then exchanges, then the books listing most of those keys, ten books in
+    all, so the call bills one region: 1 credit per market.
+- **Stops.** Everything stops if a discovery call bills more than 1 credit or an odds call
+  more than its number of markets. The cap and the 3,000 reserve are kept
+  (`CappedBudget`).
+- **Output.** Per market and book: lines, two-sided lines and the margin (median and
+  minimum). On the lines Pinnacle also quotes two-sided: the better side's value
+  (odds × Pinnacle's fair chance − 1), its median and maximum, and the shares above 0 and
+  above 2%. Also each quote's age.
+- **Reading.** A book worth logging beside Pinnacle beats Pinnacle's fair price by 2% or more
+  on a meaningful share of lines. One snapshot can only shortlist such a book; testing one
+  would mean logging it like DraftKings, which is a new decision for the lead and the owner.
+
+## Corner price moves (corners team, 8 Nov 2026; pre-registered before the read)
+
+**Question.** Does model (f)'s side predict which way Pinnacle's team-corner price moves
+between the look (18–30 h before kickoff) and the close (≤ 30 min)? Prices only. The model's
+chance is the one logged beside each quote when it was logged (`p_model_over`), so nothing is
+looked ahead and no corner count or result is read. E0, I1 and F1 are included: this reads no
+2026/27 corner outcome.
+
+**Sample.** The live log's team-corner quotes (`odds_log/<code>_corners_*.jsonl`, all eight
+leagues) with kickoffs before 2026-11-08 00:00 UTC:
+- per book, event, team and half line, the newest two-sided "look" and the newest two-sided
+  "close" quote;
+- whole lines are left out (their push makes the model's over chance and the fair over
+  different things).
+
+**Measure.**
+- r = model − Pinnacle's Shin-fair over chance at the look;
+- m = fair over at the close − fair over at the look;
+- the primary measure is the mean of sign(r) × m on Pinnacle's lines: the move toward the
+  model's side, in chance points;
+- its 95% range resamples matches (2,000 draws, seed 0).
+
+**Pass (a signal exists):** the range is above 0. Otherwise no signal is shown.
+
+**Descriptive** (not judged):
+- the slope of m on r;
+- the shares moving toward and away from the model's side (|m| > 0.5 points);
+- the main line per team (fair over nearest 50%);
+- the lines where the 12% rule would bet at the look;
+- per league, and DraftKings' lines.
+
+**What it would mean.** A pass says the model knows a little that Pinnacle's look price
+doesn't yet, which the close then shows. It isn't bettable on its own: the margin (about 6%)
+is far larger. It would matter only beside a book paying above Pinnacle's look price (see the
+discovery above), or as a signal to wait for the close or bet the look. Nothing live changes.
+
+**Disclosure.** Task 1 (above) already saw the move on the 248 settled trades' lines
+(+0.37%), which overlap this sample. The primary measure is on every logged half line, not
+only the trades.
+
+**Code.** `edge/corner_moves.py`; `odds-check.yml` `task=corner-moves` (no key; data-log's
+corner price logs). Log line `CORNER_MOVES_JSON`.
+
+### Corner-market discovery: results (8 Nov 2026 08:13 UTC; run 42461964987, default branch, 20 of 20 credits)
+
+**Credits.**
+- 20 of the cap of 20; the balance went from 4,959,619 to 4,959,599.
+- Events lists free; discovery 1 credit per league in all eight; odds 4 credits (one per
+  market) in each of E0, SP1 and D1.
+- Nothing stopped (no call billed more than planned).
+- Bodies are in the run artifact only (7 days). Nothing goes to live logging from them.
+
+**Matches.**
+- E0: Ipswich v Bournemouth. SP1: Elche v Betis. D1: Köln v Leverkusen (all priced).
+- I1: Napoli v Lazio. F1: Rennes v Lille (discovery only).
+- E1, E2 and E3: discovery listed **no corner market** at any book. Their soonest matches
+  were 6–13 days away; the live log prices E1–E3 corners at Pinnacle closer to kickoff.
+
+**Which books list which corner market** (top five leagues; E0 adds Bovada, Fanatics,
+Caesars and MyBookie):
+
+| Market (key) | Books listing it | Pinnacle? | Exchanges? |
+| --- | --- | --- | --- |
+| Team corners (`alternate_team_totals_corners`) | 6–9: Pinnacle, DraftKings, FanDuel (E0, SP1, I1), BetMGM, BetRivers, Unibet, TABtouch | yes | no |
+| Match total corners (`alternate_totals_corners`) | 9–17: the above plus LeoVegas, Paddy Power, Sportsbet, Betfair (UK, AU) | yes | Betfair back and lay |
+| Corner handicaps (`alternate_spreads_corners`) | DraftKings and Pinnacle only (Bovada in E0) | yes | no |
+| First-half corner totals (`alternate_totals_corners_h1`) | 4–7 soft books (DraftKings, FanDuel, BetRivers, Unibet, TABtouch) | **no** | no |
+| Most corners, 1X2 (`corners_1x2`) | 6–8 soft books | **no** | no |
+
+The share of credits left after team and match totals didn't reach handicaps or first-half
+corners, so those two were listed but not priced. First-half and 1X2 corners have no
+Pinnacle price to judge against.
+
+**Margins and value against Pinnacle's fair price at the same moment** (one snapshot,
+priced in E0, SP1 and D1). Pinnacle quotes one or two lines per team and per match, so
+"vs Pinnacle" covers about 2 lines per book and league: 88 lines in all.
+
+| Book | Team corners margin | Match total margin | Better side vs Pinnacle's fair price (median, best) |
+| --- | --- | --- | --- |
+| Pinnacle | 6.1–6.7% | 5.2–5.8% | – |
+| FanDuel | 7.0% (min 5.4%) | 7.0% (min 3.4%) | team −1.9% to −0.5%, best +5.5% (SP1, one line); totals −4.4% to +0.9%, best +1.9% |
+| Betfair exchange (UK, AU) | not listed | 4.6–5.9% before about 5% commission | −4.2% to −4.9% (one line a league) |
+| Bovada (E0) | 6.9% | 6.8% | −5.6% / −5.5% |
+| DraftKings | 7.9–8.5% | 8.0–8.2% | −5.3% to −7.0% |
+| BetMGM, Unibet, BetRivers, LeoVegas, TABtouch | 8–11% | 7.7–10.2% | mostly −2% to −8%; in SP1 one team line at +0.3% to +1.9% |
+
+**Reading.**
+- No book beats Pinnacle's fair price consistently.
+- FanDuel is the only one that comes close: it is about 1–2% behind Pinnacle's fair price
+  rather than DraftKings' 5–7%, and above it on 2 of 8 lines, once by 5.5%. In SP1 several
+  books were above Pinnacle's fair price on the same team line, which looks like Pinnacle
+  being the outlier at that moment.
+- Betfair's corner totals are thin and cost a commission.
+- One snapshot can't make a rule. The cheap next step is to add FanDuel, BetMGM, BetRivers
+  and Bovada to the live corner call, which already asks for Pinnacle and DraftKings. Up to
+  ten books bill as one region, so that is 0 extra credits. It would build the forward log
+  a corner line-shop rule would need (pre-registered like Moneyline's line shop). That is
+  the lead's and the owner's decision.
+
+### Corner price moves: result (run 42461462462, team/corners at 54bf45c, 8 Nov; no key)
+
+**VERDICT: pass, but tiny.** On 433 Pinnacle half lines in 236 matches, Pinnacle's price
+moved toward model (f)'s side by **+0.18 chance points (+0.02 to +0.35)**.
+
+| Lines | Lines (matches) | Toward the model, pts | Slope of the move on r | Toward / away |
+| --- | --- | --- | --- | --- |
+| Pinnacle, all half lines (judged) | 433 (236) | +0.18 (+0.02 to +0.35) | +0.024 (+0.000 to +0.044) | 39% / 28% |
+| Pinnacle, where the 12% rule bets | 97 (86) | +0.32 (−0.08 to +0.67) | +0.027 (−0.005 to +0.056) | 45% / 22% |
+| DraftKings, all half lines | 229 (126) | +0.15 (−0.15 to +0.44) | +0.017 (−0.022 to +0.051) | 41% / 37% |
+
+- **Size.** The mean |model − look price| is 6.5 points and the mean |move| 1.3 points.
+- **By league.** Every range crosses 0 except E3, at +0.55 (+0.14 to +1.02) on 24 lines. The
+  rest run from E0 +0.42 and SP1 +0.47 down to F1 −0.11 and E2 −0.16.
+- **Main line per team.** Identical to the judged measure: the log holds one line per team.
+
+**Reading.**
+- Model (f) knows a little that Pinnacle's look price doesn't. That is worth about +0.35%
+  in price terms, against a margin of about 6%, so it is not bettable on its own. This
+  matches the +0.37% seen on the trades in the Task 1 read.
+- It would matter only beside a book paying at or above Pinnacle's fair price (FanDuel is
+  the nearest, above). Nothing live changes.

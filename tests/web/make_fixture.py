@@ -363,6 +363,8 @@ def build(src: Path, out: Path) -> dict:
     add_espn_team_news(data)
     add_markets_research(data)
     add_research_studies(data)
+    # The Research tab (owner, 8 Nov): Research's committed overview, whole (~13 KB).
+    data["research_overview"] = _clean(pub.research_overview())
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
