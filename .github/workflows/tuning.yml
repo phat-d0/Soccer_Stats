@@ -1,0 +1,97 @@
+# Model tuning programme (docs/lab.md "Model tuning programme"; Research lab 2, owner via the
+# lead, 8 Nov). Development only: 2019/20-2023/24 scored, 2024/25 locked (lab.harness.Holdout).
+# One job per league, then a pool job. No API key, no credits, never pushes. Results in the
+# log (TUNING_<PHASE>_JSON) and a 7-day artifact.
+#   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+name: Model tuning
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "bias = phase 1, bias vs variance"
+        type: choice
+        options: [bias]
+        default: bias
+
+permissions:
+  contents: read
+
+jobs:
+  league:
+    runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        league: [E0, SP1, D1, I1, F1, E1, E2, E3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-data-none
+          restore-keys: raw-data-
+      # The last good Understat league files (xg.GOOD_DIR), with the archived old seasons.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/understat_good
+          key: xg-good-none
+          restore-keys: xg-good-
+      # Rebuilt from the permanent archive when the cache missed (cache_archive.ARCHIVED_FREE).
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: xg-good
+      - uses: actions/cache/restore@v4
+        if: ${{ contains(fromJSON('["SP1","D1","I1","F1"]'), matrix.league) }}
+        with:
+          path: data/raw
+          key: understat-${{ matrix.league }}-none
+          restore-keys: understat-${{ matrix.league }}-
+      - name: Run the phase for one league
+        env:
+          LEAGUE: ${{ matrix.league }}
+          PHASE: ${{ inputs.phase }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          case "$PHASE" in
+            bias) uv run python -m soccer_stats.lab.tuning_bias --league "$LEAGUE" --out out ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: tuning-${{ inputs.phase }}-${{ matrix.league }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  pool:
+    needs: league
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tuning-${{ inputs.phase }}-*
+          path: in
+      - name: Pool the leagues
+        env:
+          PHASE: ${{ inputs.phase }}
+        run: |
+          uv sync --frozen
+          mkdir -p out
+          case "$PHASE" in
+            bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: tuning-${{ inputs.phase }}-pooled
+          path: out/
+          retention-days: 7
+          if-no-files-found: ignore

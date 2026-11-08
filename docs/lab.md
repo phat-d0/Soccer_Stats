@@ -3739,3 +3739,90 @@ The tests cover:
 - no look-ahead in any factor.
 
 `odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
+
+## Model tuning programme (owner via the lead, 8 Nov)
+
+The owner asked "How do I make it better?". The lead gave Research lab 2 four phases, run in
+order: bias vs variance, ceiling analysis, grid search, then LASSO on the market residual.
+
+Rules for every phase:
+- Development data only: 2019/20–2023/24 scored, 2017/18–2018/19 burn-in. 2024/25 is locked
+  (`Holdout` from 2024-07-01); opening it needs the owner's approval through the lead.
+- Time-ordered walk-forward and nested validation only; no random splits.
+- Ranges are 95%, from 2,000 draws resampling matches, seed 0.
+- Every configuration tried is logged with a running count, for the final read's
+  multiple-testing note.
+- 0 credits.
+
+Only a phase with a development gain whose range is above 0 feeds a single pre-registered
+judged read on 2024/25. That read covers everything that survived, states the count, and goes
+to the owner through the lead.
+
+Shared base: `lab/tuning_base.py`. It runs the walk-forward Dixon-Coles for any configuration
+(xi, xG weight, window, minimum team matches). It reproduces `backtest.walk_forward` exactly at
+today's defaults, which a test checks. Beside the out-of-sample chances it keeps each refit's
+in-sample log loss and team ratings.
+
+### Phase 1: bias vs variance (pre-registered 2026-11-08, before any run)
+
+**Question.** Is the match model's gap to the market mostly bias (too simple, or missing
+information) or variance (overfitting)?
+
+**Rows.**
+- The eight domestic leagues (E0, SP1, D1, I1, F1, E1, E2, E3), football-data plus Understat.
+- Scored kickoffs from 2019-07-01 to 2024-07-01 (2019/20–2023/24).
+- Comparisons use only the rows every compared series predicts. A shorter window drops more
+  teams under the 6-match minimum, so each league's learning curve is scored on the matches all
+  four windows predict.
+
+**Model learning curves.**
+- Windows of 365, 730 (today), 1,095 and 1,460 days. Everything else stays at today's settings:
+  xi 0.0019, xG weight 0.7 (0 in E1–E3), minimum 6 team matches, weekly refits.
+- Loaded data starts five seasons before 2019/20, so the 1,460-day window is full.
+- Per window, league, and pooled:
+  - **out-of-sample** 1X2 log loss on the scored rows;
+  - **in-sample** log loss, computed every fourth refit (every 28 days) and averaged over those
+    refits. Primary: on the training matches of the window's last 365 days, unweighted, the
+    rows the decayed fit leans on most. Also shown: on the whole window;
+  - training size: the mean number of matches in the window.
+
+**Blend learning curves.**
+- The live blend (`match_calibration.fit`, 28-day refits), fitted on Pinnacle's fair close as
+  live, beside the 730-day model.
+- Training rows capped at the last 1, 2, 3 and 4 seasons (365 × k days), and uncapped (today).
+- In-sample and out-of-sample log loss both apply the blend to the fair **close**, so the two
+  sides of the variance measure use the same input. The early-price version (as bet) is also
+  shown.
+- Blend rows start in 2019/20, since Pinnacle's close in football-data starts there. So the
+  blend's 3- and 4-season caps are only reached late in the period, and the read says so.
+
+**Reference levels** on the same rows: Pinnacle's Shin-fair close (the best achievable, the
+"human-level" line) and its fair early price.
+
+**Measures**, per league and pooled, each with a match-bootstrap range:
+- **bias** = out-of-sample log loss − the close's log loss;
+- **variance** = out-of-sample − in-sample;
+- also out-of-sample − the early price's log loss.
+
+**Reading.** Decided by which measure is larger in each league:
+- bias > variance, with variance's range including 0 or below 0.005: the model lacks
+  information or flexibility (more factors, or a richer model);
+- variance > bias: overfitting (more regularisation, a longer window, more data).
+- If out-of-sample log loss falls as the window grows, more data helps (a variance sign). If it
+  is flat while in-sample stays near out-of-sample, the error is bias.
+
+**Team-rating stability** (730-day window):
+- for each team, attack and defence ratings at successive weekly refits: the median
+  week-to-week change, and the correlation of all teams' ratings between refits 28 days apart;
+- per league and season.
+- Descriptive. A rating that moves a lot week to week while out-of-sample log loss doesn't
+  improve is a variance sign.
+
+**Configurations logged:** 8 leagues × 4 windows (32 model configurations) and 8 × 5 blend caps
+(40), so 72 toward the programme's count. No bets, no CLV.
+
+**Code.** `lab/tuning_base.py`, `lab/tuning_bias.py`; workflow `tuning.yml` `phase=bias` (a job
+per league, then a pool job), log line `TUNING_BIAS_JSON`, every file in the artifact.
+
+In-sample is measured per refit, so a variance range resamples the scored matches for the
+out-of-sample term and the refits for the in-sample term, independently.

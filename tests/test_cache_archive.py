@@ -297,7 +297,7 @@ def test_every_archived_free_restore_is_followed_by_a_soft_fallback():
         assert nxt.get("if") == s.get("if")
         assert nxt.get("continue-on-error") is True
         found += 1
-    assert found == 5  # publish, players, goalscorer-test, backfill, odds-check
+    assert found == 6  # publish, players, goalscorer-test, backfill, odds-check, tuning
 
 
 # ---------- bought data can't be left out of the archive ----------
