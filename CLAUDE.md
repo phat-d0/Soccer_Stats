@@ -1475,8 +1475,9 @@ four leagues: E0, E1–E3).
 - `cache_archive.py` (owner, 28 Oct; stdlib only, run as a script by the workflows):
   `PAID` (name → key prefix, exact paths), `list_files`, `content_sha256`, `entry` (files, bytes,
   `by_path`, key, `content_sha256`, archive parts and sha256), `changed`, `merge` (an unchanged or
-  missed cache keeps its entry), `verify`, `missing`; subcommands `entry`, `merge`, `verify`,
-  `missing`. `ARCHIVED_FREE` (lead, 7 Nov): free caches archived like the paid ones,
+  missed cache keeps its entry), `verify`, `missing`, `key_prefix` (caches.yml's usage job: the longest kept-alive prefix a key starts
+  with, else the key less its run id or content hash, so hashed `xg-good-<sha>` keys count as
+  kept; 8 Nov); subcommands `entry`, `merge`, `verify`, `missing`. `ARCHIVED_FREE` (lead, 7 Nov): free caches archived like the paid ones,
   today `xg-good-` (`ARCHIVED` = `PAID` | `ARCHIVED_FREE`): `caches.yml` packs every row with
   `archive: true` into the same release and manifest and the fallback test covers it; each
   `xg-good-` restore is followed by the fallback action with `continue-on-error: true`.
