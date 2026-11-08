@@ -1224,6 +1224,57 @@ rare. The rule covers any that remain.
 This note was committed before any of these snapshots was bought and before any outcome in
 the judged window was read. It changes neither the measures nor the pass rule.
 
+### Note, 2026-11-08: B's window rows through 1 Nov come from the rescued artifact (lead-approved; no outcome read)
+
+Model evaluation's dev rerun on 8 Nov (goalscorer-test.yml run 42474646236) failed in SP1,
+D1, I1 and F1 ("0 appearances (1530 match files missing)"). Their Understat match files
+were in no cache. The `understat-<league>-` caches had been evicted before 1 Nov: the dev
+run that day (41346853368) already missed them, downloaded every match file from Understat
+and saved none. Understat has been down since 2 Nov, so the files can't be fetched again.
+
+**What is kept.** The only rows built from those files are in the 1 Nov artifacts:
+- B's scored rows for all five leagues through 1 Nov, from the forward check, run
+  41325824036 (`rows_<L>.csv.gz`, `forward_<L>.csv.gz`);
+- the 2025/26 development rows, from run 41346853368 (`judged_<L>.csv.gz`).
+
+They were copied before expiry into artifact 13615572896 ("goalscorer-1nov-rescued", run
+42476536162, with SHA256SUMS), then onto the release `paid-odds-archive` as
+`goalscorer-1nov-rescued.zip`. Its sha256 is in `archive/extra_assets.json`, which
+caches.yml's verify job checks. Nothing in them was read.
+
+**Rule for the judged read.**
+- **Through 1 Nov:** window matches kicking off by 1 Nov use B's chances from the rescued
+  `rows_<L>.csv.gz`. Those rows were built at commit 182a2c3, before
+  `models.player_goals.FIT_OPTIONS`, so a rebuild would not match them bit for bit.
+- **From 2 Nov:** matches use B's chances rebuilt once Understat is back (goal-league on the
+  default branch, SP1–F1, 2021/22 onward; E0's files are in raw-data and the new
+  `understat-E0-` shard), with FIT_OPTIONS.
+- **Matches in both:** matches kicking off by 1 Nov that the rebuild also scores keep the
+  rescued rows, the copy made first.
+- **No Understat by 31 Jan:** if Understat hasn't returned, the sample is the matches
+  through 1 Nov. Under 300 bets with a CLV is "inconclusive" by §16's own rule, with no
+  departure.
+
+Measures, thresholds and the pass rule are unchanged.
+
+**Wayback Machine, checked 8 Nov** (free CDX count, run 42477795332, one-off; the tool was
+not kept). Played matches from 2021/22 with any 200 capture of the getMatchData endpoint or
+the match page:
+- all five leagues: 1,320 of 8,960 (14.7%); the endpoint our fetcher uses only 25 times;
+- E0 521 of 1,988, SP1 496 of 2,004 (378 of them 2024/25), D1 204 of 1,600, I1 51 of
+  1,614, F1 48 of 1,754;
+- the 2026/27 window: I1 0, F1 0, D1 4 of 70.
+
+B needs each player's run of earlier matches, so this can't rebuild the four leagues:
+we wait for Understat.
+
+**Protection from now on** (same PR as this note): the Understat match files are kept in
+five shards (`understat-E0-` … `understat-F1-`, path `data/raw/understat_matches`). Every run
+that works on a league restores all five, which together hold every file any run kept. A run
+saves its own shard back from the default branch only, and only when it added files, so a
+copy with fewer files than were restored is never saved. The shards are kept alive and
+archived (`cache_archive.ARCHIVED_FREE`).
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes

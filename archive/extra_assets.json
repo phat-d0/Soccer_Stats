@@ -1,0 +1,44 @@
+{
+ "note": "Files on the release paid-odds-archive that no cache holds (lead, 8 Nov 2026). caches.yml's verify job downloads each and checks its sha256. Never replace or delete them.",
+ "assets": [
+  {
+   "asset": "goalscorer-1nov-rescued.zip",
+   "bytes": 6607928,
+   "sha256": "88e8b5c69ce8ffd64645cbc496ee9f6e73e3984b2710a5cb50fb6272fb743112",
+   "uploaded": "2026-11-08",
+   "runs": {
+    "copied": 42476536162,
+    "uploaded": 42476922647,
+    "sources": [
+     41325824036,
+     41346853368
+    ]
+   },
+   "what": "The 1 Nov goalscorer artifacts: B's scored rows for all five leagues through 1 Nov (forward check, run 41325824036, built at 182a2c3 before FIT_OPTIONS) and the 2025/26 development rows (run 41346853368). The only rows built from SP1/D1/I1/F1's Understat match files, which no cache holds (docs/player_props.md \u00a716, note of 8 Nov).",
+   "files": {
+    "edge-goal-leagues/forward_D1.csv.gz": "283c745c427a801c42e4bf141d450240dbfe77b77867c500ec0fa8902c90fa12",
+    "edge-goal-leagues/forward_E0.csv.gz": "4297dcf5cdcb443d786210893906fdf982628a5c00d1537462030e9c9cc08df8",
+    "edge-goal-leagues/forward_F1.csv.gz": "6fed2f98bf65a74766d01b185b1ebd39bfafe339b59fb187c0545435a17c52a8",
+    "edge-goal-leagues/forward_I1.csv.gz": "4cdd723d7a8196142b77f22602b741e4535dd5f4423fd531420d3fc91666e07b",
+    "edge-goal-leagues/forward_SP1.csv.gz": "e84b0b550d40d9f78a9aac675deb2a529ec629fc05bb6650309c3d1f0e0e5484",
+    "edge-goal-leagues/goal_D1.json": "b4eab966b401557d1755890a6673e4dc2c02f9c677f64c219faabef3645327aa",
+    "edge-goal-leagues/goal_E0.json": "9f11bfa25c997dd64e531e369c880904cd7393357ec0f32f624e15206319f6bf",
+    "edge-goal-leagues/goal_F1.json": "c2fc4f7e5da329a1c1b440c1c3dffd03c510b62adc3fb16d2bfc05943fe2e6bc",
+    "edge-goal-leagues/goal_I1.json": "8920b527d9053b9a343dd7089b1254297dafef0bac02d57a8410f58c7a2ac047",
+    "edge-goal-leagues/goal_SP1.json": "ac16457052f8963f388993522abc017d62215ae14b7ed4b8c7cc676ae9363e3a",
+    "edge-goal-leagues/goal_pool.json": "ee06d2152076830f97d7df131c1267170ab49fc1ac7f2242883c1c456cbaf45e",
+    "edge-goal-leagues/rows_D1.csv.gz": "bcfc3a2f828694c5fce66f8d19e940d07ed958da98cf82a2fa4735d5e8d53600",
+    "edge-goal-leagues/rows_E0.csv.gz": "bee8bca886881e296cf78c5abe70ab9dbc603ad7b115ee6c291a8137ad164769",
+    "edge-goal-leagues/rows_F1.csv.gz": "c96229df1a4756b55ed851bc8798050b2eb0ee864cb5d1b0e5ee8928622ffb1c",
+    "edge-goal-leagues/rows_I1.csv.gz": "1102b9e133e8e791a31fad335a3ebe446fa328119a1320479a3bd3036f8ef7eb",
+    "edge-goal-leagues/rows_SP1.csv.gz": "f008b08a66b94214e0c558903091ec247e7fa315e092582829af3b2d03755e4c",
+    "goalscorer-dev-D1/judged_D1.csv.gz": "d57d03be339ae2f215147950622e5aea9d122f831cb501cadcbf15fcff070535",
+    "goalscorer-dev-E0/judged_E0.csv.gz": "fc08dda9a11b631f1ba0e9decf59bb10e55adf817b4f9aab7671c3eda77f37f8",
+    "goalscorer-dev-F1/judged_F1.csv.gz": "003ff9ee79c7cbb9300ee087341de5c229fd9df0dac7fad2481d8b32c347d84a",
+    "goalscorer-dev-I1/judged_I1.csv.gz": "be0d9d28ff95da4992d45ba054ddbb1504d764a92933817e68bb0d9ee5d1054c",
+    "goalscorer-dev-SP1/judged_SP1.csv.gz": "e1cb1348ae0dfeb1af5e8c54620115f35aebaf0821305bd6a5f68c7242cf7552",
+    "goalscorer-dev-pooled/goalscorer_dev.json": "940b1e5eebb8e6a84d6e2816995603da8e90271f02716a3c7ba925946adf30f5"
+   }
+  }
+ ]
+}

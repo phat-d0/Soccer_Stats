@@ -63,6 +63,20 @@ jobs:
         with:
           name: xg-good
 
+      # Understat match files (lead, 8 Nov): the Premier League's own shard, archived
+      # (raw-data-'s copy isn't); saved at the end when this run added files.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-E0-none
+          restore-keys: understat-E0-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-E0
+      - name: Count the Understat match files restored (a save never keeps fewer)
+        run: echo "UM_BEFORE=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
+
       # Paid lines: restored here, saved right after the download, even when it fails.
       - uses: actions/cache/restore@v4
         with:
@@ -115,6 +129,27 @@ jobs:
             if git -C ../log push origin data-log; then exit 0; fi
           done
           exit 1
+
+      # Saved only when this run added match files: never a copy with fewer files than
+      # were restored, and from the default branch only.
+      - name: Keep the Understat match files only if this run added some
+        id: um
+        if: ${{ always() }}
+        run: |
+          after=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)
+          before=${UM_BEFORE:-0}
+          echo "Understat match files: $before restored, $after now"
+          if [ "$after" -gt "$before" ]; then
+            echo "save=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "save=false" >> "$GITHUB_OUTPUT"
+            echo "Not saved: no new match files"
+          fi
+      - uses: actions/cache/save@v4
+        if: ${{ always() && steps.um.outputs.save == 'true' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' }}
+        with:
+          path: data/raw/understat_matches
+          key: understat-E0-${{ github.run_id }}
 
   # Archive right after a purchase (owner, 28 Oct: "save the api data permanently"): a
   # paid run on the default branch dispatches caches.yml once this job's caches are saved

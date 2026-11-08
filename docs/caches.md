@@ -75,7 +75,7 @@ Until 28 Oct some paid data was never cached:
   lost what it bought. Both now save with an explicit save step under `always()`.
 
 **Free** (kept alive only): `raw-data-` (`data/raw`), `cup-espn-`, `cup-corners-`,
-`espn-timelines-`, `heavy-espn-`, `understat-SP1/D1/I1/F1-`, `comebacks-E0/SP1/D1/I1/F1-`. CI keeps `playwright-…`
+`espn-timelines-`, `heavy-espn-`, `comebacks-E0/SP1/D1/I1/F1-`. CI keeps `playwright-…`
 and setup-uv's own caches in use itself.
 
 The `usage` job prints every cache's size and when it was last used, plus the total against the
@@ -163,3 +163,25 @@ is the player-props team's call.
 Tests: `tests/test_cache_archive.py` covers the manifest and checksum code, a real tar + zstd
 round trip, every cache step in the workflows being kept alive with its exact paths, the paid
 registry matching the workflow, a fallback after every paid restore, and the three rules above.
+
+## Understat match files (lead, 8 Nov)
+
+`understat-SP1/D1/I1/F1-` were evicted before Understat went down on 2 Nov. The 1 Nov
+goalscorer runs downloaded every match file and saved none, so B lost four leagues
+(docs/player_props.md §16, note of 8 Nov). From now on:
+
+- **Five shards:** `understat-E0-` … `understat-F1-`, each on the path
+  `data/raw/understat_matches` alone. League files are xg-good-'s.
+- **Restores:** a run that works on any league restores all five shards. Together they hold
+  every match file any run kept. goalscorer-test.yml, odds-check.yml's goal-league,
+  goal-leagues and Research tasks, and tuning.yml do this; players.yml restores the E0
+  shard.
+- **Saves:** a run saves its own shard (goal-leagues: `inputs.league`'s) only from the
+  default branch. It counts the files after the restores (`UM_BEFORE`) and saves only when
+  the count grew, so a copy with fewer files than were restored is never kept.
+  `tests/test_cache_archive.py` checks every shard save for this.
+- **Kept alive and archived:** each shard has a keep-alive row and is in
+  `cache_archive.ARCHIVED_FREE`. Every restore is followed by the soft archive fallback.
+- **Extra assets** (`archive/extra_assets.json`): files on the release that no cache holds,
+  each with its sha256, checked by caches.yml's verify job. Today that is
+  `goalscorer-1nov-rescued.zip`, the rescued 1 Nov scored rows.

@@ -129,6 +129,11 @@ rule CLV +7.6% vs baseline +2.85%, ROI −3.8%). Development cost 35,688 credits
 since 10 Oct 3,101 (bought, not read); live logging runs in `publish.yml` (first week: 43 calls, 26
 matches, 9 without a live entry); from 1 Nov, history buys only the snapshots the live log lacks
 (`backfill` design `gaps`, cap 500; §16 note of 7 Nov), and each judged row records its source.
+SP1/D1/I1/F1's Understat match files are in no cache (evicted before 1 Nov; Understat down since 2 Nov),
+so B runs only in E0 until Understat returns. The 1 Nov scored rows (all five leagues through 1 Nov, and
+2025/26 development) are kept on the release `paid-odds-archive` as `goalscorer-1nov-rescued.zip`
+(sha256 in `archive/extra_assets.json`, checked by caches.yml's verify); the judged read uses them for
+matches through 1 Nov (§16 note of 8 Nov).
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
 False`, so no player paper trades open.
@@ -359,7 +364,7 @@ four leagues: E0, E1–E3).
 - After `players.yml` or `backfill.yml` writes a backtest, dispatch `publish.yml` so the app picks it up.
 - Caches: `raw-data-*` (Understat), `xg-good-*` (the last good Understat league files), `odds-history-*`, `player-odds-history-*`,
   `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
-  `understat-<league>-*`, `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
+  `understat-<league>-*` (the Understat match files: five shards on `data/raw/understat_matches`, restored together, each saved from the default branch only when a run added files, archived as `ARCHIVED_FREE`; `docs/caches.md`), `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
   delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones,
   plus `xg-good-` (free, `cache_archive.ARCHIVED_FREE`, lead, 7 Nov),
   as release assets (`paid-odds-archive`, manifest on data-log `archive/manifest.json`); every

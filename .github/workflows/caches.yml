@@ -91,16 +91,17 @@ jobs:
           - { name: inplay-probe, prefix: inplay-probe-, paid: true, archive: true, path: "data/raw/inplay_probe" }
           # Free but archived too (cache_archive.ARCHIVED_FREE): packed and restored like the paid ones.
           - { name: xg-good, prefix: xg-good-, paid: false, archive: true, path: "data/understat_good" }
+          - { name: understat-E0, prefix: understat-E0-, paid: false, archive: true, path: "data/raw/understat_matches" }
+          - { name: understat-SP1, prefix: understat-SP1-, paid: false, archive: true, path: "data/raw/understat_matches" }
+          - { name: understat-D1, prefix: understat-D1-, paid: false, archive: true, path: "data/raw/understat_matches" }
+          - { name: understat-I1, prefix: understat-I1-, paid: false, archive: true, path: "data/raw/understat_matches" }
+          - { name: understat-F1, prefix: understat-F1-, paid: false, archive: true, path: "data/raw/understat_matches" }
           # Free (rebuilt from public sources, but slowly).
           - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
           - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
           - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }
           - { name: espn-timelines, prefix: espn-timelines-, paid: false, path: "data/raw/espn_timelines" }
           - { name: heavy-espn, prefix: heavy-espn-, paid: false, path: "data/raw/heavy_espn" }
-          - { name: understat-SP1, prefix: understat-SP1-, paid: false, path: "data/raw" }
-          - { name: understat-D1, prefix: understat-D1-, paid: false, path: "data/raw" }
-          - { name: understat-I1, prefix: understat-I1-, paid: false, path: "data/raw" }
-          - { name: understat-F1, prefix: understat-F1-, paid: false, path: "data/raw" }
           - { name: comebacks-E0, prefix: comebacks-E0-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
           - { name: comebacks-SP1, prefix: comebacks-SP1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
           - { name: comebacks-D1, prefix: comebacks-D1-, paid: false, path: "data/raw/understat_matches\ndata/raw/understat_*.json" }
@@ -271,6 +272,18 @@ jobs:
             gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$a" -D assets --clobber
           done
           python3 src/soccer_stats/cache_archive.py verify --manifest manifest.json --dir assets
+      - name: Download the extra assets (archive/extra_assets.json) and check every sha256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p extra
+          jq -r '.assets[] | "\(.asset) \(.sha256)"' archive/extra_assets.json | while read -r a sum; do
+            gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$a" -D extra --clobber
+            got=$(sha256sum "extra/$a" | cut -d' ' -f1)
+            if [ "$got" != "$sum" ]; then echo "::error::$a: sha256 $got, expected $sum"; exit 1; fi
+            echo "$a: sha256 ok"
+          done
 
   usage:
     # Every cache in the repository against the 10 GB limit; flags key prefixes not kept alive.
@@ -332,6 +345,11 @@ jobs:
           - { name: archive-probe, path: "data/raw/archive_probe" }
           - { name: inplay-probe, path: "data/raw/inplay_probe" }
           - { name: xg-good, path: "data/understat_good" }
+          - { name: understat-E0, path: "data/raw/understat_matches" }
+          - { name: understat-SP1, path: "data/raw/understat_matches" }
+          - { name: understat-D1, path: "data/raw/understat_matches" }
+          - { name: understat-I1, path: "data/raw/understat_matches" }
+          - { name: understat-F1, path: "data/raw/understat_matches" }
     steps:
       - uses: actions/checkout@v4
       - name: Local archive from this run's packs (branch dry run)

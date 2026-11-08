@@ -48,12 +48,56 @@ jobs:
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: xg-good
+      # Understat match files (lead, 8 Nov): five shards, each saved by a run that worked on
+      # that league; restored together, they hold every file any run kept. Archived
+      # (cache_archive.ARCHIVED_FREE) and rebuilt from the archive when a shard missed.
       - uses: actions/cache/restore@v4
-        if: ${{ matrix.league != 'E0' }}
         with:
-          path: data/raw
-          key: understat-${{ matrix.league }}-none
-          restore-keys: understat-${{ matrix.league }}-
+          path: data/raw/understat_matches
+          key: understat-E0-none
+          restore-keys: understat-E0-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-E0
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-SP1-none
+          restore-keys: understat-SP1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-SP1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-D1-none
+          restore-keys: understat-D1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-D1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-I1-none
+          restore-keys: understat-I1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-I1
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-F1-none
+          restore-keys: understat-F1-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-F1
+      - name: Count the Understat match files restored (a save never keeps fewer)
+        run: echo "UM_BEFORE=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
       - uses: actions/cache/restore@v4
         with:
           path: data/raw/player_odds_history
@@ -70,6 +114,26 @@ jobs:
           uv sync --frozen
           mkdir -p out
           uv run soccer-stats goalscorer-dev --league "$LEAGUE" --out "out/judged_${LEAGUE}.csv.gz"
+      # Saved only when this run added match files: never a copy with fewer files than
+      # were restored, and from the default branch only (a branch's caches are invisible elsewhere).
+      - name: Keep the Understat match files only if this run added some
+        id: um
+        if: ${{ always() }}
+        run: |
+          after=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)
+          before=${UM_BEFORE:-0}
+          echo "Understat match files: $before restored, $after now"
+          if [ "$after" -gt "$before" ]; then
+            echo "save=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "save=false" >> "$GITHUB_OUTPUT"
+            echo "Not saved: no new match files"
+          fi
+      - uses: actions/cache/save@v4
+        if: ${{ always() && steps.um.outputs.save == 'true' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' }}
+        with:
+          path: data/raw/understat_matches
+          key: understat-${{ matrix.league }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
