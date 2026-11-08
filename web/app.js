@@ -43,7 +43,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v78";
+const APP_VERSION = "v79";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -3784,14 +3784,14 @@ function kellyStats(trades, kl) {
 }
 // A trade row's ¼ Kelly column (owner, 7 Nov): the stake and its share of the
 // bankroll that sized it while open (with "to win"), the ¼ Kelly P/L once settled, "capped"
-// at the 5% cap, or "No stake" with a short reason.
+// at the cap ($50, 5% of the $1,000 start, owner 8 Nov), or "No stake" with a short reason.
 const KELLY_SHORT = { "no edge on the chance": "no edge", "no chance": "no chance", "no bankroll": "no bankroll" };
 function kellyCell(t, kt) {
   const wrap = (main, lines) => `${main}${lines.map((l) => `<small>${l}</small>`).join("")}`;
   if (!kt) return wrap(`<b class="muted">–</b>`, ["not sized"]);
   if (!(kt.stake > 0)) return wrap(`<b class="muted">No stake</b>`, [esc(KELLY_SHORT[kt.reason] || kt.reason || "no edge")]);
   const share = kt.share != null ? pct(kt.share, 1) : "";
-  const cap = kt.capped ? "capped" : "";
+  const cap = kt.capped ? `capped at ${KELLY_CAP_SHORT}` : "";
   if (t.status === "open") {
     const win = `to win ${bankUsd(kt.stake * (Number(t.odds) - 1), 2)}`;
     return wrap(`<b>${bankUsd(kt.stake, 2)}</b>`, [share, win, cap].filter(Boolean));
@@ -3878,9 +3878,13 @@ function sizingHtml(id, sz, where = "", x = null, compact = false) {
 }
 // ---------- the Kelly bet log (owner via the lead, 5 Nov; live strategies only) ----------
 // sizing.kelly.log = [{id, opened_at, settled_at, league, match, pick, odds, chance, kelly
-// (full f*), fraction (applied: min(¼ f*, 5%), 0 with no stake), capped, bankroll_before,
+// (full f*), fraction (the stake's share of the bankroll; 0 with no stake), capped (hit the $50 cap), bankroll_before,
 // stake, status, push, profit, bankroll_after, reason, flat_stake, flat_profit}], oldest first.
-const KELLY_FORMULA = "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.";
+// The cap (owner, 8 Nov): a fixed $50, 5% of the $1,000 start, not 5% of today's bankroll;
+// `capped` says a stake hit it and `fraction` is the stake's actual share of the bankroll.
+const KELLY_CAP_SHORT = "$50";
+const KELLY_CAP_TEXT = "$50 (5% of the $1,000 start)";
+const KELLY_FORMULA = `Stake = ¼ × Kelly × bankroll, capped at ${KELLY_CAP_TEXT}; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.`;
 const KELLY_CHANCE = { blend: "the blend's chance (Blend Lean's p_bet; Model 12%'s blend chance for its side)", model_f: "model (f)'s chance to win, with pushes taken out", model: "the raw model's chance" };
 const kellyLogKey = (x) => `kl-${x.key}`;
 const kellyRowId = (key, id) => `${key}-r${[...String(id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
@@ -3903,7 +3907,7 @@ function kellyLogHtml(x, k) {
     const when = r.opened_at ? dayName(r.opened_at.slice(0, 10)) : "–";
     const share = r.stake > 0 && r.bankroll_before > 0 ? r.stake / r.bankroll_before : null;
     const stake = r.stake > 0
-      ? `${bankUsd(r.stake, 2)}<span class="meta">${pct(share, 1)} of ${bankUsd(r.bankroll_before, 0)}${r.capped ? " · capped at 5%" : ""}</span>`
+      ? `${bankUsd(r.stake, 2)}<span class="meta">${pct(share, 1)} of ${bankUsd(r.bankroll_before, 0)}${r.capped ? ` · capped at ${KELLY_CAP_SHORT}` : ""}</span>`
       : `<span class="muted">No stake</span><span class="meta">${esc(r.reason || "")}</span>`;
     const pl = isNum(r.profit) ? `<span class="${signCls(r.profit)}">${usd(r.profit, 2)}</span><span class="meta">flat $10: ${usd(r.flat_profit, 2)}</span>` : `<span class="muted">–</span>`;
     return `<tr id="${kellyRowId(key, r.id)}"${state.kellyFocus === r.id ? ' class="sel"' : ""}>
@@ -3954,7 +3958,7 @@ function kellyStakeLine(t) {
         const v = stakes[t.id];
         const what = st.rule?.rule === "lineshop" ? "Pinnacle's fair chance" : st.sizing.kelly.p_source === "model_f" ? "model (f) chance" : "calibrated chance";
         const kt = kellyTrade(t, kellyOf(st));
-        const share = kt?.share != null ? ` (${pct(kt.share, 1)} of a ${bankUsd(kt.before, 0)} bankroll${kt.capped ? ", capped at 5%" : ""})` : "";
+        const share = kt?.share != null ? ` (${pct(kt.share, 1)} of a ${bankUsd(kt.before, 0)} bankroll${kt.capped ? `, capped at ${KELLY_CAP_TEXT}` : ""})` : "";
         return v > 0 ? `¼ Kelly stake: ${bankUsd(v, 2)}${share}` : `Kelly: no stake (no edge on the ${what})`;
       }
     }

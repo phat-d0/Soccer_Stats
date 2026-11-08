@@ -836,7 +836,7 @@ const STEPS = [
     if (!(await p.locator(".pf-title").innerText()).includes("all odds (old rule)")) throw new Error("old rule not opened");
     await p.click('button[data-trade="E0|2627|Arsenal|Leeds|lean"]'); await sheet(p);
     const kl = await p.textContent("#sheet-body .kelly-line");
-    if (!/^(¼ Kelly stake: \$[\d,.]+( \([\d.]+% of a \$[\d,]+ bankroll(, capped at 5%)?\))?|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
+    if (!/^(¼ Kelly stake: \$[\d,.]+( \([\d.]+% of a \$[\d,]+ bankroll(, capped at \$50 \(5% of the \$1,000 start\))?\))?|Kelly: no stake \(no edge on the calibrated chance\))\. Shown for comparison only/.test(kl)) throw new Error(`Kelly line: ${kl}`);
     const text = await p.textContent("#sheet-body");
     for (const want of ["Blend Lean (1σ+)", "Chance used (blend)", "Above break-even", "+2.6σ (Strong", "+1σ"]) if (!text.includes(want)) throw new Error(`Lean trade sheet lacks "${want}"`);
   }, true],
@@ -1139,7 +1139,7 @@ const STEPS = [
     if (!(log.length > 25)) throw new Error(`fixture Kelly log too short: ${log.length}`);
     await p.click("details#kl-edge12 > summary");
     const box = (await p.textContent("details#kl-edge12")).replace(/\s+/g, " ");
-    for (const w of [`Kelly bet log · ${log.length} bets`, "Stake = bankroll × the smaller of ¼ × Kelly and 5%; Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.", "The chance used here is the blend's chance", "Newest first", "Show more (2 left)"]) if (!box.includes(w)) throw new Error(`Kelly log lacks "${w}": ${box.slice(0, 400)}`);
+    for (const w of [`Kelly bet log · ${log.length} bets`, "Stake = ¼ × Kelly × bankroll, capped at $50 (5% of the $1,000 start); Kelly = (chance × decimal odds − 1) ÷ (decimal odds − 1). No stake when the chance shows no edge.", "The chance used here is the blend's chance", "Newest first", "Show more (2 left)"]) if (!box.includes(w)) throw new Error(`Kelly log lacks "${w}": ${box.slice(0, 400)}`);
     const rows = p.locator("details#kl-edge12 tbody tr");
     if ((await rows.count()) !== 25) throw new Error(`Kelly log rows: ${await rows.count()}`);
     // Newest first, and each row's numbers are the log's.
@@ -1396,6 +1396,9 @@ const STEPS = [
     if (!heads || heads !== lists) throw new Error(`Kelly column heads ${heads} for ${lists} lists`);
     const rows = await p.locator("#view .trade-row").count();
     if ((await p.locator("#view .trade-row .vals.two .kcol").count()) !== rows) throw new Error("every trade row should carry a ¼ Kelly column");
+    // The cap is a fixed $50 (owner, 8 Nov), not 5% of the bankroll: a capped stake says so.
+    const capped = await p.locator("#view .kcol", { hasText: "capped" }).allInnerTexts();
+    if (!capped.length || capped.some((t) => !t.includes("capped at $50"))) throw new Error(`capped Kelly cells: ${JSON.stringify(capped)}`);
     // Nothing in a row is cut off (lead, 7 Nov): every text line fits its box, the DraftKings
     // CLV line included, which wraps instead of ending in "…".
     const cut = await p.evaluate(() => [...document.querySelectorAll("#view .trade-row .meta, #view .trade-row .meta .nowrap, #view .trade-row .vals small")].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > e.closest(".trade-row").getBoundingClientRect().right + 1).map((e) => e.textContent.trim()));
