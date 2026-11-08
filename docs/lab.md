@@ -4426,12 +4426,20 @@ The model is over-confident: its range is below 1. The blend fixes that.
 - **At the priced test's threshold T = 20%:** the picks' win rate beside their mean 1/odds
   (picked = B × best odds − 1 ≥ 0.20).
 - §16's judged forward window is not read.
+- **Source (amended before (c) ran, lead 8 Nov):** the per-match Understat player files for SP1,
+  D1, I1 and F1 were lost from the cache before 1 Nov, so the rows cannot be rebuilt (run
+  42474646236 failed for those four). B is scored instead from Player props' rescue of the 1 Nov
+  development artifacts: artifact 13615572896, "goalscorer-1nov-rescued", which holds
+  `judged_<league>.csv.gz` for all five leagues, 2025/26, from dev run 41346853368. Those rows
+  were built at commit 182a2c3, before `FIT_OPTIONS` made the fit reproducible, so a rebuild
+  could differ slightly in B's chances.
 
 **Run.**
 - (a) and (b): `tuning.yml` `phase=scorecard2` (a job per league for (a), one cup job, a pool
   job).
-- (c): the pool job downloads the `goalscorer-test.yml` run's artifacts (input `goal_run`, the
-  run id).
+- (c): the pool job fetches the rescued artifact by id (input `goal_artifact`, through the
+  artifacts API with the workflow token; `goal_run` remains for a whole run's
+  `goalscorer-dev-*` artifacts).
 - All three are added to `lab/model_scorecard.json` as `goals`, `cup` and `goalscorer`.
 
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)

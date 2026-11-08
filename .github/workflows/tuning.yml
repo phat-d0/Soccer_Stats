@@ -28,6 +28,10 @@ on:
         description: "scorecard2: the goalscorer-test.yml run whose goalscorer-dev-* artifacts to score (blank = skip)"
         required: false
         default: ""
+      goal_artifact:
+        description: "scorecard2: one artifact id holding judged_<league>.csv.gz files (e.g. the rescued 1 Nov rows; blank = skip)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -157,6 +161,18 @@ jobs:
           path: goal
           run-id: ${{ inputs.goal_run }}
           github-token: ${{ github.token }}
+      - name: Fetch the goalscorer rows by artifact id
+        if: ${{ inputs.phase == 'scorecard2' && inputs.goal_artifact != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ART: ${{ inputs.goal_artifact }}
+        run: |
+          mkdir -p goal
+          curl -sSfL -H "Authorization: Bearer $GH_TOKEN" -o "$RUNNER_TEMP/goal.zip" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ART/zip"
+          unzip -o -q "$RUNNER_TEMP/goal.zip" -d goal
+          find goal -name 'judged_*.csv.gz' | sort
       - name: Pool the leagues
         env:
           PHASE: ${{ inputs.phase }}
