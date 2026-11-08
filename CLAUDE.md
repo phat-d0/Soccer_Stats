@@ -1841,6 +1841,7 @@ four leagues: E0, E1–E3).
 | `ui-designer` | `web/*` and the display fields in `publish.py`. Screenshot-tests at 390px, light and dark. |
 | `player-props` | Every player market (shots, on target, anytime goalscorer, assists, cards): models, backtests, calibration, live player lines and new player ideas (`player_*.py`, `factors.py`, `models/player_counts.py`, `players.yml`). Formerly `player-shots`. |
 | `moneyline` | The match model and match bets (`models/dixon_coles.py`, `backtest.py`, `odds*.py`, match parts of `trades.py` and `paper.py`, `backfill.yml`). |
+| `corners` | Team corners end to end (owner, 8 Nov): model (f), the live Pinnacle and DraftKings corner prices and paper tracks, their shadow filters, corner research (`corners_live.py`, corner parts of `trades.py` and `paper.py`, `edge/corners*.py`, `edge/corner_*.py`, `cup_corners.py`, the corner sections of `docs/totals.md`). |
 | `research-lab` | The shared evaluation harness and pass rules (`src/soccer_stats/lab/`, `docs/lab.md`), the machine-learning model bake-off, and signal/market research (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. Formerly `edge-finder`. |
 | `lead-reviewer` | Reviews and merges specialist branches, CI, CLAUDE.md, README, `docs/history.md`, the work plan, and credit budgets. |
 
@@ -1902,6 +1903,7 @@ the baseball team does. The first team sessions (created by the first lead) were
 | Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
 | Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
 | Soccer team: Model evaluation and tuning | session_01UShqQvgsVwKSXpXgieEppK | team/model-eval (LASSO: team/research-lasso) |
+| Soccer team: Corners | session_01UShqQu7dU5SjysFPPXbUgM | team/corners |
 
 Model evaluation and tuning (owner, 8 Nov; created as "Research lab 2", renamed the same day) runs
 the `research-lab` role for one remit: evaluation metrics and tuning for every model, live and past
