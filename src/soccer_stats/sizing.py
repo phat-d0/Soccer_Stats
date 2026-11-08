@@ -5,9 +5,11 @@ changes no record: it replays the same trades (or backtest bets) with a differen
 reports what the bankroll would have done. Flat $10 stays the record.
 
 * Paper bankroll BANKROLL_START at each strategy's first trade.
-* Fractional Kelly: stake = bankroll x min(KELLY_FRACTION x f*, KELLY_CAP), with
-  f* = (p x d - 1) / (d - 1) for decimal odds d taken and chance p; no stake when f* <= 0,
-  when p is unknown or when the bankroll is gone.
+* Fractional Kelly: stake = min(KELLY_FRACTION x f* x bankroll, KELLY_CAP_USD), with
+  f* = (p x d - 1) / (d - 1) for decimal odds d taken and chance p: at most $50 a bet (5% of
+  the $1,000 start, a fixed amount since 8 Nov, owner, so a winning run can't inflate the
+  stakes; before, the cap was 5% of the current bankroll); never more than the bankroll; no
+  stake when f* <= 0, when p is unknown or when the bankroll is gone.
 * p is a calibrated chance where there is one: Lean's blend p_bet; Model 12%'s blend
   chance for its side (p_blend); model (f)'s chance given no push for corners. Model 12%
   also gets a second variant on its raw model_p, to show why it isn't used.
@@ -27,8 +29,9 @@ import numpy as np
 import pandas as pd
 
 KELLY_FRACTION = 0.25  # quarter Kelly
-KELLY_CAP = 0.05  # never more than 5% of the bankroll on one bet
+KELLY_CAP = 0.05  # the cap as a share of the starting bankroll
 BANKROLL_START = 1000.0
+KELLY_CAP_USD = KELLY_CAP * BANKROLL_START  # at most $50 on one bet, whatever the bankroll
 FLAT_STAKE = 10.0
 MAX_CURVE = 200  # bankroll curve points kept (evenly spaced, the last one always)
 APP_LEAGUE_CURVE = 60  # per-league backtest curves in data.json (the pooled one keeps 200)
@@ -36,7 +39,7 @@ BACKTEST_LEAD = pd.Timedelta(days=4)  # backtest bets are decided 4 days before 
 NOTE = (
     "Tracked alternative only: the same trades with a different stake, no new bets; flat "
     "$10 stays the record. Paper bankroll $1,000 at the first trade; quarter Kelly "
-    "(0.25 x f*, f* = (p x odds - 1) / (odds - 1)), at most 5% of the bankroll a bet, "
+    "(0.25 x f*, f* = (p x odds - 1) / (odds - 1)), at most $50 a bet (5% of the $1,000 start), "
     "nothing when f* <= 0. Each stake uses only the bankroll from bets settled before it "
     "opened; pushes and voids return the stake. Kelly assumes p is right: every strategy's "
     "CLV is below 0, so the edge it sizes on is not proven."
@@ -62,13 +65,14 @@ def kelly_f(p, odds) -> float | None:
 
 
 def kelly_stake(
-    bankroll: float, p, odds, fraction: float = KELLY_FRACTION, cap: float = KELLY_CAP
+    bankroll: float, p, odds, fraction: float = KELLY_FRACTION, cap: float = KELLY_CAP_USD
 ) -> float:
-    """bankroll x min(fraction x f*, cap); 0 when f* <= 0, p is unknown or bankroll <= 0."""
+    """min(fraction x f* x bankroll, cap $, bankroll); 0 when f* <= 0, p is unknown or
+    bankroll <= 0. `cap` is in dollars (KELLY_CAP_USD, $50)."""
     f = kelly_f(p, odds)
     if f is None or f <= 0 or not bankroll > 0:
         return 0.0
-    return round(bankroll * min(fraction * f, cap), 2)
+    return round(min(fraction * f * bankroll, cap, bankroll), 2)
 
 
 def _ts(v) -> pd.Timestamp | None:
@@ -178,7 +182,7 @@ def flat_fn(bankroll: float, bet: dict) -> float:
     return FLAT_STAKE
 
 
-def kelly_fn(fraction: float = KELLY_FRACTION, cap: float = KELLY_CAP):
+def kelly_fn(fraction: float = KELLY_FRACTION, cap: float = KELLY_CAP_USD):
     def fn(bankroll: float, bet: dict) -> float:
         return kelly_stake(bankroll, bet.get("p"), bet.get("odds"), fraction, cap)
 
@@ -193,7 +197,7 @@ def block(bets: list[dict], kind: str, p_source: str | None = None, keep_stakes=
         out.update(fraction=None, cap=None, stake=FLAT_STAKE, p_source=None)
     else:
         out = simulate(bets, kelly_fn())
-        out.update(fraction=KELLY_FRACTION, cap=KELLY_CAP, p_source=p_source)
+        out.update(fraction=KELLY_FRACTION, cap=KELLY_CAP_USD, p_source=p_source)
         out["bets_no_chance"] = sum(1 for b in bets if not _finite(b.get("p")))
         out["p_note"] = P_NOTES.get(p_source or "")
     out["note"] = NOTE
@@ -442,7 +446,8 @@ def _pick(t: dict) -> str:
 
 def kelly_log(trades: list[dict], bets: list[dict], sim: dict) -> list[dict]:
     """One row per sized trade, in the order simulate() opened them: how its quarter-Kelly
-    stake was worked out (chance, full Kelly f, the fraction applied after the 5% cap, the
+    stake was worked out (chance, full Kelly f, the stake's share of the bankroll after the
+    $50 cap, the
     bankroll that sized it), what it did (status, profit, bankroll after its settlement)
     and the flat $10 result beside it; `capped`, `push` and `reason` appear only when set.
     `sim` is simulate(..., log=True) on `bets`."""
@@ -460,7 +465,8 @@ def kelly_log(trades: list[dict], bets: list[dict], sim: dict) -> list[dict]:
             reason = LOG_REASONS["bankroll"]
         else:
             reason = None
-        applied = min(KELLY_FRACTION * f, KELLY_CAP) if reason is None else 0.0
+        before = e["bankroll_before"]
+        applied = e["stake"] / before if reason is None and before > 0 else 0.0
         ret = b.get("ret")
         rows.append(
             {
@@ -474,7 +480,7 @@ def kelly_log(trades: list[dict], bets: list[dict], sim: dict) -> list[dict]:
                 "chance": round(b["p"], 4) if b.get("p") is not None else None,
                 "kelly": round(f, 4) if f is not None else None,
                 "fraction": round(applied, 4),
-                "capped": reason is None and KELLY_FRACTION * f > KELLY_CAP,
+                "capped": reason is None and KELLY_FRACTION * f * before > KELLY_CAP_USD,
                 "bankroll_before": round(e["bankroll_before"], 2),
                 "stake": e["stake"],
                 "status": t.get("status"),
