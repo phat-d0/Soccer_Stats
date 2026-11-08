@@ -1866,3 +1866,50 @@ price moves") could later be tried as a filter, but only with its own pre-regist
 **Code.** The logging is `corners_live.SHOP_BOOKS` / `LOG_BOOKS` (one region, 1 credit). The
 extra books are dropped for the month if a call with them bills more (`shop_off`). The rule
 itself is not built yet.
+
+## Corner dispersion: candidate f-oos (corners team, 8 Nov 2026; lead's go at low priority; pre-registered before any 2025/26 read)
+
+**Why.** Model evaluation's stage 1 (run 42461482443, `docs/lab.md`) found model (f)'s NB2 too
+narrow out of sample: dispersion under the fitted NB2 is 1.07–1.12 in every league, with every
+range above 1. (f)'s α is moment-matched on the same matches its team ratings were fitted on,
+so it leaves out the ratings' own error. Lines far from a team's mean are priced too
+confidently.
+
+**The candidate** (`edge/corner_alpha.CandidateFOos`, named "f-oos"):
+- (f)'s means exactly.
+- α per side = the moment-matched α of out-of-sample residuals over the last 365 days before
+  the fit. Each 28-day block there is predicted by a (f) fit on matches before it.
+- Earlier kickoffs only. With fewer than 200 predicted matches, the in-sample α is kept
+  (`alpha_source`).
+- It has the same interface as `TeamCornersF`, so `lab.model_assumptions.corner_walk(...,
+  model=CandidateFOos)` scores it on the same rows.
+
+**Development** (2017/18–2023/24 only; Model evaluation and tuning scores it beside (f)):
+- NB2 dispersion;
+- PIT and 50%/90% interval coverage;
+- log loss at team half lines.
+It is descriptive and not judged. If development shows no improvement, the candidate stops
+there.
+
+**The judged read: 2025/26, once** (the lead's rule of 8 Nov for model settings).
+- **Sample.**
+  - Every 2025/26 match with football-data corner counts in the eight corner leagues.
+  - Both models are refitted every 28 days on earlier matches (730-day window), on identical
+    rows.
+  - 2024/25 stays locked; 2026/27 stays bake-off 2's.
+- **Primary measure.** For each match, the summed binary log loss of over/under at the team
+  half lines 2.5, 3.5, …, 8.5, both teams (14 outcomes per match). Then the paired
+  difference f-oos − (f), pooled over the eight leagues, with its 95% range resampling
+  matches (2,000 draws, seed 0).
+- **Pass:** the range is below 0 (f-oos better).
+- **Descriptive:** per league; NB2 dispersion; 50%/90% coverage.
+- **When:** read once, after the development scoring is recorded, with a logged `reason`.
+- **Disclosure:** 2025/26 corner counts were already read once for round 12's recalibration
+  (10 Oct). That read was model (f)-free, so it can't have tuned f-oos, but the season isn't
+  untouched.
+
+**What a pass would mean.** f-oos becomes the candidate replacement for (f)'s α in
+`corners_live`. It would change only the chances on lines far from the mean. The swap is the
+owner's call after the 8 Dec review. It doesn't touch bake-off 2's frozen 3 Feb test, which
+scores (f) as frozen. It doesn't change the margin problem: the Task 1 read and the discovery
+still apply.
