@@ -89,17 +89,19 @@ def test_gradient_with_xg_targets(league):
 
 
 def test_default_rho_fit_is_pinned(league):
-    # rho_option=None must stay today's fit (the live app). The pinned values hold to the
-    # optimizer's convergence, which differs in the 6th digit between machines (CI saw the
-    # intercept 1.1e-5 off in relative terms), so 1e-4; the exact checks below compare fits
-    # made on the same machine.
+    # rho_option=None must stay today's fit (the live app). The pinned values hold only to
+    # the optimizer's convergence, which differs between CI runners (home_adv was seen 2.7e-4
+    # off in relative terms), so they are checked to an absolute 1e-3. A change of default
+    # still fails: on this fixture rho fixed at 0, a rho penalty of 50 or a ridge of 1 moves
+    # at least one of the three by 2.7e-3 or more.
+    # The exact checks below compare fits made on the same machine.
     df, _ = league
     m = DixonColes().fit(df)
-    assert m.params["intercept"] == pytest.approx(0.06761537680066211, rel=1e-4)
-    assert m.params["home_adv"] == pytest.approx(0.2238702919763295, rel=1e-4)
-    assert m.params["rho"] == pytest.approx(0.11335450748865242, rel=1e-4)
+    assert m.params["intercept"] == pytest.approx(0.06761537680066211, abs=1e-3)
+    assert m.params["home_adv"] == pytest.approx(0.2238702919763295, abs=1e-3)
+    assert m.params["rho"] == pytest.approx(0.11335450748865242, abs=1e-3)
     expected = [[0.19111285, 0.09239938], [0.25285128, 0.08630114]]
-    np.testing.assert_allclose(m.score_matrix("T00", "T01")[:2, :2], expected, rtol=1e-4)
+    np.testing.assert_allclose(m.score_matrix("T00", "T01")[:2, :2], expected, atol=1e-3)
     m2 = DixonColes(rho_option=None).fit(df)
     np.testing.assert_array_equal(m.score_matrix("T00", "T01"), m2.score_matrix("T00", "T01"))
     # A zero penalty is the same fit as None.
