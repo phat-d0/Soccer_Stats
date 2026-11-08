@@ -4274,6 +4274,45 @@ candidates come in later parts. Each part's method is written here before it run
 **Run.** `tuning.yml` `phase=scorecard`: a job per league, then a pool job that writes the file and
 prints it in base64 chunks with its SHA-256, as `residual_map` does. No key, 0 credits.
 
+### Stage 2, part 1: results (run 42470580721, descriptive)
+
+Run note: attempt 1 lost four league jobs to the uv download outage before any code ran. "Re-run
+failed jobs" completed them on the same commit (1171b4a0).
+
+**1X2, 2019/20–2023/24.** 13,667 matches priced by all four series. Log loss (lower is better)
+and ROC AUC (higher is better):
+
+| | Model | Blend | Pinnacle early | Pinnacle close |
+| --- | --- | --- | --- | --- |
+| Log loss, pooled | 1.0225 | 1.0062 | 1.0051 | 1.0020 |
+| AUC, pooled | 0.662 | 0.679 | 0.680 | 0.683 |
+
+- **Per league:** the model is behind Pinnacle's early price in every league, by 0.007 (D1) to
+  0.022 (E2). The blend is within 0.003 of the early price everywhere. It is level with or ahead of
+  the early price only in I1 (0.9650 vs 0.9653), SP1 (0.9734 vs 0.9743) and E1 (1.0406 vs 1.0405),
+  where Pinnacle's close is no better than its early price either.
+- **Model 12%'s picks:** 6,333 outcome rows. They won 27.0%, against 28.7% implied by the odds
+  and 27.7% by Pinnacle's fair early price. The picks win less often than even the fair price
+  says, so the 12% "edge" is the model's over-confidence. This agrees with the CLV record.
+- **Lean's picks:** 2,461. They won 40.4%, against 41.0% implied and 40.0% fair. Their win rate
+  tracks the fair price: the blend adds nothing the price lacks.
+- The full file is described in the next section, which also covers calibration and the 3 × 3
+  argmax confusion matrices.
+
+**Corners: model (f) against the league-mean baseline, 2017/18–2023/24.**
+- Pooled RMSE: 2.666 for (f) against 2.745 for the baseline.
+- Pooled log score: −2.352 against −2.427.
+- (f) beats the baseline in every league. The gain is largest in E0 (RMSE 2.730 vs 2.938) and I1
+  (2.716 vs 2.851), and smallest in E3 (2.647 vs 2.668).
+- (f)'s central 80% interval covers 84–86% of counts in every league. That is slightly wide:
+  whole-number counts make a central interval cover more than its nominal level, so this is
+  consistent with the NB2 fit, not a sign that it is too wide.
+
+**The committed file.** `lab/model_scorecard.json` is printed in the pool job's log as one
+base64 chunk with SHA-256 `3c815c30…c29212`. This sandbox cannot download logs or artifacts, so
+the file is committed by whoever can fetch it (the residual map's route). The numbers above are
+from the same run's summary lines.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
