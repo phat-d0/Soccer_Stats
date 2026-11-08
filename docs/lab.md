@@ -4594,6 +4594,43 @@ f-oos"), and is followed exactly. Code: `lab/corner_foos.py`, `tuning.yml`
 - **Verdict:** development shows an improvement, so the pre-registered single 2025/26 judged
   read is warranted. It is dispatched only after this record is merged and the lead says go.
 
+#### f-oos judged read on 2025/26: fail (Model evaluation and tuning, 8 Nov; read once)
+
+- **Run:** `tuning.yml` `phase=foos-judged`, run 42478718647, default branch at 2ef62b58 (the
+  frozen code of the development run). The `Holdout` was unlocked from 2025-07-01 with the
+  pre-registered reason. Seasons loaded: 2022/23–2025/26. 2024/25 was training only, and nothing
+  after 30 June 2026 was loaded.
+- **Sample:** 3,408 matches in 2025/26, eight corner leagues.
+- **Half-line log loss** (per match): (f) 7.3831, f-oos 7.3804. Difference **−0.0027 (−0.0069
+  to +0.0011)**. The range includes 0, so the read **fails** the pre-registered rule (range
+  below 0). The point estimate matches development's (−0.0025), but one season is too small to
+  confirm it.
+- **Descriptive, as in development:**
+  - Dispersion: 1.101 for (f), 1.049 for f-oos.
+  - PIT: (f) is U-shaped again (0.104 bottom, 0.106 top). f-oos is flatter (0.095–0.105).
+  - Coverage: 50% interval 60.1% → 60.9%; 90% interval 93.1% → 93.6%.
+- **Per league** (difference, 95% range):
+
+  | League | Matches | Difference | 95% range |
+  | --- | --- | --- | --- |
+  | E0 | 380 | −0.0123 | −0.0226 to −0.0027 |
+  | E3 | 552 | −0.0064 | −0.0160 to +0.0024 |
+  | I1 | 380 | −0.0050 | −0.0166 to +0.0060 |
+  | SP1 | 380 | −0.0039 | −0.0235 to +0.0148 |
+  | E2 | 552 | −0.0032 | −0.0074 to +0.0011 |
+  | D1 | 306 | −0.0013 | −0.0196 to +0.0195 |
+  | E1 | 552 | −0.0004 | −0.0060 to +0.0055 |
+  | F1 | 306 | +0.0154 | −0.0013 to +0.0308 |
+
+  Seven leagues point toward f-oos. F1 points the other way, with a range that just includes 0.
+  In development, D1 was the one league pointing the other way. So no league is consistently
+  worse.
+- **Verdict:** fail. (f) keeps its in-sample α in `corners_live`, and nothing live changes.
+  f-oos is not re-read on 2025/26. Any further test needs its own pre-registration on unused
+  data (2026/27 once the season ends, outside E0/I1/F1's locked bake-off 2 test). Its gain is
+  tiny either way: about 0.003 in log loss per match, on lines far from the mean, against a
+  6% margin.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
