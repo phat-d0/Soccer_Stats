@@ -1378,7 +1378,7 @@ four leagues: E0, E1–E3).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v77) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v78) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1386,7 +1386,7 @@ four leagues: E0, E1–E3).
   on ↻ also reloads when the deployed `sw.js` names another version (`newerAppDeployed`). The
   header subtitle ends "App vNN". The smoke test's `updateCheck` runs with the service worker
   allowed: first install no reload, a new `sw.js` one reload, ↻ on a newer `sw.js` one reload.
-- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Explore. The Record
+- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Research (v78); Explore. The Record
   tab was retired in v66 (owner via the lead, 28 Oct; `setTab` sends any unknown tab to
   Portfolio): Goals & corners became Moneyline's goals rows (below), Match bets' model replay
   moved to Moneyline → Model (`modelReplayHtml`) and its DraftKings threshold sweep to Model 12%'s
@@ -1801,6 +1801,25 @@ four leagues: E0, E1–E3).
   loss (`details.dk-sweep`) under its bets. **Player shots → Backtest**: the classic view, then
   "The strategies compared" (switch `data-recstrat`, tiles for a non-main strategy, the sweep,
   predicted vs actual, the shot model's checks).
+- **Research tab** (owner, 8 Nov; v78; `viewResearch`): Research lab's
+  `src/soccer_stats/lab/research_overview.json` (every study: id, area, name, when, verdict,
+  question, sample, result, doc; `measure`/`value`/`lo`/`hi`/`bets`, a backtest's `roi`/`roi_lo`/
+  `roi_hi`, `luck`, a running test's `due`/`due_date`), passed through by `publish.research_overview`
+  as `data.json` → `research_overview` (its own try; None when missing or not that shape; display
+  only, nothing recomputed; Research updates the file when a verdict changes). The tab: a thesis
+  line ("N studies so far. None has beaten Pinnacle's closing price." unless a passed study's CLV
+  range sits above 0), the verdict tally (`RS_TALLY`; pills reuse `VERDICT`, which adds `running`,
+  `withdrawn` `.pill.v-wd` and `exploratory` `.pill.v-exp`), "Against the closing price" and
+  "Return per $1" (`rangeChart` ids `rs-clv` / `rs-roi`, class `rc-stack`: the label over its bar;
+  rows best first, a figure without a range drawn as a dot, the strategy search's luck row toned
+  neutral (`r.tone`) with "luck (p 0.94)"; readouts name value, range, bets and verdict), the
+  cards by area (`rsCard`: left edge coloured by verdict via `data-v`, question, result, sample,
+  date or due), and "Still to be read" (the running tests by `due_date`). A card links to its
+  Portfolio page (`RS_LINKS` → `researchGo`, `data-rsgo` "portfolio|key|view|source": the in-play
+  studies, the strategy search, the line shop, the Lean and Model 12% backtests at Pinnacle's or
+  DraftKings' prices, the corners under-60% line, the goals-markets study), only when that page is
+  in the build (`rsLink`); otherwise it names its write-up (`doc`). The fixture carries the file
+  whole (`make_fixture`), about 1.49 MB in all, 8 Nov.
 - The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
   updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
   the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the

@@ -525,6 +525,22 @@ def comeback_research(path: Path = COMEBACK_RESEARCH_FILE) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+RESEARCH_OVERVIEW_FILE = LAB_DIR / "research_overview.json"
+
+
+def research_overview(path: Path = RESEARCH_OVERVIEW_FILE) -> dict | None:
+    """The Research tab (owner, 8 Nov): Research lab's committed list of every study
+    (lab/research_overview.json, `kind: "research_overview"`, `studies` [...]) passed through
+    as is, display only. None if the file is missing, unreadable or not that shape. Never
+    raises."""
+    data = comeback_research(path)
+    if not data or data.get("kind") != "research_overview":
+        return None
+    if not isinstance(data.get("studies"), list):
+        return None
+    return data
+
+
 def research_studies(registry=None, lab_dir: Path = LAB_DIR) -> list[dict]:
     """Portfolio's research rows: each registry entry whose file is committed, as the file's
     fields plus `id`, `portfolio` and `name` (the file's own `name` wins). A missing,
@@ -1390,6 +1406,15 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     except Exception as exc:  # noqa: BLE001
         data["research_studies"] = []
         print(f"Research studies: failed ({type(exc).__name__})")
+    try:  # the Research tab: every study in one committed file (display only)
+        data["research_overview"] = _clean(research_overview())
+        ro = data["research_overview"]
+        print(
+            f"Research overview: {len(ro['studies'])} studies" if ro else "Research overview: none"
+        )
+    except Exception as exc:  # noqa: BLE001
+        data["research_overview"] = None
+        print(f"Research overview: failed ({type(exc).__name__})")
     try:  # Record > Goals & corners: research numbers plus the live test's progress
         state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
         try:
