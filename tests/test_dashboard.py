@@ -67,3 +67,17 @@ def test_load_fixtures_from_cache(tmp_path):
     assert len(fx) == 1
     assert fx.loc[0, "kickoff"] == pd.Timestamp("2026-10-18 12:30")
     assert fx.loc[0, "odds_home"] == 1.9 and np.isnan(fx.loc[0, "odds_draw"])
+
+
+def test_match_model_takes_the_league_ridge(league):
+    df = league[0]
+    assert dashboard.match_model("E1", xg_weight=0.0).ridge == 10.0
+    assert dashboard.match_model("E0").ridge == 0.0
+    assert dashboard.match_model(None).ridge == 0.0
+    # The default path is today's fit exactly; a ridged league's fit differs.
+    plain = dashboard.fit_model(df)
+    e0 = dashboard.fit_model(df, league="E0")
+    assert e0.attack == plain.attack and e0.params == plain.params
+    e1 = dashboard.fit_model(df, league="E1")
+    assert e1.ridge == 10.0
+    assert sum(abs(v) for v in e1.attack.values()) < sum(abs(v) for v in plain.attack.values())

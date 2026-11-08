@@ -707,7 +707,7 @@ def build_data(
     now = now or pd.Timestamp.now(tz="UTC")
     has_xg = bool(matches["home_xg"].notna().any())
     weight = XG_WEIGHT if has_xg else 0.0
-    model = dashboard.fit_model(matches, xg_weight=weight)
+    model = dashboard.fit_model(matches, xg_weight=weight, league=league)
 
     season_matches = matches[matches["date"] >= f"{season}-07-01"]
     teams = sorted(
@@ -723,7 +723,7 @@ def build_data(
     start = pd.Timestamp(f"{season - 1}-08-01")
     record = {}
     for name, w in [("model", weight)] + ([("goals_only", 0.0)] if has_xg else []):
-        preds = dashboard.replay(matches, start, xg_weight=w)
+        preds = dashboard.replay(matches, start, xg_weight=w, league=league)
         scores = dashboard.track_record(preds, 0.0)["scores"]
         record[name] = {
             "log_loss": scores.loc["model", "log_loss"] if not scores.empty else None,
@@ -1085,7 +1085,7 @@ def league_fixtures(league: str, share: int = 1, now: pd.Timestamp | None = None
         known = _season_teams(matches, season)
         fixtures, source = with_draftkings(fixtures, league, known, now=now, share=share)
         weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
-        model = dashboard.fit_model(matches, xg_weight=weight)
+        model = dashboard.fit_model(matches, xg_weight=weight, league=league)
         source["model_fit"] = safe_fit_info(model, matches)
         source["xg_status"] = xg_status(league, matches, xg_error)
         teams = sorted(set(fixtures.get("home", [])) | set(fixtures.get("away", [])))

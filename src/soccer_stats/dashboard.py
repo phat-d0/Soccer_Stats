@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from soccer_stats import backtest
+from soccer_stats import leagues as lgs
 from soccer_stats.markets import btts, match_odds, over_under
 from soccer_stats.models import DixonColes
 from soccer_stats.odds import devig_shin
@@ -13,11 +14,22 @@ from soccer_stats.odds import devig_shin
 LOW_DATA_MATCHES = 6
 
 
+def match_model(league: str | None = None, xg_weight: float = 0.0, **kw) -> DixonColes:
+    """The live match model for a domestic league: DixonColes with the league's ratings ridge
+    (leagues.match_ridge). The live fit, fit-match-blends and the match backtests build it
+    here; research and lab paths keep their own settings."""
+    return DixonColes(xg_weight=xg_weight, ridge=lgs.match_ridge(league), **kw)
+
+
 def fit_model(
-    matches: pd.DataFrame, as_of: pd.Timestamp | None = None, xg_weight: float = 0.0
+    matches: pd.DataFrame,
+    as_of: pd.Timestamp | None = None,
+    xg_weight: float = 0.0,
+    league: str | None = None,
 ) -> DixonColes:
     as_of = as_of or matches["date"].max() + pd.Timedelta(days=1)
-    return DixonColes(xg_weight=xg_weight).fit(matches[matches["date"] < as_of], as_of=as_of)
+    model = match_model(league, xg_weight=xg_weight)
+    return model.fit(matches[matches["date"] < as_of], as_of=as_of)
 
 
 def match_counts(matches: pd.DataFrame, current_teams: list[str]) -> pd.Series:
@@ -126,10 +138,12 @@ def team_ratings(model: DixonColes, counts: pd.Series, teams: list[str]) -> pd.D
     return df
 
 
-def replay(matches: pd.DataFrame, start: pd.Timestamp, xg_weight: float = 0.0) -> pd.DataFrame:
+def replay(
+    matches: pd.DataFrame, start: pd.Timestamp, xg_weight: float = 0.0, league: str | None = None
+) -> pd.DataFrame:
     """Walk-forward predictions from `start` with de-vigged closing probabilities (slow)."""
     preds = backtest.walk_forward(
-        matches, start=start, model_factory=lambda: DixonColes(xg_weight=xg_weight)
+        matches, start=start, model_factory=lambda: match_model(league, xg_weight=xg_weight)
     )
     return backtest.add_market_probs(preds) if not preds.empty else preds
 

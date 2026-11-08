@@ -218,3 +218,26 @@ def test_run_uses_the_backtest_level_and_says_why(tmp_path, monkeypatch):
     assert data["portfolio"]["rule"]["threshold_source"] == "default"
     led = paper.load_ledger(tmp_path)
     assert led["E0|2627|Arsenal|Leeds"]["threshold"] == tr.PAPER_EDGE
+
+
+def test_model_ref_records_each_league_fit():
+    data = {
+        "xg_weight": 0.7,
+        "matches_fit": 1500,
+        "match_model": {
+            "E0": {"xg_weight": 0.7, "ridge": 0.0, "matches": 1500},
+            "E1": {"xg_weight": 0.0, "ridge": 10.0, "matches": 1800},
+            "SP1": {"kind": "domestic", "error": "ValueError: x"},
+        },
+    }
+    e1 = paper.model_ref(data, "E1")
+    assert (e1["xg_weight"], e1["ridge"], e1["matches_fit"], e1["league"]) == (
+        0.0,
+        10.0,
+        1800,
+        "E1",
+    )
+    # No league, or a league without a usable fit: the top level, as before 8 Nov.
+    for ref in (paper.model_ref(data), paper.model_ref(data, "SP1"), paper.model_ref(data, "D1")):
+        assert (ref["xg_weight"], ref["matches_fit"]) == (0.7, 1500)
+        assert "ridge" not in ref

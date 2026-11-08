@@ -80,6 +80,14 @@ LEAGUES: dict[str, League] = {
 }
 PRIMARY = "E0"  # the league whose fields fill data.json's top level (params, teams, ...)
 
+# The match model's ratings ridge per league (DixonColes(ridge=); 0 = none). Model evaluation
+# and tuning's judged read on 2025/26 passed (8 Nov 2026, run 42467772606; docs/lab.md "Model
+# settings: the judged read on 2025/26"): each value is the one in {0, 1, 3, 10, 30} with the
+# lowest development log loss (2017/18-2023/24). Owner-approved for the live fit, the Lean
+# blend refit and the match backtests (dashboard.match_model). Leagues not listed (E0, SP1, I1)
+# stay at 0; the Champions League's cross-league fit keeps its own (cup_model.RIDGE).
+MATCH_RIDGE: dict[str, float] = {"D1": 3.0, "F1": 1.0, "E1": 10.0, "E2": 3.0, "E3": 10.0}
+
 
 def get(code: str) -> League:
     """The registry entry for a football-data code (KeyError if unknown)."""
@@ -90,6 +98,11 @@ def live_codes() -> list[str]:
     """Codes of the leagues switched on, the primary league first."""
     codes = [c for c, lg in LEAGUES.items() if lg.live]
     return sorted(codes, key=lambda c: c != PRIMARY)
+
+
+def match_ridge(code: str | None) -> float:
+    """The live match model's ratings ridge for a league (MATCH_RIDGE; 0 when unlisted)."""
+    return MATCH_RIDGE.get(code or "", 0.0)
 
 
 def name(code: str) -> str:

@@ -795,3 +795,15 @@ def test_draftkings_names_map_to_football_data_in_new_leagues():
     row = feed.parse_odds(events, {"Dortmund", "Werder Bremen"}).iloc[0]
     assert (row["home"], row["away"]) == ("Dortmund", "Werder Bremen")
     assert row["odds_home"] == 1.6 and row["odds_away"] == 5.0
+
+
+def test_match_ridge_per_live_league_is_pinned():
+    # Model evaluation and tuning's judged read on 2025/26 (8 Nov 2026, run 42467772606):
+    # the live ratings ridge per league. Changing one needs a new pre-registered read.
+    expected = {"E0": 0.0, "SP1": 0.0, "I1": 0.0, "D1": 3.0, "F1": 1.0,
+                "E1": 10.0, "E2": 3.0, "E3": 10.0}  # fmt: skip
+    assert {c: lgs.match_ridge(c) for c in expected} == expected
+    assert set(lgs.MATCH_RIDGE) <= set(lgs.live_codes())
+    # The Champions League keeps the cross-league model's own ridge.
+    assert lgs.match_ridge("UCL") == 0.0
+    assert lgs.match_ridge(None) == 0.0

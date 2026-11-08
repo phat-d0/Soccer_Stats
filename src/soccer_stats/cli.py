@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from soccer_stats import backtest
+from soccer_stats import backtest, dashboard
 from soccer_stats.data import current_season, load_matches
 from soccer_stats.models import DixonColes
 from soccer_stats.xg import with_xg
@@ -1130,7 +1130,7 @@ def cmd_fit_match_blends(args: argparse.Namespace) -> None:
             if err and lgs.LEAGUES[code].understat:
                 print(f"{lgs.name(code)}: {err}")
             weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
-            factory = functools.partial(DixonColes, xg_weight=weight)
+            factory = functools.partial(dashboard.match_model, code, xg_weight=weight)
             pins = pinnacle_closes(code, years)
             rows, cov = league_blend_rows(code, matches, pins, f"{args.from_season}-07-01", factory)
             entry = {**mc.league_fit(rows, fit_date), "xg_weight": weight, "coverage": cov}
@@ -1295,7 +1295,8 @@ def _cup_close_reports(codes, closes_path, which: tuple[str, ...]) -> dict[str, 
 
 def _early_preds(code: str, from_season: int, burn_in: int):
     """One domestic league's walk-forward model chances from `from_season` (xG weight 0.7
-    where Understat has xG, else goals only) and Pinnacle's own prices for those seasons."""
+    where Understat has xG, else goals only; the league's live ratings ridge,
+    leagues.match_ridge) and Pinnacle's own prices for those seasons."""
     from soccer_stats import leagues as lgs
     from soccer_stats.data import pinnacle_prices
     from soccer_stats.publish import XG_WEIGHT
@@ -1306,7 +1307,7 @@ def _early_preds(code: str, from_season: int, burn_in: int):
     if err and lgs.LEAGUES[code].understat:
         print(f"{lgs.name(code)}: {err}")
     weight = XG_WEIGHT if matches["home_xg"].notna().any() else 0.0
-    factory = functools.partial(DixonColes, xg_weight=weight)
+    factory = functools.partial(dashboard.match_model, code, xg_weight=weight)
     preds = backtest.walk_forward(matches, start=f"{from_season}-07-01", model_factory=factory)
     return preds, pinnacle_prices(code, range(from_season, last + 1)), weight
 
