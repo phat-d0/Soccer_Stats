@@ -4388,6 +4388,49 @@ Calibration slopes (1 = calibrated, below 1 = over-confident):
 
 The model is over-confident: its range is below 1. The blend fixes that.
 
+
+### Stage 2, part 2: method (written before any run; descriptive, no pass rule)
+
+**(a) The goal distributions** (the score matrix behind the Goals rows and the team totals):
+- **Rows:** the same walk-forward as part 1, eight leagues, 2019/20–2023/24, with the score
+  matrix kept.
+- **Total goals over/under 2.5:**
+  - log loss, Brier, AUC and the calibration slope for the model's chance, set beside Pinnacle's
+    Shin-fair early and close O/U 2.5 (football-data P>2.5, PC>2.5);
+  - only matches all three price are used;
+  - the paired log-loss difference against the early price, with a match-resampled 95% range.
+- **Total goals as a distribution (0 to 6+):**
+  - the ranked probability score of the model's distribution, against a baseline: Poisson at
+    the league's mean total over the same 730 training days;
+  - the share of matches inside the model's central 80% interval.
+- **Each team's goals:** RMSE and MAE of the expected goals; the log score against the
+  baseline's Poisson at the league mean for home and away goals.
+
+**(b) The cup model (UCL):**
+- **Rows:** `cup_model.history`'s walk-forward chances (Monday refits on matches before them)
+  on the Champions League matches with a bought close (2024/25 and 2025/26, `EVAL_SEASONS`).
+- **Reported:** log loss, Brier, AUC and the calibration slope beside Pinnacle's Shin-fair close
+  and DraftKings' close on the same matches, and the paired log-loss difference against
+  Pinnacle's close.
+- These seasons are the closes already read by `cup_backtest` (published since October). No new
+  data is opened, and the domestic 2024/25 lock is not touched.
+
+**(c) Goalscorer B:**
+- **Rows:** the 2025/26 development starters that `goalscorer-test.yml` (`design=dev`, no key,
+  0 credits) joins to cached prices. These are the rows `lab/auc.py` read. Their artifacts have
+  a 7-day retention, so they are rebuilt by one dispatch.
+- **Reported:** log loss, Brier, AUC and calibration for B beside the season-goals and season-xG
+  benchmarks and the best price (1/odds, margin included: no book quotes a No price).
+- **At the priced test's threshold T = 20%:** the picks' win rate beside their mean 1/odds
+  (picked = B × best odds − 1 ≥ 0.20).
+- §16's judged forward window is not read.
+
+**Run.**
+- (a) and (b): `tuning.yml` `phase=scorecard2` (a job per league for (a), one cup job, a pool
+  job).
+- (c): read from the `goalscorer-test.yml` run's artifacts.
+- All three are added to `lab/model_scorecard.json` as `goals`, `cup` and `goalscorer`.
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
