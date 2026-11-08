@@ -3627,7 +3627,11 @@ sample, where that price is wrong? Earlier work says probably not:
 - One row per match, with its three outcomes (home, draw, away), in eight leagues: E0, SP1, D1,
   I1, F1, E1, E2, E3.
 - Source is football-data, with Pinnacle's own early and close 1X2 (`data.pinnacle_prices`).
-- A match counts only if it has a full early price and a walk-forward model chance.
+- A match counts if it has a full early price.
+- Where the walk-forward model has no chance (a team with under 6 matches in its 730-day
+  window, mostly newcomers early in a season), `model_gap` is missing (0). The match is kept, so
+  that the newcomer factor keeps its first matches. (Amended 8 Nov, before any fit: the first
+  draft required a model chance.)
 
 **Decision time and the baseline.**
 - A bet is decided at Pinnacle's early price, so the decision day is kickoff − 4 days
@@ -3661,7 +3665,7 @@ fixtures are published in advance.
 | 1 | `rest` | home rest days, away rest days, home minus away. Days since each team's previous league match, capped at 14 (`lab.features`). |
 | 2 | `europe` | for each side: a UEFA match 1–4 days before kickoff (0/1), and that match played away and not at a neutral ground (0/1, the travel). From ESPN's UEFA results via `residual_map.load_europe`'s mapping; qualifiers count. |
 | 3 | `xg_luck` | for each side: (xG for − xG against) − (goals for − goals against) per game over its last 6 league matches finished before the decision day, at least 3. Understat leagues only; 0 (missing) in E1–E3 and in I1 2022/23. |
-| 4 | `form_vs_market` | for each side: mean of (points − the points expected from Pinnacle's Shin-fair close) over its last 6 league matches finished before the decision day, at least 3. |
+| 4 | `form_vs_market` | for each side: mean of (points − the points expected from Pinnacle's Shin-fair close, else its early price where the file has no close) over its last 6 league matches finished before the decision day, at least 3. |
 | 5 | `newcomer` | for each side: new to the division this season (promoted or relegated) (0/1), and new and within its first 10 league matches (0/1). |
 | 6 | `season_phase` | three 0/1 features for the kickoff month: Aug–Sep, Jan–Feb, Mar–Jul. Oct–Dec is the reference. |
 | 7 | `model_gap` | log p_model,k − log q_k for home, draw and away. p_model is the walk-forward Dixon-Coles chance: weekly refits, xG weight 0.7, goals only where there is no xG, as in `lean_backtest`. |
