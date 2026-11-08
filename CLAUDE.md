@@ -1253,6 +1253,14 @@ four leagues: E0, E1–E3).
   goals-only) and `xg_note` puts that in the file's note; a tenth slice splits home sides by
   league. Result: 7 of 331 cells with 200+ rows exclude 0, fewer than chance; the four-league
   home-side cell did not hold (+0.9 points, −0.6 to +2.5). The lead builds the owner's 3D view from it.
+- `lab/auc.py` (owner via the lead, 8 Nov; exploratory, no key; `docs/lab.md` "ROC AUC"): ROC AUC
+  (weighted, tie-aware, one shared match bootstrap) of the match model, blend, Pinnacle's early and
+  close and DraftKings' 48 h price (eight leagues 2019/20–2023/24), within 5-point price bands,
+  live corner lines (SP1, D1, E1–E3; E0/I1/F1 locked) and goalscorer B's 2025/26 development rows
+  (run 41346853368's artifacts). `odds-check.yml` `task=auc`, log lines `AUC_JSON`, `AUC_B64`;
+  committed `lab/auc_research.json` (run 42457943922): model 0.662 vs Pinnacle early 0.680, no
+  ranking beyond the price (within-band 0.499); goalscorer B 0.746 = the best price 0.746.
+
 - `lab/lasso_residual.py` (owner, 8 Nov; `docs/lab.md` "LASSO on the market residual",
   pre-registered before any fit; development only, no key): one row per match, eight leagues,
   a multinomial logistic (draw reference) with Pinnacle's Shin-fair early 1X2 as a fixed
@@ -1283,6 +1291,12 @@ four leagues: E0, E1–E3).
   `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
   It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
   15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
+- `lab/research_overview.json` (owner, 8 Nov; `docs/lab.md` "Research overview"): every study to
+  date in one file for the app's Research tab (UI Design builds it): `areas`, `verdicts`, and per
+  study `area`, `name`, `when`, `verdict`, `question`, `sample`, `result`, `doc`, plus `measure`
+  (clv/roi) with `value`/`lo`/`hi`/`bets`, a backtest's `roi` range, `luck`, and `due`/`due_date`
+  for running tests. Copied from the recorded verdicts; Research updates it when one changes.
+  Map: https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8.
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
@@ -1390,7 +1404,7 @@ four leagues: E0, E1–E3).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v77) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v78) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1398,7 +1412,7 @@ four leagues: E0, E1–E3).
   on ↻ also reloads when the deployed `sw.js` names another version (`newerAppDeployed`). The
   header subtitle ends "App vNN". The smoke test's `updateCheck` runs with the service worker
   allowed: first install no reload, a new `sw.js` one reload, ↻ on a newer `sw.js` one reload.
-- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Explore. The Record
+- Tabs: Matches; Teams (per league, with Players season stats); Portfolio; Research (v78); Explore. The Record
   tab was retired in v66 (owner via the lead, 28 Oct; `setTab` sends any unknown tab to
   Portfolio): Goals & corners became Moneyline's goals rows (below), Match bets' model replay
   moved to Moneyline → Model (`modelReplayHtml`) and its DraftKings threshold sweep to Model 12%'s
@@ -1813,6 +1827,25 @@ four leagues: E0, E1–E3).
   loss (`details.dk-sweep`) under its bets. **Player shots → Backtest**: the classic view, then
   "The strategies compared" (switch `data-recstrat`, tiles for a non-main strategy, the sweep,
   predicted vs actual, the shot model's checks).
+- **Research tab** (owner, 8 Nov; v78; `viewResearch`): Research lab's
+  `src/soccer_stats/lab/research_overview.json` (every study: id, area, name, when, verdict,
+  question, sample, result, doc; `measure`/`value`/`lo`/`hi`/`bets`, a backtest's `roi`/`roi_lo`/
+  `roi_hi`, `luck`, a running test's `due`/`due_date`), passed through by `publish.research_overview`
+  as `data.json` → `research_overview` (its own try; None when missing or not that shape; display
+  only, nothing recomputed; Research updates the file when a verdict changes). The tab: a thesis
+  line ("N studies so far. None has beaten Pinnacle's closing price." unless a passed study's CLV
+  range sits above 0), the verdict tally (`RS_TALLY`; pills reuse `VERDICT`, which adds `running`,
+  `withdrawn` `.pill.v-wd` and `exploratory` `.pill.v-exp`), "Against the closing price" and
+  "Return per $1" (`rangeChart` ids `rs-clv` / `rs-roi`, class `rc-stack`: the label over its bar;
+  rows best first, a figure without a range drawn as a dot, the strategy search's luck row toned
+  neutral (`r.tone`) with "luck (p 0.94)"; readouts name value, range, bets and verdict), the
+  cards by area (`rsCard`: left edge coloured by verdict via `data-v`, question, result, sample,
+  date or due), and "Still to be read" (the running tests by `due_date`). A card links to its
+  Portfolio page (`RS_LINKS` → `researchGo`, `data-rsgo` "portfolio|key|view|source": the in-play
+  studies, the strategy search, the line shop, the Lean and Model 12% backtests at Pinnacle's or
+  DraftKings' prices, the corners under-60% line, the goals-markets study), only when that page is
+  in the build (`rsLink`); otherwise it names its write-up (`doc`). The fixture carries the file
+  whole (`make_fixture`), about 1.49 MB in all, 8 Nov.
 - The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
   updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
   the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the
@@ -1853,6 +1886,7 @@ four leagues: E0, E1–E3).
 | `ui-designer` | `web/*` and the display fields in `publish.py`. Screenshot-tests at 390px, light and dark. |
 | `player-props` | Every player market (shots, on target, anytime goalscorer, assists, cards): models, backtests, calibration, live player lines and new player ideas (`player_*.py`, `factors.py`, `models/player_counts.py`, `players.yml`). Formerly `player-shots`. |
 | `moneyline` | The match model and match bets (`models/dixon_coles.py`, `backtest.py`, `odds*.py`, match parts of `trades.py` and `paper.py`, `backfill.yml`). |
+| `corners` | Team corners end to end (owner, 8 Nov): model (f), the live Pinnacle and DraftKings corner prices and paper tracks, their shadow filters, corner research (`corners_live.py`, corner parts of `trades.py` and `paper.py`, `edge/corners*.py`, `edge/corner_*.py`, `cup_corners.py`, the corner sections of `docs/totals.md`). |
 | `research-lab` | The shared evaluation harness and pass rules (`src/soccer_stats/lab/`, `docs/lab.md`), the machine-learning model bake-off, and signal/market research (`src/soccer_stats/edge/`, `docs/edge.md`, `odds-check.yml`). Proposes; owners build. Formerly `edge-finder`. |
 | `lead-reviewer` | Reviews and merges specialist branches, CI, CLAUDE.md, README, `docs/history.md`, the work plan, and credit budgets. |
 
@@ -1913,6 +1947,20 @@ the baseball team does. The first team sessions (created by the first lead) were
 | Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
 | Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
 | Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
+| Soccer team: Model evaluation and tuning | session_01UShqQvgsVwKSXpXgieEppK | team/model-eval (LASSO: team/research-lasso) |
+| Soccer team: Corners | session_01UShqQu7dU5SjysFPPXbUgM | team/corners |
+
+Model evaluation and tuning (owner, 8 Nov; created as "Research lab 2", renamed the same day) runs
+the `research-lab` role for one remit: evaluation metrics and tuning for every model, live and past
+(match model, blend, cup model, corners model (f), goalscorer B, the goals distributions, the
+retired shots model and the bake-off candidates). Three stages: method selection (is the method
+right for the target, data type and size), performance evaluation (one out-of-sample scorecard
+per model beside the market's price: AUC, log loss, Brier, calibration, a confusion matrix at each
+strategy's threshold, RMSE/MAE and interval coverage for counts; `lab/model_scorecard.json`) and
+tuning (bias vs variance, ceiling analysis, a grid search on never-tuned settings, LASSO on the
+market residual). Development data 2019/20–2023/24 only; 2024/25 stays locked for one judged read
+that needs the owner's approval. Research lab keeps signal and market research, study
+pre-registrations and the research overview.
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub

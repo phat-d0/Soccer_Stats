@@ -519,7 +519,7 @@ const STEPS = [
   ["no-record-tab", async (p) => {
     await closeSheet(p);
     if (await p.locator('.tabbar button[data-tab="record"]').count()) throw new Error("the Record tab is still in the tab bar");
-    if ((await p.locator(".tabbar button").count()) !== 4) throw new Error("the tab bar should have four tabs");
+    if ((await p.locator(".tabbar button").count()) !== 5) throw new Error("the tab bar should have five tabs (Research since v78)");
     await tab("portfolio")(p);
   }],
   // Record → Goals & corners became two Moneyline rows: Goals markets (closed, in the
@@ -1769,6 +1769,55 @@ const STEPS = [
     if (text.includes("A $10 paper trade opens") || text.includes("nothing new opens here")) throw new Error("finished match sheet reads like an upcoming one");
   }, true],
   ["matches-reset-clock", async (p) => { await closeSheet(p); await p.clock.setFixedTime(NOW); await tab("portfolio")(p); await tab("matches")(p); }],
+  // The Research tab (owner, 8 Nov): Research lab's overview of every study, display only.
+  ["research", async (p) => {
+    await closeSheet(p); await tab("research")(p);
+    // Five tabs fit at every width: no label overflows its button.
+    const tabs = await p.evaluate(() => [...document.querySelectorAll(".tabbar button")].map((b) => ({ tab: b.dataset.tab, over: b.scrollWidth > b.clientWidth + 1 })));
+    if (tabs.map((t) => t.tab).join(",") !== "matches,ratings,portfolio,research,explore") throw new Error(`tab order ${tabs.map((t) => t.tab)}`);
+    if (tabs.some((t) => t.over)) throw new Error(`a tab label overflows: ${JSON.stringify(tabs)}`);
+    if (!(await p.locator('.tabbar button[data-tab="research"].active').count())) throw new Error("Research tab not active");
+    const d = await p.evaluate(() => state.data.research_overview);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!text.includes(`${d.studies.length} studies so far. None has beaten Pinnacle's closing price.`)) throw new Error("research thesis line");
+    // The tally counts every study once, by verdict.
+    const tally = await p.locator(".rs-tally-item").allInnerTexts();
+    const counted = tally.reduce((a, t) => a + Number(t.match(/(\d+)\s*$/)[1]), 0);
+    if (counted !== d.studies.length) throw new Error(`tally ${tally} vs ${d.studies.length} studies`);
+    for (const w of ["Withdrawn", "Exploratory", "Inconclusive", "Passed", "Failed", "Running"]) if (!tally.some((t) => t.includes(w))) throw new Error(`tally lacks ${w}`);
+    if (!(await p.locator(".rs-tally .pill.v-wd").count()) || !(await p.locator(".rs-tally .pill.v-exp").count())) throw new Error("withdrawn/exploratory pill styles");
+    // One card per study, grouped under each area's name.
+    if ((await p.locator(".rs-card").count()) !== d.studies.length) throw new Error("one card per study");
+    for (const a of d.areas) if (!text.includes(a.name)) throw new Error(`area ${a.name}`);
+    // The CLV chart: one row per study with a CLV figure, sorted best first, scrubbable.
+    const clv = d.studies.filter((x) => x.measure === "clv" && x.value != null).sort((a, b) => b.value - a.value);
+    const rows = await p.locator("[data-scrub='rs-clv'] .rc-row .eb-label").allInnerTexts();
+    if (rows.length !== clv.length || !rows.every((r, i) => r.startsWith(clv[i].name))) throw new Error(`CLV rows ${rows.length} vs ${clv.length}`);
+    const read0 = await p.evaluate(() => plain(scrubCharts["rs-clv"].readout(0)));
+    if (!read0.startsWith(`${clv[0].name}: CLV`) || (clv[0].luck && !read0.includes("94% of the time"))) throw new Error(`CLV readout ${read0}`);
+    await scrubCheck(p, "[data-scrub='rs-clv']");
+    await scrubCheck(p, "[data-scrub='rs-roi']");
+    // Still to be read: the running tests in date order, each with its date.
+    const due = d.studies.filter((x) => x.verdict === "running").sort((a, b) => (a.due_date || a.when).localeCompare(b.due_date || b.when));
+    const dueRows = await p.locator(".rs-due-row").allInnerTexts();
+    if (dueRows.length !== due.length || !due.every((x, i) => dueRows[i].replace(/\s+/g, " ").includes(x.due) && dueRows[i].includes(x.name))) throw new Error(`due rows ${JSON.stringify(dueRows)}`);
+    // A study without a Portfolio page shows its write-up; one with a page links to it.
+    if (!(await p.locator('.rs-card[data-rsid="bakeoffs"] .rs-doc').innerText()).includes(d.studies.find((x) => x.id === "bakeoffs").doc)) throw new Error("bake-offs card should name its write-up");
+    if (!(await p.locator('.rs-card[data-rsid="search"] [data-rsgo]').count())) throw new Error("the strategy search card should link to Portfolio");
+  }],
+  ["research-link-study", async (p) => {
+    await p.click('.rs-card[data-rsid="search"] [data-rsgo]');
+    if (!(await p.locator('.tabbar button[data-tab="portfolio"].active').count())) throw new Error("a study link opens Portfolio");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    if (!text.includes("Strategy search") || !(await p.locator('[data-pfnav="portfolio"]').count())) throw new Error("the link should open the strategy search's page");
+  }],
+  ["research-link-backtest", async (p) => {
+    await tab("research")(p);
+    await p.click('.rs-card[data-rsid="edge12_dk"] [data-rsgo]');
+    if (!(await p.locator('button[data-pf="backtest"].on').count())) throw new Error("a backtest link opens the Backtest view");
+    if (!(await p.locator('.bt-src button.on', { hasText: "DraftKings" }).count())) throw new Error("the DraftKings backtest link opens DraftKings' prices");
+    await p.click('button[data-pf="live"]');
+  }],
   ["explore", tab("explore")],
 ];
 const MODES = [

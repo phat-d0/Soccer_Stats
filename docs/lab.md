@@ -3612,6 +3612,215 @@ season, E0's own value fell from +2.1 to +1.2.
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
 
+## Settings audit: which settings were tuned, on what, and which backtests are out of sample (owner via the lead, 8 Nov; read-only, 0 credits, no outcome read)
+
+Every fixed number in the live code was traced through the git history and the docs to say who
+chose it, when, and on what data. A setting chosen after reading outcomes makes the seasons it
+was read on in-sample for that setting: a backtest over those seasons flatters it.
+
+### The settings
+
+| Setting | Value | Where | Chosen | On what | Outcomes read when chosen? |
+| --- | --- | --- | --- | --- | --- |
+| Dixon-Coles time decay `xi` | 0.0019 a day (half-life about a year) | `models/dixon_coles.py` | 5 Oct, scaffold | Default; the README's "tune xi by out-of-sample log loss" was never done | No |
+| xG weight | 0.7 (0 for goals-only leagues) | `publish.XG_WEIGHT` | 5 Oct, scaffold | Default; a sweep 0/0.5/0.7/1 was suggested in the code, no result is recorded | Unknown (no record) |
+| Walk-forward window, min team matches, refit | 730 days, 6, weekly | `backtest.py` | 5 Oct | Default | No |
+| Blend burn-in | 2 seasons | `fit-match-blends`, `backtest-lean` | 10 Oct | Default | No |
+| Cup model ridge, decay, window | 0.1, 0.0019, 730 days | `cup_model.py` | 13 Oct | "A small ridge"; decay as the domestic model | No (UCL log loss read after) |
+| Blend form, refit, minimum rows | logit on log price and log model, 28 days, 300 | `match_calibration.py` | 6 Oct | Ported from the player calibration | No |
+| σ | sd of (blend − price) on the fit rows | `match_calibration.sigma` | 10 Oct | Definition | No |
+| Lean z, Strong z | 1σ, 2σ | `trades.LEAN_Z`, `STRONG_Z` | 10 Oct | Owner, from the baseball app | No soccer outcomes |
+| **Lean odds range** | 1.50 < odds ≤ 3.00 | `trades.LEAN_ODDS_RANGE` | 24 Oct | Owner, after reading live paper (22 trades) **and** `lean_backtest.json`'s odds bands | **Yes: 2019/20–2024/25, eight leagues** |
+| Model 12% edge | 12%, raw model | `trades.PAPER_EDGE`, `PAPER_RULE` | 5 Oct (12%), 10 Oct (fixed_raw) | Original scope; re-adopted by the owner knowing the backtest lost | No (basis not recorded) |
+| Early price lead | 4 days before kickoff | `lean_backtest.EARLY_LEAD` | 10 Oct | football-data's early price is 2–3 days out | No |
+| Corner model (f) | shrunk team ratios, NB2 | `corners_live.TeamCornersF` | Pre-registered 10 Oct | Bake-off 2, nothing tuned; selected on 2017/18–2023/24 (six leagues) | Yes, by design: dev seasons; 2026/27 locked |
+| Corner window, minimum | 730 days, 300 matches | `corners_live` | 10 Oct | 730 = bake-off 2's window; 300 has no recorded reason (the bake-off required 1,000) | No |
+| Corner edge | 12% | `trades.CORNERS_EDGE` | 10 Oct | Copied from the match rule | No |
+| **Corners "below 60%" cut** | 0.60 | `trades.CORNER_VARIANTS` | 23 Oct (pre-registered) | Owner, after the first 55 settled live Pinnacle corner trades | **Yes: live trades before 23 Oct 08:39**; judged only after |
+| Goalscorer factors (B) | `GOAL_FACTORS` | `models/player_goals.py` | 6 Oct | Spec fixed before data was scored; stayed primary when C–H failed on E0 2023/24–2024/25 | Dev seasons; E0 2025/26 seen weekly |
+| Goalscorer threshold T | 20% of {5, 8, 12, 16, 20%} | `player_goal_priced.T_JUDGED` | 1 Nov | Volume rule (≥ 0.3 bets a match) on 2025/26 | No (counts only) |
+| Kelly fraction, cap | ¼, 5% | `sizing.py` | 24 Oct | Defaults; display only | No |
+
+### Which backtests are out of sample
+
+- **Blend Lean at Pinnacle's early price** (`lean_backtest.json`, 2019/20–2024/25): **partly**.
+  The model, blend, σ and z cuts were set before these seasons were read and are refitted walk
+  forward. The **odds range** was chosen on this file's odds bands, so the live rule's backtest
+  ("−1.8%, 1,345 bets, −200 to +200") is in-sample for the range. The all-odds replay is clean.
+- **Model 12%** (`edge12_backtest.json`, same seasons): **fully** out of sample. 12% predates any
+  backtest, and the later sweeps changed nothing.
+- **Both rules at DraftKings' prices** (2020/21–2024/25): Model 12% fully; Lean's live rule
+  partly (the same odds range, read on the same seasons through the Pinnacle file).
+- **Draw no bet, strategy search, price bands, comeback, cash-out, line shop**: their rules were
+  pre-registered, and the strategy search kept 2024/25 locked. Out of sample as stated in each
+  section.
+- **Corners**: the research view's numbers are development seasons (model (f) was chosen on
+  2017/18–2023/24); the clean test is the locked 2026/27 read on 3 Feb 2027. The 60% cut is
+  judged only on trades from 23 Oct 08:39, so its verdict will be clean.
+- **Goalscorer**: the 2025/26 development is in-sample for T (by volume, not results); the
+  judged §16 window is clean.
+
+### How much the tuned settings could matter (from sweeps already logged)
+
+- **Lean odds range**: pooled CLV by band, 2019/20–2024/25: ≤1.50 −1.9% (232 bets), 1.50–2.00
+  −2.7% (632), 2.00–3.00 −3.1% (712), 3.00–5.00 −3.8% (790), >5.00 −3.0% (261). The range keeps
+  the middle bands (about −2.9% pooled, against −3.1% at every price) and drops the best band
+  (≤1.50); every band is below 0, so the range can't turn the rule positive. The flattering is
+  about 0.2 points of CLV.
+- **Edge threshold**: at DraftKings, E0 2025/26, every threshold from 2% to 20% loses (ROI −8%
+  to −21%); E0 line shopping 2017/18–2025/26 shows flat CLV across 2–20%; the price-band sweep
+  (2–30% per band) has every band's best CLV below 0. The 12% choice is not what makes Model 12%
+  lose.
+- **Strategy search**: 11,857 rules over thresholds, z cuts and filters, best CLV +1.3% with a
+  luck-check p of 0.94. Tuning these settings on 2019/20–2023/24 finds nothing either.
+- **Never varied** (no record): `xi`, the xG weight, burn-in, the 28-day refit and 300-row
+  minimum, the 730-day windows, min team matches, the cup ridge, corners' 300-match minimum,
+  Kelly's ¼ and 5%. Being untuned, they can't be over-fitted, but nobody knows whether better
+  values exist.
+
+### For the owner
+
+Most of the model's settings were never tuned on results: they are defaults, so the backtests
+don't flatter them. Two settings were chosen after looking at results: Blend Lean's 1.50–3.00
+odds range (on the 2019/20–2024/25 backtest) and the corners' under-60% cut (on October's live
+trades). Lean's live-rule backtest is therefore slightly flattering, by about 0.2 points of CLV,
+and it still loses; the 60% cut is judged only on trades after it was set. No setting we
+have swept turns a strategy positive, so the losses are not a tuning problem.
+
+## ROC AUC: how well each model ranks outcomes (owner via the lead, 8 Nov; exploratory, 0 credits; method written before any run)
+
+**Why.** The owner asked: "can we run ROC AUC on our models?" AUC is the chance that a random
+outcome that happened had been given a higher chance than a random one that didn't: 0.5 is a
+coin, 1 is perfect. It measures **ranking only**, not calibration, so it sits beside the
+calibration numbers already reported. Exploratory: no verdict, no bets, nothing goes live.
+
+**Common rules.**
+- Every series in a comparison is scored on the same rows, one row per outcome (the
+  `calibration.outcome_rows` shape).
+- 95% ranges come from one match-level bootstrap (2,000 draws, seed 0), shared by every series,
+  so a difference between two series has a paired range.
+- 2024/25 onward stays locked (`Holdout`). No row from §16's judged goalscorer window and none
+  from bake-off 2's locked corner test is read.
+
+**1. Match 1X2, eight leagues, 2019/20–2023/24** (`residual_map.load_league`'s walk-forward rows):
+- series: the raw model, the blend (`p_bet`; rows before a league's first blend fit are left
+  out so every series has the same rows), Pinnacle's Shin-fair early price and its fair close;
+- AUC pooled over outcome rows, per outcome (home, draw, away) and per league;
+- paired differences: model − Pinnacle early, blend − Pinnacle early, close − early;
+- on the matches the bought ten-book history covers (2020/21–2023/24; `dk_price_backtest.candidates`,
+  DraftKings' quote at the 48 h look ≤ 6 h old), the same series plus DraftKings' Shin-fair 48 h
+  price, with DraftKings − Pinnacle early and model − DraftKings.
+
+**2. Does the model add ranking beyond the price?**
+- Rows are cut into 5-point bands of Pinnacle's early fair chance (bands with ≥ 50 rows and both
+  classes). Inside a band the price barely varies, so a series that still ranks outcomes there
+  carries information the price lacks.
+- AUC of the model, the blend, the residual (model − price), the early price itself and the close,
+  inside each band, averaged by band size, with paired ranges.
+- A range including 0.5 means no ranking beyond the price. This is the ranking twin of the blend
+  weight c and of the residual map.
+
+**3. Corners model (f)** (`corners_live`'s live log; no historical corner prices exist):
+- each team half line's newest pre-kickoff quote, per book (Pinnacle, DraftKings), where both
+  sides are priced and the corner count is known; whole lines are left out;
+- model (f)'s over chance vs the book's fair over, model − price paired;
+- leagues SP1, D1, E1, E2, E3 only. E0, I1 and F1 are left out because their 2026/27 corners are
+  bake-off 2's locked test (read once on 3 Feb 2027).
+
+**4. Goalscorer B** (2025/26 development only):
+- the joined starters `goalscorer-test.yml` wrote in run 41346853368 (`judged_<league>.csv.gz`,
+  five leagues);
+- series: B, the season-goals and season-xG benchmarks, and the best bookmaker's Yes price as
+  1/odds (no book offers a No price, so its margin can't be removed; AUC only needs the ranking);
+- pooled and per league, B − price, B − xG and B − goals paired.
+
+**Output.** `odds-check.yml` `task=auc` (no key) prints `AUC_JSON` and the file as `AUC_B64`
+chunks with its SHA-256; the committed `lab/auc_research.json` is that text.
+
+## ROC AUC: results (run 42457943922, 8 Nov; exploratory, 0 credits)
+
+File `lab/auc_research.json` (SHA-256 2d7c3856…, 22,630 bytes). Ranges are 95%, resampling
+matches; differences are paired.
+
+**1. Match 1X2, eight leagues, 2019/20–2023/24** (13,667 matches, 41,001 outcome rows):
+
+| Series | AUC | vs Pinnacle early |
+| --- | --- | --- |
+| Raw model | 0.662 | −0.017 (−0.020 to −0.014) |
+| Blend (`p_bet`) | 0.679 | −0.001 (−0.002 to +0.000) |
+| Pinnacle early (fair) | 0.680 | – |
+| Pinnacle close (fair) | 0.683 | +0.0035 (+0.002 to +0.005) |
+
+- The raw model ranks worse than the price in every outcome (home −0.024, draw −0.013, away
+  −0.021) and every league (−0.010 in D1 and SP1 to −0.024 in E3), each range below 0.
+- DraftKings subset (2020/21–2023/24, 36,663 rows): DraftKings' 48 h price 0.682, Pinnacle early
+  0.684 (DraftKings − Pinnacle −0.0014, −0.0022 to −0.0006), the model 0.668 (model − DraftKings
+  −0.015, −0.018 to −0.012).
+
+**2. Ranking beyond the price** (inside 5-point bands of Pinnacle's early chance; 18 bands,
+40,987 rows): the model 0.499 (0.492 to 0.507) and the residual (model − price) 0.494 (0.486 to
+0.501) include 0.5: **the model adds no ranking beyond the price**. The blend 0.518 (0.510 to
+0.525) is above 0.5 only as much as the early price itself, 0.520 (0.514 to 0.526): both rank
+a little inside a 5-point band because the band still holds some spread. Pinnacle's close 0.539
+(0.531 to 0.546) does: it knows what happened between the early price and kickoff. This agrees
+with the blend weight c, the residual map and every bake-off.
+
+**3. Corners model (f), live log, SP1, D1, E1, E2, E3** (half lines, settled): small samples.
+Against Pinnacle (369 lines, 175 matches) model (f) 0.499 (0.438 to 0.563), Pinnacle's fair over
+0.559 (0.506 to 0.614), difference −0.060 (−0.120 to +0.006). Against DraftKings (77 lines, 37
+matches) 0.511 vs 0.481, difference +0.029 (−0.089 to +0.156). Model (f) ranks these lines no
+better than a coin so far; too few to say more.
+
+**4. Goalscorer B, 2025/26 development** (27,167 starters, 1,704 matches, five leagues): B 0.746
+(0.737 to 0.756), the best Yes price 0.746 (0.736 to 0.756), season xG 0.709, season goals 0.663.
+B − price +0.0002 (−0.004 to +0.004); B − xG +0.037 (+0.031 to +0.044); B − goals +0.083 (+0.074
+to +0.093). Per league B − price runs −0.003 (F1) to +0.002 (E0), every range across 0. B ranks
+scorers as well as the bookmakers and clearly better than season form; whether its chances beat
+the price is the §16 priced test's question, not this one.
+
+**For the owner.** AUC asks how well each model sorts what happened from what didn't (0.5 a coin,
+1 perfect). The match model scores 0.66, a little below Pinnacle's price at 0.68; the blend
+matches the price, and inside a narrow price band the model sorts no better than a coin, so it
+adds nothing the price doesn't already know. The goalscorer model ties the bookmakers at 0.75
+and beats season goals and xG clearly. The live corner model can't be judged yet (a few hundred
+lines, ranking near 0.5).
+
+## Research overview: every study in one file (owner, 8 Nov; for the app's Research tab)
+
+The owner asked to see the research results mapped out, then in the app under a Research tab.
+Research keeps one committed file of every study, and UI Design builds the tab from it (the
+owner chose to route the tab to UI Design).
+
+**The file.** `src/soccer_stats/lab/research_overview.json` = `{kind: "research_overview",
+generated, note, areas [{id, name}], verdicts {pass, fail, inconclusive, running, exploratory,
+withdrawn → label}, studies [...]}`. Each study has:
+- always: `id`, `area`, `name`, `when` (ISO date), `verdict`, `question`, `sample`, `result`
+  (one plain sentence) and `doc` (the write-up);
+- where recorded: `measure` ("clv" or "roi") with `value`, `lo`, `hi` (per $1, a 95% range
+  resampling matches) and `bets`; a backtest's `roi`, `roi_lo`, `roi_hi`; `luck: true` (the
+  strategy search's best rule, beaten by chance at p 0.94);
+- running tests only: `due` (words) and `due_date` (ISO).
+
+The figures are copied from the recorded verdicts, never recomputed: CLAUDE.md "Research verdicts
+to date", `docs/lab.md`, `docs/edge.md`, `docs/totals.md`, `docs/leagues.md` and
+`docs/player_props.md`. Research updates the file whenever a verdict changes; the 27 studies of
+8 Nov are the first version.
+
+**A first map** (Research, 8 Nov): https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8. It shows:
+- a verdict tally;
+- one CLV axis with Pinnacle's close as zero, and a return-per-$1 axis;
+- the studies as cards by area, each card's edge coloured by its verdict;
+- the tests still to be read, by due date.
+The app's tab can follow it or not; the file is the contract.
+
+**Suggested for the tab (UI Design decides):**
+- `publish.py` passes the file through as `data.json` → `research_overview`, in its own try;
+- a fifth tab, "Research", or Research inside Explore;
+- the tally and the two axes first, then the cards by area with the competition-free layout,
+  then "Still to be read";
+- studies that already have a page in Portfolio (comebacks, heavy favourites, cash-out, strategy
+  search, line shop) link to it.
+
 ## LASSO on the market residual (owner, 8 Nov; DRAFT, not frozen)
 
 > **Draft, not frozen (8 Nov).** The lead asked for the factor list to be agreed with the

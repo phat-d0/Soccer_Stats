@@ -136,6 +136,8 @@
 #   residual-map: where the model and the market disagree, and who was right (docs/lab.md
 #            "Residual map"; exploratory, 2019/20-2023/24, no key). Prints the file as
 #            RESIDUAL_MAP_B64 chunks with its SHA-256.
+#   auc: ROC AUC for the match model, blend and prices, corners model (f) and goalscorer B
+#            (docs/lab.md "ROC AUC"; exploratory, 2019/20-2023/24, no key).
 #   lasso-residual: LASSO on the market residual (docs/lab.md "LASSO on the market
 #            residual"; development 2019/20-2023/24, 2024/25 locked, no key). Log line
 #            LASSO_RESIDUAL_JSON; the file is in the artifact.
@@ -157,9 +159,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, lasso-coverage, tuning-bias, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, lasso-coverage, tuning-bias, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, lasso-coverage, tuning-bias, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, lasso-coverage, tuning-bias, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -309,7 +311,7 @@ jobs:
           name: comeback-odds
       # DraftKings' historical snapshots (paid): the probe never buys a snapshot already held.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'dk-history' || inputs.task == 'dk-gap-counts' }}
+        if: ${{ inputs.task == 'dk-history' || inputs.task == 'dk-gap-counts' || inputs.task == 'auc' }}
         with:
           path: data/raw/odds_history
           key: odds-history-none
@@ -318,7 +320,7 @@ jobs:
       # Paid odds: if the cache missed, rebuild it from the permanent archive before
       # anything can buy (docs/caches.md).
       - name: Rebuild the paid odds-history cache from the archive if it missed
-        if: ${{ inputs.task == 'dk-history' || inputs.task == 'dk-gap-counts' }}
+        if: ${{ inputs.task == 'dk-history' || inputs.task == 'dk-gap-counts' || inputs.task == 'auc' }}
         uses: ./.github/actions/paid-archive-restore
         with:
           name: odds-history
@@ -333,25 +335,25 @@ jobs:
           key: comebacks-${{ inputs.league }}-none
           restore-keys: comebacks-${{ inputs.league }}-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
         with:
           path: data/raw
           key: understat-SP1-none
           restore-keys: understat-SP1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
         with:
           path: data/raw
           key: understat-D1-none
           restore-keys: understat-D1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
         with:
           path: data/raw
           key: understat-I1-none
           restore-keys: understat-I1-
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
+        if: ${{ inputs.task == 'goal-leagues' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' }}
         with:
           path: data/raw
           key: understat-F1-none
@@ -427,6 +429,16 @@ jobs:
       - name: Swap the older raw cache out
         if: ${{ inputs.task == 'understat-restore' }}
         run: mv data/raw "$RUNNER_TEMP/raw_old" && mv "$RUNNER_TEMP/raw_new" data/raw
+      # ROC AUC (docs/lab.md "ROC AUC"): goalscorer B's 2025/26 development rows, the joined
+      # starters goalscorer-test.yml wrote in run 41346853368 (no prices bought, no key).
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.task == 'auc' }}
+        continue-on-error: true
+        with:
+          pattern: goalscorer-dev-*
+          path: out/goal
+          run-id: 41346853368
+          github-token: ${{ github.token }}
       - name: Run
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
@@ -662,6 +674,14 @@ jobs:
               uv run python -m soccer_stats.lab.tuning_bias --pool out/bias --out out ;;
             lasso-coverage) uv run python -m soccer_stats.lab.lasso_residual --coverage ;;
             dk-gap-counts) uv run python -m soccer_stats.lab.dk_gap_counts ;;
+            auc)  # no key: the corner price logs from data-log, goalscorer rows from run 41346853368
+              git fetch -q --depth=1 origin data-log
+              mkdir -p out/log/odds_log
+              for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '_corners_' | grep -v calls); do
+                git show "FETCH_HEAD:$f" > "out/log/odds_log/$(basename "$f")"
+              done
+              uv run python -m soccer_stats.lab.auc --log-dir out/log/odds_log --goal-dir out/goal \
+                --json out/auc_research.json ;;
             team-totals)  # no key: reads data-log's team-total log, scores it if enough
               git fetch --depth=1 origin data-log
               mkdir -p out/log/odds_log

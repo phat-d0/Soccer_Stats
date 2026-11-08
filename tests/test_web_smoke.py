@@ -34,6 +34,9 @@ def test_fixture_is_complete():
     assert pfs["comebacks"]["status"] == "closed" and pfs["comebacks"]["live"]["trades"] == []
     studies = {s["id"]: s for s in data["research_studies"]}
     assert {s["verdict"] for s in studies.values()} == {"pass", "fail", "pending", "inconclusive"}
+    # The Research tab (owner, 8 Nov): Research's overview file, whole.
+    ro = data["research_overview"]
+    assert ro["kind"] == "research_overview" and len(ro["studies"]) >= 27
     cr = studies["comeback_ht"]
     assert cr["portfolio"] == "comebacks" and cr["designs"]["C"]["bets"] == len(
         [b for b in cr["bets"] if b["design"] == "C"]

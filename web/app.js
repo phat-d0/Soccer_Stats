@@ -43,7 +43,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v77";
+const APP_VERSION = "v78";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -1659,7 +1659,7 @@ function niceStep(raw) {
 // A range plot per league (dot = estimate, bar = its range, line at 0). Blue when the whole
 // range is above 0, red when it is all below, grey when it could be 0. Point at, drag or
 // tap a row to read it (a row scrub chart).
-function rangeChart(id, rows, fmt) {
+function rangeChart(id, rows, fmt, cls = "") {
   rows = rows.filter((r) => r.v != null && r.lo != null && r.hi != null);
   if (!rows.length) return "";
   scrubCharts[id] = { n: rows.length, rows: true, readoutId: `rc-readout-${id}`, readout: (i) => rows[i].readout };
@@ -1667,7 +1667,7 @@ function rangeChart(id, rows, fmt) {
   const span = Math.max(...vals) - Math.min(...vals) || 1;
   const lo = Math.min(...vals) - span * 0.08, hi = Math.max(...vals) + span * 0.08;
   const x = (v) => ((v - lo) / (hi - lo)) * 100;
-  const tone = (r) => (r.lo > 0 ? "pos" : r.hi < 0 ? "neg" : "mid");
+  const tone = (r) => r.tone || (r.lo > 0 ? "pos" : r.hi < 0 ? "neg" : "mid");
   const body = rows.map((r, i) => `
     <div class="eb-row rc-row" data-stop="${i}" data-rcrow="${i}" data-rc="${esc(id)}">
       <span class="eb-label">${esc(r.label)}${r.sub ? `<span class="meta">${esc(r.sub)}</span>` : ""}</span>
@@ -1676,7 +1676,7 @@ function rangeChart(id, rows, fmt) {
   // Ticks at 0 and near each end, skipping any that would crowd the 0 label.
   const ticks = [lo + (hi - lo) * 0.1, hi - (hi - lo) * 0.1].filter((v) => Math.abs(x(v) - x(0)) > 18);
   const axis = `<div class="eb-axis"><span></span><span class="eb-plot">${ticks.map((v) => `<span style="left:${x(v)}%">${fmt(v)}</span>`).join("")}<span style="left:${x(0)}%">0</span></span></div>`;
-  return `<div class="card eb-card scrub-rows" ${scrubAttrs(id, rows.length, "Point at or drag across the rows, or use the arrow keys")}>${body}${axis}<div class="eb-readout" id="rc-readout-${esc(id)}" aria-live="polite">${rows[0].readout}</div></div>`;
+  return `<div class="card eb-card scrub-rows${cls ? ` ${cls}` : ""}" ${scrubAttrs(id, rows.length, "Point at or drag across the rows, or use the arrow keys")}>${body}${axis}<div class="eb-readout" id="rc-readout-${esc(id)}" aria-live="polite">${rows[0].readout}</div></div>`;
 }
 
 const gainFmt = (v, d = 3) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`);
@@ -1990,6 +1990,115 @@ function modelReplayHtml() {
     <details class="fold mk-fold"><summary>Running profit (units)</summary>
       <div class="card">${profitChart(s.sel) || '<p class="muted">No bets at this threshold.</p>'}</div>
     </details>`;
+}
+
+// ---------- Research tab (owner, 8 Nov): every study in one place ----------
+// data.research_overview = Research lab's src/soccer_stats/lab/research_overview.json, passed
+// through by publish.py: {generated, note, areas [{id, name}], verdicts {key: label}, studies
+// [{id, area, name, when, verdict, question, sample, result, doc, measure?, value?, lo?, hi?,
+// bets?, roi?, roi_lo?, roi_hi?, luck?, due?, due_date?}]}. Display only; nothing recomputed.
+const RS_TALLY = ["fail", "pass", "inconclusive", "withdrawn", "running", "exploratory"];
+// A study's page in Portfolio, where one exists: [portfolio, strategy or study key, view].
+const RS_LINKS = {
+  comeback_b: ["comebacks", "comeback_ht", "result"], comeback_c: ["comebacks", "comeback_ht", "result"],
+  heavy_fav: ["comebacks", "heavy_fav_ht", "result"], cashout: ["comebacks", "cashout_ht", "result"],
+  search: ["moneyline", "strategy_search", "result"], lineshop: ["moneyline", "lineshop", "live"],
+  lean_bt: ["moneyline", "lean", "backtest", "pin"], lean_dk: ["moneyline", "lean", "backtest", "dk"],
+  edge12_bt: ["moneyline", "edge12", "backtest", "pin"], edge12_dk: ["moneyline", "edge12", "backtest", "dk"],
+  below60: ["corners", "draftkings_below60", "live"], totals_corners: ["moneyline", "goals_markets", "live"],
+};
+const rsData = () => state.data?.research_overview || null;
+// Readouts are HTML read back as text by the scrub check, so only &, < and > are escaped.
+const rsText = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const rsVerdict = (v) => rsData()?.verdicts?.[v] || (VERDICT[v] || [v])[0];
+const rsDay = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "");
+// The Portfolio page a study links to, only when that page is in this build.
+function rsLink(s) {
+  const l = RS_LINKS[s.id];
+  if (!l) return null;
+  const cur = pfById(l[0]);
+  return cur && pfStrategies(cur).some((x) => x.key === l[1]) ? l : null;
+}
+function researchGo(spec) {
+  const [pf, key, view, src] = spec.split("|");
+  state.pfId = pf; store.set("pfId", pf);
+  if (pf === "corners") { state.pfStratCorners = key; store.set("pfStratCorners", key); }
+  else if (pf === CB_ID) { state.pfStratResearch = key; state.cbShown = 0; }
+  else { state.pfStrat = key; store.set("pfStrat", key); }
+  if (src) { state.btSource = src; store.set("btSource", src); }
+  state.pfLevel = "strategy"; state.pfView = view || "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = ""; state.lbShown = 20;
+  // A link names a study's own figures, for every competition.
+  state.league = ""; store.set("league", "");
+  setTab("portfolio");
+}
+// One row of a range chart: the value, its 95% range (or the value alone when none was
+// recorded) and the readout naming both.
+function rsRow(s, v, lo, hi, what) {
+  const range = lo != null && hi != null;
+  const bets = isNum(s.bets) ? `${num(s.bets)} bets` : "";
+  const luck = s.luck ? "luck: a no-skill search finds one this good 94% of the time" : "";
+  return {
+    label: s.name, v, lo: range ? lo : v, hi: range ? hi : v,
+    tone: s.luck ? "mid" : undefined,
+    sub: [rsVerdict(s.verdict), bets, range ? "" : "no range recorded", s.luck ? "luck (p 0.94)" : ""].filter(Boolean).join(" · "),
+    readout: `<b>${rsText(s.name)}</b>: ${what} ${signedPct(v)}${range ? ` (${signedPct(lo)} to ${signedPct(hi)})` : " (no range recorded)"}${bets ? ` · ${bets}` : ""} · ${rsText(rsVerdict(s.verdict))}${s.luck ? ` · ${luck}` : ""}`,
+  };
+}
+function rsCard(s) {
+  const link = rsLink(s);
+  const when = s.due ? `due ${s.due}` : rsDay(s.when);
+  const go = link
+    ? `<button class="linkish rs-go" data-rsgo="${esc(link.join("|"))}">Open in Portfolio ›</button>`
+    : `<span class="rs-doc">Write-up: ${esc(s.doc || "")}</span>`;
+  return `
+    <article class="card rs-card" data-v="${esc(s.verdict)}" data-rsid="${esc(s.id)}">
+      <div class="rs-top"><b class="rs-name">${esc(s.name)}</b><span class="pill ${(VERDICT[s.verdict] || ["", "v-run"])[1]}">${esc(rsVerdict(s.verdict))}</span></div>
+      <p class="rs-q">${esc(s.question)}</p>
+      <p class="rs-r">${esc(s.result)}</p>
+      <div class="meta rs-meta"><span>${esc(s.sample || "")}</span>${when ? `<span>${esc(when)}</span>` : ""}</div>
+      ${go}
+    </article>`;
+}
+function viewResearch() {
+  const d = rsData();
+  if (!d || !Array.isArray(d.studies)) return `<div class="section-title">Research</div><div class="card"><p class="muted">The research overview isn't in this build yet.</p></div>`;
+  const st = d.studies;
+  const counts = {};
+  st.forEach((s) => { counts[s.verdict] = (counts[s.verdict] || 0) + 1; });
+  const tally = RS_TALLY.filter((v) => counts[v]).map((v) => `<span class="rs-tally-item"><span class="pill ${(VERDICT[v] || ["", "v-run"])[1]}">${esc(rsVerdict(v))}</span> ${counts[v]}</span>`).join("");
+  // Has any study beaten the close? Only a passed one whose CLV range sits above 0.
+  const beat = st.some((s) => s.verdict === "pass" && s.measure === "clv" && s.lo > 0 && !s.luck);
+  const clv = st.filter((s) => s.measure === "clv" && isNum(s.value)).map((s) => rsRow(s, s.value, s.lo, s.hi, "CLV")).sort((a, b) => b.v - a.v);
+  const roi = st.filter((s) => (s.measure === "roi" && isNum(s.value)) || isNum(s.roi))
+    .map((s) => (s.measure === "roi" ? rsRow(s, s.value, s.lo, s.hi, "return") : rsRow(s, s.roi, s.roi_lo, s.roi_hi, "return"))).sort((a, b) => b.v - a.v);
+  const below = roi.filter((r) => r.hi < 0 && r.lo !== r.hi).length, above = roi.filter((r) => r.lo > 0 && r.lo !== r.hi).length;
+  const areas = (d.areas || []).map((a) => {
+    const cards = st.filter((s) => s.area === a.id);
+    return cards.length ? `<div class="section-title">${esc(a.name)} <span class="muted nocase">· ${cards.length}</span></div><div class="rs-grid">${cards.map(rsCard).join("")}</div>` : "";
+  }).join("");
+  const due = st.filter((s) => s.verdict === "running").sort((a, b) => String(a.due_date || a.when).localeCompare(String(b.due_date || b.when)));
+  const dueRows = due.map((s) => {
+    const link = rsLink(s);
+    return `<div class="rs-due-row" data-rsdue="${esc(s.id)}"><span class="rs-due-date">${esc(s.due || rsDay(s.due_date || s.when))}</span><span><b>${esc(s.name)}</b>. ${esc(s.result)}${link ? ` <button class="linkish" data-rsgo="${esc(link.join("|"))}">Open ›</button>` : ""}</span></div>`;
+  }).join("");
+  return `
+    <div class="section-title">Research</div>
+    <div class="card rs-head">
+      <p class="rs-thesis">${st.length} studies so far.${beat ? "" : " None has beaten Pinnacle's closing price."}</p>
+      <p class="note">Every test the research lab has run, in one place. Each asks whether a rule, model or signal beats Pinnacle's closing price, the sharpest price there is; beating it over many bets is the clearest sign of a real edge.</p>
+      <div class="rs-tally">${tally}</div>
+    </div>
+    ${clv.length ? `<div class="section-title">Against the closing price</div>
+    <p class="note">Closing-line value per $1: how much better the price taken was than Pinnacle's margin-free close. 0 is the close itself. Each bar is a 95% range; a dot alone is a figure recorded without one. Point at a row, or use the arrow keys, for its numbers.</p>
+    ${rangeChart("rs-clv", clv, (v) => signedPct(v, 0), "rc-stack")}` : ""}
+    ${roi.length ? `<div class="section-title">Return per $1</div>
+    <p class="note">Profit per $1 staked, for the studies that recorded it. The in-play tests were judged on return, since they bet at a live price with no close to compare. ${below} of ${roi.length} ranges sit wholly below break even and ${above} above it; a few hundred bets can't tell +7% from −20%.</p>
+    ${rangeChart("rs-roi", roi, (v) => signedPct(v, 0), "rc-stack")}` : ""}
+    ${areas}
+    ${due.length ? `<div class="section-title">Still to be read</div>
+    <p class="note">Pre-registered tests waiting for data. Each is read once, on the date or count fixed before it started.</p>
+    <div class="card rs-due">${dueRows}</div>` : ""}
+    <p class="note rs-foot">${esc(d.note || "")}${d.generated ? ` As of ${esc(rsDay(d.generated))}.` : ""}</p>`;
 }
 
 function viewExplore() {
@@ -4634,7 +4743,7 @@ function studyCashout(sd) {
 // Log growth a bet, in %: three decimals, four when it is under 0.01% (growth differences are tiny).
 const growthText = (v) => (isNum(v) ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(Math.abs(v * 100) < 0.01 && v !== 0 ? 4 : 3)}%` : "–");
 const pText = (v) => (isNum(v) ? (v >= 0.995 ? "0.99+" : v.toFixed(2)) : "–");
-const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"], inconclusive: ["Inconclusive", "v-inc"], closed: ["Closed", "st-closed"], testing: ["Testing", "st-testing"] };
+const VERDICT = { pass: ["Passed", "v-pass"], fail: ["Failed", "v-fail"], pending: ["Running", "v-run"], running: ["Running", "v-run"], inconclusive: ["Inconclusive", "v-inc"], withdrawn: ["Withdrawn", "v-wd"], exploratory: ["Exploratory", "v-exp"], closed: ["Closed", "st-closed"], testing: ["Testing", "st-testing"] };
 const verdictPill = (sd) => { const [t, c] = VERDICT[sd.verdict] || ["Running", "v-run"]; return `<span class="pill ${c}">${t}</span>`; };
 const studyDay = (d) => (d ? monthDay(`${String(d).slice(0, 10)}T12:00:00Z`) : "");
 const studyCost = (sd) => (isNum(sd.cost?.total) ? (sd.cost.total ? `${num(sd.cost.total)} credits` : "free data, no credits") : "");
@@ -5293,7 +5402,7 @@ function tradeHtml(t) {
 }
 
 // The Record tab was retired on 28 Oct (its parts live in Portfolio); any other tab name opens Portfolio.
-const VIEWS = { matches: viewMatches, ratings: viewRatings, portfolio: viewPortfolio, explore: viewExplore };
+const VIEWS = { matches: viewMatches, ratings: viewRatings, portfolio: viewPortfolio, research: viewResearch, explore: viewExplore };
 
 function render() {
   $("#view").innerHTML = VIEWS[state.tab]();
@@ -5376,6 +5485,8 @@ document.addEventListener("click", (ev) => {
     state.pfLevel = "strategy"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     render();
     window.scrollTo(0, 0);
+  } else if (t.dataset.rsgo) {
+    researchGo(t.dataset.rsgo);
   } else if (t.dataset.gotoPf) {
     state.pfId = t.dataset.gotoPf; state.pfLevel = "portfolio"; state.pfView = "live"; state.pfShown = 15; state.pfMarket = ""; state.pfSeason = "";
     store.set("pfId", state.pfId);
