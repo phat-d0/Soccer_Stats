@@ -4442,6 +4442,40 @@ The model is over-confident: its range is below 1. The blend fixes that.
   `goalscorer-dev-*` artifacts).
 - All three are added to `lab/model_scorecard.json` as `goals`, `cup` and `goalscorer`.
 
+
+### Stage 2, part 2: results (run 42476689024, descriptive)
+
+An earlier run (42476331121, at the commit before the goalscorer input existed) scored only (a)
+and (b), and was not read. This run is the read.
+
+**(a) Goal distributions** (the live model with its ridge, eight leagues, 2019/20–2023/24).
+- **O/U 2.5:** log loss 0.6836 for the model, 0.6765 for Pinnacle's early price and 0.6745 for
+  its close; AUC 0.582, 0.603 and 0.608.
+  - The model is worse than the early price by +0.0071 (+0.0053 to +0.0087).
+  - As in 1X2, the model trails the price on totals.
+- **Total goals (0 to 6+):**
+  - ranked probability score 0.1439, against 0.1452 for the league-mean Poisson baseline;
+  - the model's central 80% interval covers 88.6% of matches. With whole-number goals and few
+    classes a central interval over-covers, so this is not a sign that the spread is too wide.
+- **Each team's goals:** RMSE 1.147 against the baseline's 1.200; log score −1.448 against −1.490.
+- So the model clearly beats a no-skill baseline, and is clearly behind the market.
+
+**(b) Cup model, UCL** (302 matches with a bought close, 2024/25–2025/26).
+- Log loss: 0.9535 for the model, against 0.9449 for Pinnacle's close.
+- The ranges, the DraftKings close and the calibration are in the JSON file.
+
+**(c) Goalscorer B** (the rescued 1 Nov development rows, five leagues, 2025/26 starters).
+- **Log loss:** 0.2913 for B, 0.3181 for the season-xG benchmark, 0.4603 for season goals and
+  0.2953 for the best price as 1/odds.
+- **B beating 1/odds is not an edge.** No book offers a No price, so 1/odds keeps the bookmaker's
+  margin and overstates every chance; it is not a fair price. The fair-price comparison is the
+  priced test's (§16).
+- **At T = 20%:** 2,113 picks. They won 9.5%, against 10.1% implied by 1/odds. Even at a price
+  that includes the margin, the picks win less often than the price says.
+
+**The committed file.** The pool log prints `model_scorecard2.json` (SHA-256 `9ee625d1…97c8db`).
+It goes beside part 1's file by the same route as part 1 (the lead decodes and commits it).
+
 ## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
 
 ### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
