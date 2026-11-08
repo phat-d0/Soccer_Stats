@@ -1901,12 +1901,19 @@ the baseball team does. The first team sessions (created by the first lead) were
 | Soccer team: Research lab | session_01UShqQxNjtyWw56v1yofbNb | team/research |
 | Soccer team: Player props | session_01UShqQw8MRfRzHSg5BG6g26 | team/player-props |
 | Soccer team: UI Design | session_01UShqQxkd2gvZrLN27etJEA | team/ui |
-| Soccer team: Research lab 2 | session_01UShqQvgsVwKSXpXgieEppK | team/research-lasso |
+| Soccer team: Model evaluation and tuning | session_01UShqQvgsVwKSXpXgieEppK | team/model-eval (LASSO: team/research-lasso) |
 
-Research lab 2 (owner, 8 Nov) is a second session in the `research-lab` role, so research can run two
-studies at once. Each research session keeps to its own files and docs/lab.md section; the lead
-routes work between them. Its first study is LASSO on the market residual (pre-registration and
-development on 2019/20–2023/24; 2024/25 stays locked until the owner approves).
+Model evaluation and tuning (owner, 8 Nov; created as "Research lab 2", renamed the same day) runs
+the `research-lab` role for one remit: evaluation metrics and tuning for every model, live and past
+(match model, blend, cup model, corners model (f), goalscorer B, the goals distributions, the
+retired shots model and the bake-off candidates). Three stages: method selection (is the method
+right for the target, data type and size), performance evaluation (one out-of-sample scorecard
+per model beside the market's price: AUC, log loss, Brier, calibration, a confusion matrix at each
+strategy's threshold, RMSE/MAE and interval coverage for counts; `lab/model_scorecard.json`) and
+tuning (bias vs variance, ceiling analysis, a grid search on never-tuned settings, LASSO on the
+market residual). Development data 2019/20–2023/24 only; 2024/25 stays locked for one judged read
+that needs the owner's approval. Research lab keeps signal and market research, study
+pre-registrations and the research overview.
 
 **Process:**
 - The lead reviews each PR (diff, CI on the PR, local checks), leaves a review comment (GitHub
