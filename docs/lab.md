@@ -4216,3 +4216,327 @@ matches per league):
   2024/25 holdout once in October. 2024/25 is therefore locked for strategies (the strategy
   search) but not untouched for model comparisons. The tuning programme's judged read must say
   so.
+
+## Model tuning programme, phases 2 and 3 (continued from "Model tuning programme" above)
+
+### Phase 2: ceiling analysis (pre-registered 2026-11-08, before any run)
+
+**Question.** Where in the pipeline is the upside? The pipeline runs: data → match model →
+blend → bet rule → execution (which book, when). For each stage in turn, swap in a perfect
+or best-available version and measure how much the Lean rule's results improve. **Every
+oracle is descriptive and never tradable.** No verdict and no bet comes from this phase.
+
+**The base.**
+- The Lean backtest as `backtest-lean` builds it (`lean_backtest.league_report`): the model
+  walk-forward from 2019-07-01 (two-season burn-in), the blend's 28-day fits, σ per fit, Lean's
+  1σ rule on every side at every price (the all-odds replay), entry at Pinnacle's early price.
+- Eight domestic leagues, scored seasons 2019/20–2023/24 (coverage ≥ 90%). 2024/25 is never
+  loaded.
+- End metrics: bets; CLV against Pinnacle's Shin-fair close (per $1); ROI per $1. Each comes
+  with a 95% range from 2,000 bootstrap draws, seed 0, resampling bets (one bet per match).
+
+**Stages** (each changes one thing from the base):
+- **(a) Information ceiling.** The blend's chance is replaced by Pinnacle's fair close for that
+  match. Same σ, same rule, same early entry. This is how much the Lean rule earns if it knew
+  the close.
+- **(b) Better form data, upper bound.** The model's chance is replaced, in training rows and
+  targets, by independent Poisson 1X2 on the match's own post-match xG. The blend is then
+  refitted walk-forward as usual. The five Understat leagues only (I1 2022/23 has no xG), so
+  (b) is compared with the base on the same leagues.
+- **(c) Rule tuning ceiling.** Lean's z cut swept over {0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3}. The
+  best CLV is chosen in hindsight on the same rows. Reported with every cut, so the
+  hindsight gain is visible.
+- **(d) Execution: line shop.** Base picks on the matches the bought ten-book history covers
+  (2020/21–2023/24, `dk_price_backtest`'s bodies). The pick is entered at the best price among
+  the ten books at the 48 h look (each quote ≤ 6 h old, `dk_price_backtest.quote`) instead of
+  Pinnacle's early price.
+- **(e) Timing.** The same picks on the same matches, entered at Pinnacle's early price (the
+  base), DraftKings' 48 h price, the best price at 48 h, and Pinnacle's quoted close (whose
+  CLV is minus its margin by construction; ROI is the comparison there).
+
+**Output.** One table: stage, bets, CLV and ROI with ranges, and the gain over its
+reference:
+- (a), (b) and (c) are compared with the base (on the same leagues for (b));
+- (d) and (e) are compared with the base picks' Pinnacle-early entry on the same matches,
+  paired by bet.
+
+**Configurations counted:** 8 z cuts + 4 other stages = 12 toward the programme's count.
+
+**Code.** `lab/tuning_ceiling.py`; `tuning.yml` `phase=ceiling`. The league jobs restore the
+paid `odds-history-` cache (read only, with the archive fallback); no key, 0 credits. Log line
+`TUNING_CEILING_JSON`.
+
+### Phase 3: grid search on the never-tuned settings (pre-registered 2026-11-08, before any run)
+
+**Question.** Do better values exist for the settings nobody ever tuned (settings audit), when
+each one is chosen only on earlier seasons?
+
+**Blocks.** Each block is varied one at a time from today's defaults, so the count stays honest
+and every block's gain is its own:
+- **A. Time decay × xG weight.** xi ∈ {0.0010, 0.0015, 0.0019, 0.0025, 0.0035} × xG weight ∈
+  {0, 0.3, 0.5, 0.7, 0.85, 1} in the five xG leagues (30 configurations each). xi alone in E1–E3,
+  which have no xG (5 each).
+- **R. Ratings ridge** (added after phase 1, before this registration): ridge ∈ {0, 0.1, 0.3, 1,
+  3} on `DixonColes`' attack and defence, at today's xi and xG weight (5 each).
+- **B. Window × minimum team matches.** Window ∈ {365, 540, 730, 1,095} days × minimum ∈ {4, 6, 8}
+  (12 each).
+- **C. The blend's cadence.** Refit ∈ {14, 28, 56} days × minimum rows ∈ {200, 300, 500} (9 each),
+  on today's model.
+- **Not in this phase:**
+  - Corners' 300-match minimum: Corners own model (f); asked before any work.
+  - A goals-only ρ: stage 1's 0-0 finding needs a model change (`DixonColes` fits ρ with the
+    rest), which is Moneyline's to build; noted for them.
+
+**Method.**
+- Every configuration is run walk-forward from 2017-07-01 to 2024-07-01: weekly model refits;
+  for C, the blend's own cadence on the default model.
+- **Nested choice:** for each season S from 2019/20 to 2023/24, the configuration with the lowest
+  1X2 log loss over the seasons before S (from 2017/18; for C, from the blend's first fits) is
+  used to predict S. The choice is made per league. S never chooses anything.
+- Scored against today's default on the same rows: each block's rows are those every
+  configuration in it predicts.
+- 2024/25 is never loaded.
+
+**Measures**, per block, per league and pooled:
+- the nested configuration's out-of-sample log loss and the default's;
+- the **gain** = default − nested per match, with a 95% range (2,000 draws resampling matches,
+  seed 0);
+- the configuration chosen for each season (stability: the same value chosen every season, or
+  not);
+- the best configuration in hindsight, as a descriptive upper bound only.
+
+**Pass rule** (to recommend a change): a block's pooled gain has its range above 0. CLV and ROI
+are descriptive and are computed only for a block that passes, with the Lean backtest re-run
+on the nested setting. Any change goes into the single judged 2024/25 read at the end; nothing
+goes live from development alone.
+
+**Configurations counted:**
+- per xG league: 30 + 5 + 12 + 9 = 56;
+- per E1–E3 league: 5 + 5 + 12 + 9 = 31;
+- 373 in all, toward the programme's count (with phase 1's 72 and phase 2's 12: 457).
+
+**Code.** `lab/tuning_grid.py`; `tuning.yml` `phase=grid` (a job per league, then a pool job;
+no key, 0 credits). Log line `TUNING_GRID_JSON`.
+
+**Judged read (lead's decision, 8 Nov; added after phase 3's run was dispatched and before any
+of its results were read).**
+- **Model settings** (a phase 3 block that passes, any ridge, ρ or corner α change, LASSO's
+  log-loss gain) are judged once on **2025/26**:
+  - It was never used for match or corner model comparisons, and it is outside the
+    development seasons.
+  - Log loss is scored against today's defaults on the whole season, whose results are complete.
+  - Pinnacle's fair price is the benchmark where football-data has it. About half of 2025/26 is
+    priced in some leagues, so coverage is reported.
+- **Before that read is pre-registered,** check that `xg-good-` holds the 2025/26 Understat files
+  for E0, SP1, D1, I1 and F1, and name any gap. Goalscorer development used 2025/26 player rows;
+  that is a different model and doesn't touch these settings.
+- **2024/25 stays locked for any strategy-level read** (a betting rule's CLV), as the strategy
+  search kept it. It was opened once in October for model comparisons (bake-offs 1 and 3, and
+  corners bake-off 1); the final write-up states both.
+- **Named candidates for that read, if development supports them:** ρ (the 0-0 correction),
+  and corners' α and home–away correlation (Corners' model).
+
+### Phase 3, block P: the low-score correction ρ (pre-registered 2026-11-08, before it runs)
+
+Stage 1 found the fitted ρ over-predicts 0-0 in every league. Moneyline's `DixonColes(rho_option=)`
+(PR #213; off by default, so the live model is unchanged) now allows ρ to be fixed or shrunk.
+- **Block P:** ρ ∈ {free (today), fixed at 0 (no correction), penalty k·ρ² with k ∈ {1, 10, 100,
+  1,000}}, at today's xi, xG weight, window and minimum. That is 6 configurations per league,
+  48 in all (the programme's count rises to 505).
+- **Penalty scale:** the penalty is added to the weighted log-likelihood, which sums about a few
+  hundred decayed matches. So k = 1 barely moves ρ, and k = 1,000 holds it near 0. The grid
+  spans that range.
+- **Method, measures and pass rule:** exactly as the other blocks: nested per league and season
+  on earlier seasons, scored against the default on the same rows, pass = pooled gain range
+  above 0.
+- **Follow-up, only if P passes:** the 0-0 and 1-1 cells under the chosen ρ (stage 1's measure),
+  as a descriptive check. This run computes log loss only.
+- **Judged read:** on 2025/26 if it passes (the lead's decision above).
+- **Run:** `tuning.yml` `phase=grid-rho` (`tuning_grid --blocks P`).
+
+### Phase 2: results (2026-11-08; `tuning.yml` `phase=ceiling` run 42463207351, 0 credits, no key)
+
+Descriptive. Every oracle is labelled never tradable.
+- **Seasons:** eight leagues, 2019/20–2023/24.
+- **The base reproduces the recorded Lean backtest:** 2,462 bets, CLV −3.1% (−3.4% to −2.8%),
+  ROI −1.3%. (`lean_backtest.json`'s −3.1% includes 2024/25.)
+
+| Stage | Bets | CLV vs Pinnacle's close | ROI | CLV gain over its reference |
+| --- | --- | --- | --- | --- |
+| Base (Lean, z ≥ 1, Pinnacle early) | 2,462 | −3.1% (−3.4 to −2.8) | −1.3% | – |
+| (a) the chance = Pinnacle's fair close | 3,475 | **+9.8%** (+9.6 to +10.1) | +13.6% | **+12.9 points** |
+| (b) the model = Poisson on post-match xG (5 leagues) | 2,812 | −1.3% (−1.6 to −1.0) | +80%* | +1.2 (+0.6 to +1.7) vs −2.5% on the same leagues |
+| (c) z cut in hindsight (best: 1.25) | 1,233 | −3.0% (−3.4 to −2.5) | −1.2% | +0.15 (−0.4 to +0.7) |
+| (d) same picks, best of ten books at 48 h | 2,171 | −2.1% (−2.5 to −1.7) | −0.4% | **+1.0** (+0.9 to +1.2), paired |
+| (e) same picks, DraftKings at 48 h | 2,171 | −4.9% | −3.2% | −1.8 (−1.9 to −1.6), paired |
+| (e) same picks, Pinnacle's quoted close | 2,171 | −2.8% | −0.5% | +0.3 (−0.0 to +0.6), paired |
+
+\* (b)'s ROI uses the match's own outcome-linked xG, so it is not a measure of anything tradable.
+Its CLV is the meaningful number.
+
+**z cuts:** CLV is flat across every cut:
+- 0.5: −3.1% (6,266 bets)
+- 0.75: −3.1%
+- 1: −3.1%
+- 1.25: −3.0%
+- 1.5: −3.1%
+- 2: −3.6% (177)
+- 2.5: −2.6% (56)
+- 3: −0.6% (21)
+
+The rule's threshold is not where the loss is.
+
+**Best book at the 48 h look:** Pinnacle on 1,127 of 2,171 picks, then DraftKings 284, BetRivers
+184, Caesars 160, BetMGM 140, BetOnline 109, FanDuel 100, Bovada 61, ESPN Bet 6.
+
+**Reading: where the ceiling is.**
+- **Information:** knowing what the close knows is worth about 13 points of CLV. Every other
+  stage is worth 1 point or less. The loss is not in the rule, the timing or the book; it is
+  that the model and blend don't know what the market learns by kickoff.
+- **Better form data:** even the match's own post-match xG lifts CLV by only 1.2 points. Form
+  data alone, however good, does not reach the close.
+- **Line shopping:** across ten books at 48 h it gains 1.0 point, leaving −2.1%. It narrows the
+  loss and does not close it. Line shop vs Pinnacle (the live track) is the test of whether the
+  best price alone, without the model, beats Pinnacle.
+- **Implication for the programme:** stage 3's remaining effort is best spent on information the
+  market prices before the close (the LASSO's factors, team news), not on rule tuning.
+
+### Phase 3: results (2026-11-08; `tuning.yml` `phase=grid` run 42463376432, 0 credits, no key)
+
+373 configurations; eight leagues; nested per league and season, 2019/20–2023/24; gains are
+the default's log loss minus the nested choice's, per match.
+
+| Block | Matches | Default | Nested | Gain (95% range) | Pass |
+| --- | --- | --- | --- | --- | --- |
+| A: xi × xG weight | 16,300 | 1.02135 | 1.02139 | −0.00005 (−0.00063 to +0.00051) | no |
+| **R: ratings ridge** | 16,300 | 1.02135 | **1.01894** | **+0.00240 (+0.00167 to +0.00314)** | **yes** |
+| B: window × minimum | 15,778 | 1.02030 | 1.02003 | +0.00028 (−0.00056 to +0.00108) | no |
+| C: blend refit × minimum rows | 16,270 | 1.00444 | 1.00443 | +0.00002 (−0.00005 to +0.00008) | no |
+
+**Block R, per league** (gain; the ridge chosen each season):
+- **E1** +0.0042 (+0.0019 to +0.0065), **E2** +0.0054 (+0.0025 to +0.0086), **E3** +0.0055
+  (+0.0032 to +0.0080): ridge 3 every season.
+- D1 +0.0008 (ridge 3, range across 0); F1 +0.00004 (ridge 1–3).
+- E0, I1 and SP1 about 0 (0 to 0.3 chosen).
+- **Caution: 3 is the top of the grid.** In E1–E3 the best value may be larger. The judged read
+  uses the frozen grid's rule as is (no new values are added after reading this).
+
+**The other blocks:**
+- **A:** the nested picks lean toward faster decay (xi 0.0025–0.0035), but gain nothing pooled.
+- **B:** E1 alone gains +0.0027 (+0.0008 to +0.0048) with 1,095 days and minimum 4. F1 loses
+  −0.0019 (−0.0035 to −0.0004). Pooled is about 0: one league of eight in each direction is
+  what chance gives.
+- **C:** the blend's cadence doesn't matter.
+
+**Reading.** Shrinking the team ratings toward average improves the model's log loss by 0.0024
+pooled, about an eighth of its 0.020 gap to Pinnacle's close. Almost all of it is in the three
+goals-only English leagues, where the model has no xG to steady the ratings; there the gain is
+0.004–0.005, about a fifth of their gap. This is phase 1's diagnosis confirmed: the model's
+error is fitting optimism, and shrinkage is the lever. No other never-tuned setting matters.
+
+**Next, as pre-registered.**
+- The Lean backtest is re-run on the nested ridge for its CLV and ROI (descriptive).
+- R becomes a named candidate for the single judged read on 2025/26, with the rule frozen:
+  - per league, the ridge with the lowest log loss over the development seasons 2017/18–2023/24
+    (2024/25 is not used, and 2025/26 never chooses);
+  - 2025/26 log loss against today's default, pass = range above 0;
+  - Pinnacle's fair price on the priced matches as the benchmark, with coverage reported;
+  - 2025/26 Understat coverage checked first.
+
+### Phase 3, block R2: a wider ratings ridge for the judged read's choice (pre-registered 2026-11-08, after block R's result and before R2 runs)
+
+- **Why:** block R chose ridge 3, the top of its grid, every season in E1–E3. The lead suggested
+  widening the choice before the 2025/26 judged read, which development never touched.
+- **Said plainly:** this grid is set after seeing 3 win in development. That is why it is only a
+  development choice. The judgement is on 2025/26, a season no setting has been chosen on.
+- **Block R2:** ridge ∈ {0, 1, 3, 10, 30} at today's other settings, 5 per league, 40 in all.
+- **Method:** as the other blocks. Nested per league and season on 2019/20–2023/24, scored against
+  the default, pass = pooled gain range above 0 (descriptive here; R has already passed).
+- **The judged read's ridge per league:** the value with the lowest log loss over the
+  development seasons 2017/18–2023/24 in this block.
+- **Run:** `tuning.yml` `phase=grid-ridge` (`tuning_grid --blocks R2`).
+- **Count:** the programme's configuration count rises to 545.
+
+### Phase 3, block R2: results (`tuning.yml` `phase=grid-ridge` run 42464940851, attempt 2 after a uv download outage; 0 credits)
+
+- **Pooled gain:** +0.00270 (+0.00151 to +0.00389) over 16,300 matches, 40 configurations.
+- **No league chose 30**, the new top value, so the optimum is now inside the grid.
+
+| League | Gain (95% range) | Ridge chosen, season by season (2019/20–2023/24) |
+| --- | --- | --- |
+| E3 | +0.0079 (+0.0036 to +0.0125) | 10, 10, 10, 10, 10 |
+| E1 | +0.0048 (+0.0006 to +0.0093) | 3, 10, 10, 10, 10 |
+| E2 | +0.0043 (+0.0006 to +0.0083) | 3, 3, 10, 10, 3 |
+| D1 | +0.0008 (−0.0018 to +0.0034) | 3 every season |
+| F1 | +0.00004 | 3, 3, 1, 1, 1 |
+| E0 | −0.0002 | default ×4, then 1 |
+| I1 | 0 | default every season |
+| SP1 | −0.0002 | 1, then default ×4 |
+
+**Reading.**
+- Among the goals-only leagues, the stronger ridge (10) beats 3 in E1 and E3.
+- The xG leagues need little or none: the xG targets already steady the ratings.
+- The judged read's per-league ridge is chosen by the rule pre-registered for R2. That is the
+  lowest log loss over all of 2017/18–2023/24, computed by the judged-read code, so this
+  season-by-season table does not set it.
+
+## Model settings: the judged read on 2025/26 (FROZEN 2026-11-08 with the lead's approval, before any 2025/26 result is read)
+
+**What is judged.**
+- **Candidate R:** today's match model with a per-league ratings ridge. Each league's value is the
+  one in {0, 1, 3, 10, 30} (block R2's grid) with the lowest mean log loss over the development
+  seasons 2017/18–2023/24.
+  - This is set after development showed ridge 3 (block R) and then 10 (block R2) doing best.
+  - It is legitimate only because 2025/26 has never been used to choose or compare anything.
+- **Candidate P: not included.** Block P failed in development (below), so the candidate is the
+  ridge alone: one hypothesis, 95% ranges, no Bonferroni.
+
+**The season.**
+- 2025/26, 2025-07-01 to 2026-06-30, eight leagues; results are complete.
+- The model is refitted weekly as live. Its 730-day training windows include 2024/25's results as
+  training data only. 2024/25 is never scored here; it stays locked for strategy-level reads (a
+  betting rule's CLV), as the strategy search kept it. It was opened once for model comparisons
+  in October (bake-offs 1 and 3, corners bake-off 1).
+- **Data check (run 42464974995, counts only):** 2025/26 Understat xG is attached to every
+  match in all five xG leagues: E0 380/380, SP1 380/380, D1 306/306, I1 380/380, F1 306/306.
+  No gap, so no league runs goals-only for this reason. E1–E3 are goals-only as always. Goalscorer development used 2025/26 player rows; that is a
+  different model and doesn't bear on these settings.
+
+**Measure and pass rule.**
+- **Primary:** the pooled per-match difference in 1X2 log loss, today's default minus the
+  candidate, over every 2025/26 match both predict. 95% range from 2,000 bootstrap draws
+  resampling matches, seed 0. **Pass: the range's lower end above 0.**
+- **Descriptive:**
+  - per league;
+  - E1–E3 together;
+  - both models against Pinnacle's fair early and close on the matches football-data prices,
+    with coverage per league (2025/26 is only about half priced in some leagues).
+
+**Multiple testing.**
+- The programme has logged 545 configurations in development: phase 1 72, phase 2 12, phase 3
+  373 + P 48 + R2 40.
+- Development only chose. The judged read tests one pre-specified hypothesis (the ridge),
+  at 95%.
+
+**What a pass would mean for live.**
+- Moneyline adds the per-league ridge to the live fit (`DixonColes(ridge=)` already exists).
+- The Lean blends are refitted (`fit-match-blends`), and the backtests re-run.
+- The owner decides whether it goes live.
+- A pass is about prediction accuracy (log loss), not profit. The ceiling analysis shows the
+  model's gap to the close is information, so a better-calibrated model is unlikely on its own to
+  make Lean profitable.
+
+**A fail** changes nothing, and the settings stay as they are.
+
+**Block P's development result** (`tuning.yml` `phase=grid-rho` run 42464660129, attempt 4 after
+uv download outages; 48 configurations, all eight leagues):
+- **Pooled gain:** −0.00002 (−0.00043 to +0.00042). **Fails.**
+- **Per league:** E0 +0.0006, E1 +0.0002, E2 +0.0005, E3 +0.0002, F1 +0.0003, D1 −0.0005,
+  I1 −0.0008, SP1 −0.0011. Every range includes 0.
+- **The choices waver** between fixed 0 and the penalties, and E0 picks ρ = 0 every season.
+- **Reading:** the 0-0 over-prediction stage 1 found is real but costs too little log loss for
+  shrinking ρ to help out of sample. ρ stays as it is, and the named candidate is closed.
+
+**Run.** `tuning.yml` `phase=judged` (`lab/tuning_judged.py`: per league the ridge chosen on
+2017/18–2023/24, then default vs candidate over 2025/26, weekly refits; a pool job gives the
+verdict). Run once, from team/model-tuning after the PR that holds this frozen text is open.
