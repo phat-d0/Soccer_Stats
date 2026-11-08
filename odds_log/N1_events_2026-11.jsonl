@@ -18,3 +18,5 @@
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"f73ffb41e418d1a67544b0fbf261693a","home":"FC Twente Enschede","away":"Willem II","kickoff":"2026-11-22T11:15:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"b192dbcfd675d0ee75492948b7d2a35f","home":"Ajax","away":"ADO Den Haag","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"8e33c1a370f9763723426e4f0aa0fdd0","home":"Sparta Rotterdam","away":"AZ Alkmaar","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"a586f0f2f16b5ff2aced035c030f1c54","home":"NEC Nijmegen","away":"PSV Eindhoven","kickoff":"2026-11-21T15:30:00+00:00","fetched_at":"2026-11-08T19:45:44+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"a620a95dde2d702247e888f21e2b1cf7","home":"FC Utrecht","away":"SC Cambuur","kickoff":"2026-11-21T17:45:00+00:00","fetched_at":"2026-11-08T19:45:44+00:00"}
