@@ -3678,27 +3678,6 @@ was read on in-sample for that setting: a backtest over those seasons flatters i
   Kelly's ¼ and 5%. Being untuned, they can't be over-fitted, but nobody knows whether better
   values exist.
 
-### What a tuning study of the xG weight and the decay would cost (estimate only; the owner hasn't decided)
-
-- **Design**: a grid of `xi` (0, 0.001, 0.0019, 0.003, 0.005 a day) × xG weight (0, 0.3, 0.5,
-  0.7, 1) in E0, SP1, D1, I1, F1 (25 settings), `xi` alone in E1–E3 (5 each): 140 league-settings.
-  Each gets one walk-forward over 2017/18–2023/24; then, for each season from 2019/20, the setting
-  with the best 1X2 log loss on the earlier seasons only is scored on that season (nested, so
-  the score is out of sample), against today's 0.7 / 0.0019. 2024/25 stays locked.
-- **Actions time**: the AUC run's walk-forwards took about a minute a league for five seasons
-  (run 42457943922: 7.8 minutes for eight leagues); seven seasons is about 1.4 minutes. So about
-  200 runner-minutes, or about 35 minutes of wall time as a matrix job per league. Free: the repo
-  is public, so Actions minutes cost nothing.
-- **Credits**: 0 (football-data and the archived Understat copies in `xg-good-`; I1 2022/23 stays
-  goals-only).
-- **If a setting changes**: rerun `fit-match-blends`, both backtests and the DraftKings-price
-  backtest (0 credits, about an hour of Actions), then republish.
-- **Session work**: a pre-registration and one module on the `lab.harness` walk-forward with its
-  tests, about half a day.
-- **Expected gain**: small. The blend already gives the model little weight, and inside a price
-  band the model ranks no better than a coin (ROC AUC 0.499). Better settings would improve its
-  log loss but are unlikely to give it an edge on the price.
-
 ### For the owner
 
 Most of the model's settings were never tuned on results: they are defaults, so the backtests
