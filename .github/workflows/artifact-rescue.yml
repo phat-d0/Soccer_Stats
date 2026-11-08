@@ -1,0 +1,41 @@
+# One-off (lead, 8 Nov 2026): keep the 1 Nov goalscorer artifacts before their 7-day expiry.
+# Understat has been down since 2 Nov and the understat-<league>- caches are gone, so these
+# artifacts are the only copies of the scored rows built from SP1/D1/I1/F1's Understat match
+# files. It downloads them and uploads them again with 90-day retention. Nothing is read or
+# joined; no key, no credits, never pushes.
+name: Artifact rescue
+on:
+  push:
+    branches: [team/player-props-artifact-rescue]
+    paths: [.github/workflows/artifact-rescue.yml]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  rescue:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download the 1 Nov artifacts by id
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p rescue
+          # name:id (runs 41325824036 goal-leagues forward check; 41346853368 goalscorer dev)
+          for pair in edge-goal-leagues:13095491512 goalscorer-dev-E0:13099143460 \
+                      goalscorer-dev-SP1:13100487167 goalscorer-dev-D1:13100580257 \
+                      goalscorer-dev-I1:13100323748 goalscorer-dev-F1:13100049468 \
+                      goalscorer-dev-pooled:13101085434; do
+            name=${pair%%:*}; id=${pair##*:}
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "rescue/$name.zip"
+            mkdir -p "rescue/$name" && unzip -q "rescue/$name.zip" -d "rescue/$name" && rm "rescue/$name.zip"
+            echo "$name ($id): $(find "rescue/$name" -type f | wc -l) files, $(du -sb "rescue/$name" | cut -f1) bytes"
+            find "rescue/$name" -type f -printf '  %P %s\n'
+          done
+          (cd rescue && find . -type f -print0 | sort -z | xargs -0 sha256sum) > rescue/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goalscorer-1nov-rescued
+          path: rescue/
+          retention-days: 90
+          if-no-files-found: error
