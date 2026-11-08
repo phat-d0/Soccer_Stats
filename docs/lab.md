@@ -3611,3 +3611,121 @@ season, E0's own value fell from +2.1 to +1.2.
 
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
+
+## LASSO on the market residual (owner, 8 Nov; pre-registered 2026-11-08, before any model is fitted)
+
+**Question.** Start from the market's price. Does any extra pre-match factor explain, out of
+sample, where that price is wrong? Earlier work says probably not:
+- the residual map (above) found no more striking cells than chance would give;
+- the strategy search (11,857 arms) found no strategy;
+- the free-signals round (`docs/edge.md` round 2) found no blend weight.
+
+"LASSO keeps nothing" is a valid, useful result. This is development only. 2024/25 stays locked
+(below).
+
+**Unit.**
+- One row per match, with its three outcomes (home, draw, away), in eight leagues: E0, SP1, D1,
+  I1, F1, E1, E2, E3.
+- Source is football-data, with Pinnacle's own early and close 1X2 (`data.pinnacle_prices`).
+- A match counts only if it has a full early price and a walk-forward model chance.
+
+**Decision time and the baseline.**
+- A bet is decided at Pinnacle's early price, so the decision day is kickoff − 4 days
+  (`lean_backtest.EARLY_LEAD`).
+- Baseline: the Shin-fair early chances q_k. They enter as a fixed offset: log q_k with its
+  coefficient held at 1.
+- Pinnacle's Shin-fair close is shown only as a descriptive comparison (its log loss on the
+  same matches), and as the reference for CLV.
+
+**The model.**
+- A multinomial logistic regression with the draw as reference:
+  - score_draw = log q_draw;
+  - score_home = log q_home + a_home + Σ_j β_home,j · x_j;
+  - score_away = log q_away + a_away + Σ_j β_away,j · x_j.
+- The two intercepts are not penalised. Every β has an L1 penalty λ · |β|.
+- Each feature is standardised with the mean and standard deviation of that refit's training
+  rows only. A missing value is set to 0 after standardising (the training mean).
+- Fit: proximal gradient with FISTA (numpy, `lab/lasso_residual.py`), warm-started along the λ
+  path, run until the step changes the objective by less than 1e-9 or 5,000 iterations.
+  scikit-learn's logistic regression takes no offset, so it is not used.
+- Pure L1. No elastic net is run.
+
+**Frozen candidate factors.** Every factor is a match-level number seen from the home side, and
+each enters both the home and the away score. A factor is "selected" in a refit when any of its
+coefficients is non-zero. Results-based factors use only matches that kicked off before the
+decision day. Fixture-based facts (rest days, a UEFA match before kickoff) count as known, since
+fixtures are published in advance.
+
+| # | Factor | Features |
+| --- | --- | --- |
+| 1 | `rest` | home rest days, away rest days, home minus away. Days since each team's previous league match, capped at 14 (`lab.features`). |
+| 2 | `europe` | for each side: a UEFA match 1–4 days before kickoff (0/1), and that match played away and not at a neutral ground (0/1, the travel). From ESPN's UEFA results via `residual_map.load_europe`'s mapping; qualifiers count. |
+| 3 | `xg_luck` | for each side: (xG for − xG against) − (goals for − goals against) per game over its last 6 league matches finished before the decision day, at least 3. Understat leagues only; 0 (missing) in E1–E3 and in I1 2022/23. |
+| 4 | `form_vs_market` | for each side: mean of (points − the points expected from Pinnacle's Shin-fair close) over its last 6 league matches finished before the decision day, at least 3. |
+| 5 | `newcomer` | for each side: new to the division this season (promoted or relegated) (0/1), and new and within its first 10 league matches (0/1). |
+| 6 | `season_phase` | three 0/1 features for the kickoff month: Aug–Sep, Jan–Feb, Mar–Jul. Oct–Dec is the reference. |
+| 7 | `model_gap` | log p_model,k − log q_k for home, draw and away. p_model is the walk-forward Dixon-Coles chance: weekly refits, xG weight 0.7, goals only where there is no xG, as in `lean_backtest`. |
+| 8 | `price_shape` | log(q_home / q_draw) and log(q_away / q_draw). This allows a favourite–longshot recalibration (the blend's b ≠ 1), so that no other factor can pass simply by standing in for it. |
+
+**Dropped, with the reason:**
+- *Manager change:* the repo has no free history of it.
+- *Derby / same city:* there is no club-location data here. Building it by hand is not cheap,
+  and a hand list would risk mistakes.
+- *Line movement from the early price to 48 h:* at the early-price decision time, the 48 h
+  price is still in the future, so using it would be look-ahead. football-data holds no earlier
+  price. The residual map already describes the early-to-close move.
+- *FPL/ESPN team-news counts:* there is no history before October 2026.
+
+**Splits.**
+- Rows run from 2017/18. The Dixon-Coles walk-forward starts on 2017-07-01, using 2015/16–2016/17
+  as its own burn-in.
+- Scored rows: 2019/20–2023/24. 2017/18 and 2018/19 are burn-in: they are used for training only.
+- Walk-forward:
+  - Decision-day blocks are 28 days long, starting on 2019-07-01.
+  - Each block is predicted by a fit on every match that kicked off before the block's first
+    decision day (so every training result was known when the block's first bet was decided).
+  - Leagues are pooled into one model.
+- λ is chosen inside each training window only:
+  - the window's last 365 days (by kickoff) are the validation part;
+  - the path is fitted on the rows before them, on 20 values log-spaced from λ_max (the smallest
+    λ that keeps nothing) down to λ_max / 1,000;
+  - the λ with the lowest validation log loss is kept, with no one-standard-error rule;
+  - the model is then refitted on the whole window at that λ.
+  - The scored block never chooses anything.
+- **2024/25 stays locked.** `lab.harness.Holdout` from 2024-07-01 checks every frame. 2025/26
+  and later are never loaded. Opening 2024/25 needs the owner's approval through the lead.
+
+**Development read** (2019/20–2023/24, out of sample):
+- For each factor:
+  - the share of refits in which it is selected;
+  - its standardised coefficients and the chosen λ in every refit (the paths).
+- Log loss:
+  - the mean per-match difference, log loss of the price alone minus log loss of the L1 model
+    (positive means the model is better);
+  - a 95% range from 2,000 bootstrap draws that resample matches, seed 0;
+  - pooled and per league.
+- The close's log loss on the same matches, for scale (descriptive).
+- A simple rule:
+  - in each match, bet the outcome with the largest p_L1 × early odds − 1, provided that is more
+    than **T = 0.03** (fixed now);
+  - $1 a bet;
+  - CLV = early odds × Pinnacle's Shin-fair close − 1, with a match-resampled 95% range;
+  - ROI is shown last.
+
+**The gate to the holdout.** Both of these must hold on development:
+1. the pooled log-loss improvement's 95% range lies above 0;
+2. at least one factor is selected in more than half of the refits.
+
+If both hold, the lead asks the owner to open 2024/25 for **one** judged read, using the same
+code, the same frozen factor list and walk-forward. The pass rule is fixed now:
+- the 2024/25 log-loss improvement's 95% range is above 0;
+- the rule's CLV range at T = 0.03 is above 0, on at least 300 bets.
+
+Otherwise the study closes as **"no edge in these factors"** and the holdout is not spent.
+
+**Code.** `src/soccer_stats/lab/lasso_residual.py`, tests in `tests/test_lab_lasso_residual.py`.
+The tests cover:
+- a planted factor is kept, and pure noise is dropped;
+- no look-ahead in any factor.
+
+`odds-check.yml` `task=lasso-residual` (no key, 0 credits), log line `LASSO_RESIDUAL_JSON`.
