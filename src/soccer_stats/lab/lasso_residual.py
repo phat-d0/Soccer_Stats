@@ -56,6 +56,18 @@ FORM_MIN = 3
 REST_CAP = 14
 EURO_DAYS = (1, 4)
 NEW_FIRST = 10
+CONG_BEFORE = 14  # days before kickoff, every competition
+CONG_AFTER = 4  # days after kickoff, league matches only
+BIG_MARGIN = 3
+GAP_CLIP = 2.0
+# Domestic cups counted in congestion, per league, and whether they are complete in the data
+# (docs/lab.md "LASSO on the market residual", frozen 8 Nov; run 42462857463).
+LEAGUE_CUPS = {
+    "E0": ("FAC", "EFLC"), "E1": ("FAC", "EFLC"), "E2": ("FAC", "EFLC"), "E3": ("FAC", "EFLC"),
+    "SP1": ("CDR",), "D1": ("DFBP",), "I1": ("CI",), "F1": ("CDF", "CDL"),
+}  # fmt: skip
+CUPS_COMPLETE = {"E0": 1, "E1": 1, "E2": 0, "E3": 0, "SP1": 0, "D1": 1, "I1": 1, "F1": 1}
+CDL_LAST = 2019  # the Coupe de la Ligue's last season (2019/20)
 TOL = 1e-9
 MAX_ITER = 5000
 
@@ -68,6 +80,17 @@ FACTORS: dict[str, list[str]] = {
     "season_phase": ["phase_aug_sep", "phase_jan_feb", "phase_mar_jul"],
     "model_gap": ["gap_home", "gap_draw", "gap_away"],
     "price_shape": ["shape_home", "shape_away"],
+    "motivation": [
+        f"{side}_{x}"
+        for side in ("home", "away")
+        for x in ("gap_hi", "gap_mid", "gap_rel", "games_left", "nothing")
+    ],
+    "congestion": ["home_cong", "away_cong", "cups_covered"],
+    "last_match": [
+        f"{side}_{x}" for side in ("home", "away") for x in ("big_win", "big_loss", "shock")
+    ],
+    "red_card": ["home_red_last", "away_red_last"],
+    "sot_form": ["home_sot", "away_sot"],
 }
 FEATURES = [f for fs in FACTORS.values() for f in fs]
 FACTOR_OF = {f: k for k, fs in FACTORS.items() for f in fs}
@@ -247,13 +270,22 @@ def walk(rows: pd.DataFrame, start, end, holdout: Holdout | None = None, feats=F
 # --- factors (no look-ahead) --------------------------------------------------------------
 
 
+LONG_COLS = ("fvm", "luck", "big_win", "big_loss", "red", "sot")
+
+
 def _team_long(m: pd.DataFrame) -> pd.DataFrame:
-    """One row per (match, team) with kickoff date, points minus expected points, xG luck."""
+    """One row per (match, team) with kickoff date, points minus expected points, xG luck,
+    a 3+ goal win or loss, a red card (0/1) and shots-on-target share minus the price's
+    expected share (win + draw / 2)."""
     parts = []
     for side, other in (("home", "away"), ("away", "home")):
         gf, ga = m[f"{side}_goals"].astype(float), m[f"{other}_goals"].astype(float)
         pts = np.where(gf > ga, 3.0, np.where(gf == ga, 1.0, 0.0))
         xpts = 3 * m[f"pre_{side}"] + m["pre_draw"]
+        sf, sa = m[f"{side}_hst"].astype(float), m[f"{other}_hst"].astype(float)
+        tot = (sf + sa).to_numpy(float)
+        share = np.divide(sf.to_numpy(float), tot, out=np.full(len(m), np.nan), where=tot > 0)
+        red = m[f"{side}_red"].astype(float).to_numpy()
         parts.append(
             pd.DataFrame(
                 {
@@ -261,6 +293,10 @@ def _team_long(m: pd.DataFrame) -> pd.DataFrame:
                     "date": m["date"].to_numpy(),
                     "fvm": pts - xpts.to_numpy(float),
                     "luck": ((m[f"{side}_xg"] - m[f"{other}_xg"]) - (gf - ga)).to_numpy(float),
+                    "big_win": (gf - ga >= BIG_MARGIN).astype(float).to_numpy(),
+                    "big_loss": (ga - gf >= BIG_MARGIN).astype(float).to_numpy(),
+                    "red": np.where(np.isfinite(red), (red > 0).astype(float), np.nan),
+                    "sot": share - (m[f"pre_{side}"] + m["pre_draw"] / 2).to_numpy(float),
                 }
             )
         )
@@ -337,28 +373,136 @@ def _euro(trips, day) -> tuple[float, float]:
     return (1.0 if hit else 0.0, 1.0 if any(hit) else 0.0)
 
 
-def build_factors(m: pd.DataFrame, euro: dict | None = None) -> pd.DataFrame:
+def places(league: str, season: str) -> tuple[int, int, int, int]:
+    """The frozen place table: (clubs, gap_hi place, gap_mid place, first relegation place)."""
+    s = str(season)
+    if league in ("E0", "SP1", "I1"):
+        return (20, 4, 6, 18)
+    if league == "D1":
+        return (18, 4, 6, 16)
+    if league == "F1":
+        if s == "2223":
+            return (20, 4, 6, 17)
+        return (18, 4, 6, 16) if s >= "2324" else (20, 4, 6, 18)
+    if league == "E1":
+        return (24, 2, 6, 22)
+    if league == "E2":
+        return (23 if s == "1920" else 24, 2, 6, 21)
+    if league == "E3":
+        return (24, 3, 7, 23)
+    raise KeyError(league)
+
+
+def table_features(m: pd.DataFrame) -> dict[tuple, dict[str, float]]:
+    """(row index, side) -> the motivation features, from the league table of the row's
+    season built from league results kicked off before its decision day (m['day'])."""
+    out: dict[tuple, dict[str, float]] = {}
+    for (lg, s), g in m.groupby(["league", m["season"].astype(str)], sort=False):
+        n, hi, mid, rel = places(lg, s)
+        g = g.sort_values("date", kind="stable")
+        dates = g["date"].to_numpy("datetime64[ns]")
+        hs, as_ = g["home"].to_numpy(), g["away"].to_numpy()
+        hg, ag = g["home_goals"].to_numpy(float), g["away_goals"].to_numpy(float)
+        teams = sorted(set(hs) | set(as_))
+        pts = dict.fromkeys(teams, 0.0)
+        gd = dict.fromkeys(teams, 0.0)
+        gf = dict.fromkeys(teams, 0.0)
+        pl = dict.fromkeys(teams, 0)
+        j = 0
+        for day, sub in g.groupby("day", sort=True):
+            cut = np.datetime64(day)
+            while j < len(g) and dates[j] < cut:
+                if np.isfinite(hg[j]) and np.isfinite(ag[j]):
+                    h, a = hs[j], as_[j]
+                    ph = 3.0 if hg[j] > ag[j] else (1.0 if hg[j] == ag[j] else 0.0)
+                    pa = 3.0 if ag[j] > hg[j] else (1.0 if hg[j] == ag[j] else 0.0)
+                    pts[h] += ph
+                    pts[a] += pa
+                    gd[h] += hg[j] - ag[j]
+                    gd[a] += ag[j] - hg[j]
+                    gf[h] += hg[j]
+                    gf[a] += ag[j]
+                    pl[h] += 1
+                    pl[a] += 1
+                j += 1
+            ranked = sorted(teams, key=lambda t: (-pts[t], -gd[t], -gf[t], t))
+            pos = {t: i + 1 for i, t in enumerate(ranked)}
+
+            def at(place, ranked=ranked, pts=pts):
+                return pts[ranked[min(place, len(ranked)) - 1]]
+
+            for idx, h, a in zip(sub.index, sub["home"], sub["away"], strict=True):
+                for side, t in (("home", h), ("away", a)):
+                    if pl[t] < FORM_MIN:
+                        out[(idx, side)] = dict.fromkeys(
+                            ("gap_hi", "gap_mid", "gap_rel", "games_left", "nothing"), np.nan
+                        )
+                        continue
+                    left = max(2 * (n - 1) - pl[t], 0)
+                    den = 3.0 * left + 3.0
+
+                    def gap(place, t=t, den=den, pts=pts):
+                        return float(np.clip((pts[t] - at(place)) / den, -GAP_CLIP, GAP_CLIP))
+
+                    nothing = (pos[t] > mid and pts[t] + 3 * left < at(mid)
+                               and pts[t] - at(rel) > 3 * left)  # fmt: skip
+                    out[(idx, side)] = {"gap_hi": gap(hi), "gap_mid": gap(mid),
+                                        "gap_rel": gap(rel), "games_left": float(left),
+                                        "nothing": float(nothing)}  # fmt: skip
+    return out
+
+
+def _last_before(long: dict, col: str, team, day) -> float:
+    """`col` of the team's last match kicked off before `day`, else NaN."""
+    g = long.get(team)
+    if g is None:
+        return np.nan
+    dates, vals = g
+    i = int(np.searchsorted(dates, np.datetime64(day), side="left"))
+    return float(vals[col][i - 1]) if i > 0 else np.nan
+
+
+def _count(days: np.ndarray, lo, hi, closed: str = "left") -> int:
+    """Days in [lo, hi) (closed='left') or (lo, hi] (closed='right')."""
+    if days is None or not len(days):
+        return 0
+    lo, hi = np.datetime64(lo), np.datetime64(hi)
+    side_lo, side_hi = ("left", "left") if closed == "left" else ("right", "right")
+    return int(np.searchsorted(days, hi, side=side_hi) - np.searchsorted(days, lo, side=side_lo))
+
+
+def build_factors(m: pd.DataFrame, euro: dict | None = None, cups: dict | None = None,
+                  cups_incomplete: set | None = None) -> pd.DataFrame:  # fmt: skip
     """Every FEATURES column for every match in `m` (every loaded league match: league,
     season, date, home, away, goals, xG (NaN without), Pinnacle early odds_*/close_*, and
     q_* (Shin-fair early) and p_* (model; NaN without)). Results-based factors use matches
-    kicked off before the decision day (date - EARLY_LEAD) only."""
+    kicked off before the decision day (date - EARLY_LEAD) only. `cups`: football-data name ->
+    sorted cup-match days (None = no cup data: cups_covered 0); `cups_incomplete`:
+    (league, season) whose cup fetch did not complete (cups_covered 0 there)."""
     m = m.copy()
     m["date"] = pd.to_datetime(m["date"]).dt.normalize()
     m["day"] = m["date"] - EARLY_LEAD
     m = m.reset_index(drop=True)
     m = pd.concat([m.drop(columns=["pre_home", "pre_draw", "pre_away"], errors="ignore"),
                    expected_points_prices(m)], axis=1)  # fmt: skip
-    for c in ("home_xg", "away_xg"):
+    for c in ("home_xg", "away_xg", "home_hst", "away_hst", "home_red", "away_red"):
         if c not in m:
             m[c] = np.nan
     long = _team_long(m)
     by_team = {
         t: (
             g["date"].to_numpy("datetime64[ns]"),
-            {c: g[c].to_numpy(float) for c in ("fvm", "luck")},
+            {c: g[c].to_numpy(float) for c in LONG_COLS},
         )
         for t, g in long.groupby("team", sort=False)
     }
+    table = table_features(m)
+    euro_days = {
+        k: np.array(sorted(d for d, _ in v), dtype="datetime64[ns]")
+        for k, v in (euro or {}).items()
+    }
+    cup_days = {k: np.array(sorted(v), dtype="datetime64[ns]") for k, v in (cups or {}).items()}
+    incomplete = cups_incomplete or set()
     # League schedule for rest days: every league match's date per team (fixtures known).
     sched = {
         t: np.sort(np.concatenate([m.loc[m["home"] == t, "date"].to_numpy("datetime64[ns]"),
@@ -397,6 +541,24 @@ def build_factors(m: pd.DataFrame, euro: dict | None = None) -> pd.DataFrame:
                 f[f"{side}_euro"], f[f"{side}_euro_away"] = _euro(
                     euro.get(f"{r['league']}:{t}"), r["date"]
                 )
+            for k, v in table[(i, side)].items():
+                f[f"{side}_{k}"] = v
+            ko = r["date"]
+            lo, hi = ko - pd.Timedelta(days=CONG_BEFORE), ko + pd.Timedelta(days=CONG_AFTER)
+            cong = _count(d, lo, ko) + _count(d, ko, hi, closed="right")
+            cong += _count(euro_days.get(f"{r['league']}:{t}"), lo, ko)
+            if cups is not None:
+                cong += _count(cup_days.get(t), lo, ko)
+            f[f"{side}_cong"] = float(cong)
+            f[f"{side}_big_win"] = _last_before(by_team, "big_win", t, r["day"])
+            f[f"{side}_big_loss"] = _last_before(by_team, "big_loss", t, r["day"])
+            f[f"{side}_shock"] = _last_before(by_team, "fvm", t, r["day"])
+            f[f"{side}_red_last"] = _last_before(by_team, "red", t, r["day"])
+            f[f"{side}_sot"] = _results_before(by_team, "sot", t, r["day"])
+        covered = cups is not None and CUPS_COMPLETE.get(r["league"], 0)
+        f["cups_covered"] = float(
+            bool(covered) and (r["league"], str(r["season"])) not in incomplete
+        )
         f["rest_gap"] = f["home_rest"] - f["away_rest"]
         mo = r["date"].month
         f["phase_aug_sep"] = float(mo in (8, 9))
@@ -636,11 +798,108 @@ def load_league(code: str, holdout: Holdout, first: int = FIRST_ROWS, last: int 
     else:
         for s in SIDES:
             base[f"p_{s}"] = np.nan
+    extra = fd_extra(code, years)
+    base = base.merge(extra, on=keys, how="left")
     base["league"] = code
     cov = {c["season"]: c for c in lb.coverage(pins)}
     return base, {"xg_weight": weight, "matches": int(len(base)),
                   "model_chances": int(base["p_home"].notna().sum()),
+                  "shots_on_target": int(base["home_hst"].notna().sum()),
+                  "red_cards": int(base["home_red"].notna().sum()),
                   "coverage": cov}  # fmt: skip
+
+
+def fd_extra(code: str, years) -> pd.DataFrame:
+    """Shots on target (HST/AST) and red cards (HR/AR) from football-data's own files, keyed
+    by season, home, away (the shared data.COLUMNS is left alone)."""
+    from soccer_stats.data import download, season_code
+
+    parts = []
+    for y in years:
+        raw = pd.read_csv(download(code, y), encoding="latin-1", on_bad_lines="skip")
+        raw = raw.dropna(subset=[c for c in ("HomeTeam", "AwayTeam", "FTHG") if c in raw])
+        out = pd.DataFrame(
+            {"season": season_code(y), "home": raw["HomeTeam"], "away": raw["AwayTeam"]}
+        )
+        for col, name in (("HST", "home_hst"), ("AST", "away_hst"), ("HR", "home_red"),
+                          ("AR", "away_red")):  # fmt: skip
+            out[name] = pd.to_numeric(raw[col], errors="coerce") if col in raw else np.nan
+        parts.append(out)
+    return pd.concat(parts, ignore_index=True).drop_duplicates(["season", "home", "away"])
+
+
+def cup_days(events: list[dict], teams: dict[str, set], match, cutoff) -> tuple[dict, int]:
+    """football-data name -> [cup-match day] for every event side `match` maps to a club of
+    `teams` ({league: names}); events at or after `cutoff` are left out."""
+    out: dict[str, list] = {}
+    seen: dict[str, str | None] = {}
+    n = 0
+    for e in events:
+        k = e.get("kickoff")
+        if k is None:
+            continue
+        ts = pd.Timestamp(k)
+        if ts >= cutoff:
+            continue
+        day = (ts.tz_convert(None) if ts.tzinfo else ts).normalize()
+        for side in ("home", "away"):
+            name = e.get(side)
+            if not name:
+                continue
+            if name not in seen:
+                mt = match(name, teams)
+                seen[name] = mt["name"] if mt else None
+            if seen[name]:
+                out.setdefault(seen[name], []).append(day)
+                n += 1
+    return out, n
+
+
+def load_cups(m: pd.DataFrame, first: int, last: int, seconds: float = 100 * 60):
+    """Domestic-cup match days per club (LEAGUE_CUPS), the (league, season) pairs whose cup
+    fetch did not complete, and one report row per cup-season."""
+    import time
+
+    from soccer_stats import cups as cupmod
+    from soccer_stats.data import season_code
+
+    stop = time.time() + seconds
+    cutoff = pd.Timestamp(LOCK, tz="UTC")
+    teams = {lg: set(g["home"]) | set(g["away"]) for lg, g in m.groupby("league")}
+    days: dict[str, list] = {}
+    incomplete: set = set()
+    rep = []
+    for code, (slug, lgs) in DOMESTIC_CUPS.items():
+        ours = [lg for lg in lgs if lg in teams and code in LEAGUE_CUPS.get(lg, ())]
+        if not ours:
+            continue
+        tm = {lg: teams[lg] for lg in ours}
+        for y in range(first, last + 1):
+            if code == "CDL" and y > CDL_LAST:
+                continue
+            row: dict = {"cup": code, "season": season_code(y)}
+            if time.time() > stop:
+                row["error"] = "time budget"
+            else:
+                stats: dict = {}
+                try:
+                    cal = cupmod.season_calendar(
+                        slug, pd.Timestamp(f"{y}-07-01", tz="UTC"),
+                        pd.Timestamp(f"{y + 1}-07-01", tz="UTC"), stats=stats, today=cutoff,
+                    )  # fmt: skip
+                    got, n = cup_days(cal["events"], tm, cupmod.match_team, cutoff)
+                    for k, v in got.items():
+                        days.setdefault(k, []).extend(v)
+                    row.update({"events": len(cal["events"]), "club_matches": n,
+                                "failures": stats.get("failures", 0)})  # fmt: skip
+                    if stats.get("failures", 0):
+                        row["error"] = "fetch failures"
+                except Exception as exc:  # noqa: BLE001 - that league-season loses its cups
+                    row["error"] = type(exc).__name__
+            if "error" in row:
+                incomplete.update((lg, row["season"]) for lg in ours)
+            rep.append(row)
+    return {k: sorted(set(v)) for k, v in days.items()}, incomplete, rep
 
 
 def load_euro(matches: pd.DataFrame, first: int, last: int, cutoff: pd.Timestamp):
@@ -799,6 +1058,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--leagues", default=",".join(LEAGUES), help="comma list of codes")
     p.add_argument("--boot", type=int, default=N_BOOT, help="bootstrap draws")
     p.add_argument("--no-europe", action="store_true", help="skip the ESPN UEFA results")
+    p.add_argument("--no-cups", action="store_true", help="skip the domestic cups (flag 0)")
     p.add_argument("--json", default="", help="write the result here too")
     p.add_argument("--coverage", action="store_true", help="counts only: no model is fitted")
     p.add_argument("--cups", default="", help="coverage of these domestic cups only (counts)")
@@ -830,15 +1090,26 @@ def main(argv: list[str] | None = None) -> None:
         except Exception as exc:  # noqa: BLE001 - the factor is then missing (0)
             euro_rep = {"error": f"{type(exc).__name__}: {exc}"[:200]}
         print(f"Europe: {euro_rep}", flush=True)
+    cup_map, cup_inc, cup_rep = None, set(), []
+    if not args.no_cups:
+        try:
+            cup_map, cup_inc, cup_rep = load_cups(m, FIRST_ROWS, LAST_YEAR)
+        except Exception as exc:  # noqa: BLE001 - no cup data: cups_covered 0 everywhere
+            cup_rep = [{"error": f"{type(exc).__name__}: {exc}"[:200]}]
+        for r in cup_rep:
+            print("LASSO_CUP " + json.dumps(r), flush=True)
+        print(f"Cups: incomplete league-seasons {sorted(cup_inc)}", flush=True)
     m = add_early_fair(m)
-    m = build_factors(m, euro)
+    m = build_factors(m, euro, cup_map, cup_inc)
     rows = scored_rows(m)
     holdout.check(rows["date"])
     preds, refits = walk(rows, f"{FIRST_SCORED}-07-01", LOCK, holdout)
     scored = rows.loc[preds.index].join(preds)
     res = report(scored, refits, args.boot)
     run = os.environ.get("GITHUB_RUN_ID")
-    res.update({"leagues": reps, "europe": euro_rep, "runs": {"lasso_residual": run} if run else {},
+    res.update({"leagues": reps, "europe": euro_rep, "cups": cup_rep,
+                "cups_incomplete": sorted(map(list, cup_inc)),
+                "runs": {"lasso_residual": run} if run else {},
                 "rows": int(len(rows))})  # fmt: skip
     print("\n".join(summary_lines(res)))
     text = json.dumps(res, default=str, separators=(",", ":"))

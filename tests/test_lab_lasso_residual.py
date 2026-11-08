@@ -83,6 +83,10 @@ def _matches():
                     "p_home": 0.45,
                     "p_draw": 0.27,
                     "p_away": 0.28,
+                    "home_hst": int(rng.integers(0, 8)),
+                    "away_hst": int(rng.integers(0, 6)),
+                    "home_red": int(rng.random() < 0.1),
+                    "away_red": int(rng.random() < 0.1),
                 }
             )
             d += pd.Timedelta(days=7)
@@ -101,10 +105,13 @@ def test_factors_use_only_results_before_the_decision_day():
     m2 = m.copy()
     m2.loc[later, ["home_goals", "away_goals"]] = 9
     m2.loc[later, ["home_xg", "away_xg"]] = 0.0
+    m2.loc[later, ["home_hst", "away_hst", "home_red", "away_red"]] = [9, 0, 1, 1]
     m2.loc[later, ["close_home", "close_draw", "close_away"]] = [1.2, 8.0, 15.0]
     m2.loc[later & (m2.index != target), ["odds_home", "odds_draw", "odds_away"]] = [9.0, 5.0, 1.3]
     m2 = lr.add_early_fair(m2)
     again = lr.build_factors(m2)
+    assert base.loc[target, lr.FACTORS["motivation"]].notna().any()
+    assert base.loc[target, ["home_sot", "home_red_last", "home_shock"]].notna().all()
     for f in lr.FEATURES:
         a, b = base.loc[target, f], again.loc[target, f]
         assert (np.isnan(a) and np.isnan(b)) or a == pytest.approx(b), f
@@ -199,3 +206,92 @@ def test_cup_coverage_counts_only_the_cups_asked(monkeypatch):
     rows = lr.cup_coverage(m, [2020], 60, ["DFBP"])
     assert asked == ["ger.dfb_pokal"]
     assert rows[0]["cup"] == "DFBP" and rows[0]["events_with_club"] == 1
+
+
+def test_feature_list_is_the_frozen_one():
+    assert len(lr.FACTORS) == 13 and len(lr.FEATURES) == 46
+    assert len(set(lr.FEATURES)) == 46
+
+
+def test_place_table():
+    assert lr.places("E0", "1819") == (20, 4, 6, 18)
+    assert lr.places("D1", "2021") == (18, 4, 6, 16)
+    assert lr.places("F1", "2122") == (20, 4, 6, 18)
+    assert lr.places("F1", "2223") == (20, 4, 6, 17)
+    assert lr.places("F1", "2324") == (18, 4, 6, 16)
+    assert lr.places("E1", "2324") == (24, 2, 6, 22)
+    assert lr.places("E2", "1920") == (23, 2, 6, 21)
+    assert lr.places("E3", "1819") == (24, 3, 7, 23)
+
+
+def _table_league(results):
+    """One E0 season: matches (home, away, hg, ag) a week apart from 1 Aug 2018."""
+    rows = []
+    d = pd.Timestamp("2018-08-01")
+    for h, a, hg, ag in results:
+        rows.append(
+            {
+                "league": "E0",
+                "season": "1819",
+                "date": d,
+                "home": h,
+                "away": a,
+                "home_goals": hg,
+                "away_goals": ag,
+            }
+        )
+        d += pd.Timedelta(days=7)
+    m = pd.DataFrame(rows)
+    m["day"] = m["date"] - lr.EARLY_LEAD
+    return m
+
+
+def test_table_features_use_earlier_results_and_need_three_matches():
+    teams = [f"T{i}" for i in range(20)]
+    res = [(teams[0], teams[i], 3, 0) for i in range(1, 4)]  # T0 wins three
+    res += [(teams[0], teams[4], 0, 0)]
+    m = _table_league(res)
+    t = lr.table_features(m)
+    assert np.isnan(t[(2, "home")]["gap_hi"])  # T0 has played two before the 3rd match
+    f = t[(3, "home")]  # T0: 9 points from 3; 35 games left
+    assert f["games_left"] == 35
+    assert f["gap_hi"] == pytest.approx((9 - 0) / (3 * 35 + 3))
+    assert f["nothing"] == 0
+
+
+def test_congestion_counts_before_kickoff_and_league_matches_after():
+    days = np.array(
+        pd.to_datetime(["2018-09-01", "2018-09-10", "2018-09-15", "2018-09-18"]),
+        dtype="datetime64[ns]",
+    )
+    ko = pd.Timestamp("2018-09-15")
+    lo, hi = ko - pd.Timedelta(days=14), ko + pd.Timedelta(days=4)
+    assert lr._count(days, lo, ko) == 2  # 1 and 10 Sep; not the match itself
+    assert lr._count(days, ko, hi, closed="right") == 1  # 18 Sep
+
+
+def test_cup_days_map_clubs_and_drop_after_the_cutoff():
+    events = [
+        {"kickoff": "2018-09-25T18:45:00Z", "home": "Arsenal FC", "away": "Brentford"},
+        {"kickoff": "2024-09-25T18:45:00Z", "home": "Arsenal FC", "away": "Bolton"},
+    ]
+
+    def match(name, teams):
+        return {"name": "Arsenal"} if name.startswith("Arsenal") else None
+
+    got, n = lr.cup_days(events, {"E0": {"Arsenal"}}, match, pd.Timestamp("2024-07-01", tz="UTC"))
+    assert got == {"Arsenal": [pd.Timestamp("2018-09-25")]} and n == 1
+
+
+def test_cups_flag_and_congestion_in_build_factors():
+    m = _matches()
+    a = lr.build_factors(m)
+    assert (a["cups_covered"] == 0).all()
+    ko = pd.Timestamp(m.loc[40, "date"])
+    team = m.loc[40, "home"]
+    cups = {team: [ko - pd.Timedelta(days=3)]}
+    b = lr.build_factors(m, cups=cups)
+    assert (b["cups_covered"] == 1).all()  # E0's cups are complete
+    assert b.loc[40, "home_cong"] == a.loc[40, "home_cong"] + 1
+    c = lr.build_factors(m, cups=cups, cups_incomplete={("E0", "1819")})
+    assert (c.loc[c["season"] == "1819", "cups_covered"] == 0).all()
