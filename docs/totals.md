@@ -1770,8 +1770,8 @@ priced in E0, SP1 and D1). Pinnacle quotes one or two lines per team and per mat
 | FanDuel | 7.0% (min 5.4%) | 7.0% (min 3.4%) | team −1.9% to −0.5%, best +5.5% (SP1, one line); totals −4.4% to +0.9%, best +1.9% |
 | Betfair exchange (UK, AU) | not listed | 4.6–5.9% before about 5% commission | −4.2% to −4.9% (one line a league) |
 | Bovada (E0) | 6.9% | 6.8% | −5.6% / −5.5% |
-| DraftKings | 7.9–8.5% | 8.0–8.2% | −5.3% to −6.6% |
-| BetMGM, Unibet, BetRivers, LeoVegas, TABtouch | 8–11% | 7.7–10.2% | mostly −2% to −8%; in SP1 one team line at +1.4% to +1.9% |
+| DraftKings | 7.9–8.5% | 8.0–8.2% | −5.3% to −7.0% |
+| BetMGM, Unibet, BetRivers, LeoVegas, TABtouch | 8–11% | 7.7–10.2% | mostly −2% to −8%; in SP1 one team line at +0.3% to +1.9% |
 
 **Reading.**
 - No book beats Pinnacle's fair price consistently.
