@@ -1258,6 +1258,12 @@ four leagues: E0, E1–E3).
   `odds-check.yml` `task=dk-gap-counts`, log line `DK_GAP_COUNTS_JSON` (run 42006552522).
   It backs `docs/lab.md` "DraftKings vs Pinnacle's fair price" (withdrawn, untestable: about
   15 bets a year) and "Line shop vs Pinnacle" (approved 5 Nov, rules frozen).
+- `lab/research_overview.json` (owner, 8 Nov; `docs/lab.md` "Research overview"): every study to
+  date in one file for the app's Research tab (UI Design builds it): `areas`, `verdicts`, and per
+  study `area`, `name`, `when`, `verdict`, `question`, `sample`, `result`, `doc`, plus `measure`
+  (clv/roi) with `value`/`lo`/`hi`/`bets`, a backtest's `roi` range, `luck`, and `due`/`due_date`
+  for running tests. Copied from the recorded verdicts; Research updates it when one changes.
+  Map: https://claude.ai/artifact/WkPzT1s1u5hK3qDS6LZFY8.
 - `lab/markets_research.json`: goal and corner research numbers for Moneyline's Goals markets and
   Team totals rows (corners' are Team corners → Backtest's research view),
   verbatim from `docs/totals.md` with run ids; edit it when a result changes.
