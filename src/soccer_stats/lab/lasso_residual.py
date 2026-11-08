@@ -669,15 +669,131 @@ def scored_rows(m: pd.DataFrame) -> pd.DataFrame:
     return m.reset_index(drop=True)
 
 
+# --- coverage (counts only: no model, no fit; for agreeing the factor list) ---------------
+
+FD_COLUMNS = ("Referee", "Time", "HS", "AS", "HST", "AST", "HC", "AC", "HF", "AF", "HY", "AY",
+              "HR", "AR", "HTHG", "HTAG", "PSH", "PSCH")  # fmt: skip
+DOMESTIC_CUPS = {
+    "FAC": ("eng.fa", ("E0", "E1", "E2", "E3")),
+    "EFLC": ("eng.league_cup", ("E0", "E1", "E2", "E3")),
+    "EFLT": ("eng.league_trophy", ("E2", "E3")),
+    "CDR": ("esp.copa_del_rey", ("SP1",)),
+    "DFBP": ("ger.dfb_pokal", ("D1",)),
+    "CI": ("ita.coppa_italia", ("I1",)),
+    "CDF": ("fra.coupe_de_france", ("F1",)),
+    "CDL": ("fra.coupe_de_la_ligue", ("F1",)),
+}
+
+
+def fd_coverage(code: str, years) -> list[dict]:
+    """Per season: matches, and the share of matches with each FD_COLUMNS value present."""
+    from soccer_stats.data import download
+
+    out = []
+    for y in years:
+        raw = pd.read_csv(download(code, y), encoding="latin-1", on_bad_lines="skip")
+        raw = raw.dropna(subset=[c for c in ("HomeTeam", "AwayTeam", "FTHG") if c in raw])
+        row = {"league": code, "season": f"{y % 100:02d}{(y + 1) % 100:02d}", "matches": len(raw)}
+        for c in FD_COLUMNS:
+            if c not in raw:
+                row[c] = 0.0
+                continue
+            v = raw[c]
+            ok = v.notna() & (v.astype(str).str.strip() != "")
+            row[c] = round(float(ok.mean()), 3) if len(raw) else 0.0
+        out.append(row)
+    return out
+
+
+def cup_coverage(matches: pd.DataFrame, years, seconds: float = 1500) -> list[dict]:
+    """Per domestic cup and season: ESPN events and those with a club of its leagues."""
+    import time
+
+    from soccer_stats import cups
+
+    stop = time.time() + seconds
+    teams = {lg: set(g["home"]) | set(g["away"]) for lg, g in matches.groupby("league")}
+    out = []
+    for code, (slug, lgs) in DOMESTIC_CUPS.items():
+        tm = {lg: t for lg, t in teams.items() if lg in lgs}
+        stats: dict = {}
+        for y in years:
+            if time.time() > stop:
+                out.append({"cup": code, "season": y, "error": "time budget"})
+                continue
+            try:
+                cal = cups.season_calendar(slug, pd.Timestamp(f"{y}-07-01", tz="UTC"),
+                                           pd.Timestamp(f"{y + 1}-07-01", tz="UTC"), stats=stats,
+                                           today=pd.Timestamp(LOCK, tz="UTC"))  # fmt: skip
+            except Exception as exc:  # noqa: BLE001 - reported
+                out.append({"cup": code, "season": y, "error": type(exc).__name__})
+                continue
+            evs = cal["events"]
+            names = {e[s] for e in evs for s in ("home", "away") if e.get(s)}
+            mapped = {n for n in names if cups.match_team(n, tm)}
+            with_club = sum(1 for e in evs if e.get("home") in mapped or e.get("away") in mapped)
+            out.append({"cup": code, "season": y, "events": len(evs), "clubs": len(names),
+                        "clubs_mapped": len(mapped), "events_with_club": with_club,
+                        "mode": cal.get("mode"), "failures": cal.get("failures")})  # fmt: skip
+    return out
+
+
+def coverage_main(codes: list[str]) -> None:
+    from soccer_stats.data import load_matches
+    from soccer_stats.xg import with_xg
+
+    years = range(FIRST_ROWS - 1, LAST_YEAR + 1)
+    fd, mats = [], []
+    for code in codes:
+        try:
+            fd += fd_coverage(code, years)
+            m = load_matches([code], years)
+            m, _ = with_xg(m)
+            m["league"] = code
+            mats.append(m)
+            xg = m.groupby(m["season"].astype(str))["home_xg"].apply(
+                lambda v: round(float(v.notna().mean()), 3)
+            )
+            print(f"COVERAGE_XG {code} {xg.to_dict()}", flush=True)
+        except Exception as exc:  # noqa: BLE001 - reported
+            print(f"COVERAGE_ERROR {code} {type(exc).__name__}: {exc}"[:300], flush=True)
+    for r in fd:
+        print("COVERAGE_FD " + json.dumps(r), flush=True)
+    m = pd.concat(mats, ignore_index=True)
+    m = m[pd.to_datetime(m["date"]) < LOCK]
+    try:
+        euro, rep = load_euro(m, FIRST_ROWS, LAST_YEAR, pd.Timestamp(LOCK, tz="UTC"))
+        per = {}
+        for key, trips in euro.items():
+            lg = key.split(":", 1)[0]
+            for d, _ in trips:
+                s = (
+                    f"{d.year % 100:02d}{(d.year + 1) % 100:02d}"
+                    if d.month >= 7
+                    else f"{(d.year - 1) % 100:02d}{d.year % 100:02d}"
+                )
+                per.setdefault(lg, {}).setdefault(s, 0)
+                per[lg][s] += 1
+        print("COVERAGE_UEFA " + json.dumps({"report": rep, "club_matches": per}), flush=True)
+    except Exception as exc:  # noqa: BLE001 - reported
+        print(f"COVERAGE_UEFA error {type(exc).__name__}: {exc}"[:300], flush=True)
+    for r in cup_coverage(m, list(years)):
+        print("COVERAGE_CUP " + json.dumps(r), flush=True)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--leagues", default=",".join(LEAGUES), help="comma list of codes")
     p.add_argument("--boot", type=int, default=N_BOOT, help="bootstrap draws")
     p.add_argument("--no-europe", action="store_true", help="skip the ESPN UEFA results")
     p.add_argument("--json", default="", help="write the result here too")
+    p.add_argument("--coverage", action="store_true", help="counts only: no model is fitted")
     args = p.parse_args(argv)
-    holdout = Holdout(LOCK)
     codes = [c.strip() for c in args.leagues.split(",") if c.strip()]
+    if args.coverage:
+        coverage_main(codes)
+        return
+    holdout = Holdout(LOCK)
     frames, reps = [], {}
     for code in codes:
         try:

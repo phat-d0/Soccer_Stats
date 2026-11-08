@@ -3612,7 +3612,13 @@ season, E0's own value fell from +2.1 to +1.2.
 **Reading.** On free, pre-kickoff information the close is right where the model disagrees
 with it. No cell gives a pattern to pre-register.
 
-## LASSO on the market residual (owner, 8 Nov; pre-registered 2026-11-08, before any model is fitted)
+## LASSO on the market residual (owner, 8 Nov; DRAFT, not frozen)
+
+> **Draft, not frozen (8 Nov).** The lead asked for the factor list to be agreed with the
+> owner before it is frozen. The owner is adding factors. This section was committed before
+> that request arrived. A development run (42457953990) was started from it and cancelled
+> within seconds, during setup: no model was fitted, and no output was read. The frozen version
+> will replace this section once the list is agreed.
 
 **Question.** Start from the market's price. Does any extra pre-match factor explain, out of
 sample, where that price is wrong? Earlier work says probably not:
