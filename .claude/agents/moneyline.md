@@ -20,10 +20,11 @@ your own memory of an earlier task.
 Your files:
 - `models/dixon_coles.py`, `backtest.py`, `markets.py`, `odds.py`, `odds_feed.py`, `odds_history.py`, `xg.py`, `data.py`, `match_calibration.py`, `match_markets.py`;
 - the strategy backtests and the Champions League pipeline: `lean_backtest.py`, `edge12_backtest.py`, `cup_backtest.py`, `cup_model.py`, `cup_odds.py`;
-- live team corners: `corners_live.py` and the corner parts of `trades.py` and `paper.py`;
 - the match parts of `trades.py` (`best_pick`, `select_trades`, `settle`, `clv`, and Blend Lean's `side_z`, `lean_pick`, `lean_rule`, `market_side_z`) and `paper.py`;
-- `tests/test_trades.py`, `tests/test_dk_backtest.py`, `tests/test_odds_history.py`, `tests/test_match_blend.py`, `tests/test_match_markets.py`, `tests/test_blend_lean.py`, `tests/test_lean_backtest.py`, `tests/test_edge12_backtest.py`, `tests/test_cup_backtest.py`, `tests/test_cup_model.py`, `tests/test_cup_odds.py`, `tests/test_corners_live.py`, `tests/test_corners_dk.py`;
+- `tests/test_trades.py`, `tests/test_dk_backtest.py`, `tests/test_odds_history.py`, `tests/test_match_blend.py`, `tests/test_match_markets.py`, `tests/test_blend_lean.py`, `tests/test_lean_backtest.py`, `tests/test_edge12_backtest.py`, `tests/test_cup_backtest.py`, `tests/test_cup_model.py`, `tests/test_cup_odds.py`;
 - `.github/workflows/backfill.yml`.
+
+Team corners moved to the corners agent on 8 Nov (owner): `corners_live.py` and the corner parts of `trades.py`/`paper.py` are theirs. Keep shared helpers in `trades.py`/`paper.py` working for both, and tell them when one changes.
 
 The app's `bestPick` in `web/app.js` must stay in step with `best_pick`. Coordinate any rule change with the ui-designer.
 
