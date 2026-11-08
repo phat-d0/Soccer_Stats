@@ -28,6 +28,7 @@ XG_WEIGHTS = (0.0, 0.3, 0.5, 0.7, 0.85, 1.0)
 RIDGES = (0.0, 0.1, 0.3, 1.0, 3.0)
 WINDOWS = (365, 540, 730, 1095)
 MIN_TEAMS = (4, 6, 8)
+RIDGES_WIDE = (0.0, 1.0, 3.0, 10.0, 30.0)  # block R2 (the judged read's development choice)
 RHOS = ("", "fixed:0", "penalty:1", "penalty:10", "penalty:100", "penalty:1000")
 REFITS = (14, 28, 56)
 MIN_ROWS = (200, 300, 500)
@@ -63,7 +64,12 @@ def model_configs(code: str) -> dict[str, dict[str, tb.Config]]:
         c = tb.Config(xi=base.xi, xg_weight=base.xg_weight, window=base.window,
                       min_team=base.min_team, rho=rho)  # fmt: skip
         p[name(c)] = c
-    return {"A": a, "R": r, "B": b, "P": p}
+    r2 = {}
+    for rg in RIDGES_WIDE:
+        c = tb.Config(xi=base.xi, xg_weight=base.xg_weight, window=base.window,
+                      min_team=base.min_team, ridge=rg)  # fmt: skip
+        r2[name(c)] = c
+    return {"A": a, "R": r, "B": b, "P": p, "R2": r2}
 
 
 def blend_configs() -> dict[str, tuple[str, int]]:
@@ -236,7 +242,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--pool", default="", help="pool every league's files under this folder")
     p.add_argument("--out", default="out", help="output folder")
     p.add_argument("--boot", type=int, default=tb.N_BOOT, help="bootstrap draws")
-    p.add_argument("--blocks", default="A,R,B,C", help="comma list of blocks (A, R, B, C, P)")
+    p.add_argument("--blocks", default="A,R,B,C", help="comma list of blocks (A, R, B, C, P, R2)")
     a = p.parse_args(argv)
     if a.league:
         blocks = tuple(b.strip() for b in a.blocks.split(",") if b.strip())

@@ -4442,3 +4442,17 @@ error is fitting optimism, and shrinkage is the lever. No other never-tuned sett
   - 2025/26 log loss against today's default, pass = range above 0;
   - Pinnacle's fair price on the priced matches as the benchmark, with coverage reported;
   - 2025/26 Understat coverage checked first.
+
+### Phase 3, block R2: a wider ratings ridge for the judged read's choice (pre-registered 2026-11-08, after block R's result and before R2 runs)
+
+- **Why:** block R chose ridge 3, the top of its grid, every season in E1–E3. The lead suggested
+  widening the choice before the 2025/26 judged read, which development never touched.
+- **Said plainly:** this grid is set after seeing 3 win in development. That is why it is only a
+  development choice. The judgement is on 2025/26, a season no setting has been chosen on.
+- **Block R2:** ridge ∈ {0, 1, 3, 10, 30} at today's other settings, 5 per league, 40 in all.
+- **Method:** as the other blocks. Nested per league and season on 2019/20–2023/24, scored against
+  the default, pass = pooled gain range above 0 (descriptive here; R has already passed).
+- **The judged read's ridge per league:** the value with the lowest log loss over the
+  development seasons 2017/18–2023/24 in this block.
+- **Run:** `tuning.yml` `phase=grid-ridge` (`tuning_grid --blocks R2`).
+- **Count:** the programme's configuration count rises to 545.

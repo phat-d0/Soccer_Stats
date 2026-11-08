@@ -3,6 +3,7 @@
 # One job per league, then a pool job. No API key, no credits, never pushes. Results in the
 # log (TUNING_<PHASE>_JSON) and a 7-day artifact.
 #   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+#   phase=grid-ridge: block R2, the ratings ridge on a wider grid (the judged read's choice).
 #   phase=grid-rho: phase 3's rho block alone (DixonColes.rho_option).
 #   phase=grid: phase 3, the nested grid search on the never-tuned settings (lab/tuning_grid.py).
 #   phase=ceiling: phase 2, the ceiling analysis (lab/tuning_ceiling.py); reads the paid
@@ -13,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block"
+        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2"
         type: choice
-        options: [bias, ceiling, grid, grid-rho]
+        options: [bias, ceiling, grid, grid-rho, grid-ridge]
         default: bias
 
 permissions:
@@ -79,6 +80,8 @@ jobs:
             grid) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out ;;
             grid-rho) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
                         --blocks P ;;
+            grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
+                        --blocks R2 ;;
           esac
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
@@ -108,7 +111,7 @@ jobs:
           case "$PHASE" in
             bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
             ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --pool in --out out ;;
-            grid|grid-rho) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
+            grid|grid-rho|grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
           esac
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}

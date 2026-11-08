@@ -15,6 +15,7 @@ def test_config_counts_match_the_pre_registration():
     for block in ("A", "R", "B"):
         assert "default" in a[block] and a[block]["default"] == tb.default_for("E0")
     assert a["R"]["default"].ridge == 0
+    assert len(a["R2"]) == 5 and a["R2"]["default"].ridge == 0
     assert len(a["P"]) == 6 and a["P"]["default"].rho_option() is None
     opts = {c.rho for c in a["P"].values()}
     assert {"fixed:0", "penalty:1000"} <= opts
