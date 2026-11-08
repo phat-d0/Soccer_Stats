@@ -9,3 +9,7 @@
 {"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"738890a6b3c304184f69fd5a147c041d","home":"Sturm Graz","away":"RB Salzburg","kickoff":"2026-11-08T16:00:00+00:00","fetched_at":"2026-11-01T14:15:45+00:00"}
 {"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"66b0c66f449a35afd5be6038234deaa0","home":"Grazer AK","away":"Rapid Wien","kickoff":"2026-11-21T18:30:00+00:00","fetched_at":"2026-11-08T10:25:49+00:00"}
 {"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"855caac815973841b663eaf77d07bae4","home":"Wolfsberger AC","away":"Ried","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T10:25:49+00:00"}
+{"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"1921e07cc28ad41d7f6b80e30e38f99d","home":"WSG Tirol","away":"Austria Lustenau","kickoff":"2026-11-21T16:00:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"dcb38bd3a2a8dc13573281a49afb9407","home":"LASK","away":"Hartberg","kickoff":"2026-11-21T16:00:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"69c8fd5d654b0e1ea5ed5bb1cfee7a86","home":"Rheindorf Altach","away":"Sturm Graz","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"AUT","sport":"soccer_austria_bundesliga","event_id":"5b642036524e93f480f445a8dd0f0e42","home":"Austria Wien","away":"RB Salzburg","kickoff":"2026-11-22T16:00:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}

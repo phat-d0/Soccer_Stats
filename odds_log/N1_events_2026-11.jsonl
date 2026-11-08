@@ -14,3 +14,7 @@
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"2b580b7b4964cdf303dc432fcc3083a1","home":"SC Telstar","away":"FC Zwolle","kickoff":"2026-11-21T20:00:00+00:00","fetched_at":"2026-11-07T22:42:52+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"f0c241457472f32fc55b90b2b95b665b","home":"Go Ahead Eagles","away":"Fortuna Sittard","kickoff":"2026-11-22T15:45:00+00:00","fetched_at":"2026-11-07T22:42:52+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"15c2074550c986e69e8b9831b596f37d","home":"Feyenoord","away":"Excelsior","kickoff":"2026-11-21T17:45:00+00:00","fetched_at":"2026-11-08T13:36:18+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"cc8ea455586c0bdfcca464f1bf617843","home":"Groningen","away":"Heerenveen","kickoff":"2026-11-21T20:00:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"f73ffb41e418d1a67544b0fbf261693a","home":"FC Twente Enschede","away":"Willem II","kickoff":"2026-11-22T11:15:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"b192dbcfd675d0ee75492948b7d2a35f","home":"Ajax","away":"ADO Den Haag","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"8e33c1a370f9763723426e4f0aa0fdd0","home":"Sparta Rotterdam","away":"AZ Alkmaar","kickoff":"2026-11-22T13:30:00+00:00","fetched_at":"2026-11-08T16:43:26+00:00"}
