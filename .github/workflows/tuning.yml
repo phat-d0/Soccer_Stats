@@ -3,15 +3,22 @@
 # One job per league, then a pool job. No API key, no credits, never pushes. Results in the
 # log (TUNING_<PHASE>_JSON) and a 7-day artifact.
 #   phase=bias: phase 1, bias vs variance (lab/tuning_bias.py).
+#   phase=judged: the frozen 2025/26 judged read of the model settings (run once; docs/lab.md).
+#   phase=xg-2025: 2025/26 Understat coverage per league (counts only, for the judged read).
+#   phase=grid-ridge: block R2, the ratings ridge on a wider grid (the judged read's choice).
+#   phase=grid-rho: phase 3's rho block alone (DixonColes.rho_option).
+#   phase=grid: phase 3, the nested grid search on the never-tuned settings (lab/tuning_grid.py).
+#   phase=ceiling: phase 2, the ceiling analysis (lab/tuning_ceiling.py); reads the paid
+#   odds-history cache (restore only, with the archive fallback) for the line-shop stages.
 name: Model tuning
 
 on:
   workflow_dispatch:
     inputs:
       phase:
-        description: "bias = phase 1, bias vs variance"
+        description: "bias = phase 1, bias vs variance; ceiling = phase 2, the ceiling analysis; grid = phase 3, the grid search; grid-rho = phase 3's rho block; grid-ridge = the wider ridge block R2; xg-2025 = 2025/26 xG coverage (counts); judged = the frozen 2025/26 read (run once)"
         type: choice
-        options: [bias]
+        options: [bias, ceiling, grid, grid-rho, grid-ridge, xg-2025, judged]
         default: bias
 
 permissions:
@@ -20,7 +27,7 @@ permissions:
 jobs:
   league:
     runs-on: ubuntu-24.04  # pinned 24 Oct: ubuntu-latest moved to 26.04
-    timeout-minutes: 120
+    timeout-minutes: 240  # phase 3: up to 45 walk-forwards per league
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +57,18 @@ jobs:
           path: data/raw
           key: understat-${{ matrix.league }}-none
           restore-keys: understat-${{ matrix.league }}-
+      # Paid odds (restore only): the ten-book history for phase 2's line-shop stages.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.phase == 'ceiling' }}
+        with:
+          path: data/raw/odds_history
+          key: odds-history-none
+          restore-keys: odds-history-
+      - name: Rebuild the paid odds-history cache from the archive if it missed
+        if: ${{ inputs.phase == 'ceiling' }}
+        uses: ./.github/actions/paid-archive-restore
+        with:
+          name: odds-history
       - name: Run the phase for one league
         env:
           LEAGUE: ${{ matrix.league }}
@@ -59,6 +78,14 @@ jobs:
           mkdir -p out
           case "$PHASE" in
             bias) uv run python -m soccer_stats.lab.tuning_bias --league "$LEAGUE" --out out ;;
+            ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --league "$LEAGUE" --out out ;;
+            grid) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out ;;
+            grid-rho) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
+                        --blocks P ;;
+            xg-2025) uv run python -m soccer_stats.lab.tuning_base --xg-check 2025 --league "$LEAGUE" ;;
+            judged) uv run python -m soccer_stats.lab.tuning_judged --league "$LEAGUE" --out out ;;
+            grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --league "$LEAGUE" --out out \
+                        --blocks R2 ;;
           esac
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
@@ -86,7 +113,11 @@ jobs:
           uv sync --frozen
           mkdir -p out
           case "$PHASE" in
+            xg-2025) echo "counts are in the league jobs' logs (XG_COVERAGE)" ;;
+            judged) uv run python -m soccer_stats.lab.tuning_judged --pool in --out out ;;
             bias) uv run python -m soccer_stats.lab.tuning_bias --pool in --out out ;;
+            ceiling) uv run python -m soccer_stats.lab.tuning_ceiling --pool in --out out ;;
+            grid|grid-rho|grid-ridge) uv run python -m soccer_stats.lab.tuning_grid --pool in --out out ;;
           esac
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}

@@ -275,7 +275,7 @@ def test_every_paid_restore_is_followed_by_the_archive_fallback():
         assert nxt["with"]["name"] == paid[prefix]
         assert nxt.get("if") == s.get("if"), f"{wf} {job}: the fallback's condition differs"
         found += 1
-    assert found == 13
+    assert found == 14  # + tuning.yml (phase 2 reads odds-history)
 
 
 def test_every_archived_free_restore_is_followed_by_a_soft_fallback():

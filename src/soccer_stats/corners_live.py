@@ -65,8 +65,17 @@ ROW_MARKET = "team_corners"  # `market` on a logged row (team totals: "team_tota
 GROUP = "team_corners"  # the call record's market group
 BOOK = "pinnacle"  # the original track: its rows and trades are unchanged
 DK = "draftkings"
-BOOKS = (BOOK, DK)  # one call, both books (one region of up to ten books: 1 credit)
-BOOKS_PARAM = ",".join(BOOKS)
+BOOKS = (BOOK, DK)  # the two paper tracks' books (their trades and ledgers)
+# Logged only (lead, 8 Nov; docs/totals.md "Corner-market discovery"): the books nearest
+# Pinnacle's fair price in the discovery, asked in the same call for a corner line-shop
+# log. No paper track reads them. Ten books bill as one region, so the call stays 1 credit;
+# if a call with them ever bills more, they are dropped for the rest of the month
+# (`shop_off`).
+SHOP_BOOKS = ("fanduel", "betmgm", "betrivers", "bovada")
+MAX_BOOKS = 10  # one region
+LOG_BOOKS = BOOKS + SHOP_BOOKS
+BOOKS_PARAM = ",".join(BOOKS)  # the call's books from 20 Oct to 8 Nov
+LOG_BOOKS_PARAM = ",".join(LOG_BOOKS)
 # League One and League Two from 24 Oct (owner, pre-approved 20 Oct; docs/leagues.md "League
 # One and League Two check"): Pinnacle's discovery listed the market there (run
 # 40088231180), DraftKings didn't, so those calls ask Pinnacle alone.
@@ -94,11 +103,29 @@ def _ts(x) -> pd.Timestamp:
     return tt._ts(x)
 
 
-def books_for(league: str) -> tuple[str, ...]:
+def books_for(league: str, shop: bool = True) -> tuple[str, ...]:
     """The books one corner call asks for in `league`: Pinnacle alone where DraftKings
-    lists no team corners (PINNACLE_ONLY), else Pinnacle and DraftKings (one region, 1
-    credit either way)."""
-    return (BOOK,) if league in PINNACLE_ONLY else BOOKS
+    lists no team corners (PINNACLE_ONLY), else Pinnacle, DraftKings and, unless `shop` is
+    off, the logged-only SHOP_BOOKS (at most MAX_BOOKS: one region, 1 credit either way)."""
+    if league in PINNACLE_ONLY:
+        return (BOOK,)
+    return LOG_BOOKS if shop else BOOKS
+
+
+def shop_off(calls: list[dict], now) -> bool:
+    """True when a call this month (UTC) that asked a SHOP_BOOKS book billed more than
+    COST_PER_CALL: the extra books then stop being asked until the month turns."""
+    month = _ts(now).strftime("%Y-%m")
+    for c in calls:
+        books = set(str(c.get("books") or "").split(","))
+        if not books & set(SHOP_BOOKS) or not c.get("fetched_at"):
+            continue
+        if (
+            _ts(c["fetched_at"]).strftime("%Y-%m") == month
+            and int(c.get("cost") or 0) > COST_PER_CALL
+        ):
+            return True
+    return False
 
 
 def paused_leagues(calls: list[dict], now) -> dict[str, str]:
@@ -361,10 +388,12 @@ def rows_from_body(
     body: dict | None, card: dict, event_id: str, snapshot: str, downloaded: pd.Timestamp
 ) -> list[dict]:
     """One row per book, team and line: Pinnacle's with both sides priced (unchanged),
-    then DraftKings' with at least one side priced (a one-sided line has the other side,
-    the fair prices and the margin None)."""
+    then DraftKings' and each SHOP_BOOKS book's with at least one side priced (a one-sided
+    line has the other side, the fair prices and the margin None)."""
     rows = _book_rows(body, card, event_id, snapshot, downloaded, BOOK, two_sided=True)
-    return rows + _book_rows(body, card, event_id, snapshot, downloaded, DK, two_sided=False)
+    for book in (DK, *SHOP_BOOKS):
+        rows += _book_rows(body, card, event_id, snapshot, downloaded, book, two_sided=False)
+    return rows
 
 
 def _book_rows(
@@ -469,6 +498,7 @@ def run(
         others = []
     credits = tt.freshest_credits(raw_dir, calls + others)
     paused = paused_leagues(calls, now)
+    shop = not shop_off(calls, now)
     summary = {
         "calls": 0,
         "credits": 0,
@@ -478,6 +508,7 @@ def run(
         "month_spent": spent,
         "stop": None,
         "paused": paused,
+        "shop_books": shop,
     }
     if not api_key:
         summary["stop"] = "no ODDS_API_KEY"
@@ -491,7 +522,7 @@ def run(
     try:  # a crash part-way still writes the calls already made (below)
         for league in [lg for lg in LEAGUES if lg in by_league]:
             lcards = by_league[league]
-            books = ",".join(books_for(league))
+            books = ",".join(books_for(league, shop))
             due = [(c, s) for c in lcards if (s := tt.due_snapshot(c["kickoff"], now, runs))]
             if not due:
                 continue
@@ -535,6 +566,10 @@ def run(
                     credits = left
                 spent += cost
                 expected = max(expected, cost)  # a dearer call than thought: budget for it
+                if shop and cost > COST_PER_CALL and set(books.split(",")) & set(SHOP_BOOKS):
+                    shop = False  # the extra books billed more: drop them from here on
+                    summary["shop_books"] = False
+                    summary["shop_note"] = f"a call with the extra books billed {cost} credits"
                 rows = []
                 if resp.ok:
                     try:
@@ -568,7 +603,7 @@ def run(
         calls=len(new_calls),
         credits=sum(c["cost"] for c in new_calls),
         rows=len(new_rows),
-        rows_by_book={b: sum(r["book"] == b for r in new_rows) for b in BOOKS},
+        rows_by_book={b: sum(r["book"] == b for r in new_rows) for b in LOG_BOOKS},
         month_spent=spent,
         credits_left=credits,
     )
@@ -588,7 +623,7 @@ def expected_cost(calls: list[dict], now) -> int:
     comes from `x-requests-last`; this only keeps the cap and the reserve checks honest if
     billing for a corner call is ever more than 1 credit."""
     month = _ts(now).strftime("%Y-%m")
-    params = {BOOKS_PARAM, BOOK}
+    params = {BOOKS_PARAM, LOG_BOOKS_PARAM, BOOK}
     seen = [
         int(c.get("cost") or 0)
         for c in calls
@@ -604,13 +639,20 @@ def summary_line(s: dict) -> str:
     return (
         f"Corners (Pinnacle, DraftKings): {s.get('calls', 0)} calls, "
         f"{s.get('credits', 0)} credits, {s.get('rows', 0)} rows "
-        f"({by.get(BOOK, 0)} Pinnacle, {by.get(DK, 0)} DraftKings); "
+        f"({by.get(BOOK, 0)} Pinnacle, {by.get(DK, 0)} DraftKings"
+        + "".join(f", {by[b]} {b}" for b in SHOP_BOOKS if by.get(b))
+        + "); "
         f"month {s.get('month_spent', 0)} of {CORNERS_MONTHLY_CAP} corner credits"
         + (f", credits left {s['credits_left']}" if s.get("credits_left") is not None else "")
         + (
             f"; paused (no prices in the last {EMPTY_PAUSE} calls): "
             + ", ".join(f"{lg} until {u}" for lg, u in sorted(s["paused"].items()))
             if s.get("paused")
+            else ""
+        )
+        + (
+            f"; extra books off ({s.get('shop_note') or 'a call with them billed over 1'})"
+            if s.get("shop_books") is False
             else ""
         )
         + (f" (stopped: {s['stop']})" if s.get("stop") else "")

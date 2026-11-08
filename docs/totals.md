@@ -1808,3 +1808,108 @@ moved toward model (f)'s side by **+0.18 chance points (+0.02 to +0.35)**.
   matches the +0.37% seen on the trades in the Task 1 read.
 - It would matter only beside a book paying at or above Pinnacle's fair price (FanDuel is
   the nearest, above). Nothing live changes.
+## Corner line shop vs Pinnacle: pre-registration (corners team, 8 Nov 2026; no new-book price, outcome or close read)
+
+**Status.** These are the rules, written before any FanDuel, BetMGM, BetRivers or Bovada
+corner price is logged; the commit that adds this section fixes them. The lead approved
+logging the extra books, which costs 0 extra credits (`corners_live.SHOP_BOOKS`). The paper
+track isn't built: the lead shows the owner first. Changing a rule after this needs a new
+pre-registration.
+
+**The idea.** On team corners, bet the best of the four books the owner can use (DraftKings,
+FanDuel, BetMGM, BetRivers) when its price beats Pinnacle's Shin-fair price for the same team,
+line and side by at least T, at the same moment. Pinnacle is the reference and is never bet.
+No model. This is Moneyline's line shop ("Line shop vs Pinnacle", `docs/lab.md`) carried over
+to corners.
+
+**The rule.**
+- *Moment:* the **look** snapshot only (18–30 h before kickoff), the one corner call that
+  asks every book. The close snapshot (≤ 30 min) is the judged reference, so an entry there
+  would be measured against itself.
+- *Lines:* each team half line that Pinnacle quotes two-sided in that same call. Whole lines
+  are left out (their push).
+- *Gap:* for each side (over, under), the book's price × Pinnacle's Shin-fair chance − 1.
+- *Books that can be bet:* DraftKings, FanDuel, BetMGM and BetRivers, ties in that order.
+  Bovada is logged for description only and is never bet.
+- *Fresh quotes:* the book's and Pinnacle's quotes in the same call, each updated
+  (`last_update`) within 3 hours before download. This is the corner tracks' gate.
+- *Entry:* every side whose best gap at the look is ≥ T, at that logged price. At most one bet
+  per team per match: the larger gap, then the home team's line if two tie.
+- *Stake:* $10 at the book named.
+- *T = 2%,* judged. **T = 1% is a descriptive shadow** (no bets, never judged), as for
+  Moneyline.
+
+**How it is judged.**
+- *Measure:* CLV per bet = entry price × Pinnacle's Shin-fair chance for that side at the close
+  snapshot, same team and line, − 1.
+  - A bet with no two-sided Pinnacle close at its line has no CLV and is counted as missing.
+  - The book's own close (`clv_book`) is descriptive.
+- *Pass:* the 95% range of mean CLV is above 0 (matches resampled, 2,000 draws, seed 0).
+  - It is read once, at 300 bets counted from the first look snapshot logged with the extra
+    books, or on 31 May 2027 if that comes first.
+  - Fewer than 300 bets by then is "inconclusive".
+- *Not judged:* ROI. Counts per book and per league are also reported.
+- *No backcast:* the extra books weren't logged before this change, so there is nothing to
+  backcast. This is a documented exception to the 14 Oct convention, as for Moneyline's line
+  shop.
+
+**Expected volume (a rough prior, from one snapshot).** The discovery found FanDuel above
+Pinnacle's fair price on 2 of 8 lines and other books on 1 of about 30, in three matches. That
+is too little for a rate. After the first week of logging, the counts of qualifying entries
+(prices at the look only, no close or result) go to the lead with a time-to-300 estimate.
+
+**What a pass would mean.** At least one US book prices team corners above Pinnacle's fair
+price often enough, and by enough, to beat the close. That would be the first corner bet with
+an edge that doesn't depend on model (f). Model (f)'s small lean toward the close ("Corner
+price moves") could later be tried as a filter, but only with its own pre-registration.
+
+**Code.** The logging is `corners_live.SHOP_BOOKS` / `LOG_BOOKS` (one region, 1 credit). The
+extra books are dropped for the month if a call with them bills more (`shop_off`). The rule
+itself is not built yet.
+
+## Corner dispersion: candidate f-oos (corners team, 8 Nov 2026; lead's go at low priority; pre-registered before any 2025/26 read)
+
+**Why.** Model evaluation's stage 1 (run 42461482443, `docs/lab.md`) found model (f)'s NB2 too
+narrow out of sample: dispersion under the fitted NB2 is 1.07–1.12 in every league, with every
+range above 1. (f)'s α is moment-matched on the same matches its team ratings were fitted on,
+so it leaves out the ratings' own error. Lines far from a team's mean are priced too
+confidently.
+
+**The candidate** (`edge/corner_alpha.CandidateFOos`, named "f-oos"):
+- (f)'s means exactly.
+- α per side = the moment-matched α of out-of-sample residuals over the last 365 days before
+  the fit. Each 28-day block there is predicted by a (f) fit on matches before it.
+- Earlier kickoffs only. With fewer than 200 predicted matches, the in-sample α is kept
+  (`alpha_source`).
+- It has the same interface as `TeamCornersF`, so `lab.model_assumptions.corner_walk(...,
+  model=CandidateFOos)` scores it on the same rows.
+
+**Development** (2017/18–2023/24 only; Model evaluation and tuning scores it beside (f)):
+- NB2 dispersion;
+- PIT and 50%/90% interval coverage;
+- log loss at team half lines.
+It is descriptive and not judged. If development shows no improvement, the candidate stops
+there.
+
+**The judged read: 2025/26, once** (the lead's rule of 8 Nov for model settings).
+- **Sample.**
+  - Every 2025/26 match with football-data corner counts in the eight corner leagues.
+  - Both models are refitted every 28 days on earlier matches (730-day window), on identical
+    rows.
+  - 2024/25 stays locked; 2026/27 stays bake-off 2's.
+- **Primary measure.** For each match, the summed binary log loss of over/under at the team
+  half lines 2.5, 3.5, …, 8.5, both teams (14 outcomes per match). Then the paired
+  difference f-oos − (f), pooled over the eight leagues, with its 95% range resampling
+  matches (2,000 draws, seed 0).
+- **Pass:** the range is below 0 (f-oos better).
+- **Descriptive:** per league; NB2 dispersion; 50%/90% coverage.
+- **When:** read once, after the development scoring is recorded, with a logged `reason`.
+- **Disclosure:** 2025/26 corner counts were already read once for round 12's recalibration
+  (10 Oct). That read was model (f)-free, so it can't have tuned f-oos, but the season isn't
+  untouched.
+
+**What a pass would mean.** f-oos becomes the candidate replacement for (f)'s α in
+`corners_live`. It would change only the chances on lines far from the mean. The swap is the
+owner's call after the 8 Dec review. It doesn't touch bake-off 2's frozen 3 Feb test, which
+scores (f) as frozen. It doesn't change the margin problem: the Task 1 read and the discovery
+still apply.
