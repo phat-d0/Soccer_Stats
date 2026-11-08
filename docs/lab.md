@@ -4196,3 +4196,21 @@ goes live from development alone.
 
 **Code.** `lab/tuning_grid.py`; `tuning.yml` `phase=grid` (a job per league, then a pool job;
 no key, 0 credits). Log line `TUNING_GRID_JSON`.
+
+**Judged read (lead's decision, 8 Nov; added after phase 3's run was dispatched and before any
+of its results were read).**
+- **Model settings** (a phase 3 block that passes, any ridge, ρ or corner α change, LASSO's
+  log-loss gain) are judged once on **2025/26**:
+  - It was never used for match or corner model comparisons, and it is outside the
+    development seasons.
+  - Log loss is scored against today's defaults on the whole season, whose results are complete.
+  - Pinnacle's fair price is the benchmark where football-data has it. About half of 2025/26 is
+    priced in some leagues, so coverage is reported.
+- **Before that read is pre-registered,** check that `xg-good-` holds the 2025/26 Understat files
+  for E0, SP1, D1, I1 and F1, and name any gap. Goalscorer development used 2025/26 player rows;
+  that is a different model and doesn't touch these settings.
+- **2024/25 stays locked for any strategy-level read** (a betting rule's CLV), as the strategy
+  search kept it. It was opened once in October for model comparisons (bake-offs 1 and 3, and
+  corners bake-off 1); the final write-up states both.
+- **Named candidates for that read, if development supports them:** ρ (the 0-0 correction),
+  and corners' α and home–away correlation (Corners' model).
