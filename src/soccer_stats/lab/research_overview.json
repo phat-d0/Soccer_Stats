@@ -110,6 +110,22 @@
    "doc": "docs/lab.md: LASSO on the market residual"
   },
   {
+   "id": "market_moves",
+   "area": "model",
+   "name": "Market-move factor model",
+   "when": "2026-11-08",
+   "verdict": "fail",
+   "question": "Can factors known at the look predict Pinnacle's move from its early price to its close well enough to bet ahead of it?",
+   "sample": "Eight leagues, 2019/20–2023/24; design A at football-data's early price, design B at the ten-book 48 h look (2024/25 not opened)",
+   "measure": "clv",
+   "value": -0.0129,
+   "lo": -0.0183,
+   "hi": -0.0076,
+   "bets": 813,
+   "result": "The move is partly predictable (out-of-sample R² +1.9% in A, +2.8% in B, almost all of it from the books disagreeing at the look), but not past the margin. Rule CLV −1.59% on 1,006 bets (A) and −1.29% on 813 bets (B), both ranges below 0.",
+   "doc": "docs/lab.md: Market-move factor model"
+  },
+  {
    "id": "tuning_ridge",
    "area": "model",
    "name": "Model tuning: a per-league ratings ridge",
