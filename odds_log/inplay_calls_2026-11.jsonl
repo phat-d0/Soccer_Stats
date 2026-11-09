@@ -579,3 +579,5 @@
 {"league":"MEX","kinds":["inplay75"],"kickoffs":["2026-11-09T02:00:00+00:00","2026-11-09T02:10:00+00:00"],"fetched_at":"2026-11-09T03:18:18+00:00","status":200,"cost":1,"credits_left":4959214,"events":2,"rows":5}
 {"league":"NOR","kinds":["inplay55"],"kickoffs":["2026-11-09T18:00:00+00:00"],"fetched_at":"2026-11-09T18:58:22+00:00","status":200,"cost":1,"credits_left":4958851,"events":1,"rows":6}
 {"league":"NOR","kinds":["inplay75"],"kickoffs":["2026-11-09T18:00:00+00:00"],"fetched_at":"2026-11-09T19:18:22+00:00","status":200,"cost":1,"credits_left":4958850,"events":1,"rows":6}
+{"league":"FAC","kinds":["inplay55"],"kickoffs":["2026-11-09T19:30:00+00:00"],"fetched_at":"2026-11-09T20:28:19+00:00","status":200,"cost":1,"credits_left":4958848,"events":1,"rows":4}
+{"league":"SP2","kinds":["inplay55"],"kickoffs":["2026-11-09T19:30:00+00:00"],"fetched_at":"2026-11-09T20:28:19+00:00","status":200,"cost":1,"credits_left":4958847,"events":13,"rows":12}
