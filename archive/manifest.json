@@ -1,7 +1,7 @@
 {
  "tag": "paid-odds-archive",
- "updated": "2026-11-09T09:18:29Z",
- "checked": "2026-11-09T13:06:41Z",
+ "updated": "2026-11-09T16:25:32Z",
+ "checked": "2026-11-09T16:25:32Z",
  "caches": {
   "archive-probe": {
    "name": "archive-probe",
@@ -27,7 +27,7 @@
     ]
    },
    "created": "2026-10-28T14:05:13Z",
-   "checked": "2026-11-09T13:06:41Z"
+   "checked": "2026-11-09T16:25:32Z"
   },
   "comeback-odds": {
    "name": "comeback-odds",
@@ -53,7 +53,7 @@
     ]
    },
    "created": "2026-10-28T20:35:19Z",
-   "checked": "2026-11-09T13:06:41Z"
+   "checked": "2026-11-09T16:25:32Z"
   },
   "odds-history": {
    "name": "odds-history",
@@ -79,7 +79,7 @@
     ]
    },
    "created": "2026-10-28T18:35:04Z",
-   "checked": "2026-11-09T13:06:41Z"
+   "checked": "2026-11-09T16:25:32Z"
   },
   "player-odds-history": {
    "name": "player-odds-history",
@@ -105,7 +105,33 @@
     ]
    },
    "created": "2026-11-09T09:18:15Z",
-   "checked": "2026-11-09T13:06:41Z"
+   "checked": "2026-11-09T16:25:32Z"
+  },
+  "understat-E0": {
+   "name": "understat-E0",
+   "key": "understat-E0-42654398699",
+   "paths": [
+    "data/raw/understat_matches"
+   ],
+   "files": 1608,
+   "bytes": 61420449,
+   "by_path": {
+    "data/raw/understat_matches": 1608
+   },
+   "content_sha256": "b99bd7978b8e4a8f6780e624c90507a55905a569db859e890591fee9150fc235",
+   "archive": {
+    "bytes": 3823893,
+    "sha256": "2752b1437b436754221083add126b309972037a43f8c4c1eb745ccd4267594e8",
+    "parts": [
+     {
+      "asset": "understat-E0.tar.zst",
+      "bytes": 3823893,
+      "sha256": "2752b1437b436754221083add126b309972037a43f8c4c1eb745ccd4267594e8"
+     }
+    ]
+   },
+   "created": "2026-11-09T16:25:10Z",
+   "checked": "2026-11-09T16:25:32Z"
   },
   "xg-good": {
    "name": "xg-good",
@@ -131,7 +157,7 @@
     ]
    },
    "created": "2026-11-07T23:00:04Z",
-   "checked": "2026-11-09T13:06:41Z"
+   "checked": "2026-11-09T16:25:32Z"
   }
  },
  "note": "Paid odds caches packed as tar + zstd release assets on the `paid-odds-archive` tag; content_sha256 covers every file's path, size and sha256, archive.sha256 the whole archive, parts[].sha256 each asset."
