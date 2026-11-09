@@ -362,7 +362,7 @@ def match_model(matches: pd.DataFrame, err, home: str, away: str, date) -> dict:
     from soccer_stats.models.player_goals import FIT_OPTIONS
 
     lo = mm_window(date)
-    m = matches
+    m = matches.sort_values("date").reset_index(drop=True)  # walk_forward's own order
     train = m[(m["date"] < lo) & (m["date"] >= lo - MM_LOOKBACK)]
     counts = pd.concat([train["home"], train["away"]]).value_counts()
     if min(counts.get(home, 0), counts.get(away, 0)) < MM_MIN_TEAM:
@@ -370,7 +370,8 @@ def match_model(matches: pd.DataFrame, err, home: str, away: str, date) -> dict:
     model = DixonColes(xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS).fit(train, as_of=lo)
     eh, ea = model.expected_goals(home, away)
     p = match_odds(model.score_matrix(home, away))
-    return {home: (eh, p["home"] - p["away"]), away: (ea, p["away"] - p["home"])}
+    gs = float(p[0] - p[2])  # [home, draw, away], as walk_forward's p_home - p_away
+    return {home: (float(eh), gs), away: (float(ea), -gs)}
 
 
 def history_info(matches: pd.DataFrame, err, apps: pd.DataFrame, since) -> pd.DataFrame:
@@ -489,6 +490,7 @@ class BSource:
         self._loaded = False
         self.apps = self.matches = self.err = None
         self.info: pd.DataFrame | None = None
+        self.missing = 0  # played matches whose Understat file this run doesn't hold
 
     def load(self) -> bool:
         if self._loaded:
@@ -499,7 +501,7 @@ class BSource:
         from soccer_stats.xg import with_xg
 
         years = range(FIRST_YEAR, current_season() + 1)
-        apps, _ = load_appearances(self.league, years, max_new=0)
+        apps, self.missing = load_appearances(self.league, years, max_new=0)
         season = f"{current_season() % 100:02d}{(current_season() + 1) % 100:02d}"
         if apps.empty or not (apps["season"].astype(str) == season).any():
             return False  # no match files for this season (Understat cache missing)
@@ -646,6 +648,7 @@ def decide(
             DK_KEY: sum(t["strategy"] == DK_KEY for t in out),
         },  # fmt: skip
         **{x: detail.get(x) for x in ("features_through", "block_start", "train_rows", "why")},
+        match_files_missing=getattr(source, "missing", None),
     )
     return out, rec
 

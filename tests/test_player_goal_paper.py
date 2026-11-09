@@ -342,3 +342,47 @@ def test_portfolio_section_and_run_without_a_log(tmp_path):
     json.dumps(out, default=str)
     mm = next(p for p in out if p["id"] == "moneyline")
     assert mm["live"]["trades"] == []
+
+
+def _matches(seed=1):
+    """Football-data-like results for the six clubs, weekly from Aug 2024."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for w in range(115):
+        order = rng.permutation(TEAMS)
+        for j in range(3):
+            rows.append(
+                {
+                    "date": pd.Timestamp("2024-08-10") + pd.Timedelta(days=7 * w),
+                    "home": order[2 * j],
+                    "away": order[2 * j + 1],
+                    "home_goals": int(rng.poisson(1.5)),
+                    "away_goals": int(rng.poisson(1.1)),
+                    "season": "2425",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_match_model_equals_walk_forward():
+    from soccer_stats import backtest
+
+    m = _matches()
+    target = m.iloc[-1]
+    got = pgp.match_model(m, None, target["home"], target["away"], target["date"])
+    lo = pgp.mm_window(target["date"])
+    wf = backtest.walk_forward(m, start=lo, model_factory=_dc)
+    row = wf[(wf["home"] == target["home"]) & (wf["date"] == target["date"])].iloc[0]
+    xg, gs = got[target["home"]]
+    assert xg == pytest.approx(row["exp_home"], rel=1e-9)
+    assert gs == pytest.approx(row["p_home"] - row["p_away"], rel=1e-9)
+    assert got[target["away"]][1] == pytest.approx(-gs)
+
+
+def _dc():
+    import functools
+
+    from soccer_stats.models import DixonColes
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+
+    return functools.partial(DixonColes, xg_weight=0.7, options=FIT_OPTIONS)()

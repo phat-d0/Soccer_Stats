@@ -1924,7 +1924,6 @@ def portfolios_section(
             section["strategies"] = pgp.safe_sections(
                 goalscorer["trades"], goalscorer["defined_at"], now
             )
-            section["rule"] = pgp.rule()
             section["note"] = pgp.RULE_NOTE
             section["features_note"] = pgp.FEATURES_NOTE
         out.append(
