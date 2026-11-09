@@ -1625,7 +1625,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v79) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v80) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1670,8 +1670,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 - **Portfolio** (drill-down lists since v58, owner, 24 Oct; `state.pfLevel` "home" /
   "portfolio" / "strategy", in memory only, `pfLevelOn`): the top level (`pfHomeHtml`) lists one
   row per portfolio (name, status pill, its strategies, live profit of all of them together,
-  settled and open counts) with retired Player shots behind a link; Anytime goalscorer is hidden
-  (`PF_HIDDEN`). A portfolio (`pfFolderHtml`, `data-pfid`) shows crumbs ("‹ Portfolio"), its
+  settled and open counts) with retired Player shots behind a link; `PF_HIDDEN` is empty since
+  v80 (Anytime goalscorer, hidden from 24 Oct, shows again with its paper track). A portfolio (`pfFolderHtml`, `data-pfid`) shows crumbs ("‹ Portfolio"), its
   name, status and note, the competition filter and one row per strategy (`strategyFolders`,
   `data-pfstrat`: full name, `stratMeta`, live profit and record, a "Backtest:" line from
   `backtestHeadline`). Since v59 (owner, 25 Oct) every strategy is its own row, none filed
@@ -2072,6 +2072,27 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   DraftKings' prices, the corners under-60% line, the goals-markets study), only when that page is
   in the build (`rsLink`); otherwise it names its write-up (`doc`). The fixture carries the file
   whole (`make_fixture`), about 1.49 MB in all, 8 Nov.
+- **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows
+  again (`PF_HIDDEN` empty). `live.strategies` = `goalscorer` (main line, model B 20%+ over the
+  best of nine books, the lead) and `goalscorer_dk` (`variant_of`, DraftKings' price only, right
+  after it); their trades are the portfolio's own `trades` (`isGoal`: `bet_type` "goalscorer";
+  `isGoalStrat`: rule `goalscorer_b`); selection `state.pfStratGoal`. Live paper only, with the
+  competition filter; rows say `GOAL_JUDGED` ("Judged once on 1 Feb 2027 (test §16)") in place
+  of a backtest line, and the folder note and the page's box link to the Research card
+  `goalscorer_priced` (`data-rscard`: opens Research, marks the card `.rs-focus`; the card's
+  `RS_LINKS` entry opens the main line). Trade rows: "<player> to score", team · match, the
+  book's odds (American and decimal) "at <book>", B's chance (`p_B`) and edge, CLV best-to-best
+  (`clv_best`; `tradeClv`/`tradeBeat` read `clv_best`/`beat_close`); a void reads "didn't start:
+  stake back"; a stale trade carries "Data up to 30 Sep" (`goalChip`, `features_through`,
+  `goalDay` "31 Oct" from a fixed month list) and the page says "Understat is down, so these
+  chances use player data only up to <date>." (`goalStaleHtml`, the latest stale date, with the
+  section's `features_note` folded). `goalJudgedHtml`: mean CLV best-to-best and against the same
+  book's close over the shown settled trades, "Not judged here", and on DraftKings' line the
+  `compare` table. "Where the price was" counts trades per book (`goalBooksHtml`). Overlay
+  "Best of nine books" / "DraftKings only", marker "track set". Kelly as everywhere (on B's
+  chance). Sheet: `GOAL_FIELDS` (player and team, book, B's chance, break-even, edge, player data
+  up to, best and same-book closes, both CLVs, status with `void_reason`, his goals, result
+  source, the Understat `result_check`).
 - The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
   updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
   the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the
@@ -2095,11 +2116,16 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `uv run python tests/web/make_fixture.py` (synthetic leagues through `publish.build_data`, the real
   ledger and backtests from `origin/data-log` through `paper.run`; fixed `NOW`, reproducible).
   To stay small it trims lists (`LEAN_BETS`, `EDGE12_BETS` 30, `DK_BT_TRADES` 20,
-  `PLAYER_BT_TRADES` 25, `SAMPLE_PLAYERS`); `add_models` rebuilds `portfolio.models` once every
+  `PLAYER_BT_TRADES` 25, `SAMPLE_PLAYERS`, and the player sample's appearances from `APPS_FROM`
+  2025-07-01, 9 Nov); `add_models` rebuilds `portfolio.models` once every
   block is in (the synthetic leagues' fits via `publish.safe_fit_info`, data-log's real
   `match_blends.json` for the blend's numbers) and gives the corners live section a synthetic
   `quote_calibration` (the fixture logs no quotes); synthetic blocks (`add_lean_strategy`, `add_corners`,
-  `add_champions_league`, `STARTED_OPEN`, `add_second_league`) cover states the real data lacks.
+  `add_champions_league`, `STARTED_OPEN`, `add_second_league`, `add_goalscorer`: ten synthetic
+  goalscorer trades through `player_goal_paper._new_trade`, `close_fields` and `settle_fields`,
+  won, lost, a non-starter void, open, three stale, one backcast; `GOALSCORER_TRADES`, the track
+  moved back to 14 Sep / 27 Sep like the line shop's) cover states the real data lacks; about
+  1.44 MB in all, 9 Nov.
 - Smoke test (its `closeSheet` is a no-op when no sheet is open): `node tests/web/smoke.mjs [--shots DIR]` visits every tab, view and sheet at 390px
   light and dark and at 1280px; fails on console errors, horizontal scroll, or "undefined", "NaN"
   or "${" in the text. `tests/test_web_smoke.py` runs it under pytest (skips without node or

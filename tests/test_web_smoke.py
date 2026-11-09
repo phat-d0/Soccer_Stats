@@ -28,7 +28,11 @@ def test_fixture_is_complete():
     assert pf["player_model"]["priced"]["strategies"]
     pfs = {p["id"]: p for p in pf["portfolios"]}
     assert pfs["moneyline"]["live"]["trades"] and pfs["moneyline"]["backtest"]["trades"]
-    assert pfs["goalscorer"]["live"]["summary"]["trades"] == 0  # the empty state
+    # Anytime goalscorer's paper track (owner, 9 Nov): both lines, with stale and void trades.
+    gs = pfs["goalscorer"]["live"]
+    assert [s["key"] for s in gs["strategies"]] == ["goalscorer", "goalscorer_dk"]
+    assert {t["status"] for t in gs["trades"]} == {"won", "lost", "void", "open"}
+    assert any(t["features_stale"] for t in gs["trades"])
     assert pfs["player_shots"]["status"] == "retired" and pfs["player_shots"]["backtest"]
     # Comeback bets (26 Oct): a closed research portfolio, its result passed through publish
     assert pfs["comebacks"]["status"] == "closed" and pfs["comebacks"]["live"]["trades"] == []

@@ -44,6 +44,7 @@ from soccer_stats import corners_live, paper  # noqa: E402
 from soccer_stats import paper_dnb as pdnb  # noqa: E402
 from soccer_stats import paper_lineshop as plsh  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
+from soccer_stats import player_goal_paper as pgp  # noqa: E402
 from soccer_stats import publish as pub  # noqa: E402
 from soccer_stats import trades as tr  # noqa: E402
 from soccer_stats.player_data import season_stats  # noqa: E402
@@ -98,6 +99,7 @@ PLAYER_BT_TRADES = 25  # Player shots (retired) backtest trades kept, newest fir
 DK_BT_TRADES = 20  # Moneyline DraftKings backtest trades kept, newest first (pages of 15)
 LEAN_BETS = 25  # Lean backtest rows kept (the app pages them by 20)
 EDGE12_BETS = 30  # Model 12% backtest rows kept (newest first; every league, the cup too)
+APPS_FROM = "2025-07-01"  # the sample's appearances start here
 SAMPLE_PLAYERS = 35  # players kept from the real detail file (keeps fixtures < 1 MB)
 
 
@@ -263,7 +265,12 @@ def sample_detail(detail: dict, fixtures: list[dict]) -> dict:
     return {
         **{k: v for k, v in detail.items() if k not in ("players", "apps")},
         "players": [p for p in detail["players"] if p["player_id"] in keep],
-        "apps": {k: v for k, v in detail["apps"].items() if k in keep},
+        # Appearances from 2025/26 on (9 Nov: room for the goalscorer track under 1.5 MB).
+        "apps": {
+            k: [a for a in v if a[detail["fields"].index("date")] >= APPS_FROM]
+            for k, v in detail["apps"].items()
+            if k in keep
+        },
     }
 
 
@@ -368,6 +375,7 @@ def build(src: Path, out: Path) -> dict:
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
+    add_goalscorer(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
     # The same for Model 12%'s per-league replay (edge12_backtest.json), keeping a few of
@@ -1845,6 +1853,100 @@ def lineshop_trades() -> list[dict]:
                      result_source="football-data")  # fmt: skip
         out.append(t)
     return out
+
+
+# Anytime goalscorer's paper track (owner-approved 9 Nov; player_goal_paper): its real start
+# (1 Nov) is after the fixture's NOW, so it moves back with the line shop's (backcast from
+# 14 Sep, defined 27 Sep) and the trades are synthetic, built through player_goal_paper's own
+# record (_new_trade, close_fields, settle_fields). Each row: track, league, home, away,
+# kickoff, player, team, book, B's chance, entry odds, best close, same-book close, result
+# ("won", "lost", "void" = not in the XI, None = open), features through (None = fresh).
+GOALSCORER_TRADES = [
+    ("goalscorer", "E0", "Man City", "Everton", "2026-09-20T14:00:00Z", "Erling Haaland",
+     "Man City", "fanduel", 0.612, 2.05, 1.95, 2.00, "won", None),
+    ("goalscorer", "E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "Cole Palmer",
+     "Chelsea", "betmgm", 0.402, 3.10, 3.00, 3.10, "lost", None),
+    ("goalscorer", "SP1", "Betis", "Celta", "2026-09-29T19:00:00Z", "Iago Aspas",
+     "Celta", "draftkings", 0.335, 3.75, 3.80, 3.75, "lost", None),
+    ("goalscorer", "E0", "Arsenal", "Brentford", "2026-10-01T19:00:00Z", "Bukayo Saka",
+     "Arsenal", "betrivers", 0.420, 2.95, 2.80, 2.85, "void", None),
+    ("goalscorer", "E0", "Liverpool", "Spurs", "2026-10-04T14:00:00Z", "Mohamed Salah",
+     "Liverpool", "fanduel", 0.515, 2.40, 2.30, 2.35, "won", "2026-09-30"),
+    ("goalscorer", "SP1", "Sevilla", "Getafe", "2026-10-04T16:00:00Z", "Isaac Romero",
+     "Sevilla", "williamhill_us", 0.310, 3.95, 4.10, 4.00, "lost", "2026-09-30"),
+    ("goalscorer", "E0", "Newcastle", "Wolves", "2026-10-06T12:45:00Z", "Alexander Isak",
+     "Newcastle", "fanduel", 0.480, 2.60, None, None, None, "2026-09-30"),
+    ("goalscorer_dk", "E0", "Chelsea", "Fulham", "2026-09-28T14:00:00Z", "Cole Palmer",
+     "Chelsea", "draftkings", 0.402, 3.00, 3.00, 3.00, "lost", None),
+    ("goalscorer_dk", "SP1", "Betis", "Celta", "2026-09-29T19:00:00Z", "Iago Aspas",
+     "Celta", "draftkings", 0.335, 3.75, 3.80, 3.80, "lost", None),
+    ("goalscorer_dk", "E0", "Liverpool", "Spurs", "2026-10-04T14:00:00Z", "Mohamed Salah",
+     "Liverpool", "draftkings", 0.515, 2.35, 2.30, 2.30, "won", "2026-09-30"),
+]  # fmt: skip
+
+
+def goalscorer_trades() -> list[dict]:
+    """The synthetic goalscorer trades, through player_goal_paper's own steps."""
+    defined = pd.Timestamp(FIXTURE_DNB_FROM)
+    out = []
+    for (key, lg, home, away, ko, player, team, book, p, odds, cbest, csame, res,
+         through) in GOALSCORER_TRADES:  # fmt: skip
+        kick = pd.Timestamp(ko)
+        at = kick - pd.Timedelta(minutes=45)
+        entry = {"home": home, "away": away, "kickoff": kick, "fetched_at": at,
+                 "event_id": f"ev{len(out)}"}  # fmt: skip
+        pid = str(1000 + len(out))
+        name = {"understat": player, "espn": player, "odds": player}
+        detail = {"block_start": "2026-09-01", "train_rows": 41210,
+                  "features_through": through or (kick - pd.Timedelta(days=3)).date().isoformat(),
+                  "features_stale": bool(through)}  # fmt: skip
+        xi = [player] if res != "void" else []
+        lineup = {"home": xi if team == home else [], "away": xi if team == away else [],
+                  "home_at": at.isoformat(), "away_at": at.isoformat()}  # fmt: skip
+        t = pgp._new_trade(key, lg, entry, pid, name, team, p, odds, book, detail, lineup,
+                           defined, entry["fetched_at"] + pd.Timedelta(minutes=2))  # fmt: skip
+        if cbest is not None:
+            close_book = book if csame == cbest else "fanduel"
+            prices = pd.DataFrame([{"player": player, "book": close_book, "yes": cbest},
+                                   {"player": player, "book": book, "yes": csame}])  # fmt: skip
+            close = {
+                "prices": prices,
+                "fetched_at": kick - pd.Timedelta(minutes=6),
+                "kickoff": kick,
+            }
+            t.update(pgp.close_fields(t, close))
+        if res:
+            side = 0 if team == home else 1
+            goals = [{"name": player, "own_goal": False, "team_id": ""}] if res == "won" else []
+            sc = [1, 1] if res == "won" else [0, 2]
+            sc[side] = max(sc[side], len(goals))
+            other = [{"name": "Someone Else", "own_goal": False, "team_id": ""}] * (
+                sum(sc) - len(goals)
+            )
+            result = {"score90": sc, "goals": goals + other}
+            t.update(pgp.settle_fields(t, result, {"home": lineup["home"], "away": lineup["away"]}))
+            t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+            if res == "void":
+                t["result_source"] = "espn"
+        out.append(t)
+    return out
+
+
+def add_goalscorer(data: dict) -> None:
+    """Anytime goalscorer's live section as paper.portfolios_section builds it (its trades in
+    `trades`, the two lines in `strategies`), on the synthetic trades."""
+    pgp.BACKCAST_START = FIXTURE_DNB_STARTED
+    trades = goalscorer_trades()
+    pf = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "goalscorer")
+    live = {**paper.portfolio_section(trades), "error": None}
+    if lg := paper.by_league(trades):
+        live["by_league"] = lg
+    live["strategies"] = pgp.safe_sections(trades, FIXTURE_DNB_FROM, NOW)
+    live["note"] = pgp.RULE_NOTE
+    live["features_note"] = pgp.FEATURES_NOTE
+    for sec in live["strategies"]:
+        sec.pop("calibration", None)  # no Model view (the 1.5 MB cap)
+    pf["live"] = live
 
 
 def add_lean_strategy(data: dict) -> None:

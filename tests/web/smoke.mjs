@@ -592,9 +592,9 @@ const STEPS = [
   }],
   ["portfolio-live", async (p) => {
     await closeSheet(p); await tab("portfolio")(p);
-    // The top level: one folder per portfolio, Anytime goalscorer hidden (owner, 24 Oct).
+    // The top level: one folder per portfolio (Anytime goalscorer shown again since 9 Nov).
     const folders = await p.locator("#view button[data-pfid]:not(.linkish)").evaluateAll((els) => els.map((e) => e.dataset.pfid));
-    if (folders.join(",") !== "moneyline,corners,comebacks") throw new Error(`portfolio folders: ${folders.join(",")}`);
+    if (folders.join(",") !== "moneyline,goalscorer,corners,comebacks") throw new Error(`portfolio folders: ${folders.join(",")}`);
     if (!(await p.locator('#view button.linkish[data-pfid="player_shots"]').count())) throw new Error("retired link missing");
     await p.click('button[data-pfid="moneyline"]');
     // Moneyline's folders: one per strategy, the old rule filed under Lean.
@@ -1183,12 +1183,13 @@ const STEPS = [
   // The DraftKings backtest's own trades: Model 12% under the Premier League.
   ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await pfOpenStrat(p, "edge12"); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  // Anytime goalscorer is hidden while paused (owner, 24 Oct): no folder for it at the top.
+  // Anytime goalscorer shows again (owner, 9 Nov): its folder leads with the main line.
   ["portfolio-top", async (p) => {
     // Tapping the Portfolio tab again goes back to the top level.
     await closeSheet(p); await tab("portfolio")(p);
     if (await p.locator(".crumbs").count()) throw new Error("the Portfolio tab didn't go back to the top");
-    if (await p.locator('#view button[data-pfid="goalscorer"]').count()) throw new Error("goalscorer folder should be hidden");
+    const gRow = (await p.locator('#view button[data-pfid="goalscorer"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Anytime goalscorer", "In testing", "Lead: Anytime goalscorer, model B at 20%", "1 more"]) if (!gRow.includes(w)) throw new Error(`goalscorer folder lacks "${w}": ${gRow}`);
     const text = await p.textContent("#view");
     for (const w of ["Moneyline", "Team corners", "Lead: Model (f) vs DraftKings", "1 more", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
   }],
@@ -1544,6 +1545,65 @@ const STEPS = [
     const box = (await p.textContent(".ls-compare")).replace(/\s+/g, " ");
     for (const w of ["Compared with Line shop vs Pinnacle", "descriptive", "1% gap", "2% gap (judged)", "CLV vs Pinnacle", "Descriptive only: the 1% line enters"]) if (!box.includes(w)) throw new Error(`1% compare lacks "${w}": ${box}`);
     if (await p.locator(".ls-judged").count()) throw new Error("the 1% line shows the judged box");
+  }],
+  // Anytime goalscorer's paper track (owner-approved 9 Nov): the main line (model B at 20%
+  // over the best of nine books) then DraftKings' line; live paper only, not judged here (its
+  // test is read once on 1 Feb 2027), linked both ways with its Research card.
+  ["portfolio-goalscorer", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "goalscorer"); await p.click('.chip[data-league=""]');
+    const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
+    if (strats.join(",") !== "goalscorer,goalscorer_dk") throw new Error(`goalscorer lines: ${strats.join(",")}`);
+    const row = (await p.locator('button[data-pfstrat="goalscorer"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Anytime goalscorer, model B at 20%", "Live since Sep 27 · model B 20%+ over the best of 9 books · descriptive · backcast from Sep 14", "Judged once on 1 Feb 2027 (test §16)"]) if (!row.includes(w)) throw new Error(`goalscorer row lacks "${w}": ${row}`);
+    if (row.includes("Backtest:")) throw new Error("the goalscorer row shows a backtest line");
+    const dk = (await p.locator('button[data-pfstrat="goalscorer_dk"]').innerText()).replace(/\s+/g, " ");
+    if (!dk.includes("Descriptive · the same rule at DraftKings' price only · never judged")) throw new Error(`DraftKings row: ${dk}`);
+    if (!(await p.locator(`.goal-folder-note button[data-rscard="goalscorer_priced"]`).count())) throw new Error("the folder note should link to the Research card");
+    await p.click('button[data-pfstrat="goalscorer"]');
+    if (await p.locator('button[data-pf="backtest"], button[data-pf="model"]').count()) throw new Error("the goalscorer track has Live paper only");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["descriptive: judged once on 1 Feb 2027 (test §16)", "Understat is down, so these chances use player data only up to 30 Sep.", "3 of 7 trades carry the \"Data up to\" mark",
+      "Closing line value so far", "Best price to best close", "Same book's close", "Not judged here.", "The test is judged once on 1 Feb 2027 (test §16), on its own data",
+      "Where the price was", "FanDuel 3", "Erling Haaland to score", "Man City · Man City v Everton", "+105 (2.05) at FanDuel · B 61.2% · edge +25.5%", "best-to-best",
+      "didn't start: stake back", "1 void (didn't start)", "Data up to 30 Sep", "model B × the price − 1"]) if (!text.includes(w)) throw new Error(`goalscorer view lacks "${w}"`);
+    if ((await p.locator("#view .trade-row .chip-stale").count()) !== 3) throw new Error("stale chips");
+    if ((await p.locator("#view .trade-row .chip-backcast").count()) !== 1) throw new Error("goalscorer backcast chip");
+    const rows = await p.locator("#view .trade-row").count();
+    if (rows !== 7 || (await p.locator("#view .trade-row .kcol").count()) !== rows) throw new Error("every goalscorer row should carry its ¼ Kelly column");
+    const legend = await p.locator(".pf-curve .curve-legend").innerText();
+    if (!legend.includes("Best of nine books") || !legend.includes("DraftKings only")) throw new Error(`goalscorer legend: ${legend}`);
+    // A competition narrows the rows and the stale note.
+    await p.click('.chip[data-league="SP1"]');
+    if ((await p.locator("#view .trade-row").count()) !== 2) throw new Error("La Liga goalscorer rows");
+    await p.click('.chip[data-league=""]');
+  }],
+  ["portfolio-goalscorer-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Man City|Everton|goal|1000"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Erling Haaland to score", "Man City v Everton", "Erling Haaland to score, any time", "Erling Haaland (Man City)", "Backcast", "best of nine books", "FanDuel", "Model B's chance", "61.2%", "Best price at the close", "CLV, best to best", "CLV vs the same book", "His goals", "Player data up to"]) if (!text.includes(w)) throw new Error(`goalscorer sheet lacks "${w}"`);
+    for (const w of ["Team news applied", "Model 12%", "Without team news", "undefined"]) if (text.includes(w)) throw new Error(`goalscorer sheet shows "${w}"`);
+  }, true],
+  ["portfolio-goalscorer-void", async (p) => {
+    await closeSheet(p);
+    await p.click('button[data-trade="E0|2627|Arsenal|Brentford|goal|1003"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    if (!text.includes("Void: not in ESPN's starting XI, stake back")) throw new Error("void goalscorer sheet");
+    if (text.includes("His goals")) throw new Error("a non-starter has no goals row");
+  }, true],
+  ["portfolio-goalscorer-dk", async (p) => {
+    await closeSheet(p); await pfOpenStrat(p, "goalscorer_dk");
+    const box = (await p.textContent(".goal-judged")).replace(/\s+/g, " ");
+    for (const w of ["Compared with Anytime goalscorer, model B at 20%", "DraftKings only", "Best of nine books", "This line is descriptive and never judged", "DraftKings' quotes (its only book)"]) if (!box.includes(w)) throw new Error(`DraftKings line lacks "${w}": ${box}`);
+    if ((await p.locator("#view .trade-row").count()) !== 3) throw new Error("DraftKings line rows");
+  }],
+  // Both ways with the Research tab: the page's link opens the test's card; the card opens the page.
+  ["portfolio-goalscorer-research", async (p) => {
+    await p.click('.goal-judged button[data-rscard="goalscorer_priced"]');
+    if (!(await p.locator('.tabbar button[data-tab="research"].active').count())) throw new Error("the link should open Research");
+    if ((await p.locator('.rs-card.rs-focus[data-rsid="goalscorer_priced"]').count()) !== 1) throw new Error("the goalscorer card should be marked");
+    await p.click('.rs-card[data-rsid="goalscorer_priced"] [data-rsgo]');
+    if (!(await p.locator('.tabbar button[data-tab="portfolio"].active').count())) throw new Error("the card should open Portfolio");
+    if (!(await p.locator(".pf-title").innerText()).includes("Anytime goalscorer, model B at 20%")) throw new Error("the card should open the main line");
   }],
   // Bet alerts (owner, 5 Nov): the control at the foot of Portfolio's top level, in each
   // state (push itself can't run headless), and a tapped alert's link opening its trade.
