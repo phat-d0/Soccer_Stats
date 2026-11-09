@@ -1275,6 +1275,39 @@ saves its own shard back from the default branch only, and only when it added fi
 copy with fewer files than were restored is never saved. The shards are kept alive and
 archived (`cache_archive.ARCHIVED_FREE`).
 
+### Note, 2026-11-09: a live paper track beside the test (owner-approved; descriptive, no outcome read)
+
+The owner asked for §16's rule to run live as a paper track under Portfolio → Anytime
+goalscorer (`player_goal_paper.py`). It is display only: **the judged read above is
+unchanged**. It is still read once, on 1 Feb 2027, from the rows this section defines, and
+nothing in the track feeds it.
+
+The track uses the frozen rule with no new parameters: B, T = 20%, the best Yes over the nine
+bookmakers, $10, and the entry and close snapshots of the live log. Beside it a DraftKings-only
+line runs the same rule at DraftKings' price (descriptive). It reads only what publish already
+logs and costs 0 credits.
+
+Where a live bet can differ from the judged rule's (sent to the lead before the build):
+1. **Features while Understat is down.** B's features for a match after the last match file
+   held see nothing later. Each trade records `features_through`. The judged read recomputes
+   with full files.
+2. **Starters.** ESPN's XI at the entry (data-log `team_news/`), not Understat's after the
+   match. A listed starter who didn't start is void.
+3. **Names.** ESPN's and the books' names map to Understat ids through each club's earlier
+   appearances, not the match's own rosters.
+4. **Position.** A starter's position is his last starting position.
+
+Everything else is computed as the judged read computes it:
+- B's 28-day blocks from 10 Oct;
+- 730 days of training before the block's first kickoff;
+- the match model's team xG from `backtest.walk_forward`'s weekly grid (a test checks they
+  are equal);
+- B rounded to 6 decimals.
+
+Settlement uses ESPN's goal details (own goals left out); football-data has no scorers.
+The track is backcast from 1 Nov, the live log's first day, on the logged entry snapshots
+only (never the bought history), and starts at its `defined_at`.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes

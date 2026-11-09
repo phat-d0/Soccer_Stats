@@ -491,6 +491,7 @@ class BSource:
         self.apps = self.matches = self.err = None
         self.info: pd.DataFrame | None = None
         self.missing = 0  # played matches whose Understat file this run doesn't hold
+        self.seasons_missing: list[str] = []  # league-seasons with no Understat league file
 
     def load(self) -> bool:
         if self._loaded:
@@ -501,7 +502,19 @@ class BSource:
         from soccer_stats.xg import with_xg
 
         years = range(FIRST_YEAR, current_season() + 1)
-        apps, self.missing = load_appearances(self.league, years, max_new=0)
+        frames = []
+        for y in years:  # one season at a time: a missing league file costs only its season
+            try:
+                a, miss = load_appearances(self.league, [y], max_new=0)
+            except Exception as exc:  # noqa: BLE001  e.g. Understat's maintenance page
+                self.seasons_missing.append(f"{y}/{(y + 1) % 100:02d} ({type(exc).__name__})")
+                continue
+            self.missing += miss
+            if not a.empty:
+                frames.append(a)
+        apps = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        if not apps.empty:
+            apps = apps.sort_values(["kickoff", "match_id", "team"]).reset_index(drop=True)
         season = f"{current_season() % 100:02d}{(current_season() + 1) % 100:02d}"
         if apps.empty or not (apps["season"].astype(str) == season).any():
             return False  # no match files for this season (Understat cache missing)
@@ -649,6 +662,7 @@ def decide(
         },  # fmt: skip
         **{x: detail.get(x) for x in ("features_through", "block_start", "train_rows", "why")},
         match_files_missing=getattr(source, "missing", None),
+        seasons_missing=getattr(source, "seasons_missing", None),
     )
     return out, rec
 
@@ -937,9 +951,13 @@ def run(log_dir: Path, now: pd.Timestamp, leagues=LEAGUES, sources=None, result_
     for lg in leagues:
         ledger = load_ledger(log_dir, lg)
         src = (sources or {}).get(lg)
-        ev, rc, c = update_league(
-            ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src, result_fn
-        )
+        try:  # one league's failure costs only that league this run
+            ev, rc, c = update_league(
+                ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src, result_fn
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Goalscorer paper track: {lg} not updated ({type(exc).__name__}: {exc})"[:300])
+            ev, rc, c = [], [], {"error": type(exc).__name__}
         events += ev
         recs += rc
         counts[lg] = c

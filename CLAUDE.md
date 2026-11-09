@@ -141,7 +141,17 @@ so B runs only in E0 until Understat returns. The 1 Nov scored rows (all five le
 matches through 1 Nov (§16 note of 8 Nov).
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
 `player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
-False`, so no player paper trades open.
+False`, so no player shot trades open.
+**Goalscorer paper track** (owner-approved 9 Nov; `player_goal_paper.py`; descriptive, never
+feeds §16's 1 Feb read): §16's frozen rule run live on what publish logs. Model B for each
+starter ESPN confirmed by the entry snapshot, best Yes over the nine bookmakers at a 20% edge,
+$10, one trade per player per match; a DraftKings-only line beside it (`goalscorer_dk`). Closes
+on the close snapshot (CLV best-to-best and same-book), settles on ESPN's goal details (own
+goals out; not in the XI = void). Backcast from 1 Nov (the live log's start), `defined_at` = the
+first paper run after the merge. E0 only until Understat returns: B needs the match files, and
+E0's sit only in publish's `raw-data-` cache (the `understat-E0-` shard missed on 9 Nov). While
+Understat is down, B's features stop at the last match file (`features_through` on each trade).
+Shown under Portfolio → Anytime goalscorer once UI Design unhides it.
 
 **Bet alerts** (owner, 5 Nov; `push/README.md`): a phone alert, once per trade, when Blend
 Lean (rule_version 2) or Model (f) vs DraftKings corners under 60% opens a paper trade. Web
@@ -387,7 +397,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
-| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, espn, understat, understat-restore, understat-backfill. Other inputs: `cap` (credit cap for coverage, props, corner-markets, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev, forward or gaps). | 0 except the capped tasks |
+| `odds-check.yml` | Diagnostics and research; never pushes. `task`: coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, heavy-favourites, timelines-fetch, timelines, inplay-probe, dk-history, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, espn, understat, understat-restore, understat-backfill. Other inputs: `cap` (credit cap for coverage, props, corner-markets, goalscorer, goalscorer-probe, goalscorer-backfill, markets, corner-history, inplay-probe, comeback-fetch, dk-history; 0 = dry run; only these get the key), `league`, `leagues` (markets/espn: e.g. `E2,E3` or `UCL,UEL,UECL`, with free name checks), `reason` (opens a locked holdout or forward window once), `finalists`, `holdout_season`, `stack_base`, `after` (team-totals confirmation), `hist_dates`, `seasons`, `design` (comeback-fetch / comebacks2: B or C; goalscorer-backfill: dev, forward or gaps). | 0 except the capped tasks |
 | `caches.yml` | Keep-alive and the paid-odds archive (owner, 28 Oct; `docs/caches.md`). Mondays and Thursdays 04:23 UTC (twice a week: a margin against the 7-day eviction) plus dispatch (`archive`, default on; `test_fallback`). `keepalive` (matrix): restores every cache with its exact key prefix and paths, logging hit or miss, files and size; warns when a paid cache missed. Packs each paid cache (`cache_archive.PAID`) as tar + zstd and, on the default branch, replaces its asset on the release `paid-odds-archive` only when `content_sha256` changed. `manifest` writes data-log `archive/manifest.json`; `verify` downloads every asset back and checks its sha256; `usage` lists every cache against the 10 GB limit and flags prefixes not kept alive; `fallback-test` forces a miss (dummy key) and rebuilds each paid cache from the archive. A push to a `team/` or `lead/` branch that edits it runs a dry run (no upload, no data-log write). | 0 (no key) |
 | `goalscorer-test.yml` | Priced goalscorer test (§16), step 3: dispatch only (`design` dev). Matrix job per league (E0, SP1, D1, I1, F1): restores `raw-data-`, `understat-<league>-` and the paid `player-odds-history-` (with the archive fallback), runs `goalscorer-dev`; a pool job downloads the five artifacts and runs `goalscorer-dev-pool` (T by the volume rule, development-only description). No key, never pushes. | 0 |
 | `tuning.yml` | Model tuning programme (Research lab 2, 8 Nov; `docs/lab.md`): dispatch with `phase` (`bias` = phase 1, `ceiling` = phase 2, `grid` = phase 3); a job per league (restores `raw-data-`, `xg-good-` with the archive fallback and `understat-<league>-`; `ceiling` also the paid `odds-history-`, restore only, with the archive fallback), then a pool job. No key, never pushes; results in the log and a 7-day artifact. | 0 |
@@ -707,7 +717,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   kelly (full f*), fraction (the stake ÷ the bankroll at open, 0 with no stake), capped?, bankroll_before, stake,
   status, push?, profit, bankroll_after, reason? ("no edge on the chance" / "no chance" / "no
   bankroll", only with no stake), flat_profit}` (flags and reason only when set);
-  `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push), the line shop Pinnacle's fair chance (`p_source` "pinnacle_fair" sizes on `model_p`).
+  `chance`: Lean `p_bet`, Model 12% `p_blend`, corners model_p ÷ (1 − p_push), the line shop Pinnacle's fair chance (`p_source` "pinnacle_fair" sizes on `model_p`), the
+  goalscorer track model B's (`p_source` "model_b", also `model_p`).
   `backtest_sizing(df, p_col, p_source, raw_col=, lead=)` (open = kickoff − `BACKTEST_LEAD` 4
   days, 0 at the close; no stakes kept).
 - `calibration.py`: `reliability(pred, won, implied=None, edges=EDGES, min_n=20, groups=None,
@@ -1120,6 +1131,38 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   book and player (Yes/No, `minutes_before`, `lineup_confirmed`, `first_confirmed_at`); `log`
   (CLI `log-goalscorer`) appends data-log `odds_log/<code>_goalscorer_<YYYY-MM>.jsonl` and
   `goalscorer_calls_<YYYY-MM>.jsonl`; `load_rows`. Log line "Goalscorer prices: …".
+- `player_goal_paper.py` (owner-approved 9 Nov; §16's rule as a live paper track,
+  descriptive): `KEY` "goalscorer" (best of `JUDGED_BOOKS`) and `DK_KEY` "goalscorer_dk"
+  (DraftKings only, `variant_of`), T = `T_JUDGED`, $10, ids `<code>|<season>|<home>|<away>|goal|
+  <player_id>` (+ "|dk"), `bet_type` "goalscorer", `portfolio` "goalscorer", `p_source`
+  "model_b" (sizing on `model_p`).
+  - `snapshots(rows, league, kind)`: the live log's first answered entry/close per event;
+    `best_prices`; `lineup_at(news, …, at=)`: ESPN's confirmed XI from data-log `team_news/`
+    fetched by the entry.
+  - B as the judged read: `b_block` (28-day blocks from `FORWARD_START`), `mm_window` (the
+    match model's weekly grid from 2022-07-01), `match_model` (= `backtest.walk_forward`'s
+    team xG and game state for one fixture; a test checks equality), `history_info`
+    (walk_forward from the window 760 days before the block), `starter_chances` (placeholder
+    rows after each starter's history, `goal_features(build_features(…))`, `GoalscorerModel`
+    on the block's 730 days, `MIN_PREV_APPS`; a test checks later matches change nothing).
+    `BSource` loads Understat appearances from 2021/22 (`max_new=0`), football-data and xG
+    once per run, only when a match needs deciding; no current-season files = the match
+    waits (`no_data`).
+  - `decide`: names → Understat ids through each club's earlier appearances
+    (`match_in_fixture`), the rule, one record per match in data-log
+    `paper_trades/goalscorer_checked.jsonl` (bets or not; never decided twice).
+    `update_league`/`run` decide, close (`close_fields`: `close_best`, `close_book`,
+    `close_same`, `clv_best`, `clv_same`) and settle (`espn_match` on espn_results'
+    scoreboard, `goal_events`, `settle_fields`; goals must add up to the score; 14 days
+    without a result = void). Entries before `defined_at` (`goalscorer_defined.json`) or
+    decided after kickoff are backcast (`backcast_from` "goalscorer_log").
+  - `sections`: `paper.strategy_section` per line plus `defined_at`, `note`, `features_note`,
+    `descriptive`, `clv`, `backcast` (from 1 Nov) and the DraftKings line's `compare`.
+    `paper.run` calls `run` after the line shop (a failure costs only this track) and
+    `portfolios_section(goalscorer=)` gives Anytime goalscorer's live section its
+    `strategies`. Ledger `paper_trades/<code>_goalscorer_<season>.jsonl` (out of
+    `paper.load_ledger`). Log line "Goalscorer paper track: …". CLI `goalscorer-paper
+    --log-dir` (`odds-check.yml` `task=goalscorer-paper`: a dry run on a copy of data-log).
 - `player_goal_odds.py` (goalscorer probe and pilot; `CappedBudget`), `player_lab.py` (shot lines on
   the lab harness, development only), `player_segments.py` (segment search).
 
