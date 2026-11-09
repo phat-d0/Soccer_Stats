@@ -358,12 +358,14 @@ on 4 Nov; trigger ids):
 KV id in `push/wrangler.jsonc`, four Worker secrets, `ALERT_URL`/`ALERT_TOKEN` repo secrets, then
 "Turn on" in the home-screen app). Until then each publish logs "Bet alerts: off".
 
-**Waiting on Understat** (down since 2 Nov; Moneyline checks daily, next 9 Nov 11:31 UTC): when it
+**Waiting on Understat** (down since 2 Nov; Moneyline checks daily, next 10 Nov 11:34 UTC): when it
 returns, Moneyline runs `odds-check.yml` `task=understat-backfill` (`seasons=2017-2025`) on the
 default branch, then reruns the three backtests (`backfill.yml` `lean_backtest`, `edge12_backtest`
 (a run of its own: it is skipped when `lean_backtest` is set) and `dk_price_backtest`) for I1
-2022/23's xG, and dispatches `task=goal-league` for SP1, D1, I1 and F1 on the default branch so
-Player props has goalscorer B's match files again (they fill the `understat-<league>-` shards).
+2022/23's xG, and dispatches `task=goal-league` for E0, SP1, D1, I1 and F1 on the default branch so
+Player props has goalscorer B's match files again (they fill the `understat-<league>-` shards;
+E0's was seeded on 9 Nov from publish's raw-data, about the last three seasons only, so its
+2021/22–2023/24 files need refilling too).
 The residual map already covers all eight leagues (run 42424591226) and the owner's "Model vs
 Market Map" (https://claude.ai/artifact/B731FfXCrdhqJuYEdtqYdV) shows them; only I1 2022/23
 there is goals-only. The Wayback Machine can't rebuild the match files (14.7% of played matches
