@@ -991,3 +991,10 @@ details.drv-fold { margin-top: 10px; }
 .row-btn.trade-row .meta { text-overflow: clip; }
 .row-btn.trade-row .meta .nowrap { display: inline-block; max-width: 100%; white-space: normal; }
 .kelly-row { color: var(--text-secondary); }
+
+/* Anytime goalscorer (v80): a trade whose chance used stale player data (Understat down). */
+.chip-stale { border-style: solid; border-color: var(--text-muted); }
+.goal-judged .goal-compare-head { margin-top: 12px; }
+.goal-judged-note .linkish, .goal-folder-note .linkish { white-space: nowrap; }
+/* A Research card opened from a Portfolio page. */
+.rs-card.rs-focus { box-shadow: 0 0 0 2px var(--accent, var(--pos)); }
