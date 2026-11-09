@@ -574,8 +574,10 @@ PORTFOLIOS = [
         "name": "Anytime goalscorer",
         "status": "testing",
         "note": "Testing: the model predicts scorers better than season averages in all five "
-        "leagues tested, but bookmakers price 'to score' about 50% above how often players "
-        "score, so there are no trades. A forward check on this season runs in December.",
+        "leagues tested. A priced test against the bookmakers' 'to score' prices is read once, "
+        "on 1 Feb 2027. Beside it, a paper track runs the test's rule live ($10 when the "
+        "model's chance x the best price is 20% above even), for display only: it never "
+        "changes the test's result.",
         "backtest": "goalscorer",
     },
     {

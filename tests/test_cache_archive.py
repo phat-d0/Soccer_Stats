@@ -299,8 +299,9 @@ def test_every_archived_free_restore_is_followed_by_a_soft_fallback():
         found += 1
     # xg-good: publish, players, goalscorer-test, backfill, odds-check, tuning (6); the
     # Understat match-file shards (lead, 8 Nov): five each in goalscorer-test, odds-check
-    # and tuning, the E0 shard in players (16).
-    assert found == 22
+    # and tuning, the E0 shard in players and publish (17; publish restores it for the
+    # goalscorer paper track, lead 9 Nov).
+    assert found == 23
 
 
 # ---------- bought data can't be left out of the archive ----------

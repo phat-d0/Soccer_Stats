@@ -44,6 +44,7 @@ from soccer_stats import odds_feed
 from soccer_stats import odds_log as ol
 from soccer_stats import paper_dnb as pdnb
 from soccer_stats import paper_lineshop as plsh
+from soccer_stats import player_goal_paper as pgp
 from soccer_stats import sizing as sz
 from soccer_stats import trades as tr
 from soccer_stats.player_odds import PLAYER_BOOKMAKER_NAME
@@ -103,8 +104,8 @@ def ledger_dir(log_dir: Path) -> Path:
 
 
 def _is_match_ledger(path: Path, league: str) -> bool:
-    """A league's match ledger file, not its corners ledger, Lean shadow, draw no bet or
-    line-shop file."""
+    """A league's match ledger file, not its corners ledger, Lean shadow, draw no bet,
+    line-shop or goalscorer file."""
     name = path.name
     return not name.startswith(
         (
@@ -112,6 +113,7 @@ def _is_match_ledger(path: Path, league: str) -> bool:
             f"{league}_lean_shadow_",
             f"{league}_dnb_",
             f"{league}_lineshop_",
+            f"{league}_goalscorer_",
         )
     )
 
@@ -1828,6 +1830,7 @@ def portfolios_section(
     dnb_trades: list[dict] | None = None,
     dnb_rules: dict[str, dict] | None = None,
     lineshop: dict | None = None,
+    goalscorer: dict | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1850,7 +1853,9 @@ def portfolios_section(
     (tr.DNB_TRACKS) follows its parent's sections (paper_dnb.section, rule from
     `dnb_rules`: track -> paper_dnb.overview). `lineshop` ({trades, defined_at}: the
     line-shop track, paper_lineshop) adds its two sections right after Blend Lean's and
-    goes on it as `lineshop_trades`, never in its `trades` or summary.
+    goes on it as `lineshop_trades`, never in its `trades` or summary. `goalscorer`
+    ({trades, defined_at}: player_goal_paper, owner 9 Nov) gives Anytime goalscorer's live
+    section its two `strategies` (its trades are passed in `live_trades`).
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1915,6 +1920,12 @@ def portfolios_section(
             section["dnb_trades"] = portfolio_section(dnb_trades or [])["trades"]
             if lineshop is not None:
                 section["lineshop_trades"] = portfolio_section(lineshop["trades"])["trades"]
+        if p["id"] == "goalscorer" and goalscorer is not None:
+            section["strategies"] = pgp.safe_sections(
+                goalscorer["trades"], goalscorer["defined_at"], now
+            )
+            section["note"] = pgp.RULE_NOTE
+            section["features_note"] = pgp.FEATURES_NOTE
         out.append(
             {
                 **{k: p[k] for k in ("id", "name", "status", "note")},
@@ -2051,6 +2062,7 @@ def run(
     }
     dnb_trades: list[dict] = []
     lineshop: dict | None = None
+    goalscorer: dict | None = None
     portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
@@ -2146,6 +2158,12 @@ def run(
                 written += n
             except Exception as exc:  # noqa: BLE001  never costs the match ledger
                 print(f"Line shop track not updated ({type(exc).__name__}: {exc})")
+            try:  # the goalscorer paper track (§16's rule, descriptive): its own ledger
+                goalscorer = pgp.run(log_dir, now)
+                written += goalscorer["events"]
+                print(pgp.summary_line(goalscorer))
+            except Exception as exc:  # noqa: BLE001  never costs the match ledger
+                print(f"Goalscorer paper track not updated ({type(exc).__name__}: {exc})")
             live.update(portfolio_section(live_trades), note=note)
             try:  # the corners portfolio: its own ledger, rows and results
                 n, corner_trades = _run_corners(
@@ -2205,7 +2223,7 @@ def run(
     corner_section["strategies"] = corner_strategies(corner_trades, now)
     portfolio["portfolios"] = portfolios_section(
         live,
-        live_trades + corner_trades,
+        live_trades + corner_trades + (goalscorer["trades"] if goalscorer else []),
         backtests,
         rule,
         {"corners": corner_section},
@@ -2218,6 +2236,7 @@ def run(
             for track in tr.DNB_TRACKS.values()
         },
         lineshop=lineshop,
+        goalscorer=goalscorer,
     )
     return written
 
