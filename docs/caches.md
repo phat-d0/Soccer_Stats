@@ -180,6 +180,12 @@ goalscorer runs downloaded every match file and saved none, so B lost four leagu
   default branch. It counts the files after the restores (`UM_BEFORE`) and saves only when
   the count grew, so a copy with fewer files than were restored is never kept.
   `tests/test_cache_archive.py` checks every shard save for this.
+- **Seeding** (lead, 9 Nov): `understat-E0-` was never saved (players.yml restored an empty
+  shard while Understat was down, so nothing grew), and caches.yml's keep-alive missed it on
+  9 Nov. E0's match files were then only in publish's `raw-data-`. `odds-check.yml`
+  `task=understat-seed` (`league`, default E0) restores every shard, counts them, then
+  restores `raw-data-` and saves `data/raw/understat_matches` as that league's shard when the
+  count grew, from the default branch only, and dispatches caches.yml to archive it.
 - **Kept alive and archived:** each shard has a keep-alive row and is in
   `cache_archive.ARCHIVED_FREE`. Every restore is followed by the soft archive fallback.
 - **Extra assets** (`archive/extra_assets.json`): files on the release that no cache holds,
