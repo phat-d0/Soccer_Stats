@@ -16,3 +16,6 @@
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"3885e90049f2430c338ff29a68c0bb47","home":"Hannover 96","away":"Greuther F\u00fcrth","kickoff":"2026-11-21T12:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"fbef2faa35a94ff9b71cbbb4767e8b51","home":"FC Energie Cottbus","away":"Hertha Berlin","kickoff":"2026-11-22T12:30:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"1773ac462fd3a3c4f0106f744117a936","home":"Karlsruher SC","away":"VfL Osnabr\u00fcck","kickoff":"2026-11-22T12:30:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"1019c0b1ba87577a71ca1b80838205b5","home":"VfL Wolfsburg","away":"Holstein Kiel","kickoff":"2026-11-21T12:00:00+00:00","fetched_at":"2026-11-09T19:34:02+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"65c5849bfaa93710e190b460c40207a2","home":"FC St. Pauli","away":"VfL Bochum","kickoff":"2026-11-21T19:30:00+00:00","fetched_at":"2026-11-09T19:34:02+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"7ca047be895023baacc7727543d12658","home":"1. FC Kaiserslautern","away":"Dynamo Dresden","kickoff":"2026-11-22T12:30:00+00:00","fetched_at":"2026-11-09T19:34:02+00:00"}
