@@ -58,6 +58,18 @@ jobs:
           key: raw-data-${{ github.run_id }}
           restore-keys: raw-data-
 
+      # E0's Understat match files (the goalscorer paper track's model B, lead 9 Nov):
+      # restore only, never saved here (raw-data, saved above, carries them on).
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/understat_matches
+          key: understat-E0-none
+          restore-keys: understat-E0-
+      - uses: ./.github/actions/paid-archive-restore
+        continue-on-error: true # free data: a failed rebuild never stops the job
+        with:
+          name: understat-E0
+
       # The last good copy of each Understat league file (xg.GOOD_DIR): only files that
       # passed the JSON check are ever written there, so a stale raw-data cache holding
       # Understat's maintenance page can't cost the season's xG. Saved below, under a key

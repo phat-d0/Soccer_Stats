@@ -1289,8 +1289,10 @@ logs and costs 0 credits.
 
 Where a live bet can differ from the judged rule's (sent to the lead before the build):
 1. **Features while Understat is down.** B's features for a match after the last match file
-   held see nothing later. Each trade records `features_through`. The judged read recomputes
-   with full files.
+   held see nothing later. Each trade records `features_through` and `features_stale`, and
+   the sections count the stale ones. The judged read recomputes with full files. Entries are
+   never rewritten; once Understat is back each settled trade gets a `result_check` against
+   its goals (lead, 9 Nov).
 2. **Starters.** ESPN's XI at the entry (data-log `team_news/`), not Understat's after the
    match. A listed starter who didn't start is void.
 3. **Names.** ESPN's and the books' names map to Understat ids through each club's earlier

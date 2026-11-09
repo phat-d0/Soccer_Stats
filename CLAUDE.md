@@ -149,8 +149,13 @@ $10, one trade per player per match; a DraftKings-only line beside it (`goalscor
 on the close snapshot (CLV best-to-best and same-book), settles on ESPN's goal details (own
 goals out; not in the XI = void). Backcast from 1 Nov (the live log's start), `defined_at` = the
 first paper run after the merge. E0 only until Understat returns: B needs the match files, and
-E0's sit only in publish's `raw-data-` cache (the `understat-E0-` shard missed on 9 Nov). While
-Understat is down, B's features stop at the last match file (`features_through` on each trade).
+E0's sit in publish's `raw-data-` cache (the `understat-E0-` shard missed on 9 Nov; publish now
+restores it, restore only). While Understat is down, B's features stop at the last match file:
+each trade records `features_through` and `features_stale`, and the sections count them
+(`stale_features`); entries are never rewritten when Understat returns, but each settled trade
+then gets a `result_check` against Understat's goals. B is fitted once per 28-day block
+(cached in `data/raw/goalscorer_paper/`, carried by raw-data) and the model work has a 120 s
+budget per paper run (lead, 9 Nov).
 Shown under Portfolio → Anytime goalscorer once UI Design unhides it.
 
 **Bet alerts** (owner, 5 Nov; `push/README.md`): a phone alert, once per trade, when Blend
@@ -1145,19 +1150,27 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     (walk_forward from the window 760 days before the block), `starter_chances` (placeholder
     rows after each starter's history, `goal_features(build_features(…))`, `GoalscorerModel`
     on the block's 730 days, `MIN_PREV_APPS`; a test checks later matches change nothing).
-    `BSource` loads Understat appearances from 2021/22 (`max_new=0`), football-data and xG
-    once per run, only when a match needs deciding; no current-season files = the match
-    waits (`no_data`).
+    `BSource` loads Understat appearances from 2021/22 one season at a time (`max_new=0`;
+    `seasons_missing`), football-data and xG once per run, only when a match needs deciding;
+    no current-season files = the match waits (`no_data`). `BSource.chances` fits B once per
+    block and keeps it in `CACHE_DIR` (`data/raw/goalscorer_paper/<code>_<block>.pkl`, inside
+    publish's raw-data), keyed by block, first kickoff (`block_first`, from the live log's
+    kickoffs), and the appearances and football-data matches before the block, so new match
+    files refit it; only a refit runs the walk-forward. `TIME_BUDGET` 120 s: matches left
+    over wait for the next run (`over_budget`). `features_stale` = the features end before
+    the league's last match (`last_kickoff`: football-data dates and the live log).
   - `decide`: names → Understat ids through each club's earlier appearances
     (`match_in_fixture`), the rule, one record per match in data-log
     `paper_trades/goalscorer_checked.jsonl` (bets or not; never decided twice).
     `update_league`/`run` decide, close (`close_fields`: `close_best`, `close_book`,
     `close_same`, `clv_best`, `clv_same`) and settle (`espn_match` on espn_results'
     scoreboard, `goal_events`, `settle_fields`; goals must add up to the score; 14 days
-    without a result = void). Entries before `defined_at` (`goalscorer_defined.json`) or
+    without a result = void); `understat_check` adds `result_check` ("ok"/"mismatch") and
+    `understat_goals` once Understat's file for the match is held. Entries before `defined_at` (`goalscorer_defined.json`) or
     decided after kickoff are backcast (`backcast_from` "goalscorer_log").
   - `sections`: `paper.strategy_section` per line plus `defined_at`, `note`, `features_note`,
-    `descriptive`, `clv`, `backcast` (from 1 Nov) and the DraftKings line's `compare`.
+    `descriptive`, `clv`, `stale_features` {stale, of, note}, `backcast` (from 1 Nov) and the
+    DraftKings line's `compare`.
     `paper.run` calls `run` after the line shop (a failure costs only this track) and
     `portfolios_section(goalscorer=)` gives Anytime goalscorer's live section its
     `strategies`. Ledger `paper_trades/<code>_goalscorer_<season>.jsonl` (out of

@@ -81,6 +81,8 @@ STAKE = 10.0
 BACKCAST_START = "2026-11-01T00:00:00+00:00"  # the live goalscorer log's first day
 BACKCAST_FROM = "goalscorer_log"
 DEFINED_FILE = "goalscorer_defined.json"
+CACHE_DIR = Path("data/raw/goalscorer_paper")  # B per block; saved with publish's raw-data
+TIME_BUDGET = 120.0  # seconds of model work per paper run (lead, 9 Nov)
 CHECKED_FILE = "goalscorer_checked.jsonl"
 FIRST_YEAR = 2021  # cli._goal_league_feats: Understat appearances from 2021/22
 MM_START = pd.Timestamp("2022-07-01")  # the match model's walk-forward grid
@@ -141,6 +143,8 @@ UPDATE_FIELDS = {
     "settled_at",
     "result_source",
     "void_reason",
+    "result_check",
+    "understat_goals",
 }
 
 
@@ -404,21 +408,17 @@ def _position(hist: pd.DataFrame, pid: str) -> str:
     return "MID"
 
 
-def starter_chances(
-    apps: pd.DataFrame,
-    info: pd.DataFrame,
-    target: dict,
-    starters: dict[str, list[str]],
-) -> tuple[dict[str, float], dict]:
-    """B's chance per starter id for one match, from appearances that kicked off before it.
+def target_features(
+    apps: pd.DataFrame, info: pd.DataFrame, target: dict, starters: dict[str, list[str]]
+) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Goal features for one match's starters (placeholder rows after every earlier
+    appearance) and for every earlier appearance: (starter rows, earlier rows, detail).
 
     `apps`: Understat appearances (player_data.load_appearances); `info`: match_info rows
-    for earlier matches (match_id, team, team_xg, game_state); `target`: {home, away,
-    kickoff, season, match_model: {team: (team_xg, game_state)}}; `starters`: team -> player
-    ids. Returns ({player_id: chance}, detail)."""
+    for earlier matches (match_id, team, team_xg, game_state; needed only to train);
+    `target`: {home, away, kickoff, season, match_model: {team: (team_xg, game_state)}};
+    `starters`: team -> player ids."""
     from soccer_stats.factors import build_features
-    from soccer_stats.models.player_goals import GOAL_FACTORS, GoalscorerModel
-    from soccer_stats.player_goal_lab import LOOKBACK_DAYS, MIN_PREV_APPS
     from soccer_stats.player_goals import goal_features
 
     k = _utc(target["kickoff"])
@@ -463,23 +463,67 @@ def starter_chances(
         "block_start": _iso(b_block(k)),
     }
     if not rows or hist.empty:
-        return {}, {**detail, "why": "no starters or no history"}
+        return pd.DataFrame(), pd.DataFrame(), {**detail, "why": "no starters or no history"}
     allr = pd.concat([hist.assign(_placeholder=False), pd.DataFrame(rows)], ignore_index=True)
     info_all = pd.concat([info, pd.DataFrame(mi)], ignore_index=True)
     info_all = info_all.astype({"team_xg": float, "game_state": float})
     feats = goal_features(build_features(allr, info_all))
-    live = feats[feats["_placeholder"].astype(bool)]
-    past = feats[~feats["_placeholder"].astype(bool)]
-    bs = b_block(k)
+    flag = feats["_placeholder"].astype(bool)
+    return feats[flag], feats[~flag], detail
+
+
+def block_first(kickoffs, kickoff) -> pd.Timestamp:
+    """The judged read's first test kickoff of `kickoff`'s block: the earliest known kickoff
+    from the block start (the judged read's test rows), never after `kickoff` itself."""
+    bs, k = b_block(kickoff), _utc(kickoff)
+    return min([_utc(x) for x in kickoffs if bs <= _utc(x) <= k] + [k])
+
+
+def fit_block(past: pd.DataFrame, kickoff, first=None):
+    """B fitted as the judged read fits the block holding `kickoff`: every earlier
+    appearance before the block start, within LOOKBACK_DAYS of the block's first kickoff.
+    Returns (model or None, training rows)."""
+    from soccer_stats.models.player_goals import GOAL_FACTORS, GoalscorerModel
+    from soccer_stats.player_goal_lab import LOOKBACK_DAYS
+
+    bs = b_block(kickoff)
     t = pd.to_datetime(past["kickoff"], utc=True)
-    first = min([*t[t >= bs], k])  # the block's first kickoff, as the judged read's test rows
+    first = _utc(first) if first is not None else block_first(t, kickoff)
     train = past[(t < bs) & (t >= first - pd.Timedelta(days=LOOKBACK_DAYS))]
+    if len(train) < 200 or train["goals"].sum() < 10:
+        return None, len(train)
+    return GoalscorerModel(list(GOAL_FACTORS)).fit(train), len(train)
+
+
+def predict(model, live: pd.DataFrame) -> dict[str, float]:
+    """B's chance for the starters with MIN_PREV_APPS earlier appearances (lineup known)."""
+    from soccer_stats.player_goal_lab import MIN_PREV_APPS
+
     ok = live[live["prev_apps"] >= MIN_PREV_APPS]
-    detail.update(train_rows=len(train), starters=len(live), eligible=len(ok))
-    if len(train) < 200 or train["goals"].sum() < 10 or ok.empty:
-        return {}, {**detail, "why": "too little training data or no eligible starter"}
-    p = GoalscorerModel(list(GOAL_FACTORS)).fit(train).prob_score(ok, lineup_known=True)
-    return {str(pid): float(v) for pid, v in zip(ok["player_id"], p, strict=True)}, detail
+    if model is None or ok.empty:
+        return {}
+    p = model.prob_score(ok, lineup_known=True)
+    return {str(pid): float(v) for pid, v in zip(ok["player_id"], p, strict=True)}
+
+
+def starter_chances(
+    apps: pd.DataFrame,
+    info: pd.DataFrame,
+    target: dict,
+    starters: dict[str, list[str]],
+    first=None,
+) -> tuple[dict[str, float], dict]:
+    """B's chance per starter id for one match, from appearances that kicked off before it
+    (target_features, then fit_block and predict). Returns ({player_id: chance}, detail)."""
+    live, past, detail = target_features(apps, info, target, starters)
+    if live.empty:
+        return {}, detail
+    model, n = fit_block(past, target["kickoff"], first)
+    out = predict(model, live)
+    detail.update(train_rows=n, starters=len(live), eligible=len(out))
+    if not out:
+        detail["why"] = "too little training data or no eligible starter"
+    return out, detail
 
 
 class BSource:
@@ -493,6 +537,8 @@ class BSource:
         self.info: pd.DataFrame | None = None
         self.missing = 0  # played matches whose Understat file this run doesn't hold
         self.seasons_missing: list[str] = []  # league-seasons with no Understat league file
+        self.cache_dir = CACHE_DIR
+        self.cache_hits = self.refits = 0
 
     def load(self) -> bool:
         if self._loaded:
@@ -522,6 +568,57 @@ class BSource:
         self.apps = apps
         self.matches, self.err = with_xg(load_matches([self.league], years))
         return True
+
+    def chances(self, target: dict, starters: dict[str, list[str]], known=()):
+        """B's chances for one match. B is fitted once per 28-day block and kept on disk
+        (CACHE_DIR, inside publish's raw-data cache), keyed by the block, its first kickoff
+        and how many appearances and football-data matches precede the block, so new match
+        files (Understat back) refit it. Only a refit runs the match-model walk-forward."""
+        import pickle
+
+        k = _utc(target["kickoff"])
+        bs = b_block(k)
+        first = block_first([*known, *pd.to_datetime(self.apps["kickoff"], utc=True)], k)
+        n_apps = int((pd.to_datetime(self.apps["kickoff"], utc=True) < bs).sum())
+        n_fd = int((self.matches["date"] < bs.tz_convert(None)).sum())
+        key = {"block": _iso(bs), "first": _iso(first), "apps": n_apps, "matches": n_fd,
+               "err": bool(self.err)}  # fmt: skip
+        path = Path(self.cache_dir) / f"{self.league}_{bs:%Y%m%d}.pkl"
+        cached = None
+        if path.exists():
+            try:
+                cached = pickle.loads(path.read_bytes())
+            except Exception:  # noqa: BLE001  a bad file is refitted
+                cached = None
+        if cached is not None and cached.get("key") == key:
+            empty = pd.DataFrame(columns=["match_id", "team", "team_xg", "game_state"])
+            live, _past, detail = target_features(self.apps, empty, target, starters)
+            model, n = cached["model"], cached["train_rows"]
+            self.cache_hits += 1
+        else:
+            info = self.history(bs - pd.Timedelta(days=760))
+            live, past, detail = target_features(self.apps, info, target, starters)
+            if live.empty:
+                return {}, detail
+            model, n = fit_block(past, k, first)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(pickle.dumps({"key": key, "model": model, "train_rows": n}))
+            self.refits += 1
+        if live.empty:
+            return {}, detail
+        out = predict(model, live)
+        detail.update(train_rows=n, starters=len(live), eligible=len(out))
+        if not out:
+            detail["why"] = "too little training data or no eligible starter"
+        return out, detail
+
+    def last_kickoff(self, kickoff, known=()) -> pd.Timestamp | None:
+        """The league's latest match before `kickoff` (football-data's dates, the live log's
+        kickoffs), for the stale-features flag."""
+        k = _utc(kickoff)
+        days = [_utc(d) for d in self.matches["date"] if _utc(d) < k.normalize()]
+        days += [_utc(x) for x in known if _utc(x) < k - pd.Timedelta(hours=3)]
+        return max(days) if days else None
 
     def history(self, since) -> pd.DataFrame:
         if self.info is None:
@@ -581,6 +678,7 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
         event_id=entry["event_id"],
         p_B=_r(p, P_DECIMALS),
         features_through=detail.get("features_through"),
+        features_stale=detail.get("features_stale"),
         lineup_fetched_at={s: lineup.get(f"{s}_at") for s in ("home", "away")},
         decided_at=_iso(now),
     )
@@ -593,7 +691,7 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
 
 
 def decide(
-    entry: dict, lineup: dict, source: BSource, league: str, defined, now
+    entry: dict, lineup: dict, source: BSource, league: str, defined, now, known=()
 ) -> tuple[list[dict], dict]:
     """The trades the rule opens on one match at its entry snapshot, and the decision record
     (written to goalscorer_checked.jsonl whether or not anything opened)."""
@@ -618,8 +716,11 @@ def decide(
         "season": tr.season_label(k),
         "match_model": source.match_model(home, away, k),
     }
-    info = source.history(b_block(k) - pd.Timedelta(days=760))
-    chances, detail = starter_chances(source.apps, info, target, ids)
+    chances, detail = source.chances(target, ids, known)
+    last = source.last_kickoff(k, known)
+    through = detail.get("features_through")
+    stale = bool(through and last is not None and _utc(through).date() < last.date())
+    detail.update(features_stale=stale, league_last_match=_iso(last) if last else None)
     best = best_prices(entry["prices"])
     dk = best_prices(entry["prices"], (DK_BOOK,))
     out = []
@@ -665,7 +766,17 @@ def decide(
             KEY: sum(t["strategy"] == KEY for t in out),
             DK_KEY: sum(t["strategy"] == DK_KEY for t in out),
         },  # fmt: skip
-        **{x: detail.get(x) for x in ("features_through", "block_start", "train_rows", "why")},
+        **{
+            x: detail.get(x)
+            for x in (
+                "features_through",
+                "features_stale",
+                "league_last_match",
+                "block_start",
+                "train_rows",
+                "why",
+            )
+        },  # fmt: skip
         match_files_missing=getattr(source, "missing", None),
         seasons_missing=getattr(source, "seasons_missing", None),
     )
@@ -774,14 +885,51 @@ def settle_fields(t: dict, result: dict, lineup: dict | None) -> dict:
     }
 
 
+def understat_check(t: dict, raw_dir=None) -> dict | None:
+    """Once Understat's file for a settled trade's match is held: {result_check "ok" or
+    "mismatch", understat_goals} from his goals there (own goals aren't his on Understat
+    either); a starter with no row there is a mismatch with understat_goals None. None while
+    the file isn't held (the check waits)."""
+    from soccer_stats.data import RAW_DIR
+    from soccer_stats.player_data import match_path, parse_match, season_matches
+
+    raw = Path(raw_dir or RAW_DIR)
+    k = _utc(t["kickoff"])
+    year = k.year if k.month >= 7 else k.year - 1
+    try:
+        sm = season_matches(t["league"], year, raw)
+    except Exception:  # noqa: BLE001  no league file (Understat down): check later
+        return None
+    near = sm[(sm["home"] == t["home"]) & (sm["away"] == t["away"]) & sm["played"]]
+    near = near[(near["kickoff"] - k).abs() <= pd.Timedelta(days=1)]
+    if len(near) != 1:
+        return None
+    meta = near.iloc[0].to_dict()
+    path = match_path(meta["match_id"], raw)
+    if not path.exists():
+        return None
+    try:
+        rows = parse_match(json.loads(path.read_text()), meta)
+    except (ValueError, KeyError, TypeError):
+        return None
+    mine = [r for r in rows if str(r["player_id"]) == str(t["player_id"])]
+    goals = int(mine[0]["goals"]) if mine else None
+    ok = goals is not None and (goals > 0) == (t["status"] == "won")
+    return {"result_check": "ok" if ok else "mismatch", "understat_goals": goals}
+
+
 def update_trades(
     ledger: dict[str, dict],
     closes: dict[str, dict],
     news: pd.DataFrame | None,
     now: pd.Timestamp,
     result_fn: Callable[[dict], dict | None],
+    check_fn: Callable[[dict], dict | None] | None = None,
 ) -> list[dict]:
-    """Close (the close snapshot) and settle (ESPN) every trade; returns update events."""
+    """Close (the close snapshot) and settle (ESPN) every trade, and once Understat holds a
+    settled trade's match, check ESPN's settlement against its goals (`check_fn`,
+    understat_check: result_check "ok"/"mismatch", the settlement stands); returns update
+    events."""
     from soccer_stats import paper
 
     events = []
@@ -790,6 +938,10 @@ def update_trades(
         f = close_fields(t, closes.get(t.get("event_id")))
         if f:
             events.append(paper._update(t, now, **f))
+        if t["status"] in ("won", "lost") and not t.get("result_check") and check_fn:
+            got = check_fn(t)
+            if got is not None:
+                events.append(paper._update(t, now, **got))
         if t["status"] != "open":
             continue
         k = _utc(t["kickoff"])
@@ -831,21 +983,30 @@ def update_league(
     now: pd.Timestamp,
     source: BSource | None = None,
     result_fn: Callable[[dict], dict | None] | None = None,
+    deadline: float | None = None,
+    check_fn: Callable[[dict], dict | None] | None = None,
 ) -> tuple[list[dict], list[dict], dict]:
     """Decide every match with a logged entry snapshot not yet decided (from BACKCAST_START,
-    entry at or before `now`), then close and settle. Mutates `ledger` and `checked`;
-    returns (ledger events, new decision records, counts)."""
+    entry at or before `now`), then close and settle. Model work stops at `deadline`
+    (time.monotonic()); the matches left wait for the next run (`over_budget`). Mutates
+    `ledger` and `checked`; returns (ledger events, new decision records, counts)."""
+    import time
+
     source = source or BSource(league, now)
     result_fn = result_fn or (lambda t: espn_match(t, now=now))
     entries = snapshots(live_rows, league, "entry")
     closes = snapshots(live_rows, league, "close")
+    known = [e["kickoff"] for e in (*entries.values(), *closes.values())]
     lo, defined = _utc(BACKCAST_START), _utc(defined)
     events, recs = [], []
-    counts = {"pending": 0, "decided": 0, "no_lineup": 0, "no_data": 0}
+    counts = {"pending": 0, "decided": 0, "no_lineup": 0, "no_data": 0, "over_budget": 0}
     for eid, e in sorted(entries.items(), key=lambda x: x[1]["fetched_at"]):
         if e["kickoff"] < lo or e["fetched_at"] > now or f"{league}|{eid}" in checked:
             continue
         counts["pending"] += 1
+        if deadline is not None and time.monotonic() > deadline:
+            counts["over_budget"] += 1
+            continue  # decided on a later run
         lineup = lineup_at(news, e["home"], e["away"], e["kickoff"], at=e["fetched_at"])
         if lineup is None:
             rec = {"league": league, "event_id": eid, "home": e["home"], "away": e["away"],
@@ -857,7 +1018,7 @@ def update_league(
             if not source.load():
                 counts["no_data"] += 1
                 continue  # no Understat match files: decided when they come back
-            new, rec = decide(e, lineup, source, league, defined, now)
+            new, rec = decide(e, lineup, source, league, defined, now, known)
             for t in new:
                 if tr.holds(ledger, t["id"]):
                     continue
@@ -866,7 +1027,8 @@ def update_league(
             counts["decided"] += 1
         checked[f"{league}|{eid}"] = rec
         recs.append(rec)
-    events += update_trades(ledger, closes, news, now, result_fn)
+    events += update_trades(ledger, closes, news, now, result_fn, check_fn or understat_check)
+    counts.update(cache_hits=getattr(source, "cache_hits", 0), refits=getattr(source, "refits", 0))
     return events, recs, counts
 
 
@@ -899,6 +1061,12 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
             features_note=FEATURES_NOTE,
             descriptive=True,
             clv={"best": _clv(mine, "clv_best"), "same_book": _clv(mine, "clv_same")},
+            stale_features={
+                "stale": sum(1 for t in mine if t.get("features_stale")),
+                "of": len(mine),
+                "note": "Trades whose features miss league matches played before them "
+                "(Understat down): their live chance can differ from the judged one.",
+            },
             goalscorer_trades=len(mine),
             backcast=bc.block(
                 mine,
@@ -943,10 +1111,23 @@ def safe_sections(trades: list[dict], defined: str, now=None) -> list[dict]:
         return [{"key": KEY, "label": LABEL, "defined_at": defined, "error": type(exc).__name__}]
 
 
-def run(log_dir: Path, now: pd.Timestamp, leagues=LEAGUES, sources=None, result_fn=None) -> dict:
-    """Every goalscorer league on data-log: decide, close, settle, write. Returns {trades,
-    defined_at, events, counts}."""
+def run(
+    log_dir: Path,
+    now: pd.Timestamp,
+    leagues=LEAGUES,
+    sources=None,
+    result_fn=None,
+    budget: float = TIME_BUDGET,
+    check_fn=None,
+) -> dict:
+    """Every goalscorer league on data-log: decide, close, settle, write. Model work stops
+    after `budget` seconds (the rest waits for the next run; publish never fails on it).
+    Returns {trades, defined_at, events, counts, opened}."""
+    import time
+
     from soccer_stats import player_goal_live as gl
+
+    deadline = time.monotonic() + budget
 
     rows = gl.load_rows(log_dir)
     defined = defined_at(log_dir, now, write=not rows.empty)
@@ -958,8 +1139,9 @@ def run(log_dir: Path, now: pd.Timestamp, leagues=LEAGUES, sources=None, result_
         src = (sources or {}).get(lg)
         try:  # one league's failure costs only that league this run
             ev, rc, c = update_league(
-                ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src, result_fn
-            )
+                ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src,
+                result_fn, deadline, check_fn,
+            )  # fmt: skip
         except Exception as exc:  # noqa: BLE001
             print(f"Goalscorer paper track: {lg} not updated ({type(exc).__name__}: {exc})"[:300])
             ev, rc, c = [], [], {"error": type(exc).__name__}
@@ -984,9 +1166,13 @@ def summary_line(res: dict) -> str:
             f"{sum(not e.get('backcast') for e in new)} opened this update"
         )
     waits = sum(c.get("no_data", 0) for c in res["counts"].values())
+    late = sum(c.get("over_budget", 0) for c in res["counts"].values())
+    refits = sum(c.get("refits", 0) for c in res["counts"].values())
     return (
         "Goalscorer paper track: "
         + "; ".join(parts)
         + f"; defined_at {res['defined_at']}"
         + (f"; {waits} matches wait for Understat match files" if waits else "")
+        + (f"; {late} left for the next run (time budget)" if late else "")
+        + (f"; B refitted {refits} times" if refits else "")
     )

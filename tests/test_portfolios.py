@@ -92,7 +92,7 @@ def test_portfolio_summaries_add_up_to_the_combined_view():
 def test_empty_portfolio():
     pfs = paper.portfolios_section({"error": None, "note": None}, [trade(1)], {})
     gs = next(p for p in pfs if p["id"] == "goalscorer")
-    assert gs["status"] == "testing" and "no trades" in gs["note"]
+    assert gs["status"] == "testing" and "paper track" in gs["note"]
     assert gs["live"]["trades"] == [] and gs["live"]["summary"]["trades"] == 0
     assert gs["backtest"] is None
     json.dumps(pfs)  # serializable for data.json

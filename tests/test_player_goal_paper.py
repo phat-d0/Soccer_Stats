@@ -115,6 +115,7 @@ class FakeSource:
     def __init__(self, apps=APPS):
         self.apps, self.matches, self.err = apps, None, None
         self.loads = 0
+        self.last = None
 
     def load(self):
         self.loads += 1
@@ -125,6 +126,12 @@ class FakeSource:
 
     def match_model(self, home, away, kickoff):
         return {home: (1.6, 0.2), away: (1.1, -0.2)}
+
+    def chances(self, target, starters, known=()):
+        return pgp.starter_chances(self.apps, INFO, target, starters)
+
+    def last_kickoff(self, kickoff, known=()):
+        return self.last
 
     def rosters(self, team, kickoff):
         a = self.apps[(self.apps["team"] == team) & (self.apps["kickoff"] < kickoff)]
@@ -386,3 +393,66 @@ def _dc():
     from soccer_stats.models.player_goals import FIT_OPTIONS
 
     return functools.partial(DixonColes, xg_weight=0.7, options=FIT_OPTIONS)()
+
+
+def test_stale_features_are_flagged_and_counted(chances):
+    src = FakeSource()
+    src.last = KICKOFF - pd.Timedelta(days=3)  # a league match the files don't hold
+    rows = _live_rows(_prices(chances))
+    entry = pgp.snapshots(rows, "E0", "entry")["ev1"]
+    lineup = pgp.lineup_at(_news(), "Arsenal", "Chelsea", KICKOFF, at=entry["fetched_at"])
+    trades, rec = pgp.decide(entry, lineup, src, "E0", KICKOFF, KICKOFF - pd.Timedelta(hours=1))
+    assert trades and all(t["features_stale"] for t in trades) and rec["features_stale"]
+    sec = pgp.sections(trades, "2026-11-01T00:00:00Z", KICKOFF)[0]
+    assert sec["stale_features"]["stale"] == sec["stale_features"]["of"] == 1
+    src.last = pd.Timestamp("2026-10-10T15:00Z")  # before the last file: not stale
+    trades, rec = pgp.decide(entry, lineup, src, "E0", KICKOFF, KICKOFF - pd.Timedelta(hours=1))
+    assert not any(t["features_stale"] for t in trades)
+
+
+def test_time_budget_leaves_matches_for_the_next_run(chances):
+    import time
+
+    src = FakeSource()
+    ledger, checked = {}, {}
+    _, recs, counts = pgp.update_league(
+        ledger, checked, _live_rows(_prices(chances)), _news(), "E0", "2026-11-01T00:00Z",
+        KICKOFF - pd.Timedelta(minutes=35), src, lambda t: None, time.monotonic() - 1,
+        lambda t: None,
+    )  # fmt: skip
+    assert counts["over_budget"] == 1 and recs == [] and checked == {} and src.loads == 0
+
+
+def test_block_model_is_cached_and_refitted_on_new_files(tmp_path):
+    src = pgp.BSource("E0", KICKOFF)
+    src.apps = APPS[APPS["kickoff"] < KICKOFF]
+    src.matches, src.err = _matches().assign(home=lambda d: d["home"]), None
+    src.cache_dir = tmp_path
+    p1, d1 = src.chances(_target(), _starters())
+    assert src.refits == 1 and src.cache_hits == 0 and len(p1) == 22
+    p2, d2 = src.chances(_target(), _starters())
+    assert src.cache_hits == 1 and p2 == pytest.approx(p1) and d2["train_rows"] == d1["train_rows"]
+    # A new Understat file before the block refits B.
+    extra = APPS[APPS["kickoff"] < pgp.b_block(KICKOFF)].tail(22).assign(match_id="new")
+    src.apps = pd.concat([src.apps, extra]).sort_values("kickoff").reset_index(drop=True)
+    src.chances(_target(), _starters())
+    assert src.refits == 2
+
+
+def test_understat_check(monkeypatch, tmp_path):
+    from soccer_stats import player_data
+
+    meta = {"match_id": "99", "kickoff": KICKOFF, "home": "Arsenal", "away": "Chelsea",
+            "played": True, "season": "2627"}  # fmt: skip
+    monkeypatch.setattr(player_data, "season_matches", lambda lg, y, raw: pd.DataFrame([meta]))
+    monkeypatch.setattr(player_data, "match_path", lambda mid, raw: tmp_path / f"{mid}.json")
+    monkeypatch.setattr(
+        player_data, "parse_match", lambda body, m: [{"player_id": "7", "goals": 1}]
+    )
+    t = {"league": "E0", "home": "Arsenal", "away": "Chelsea", "kickoff": KICKOFF.isoformat(),
+         "player_id": "7", "status": "won"}  # fmt: skip
+    assert pgp.understat_check(t, tmp_path) is None  # no match file yet: waits
+    (tmp_path / "99.json").write_text("{}")
+    assert pgp.understat_check(t, tmp_path) == {"result_check": "ok", "understat_goals": 1}
+    assert pgp.understat_check({**t, "status": "lost"}, tmp_path)["result_check"] == "mismatch"
+    assert pgp.understat_check({**t, "player_id": "8"}, tmp_path)["understat_goals"] is None
