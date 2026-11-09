@@ -116,6 +116,9 @@
 #            `league` shard (understat-<league>-, lead 9 Nov: E0's shard was never seeded),
 #            only when it adds files, default branch only, then archive it (caches.yml).
 #            No key, 0 credits.
+#   goalscorer-paper: the goalscorer paper track (player_goal_paper, §16's rule live,
+#            descriptive) on a throwaway copy of data-log: every decision and trade it
+#            would make now. No key, never pushes.
 #   goalscorer-backfill: the priced goalscorer test's history (docs/player_props.md §16):
 #             `design` dev (2025/26), forward (2026/27 from 10 Oct) or gaps (from 1 Nov,
 #             only the snapshots the live log lacks); per league and match day
@@ -176,9 +179,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -672,6 +675,10 @@ jobs:
               uv run soccer-stats goalscorer-backfill --design "$DESIGN" --cap "$CAP" \
                 --live-calls "$RUNNER_TEMP/gs_live" \
                 --minutes 120 --json out/goalscorer_backfill.json ;;
+            goalscorer-paper)  # the paper track on a copy of data-log; nothing is pushed
+              git fetch --depth=1 origin data-log
+              git worktree add --detach "$RUNNER_TEMP/log" FETCH_HEAD
+              uv run soccer-stats goalscorer-paper --log-dir "$RUNNER_TEMP/log" ;;
             goal-lab)
               curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \
                 "https://api.github.com/repos/${{ github.repository }}/actions/jobs/112639640656/logs" \
