@@ -147,3 +147,4 @@
 {"type":"update","id":"SP1|2627|Villarreal|Getafe|corners|home|6.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"9-4 corners"}
 {"type":"update","id":"SP1|2627|Valencia|Real Madrid|corners|away|6.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-5 corners"}
 {"type":"update","id":"SP1|2627|Valencia|Real Madrid|corners|away|6.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-5 corners"}
+{"type":"update","id":"SP1|2627|Osasuna|Santander|corners|home|5.5","at":"2026-11-09T10:49:39+00:00","status":"void","push":false,"profit":0.0,"settled_at":"2026-11-09T10:49:39+00:00","void_reason":"duplicate: same match under the club's old name","duplicate_of":"SP1|2627|Osasuna|Racing Santander|corners|home|5.5"}
