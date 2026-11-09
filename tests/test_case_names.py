@@ -182,3 +182,122 @@ def test_espn_matches_a_trade_whose_club_was_renamed_in_case():
     match = {"home": "Aston Villa", "away": "VIKING FK", "kickoff": KO}
     ev = {"home": "Aston Villa", "away": "Viking FK", "kickoff": KO}
     assert er.match_events(match, [ev], {"Aston Villa", "Viking FK"}) == ("matched", ev)
+
+
+def test_holds_maps_a_renamed_club_to_football_datas_name():
+    # DraftKings' "Racing Santander" became football-data's "Santander" on 5 Nov.
+    led = {"SP1|2627|Racing Santander|Real Madrid|dnb": {}}
+    assert tr.holds(led, "SP1|2627|Santander|Real Madrid|dnb")
+    assert tr.holds({"SP1|2627|Santander|Espanol": {}}, "SP1|2627|Racing Santander|Espanol")
+    assert not tr.holds(led, "SP1|2627|Santander|Real Madrid")  # another track's id
+    assert not tr.holds(led, "SP1|2627|Santander|Getafe|dnb")
+    assert tr.match_key("SP1|2627|Racing Santander|X|lean") == tr.match_key(
+        "sp1|2627|SANTANDER|x|LEAN"
+    )
+    assert tr.match_key("odd") == "odd"
+
+
+def test_duplicate_twins_keep_the_first_live_trade():
+    led = {
+        "SP1|2627|Racing Santander|Real Madrid|dnb": {
+            "opened_at": "2026-10-19T06:07:33+00:00",
+            "status": "lost",
+        },
+        "SP1|2627|Santander|Real Madrid|dnb": {
+            "opened_at": "2026-11-01T11:15:45+00:00",
+            "status": "lost",
+        },
+        # An old-name single is not a double.
+        "SP1|2627|Racing Santander|Espanol|dnb": {
+            "opened_at": "2026-10-16T17:20:43+00:00",
+            "status": "won",
+        },
+        # A twin already voided for another reason: the next one stands (Aston Villa, 18 Oct).
+        "UCL|2627|Aston Villa|VIKING FK": {
+            "opened_at": "2026-10-18T17:25:48+00:00",
+            "status": "void",
+        },
+        "UCL|2627|Aston Villa|Viking FK": {
+            "opened_at": "2026-10-18T19:35:48+00:00",
+            "status": "lost",
+        },
+    }
+    assert tr.duplicate_twins(led) == [
+        ("SP1|2627|Santander|Real Madrid|dnb", "SP1|2627|Racing Santander|Real Madrid|dnb")
+    ]
+    # Once swept, nothing more: the twin is void.
+    led["SP1|2627|Santander|Real Madrid|dnb"]["status"] = "void"
+    assert tr.duplicate_twins(led) == []
+
+
+def test_duplicate_sweep_voids_the_later_twin_once(tmp_path):
+    import json
+
+    import pandas as pd
+
+    from soccer_stats import paper, paper_dnb
+
+    now = pd.Timestamp("2026-11-09 12:00", tz="UTC")
+    d = tmp_path / "paper_trades"
+    d.mkdir()
+    rows = [
+        {
+            "type": "open",
+            "id": "SP1|2627|Racing Santander|Real Madrid|dnb",
+            "opened_at": "2026-10-19T06:07:33+00:00",
+            "status": "open",
+            "stake": 10.0,
+        },
+        {
+            "type": "update",
+            "id": "SP1|2627|Racing Santander|Real Madrid|dnb",
+            "status": "lost",
+            "profit": -10.0,
+        },
+        {
+            "type": "open",
+            "id": "SP1|2627|Santander|Real Madrid|dnb",
+            "opened_at": "2026-11-01T11:15:45+00:00",
+            "status": "open",
+            "stake": 10.0,
+        },
+        {
+            "type": "update",
+            "id": "SP1|2627|Santander|Real Madrid|dnb",
+            "status": "lost",
+            "profit": -10.0,
+        },
+    ]
+    (d / "SP1_dnb_2627.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    led = paper_dnb.load_ledger(tmp_path, "SP1")
+    ev = paper.duplicate_sweep(led, now)
+    assert len(ev) == 1 and ev[0]["id"] == "SP1|2627|Santander|Real Madrid|dnb"
+    assert ev[0]["status"] == "void" and ev[0]["profit"] == 0.0
+    assert ev[0]["void_reason"] == tr.DUPLICATE_REASON
+    assert ev[0]["duplicate_of"] == "SP1|2627|Racing Santander|Real Madrid|dnb"
+    paper_dnb.append_events(tmp_path, ev)
+    again = paper_dnb.load_ledger(tmp_path, "SP1")
+    twin = again["SP1|2627|Santander|Real Madrid|dnb"]
+    assert twin["status"] == "void" and twin["profit"] == 0.0
+    assert twin["void_reason"] == tr.DUPLICATE_REASON
+    assert again["SP1|2627|Racing Santander|Real Madrid|dnb"]["status"] == "lost"  # untouched
+    assert paper.duplicate_sweep(again, now) == []  # once only
+
+
+def test_a_push_twin_stood_and_is_kept():
+    # A DNB draw is status "void" with push true: a refunded bet that stood, so it is the
+    # first trade on the match and the later twin goes.
+    led = {
+        "SP1|2627|Racing Santander|Getafe|dnb": {
+            "opened_at": "2026-10-10T10:00:00+00:00",
+            "status": "void",
+            "push": True,
+        },
+        "SP1|2627|Santander|Getafe|dnb": {
+            "opened_at": "2026-11-02T10:00:00+00:00",
+            "status": "won",
+        },
+    }
+    assert tr.duplicate_twins(led) == [
+        ("SP1|2627|Santander|Getafe|dnb", "SP1|2627|Racing Santander|Getafe|dnb")
+    ]

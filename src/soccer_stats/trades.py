@@ -641,14 +641,57 @@ def trade_id(league: str, season: str, home: str, away: str, *extra: str) -> str
     return "|".join([league, str(season), home, away, *extra])
 
 
+def _canon_team(name: str) -> str:
+    """A club's name as football-data spells it (odds_feed.TEAM_NAMES), without case."""
+    from soccer_stats.odds_feed import TEAM_NAMES  # a plain dict; no network here
+
+    return TEAM_NAMES.get(name, name).casefold()
+
+
+def match_key(tid: str) -> str:
+    """A trade id with both team names mapped to football-data's spelling and case
+    folded, so the same match under a club's old or feed name ("Racing Santander|X" before
+    the 5 Nov mapping, "Santander|X" after) and a case-only rename ("VIKING FK" / "Viking
+    FK") give one key. Ids are <code>|<season>|<home>|<away>|..."""
+    parts = str(tid).split("|")
+    if len(parts) >= 4:
+        parts[2], parts[3] = _canon_team(parts[2]), _canon_team(parts[3])
+    return "|".join(parts).casefold()
+
+
 def holds(ledger, tid: str) -> bool:
-    """Whether `ledger` (ids, or a dict keyed by them) already holds trade `tid`, ignoring
-    case: ESPN renamed a Champions League club between builds ("VIKING FK" then "Viking
-    FK", 18 Oct), and the second spelling must not open a second trade on the match."""
+    """Whether `ledger` (ids, or a dict keyed by them) already holds trade `tid`: the same
+    id after case and the club-name mapping (match_key). ESPN renamed a Champions League
+    club only in case between builds (18 Oct), and DraftKings' "Racing Santander" became
+    "Santander" on 5 Nov; neither spelling may open a second trade on a match."""
     if tid in ledger:
         return True
-    key = tid.casefold()
-    return any(x.casefold() == key for x in ledger)
+    key = match_key(tid)
+    return any(match_key(x) == key for x in ledger)
+
+
+DUPLICATE_REASON = "duplicate: same match under the club's old name"
+
+
+def duplicate_twins(ledger: dict) -> list[tuple[str, str]]:
+    """(later id, kept id) for every trade that shares its match_key with another in
+    `ledger` (by id): one trade per match ever, so the first opened that isn't void stands
+    (a twin voided earlier for another reason, e.g. Aston Villa v "VIKING FK" on 18 Oct,
+    leaves the next one as the record). A push (status "void" with push true: a DNB draw,
+    a corner on a whole line) stood and counts as live. Void twins are never touched, and
+    nothing is swept twice."""
+    groups: dict[str, list[dict]] = {}
+    for tid, t in ledger.items():
+        groups.setdefault(match_key(tid), []).append({**t, "id": tid})
+    out = []
+    for ts in groups.values():
+        # A push (a DNB draw, a corner on a whole line) is a refunded bet that stood.
+        live = [t for t in ts if not (t.get("status") == "void" and not t.get("push"))]
+        if len(ts) < 2 or len(live) < 2:
+            continue
+        live.sort(key=lambda t: (str(t.get("opened_at") or ""), t["id"]))
+        out += [(t["id"], live[0]["id"]) for t in live[1:]]
+    return out
 
 
 ENTRY_FIELDS = (

@@ -91,6 +91,9 @@ UPDATE_FIELDS = {
     "pinnacle_live_fetched_at",
     "pinnacle_live_minutes_before",
     "clv_pinnacle_live",
+    # Duplicate sweep (lead, 9 Nov): a later twin of a match under a club's old name.
+    "void_reason",
+    "duplicate_of",
 }
 FOOTBALL_DATA = "football-data"
 
@@ -196,6 +199,28 @@ def _base_probs(card: dict) -> dict | None:
     if not b:
         return None
     return {**b, "under25": 1 - b["over25"] if b.get("over25") is not None else None}
+
+
+def duplicate_sweep(ledger: dict, now: pd.Timestamp) -> list[dict]:
+    """Void every later twin of a match the ledger already holds under another spelling
+    (tr.duplicate_twins; lead, 9 Nov: "Racing Santander" before the 5 Nov name mapping,
+    "Santander" after): status "void", profit 0, `void_reason` and `duplicate_of` the trade
+    kept. One update event each, once; the kept trade is untouched."""
+    events = []
+    for tid, keep in tr.duplicate_twins(ledger):
+        events.append(
+            _update(
+                ledger[tid],
+                now,
+                status="void",
+                push=False,
+                profit=0.0,
+                settled_at=now.isoformat(timespec="seconds"),
+                void_reason=tr.DUPLICATE_REASON,
+                duplicate_of=keep,
+            )
+        )
+    return events
 
 
 def _update(trade: dict, now: pd.Timestamp, **fields) -> dict:
@@ -2060,6 +2085,9 @@ def run(
                 log = ol.load(log_dir, lg) if ol.log_dir(log_dir).is_dir() else None
                 books = ol.load(log_dir, lg, kind=ol.BOOKS) if log is not None else None
                 esp = _league_rows(espn_results, lg)
+                # A twin of a match under a club's old name is voided before anything
+                # closes or settles it (lead, 9 Nov).
+                events += duplicate_sweep(sub, now) + duplicate_sweep(shadow, now)
                 ev, n = update_ledger(
                     sub,
                     cards,
@@ -2198,6 +2226,7 @@ def _run_dnb(data, log_dir, codes, primary, now, results, espn, rules) -> tuple[
     for lg in codes:
         ref = model_ref(data, lg)
         ledger = pdnb.load_ledger(log_dir, lg)
+        events += duplicate_sweep(ledger, now)  # lead, 9 Nov: a renamed club's twin
         cards = [c for c in data.get("fixtures", []) if (c.get("league") or primary) == lg]
         res = results
         if res is not None and "league" in res and not res.empty:
