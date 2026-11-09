@@ -201,6 +201,19 @@ def test_research_studies_read_the_registry_and_skip_missing_files(tmp_path):
     assert {e["portfolio"] for e in publish.RESEARCH_STUDIES} <= publish.STUDY_PORTFOLIOS
 
 
+def test_residual_map_passes_the_committed_file_through(tmp_path):
+    from soccer_stats import publish
+
+    # The Model vs Market Map (owner, 9 Nov): passed through whole, display only.
+    real = publish.residual_map()
+    assert real["kind"] == "residual_map" and set(real["core"]) == {"close", "early"}
+    assert len(real["slices"]) == 10
+    assert publish.residual_map(tmp_path / "missing.json") is None
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps({"kind": "residual_map", "core": [], "slices": {}}))
+    assert publish.residual_map(other) is None
+
+
 def test_research_overview_passes_the_committed_file_through(tmp_path):
     from soccer_stats import publish
 
