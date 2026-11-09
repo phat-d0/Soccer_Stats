@@ -563,6 +563,15 @@ def cmd_close_plan(args: argparse.Namespace) -> None:
         Path(args.out).write_text(json.dumps(close_runs.to_json(p)))
 
 
+def cmd_publish_heartbeat(args: argparse.Namespace) -> None:
+    """Print "due" when closes.yml should dispatch publish.yml (the newest publish run was
+    created HEARTBEAT or more ago, or there is none), else "ok" (lead, 9 Nov)."""
+    from soccer_stats import close_runs
+
+    now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
+    print("due" if close_runs.heartbeat_due(args.last, now) else "ok")
+
+
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
     """Credits to log team-total prices per match under each snapshot plan (estimate only:
     no key, no calls). Replays each league's real fixture calendar (Understat)."""
@@ -3503,6 +3512,13 @@ def main(argv: list[str] | None = None) -> None:
     cp.add_argument("--now", help="plan from this time (default: now)")
     cp.add_argument("--horizon-hours", type=float, default=5.5)
     cp.set_defaults(func=cmd_close_plan)
+
+    hb = sub.add_parser(
+        "publish-heartbeat", help="is a publish run overdue? prints due or ok (closes.yml)"
+    )
+    hb.add_argument("--last", default="", help="created_at of the newest publish.yml run")
+    hb.add_argument("--now", help="check at this time (default: now)")
+    hb.set_defaults(func=cmd_publish_heartbeat)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")

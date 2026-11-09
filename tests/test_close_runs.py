@@ -71,7 +71,7 @@ def test_horizon_and_handover():
     assert p["horizon_end"] == T("2026-10-17 11:30")
     assert p["continue"] is True and p["next_kickoff"] == outside
 
-    far = T("2026-10-18 13:00")  # 31 h away: the cron starts the next planner
+    far = T("2026-10-18 13:00")  # 31 h away: no close run planned
     q = cr.plan([far], now)
     assert q["dispatch"] == [] and q["continue"] is False
 
@@ -268,3 +268,31 @@ def test_cli_plans_the_goalscorer_runs(tmp_path, capsys):
     kinds = [d["kind"] for d in json.loads(out.read_text())["dispatch"]]
     assert kinds[:2] == ["goalscorer", "close"]
     assert "goalscorer entry for kickoffs 14:00" in capsys.readouterr().out
+
+
+def test_heartbeat_due_after_75_minutes_without_a_publish():
+    now = T("2026-11-09 12:39")
+    assert cr.heartbeat_due("2026-11-09T06:03:27Z", now)  # the 9 Nov gap
+    assert cr.heartbeat_due("2026-11-09T11:24:00Z", now)  # exactly 75 min
+    assert not cr.heartbeat_due("2026-11-09T11:25:00Z", now)
+    assert not cr.heartbeat_due("2026-11-09T12:38:00+00:00", now)  # a queued run counts
+
+
+def test_heartbeat_due_with_no_run_or_a_bad_time():
+    now = T("2026-11-09 12:39")
+    assert cr.heartbeat_due(None, now)
+    assert cr.heartbeat_due("", now)
+    assert cr.heartbeat_due("not a time", now)
+    assert not cr.heartbeat_due("2026-11-09 12:00", now)  # naive = UTC
+
+
+def test_publish_heartbeat_cli(capsys):
+    from soccer_stats import cli
+
+    for last, want in (
+        ("2026-11-09T06:03:27Z", "due"),
+        ("2026-11-09T12:30:00Z", "ok"),
+        ("", "due"),
+    ):
+        cli.main(["publish-heartbeat", "--last", last, "--now", "2026-11-09T12:39:00Z"])
+        assert capsys.readouterr().out.strip() == want

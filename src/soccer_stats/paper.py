@@ -220,6 +220,8 @@ def duplicate_sweep(ledger: dict, now: pd.Timestamp) -> list[dict]:
                 duplicate_of=keep,
             )
         )
+    if events:  # lead, 9 Nov: the sweep's own log line, only when it voids something
+        print(f"Duplicate sweep: {len(events)} voided ({', '.join(e['id'] for e in events)})")
     return events
 
 
