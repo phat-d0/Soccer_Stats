@@ -13,8 +13,8 @@ name: Close snapshots
 
 on:
   schedule:
-    # A safety net: a planner run hands over to the next one itself while kickoffs are
-    # due (see the last step), so these only restart it after a quiet spell.
+    # A safety net: a planner run hands over to the next one itself at its horizon (see
+    # the last step), so these only restart the chain if a hand-over is lost.
     - cron: "41 */3 * * *"
   workflow_dispatch:
 
@@ -53,6 +53,11 @@ jobs:
           uv run soccer-stats close-plan --log-dir "$RUNNER_TEMP/odds_log" --out "$RUNNER_TEMP/plan.json"
 
       # Only the default branch dispatches (a manual run elsewhere just prints the plan).
+      # Publish heartbeat (lead, 9 Nov; close_runs.HEARTBEAT): every sleep is cut into
+      # 5-minute steps, and at each step publish.yml is dispatched when its newest run on
+      # this branch was created 75 minutes or more ago (cron skipped it for 6.5 h on 9 Nov).
+      # The run then sleeps to its horizon and always hands over to the next planner run,
+      # so the heartbeat keeps going on days without kickoffs.
       - name: Dispatch publish at each planned time
         if: github.ref_name == github.event.repository.default_branch
         env:
@@ -60,18 +65,34 @@ jobs:
           REF: ${{ github.ref_name }}
         run: |
           plan="$RUNNER_TEMP/plan.json"
+          heartbeat() {
+            last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/runs?branch=$REF&per_page=1" \
+              --jq '.workflow_runs[0].created_at // ""' 2>/dev/null || echo "?")
+            if [ "$last" = "?" ]; then echo "Heartbeat: could not read publish runs"; return 0; fi
+            if [ "$(uv run --frozen soccer-stats publish-heartbeat --last "$last")" = "due" ]; then
+              if gh workflow run publish.yml --ref "$REF" < /dev/null; then
+                echo "Heartbeat: dispatched publish.yml at $(date -u +%Y-%m-%dT%H:%M:%SZ) (last run ${last:-none})"
+              else
+                echo "Heartbeat: dispatch of publish.yml failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              fi
+            fi
+          }
+          sleep_until() {
+            while :; do
+              heartbeat
+              left=$(( $1 - $(date +%s) ))
+              if [ "$left" -le 0 ]; then return 0; fi
+              if [ "$left" -gt 300 ]; then sleep 300; else sleep "$left"; return 0; fi
+            done
+          }
           jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
           while read -r at wf; do
-            wait=$(( at - $(date +%s) ))
-            if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+            sleep_until "$at"
             if gh workflow run "$wf" --ref "$REF" < /dev/null; then
               echo "Dispatched $wf at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             else
               echo "Dispatch of $wf failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             fi
           done < "$RUNNER_TEMP/dispatch.txt"
-          if [ "$(jq -r '.continue' "$plan")" = "true" ]; then
-            wait=$(( $(jq -r '.horizon_end.epoch' "$plan") - $(date +%s) ))
-            if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
-            gh workflow run closes.yml --ref "$REF" && echo "Next planner run requested"
-          fi
+          sleep_until "$(jq -r '.horizon_end.epoch' "$plan")"
+          gh workflow run closes.yml --ref "$REF" && echo "Next planner run requested"

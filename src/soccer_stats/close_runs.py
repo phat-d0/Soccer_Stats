@@ -69,6 +69,32 @@ GOALSCORER_SPAN = pd.Timedelta(minutes=5)
 GOALSCORER_MERGE = (pd.Timedelta(minutes=5), pd.Timedelta(minutes=2))
 GOALSCORER_MIN_LEFT = pd.Timedelta(minutes=23)
 
+# Publish heartbeat (lead, 9 Nov): GitHub's cron skipped publish.yml from 06:03 to 12:39
+# UTC on 9 Nov, a Monday with no kickoff, so no close or settle run filled the gap and E0's
+# hourly refresh and settlements stalled. While a planner run sleeps it checks every
+# HEARTBEAT_POLL how long ago the last publish.yml run on the default branch was created
+# (queued and running ones count, so they never pile up) and dispatches one when that is
+# HEARTBEAT or more, or when there is none. The dispatched run is an ordinary publish: its
+# call records and refresh floors keep it to the normal refresh's credits. A planner run now
+# always hands over to the next one at its horizon, so the heartbeat never stops.
+HEARTBEAT = pd.Timedelta(minutes=75)
+HEARTBEAT_POLL = pd.Timedelta(minutes=5)
+
+
+def heartbeat_due(last_created, now, every: pd.Timedelta = HEARTBEAT) -> bool:
+    """True when publish.yml needs a heartbeat dispatch: no run on record (None or blank),
+    an unreadable time, or the newest run created `every` or more before `now`."""
+    if last_created is None or not str(last_created).strip():
+        return True
+    try:
+        last = pd.Timestamp(last_created)
+    except (TypeError, ValueError):
+        return True
+    if last.tzinfo is None:
+        last = last.tz_localize("UTC")
+    return pd.Timestamp(now) - last >= every
+
+
 WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml", "goalscorer": "publish.yml"} | (
     dict.fromkeys(INPLAY, "inplay.yml")
 )
@@ -257,6 +283,6 @@ def describe(p: dict) -> str:
     else:
         lines.append(
             f"No kickoff within {CONTINUE_HOURS:g} h after this window: "
-            "the cron starts the next planner"
+            "a new planner run follows for the publish heartbeat"
         )
     return "\n".join(lines)
