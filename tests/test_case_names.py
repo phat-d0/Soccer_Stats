@@ -282,3 +282,22 @@ def test_duplicate_sweep_voids_the_later_twin_once(tmp_path):
     assert twin["void_reason"] == tr.DUPLICATE_REASON
     assert again["SP1|2627|Racing Santander|Real Madrid|dnb"]["status"] == "lost"  # untouched
     assert paper.duplicate_sweep(again, now) == []  # once only
+
+
+def test_a_push_twin_stood_and_is_kept():
+    # A DNB draw is status "void" with push true: a refunded bet that stood, so it is the
+    # first trade on the match and the later twin goes.
+    led = {
+        "SP1|2627|Racing Santander|Getafe|dnb": {
+            "opened_at": "2026-10-10T10:00:00+00:00",
+            "status": "void",
+            "push": True,
+        },
+        "SP1|2627|Santander|Getafe|dnb": {
+            "opened_at": "2026-11-02T10:00:00+00:00",
+            "status": "won",
+        },
+    }
+    assert tr.duplicate_twins(led) == [
+        ("SP1|2627|Santander|Getafe|dnb", "SP1|2627|Racing Santander|Getafe|dnb")
+    ]

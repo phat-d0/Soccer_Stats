@@ -677,14 +677,16 @@ def duplicate_twins(ledger: dict) -> list[tuple[str, str]]:
     """(later id, kept id) for every trade that shares its match_key with another in
     `ledger` (by id): one trade per match ever, so the first opened that isn't void stands
     (a twin voided earlier for another reason, e.g. Aston Villa v "VIKING FK" on 18 Oct,
-    leaves the next one as the record). Void twins are never touched, and nothing is swept
-    twice."""
+    leaves the next one as the record). A push (status "void" with push true: a DNB draw,
+    a corner on a whole line) stood and counts as live. Void twins are never touched, and
+    nothing is swept twice."""
     groups: dict[str, list[dict]] = {}
     for tid, t in ledger.items():
         groups.setdefault(match_key(tid), []).append({**t, "id": tid})
     out = []
     for ts in groups.values():
-        live = [t for t in ts if t.get("status") != "void"]
+        # A push (a DNB draw, a corner on a whole line) is a refunded bet that stood.
+        live = [t for t in ts if not (t.get("status") == "void" and not t.get("push"))]
         if len(ts) < 2 or len(live) < 2:
             continue
         live.sort(key=lambda t: (str(t.get("opened_at") or ""), t["id"]))
