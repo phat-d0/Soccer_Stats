@@ -318,8 +318,11 @@ the owner's baseball app, so the balance can drop without any run here.
 on 4 Nov; trigger ids):
 - 7 Nov 2026 (`trig_01HeboZFRkoZgkXr5Wu7tjCv`, Player props): the first live goalscorer calls
   (§16 step 2), sent to the lead.
-- 9 Nov 2026 (`trig_01NcdPu9HNaDgmjheEy8HFsY`): Lean refit (`backfill.yml` `match_blends`, then
-  `lean_backtest`) and Lean live tracking by driver.
+- 9 Dec 2026 (`trig_01BMtXBpqpA2vawBu7rSVvVN`): monthly Lean refit (`backfill.yml`
+  `match_blends`, then `lean_backtest`) and Lean live tracking by driver. The 9 Nov check
+  (backfill run 42640394738) left the fits unchanged from 8 Nov's ridge refit. Live record then:
+  Lean new rule 22 trades, +$129.60, CLV vs DraftKings −5.3%; market-driven 12, +$93.40, −9.0%;
+  model-driven 25, −$29.20, −4.2%; Model 12% 299, −$453.60, −7.3%.
 - 12 Nov 2026 (`trig_01L39tjFC9YJxpmZabB9QfkR`): should Blend Lean extend to team corners and
   team goals? Team goals wait for the round-13 gate; corners need a pre-registered blend and σ.
 - 16 Nov 2026 (`trig_01NQ9nZxt3QWgmvdestPM8QG`): late team news vs the DraftKings odds log
