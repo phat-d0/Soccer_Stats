@@ -9,3 +9,11 @@
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"47b7fc7d25003a9083df3789f996281e","home":"Dijon","away":"Red Star","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"d5a74e1730cf9bd8bfe0488e3d064e35","home":"Grenoble","away":"Stade de Reims","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
 {"league":"F2","sport":"soccer_france_ligue_two","event_id":"658bb2b77031ef93a7ae893145b663b3","home":"Nancy","away":"Sochaux","kickoff":"2026-11-06T19:00:00+00:00","fetched_at":"2026-11-01T20:17:43+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"dade98555cab410e4b25cd4d29c1bee8","home":"Annecy FC","away":"Clermont","kickoff":"2026-11-20T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"db03e2cc30f2c76d6db2065ddc81318c","home":"Metz","away":"Boulogne","kickoff":"2026-11-20T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"230a224cafcb332f3a1951e80d09f886","home":"Nancy","away":"Dijon","kickoff":"2026-11-20T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"c8293de34f61467f718886189bda2019","home":"Guingamp","away":"Rodez AF","kickoff":"2026-11-20T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"fc417d3eacbabd91fc524fcd7c92e723","home":"Red Star","away":"Pau FC","kickoff":"2026-11-20T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"3bf2c36a64fc68acc802eeee9c947049","home":"Nantes","away":"Grenoble","kickoff":"2026-11-21T13:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"191168adac12a304f49c685e057e97e7","home":"Stade Lavallois","away":"Montpellier","kickoff":"2026-11-21T13:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"F2","sport":"soccer_france_ligue_two","event_id":"67037ebf2ce5b3dd7e7cd6b30d5fbacb","home":"Stade de Reims","away":"Saint Etienne","kickoff":"2026-11-21T19:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
