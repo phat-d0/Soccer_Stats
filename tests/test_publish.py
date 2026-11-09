@@ -43,6 +43,8 @@ def test_build_data_shape(league):
     assert len(fx["matrix"]) == 6 and len(fx["matrix"][0]) == 6
     assert data["ratings"][0]["goal_diff"] >= data["ratings"][-1]["goal_diff"]
     assert {"model", "goals_only"} <= set(data["record"])
+    # xg_through: the last match with xG (the app's banner when Understat's refresh fails).
+    assert data["xg_through"][:10] == str(df.loc[df["home_xg"].notna(), "date"].max())[:10]
 
 
 def test_implied_probs_removes_margin():

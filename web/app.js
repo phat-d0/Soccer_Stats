@@ -44,7 +44,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v80";
+const APP_VERSION = "v81";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -5548,7 +5548,12 @@ function setUpdated() {
   const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {
-    $("#view").insertAdjacentHTML("beforebegin", '<div id="xg-banner" class="banner" style="margin:0 16px">xG was unavailable at the last update, so ratings use goals only.</div>');
+    // Understat's refresh failed (owner, 9 Nov): with the last good file the ratings use xG up
+    // to its last match (`xg_through`) and goals after; with no xG at all, goals only.
+    const partial = isNum(d.xg_coverage) && d.xg_coverage > 0 && d.xg_through;
+    const text = partial ? `Understat (xG) hasn't updated since ${goalDay(d.xg_through)}. Ratings use xG up to then and goals for later matches.`
+      : "xG was unavailable at the last update, so ratings use goals only.";
+    $("#view").insertAdjacentHTML("beforebegin", `<div id="xg-banner" class="banner" style="margin:0 16px">${esc(text)}</div>`);
   }
 }
 

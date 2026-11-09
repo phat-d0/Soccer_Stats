@@ -1627,7 +1627,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v80) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v81) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2095,6 +2095,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   chance). Sheet: `GOAL_FIELDS` (player and team, book, B's chance, break-even, edge, player data
   up to, best and same-book closes, both CLVs, status with `void_reason`, his goals, result
   source, the Understat `result_check`).
+- The xG banner (`setUpdated`, shown while `data.xg_error` is set; owner via the lead, 9 Nov;
+  v81): when the fit still has xG (`xg_coverage` > 0) it reads "Understat (xG) hasn't updated
+  since <date>. Ratings use xG up to then and goals for later matches." from `data.xg_through`
+  (`build_data`: the last match with xG, a display field); with no xG at all it keeps "xG was
+  unavailable at the last update, so ratings use goals only."
 - The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
   updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
   the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the

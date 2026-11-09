@@ -1597,6 +1597,23 @@ const STEPS = [
     if ((await p.locator("#view .trade-row").count()) !== 3) throw new Error("DraftKings line rows");
   }],
   // Both ways with the Research tab: the page's link opens the test's card; the card opens the page.
+  // The xG banner (owner, 9 Nov): a failed Understat refresh that kept the last good file
+  // names its date; a fit with no xG at all says goals only; no error, no banner.
+  ["xg-banner", async (p) => {
+    const banner = await p.evaluate(() => {
+      const d = state.data, keep = [d.xg_error, d.xg_coverage, d.xg_through], out = [];
+      const read = () => document.getElementById("xg-banner")?.textContent || "";
+      Object.assign(d, { xg_error: "Understat refresh failed, using the last good file for E0 2627", xg_coverage: 0.99, xg_through: "2026-11-01T00:00:00" });
+      setUpdated(); out.push(read());
+      Object.assign(d, { xg_coverage: 0, xg_through: null }); setUpdated(); out.push(read());
+      Object.assign(d, { xg_error: null }); setUpdated(); out.push(read());
+      [d.xg_error, d.xg_coverage, d.xg_through] = keep; setUpdated();
+      return out;
+    });
+    if (banner[0] !== "Understat (xG) hasn't updated since 1 Nov. Ratings use xG up to then and goals for later matches.") throw new Error(`stale xG banner: ${banner[0]}`);
+    if (banner[1] !== "xG was unavailable at the last update, so ratings use goals only.") throw new Error(`no-xG banner: ${banner[1]}`);
+    if (banner[2]) throw new Error("a banner without an xG error");
+  }],
   ["portfolio-goalscorer-research", async (p) => {
     await p.click('.goal-judged button[data-rscard="goalscorer_priced"]');
     if (!(await p.locator('.tabbar button[data-tab="research"].active').count())) throw new Error("the link should open Research");
