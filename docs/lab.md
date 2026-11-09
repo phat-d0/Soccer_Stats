@@ -4995,3 +4995,229 @@ was not the frozen read and was not read. "Re-run failed jobs" ran D1 on the sam
 - The owner decides whether it goes live. If it does, the Lean blends are refitted and the
   backtests re-run.
 - This is a log-loss result, not a profit result.
+
+## Market-move factor model (owner via the lead, 8 Nov; FROZEN 2026-11-08, before any code or fit)
+
+**Question.** Pinnacle's price moves between the early quote and the close. Can any part of
+that move be predicted at decision time? If it can, betting the predicted direction at the
+early price earns positive CLV by construction. Two earlier results point here:
+- **The ceiling analysis** (phase 2 above) put most of the gap in what the close knows and the
+  early price doesn't: +12.9 CLV points.
+- **LASSO on the market residual** asked whether factors predict the *result* beyond the early
+  price. They don't (−0.00010, −0.00055 to +0.00037). This asks a different question: what
+  explains the *move*?
+
+**What is new, and what isn't.**
+- **Free signals (6 Oct, `docs/edge.md` round 2)** already regressed the move on single signals,
+  mostly in the Premier League.
+  - Out-of-sample R² was −0.6% to +1.6%. Every bet test had negative CLV.
+  - The best, soft books vs Pinnacle at football-data's early price, had R² +1.6% and CLV −2.5%.
+- **The residual map** found nothing.
+- **New here:**
+  - the target is the move, modelled jointly on many frozen factor groups in eight leagues;
+  - a cross-book group at a *timed* look: every book in the bought ten-book history (US books
+    included) against Pinnacle at kickoff − 48 h.
+- The football-data cross-book factor (b-fd below) repeats the 6 Oct signal, inside the joint
+  model. It is not new evidence on its own.
+- The expected result is a small R² and negative CLV. This write-up will say so if that's what
+  comes out.
+
+**Target.** Per match and outcome k (home, draw, away): m_k = log(c_k / e_k), where e and c are
+Pinnacle's Shin-fair early and closing chances. Also reported in points of probability, c_k − e_k.
+Two designs differ only in what "early" is:
+
+- **Design A, football-data's early price.**
+  - Leagues: all eight (E0, SP1, D1, I1, F1, E1, E2, E3).
+  - Early = football-data's Pinnacle PSH/PSD/PSA; close = PSCH/PSCD/PSCA.
+  - Training rows from 2017/18; scored out of sample 2019/20–2023/24.
+  - football-data collects the early prices on the Friday (weekend games) or Tuesday (midweek)
+    before kickoff. Its other books' early columns are taken at the same moment.
+- **Design B, the ten-book 48 h look.**
+  - Leagues: the eight leagues in the bought ten-book history (paid `odds-history-` cache,
+    0 credits).
+  - Early = Pinnacle's quote in the snapshot at kickoff − 48 h. Close = Pinnacle's quote in the
+    close snapshot.
+  - Each quote is updated at most 6 h before its snapshot (`dk_price_backtest.quote`, unchanged).
+  - Training from 2020/21; scored out of sample 2021/22–2023/24.
+  - Snapshot files requested on or after 2024-07-01 are never opened (filtered by file name).
+  - football-data's early price is **not** used in design B: it may be taken after the 48 h
+    look, which would be look-ahead. Every price feature in B comes from the 48 h snapshot.
+
+**Rows.** One row per match with a full early and close 1X2 for its design. Results come from
+football-data. `lab.harness.Holdout` from 2024-07-01 is checked on every loaded and scored row.
+
+**Factor groups.** Frozen here. Each uses only information available at decision time.
+Results-based factors use only matches kicked off before kickoff − 4 days. That is LASSO's
+convention, and it is earlier than both designs' early price.
+
+- **(a) LASSO's 13 groups, unchanged:** rest, europe, xg_luck, form_vs_market, newcomer,
+  season_phase, model_gap, price_shape, motivation, congestion, last_match, red_card, sot_form.
+  These are the 46 features of `lasso_residual.build_factors`. In design B, model_gap and
+  price_shape are recomputed against Pinnacle's 48 h fair price instead of football-data's.
+- **(b) Cross-book disagreement at the look.**
+  - **b-fd (design A):** at football-data's early moment.
+    - Per side, log(fair / Pinnacle fair) for Bet365 and for the market average (`Avg`).
+    - Per side, log(Max odds / Pinnacle odds).
+    - Per side, the sd of fair chances across the named books present (B365, BW, IW, WH, VC).
+    - The count of those books.
+    - Pinnacle's overround and the average's overround.
+  - **b-10 (design B):** at the 48 h snapshot, over the books quoting with the same 6 h
+    freshness.
+    - Per side, the mean, the max and the sd of log(book fair / Pinnacle fair) over the
+      non-Pinnacle books.
+    - Per side, DraftKings' and FanDuel's own log ratio. Missing becomes 0 (the training mean
+      after scaling) and is flagged by the count.
+    - The count of non-Pinnacle books quoting.
+    - Pinnacle's overround and the mean overround of the others.
+- **(c) Market structure.**
+  - The favourite is home (1/0), and the favourite's fair chance.
+  - Long shots: the home side and the away side under 20% fair (two flags).
+  - League (seven flags, E0 the base).
+  - Midweek kickoff (Tuesday to Thursday).
+  - Design A only: days from football-data's collection day to kickoff. The collection day is
+    the previous Friday for Friday–Monday kickoffs and the previous Tuesday for Tuesday–Thursday
+    kickoffs; football-data doesn't record the time. Design B's look is always 48 h.
+- **(d) Team-news proxies at the look.**
+  - Games in hand: the team's league matches played before kickoff − 4 days, minus the league's
+    median at that day.
+  - A cup or UEFA match within 4 days after kickoff. Fixtures are known in advance; this is a
+    rotation risk.
+  - Cup congestion before kickoff is already in (a)'s congestion group.
+  - **Lineup rotation is dropped.** Its data is gone: Understat's per-match player files are lost
+    for SP1, D1, I1 and F1. Rebuilding it from ESPN summaries would take about 16,000 requests.
+  - **Confirmed lineups are out.** They arrive after the look, and they are Research lab's
+    16 Nov study (told 8 Nov). Any use of that study's result is a later step with its own
+    pre-registration.
+- Nothing else is added. Groups: design A 13 + b-fd + c + d = 16; design B 13 + b-10 + c + d = 16.
+
+**Model.**
+- Two linear targets per match, m_home and m_away, each clipped to ±0.5 for fitting. The draw's
+  prediction is derived: ĉ_k = e_k·exp(m̂_k) for home and away, ĉ_draw = 1 − ĉ_home − ĉ_away
+  (clipped to at least 0.01), m̂_draw = log(ĉ_draw / e_draw).
+- Features are standardised on each refit's training rows; missing values become 0 (LASSO's
+  `Scaler`).
+- **Primary estimator: group lasso.**
+  - Squared loss over both targets.
+  - Penalty λ·Σ_g √(2·|g|)·‖B_g‖₂, where B_g holds group g's coefficients for both targets.
+  - Unpenalised intercepts; fitted by FISTA in numpy.
+  - λ path: 20 values from λ_max down to 10⁻³·λ_max. λ is chosen as in LASSO: fit on the window
+    before its last 365 days, score squared error on those days, then refit the whole window at
+    the chosen λ.
+  - *Amended 8 Nov, before any code ran:* design B's first blocks have only 2020/21 before
+    them, so nothing precedes the 365-day cut. When fewer than 1,000 training rows precede the
+    cut, the validation uses the last third of the window's rows by kickoff instead. This
+    applies to both designs and to the ridge baseline.
+  - *Implementation note:* before 2019/20, football-data's aggregate columns are Betbrain's
+    (`BbAv*`, `BbMx*`). b-fd's average and maximum use them for 2017/18–2018/19 training rows.
+    Only 2019/20 onward is scored.
+- **Beside it, descriptive: a ridge baseline** with the same validation. α is chosen from
+  {0.1, 1, 10, 100, 1,000, 10,000} × the number of rows / 1,000.
+- **Walk-forward:** 28-day blocks of decision days (kickoff − 4 days). Each block's fit uses
+  only matches kicked off before the block's first decision day; their closes are known then.
+
+**Measures.**
+- **Out-of-sample R², the judged measure.** On the clipped targets, home and away together:
+  1 − Σ(m − m̂)² / Σ(m − m̄)², where m̄ is each block's training-window mean (the no-factor
+  forecast). Its range resamples matches (2,000 draws, seed 0, ratio of resampled sums).
+  Also reported, descriptive:
+  - R² on the unclipped targets;
+  - R² per league and per season;
+  - the mean move in points;
+  - the mean realised move on sides in the top decile of the predicted move.
+- **R² per group, descriptive:** a ridge fit on that group alone (plus intercept), same walk.
+  Also how often the group lasso keeps each group.
+- **Decision rule.**
+  - At the early price, each outcome's predicted CLV = early odds_k × ĉ_k − 1.
+  - Bet the outcome with the largest predicted CLV if it is at least **T = 0.01**: one bet per
+    match, $1.
+  - The predicted move must cover Pinnacle's margin, so this rule may bet rarely.
+  - CLV = early odds × Pinnacle's Shin-fair close − 1. ROI from the result, descriptive.
+  - Descriptive beside it: T = 0 and T = 0.02. In design B, also the same picks entered at the
+    best of the ten books at the look (`tuning_ceiling.best_at_look`).
+
+**Pass rule.** Two designs are tested, so each design's ranges are 97.5% (Bonferroni over 2).
+A design passes only if all three hold, for the group lasso:
+1. the R² range is above 0;
+2. the rule (T = 0.01) has at least 300 bets;
+3. the rule's CLV range is above 0.
+
+95% ranges are shown too. If either design passes, the lead is asked before 2024/25 is opened
+for a single judged read. If neither passes, the study closes and 2024/25 isn't spent. The ridge
+baseline, the per-group fits and the descriptive thresholds can't make a design pass.
+
+**Run.** One development run: `odds-check.yml` `task=market-moves`, 0 credits, no key. It restores
+the paid `odds-history-` cache with the archive fallback and fetches no snapshots. Intermediate
+snapshots between the look and the close are not needed and will not be bought.
+
+The code (`lab/market_moves.py`) is written after this section is committed, and the run is read
+once.
+
+### Result: fail; the move is partly predictable but not past the margin (run 42538752719, read once)
+
+`odds-check.yml` `task=market-moves`, run 42538752719, code 98261495, 0 credits, no key.
+
+- **Data.**
+  - The paid `odds-history-` cache was restored; nothing was bought.
+  - Design A: 23,880 rows, of which 16,928 matches were scored, 2019/20–2023/24.
+  - Design B: 12,659 matches with Pinnacle at both the look and the close in the bought history,
+    of which 10,176 were scored, 2021/22–2023/24. Coverage per league ran 72% (F1, E3) to 100% (D1).
+  - The UEFA results (4,828 events) and every domestic cup-season loaded completely.
+  - Six of design B's 34 refits used the amended last-third validation.
+- **The move.**
+  - Home sd 0.084–0.086, draw 0.056–0.059, away 0.105 in log terms.
+  - The mean absolute move is about 2.3 points (home), 1.0 (draw) and 2.1 (away).
+  - The draw drifts up on average (+0.6% to +1.0%); home and away drift down.
+  - Under 0.2% of moves were clipped at ±0.5.
+
+| | Design A (football-data early) | Design B (ten-book 48 h look) |
+| --- | --- | --- |
+| Out-of-sample R², group lasso (97.5% range) | **+1.91%** (+1.35% to +2.50%) | **+2.82%** (+2.16% to +3.44%) |
+| R² unclipped / ridge baseline | +1.92% / +1.94% | +2.72% / +2.64% |
+| Cross-book group alone (ridge) | +1.34% | +1.45% |
+| Next best group alone | model_gap, price_shape +0.14% | market_structure +0.40%, last_match +0.34% |
+| Top decile of predicted moves: predicted / realised | +4.3% / **+1.9%** (+0.49 points) | +5.0% / **+2.3%** (+0.60 points) |
+| Rule T = 0.01: bets (draws) | 1,006 (871) | 813 (774) |
+| Rule CLV vs Pinnacle's close (97.5% range) | **−1.59%** (−2.08% to −1.06%) | **−1.29%** (−1.83% to −0.76%) |
+| Rule ROI (95% range) | −2.5% (−12.6% to +8.5%) | −7.9% (−20.9% to +4.3%) |
+| Descriptive: T = 0 / T = 0.02 CLV | −1.47% / −1.55% | −1.25% / −1.68% |
+| Descriptive: same picks at the best of the ten books | – | −0.67% (−1.29% to +0.03%) |
+| Verdict | R² yes, ≥ 300 bets yes, CLV **no** → fail | R² yes, ≥ 300 bets yes, CLV **no** → fail |
+
+- **Per league** (R², 95% range):
+  - Design A: D1 +3.3%, E0 +2.0%, E1 +0.2%, E2 +1.2%, E3 +0.2%, F1 +2.1%, I1 +3.2%, SP1 +3.4%.
+    E1's and E3's ranges include 0.
+  - Design B: D1 +2.8%, E0 +4.0%, E1 +1.9%, E2 +2.3%, E3 +3.2%, F1 +0.7%, I1 +3.0%, SP1 +5.0%.
+    D1's and F1's ranges include 0.
+  - Every season is above 0 except design A's 2021/22 (+0.5%, −0.3% to +1.3%).
+  - The rule's CLV is below 0 in every league in both designs.
+- **What the group lasso kept.** The cross-book group was kept in 100% (A) and 97% (B) of refits.
+  Most other groups were kept often too, but none explains more than 0.4% alone.
+
+**What this means.**
+1. **The move is partly predictable at the look, unlike the result (LASSO).** About 2–3% of its
+   variance is out-of-sample predictable, and the range is well above 0 in both designs. Almost
+   all of it is cross-book disagreement: when the other books rate a side higher than Pinnacle
+   does, Pinnacle's close moves toward them. This repeats the 6 Oct free-signals finding (+1.6% in
+   the Premier League) in eight leagues and at the bought 48 h look. It is real and steady, but
+   small.
+2. **It doesn't pay at Pinnacle's price.**
+   - The top decile of predicted moves moved +1.9% to +2.3%, about half the prediction.
+   - Pinnacle's margin on a side is about 2.5–3%, so the predicted move doesn't cover it.
+   - The rule's CLV is −1.3% to −1.6%, with its range below 0. That is better than a random side
+     at Pinnacle early (−3.6%, `docs/edge.md`), and still a loss.
+3. **The rule bet almost only draws** (87% in A, 95% in B):
+   - The draw is derived as 1 − home − away, so small home and away predictions add up there.
+   - The draw also drifts up on average, which the training mean already carries.
+   - Its predicted CLV (+2.5% to +2.8%) overstated the realised −1.3% to −1.6%.
+   - This is recorded as it ran: the judged read is done and is not re-run with a different draw
+     treatment.
+4. **Line shopping comes closest:** −0.67% (−1.29% to +0.03%), descriptive only. Entering the same
+   picks at the best of the ten books at the look nearly closes the gap. This agrees with the
+   ceiling analysis (best of four books at 48 h: +1.0 points) and with the live "Line shop vs
+   Pinnacle" track, which already tests a model-free version of this, pre-registered.
+   - Any further test needs its own pre-registration: the move model's picks entered at the best
+     book. It would use the bought history's unused season, 2024/25 (locked), so it needs the
+     owner's approval first.
+
+**Verdict:** fail in both designs, on the CLV condition. The study closes. 2024/25 is not spent and
+nothing live changes.
