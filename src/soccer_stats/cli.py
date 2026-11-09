@@ -3009,6 +3009,37 @@ def cmd_log_goalscorer(args: argparse.Namespace) -> None:
     print(f"Goalscorer log: {rows} rows and {calls} calls appended")
 
 
+def cmd_goalscorer_paper(args: argparse.Namespace) -> None:
+    """The goalscorer paper track (player_goal_paper) on a data-log checkout: decide, close
+    and settle, then print every decision. The paper step runs it inside `paper`; this is
+    the dry run on a copy (odds-check.yml task=goalscorer-paper)."""
+    import time
+
+    from soccer_stats import player_goal_paper as pgp
+
+    now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
+    t0 = time.monotonic()
+    res = pgp.run(Path(args.log_dir), now)
+    print(pgp.summary_line(res) + f" ({time.monotonic() - t0:.0f} s)")
+    for lg, c in res["counts"].items():
+        print(f"  {lg}: {c}")
+    for r in pgp.load_checked(Path(args.log_dir)).values():
+        print(
+            f"  decided {r['league']} {r['home']} v {r['away']} ({r['kickoff'][:16]}): "
+            f"bets {r.get('bets')}, starters {r.get('starters_matched')}/{r.get('starters')}, "
+            f"priced {r.get('priced_matched')}/{r.get('priced_names')}, "
+            f"chances {r.get('chances')}, features through {r.get('features_through')}"
+            + (f", {r['why']}" if r.get("why") else "")
+        )
+    for t in sorted(res["trades"], key=lambda t: t["opened_at"]):
+        print(
+            f"  {t['strategy']} {t['home']} v {t['away']}: {t['player']} @ {t['odds']} "
+            f"({t['book']}), B {t['model_p']:.3f}, edge {t['edge']:+.1%}, {t['status']}"
+            + (f", CLV {t['clv_best']:+.1%}" if t.get("clv_best") is not None else "")
+            + (" [backcast]" if t.get("backcast") else "")
+        )
+
+
 def cmd_goalscorer_pilot(args: argparse.Namespace) -> None:
     """Stage 0 (live) and the 5-match pilot for anytime goalscorer odds, within --cap."""
     import json
@@ -3779,6 +3810,10 @@ def main(argv: list[str] | None = None) -> None:
     lgs.add_argument("--pending", required=True, help="the publish run's goalscorer folder")
     lgs.add_argument("--log-dir", required=True, help="data-log checkout")
     lgs.set_defaults(func=cmd_log_goalscorer)
+    gpp = sub.add_parser("goalscorer-paper", help="the goalscorer paper track on a data-log copy")
+    gpp.add_argument("--log-dir", required=True, help="data-log checkout (written to)")
+    gpp.add_argument("--now", help="ISO time to run as (default: now)")
+    gpp.set_defaults(func=cmd_goalscorer_paper)
     gdv = sub.add_parser("goalscorer-dev", help="priced goalscorer step 3: one league's rows")
     gdv.add_argument("--league", default="E0")
     gdv.add_argument("--out", help="CSV(.gz) of the joined starters")
