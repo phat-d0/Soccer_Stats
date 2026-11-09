@@ -158,3 +158,9 @@
 {"type":"update","id":"I1|2627|Inter|Como|corners|away|3.5|dk","at":"2026-11-08T16:36:00+00:00","close_odds":1.95,"close_prices":{"over":1.74,"under":1.95},"close_fetched_at":"2026-11-08T16:35:41+00:00","close_minutes_before":24.3,"close_snapshot":"close","clv_dk":-0.10410698496902637,"beat_close_dk":false,"pinnacle_close_prices":{"over":1.86,"under":1.92},"pinnacle_close_fetched_at":"2026-11-08T16:35:41+00:00","clv_pinnacle":-0.06104502688171798,"beat_close_pinnacle":false}
 {"type":"update","id":"I1|2627|Inter|Como|corners|away|3.5|dk","at":"2026-11-08T19:20:58+00:00","status":"won","actual":2,"push":false,"profit":9.1,"score":"4-2 corners","settled_at":"2026-11-08T19:20:58+00:00","result_source":"espn"}
 {"type":"update","id":"I1|2627|Inter|Como|corners|away|3.5","at":"2026-11-08T19:20:58+00:00","status":"won","actual":2,"push":false,"profit":9.2,"score":"4-2 corners","settled_at":"2026-11-08T19:20:58+00:00","result_source":"espn"}
+{"type":"update","id":"I1|2627|Roma|Sassuolo|corners|home|6.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"12-1 corners"}
+{"type":"update","id":"I1|2627|Roma|Sassuolo|corners|home|6.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"12-1 corners"}
+{"type":"update","id":"I1|2627|Napoli|Lazio|corners|away|3.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"6-6 corners"}
+{"type":"update","id":"I1|2627|Napoli|Lazio|corners|away|3.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"6-6 corners"}
+{"type":"update","id":"I1|2627|Inter|Como|corners|away|3.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"4-2 corners"}
+{"type":"update","id":"I1|2627|Inter|Como|corners|away|3.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"4-2 corners"}

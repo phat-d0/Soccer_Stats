@@ -122,3 +122,10 @@
 {"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|lineshop1","at":"2026-11-07T17:15:49+00:00","close_odds":3.96,"close_prices":{"home":1.87,"draw":4.2,"away":3.96},"close_fetched_at":"2026-11-07T17:15:18+00:00","close_minutes_before":14.7,"clv_pinnacle":0.41881887285355623,"beat_close_pinnacle":true,"book_close_odds":3.6,"book_close_prices":{"home":1.83,"draw":4.0,"away":3.6},"book_close_fetched_at":"2026-11-07T17:15:18+00:00","book_close_minutes_before":14.7,"clv_book":0.4758647095332671}
 {"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|lineshop","at":"2026-11-07T19:30:57+00:00","status":"lost","score":"1-0","profit":-10.0,"settled_at":"2026-11-07T19:30:57+00:00","result_source":"espn"}
 {"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|lineshop1","at":"2026-11-07T19:30:57+00:00","status":"lost","score":"1-0","profit":-10.0,"settled_at":"2026-11-07T19:30:57+00:00","result_source":"espn"}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|lineshop","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-2"}
+{"type":"update","id":"D1|2627|Hamburg|M'gladbach|lineshop","at":"2026-11-09T10:40:08+00:00","status":"lost","score":"3-1","profit":-10.0,"settled_at":"2026-11-09T10:40:08+00:00","result_source":"football-data"}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-2"}
+{"type":"update","id":"D1|2627|Hamburg|M'gladbach|lineshop1","at":"2026-11-09T10:40:08+00:00","status":"lost","score":"3-1","profit":-10.0,"settled_at":"2026-11-09T10:40:08+00:00","result_source":"football-data"}
+{"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|lineshop","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-0"}
+{"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-0"}

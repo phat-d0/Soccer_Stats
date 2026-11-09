@@ -121,3 +121,8 @@
 {"type":"update","id":"F1|2627|Lens|Marseille|corners|home|5.5","at":"2026-11-08T22:00:48+00:00","status":"won","actual":4,"push":false,"profit":6.6,"score":"4-6 corners","settled_at":"2026-11-08T22:00:48+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Lens|Marseille|corners|home|5.5|dk","at":"2026-11-08T22:00:48+00:00","status":"won","actual":4,"push":false,"profit":6.7,"score":"4-6 corners","settled_at":"2026-11-08T22:00:48+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Lens|Marseille|corners|home|4.5|dk","at":"2026-11-08T22:00:48+00:00","status":"won","actual":4,"push":false,"profit":11.5,"score":"4-6 corners","settled_at":"2026-11-08T22:00:48+00:00","result_source":"espn"}
+{"type":"update","id":"F1|2627|Paris SG|Troyes|corners|home|5.5","at":"2026-11-09T10:40:08+00:00","status":"won","actual":5,"push":false,"profit":8.0,"score":"5-1 corners","settled_at":"2026-11-09T10:40:08+00:00","result_source":"football-data"}
+{"type":"update","id":"F1|2627|Paris SG|Troyes|corners|home|5.5|dk","at":"2026-11-09T10:40:08+00:00","status":"won","actual":5,"push":false,"profit":8.0,"score":"5-1 corners","settled_at":"2026-11-09T10:40:08+00:00","result_source":"football-data"}
+{"type":"update","id":"F1|2627|Lens|Marseille|corners|home|5.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"F1|2627|Lens|Marseille|corners|home|5.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"F1|2627|Lens|Marseille|corners|home|4.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"4-6 corners"}

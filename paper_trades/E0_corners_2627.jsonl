@@ -113,3 +113,10 @@
 {"type":"update","id":"E0|2627|Sunderland|Chelsea|corners|home|4.5","at":"2026-11-08T16:15:53+00:00","status":"won","actual":2,"push":false,"profit":8.1,"score":"2-2 corners","settled_at":"2026-11-08T16:15:53+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Sunderland|Chelsea|corners|home|4.5|dk","at":"2026-11-08T16:15:53+00:00","status":"won","actual":2,"push":false,"profit":8.3,"score":"2-2 corners","settled_at":"2026-11-08T16:15:53+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Man United|Aston Villa|corners|home|5.5","at":"2026-11-08T18:45:58+00:00","status":"lost","actual":8,"push":false,"profit":-10.0,"score":"8-1 corners","settled_at":"2026-11-08T18:45:58+00:00","result_source":"espn"}
+{"type":"update","id":"E0|2627|Everton|Coventry|corners|home|5.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-2 corners"}
+{"type":"update","id":"E0|2627|Everton|Coventry|corners|home|5.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-2 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Chelsea|corners|home|4.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-2 corners"}
+{"type":"update","id":"E0|2627|Sunderland|Chelsea|corners|home|4.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-2 corners"}
+{"type":"update","id":"E0|2627|Man United|Aston Villa|corners|home|5.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"8-1 corners"}
+{"type":"update","id":"E0|2627|Fulham|Newcastle|corners|away|4.5","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"3-3 corners"}
+{"type":"update","id":"E0|2627|Fulham|Newcastle|corners|away|4.5|dk","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"3-3 corners"}

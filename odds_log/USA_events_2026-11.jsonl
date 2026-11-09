@@ -33,3 +33,5 @@
 {"league":"USA","sport":"soccer_usa_mls","event_id":"e373abc8622b9853aa4fbd3d01c33d8e","home":"FC Cincinnati","away":"Nashville SC","kickoff":"2026-11-07T21:10:00+00:00","fetched_at":"2026-11-07T22:42:52+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"2999abe7822c923b29c9fd21905c1723","home":"Orlando City SC","away":"New England Revolution","kickoff":"2026-11-07T21:10:00+00:00","fetched_at":"2026-11-07T22:42:52+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"c0c73d9305b8e399fb6cf9a234a7b9e4","home":"Philadelphia Union","away":"Toronto FC","kickoff":"2026-11-07T21:10:00+00:00","fetched_at":"2026-11-07T22:42:52+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"ec0a3056ce896bd73059bffab79fc261","home":"Orlando City SC","away":"FC Cincinnati","kickoff":"2026-11-20T00:30:00+00:00","fetched_at":"2026-11-09T10:40:04+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"d8eca71d848497deda0c022c1c27e3bc","home":"Seattle Sounders FC","away":"Real Salt Lake","kickoff":"2026-11-20T03:00:00+00:00","fetched_at":"2026-11-09T10:40:04+00:00"}

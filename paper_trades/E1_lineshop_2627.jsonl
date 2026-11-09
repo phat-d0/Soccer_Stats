@@ -76,3 +76,9 @@
 {"type":"update","id":"E1|2627|Preston|Southampton|lineshop1","at":"2026-11-07T17:15:49+00:00","status":"lost","score":"1-0","profit":-10.0,"settled_at":"2026-11-07T17:15:49+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Blackburn|West Ham|lineshop1","at":"2026-11-07T17:15:49+00:00","status":"lost","score":"2-1","profit":-10.0,"settled_at":"2026-11-07T17:15:49+00:00","result_source":"espn"}
 {"type":"update","id":"E1|2627|Cardiff|Burnley|lineshop1","at":"2026-11-07T17:15:49+00:00","status":"won","score":"5-4","profit":10.5,"settled_at":"2026-11-07T17:15:49+00:00","result_source":"espn"}
+{"type":"update","id":"E1|2627|Birmingham|Swansea|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"E1|2627|QPR|Lincoln|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"E1|2627|Preston|Southampton|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-0"}
+{"type":"update","id":"E1|2627|Blackburn|West Ham|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"E1|2627|Portsmouth|Stoke|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"1-2"}
+{"type":"update","id":"E1|2627|Cardiff|Burnley|lineshop1","at":"2026-11-09T10:40:08+00:00","result_check":"ok","check_score":"5-4"}
