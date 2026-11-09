@@ -230,7 +230,7 @@ def test_duplicate_twins_keep_the_first_live_trade():
     assert tr.duplicate_twins(led) == []
 
 
-def test_duplicate_sweep_voids_the_later_twin_once(tmp_path):
+def test_duplicate_sweep_voids_the_later_twin_once(tmp_path, capsys):
     import json
 
     import pandas as pd
@@ -275,6 +275,8 @@ def test_duplicate_sweep_voids_the_later_twin_once(tmp_path):
     assert ev[0]["status"] == "void" and ev[0]["profit"] == 0.0
     assert ev[0]["void_reason"] == tr.DUPLICATE_REASON
     assert ev[0]["duplicate_of"] == "SP1|2627|Racing Santander|Real Madrid|dnb"
+    out = capsys.readouterr().out
+    assert "Duplicate sweep: 1 voided (SP1|2627|Santander|Real Madrid|dnb)" in out
     paper_dnb.append_events(tmp_path, ev)
     again = paper_dnb.load_ledger(tmp_path, "SP1")
     twin = again["SP1|2627|Santander|Real Madrid|dnb"]
@@ -282,6 +284,7 @@ def test_duplicate_sweep_voids_the_later_twin_once(tmp_path):
     assert twin["void_reason"] == tr.DUPLICATE_REASON
     assert again["SP1|2627|Racing Santander|Real Madrid|dnb"]["status"] == "lost"  # untouched
     assert paper.duplicate_sweep(again, now) == []  # once only
+    assert "Duplicate sweep" not in capsys.readouterr().out  # silent when nothing is voided
 
 
 def test_a_push_twin_stood_and_is_kept():
