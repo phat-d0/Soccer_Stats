@@ -53,6 +53,9 @@ UPDATE_FIELDS = {
     "pinnacle_live_fetched_at",
     "pinnacle_live_minutes_before",
     "clv_pinnacle_live",
+    # Duplicate sweep (lead, 9 Nov; paper.duplicate_sweep).
+    "void_reason",
+    "duplicate_of",
 }
 COMPARE_NOTE = (
     "Descriptive: the track and its parent bet different sides and prices, so this compares "

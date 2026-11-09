@@ -882,9 +882,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 **Trades and portfolio**
 - `trades.py`: the trade rules; keep it free of network code.
   - Match bets: `best_pick`/`select_trades` (12% by default), $10, one per match. Every open
-    step (match, Lean, its shadow, DNB, corners) checks `holds(ledger, id)`, which ignores
-    case: ESPN renamed a Champions League club only in case between builds ("VIKING FK", then
-    "Viking FK", 18 Oct) and that opened a second trade. `publish.duplicate_fixtures` also
+    step (match, Lean, its shadow, DNB, corners) checks `holds(ledger, id)`, which compares
+    `match_key(id)`: both team names through `odds_feed.TEAM_NAMES` and case folded (lead,
+    9 Nov). ESPN renamed a Champions League club only in case between builds ("VIKING FK",
+    then "Viking FK", 18 Oct), and DraftKings' "Racing Santander" became "Santander" on 5
+    Nov; each had opened a second trade. `duplicate_twins(ledger)` lists every later twin
+    (the first opened trade that isn't void stands) and `paper.duplicate_sweep` voids it
+    once (`status` void, `profit` 0, `void_reason` `DUPLICATE_REASON`, `duplicate_of` the
+    id kept) before each paper run's match, Lean shadow and DNB updates; the 9 Nov run voided
+    the DNB twin "SP1|2627|Santander|Real Madrid|dnb". `publish.duplicate_fixtures` also
     compares names without case. Domestic cards take football-data's names and can't split.
     Closes and results match names without case too (lead, 5 Nov; `odds_log.name_key`,
     `same_teams`): `odds_log.last_before` (DraftKings and every-book closes), the entry
