@@ -974,7 +974,9 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     Pinnacle trades close on Pinnacle's quotes (`clv_pinnacle`,
     `beat_close_pinnacle`); DraftKings trades on DraftKings' (`_dk_close`: `clv_dk`, null on a
     one-sided close) plus Pinnacle's at the same line (`_pinnacle_ref`: `pinnacle_close_prices`,
-    `clv_pinnacle`). `CORNER_UPDATE_FIELDS`. A corner failure costs only the corners section.
+    `clv_pinnacle`). `CORNER_UPDATE_FIELDS` (with `void_reason`, `duplicate_of`). `_run_corners` runs
+    `duplicate_sweep` on each corner ledger before `update_corner_ledger` (9 Nov: a later twin under a
+    club's old name is voided; the first opened stands). A corner failure costs only the corners section.
   - `run(...)` → `portfolio`: `rules[code]` (the 12% dict plus `sigma` and `lean`), `rule` (E0's),
     `strategy_order`, `portfolios` (`portfolios_section`: per portfolio `id, name, status, note,
     live, backtest`). Moneyline `live.strategies` (`match_strategies`) = `[{key, label, rule,
