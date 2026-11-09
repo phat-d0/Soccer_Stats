@@ -743,6 +743,9 @@ def build_data(
             "xg_weight": weight,
             "xg_coverage": float(matches["home_xg"].notna().mean()),
             "xg_error": xg_error,
+            # The last match with xG (display: the app's banner says xG runs to this date
+            # when Understat's refresh failed and the last good file was used).
+            "xg_through": matches.loc[matches["home_xg"].notna(), "date"].max() if has_xg else None,
             "record_start": start,
             "teams": teams,
             "params": model_params(model),
