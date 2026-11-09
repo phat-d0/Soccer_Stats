@@ -891,6 +891,9 @@ CORNER_UPDATE_FIELDS = {
     "result_source",
     "result_check",
     "check_score",
+    # duplicate_sweep (9 Nov): a later twin of a corner trade under a club's old name.
+    "void_reason",
+    "duplicate_of",
 }
 KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 
@@ -2365,6 +2368,9 @@ def _run_corners(data, log_dir, codes, primary, now, results, espn=None) -> tupl
         if res is not None and "league" in res and not res.empty:
             res = res[res["league"] == lg]
         lrows = [r for r in rows if r.get("league") == lg]
+        # One trade per match, team, line and book ever: a later twin opened under a club's
+        # old name is voided first (lead, 9 Nov; the first opened stands, blind to results).
+        events += duplicate_sweep(ledger, now)
         events += update_corner_ledger(
             ledger, cards, lrows, res, now, lg, ref, espn=_league_rows(espn, lg)
         )
