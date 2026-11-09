@@ -5151,3 +5151,73 @@ snapshots between the look and the close are not needed and will not be bought.
 
 The code (`lab/market_moves.py`) is written after this section is committed, and the run is read
 once.
+
+### Result: fail; the move is partly predictable but not past the margin (run 42538752719, read once)
+
+`odds-check.yml` `task=market-moves`, run 42538752719, code 98261495, 0 credits, no key.
+
+- **Data.**
+  - The paid `odds-history-` cache was restored; nothing was bought.
+  - Design A: 23,880 rows, of which 16,928 matches were scored, 2019/20–2023/24.
+  - Design B: 12,659 matches with Pinnacle at both the look and the close in the bought history,
+    of which 10,176 were scored, 2021/22–2023/24. Coverage per league ran 72% (F1, E3) to 100% (D1).
+  - The UEFA results (4,828 events) and every domestic cup-season loaded completely.
+  - Six of design B's 34 refits used the amended last-third validation.
+- **The move.**
+  - Home sd 0.084–0.086, draw 0.056–0.059, away 0.105 in log terms.
+  - The mean absolute move is about 2.3 points (home), 1.0 (draw) and 2.1 (away).
+  - The draw drifts up on average (+0.6% to +1.0%); home and away drift down.
+  - Under 0.2% of moves were clipped at ±0.5.
+
+| | Design A (football-data early) | Design B (ten-book 48 h look) |
+| --- | --- | --- |
+| Out-of-sample R², group lasso (97.5% range) | **+1.91%** (+1.35% to +2.50%) | **+2.82%** (+2.16% to +3.44%) |
+| R² unclipped / ridge baseline | +1.92% / +1.94% | +2.72% / +2.64% |
+| Cross-book group alone (ridge) | +1.34% | +1.45% |
+| Next best group alone | model_gap, price_shape +0.14% | market_structure +0.40%, last_match +0.34% |
+| Top decile of predicted moves: predicted / realised | +4.3% / **+1.9%** (+0.49 points) | +5.0% / **+2.3%** (+0.60 points) |
+| Rule T = 0.01: bets (draws) | 1,006 (871) | 813 (774) |
+| Rule CLV vs Pinnacle's close (97.5% range) | **−1.59%** (−2.08% to −1.06%) | **−1.29%** (−1.83% to −0.76%) |
+| Rule ROI (95% range) | −2.5% (−12.6% to +8.5%) | −7.9% (−20.9% to +4.3%) |
+| Descriptive: T = 0 / T = 0.02 CLV | −1.47% / −1.55% | −1.25% / −1.68% |
+| Descriptive: same picks at the best of the ten books | – | −0.67% (−1.29% to +0.03%) |
+| Verdict | R² yes, ≥ 300 bets yes, CLV **no** → fail | R² yes, ≥ 300 bets yes, CLV **no** → fail |
+
+- **Per league** (R², 95% range):
+  - Design A: D1 +3.3%, E0 +2.0%, E1 +0.2%, E2 +1.2%, E3 +0.2%, F1 +2.1%, I1 +3.2%, SP1 +3.4%.
+    E1's and E3's ranges include 0.
+  - Design B: D1 +2.8%, E0 +4.0%, E1 +1.9%, E2 +2.3%, E3 +3.2%, F1 +0.7%, I1 +3.0%, SP1 +5.0%.
+    D1's and F1's ranges include 0.
+  - Every season is above 0 except design A's 2021/22 (+0.5%, −0.3% to +1.3%).
+  - The rule's CLV is below 0 in every league in both designs.
+- **What the group lasso kept.** The cross-book group was kept in 100% (A) and 97% (B) of refits.
+  Most other groups were kept often too, but none explains more than 0.4% alone.
+
+**What this means.**
+1. **The move is partly predictable at the look, unlike the result (LASSO).** About 2–3% of its
+   variance is out-of-sample predictable, and the range is well above 0 in both designs. Almost
+   all of it is cross-book disagreement: when the other books rate a side higher than Pinnacle
+   does, Pinnacle's close moves toward them. This repeats the 6 Oct free-signals finding (+1.6% in
+   the Premier League) in eight leagues and at the bought 48 h look. It is real and steady, but
+   small.
+2. **It doesn't pay at Pinnacle's price.**
+   - The top decile of predicted moves moved +1.9% to +2.3%, about half the prediction.
+   - Pinnacle's margin on a side is about 2.5–3%, so the predicted move doesn't cover it.
+   - The rule's CLV is −1.3% to −1.6%, with its range below 0. That is better than a random side
+     at Pinnacle early (−3.6%, `docs/edge.md`), and still a loss.
+3. **The rule bet almost only draws** (87% in A, 95% in B):
+   - The draw is derived as 1 − home − away, so small home and away predictions add up there.
+   - The draw also drifts up on average, which the training mean already carries.
+   - Its predicted CLV (+2.5% to +2.8%) overstated the realised −1.3% to −1.6%.
+   - This is recorded as it ran: the judged read is done and is not re-run with a different draw
+     treatment.
+4. **Line shopping comes closest:** −0.67% (−1.29% to +0.03%), descriptive only. Entering the same
+   picks at the best of the ten books at the look nearly closes the gap. This agrees with the
+   ceiling analysis (best of four books at 48 h: +1.0 points) and with the live "Line shop vs
+   Pinnacle" track, which already tests a model-free version of this, pre-registered.
+   - Any further test needs its own pre-registration: the move model's picks entered at the best
+     book. It would use the bought history's unused season, 2024/25 (locked), so it needs the
+     owner's approval first.
+
+**Verdict:** fail in both designs, on the CLV condition. The study closes. 2024/25 is not spent and
+nothing live changes.

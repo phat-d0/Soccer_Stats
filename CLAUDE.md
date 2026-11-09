@@ -194,6 +194,11 @@ settlement runs after them.
   Bake-off 2's finalist (f) in E0, I1 and F1 has one locked test left (3 Feb 2027).
 - Model 12% filters (favourites only; no long shots): neither passes, pooled CLV −2.7% and
   −3.1% vs −4.6% for the plain rule (`docs/lab.md` "Model 12% filters").
+- Market-move factor model (owner via the lead, 8 Nov; `docs/lab.md`, run 42538752719): Pinnacle's
+  early-to-close move is partly predictable (out-of-sample R² +1.9% on football-data's early price,
+  +2.8% at the ten-book 48 h look, ranges above 0; almost all from cross-book disagreement), but
+  the T = 0.01 rule's CLV is −1.6% / −1.3% (ranges below 0): **fail**, 2024/25 not spent. The same
+  picks at the best of the ten books: −0.7% (−1.3% to +0.0%), descriptive.
 - Price-band edges: every band's best CLV is below 0, so the frozen rule bets nothing
   (`docs/lab.md` "Price-band edge rule").
 - Model 12% per league at Pinnacle's early price: CLV below 0 in every league; pooled 8,910
