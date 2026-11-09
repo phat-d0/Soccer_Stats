@@ -54,6 +54,7 @@ record. A failure here costs only this track.
 from __future__ import annotations
 
 import functools
+import html
 import json
 import os
 from collections.abc import Callable
@@ -627,7 +628,11 @@ def decide(
             p, oname = chances.get(pid), odds_of.get(pid)
             if p is None or oname is None:
                 continue
-            name = {"understat": rosters[team].get(pid), "espn": espn_of.get(pid), "odds": oname}
+            name = {
+                "understat": html.unescape(rosters[team].get(pid) or ""),  # "O&#039;Nien"
+                "espn": espn_of.get(pid),
+                "odds": oname,
+            }
             for key, prices in ((KEY, best), (DK_KEY, dk)):
                 if oname not in prices:
                     continue
