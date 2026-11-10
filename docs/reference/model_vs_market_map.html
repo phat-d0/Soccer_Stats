@@ -15,6 +15,7 @@
   --neg: #c8402f;      /* market was closer */
   --agree: #8a96a3;    /* model and market agreed */
   --plane: #9fb0c2;
+  --surf-lo: #c2620f; --surf-mid: #e6e9ec; --surf-hi: #13857a;
   --warn-bg: #fff4dc;
   --warn-fg: #6b4a00;
   --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
@@ -24,13 +25,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f151b; --surface: #161e26; --fg: #e5ebf1; --muted: #93a1af; --line: #2a3541;
-    --pos: #6ea3f5; --neg: #f07a68; --agree: #7d8a97; --plane: #4b5b6b;
+    --pos: #6ea3f5; --neg: #f07a68; --agree: #7d8a97; --plane: #4b5b6b; --surf-lo: #f0a25a; --surf-mid: #3a4552; --surf-hi: #4cc2b2;
     --warn-bg: #2e2510; --warn-fg: #f1d18d; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f151b; --surface: #161e26; --fg: #e5ebf1; --muted: #93a1af; --line: #2a3541;
-  --pos: #6ea3f5; --neg: #f07a68; --agree: #7d8a97; --plane: #4b5b6b;
+  --pos: #6ea3f5; --neg: #f07a68; --agree: #7d8a97; --plane: #4b5b6b; --surf-lo: #f0a25a; --surf-mid: #3a4552; --surf-hi: #4cc2b2;
   --warn-bg: #2e2510; --warn-fg: #f1d18d; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -111,12 +112,18 @@ details p { margin-top: 8px; }
           <button type="button" id="pclose" aria-pressed="true">Closing price</button>
           <button type="button" id="pearly" aria-pressed="false">Early price</button>
         </div>
+        <div class="seg" role="group" aria-label="3D shows" id="showseg">
+          <button type="button" id="ssurf" aria-pressed="true">Surface</button>
+          <button type="button" id="spts" aria-pressed="false">Points</button>
+          <button type="button" id="sboth" aria-pressed="false">Both</button>
+        </div>
         <label class="tog"><input type="checkbox" id="hidethin" checked> Hide groups under 200</label>
         <span class="small" id="no3d" hidden>The 3D chart couldn't load here. The flat view shows the same numbers.</span>
       </div>
       <div id="plot3d" role="img" aria-label="3D map of outcome groups: market chance, model minus market, and how often the outcome happened compared with the market"></div>
       <div id="flat" class="gridwrap" hidden></div>
-      <div class="legend">
+      <p class="small" id="surfnote" hidden><b>The surface</b> is the groups smoothed into one sheet: at each spot it averages the nearby groups, weighted by how many outcomes they hold (about ±7 points of market chance and ±3 points of the model's gap count as nearby). It is left blank where few outcomes sit, and its height uses the same scale as the points. If the model's disagreements were as often right as wrong, the sheet would lie flat on the grey zero plane. Instead it tilts: where the model rated a side well below the market, the outcome happened more often than the market said, and where it rated a side above, less often. So in both directions the market was closer. Hover the sheet for its height and an approximate 95% range.</p>
+      <div class="legend" id="ptlegend">
         <span style="--c: var(--pos)">Model was right</span>
         <span style="--c: var(--neg)">Market was closer</span>
         <span style="--c: var(--agree)">Agreed within 2 pts</span>
@@ -167,7 +174,7 @@ details p { margin-top: 8px; }
   const fmt = (n) => Number(n).toLocaleString("en-US");
   const seasonName = (s) => "20" + s.slice(0, 2) + "/" + s.slice(2);
   const thin = D.thin_below || 200;
-  const st = { view: "3d", price: "close", hideThin: true, factor: "side" };
+  const st = { view: "3d", price: "close", hideThin: true, factor: "side", show: "surface" };
 
   // Who was right: the model's disagreement (y) and what happened against the market (z).
   function verdict(c) {
@@ -253,8 +260,36 @@ details p { margin-top: 8px; }
     const m = Math.max(Math.abs(lo), Math.abs(hi)) * 1.1;
     return [-m, m];
   }
+  // The smoothed surface: an outcome-weighted Gaussian average of every group's height (all
+  // groups, thin ones included: the weights handle them), on a grid inside the groups' range.
+  const SX = 7, SY = 3, SMIN = 300;
+  function surface() {
+    const all = core().cells.filter((c) => c.n);
+    const vr = (c) => (c.z_ci95 ? ((c.z_ci95[1] - c.z_ci95[0]) / 3.92 * 100) ** 2 : (c.x * (1 - c.x) / c.n) * 1e4);
+    const xs = [], ys = [];
+    for (let x = 7.5; x <= 77.5 + 1e-9; x += 2.5) xs.push(x);
+    for (let y = -14; y <= 14 + 1e-9; y += 1) ys.push(y);
+    const z = [], cd = [];
+    ys.forEach((y) => {
+      const zr = [], cr = [];
+      xs.forEach((x) => {
+        let W = 0, S = 0, V = 0;
+        all.forEach((c) => {
+          const w = c.n * Math.exp(-0.5 * (((c.x * 100 - x) / SX) ** 2 + ((c.y * 100 - y) / SY) ** 2));
+          W += w; S += w * c.z * 100; V += w * w * vr(c);
+        });
+        if (W < SMIN) { zr.push(null); cr.push([0, 0, 0]); return; }
+        const m = S / W, se = Math.sqrt(V) / W;
+        zr.push(m); cr.push([m - 1.96 * se, m + 1.96 * se, Math.round(W)]);
+      });
+      z.push(zr); cd.push(cr);
+    });
+    return { x: xs, y: ys, z, cd };
+  }
+
   function draw3d() {
-    const cs = cells();
+    const cs = st.show === "surface" ? [] : cells();
+    const zr = zRange(cells());
     const fg = css("--fg"), muted = css("--muted"), line = css("--line");
     const traces = [];
     // zero plane
@@ -262,6 +297,23 @@ details p { margin-top: 8px; }
       type: "surface", x: [0, 100], y: [-25, 25], z: [[0, 0], [0, 0]], showscale: false, opacity: 0.25,
       colorscale: [[0, css("--plane")], [1, css("--plane")]], hoverinfo: "skip", contours: { x: { highlight: false }, y: { highlight: false }, z: { highlight: false } },
     });
+    const narrow = $("plot3d").clientWidth < 600;
+    if (st.show !== "points") {
+      const sf = surface();
+      let zmax = 1;
+      sf.z.forEach((r) => r.forEach((v) => { if (v != null) zmax = Math.max(zmax, Math.abs(v)); }));
+      const lo = css("--surf-lo"), mid = css("--surf-mid"), hi = css("--surf-hi");
+      traces.push({
+        type: "surface", x: sf.x, y: sf.y, z: sf.z, customdata: sf.cd,
+        cmin: -zmax, cmax: zmax, colorscale: [[0, lo], [0.5, mid], [1, hi]],
+        opacity: st.show === "both" ? 0.6 : 0.95, showscale: true,
+        colorbar: narrow
+          ? { orientation: "h", x: 0.5, xanchor: "center", y: 0, yanchor: "top", thickness: 8, len: 0.8, title: { text: "Happened vs market (pts)", side: "top", font: { size: 11, color: muted } }, tickfont: { size: 10, color: muted }, outlinewidth: 0 }
+          : { title: { text: "Happened<br>vs market<br>(pts)", font: { size: 11, color: muted } }, tickfont: { size: 10, color: muted }, thickness: 10, len: 0.6, outlinewidth: 0 },
+        contours: { z: { show: true, start: -10, end: 10, size: 1, usecolormap: true, width: 1, project: { z: true } }, x: { highlight: false }, y: { highlight: false } },
+        hovertemplate: "Market's chance %{x:.0f}%<br>Model minus market %{y:+.0f} pts<br>Happened %{z:+.1f} pts vs the market<br>95% range about %{customdata[0]:+.1f} to %{customdata[1]:+.1f} pts<br>Smoothed from about %{customdata[2]:,} outcomes<extra></extra>",
+      });
+    }
     // stems: one trace per colour
     const groups = new Map();
     cs.forEach((c) => {
@@ -292,12 +344,12 @@ details p { margin-top: 8px; }
       backgroundcolor: "rgba(0,0,0,0)", showbackground: false, tickfont: { size: 10, color: muted },
     }, extra);
     const layout = {
-      paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 0, r: 0, t: 0, b: 0 },
+      paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 0, r: 0, t: 0, b: narrow && st.show !== "points" ? 56 : 0 },
       font: { family: "IBM Plex Mono, monospace", color: muted },
       scene: {
         xaxis: ax("Market's chance (%)", { range: [0, 100] }),
         yaxis: ax("Model minus market (pts)", { range: [-22, 22] }),
-        zaxis: ax("Happened vs market (pts)", { range: zRange(cs) }),
+        zaxis: ax("Happened vs market (pts)", { range: zr }),
         camera: { eye: { x: 1.25, y: -1.3, z: 0.85 }, center: { x: 0, y: 0, z: -0.1 } },
         aspectratio: { x: 1.2, y: 1, z: 0.7 },
       },
@@ -362,12 +414,15 @@ details p { margin-top: 8px; }
   function defaultReadout() {
     const co = core();
     const best = co.cells.filter((c) => c.n >= thin).sort((a, b) => b.n - a.n)[0];
-    $("readout").innerHTML = (st.view === "3d" ? "Drag to turn the map; tap or hover a point for its numbers. " : "Tap a square for its numbers. ") + "The biggest group:<br>" + describe(best);
+    $("readout").innerHTML = (st.view !== "3d" ? "Tap a square for its numbers. " : st.show === "surface" ? "Drag to turn the map; hover the surface for its height. Switch to Points for the groups. " : "Drag to turn the map; tap or hover a point for its numbers. ") + "The biggest group:<br>" + describe(best);
   }
 
   function render() {
     $("plot3d").hidden = st.view !== "3d";
     $("flat").hidden = st.view !== "flat";
+    $("showseg").hidden = st.view !== "3d";
+    $("ptlegend").hidden = st.view === "3d" && st.show === "surface";
+    $("surfnote").hidden = st.view !== "3d" || st.show === "points";
     if (st.view === "3d") draw3d(); else drawFlat();
     defaultReadout();
     renderSlice();
@@ -425,6 +480,10 @@ details p { margin-top: 8px; }
   $("pclose").addEventListener("click", () => { st.price = "close"; setPressed($("pclose"), $("pearly")); render(); });
   $("pearly").addEventListener("click", () => { st.price = "early"; setPressed($("pearly"), $("pclose")); render(); });
   $("hidethin").addEventListener("change", (e) => { st.hideThin = e.target.checked; render(); });
+  const shows = { surface: $("ssurf"), points: $("spts"), both: $("sboth") };
+  Object.entries(shows).forEach(([k, b]) => b.addEventListener("click", () => {
+    st.show = k; Object.values(shows).forEach((x) => x.setAttribute("aria-pressed", String(x === b))); render();
+  }));
 
   // Phones start on the flat view: easier to read than a 3D drag at 390px.
   if (window.matchMedia("(max-width: 520px)").matches) { st.view = "flat"; setPressed($("vflat"), $("v3d")); }
