@@ -1627,7 +1627,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v82) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v83) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2091,10 +2091,17 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   pan-y`); "What stands out" (`mmFindings`), "By factor" (ten chips `data-mmfactor`, `MM_FACTORS`
   order, grid `mmSliceHtml`, readout), "Read with care" (`warning`) and "How this was measured"
   (`note`, run ids). 3D (`mm3dSvg`): no CDN (the artifact's Plotly never loaded for the owner);
-  an SVG orthographic projection (`mmProject`, `state.mm.az`/`el`) of the same points: floor
-  grid, axes with tick labels and names, stems, 95% ranges, heads sized by n, theme colours by
-  class; a drag (one finger on a phone, `touch-action: none`) turns it, a tap on a point reads it
-  (`mmPick3d`). The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
+  an SVG orthographic projection (`mmProject`, `state.mm.az`/`el`, default −20° / 34° since v83 so
+  the depth axis has length) of the same points: floor grid, axes with tick labels and names,
+  stems, 95% ranges, heads sized by n, theme colours by class; a drag (one finger on a phone,
+  `touch-action: none`) turns it, a tap on a point reads it (`mmPick3d`). Since v83 (lead, 10
+  Nov) the scale is fitted to what is drawn at the current turn (`mmFit` over the floor, the
+  height axis, the points and their ranges, inside `MM3D`'s margins), so the cloud fills the box;
+  the labels are drawn last with a halo (`paint-order: stroke`) and outside the cloud: the
+  market's ticks and name under everything, the depth ticks and name end-anchored at the box's right
+  edge, level with their places on the floor (never clipped), the height axis at the near corner
+  with no tick labels, its name and range ("±N pts at the axis ends") in the box's top-left corner;
+  the smoke step checks every label lies inside the SVG's box. The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
   empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
   goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows

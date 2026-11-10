@@ -1937,7 +1937,23 @@ const STEPS = [
     const want = await p.evaluate(() => mmShown().length);
     if ((await p.locator("[data-mm3d] circle[data-mmi]").count()) !== want) throw new Error("3D points");
     const svg = (await p.textContent("[data-mm3d] svg")).replace(/\s+/g, " ");
-    for (const w of ["Market's chance", "Model − market", "Happened − market (pts)", "100%", "+20 pts"]) if (!svg.includes(w)) throw new Error(`3D axes lack "${w}"`);
+    for (const w of ["Market's chance", "Model − market", "Height: happened − market", "pts at the axis ends", "100%", "+20 pts"]) if (!svg.includes(w)) throw new Error(`3D axes lack "${w}"`);
+    // The cloud fills the box (lead, 10 Nov): points, floor and axis span most of its width and height.
+    const fill = await p.evaluate(() => {
+      const svg = document.querySelector("[data-mm3d] svg"), vb = svg.viewBox.baseVal, b = svg.querySelector("polygon").getBBox();
+      const pts = [...svg.querySelectorAll("circle, line")].map((e) => e.getBBox());
+      const y0 = Math.min(b.y, ...pts.map((r) => r.y)), y1 = Math.max(b.y + b.height, ...pts.map((r) => r.y + r.height));
+      const x0 = Math.min(b.x, ...pts.map((r) => r.x)), x1 = Math.max(b.x + b.width, ...pts.map((r) => r.x + r.width));
+      return { w: (x1 - x0) / vb.width, h: (y1 - y0) / vb.height };
+    });
+    if (fill.w < 0.7 || fill.h < 0.65) throw new Error(`the 3D cloud should fill its box: ${JSON.stringify(fill)}`);
+    // Every label lies inside the SVG's box (lead, 10 Nov: nothing clipped at 390px or 375px).
+    const out = await p.evaluate(() => {
+      const svg = document.querySelector("[data-mm3d] svg"), vb = svg.viewBox.baseVal;
+      return [...svg.querySelectorAll("text")].map((t) => ({ t: t.textContent, b: t.getBBox() }))
+        .filter(({ b }) => b.x < -0.5 || b.y < -0.5 || b.x + b.width > vb.width + 0.5 || b.y + b.height > vb.height + 0.5).map(({ t }) => t);
+    });
+    if (out.length) throw new Error(`3D labels outside the box: ${out.join(", ")}`);
     // Drag turns it.
     await p.evaluate(() => document.querySelector("[data-mm3d]").scrollIntoView({ block: "center" }));
     const box = await p.locator("[data-mm3d]").boundingBox();
