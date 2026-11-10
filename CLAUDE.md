@@ -1627,7 +1627,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v83) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v84) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2101,7 +2101,27 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   market's ticks and name under everything, the depth ticks and name end-anchored at the box's right
   edge, level with their places on the floor (never clipped), the height axis at the near corner
   with no tick labels, its name and range ("±N pts at the axis ends") in the box's top-left corner;
-  the smoke step checks every label lies inside the SVG's box. The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
+  the smoke step checks every label lies inside the SVG's box (`labelsInBox`).
+  **The surface** (owner, 10 Nov; v84; the reference page's `surface()`, commit a5e18c4): a
+  switch "Surface | Points | Both" (`data-mmshow`, `state.mm.show`, default Surface, only in 3D;
+  phones still open on Flat). `mmSurface(core)` (kept per price in a WeakMap, so Closing | Early
+  redraws it): grid x 7.5–77.5% by 2.5, y −14 to +14 pts by 1 (`MM_SURF`); at each point every
+  group with n > 0 (thin too), w = n·exp(−½((x_c − x)/7)² − ½((y_c − y)/3)²), z = Σw·z/Σw, blank
+  under Σw 300; se ≈ √(Σw²·var)/Σw with var from the group's range (width ÷ 3.92, squared), else
+  x(1 − x)/n; all in pts. Drawn as SVG quads between four non-blank points, sorted back to front
+  with the points by projected depth (re-sorted as it turns), filled on a diverging scale
+  symmetric at the sheet's largest |height| (`mmSurfFill`: `color-mix` of `--surf-lo` orange /
+  `--surf-mid` / `--surf-hi` teal, light and dark tokens; never the blue/red of who was right),
+  a faint mesh outline, lighter in Both; whole-point contours on the floor by marching squares
+  (`mmContours`). The height scale stays the points' (`mmZmax(mmShown())`) in every mode. Under
+  the chart a key "Happened vs market (pts)" (`mmKeyHtml`), the point legend only when points
+  show, and the reference's #surfnote word for word (`MM_SURF_NOTE`). A tap on the sheet (or a
+  mouse over it) reads the nearest grid point (`mmSurfAt`, `mmPickSurf`, `state.mm.ssurf`, dot
+  `#mm-sdot`; `mmSurfDescribe`: "Market's chance 40% · model minus market +3 pts · happened +0.4
+  pts vs the market · 95% range about −0.6 to +1.4 · smoothed from about 5,200 outcomes"); a drag
+  still turns it. On the committed map the closing-price sheet runs −2.4 to +3.9 pts, early
+  −1.6 to +3.3, higher where the model sat below the market (smoke steps `research-map-surface`,
+  `research-map-both`). The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
   empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
   goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows

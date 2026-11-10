@@ -18,6 +18,9 @@
   --neg: #e34948;
   --pos: #2a78d6;
   --track: #f0efec;
+  --surf-lo: #c2620f;
+  --surf-mid: #e6e9ec;
+  --surf-hi: #13857a;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.04);
   --radius: 14px;
   --tabbar-h: 58px;
@@ -43,6 +46,9 @@
     --neg: #e66767;
     --pos: #3987e5;
     --track: #383835;
+    --surf-lo: #f0a25a;
+    --surf-mid: #3a4552;
+    --surf-hi: #4cc2b2;
     --shadow: none;
   }
 }
@@ -65,6 +71,9 @@
   --neg: #e66767;
   --pos: #3987e5;
   --track: #383835;
+  --surf-lo: #f0a25a;
+  --surf-mid: #3a4552;
+  --surf-hi: #4cc2b2;
   --shadow: none;
 }
 
@@ -1048,6 +1057,15 @@ details.drv-fold { margin-top: 10px; }
 .mm-3d circle { cursor: pointer; stroke: transparent; stroke-width: 2; }
 .mm-3d circle.sig { stroke: var(--text-primary); }
 .mm-3d .mm-pt.sel circle { stroke: var(--accent); stroke-width: 3; }
+.mm-3d .mm-quad { stroke: var(--text-muted); stroke-opacity: 0.22; stroke-width: 0.4; stroke-linejoin: round; fill-opacity: 0.95; cursor: pointer; }
+.mm-3d .mm-quad.both { fill-opacity: 0.6; }
+.mm-3d .mm-contour { stroke-width: 0.8; opacity: 0.8; pointer-events: none; }
+.mm-3d .mm-sdot { fill: var(--surface-2); stroke: var(--text-primary); stroke-width: 2; pointer-events: none; }
+.mm-key { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+.mm-key-title { font-weight: 600; }
+.mm-key-bar { width: min(280px, 100%); height: 10px; border-radius: 5px; background: linear-gradient(to right, var(--surf-lo), var(--surf-mid), var(--surf-hi)); border: 0.5px solid var(--border); }
+.mm-key-ticks { width: min(280px, 100%); display: flex; justify-content: space-between; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mm-surfnote { margin: 0; }
 .mm-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); }
 .mm-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); }
 .mm-legend .t-pos { --c: var(--pos); } .mm-legend .t-neg { --c: var(--neg); } .mm-legend .t-agree { --c: var(--text-muted); }
