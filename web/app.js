@@ -2226,19 +2226,18 @@ function mm3dSvg() {
   const by = Math.min(MM3D.h - 22, low + 13);
   for (const x of [0, 0.5, 1]) g += text(P(x, front, 0).x, by, `${Math.round(x * 100)}%`);
   g += text(P(0.5, front, 0).x, by + 14, "Market's chance", "mm-axtitle");
-  const off = right ? 0.05 : -0.05;
+  // The depth ticks and name hang off the box's right edge (end-anchored), level with their
+  // places on the floor's right edge, so no font can push them out of the box.
+  const ex = MM3D.w - 3;
   for (const y of [-0.2, 0, 0.2]) {
-    const q = P(right + off, y, 0);
-    g += text(q.x, q.y + 3, y ? `${y > 0 ? "+" : "−"}${Math.abs(y * 100)} pts` : "0", "mm-tick", right ? "start" : "end");
+    const q = P(right ? 1 : 0, y, 0);
+    g += text(ex, q.y + 3, y ? `${y > 0 ? "+" : "−"}${Math.abs(y * 100)} pts` : "0", "mm-tick", "end");
   }
-  // The depth axis's name sits under its nearer tick.
-  const yt = P(right + off, front > 0 ? 0.2 : -0.2, 0);
-  g += text(yt.x, yt.y + 16, "Model − market", "mm-axtitle", right ? "start" : "end");
-  const zside = zt.x < fr.cx ? "end" : "start", zdx = zside === "end" ? -5 : 5;
-  g += text(zt.x + zdx, zt.y + 4, `+${(zmax * 100).toFixed(0)}`, "mm-tick", zside);
-  g += text(zb.x + zdx, zb.y + 4, `−${(zmax * 100).toFixed(0)}`, "mm-tick", zside);
-  // The height axis's name: the box's top-left corner, above everything drawn.
-  g += text(4, 13, "Height: happened − market (pts)", "mm-axtitle", "start");
+  const yt = P(right ? 1 : 0, front > 0 ? 0.2 : -0.2, 0);
+  g += text(ex, yt.y + 16, "Model − market", "mm-axtitle", "end");
+  // The height axis carries no tick labels (they read as stray labels among the points); its
+  // name in the box's top-left corner gives the range at its ends.
+  g += text(4, 13, `Height: happened − market, ±${(zmax * 100).toFixed(0)} pts at the axis ends`, "mm-axtitle", "start");
   return `<svg viewBox="0 0 ${MM3D.w} ${MM3D.h}" role="img" aria-label="3D map: the market's chance across, the model minus the market in depth, and how often the outcome happened against the market in height">${g}</svg>`;
 }
 function mmDefaultReadout() {

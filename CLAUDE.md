@@ -2098,8 +2098,10 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   Nov) the scale is fitted to what is drawn at the current turn (`mmFit` over the floor, the
   height axis, the points and their ranges, inside `MM3D`'s margins), so the cloud fills the box;
   the labels are drawn last with a halo (`paint-order: stroke`) and outside the cloud: the
-  market's ticks and name under everything, the depth ticks on the right edge with the name under
-  the near tick, the height axis at the near corner and its name in the box's top-left corner. The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
+  market's ticks and name under everything, the depth ticks and name end-anchored at the box's right
+  edge, level with their places on the floor (never clipped), the height axis at the near corner
+  with no tick labels, its name and range ("±N pts at the axis ends") in the box's top-left corner;
+  the smoke step checks every label lies inside the SVG's box. The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
   empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
   goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows
