@@ -372,6 +372,12 @@ def build(src: Path, out: Path) -> dict:
     add_research_studies(data)
     # The Research tab (owner, 8 Nov): Research's committed overview, whole (~13 KB).
     data["research_overview"] = _clean(pub.research_overview())
+    add_residual_map(data)
+    # Room for the map (9 Nov): the goals-only replay is read only at the 12% edge (the app's
+    # modelReplayHtml summarizes bets with edge >= PAPER_EDGE), so its other bets go.
+    go = (data.get("record") or {}).get("goals_only")
+    if go and go.get("bets"):
+        go["bets"] = [b for b in go["bets"] if b[5] is not None and b[5] >= tr.PAPER_EDGE]
     add_corners(data)
     add_lean_strategy(data)
     add_champions_league(data)
@@ -1930,6 +1936,35 @@ def goalscorer_trades() -> list[dict]:
                 t["result_source"] = "espn"
         out.append(t)
     return out
+
+
+def add_residual_map(data: dict) -> None:
+    """The Model vs Market Map (owner, 9 Nov): Research's lab/residual_map.json, trimmed for the
+    1.5 MB cap to what the app reads: no empty cells, no slice totals, no league_reports, and
+    no `model_resid` or `thin` (the app derives thin from n), figures to 4 decimals."""
+    rm = _clean(pub.residual_map())
+    if not rm:
+        data["residual_map"] = None
+        return
+
+    def r4(v):
+        return (
+            round(v, 4)
+            if isinstance(v, float)
+            else [r4(x) for x in v]
+            if isinstance(v, list)
+            else v
+        )
+
+    for grp in [*rm["core"].values(), *rm["slices"].values()]:
+        grp["cells"] = [
+            {k: r4(v) for k, v in c.items() if k not in ("model_resid", "thin")}
+            for c in grp["cells"]
+            if c.get("n")
+        ]
+        grp.pop("totals", None)
+    rm.pop("league_reports", None)
+    data["residual_map"] = rm
 
 
 def add_goalscorer(data: dict) -> None:

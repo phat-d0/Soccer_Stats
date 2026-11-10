@@ -541,6 +541,21 @@ def research_overview(path: Path = RESEARCH_OVERVIEW_FILE) -> dict | None:
     return data
 
 
+RESIDUAL_MAP_FILE = LAB_DIR / "residual_map.json"
+
+
+def residual_map(path: Path = RESIDUAL_MAP_FILE) -> dict | None:
+    """The Research tab's "Model vs Market Map" (owner, 9 Nov): Research lab's committed
+    lab/residual_map.json (`kind: "residual_map"`, `core` and `slices` grids) passed through as
+    is, display only. None if the file is missing, unreadable or not that shape. Never raises."""
+    data = comeback_research(path)
+    if not data or data.get("kind") != "residual_map":
+        return None
+    if not isinstance(data.get("core"), dict) or not isinstance(data.get("slices"), dict):
+        return None
+    return data
+
+
 def research_studies(registry=None, lab_dir: Path = LAB_DIR) -> list[dict]:
     """Portfolio's research rows: each registry entry whose file is committed, as the file's
     fields plus `id`, `portfolio` and `name` (the file's own `name` wins). A missing,
@@ -1418,6 +1433,17 @@ def publish(out: Path, league: str = lgs.PRIMARY) -> Path:
     except Exception as exc:  # noqa: BLE001
         data["research_overview"] = None
         print(f"Research overview: failed ({type(exc).__name__})")
+    try:  # the Research tab's Model vs Market Map (display only)
+        data["residual_map"] = _clean(residual_map())
+        rm = data["residual_map"]
+        print(
+            f"Model vs Market Map: {rm['matches']} matches, {len(rm['slices'])} factors"
+            if rm
+            else "Model vs Market Map: none"
+        )
+    except Exception as exc:  # noqa: BLE001
+        data["residual_map"] = None
+        print(f"Model vs Market Map: failed ({type(exc).__name__})")
     try:  # Record > Goals & corners: research numbers plus the live test's progress
         state_dirs = [os.environ.get("TEAM_TOTALS_STATE"), tt_dir]
         try:

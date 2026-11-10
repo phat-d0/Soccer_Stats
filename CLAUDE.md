@@ -1627,7 +1627,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v81) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v82) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2074,6 +2074,29 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   DraftKings' prices, the corners under-60% line, the goals-markets study), only when that page is
   in the build (`rsLink`); otherwise it names its write-up (`doc`). The fixture carries the file
   whole (`make_fixture`), about 1.49 MB in all, 8 Nov.
+- **Model vs Market Map** (owner via the lead, 9 Nov; v82): the owner's artifact (reference page
+  `docs/reference/model_vs_market_map.html` on branch `claude/fervent-brown-3antck`) ported into
+  the Research tab as its own page, linked from the tab's top (`data-mmopen`, `state.mm.open`;
+  "‹ Research" goes back, and so does tapping the tab again). Data: Research lab's committed
+  `lab/residual_map.json`, passed through by `publish.residual_map` as `data.json` →
+  `residual_map` (its own try; None when missing or not `kind: "residual_map"` with `core` and
+  `slices`; log "Model vs Market Map: …"). `mmPageHtml`: header chips (leagues, matches and
+  outcomes, seasons, the locked season), the xG note (Wayback copies, goals-only seasons from
+  `xg_files`, E1–E3 no xG), the map (`mmFlatHtml`: market chance across × model minus market
+  down, each square won minus market, toned blue/red/grey by who was right via `mmTone`,
+  strength by |z|, thin under `thin_below` faint, ringed when the range clears 0), the switches
+  3D | Flat (`data-mmview`; phones open on Flat), Closing | Early price (`data-mmprice`) and
+  "Hide groups under 200" (`#mm-thin`), the readout (`mmDescribe`, the artifact's wording) on
+  tap, Enter or a drag across the squares (pointer handlers on `.mm-grid`, `touch-action:
+  pan-y`); "What stands out" (`mmFindings`), "By factor" (ten chips `data-mmfactor`, `MM_FACTORS`
+  order, grid `mmSliceHtml`, readout), "Read with care" (`warning`) and "How this was measured"
+  (`note`, run ids). 3D (`mm3dSvg`): no CDN (the artifact's Plotly never loaded for the owner);
+  an SVG orthographic projection (`mmProject`, `state.mm.az`/`el`) of the same points: floor
+  grid, axes with tick labels and names, stems, 95% ranges, heads sized by n, theme colours by
+  class; a drag (one finger on a phone, `touch-action: none`) turns it, a tap on a point reads it
+  (`mmPick3d`). The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
+  empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
+  goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows
   again (`PF_HIDDEN` empty). `live.strategies` = `goalscorer` (main line, model B 20%+ over the
   best of nine books, the lead) and `goalscorer_dk` (`variant_of`, DraftKings' price only, right
