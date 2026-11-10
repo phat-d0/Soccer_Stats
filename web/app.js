@@ -27,7 +27,7 @@ const state = {
   kellyFocus: "", // the trade the sheet's "How it was sized" points at
   // Research → Model vs Market Map (owner, 9 Nov): open or not, view (null = by width), price,
   // thin groups hidden, factor, the picked square / point and the 3D view's turn.
-  mm: { open: false, view: null, price: "close", hideThin: true, factor: "side", sel: null, ssel: null, sel3d: null, az: -35, el: 25 },
+  mm: { open: false, view: null, price: "close", hideThin: true, factor: "side", sel: null, ssel: null, sel3d: null, az: -20, el: 34 },
   pfStratGoal: store.get("pfStratGoal", ""), // Anytime goalscorer: which line ("" = the main one)
   pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the lead, DraftKings under 60%)
   pfStratResearch: "", // In-play research: which study ("" = the first)
@@ -47,7 +47,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v82";
+const APP_VERSION = "v83";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2152,13 +2152,25 @@ function mmFlatHtml() {
 }
 // The 3D view: an orthographic projection turned by azimuth (az) and elevation (el), drawn
 // as SVG with the theme's colours (classes, so a theme change needs no redraw).
-const MM3D = { w: 440, h: 330, scale: 100 };
-function mmProject(X, Y, Z) {
+// The box and its margins for labels. The scale is fitted to what is drawn at the current
+// turn (floor, height axis, points and their ranges), so the cloud fills the box; it follows
+// smoothly while dragging (owner via the lead, 10 Nov).
+const MM3D = { w: 440, h: 300, padL: 22, padR: 64, padT: 26, padB: 40 };
+const MM_ZH = 0.75;
+const MM_UNIT = { s: 1, cx: 0, cy: 0 };
+function mmFit(raw) {
+  const xs = raw.map((p) => p.x), ys = raw.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const iw = MM3D.w - MM3D.padL - MM3D.padR, ih = MM3D.h - MM3D.padT - MM3D.padB;
+  const s = Math.min(iw / Math.max(x1 - x0, 1e-6), ih / Math.max(y1 - y0, 1e-6));
+  return { s, cx: MM3D.padL + iw / 2 - (s * (x0 + x1)) / 2, cy: MM3D.padT + ih / 2 - (s * (y0 + y1)) / 2 };
+}
+function mmProject(X, Y, Z, fr = MM_UNIT) {
   const a = (state.mm.az * Math.PI) / 180, e = (state.mm.el * Math.PI) / 180;
   const sx = X * Math.cos(a) - Y * Math.sin(a);
   const dy = X * Math.sin(a) + Y * Math.cos(a);
   const up = Z * Math.cos(e) + dy * Math.sin(e);
-  return { x: MM3D.w * 0.5 + sx * MM3D.scale, y: MM3D.h * 0.55 - up * MM3D.scale, d: dy * Math.cos(e) - Z * Math.sin(e) };
+  return { x: fr.cx + sx * fr.s, y: fr.cy - up * fr.s, d: dy * Math.cos(e) - Z * Math.sin(e) };
 }
 function mmZmax(cs) {
   let m = 0.02;
@@ -2169,38 +2181,64 @@ const mmX = (x) => (x * 100 - 50) / 50 * 1.2;
 const mmY = (y) => Math.max(-1, Math.min(1, (y * 100) / 22));
 function mm3dSvg() {
   const cs = mmShown(), thin = mmThin(), zmax = mmZmax(cs);
-  const Z = (z) => (z / zmax) * 0.75;
-  const P = (x, y, z) => mmProject(mmX(x), mmY(y), Z(z));
+  const Z = (z) => (z / zmax) * MM_ZH;
+  const R = (x, y, z) => mmProject(mmX(x), mmY(y), Z(z));
+  // Which edges face the viewer: the nearer depth edge carries the market's ticks, the edge
+  // further right the depth ticks, and the near corner on the other side the height axis (its
+  // ticks then sit outside the cloud).
+  const front = R(0.5, -0.22, 0).d < R(0.5, 0.22, 0).d ? -0.22 : 0.22;
+  const right = R(1, 0, 0).x > R(0, 0, 0).x ? 1 : 0;
+  const fr = mmFit([
+    ...[[0, -0.22], [1, -0.22], [1, 0.22], [0, 0.22]].map(([x, y]) => R(x, y, 0)),
+    R(1 - right, front, -zmax), R(1 - right, front, zmax),
+    ...cs.flatMap((c) => [R(c.x, c.y, c.z), ...(c.z_ci95 ? [R(c.x, c.y, c.z_ci95[0]), R(c.x, c.y, c.z_ci95[1])] : [])]),
+  ]);
+  const P = (x, y, z) => mmProject(mmX(x), mmY(y), Z(z), fr);
   const f = (v) => v.toFixed(1);
   const line = (a, b, cls) => `<line class="${cls}" x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(b.x)}" y2="${f(b.y)}"/>`;
-  const text = (p, t, cls = "mm-tick", anchor = "middle") => `<text class="${cls}" x="${f(p.x)}" y="${f(p.y)}" text-anchor="${anchor}">${t}</text>`;
+  const text = (x, y, t, cls = "mm-tick", anchor = "middle") => `<text class="${cls}" x="${f(x)}" y="${f(y)}" text-anchor="${anchor}">${t}</text>`;
   let g = "";
-  // The floor (happened = the market) with its grid, then the axes and their labels.
+  // The floor (happened = the market) with its grid, and the height axis at a back corner.
   const corners = [[0, -0.22], [1, -0.22], [1, 0.22], [0, 0.22]].map(([x, y]) => P(x, y, 0));
   g += `<polygon class="mm-floor" points="${corners.map((p) => `${f(p.x)},${f(p.y)}`).join(" ")}"/>`;
   for (const x of [0.25, 0.5, 0.75]) g += line(P(x, -0.22, 0), P(x, 0.22, 0), "mm-gridline");
   for (const y of [-0.1, 0, 0.1]) g += line(P(0, y, 0), P(1, y, 0), y === 0 ? "mm-gridline zero" : "mm-gridline");
-  for (const x of [0, 0.5, 1]) g += text(P(x, -0.27, 0), `${Math.round(x * 100)}%`);
-  for (const y of [-0.2, 0, 0.2]) g += text(P(1.06, y, 0), y ? `${y > 0 ? "+" : "−"}${Math.abs(y * 100)} pts` : "0", "mm-tick", "start");
-  const zb = P(0, 0.22, -zmax), zt = P(0, 0.22, zmax);
+  const zb = P(1 - right, front, -zmax), zt = P(1 - right, front, zmax);
   g += line(zb, zt, "mm-axisline");
-  g += text({ x: zt.x, y: zt.y - 4 }, `+${(zmax * 100).toFixed(0)}`);
-  g += text({ x: zb.x, y: zb.y + 11 }, `−${(zmax * 100).toFixed(0)}`);
-  // Axis names beside their axes: across (the front edge), depth (the right edge), height.
-  const xt = P(0.5, -0.62, 0), yt = P(1.08, 0.36, 0);
-  g += text({ x: xt.x, y: xt.y + 6 }, "Market's chance", "mm-axtitle");
-  g += text({ x: yt.x, y: yt.y - 14 }, "Model − market", "mm-axtitle", "middle");
-  g += text({ x: zt.x, y: zt.y - 15 }, "Happened − market (pts)", "mm-axtitle");
   // The points, farthest first: a stem from the floor, the 95% range, a head sized by n.
   const pts = cs.map((c, i) => ({ c, i, base: P(c.x, c.y, 0), head: P(c.x, c.y, c.z) })).sort((a, b) => b.head.d - a.head.d);
+  let low = Math.max(...corners.map((p) => p.y), zb.y);
   for (const { c, i, base, head } of pts) {
     const tone = mmTone(c), faint = c.n < thin ? " thin" : "";
     g += `<g class="mm-pt t-${tone}${faint}${state.mm.sel3d === i ? " sel" : ""}">`;
-    if (c.z_ci95) g += line(P(c.x, c.y, c.z_ci95[0]), P(c.x, c.y, c.z_ci95[1]), "mm-whisker");
+    if (c.z_ci95) {
+      const lo = P(c.x, c.y, c.z_ci95[0]);
+      g += line(lo, P(c.x, c.y, c.z_ci95[1]), "mm-whisker");
+      low = Math.max(low, lo.y);
+    }
     g += line(base, head, "mm-stem");
     g += `<circle data-mmi="${i}" cx="${f(head.x)}" cy="${f(head.y)}" r="${(3 + Math.min(6, Math.sqrt(c.n) / 9)).toFixed(1)}"${mmSig(c) ? ' class="sig"' : ""}/>`;
     g += `</g>`;
+    low = Math.max(low, head.y);
   }
+  // Labels last, each with a halo (CSS paint-order) so nothing under them hides them. The
+  // market's ticks and name sit below everything drawn, under their own x positions.
+  const by = Math.min(MM3D.h - 22, low + 13);
+  for (const x of [0, 0.5, 1]) g += text(P(x, front, 0).x, by, `${Math.round(x * 100)}%`);
+  g += text(P(0.5, front, 0).x, by + 14, "Market's chance", "mm-axtitle");
+  const off = right ? 0.05 : -0.05;
+  for (const y of [-0.2, 0, 0.2]) {
+    const q = P(right + off, y, 0);
+    g += text(q.x, q.y + 3, y ? `${y > 0 ? "+" : "−"}${Math.abs(y * 100)} pts` : "0", "mm-tick", right ? "start" : "end");
+  }
+  // The depth axis's name sits under its nearer tick.
+  const yt = P(right + off, front > 0 ? 0.2 : -0.2, 0);
+  g += text(yt.x, yt.y + 16, "Model − market", "mm-axtitle", right ? "start" : "end");
+  const zside = zt.x < fr.cx ? "end" : "start", zdx = zside === "end" ? -5 : 5;
+  g += text(zt.x + zdx, zt.y + 4, `+${(zmax * 100).toFixed(0)}`, "mm-tick", zside);
+  g += text(zb.x + zdx, zb.y + 4, `−${(zmax * 100).toFixed(0)}`, "mm-tick", zside);
+  // The height axis's name: the box's top-left corner, above everything drawn.
+  g += text(4, 13, "Height: happened − market (pts)", "mm-axtitle", "start");
   return `<svg viewBox="0 0 ${MM3D.w} ${MM3D.h}" role="img" aria-label="3D map: the market's chance across, the model minus the market in depth, and how often the outcome happened against the market in height">${g}</svg>`;
 }
 function mmDefaultReadout() {

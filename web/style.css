@@ -1036,8 +1036,9 @@ details.drv-fold { margin-top: 10px; }
 .mm-3d .mm-gridline { stroke: var(--border); stroke-width: 0.6; }
 .mm-3d .mm-gridline.zero { stroke: var(--text-muted); stroke-dasharray: 3 2; }
 .mm-3d .mm-axisline { stroke: var(--text-muted); stroke-width: 0.8; }
-.mm-3d .mm-tick { fill: var(--text-muted); font-size: 9px; }
-.mm-3d .mm-axtitle { fill: var(--text-secondary); font-size: 9.5px; font-weight: 600; }
+.mm-3d .mm-tick { fill: var(--text-muted); font-size: 10px; }
+.mm-3d .mm-tick, .mm-3d .mm-axtitle { paint-order: stroke; stroke: var(--surface-2); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.mm-3d .mm-axtitle { fill: var(--text-secondary); font-size: 10.5px; font-weight: 600; }
 .mm-3d .mm-whisker { stroke: var(--text-muted); stroke-width: 1; opacity: 0.6; }
 .mm-3d .mm-stem { stroke-width: 2; }
 .mm-3d .mm-pt.t-pos .mm-stem { stroke: var(--pos); } .mm-3d .mm-pt.t-pos circle { fill: var(--pos); }
