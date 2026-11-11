@@ -254,6 +254,7 @@ def run(
         res["estimate"] = est
     dry = cap <= 0 or not api_key
     res["dry_run"] = dry
+    res["net_estimate"] = 0  # dry run: the cost after the cache (bodies not already held)
     if dry:
         budget.log.append(
             f"Dry run (cap 0 or no key): no Odds API calls; {len(days)} match days "
@@ -282,7 +283,10 @@ def run(
         """(body or None, stop?) for one capped, cached call."""
         if path.exists():
             return json.loads(path.read_text()), False
-        if key in done or dry:
+        if key in done:
+            return None, False
+        if dry:  # what a paid run would buy: not cached, never answered before
+            res["net_estimate"] += estimate
             return None, False
         if end is not None and time.monotonic() > end:
             res["stopped"] = f"time budget of {minutes:g} minutes used; run again to resume"
@@ -344,6 +348,8 @@ def run(
             elif gaps and known:
                 body = list(known.values())
         evs = day_events(body, d["day"])
+        if dry and body is None:  # list not held: its events unknown, count them gross
+            res["net_estimate"] += HIST_COST * len(SNAPSHOTS) * d["matches"]
         if until is not None:
             evs = [e for e in evs if pd.Timestamp(e["commence_time"]) <= until]
         s["events"] += len(evs)
@@ -399,7 +405,10 @@ def summary_lines(res: dict) -> list[str]:
     )
     lines = [head]
     if res.get("dry_run"):
-        lines.append(f"  dry run: about {res['estimate']} credits before what the cache holds")
+        lines.append(
+            f"  dry run: about {res.get('net_estimate', 0)} credits after the cache (bodies not "
+            f"already held); {res['estimate']} before what the cache holds"
+        )
     else:
         lines.append(
             f"  bought {res['bought']['lists']} lists and {res['bought']['snapshots']} snapshots, "
