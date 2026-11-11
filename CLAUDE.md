@@ -1100,7 +1100,9 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   lists each `gap`; the CLI refuses an empty live record. Per league and UTC match day (football-data kickoffs) one
   events list 3 h before the first kickoff (1 credit), then each event at kickoff − 50 and − 2 min
   (`SNAPSHOTS`) with §16's ten books (`BOOKS`; `JUDGED_BOOKS` = the nine bookmakers), 10 credits a
-  snapshot. `CappedBudget` with the 3,000 reserve, a call over `MAX_CALL_COST` 10 or a
+  snapshot. A dry run prints the cost after the cache (`net_estimate`: bodies not already held
+  nor answered before) beside the gross `estimate` (lead, 11 Nov: the net cost is what counts
+  against a cap). `CappedBudget` with the 3,000 reserve, a call over `MAX_CALL_COST` 10 or a
   network/401/429/5xx error stops, a 404/422 for one event is recorded and skipped (`KEEP_GOING`);
   `calls.jsonl` and every body in `data/raw/player_odds_history/goalscorer_test/` (paid cache,
   never bought twice); cap 0 = dry run; resumable within `--minutes`. Log line
