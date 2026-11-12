@@ -47,7 +47,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v84";
+const APP_VERSION = "v85";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -1763,6 +1763,37 @@ function teamTotalsProgressHtml(tm) {
   }
   return liveHtml;
 }
+// The team-total test's one pre-registered read (live.result; Research, 12 Nov, PR #248): every
+// candidate's matches, bets at the 2% rule and CLV against FanDuel's close, the model's blend
+// weight c, and the verdict. Logging goes on.
+const TT_CANDIDATES = [
+  ["model", "Our model"],
+  ["fanduel_anchor", "Built from FanDuel's match total"],
+  ["pinnacle_anchor", "Built from Pinnacle's match total"],
+  ["blend", "Half our model, half Pinnacle's"],
+];
+const ttRange = (r, f) => (Array.isArray(r) ? `${f(r[0])} to ${f(r[1])}` : "");
+function teamTotalsResultHtml(res) {
+  const m = res.model || {}, n = res.matches || {};
+  const rows = TT_CANDIDATES.filter(([k]) => res[k]).map(([k, label]) => {
+    const c = res[k];
+    const matches = n[k] ?? n.pinnacle_anchor;
+    const clv = c.clv == null ? "–" : `${signedPct(c.clv)}${c.clv_range ? `<br><small>${ttRange(c.clv_range, signedPct)}</small>` : ""}`;
+    return `<tr><td>${esc(label)}</td><td>${num(matches)}</td><td>${num(c.bets ?? 0)}</td><td class="${c.clv != null && c.clv < 0 ? "loss" : ""}">${clv}</td></tr>`;
+  }).join("");
+  return `
+    <div class="card tt-result">
+      <div class="mk-progress-head"><b>${res.passes ? "Passed" : "No edge"}.</b> ${num(m.bets ?? 0)} bets by the model at a 2% edge, closing line value ${signedPct(m.clv)}${m.clv_range ? ` (${ttRange(m.clv_range, signedPct)})` : ""} against FanDuel's close.</div>
+      <table class="mkts mk-table tt-table">
+        <thead><tr><th>Prices from</th><th>Matches</th><th>Bets</th><th>CLV</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="note" style="margin:8px 0 0">Blend weight of the model beside FanDuel's price: c = ${gainFmt(m.blend_c, 2)}${m.blend_c_range ? ` (${ttRange(m.blend_c_range, (v) => gainFmt(v, 2))})` : ""}. A range across 0 means the model adds nothing FanDuel's price doesn't already hold. Its log-loss gain against FanDuel's early price: ${gainFmt(m.gain, 4)}${m.gain_range ? ` (${ttRange(m.gain_range, (v) => gainFmt(v, 4))})` : ""}.</p>
+      <p class="note" style="margin:8px 0 0">An edge needed a candidate with 30+ bets and its CLV range above 0. ${res.level ? `Ranges at ${esc(res.level)}, read once` : "Read once"}${res.run ? ` (run ${esc(res.run)})` : ""}. <b>Logging continues</b>: it is cheap and it is the only data a later team-goals idea would have.</p>
+    </div>`;
+}
+// The result when the test has been read, else (older data) its progress toward the gate.
+const teamTotalsLiveHtml = (tm) => (tm?.live?.result ? teamTotalsResultHtml(tm.live.result) : teamTotalsProgressHtml(tm));
 function marketTeamGoals(tm, withLive = true) {
   if (!tm) return "";
   const res = tm.research || {}, live = tm.live || {};
@@ -1773,9 +1804,9 @@ function marketTeamGoals(tm, withLive = true) {
     </table></div>
     <p class="note">Each team over/under 0.5, 1.5 and 2.5 goals. Gains ${esc(res.gains || "")}. Well calibrated at ${esc(res.calibrated || "")} (slopes ${esc(res.slopes || "")}, 1 is ideal). ${esc(res.e1 || "")} ${esc(res.seasons || "")}.</p>
     ${sourceNote(res)}` : "";
-  return marketCard("Each team's goals", tm.verdict, "mid", `
-    <p class="note" style="margin-top:4px">In past seasons the model beat the league average at ${res.lines_beating_top5 ?? "–"} of ${res.lines_top5 ?? "–"} lines in the top five leagues. ${withLive ? esc(live.plan || "") : "Its test against a bookmaker is the team-total log: the Team totals (logging only) row in Moneyline's main list."}</p>
-    ${withLive ? `<div class="sub-title">${esc(live.title || "Live test against FanDuel")}</div>${teamTotalsProgressHtml(tm)}` : ""}`, table);
+  return marketCard("Each team's goals", tm.verdict, live.result ? "neg" : "mid", `
+    <p class="note" style="margin-top:4px">In past seasons the model beat the league average at ${res.lines_beating_top5 ?? "–"} of ${res.lines_top5 ?? "–"} lines in the top five leagues. ${withLive ? esc(live.plan || "") : live.result ? "Its test against a bookmaker found no edge: the Team totals (logging only) row in Moneyline's Archive." : "Its test against a bookmaker is the team-total log: the Team totals (logging only) row in Moneyline's main list."}</p>
+    ${withLive ? `<div class="sub-title">${esc(live.title || "Live test against FanDuel")}</div>${teamTotalsLiveHtml(tm)}` : ""}`, table);
 }
 
 const bandText = (part) => ((part?.slope_band || [0.8, 1.25]).map((v) => v.toFixed(2)).join("–"));
@@ -5269,14 +5300,16 @@ function studies() {
 // The goals-market research (data.markets_research, from lab/markets_research.json; moved from
 // Record → Goals & corners on 28 Oct) as two Moneyline rows: "Goals markets" (total goals and
 // each team's goals), closed, in the Archive; and the team-total log (FanDuel, scored at the
-// round-13 gate of 50 matches), in testing, in the main list. Corners' research is Team
-// corners → Backtest. `markets` says which page a row opens.
+// round-13 gate of 50 matches): in testing in the main list until the test is read, then
+// (live.result, 12 Nov: no edge) closed in the Archive. Corners' research is Team corners →
+// Backtest. `markets` says which page a row opens.
 function marketStudies() {
   const mr = state.data?.markets_research;
   if (!mr || typeof mr !== "object") return [];
   const out = [];
   if (mr.total_goals || mr.team_goals) out.push({ id: "goals_markets", portfolio: "moneyline", name: "Goals markets: total goals and each team's goals", verdict: "closed", markets: "goals", closed_at: mr.updated || null, cost: { total: 0 } });
-  if (mr.team_goals?.live) out.push({ id: "team_totals_log", portfolio: "moneyline", name: "Team totals (logging only)", verdict: "testing", markets: "team_totals" });
+  const ttRead = mr.team_goals?.live?.result;
+  if (mr.team_goals?.live) out.push({ id: "team_totals_log", portfolio: "moneyline", name: "Team totals (logging only)", verdict: ttRead ? "closed" : "testing", markets: "team_totals", closed_at: ttRead ? mr.updated || null : null, cost: ttRead ? { total: 0 } : undefined });
   return out;
 }
 const isMarketStudy = (sd) => !!sd?.markets;
@@ -5380,6 +5413,14 @@ function cbFolderHtml(cur) {
 // markets_research, as Record → Goals & corners showed them).
 function marketStudyHeadline(sd) {
   const mr = state.data?.markets_research || {};
+  if (sd.markets === "team_totals" && mr.team_goals?.live?.result) {
+    const m = mr.team_goals.live.result.model || {};
+    return {
+      right: `<b class="neg-text">No edge</b><small>${num(m.bets ?? 0)} model bets</small>`,
+      meta: [`Closed${sd.closed_at ? ` ${studyDay(sd.closed_at)}` : ""}`, "never traded", "logging continues"].join(" · "),
+      bt: `Against FanDuel's close: CLV ${signedPct(m.clv)}${m.clv_range ? ` (${ttRange(m.clv_range, signedPct)})` : ""} on the model's ${num(m.bets ?? 0)} bets`,
+    };
+  }
   if (sd.markets === "team_totals") {
     const live = mr.team_goals?.live || {}, p = live.progress || {};
     const target = p.target || live.target || 50;
@@ -5393,12 +5434,21 @@ function marketStudyHeadline(sd) {
   return {
     right: `<b class="neg-text">No edge</b><small>${parts.length} market${parts.length === 1 ? "" : "s"}</small>`,
     meta: [`Closed${sd.closed_at ? ` ${studyDay(sd.closed_at)}` : ""}`, "never traded", "free data, no credits"].join(" · "),
-    bt: `${mr.total_goals ? "Total goals lose to Pinnacle's price" : ""}${mr.total_goals && mr.team_goals ? " · " : ""}${mr.team_goals ? "each team's goals beat the league average, not yet a bookmaker" : ""}`,
+    bt: `${mr.total_goals ? "Total goals lose to Pinnacle's price" : ""}${mr.total_goals && mr.team_goals ? " · " : ""}${mr.team_goals ? (mr.team_goals.live?.result ? "each team's goals beat the league average, not FanDuel's price" : "each team's goals beat the league average, not yet a bookmaker") : ""}`,
   };
 }
 function marketStudyPageHtml(cur, sd) {
   const mr = state.data?.markets_research || {};
   const head = (sub) => `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(studyStrat(sd).label)} ${verdictPill(sd)}</h2><div class="pf-sub">${sub}</div>`;
+  if (sd.markets === "team_totals" && mr.team_goals?.live?.result) {
+    const tm = mr.team_goals, live = tm.live;
+    return `${head(`Closed${sd.closed_at ? ` ${studyDay(sd.closed_at)}` : ""}: no edge against FanDuel · logging continues, nothing is bet`)}
+      <div class="verdict neg">${esc(tm.verdict || "")}</div>
+      <p class="note">${esc(live.plan || "")}</p>
+      <div class="section-title">${esc(live.title || "Test against FanDuel")}</div>
+      ${teamTotalsResultHtml(live.result)}
+      <p class="note">The test was pre-registered: the model, prices built from FanDuel's and Pinnacle's own match totals, and a half-and-half mix were scored against FanDuel's closing price, read once at the gate. As nothing passed, the test stops: no rule, no bets. The research behind it is in the Archive's Goals markets row.</p>`;
+  }
   if (sd.markets === "team_totals") {
     const tm = mr.team_goals || {}, live = tm.live || {};
     return `${head("Testing: FanDuel's team-total prices are logged, nothing is bet")}

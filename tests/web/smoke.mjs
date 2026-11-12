@@ -549,7 +549,8 @@ const STEPS = [
     await tab("portfolio")(p);
   }],
   // Record → Goals & corners became two Moneyline rows: Goals markets (closed, in the
-  // Archive, with the range charts) and Team totals (logging only), testing, in the main list.
+  // Archive, with the range charts) and Team totals (logging only): closed in the Archive
+  // since its test was read (12 Nov, no edge), in testing in the main list on older data.
   ["portfolio-goals-markets", async (p) => {
     await pfOpenPf(p, "moneyline");
     if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="goals_markets"]').count())) throw new Error("Goals markets isn't in the Archive");
@@ -557,7 +558,7 @@ const STEPS = [
     for (const w of ["Goals markets", "Closed", "No edge", "never traded", "Total goals lose to Pinnacle's price"]) if (!row.includes(w)) throw new Error(`Goals markets row lacks "${w}": ${row}`);
     await p.click('button[data-pfstrat="goals_markets"]');
     const text = await p.textContent("#view");
-    for (const w of ["Total goals", "Each team's goals", "No edge", "Team totals (logging only) row", "Corners' research is under Team corners"]) if (!text.includes(w)) throw new Error(`Goals markets page lacks "${w}"`);
+    for (const w of ["Total goals", "Each team's goals", "No edge", "Team totals (logging only) row in Moneyline's Archive", "Corners' research is under Team corners"]) if (!text.includes(w)) throw new Error(`Goals markets page lacks "${w}"`);
     if (text.includes("5 of 50")) throw new Error("the team-total progress belongs on its own row");
     await scrubCheck(p, "[data-scrub='tg']");
   }],
@@ -565,15 +566,38 @@ const STEPS = [
     for (const d of await p.locator("details.mk-fold > summary").all()) await d.click();
     if (!(await p.textContent("#view")).includes("Lines better")) throw new Error("the league tables don't open");
   }],
+  // The team-total test was read on 12 Nov (no edge): the row is closed, in the Archive, and its
+  // page shows the result in place of the gate's progress.
   ["portfolio-team-totals", async (p) => {
     await pfUp(p);
-    const main = await p.locator('.card.folders').first().locator('button[data-pfstrat="team_totals_log"]').count();
-    if (!main) throw new Error("Team totals isn't in the main list");
+    if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="team_totals_log"]').count())) throw new Error("Team totals isn't in the Archive");
     const row = (await p.locator('button[data-pfstrat="team_totals_log"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Team totals (logging only)", "Testing", "5 of 50", "places no bets"]) if (!row.includes(w)) throw new Error(`Team totals row lacks "${w}": ${row}`);
+    for (const w of ["Team totals (logging only)", "Closed", "No edge", "199 model bets", "logging continues", "CLV −4.7% (−6.1% to −3.3%) on the model's 199 bets"]) if (!row.includes(w)) throw new Error(`Team totals row lacks "${w}": ${row}`);
+    if (row.includes("of 50")) throw new Error("a read test shows no gate progress");
+    await p.click('button[data-pfstrat="team_totals_log"]');
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Test against FanDuel: no edge (12 Nov)", "No edge. 199 bets by the model at a 2% edge, closing line value −4.7% (−6.1% to −3.3%)", "Our model", "Built from FanDuel's match total", "Built from Pinnacle's match total", "213", "71", "203", "c = −0.13 (−0.94 to +0.78)", "Logging continues", "run 43243468899", "nothing is bet"]) if (!text.includes(w)) throw new Error(`Team totals page lacks "${w}"`);
+    if (text.includes("matches ready to score")) throw new Error("the read test shouldn't show the progress card");
+  }],
+  // Older data (no live.result): the row is testing in the main list with the gate's progress.
+  ["portfolio-team-totals-old", async (p) => {
+    await p.route("**/data.json", async (route) => {
+      const res = await route.fetch();
+      const d = await res.json();
+      delete d.markets_research.team_goals.live.result;
+      await route.fulfill({ response: res, json: d });
+    });
+    await p.reload(); await p.waitForSelector("button.match");
+    await tab("portfolio")(p); await pfOpenPf(p, "moneyline");
+    if (!(await p.locator('.card.folders').first().locator('button[data-pfstrat="team_totals_log"]').count())) throw new Error("older data: Team totals belongs in the main list");
+    const row = (await p.locator('button[data-pfstrat="team_totals_log"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Testing", "5 of 50", "places no bets"]) if (!row.includes(w)) throw new Error(`older Team totals row lacks "${w}": ${row}`);
     await p.click('button[data-pfstrat="team_totals_log"]');
     const text = await p.textContent("#view");
-    for (const w of ["5 of 50", "matches ready to score", "Live test against FanDuel", "nothing is bet"]) if (!text.includes(w)) throw new Error(`Team totals page lacks "${w}"`);
+    for (const w of ["5 of 50", "matches ready to score"]) if (!text.includes(w)) throw new Error(`older Team totals page lacks "${w}"`);
+    await p.unroute("**/data.json");
+    await p.reload(); await p.waitForSelector("button.match");
+    await tab("portfolio")(p); await pfOpenPf(p, "moneyline");
   }],
   // The publish field missing (a broken or old build): no goals rows, nothing else breaks.
   ["portfolio-markets-missing", async (p) => {
@@ -629,7 +653,7 @@ const STEPS = [
     // Each draw no bet track sits right after its parent in the main list (owner, 26 Oct).
     // Model 12% and its draw no bet track are archived (owner, 26 Oct), after the old Lean rule.
     // A failed pre-match study (the strategy search) joins the Archive last (owner, 28 Oct).
-    if (strats.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct,team_totals_log,lean_all_odds,edge12,edge12_dnb,strategy_search,goals_markets") throw new Error(`strategy folders: ${strats.join(",")}`);
+    if (strats.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct,lean_all_odds,edge12,edge12_dnb,strategy_search,goals_markets,team_totals_log") throw new Error(`strategy folders: ${strats.join(",")}`);
     const archive = await p.locator(".section-title", { hasText: "Archive" }).count();
     if (!archive || !(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="lean_all_odds"]').count())) throw new Error("the old rule isn't in the Archive list");
     // The strategy folders: Lean's row carries its own settled record and its backtest.
@@ -1534,7 +1558,7 @@ const STEPS = [
   ["portfolio-lineshop", async (p) => {
     await closeSheet(p); await pfOpenPf(p, "moneyline"); await p.click('.chip[data-league=""]');
     const main = await p.locator('.section-title:has-text("Strategies") + .card button[data-pfstrat]').evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
-    if (main.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct,team_totals_log") throw new Error(`Moneyline main list: ${main.join(",")}`);
+    if (main.join(",") !== "lean,lean_dnb,lineshop,lineshop_1pct") throw new Error(`Moneyline main list: ${main.join(",")}`);
     const row = (await p.locator('button[data-pfstrat="lineshop"]').innerText()).replace(/\s+/g, " ");
     for (const w of ["Line shop vs Pinnacle", "Live since Sep 27 · 2%+ over Pinnacle's fair price · best of 4 books", "Judged at 300 bets: 3 with a final close so far"]) if (!row.includes(w)) throw new Error(`line shop row lacks "${w}": ${row}`);
     const row1 = (await p.locator('button[data-pfstrat="lineshop_1pct"]').innerText()).replace(/\s+/g, " ");
