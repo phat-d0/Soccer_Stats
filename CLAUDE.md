@@ -338,8 +338,16 @@ on 4 Nov; trigger ids):
   (backfill run 42640394738) left the fits unchanged from 8 Nov's ridge refit. Live record then:
   Lean new rule 22 trades, +$129.60, CLV vs DraftKings −5.3%; market-driven 12, +$93.40, −9.0%;
   model-driven 25, −$29.20, −4.2%; Model 12% 299, −$453.60, −7.3%.
-- 12 Nov 2026 (`trig_01L39tjFC9YJxpmZabB9QfkR`): should Blend Lean extend to team corners and
-  team goals? Team goals wait for the round-13 gate; corners need a pre-registered blend and σ.
+- 12 Nov 2026 (`trig_01L39tjFC9YJxpmZabB9QfkR`, done): should Blend Lean extend to team corners
+  and team goals? Team goals: the round-13 gate was reached (FanDuel anchor 71, Pinnacle anchor
+  203 settled matches), so its single development run went (odds-check run 43243468899): **fail**,
+  no candidate passes (model vs FanDuel −0.0126 log loss, its 2% rule CLV −4.7%, −6.1% to −3.3%;
+  anchors level; the model's blend weight c −0.13, −0.94 to +0.78), so no Lean for team goals
+  (Research writes it up in `docs/totals.md`). Corners: the log held 474 Pinnacle team lines with
+  a look and a close (258 matches, eight leagues; DraftKings 272), so Research lab pre-registers a
+  corners Lean (blend on Pinnacle's fair and model (f), σ, walk-forward, pooled; z ≥ 1; CLV vs
+  Pinnacle's close) and the Corners team then builds it as a side-by-side paper track backcast
+  from 14 Oct, then UI Design.
 - 16 Nov 2026 (`trig_01NQ9nZxt3QWgmvdestPM8QG`): late team news vs the DraftKings odds log
   (Research lab; ≥100 logged matches). Measure how fast DraftKings reacts compared with
   Pinnacle after a lineup surprise; data-log `team_news/` has `first_confirmed_at` per match.
