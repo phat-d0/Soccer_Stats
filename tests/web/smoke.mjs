@@ -801,9 +801,12 @@ const STEPS = [
     if (!e12.includes("Archived Oct 26 · still logs every 12%-edge pick") || !e12.includes("Backtest:")) throw new Error(`Model 12% row: ${e12}`);
     const arch = (await p.locator('.section-title:has-text("Archive") + .card + .note').innerText()).replace(/\s+/g, " ");
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
+    // The top-level row counts the Archive list's rows: read here, not hard-coded, so a study
+    // or track moving to the Archive changes one place (the app), not this check.
+    const archived = await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat]').count();
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Lead: Blend Lean (new rule) · 2 more · 1 draw no bet track · 6 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes(`Lead: Blend Lean (new rule) · 2 more · 1 draw no bet track · ${archived} archived`) || home.includes("Model 12%")) throw new Error(`Moneyline row (${archived} archived): ${home}`);
     // The headline is the lead strategy's: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
