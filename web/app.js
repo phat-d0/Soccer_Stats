@@ -25,6 +25,9 @@ const state = {
   kellyShown: {}, // Kelly bet log rows shown per strategy (25, then 50 more a tap)
   kellyOpen: "", // the Kelly bet log kept open across re-renders
   kellyFocus: "", // the trade the sheet's "How it was sized" points at
+  // Research → Model vs Market Map (owner, 9 Nov): open or not, view (null = by width), price,
+  // thin groups hidden, factor, the picked square / point and the 3D view's turn.
+  mm: { open: false, view: null, price: "close", hideThin: true, factor: "side", sel: null, ssel: null, sel3d: null, ssurf: null, show: "surface", az: -20, el: 34 },
   pfStratGoal: store.get("pfStratGoal", ""), // Anytime goalscorer: which line ("" = the main one)
   pfStratCorners: store.get("pfStratCorners", ""), // Team corners: which book's strategy ("" = the lead, DraftKings under 60%)
   pfStratResearch: "", // In-play research: which study ("" = the first)
@@ -44,7 +47,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v80";
+const APP_VERSION = "v84";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2077,7 +2080,483 @@ function rsCard(s) {
       ${go}
     </article>`;
 }
+// ---------- Model vs Market Map (owner, 9 Nov): Research lab's residual map in the Research tab ----------
+// data.residual_map = lab/residual_map.json passed through by publish.py: {seasons, leagues,
+// rows, matches, locked_from, thin_below, core: {close, early: {x_edges, y_edges, cells [{xi,
+// yi, n, matches, x, y, won, z, z_ci95}]}}, slices: {key: {label, levels, bands, cells [{level,
+// band, …}], note}}, multiplicity, note, warning, xg_files, runs}. x = the market's margin-free
+// chance, y = the model's minus it, z = won minus it. Display only: nothing is recomputed.
+// The artifact's 3D view used Plotly from a CDN; here it is a small SVG of our own (no CDN:
+// the app must work offline), dragged to turn. Phones open on the flat grid, as the artifact.
+const mmData = () => state.data?.residual_map || null;
+const mmThin = () => mmData()?.thin_below || 200;
+const MM_FACTORS = ["side", "home_league", "league", "rest_diff", "europe", "xg_luck", "new_team", "month", "price_move", "driver"];
+const MM_BAND_HEAD = ["far below", "below", "about equal", "above", "far above"];
+const mmPts = (v, d = 1) => (v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(d)} pts`);
+const mmSig = (c) => !!(c.z_ci95 && (c.z_ci95[0] > 0 || c.z_ci95[1] < 0));
+const mmAgree = (c) => c.y != null && Math.abs(c.y) < 0.02;
+// Who was right: the model's disagreement (y) times what happened against the market (z).
+const mmVerdict = (c) => (c.y == null || c.z == null || mmAgree(c) ? 0 : Math.sign(c.y) * c.z);
+const mmTone = (c) => (mmAgree(c) ? "agree" : mmVerdict(c) >= 0 ? "pos" : "neg");
+const mmSeason = (s) => `20${String(s).slice(0, 2)}/${String(s).slice(2)}`;
+const mmNum = (n) => Number(n).toLocaleString("en-US");
+function mmDescribe(c, prefix) {
+  if (!c || !c.n) return "No outcomes in this group.";
+  const lines = prefix ? [rsText(prefix)] : [];
+  const agree = mmAgree(c);
+  lines.push(`Market said ${pct(c.x, 1)} · model ${agree ? "agreed within 2 pts" : `said ${mmPts(Math.abs(c.y)).replace("+", "")} ${c.y > 0 ? "higher" : "lower"}`}`);
+  lines.push(`Happened ${pct(c.won, 1)}: ${mmPts(c.z)} vs the market${c.z_ci95 ? ` (range ${mmPts(c.z_ci95[0])} to ${mmPts(c.z_ci95[1])})` : ""}`);
+  let who;
+  if (c.n < mmThin()) who = `Only ${mmNum(c.n)} outcomes: too few to read.`;
+  else if (agree) who = mmSig(c) ? "Both agreed, and both were off." : "They agreed, and the result matched.";
+  else if (!mmSig(c)) who = "Can't tell who was right: the range includes zero.";
+  else who = mmVerdict(c) > 0 ? "The model was right here." : "The market was closer here.";
+  lines.push(`${mmNum(c.n)} outcomes from ${mmNum(c.matches)} matches. ${who}`);
+  return lines.join("<br>");
+}
+function mmState() {
+  const s = state.mm;
+  if (!s.view) s.view = window.matchMedia?.("(max-width: 520px)").matches ? "flat" : "3d";
+  return s;
+}
+const mmCore = () => mmData().core[mmState().price] || mmData().core.close;
+const mmShown = () => mmCore().cells.filter((c) => c.n && (!state.mm.hideThin || c.n >= mmThin()));
+// A grid square: tone by who was right, strength by how far it happened from the market.
+function mmSquare(c, key, kind) {
+  const amt = Math.min(1, Math.abs(c.z) / 0.06) * 0.85 + 0.12;
+  const cls = ["mm-cell", `t-${mmTone(c)}`, c.n < mmThin() ? "thin" : "", mmSig(c) ? "sig" : "", amt > 0.55 ? "strong" : "", state.mm[kind === "core" ? "sel" : "ssel"] === key ? "sel" : ""].filter(Boolean).join(" ");
+  return `<td class="${cls}" tabindex="0" data-mmk="${esc(key)}" style="--a:${Math.round(amt * 100)}%">${c.z >= 0 ? "+" : "−"}${Math.abs(c.z * 100).toFixed(1)}</td>`;
+}
+function mmBandLabel(lo, hi) {
+  const f = (v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.round(Math.abs(v * 100))}`;
+  if (lo == null) return `&lt;${f(hi)}`;
+  if (hi == null) return `&gt;${f(lo)}`;
+  if (lo === -hi) return `±${Math.round(Math.abs(hi * 100))}`;
+  return `${f(lo)}…${f(hi)}`;
+}
+function mmFlatHtml() {
+  const co = mmCore(), xe = co.x_edges, ye = co.y_edges, thin = mmThin();
+  const by = new Map(co.cells.map((c) => [`${c.xi}:${c.yi}`, c]));
+  let h = `<table class="mm-grid" data-mmgrid="core"><thead><tr><th></th>`;
+  for (let xi = 0; xi < xe.length - 1; xi++) h += `<th>${Math.round(xe[xi] * 100)}–<wbr>${Math.round(xe[xi + 1] * 100)}</th>`;
+  h += `</tr></thead><tbody>`;
+  for (let yi = ye.length - 2; yi >= 0; yi--) {
+    h += `<tr><th class="rowh">${mmBandLabel(ye[yi], ye[yi + 1])}</th>`;
+    for (let xi = 0; xi < xe.length - 1; xi++) {
+      const c = by.get(`${xi}:${yi}`);
+      h += !c || !c.n || (state.mm.hideThin && c.n < thin) ? `<td class="mm-cell empty">·</td>` : mmSquare(c, `${xi}:${yi}`, "core");
+    }
+    h += `</tr>`;
+  }
+  return `${h}</tbody></table><p class="mm-axis">Across: the market's chance (%). Down: the model minus the market (pts), the model above the market at the top. Squares: how often it happened against the market (pts). Tap or drag across the squares for the numbers.</p>`;
+}
+// The 3D view: an orthographic projection turned by azimuth (az) and elevation (el), drawn
+// as SVG with the theme's colours (classes, so a theme change needs no redraw).
+// The box and its margins for labels. The scale is fitted to what is drawn at the current
+// turn (floor, height axis, points and their ranges), so the cloud fills the box; it follows
+// smoothly while dragging (owner via the lead, 10 Nov).
+const MM3D = { w: 440, h: 300, padL: 22, padR: 64, padT: 26, padB: 40 };
+const MM_ZH = 0.75;
+const MM_UNIT = { s: 1, cx: 0, cy: 0 };
+function mmFit(raw) {
+  const xs = raw.map((p) => p.x), ys = raw.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const iw = MM3D.w - MM3D.padL - MM3D.padR, ih = MM3D.h - MM3D.padT - MM3D.padB;
+  const s = Math.min(iw / Math.max(x1 - x0, 1e-6), ih / Math.max(y1 - y0, 1e-6));
+  return { s, cx: MM3D.padL + iw / 2 - (s * (x0 + x1)) / 2, cy: MM3D.padT + ih / 2 - (s * (y0 + y1)) / 2 };
+}
+function mmProject(X, Y, Z, fr = MM_UNIT) {
+  const a = (state.mm.az * Math.PI) / 180, e = (state.mm.el * Math.PI) / 180;
+  const sx = X * Math.cos(a) - Y * Math.sin(a);
+  const dy = X * Math.sin(a) + Y * Math.cos(a);
+  const up = Z * Math.cos(e) + dy * Math.sin(e);
+  return { x: fr.cx + sx * fr.s, y: fr.cy - up * fr.s, d: dy * Math.cos(e) - Z * Math.sin(e) };
+}
+function mmZmax(cs) {
+  let m = 0.02;
+  cs.forEach((c) => { const r = c.z_ci95 || [c.z, c.z]; m = Math.max(m, Math.abs(c.z), Math.abs(r[0]), Math.abs(r[1])); });
+  return m * 1.1;
+}
+// The smoothed surface (owner via the lead, 10 Nov; the reference page's surface()): on a grid
+// of market chance 7.5–77.5% (2.5 steps) by model minus market −14 to +14 pts (1-pt steps), an
+// outcome-weighted Gaussian average of every group's height (thin groups too: the weights
+// handle them), w = n·exp(−½(dx/7)² − ½(dy/3)²), blank where Σw < 300. Its 95% range is
+// approximate: se = √(Σw²·var)/Σw, var from the group's range (width ÷ 3.92, squared), else
+// x(1 − x)/n. Everything in pts; one surface per price, kept.
+const MM_SURF = { sx: 7, sy: 3, min: 300, nx: 29, ny: 29 };
+const mmSurfKept = new WeakMap();
+function mmSurface(co = mmCore()) {
+  if (mmSurfKept.has(co)) return mmSurfKept.get(co);
+  const all = co.cells.filter((c) => c.n);
+  const vr = (c) => (c.z_ci95 ? (((c.z_ci95[1] - c.z_ci95[0]) / 3.92) * 100) ** 2 : ((c.x * (1 - c.x)) / c.n) * 1e4);
+  const xs = Array.from({ length: MM_SURF.nx }, (_, i) => 7.5 + 2.5 * i);
+  const ys = Array.from({ length: MM_SURF.ny }, (_, j) => -14 + j);
+  let zmax = 0, zmin = Infinity, ztop = -Infinity;
+  const pts = ys.map((y, j) => xs.map((x, i) => {
+    let W = 0, S = 0, V = 0;
+    for (const c of all) {
+      const w = c.n * Math.exp(-0.5 * (((c.x * 100 - x) / MM_SURF.sx) ** 2 + ((c.y * 100 - y) / MM_SURF.sy) ** 2));
+      W += w; S += w * c.z * 100; V += w * w * vr(c);
+    }
+    if (!(W >= MM_SURF.min)) return null;
+    const z = S / W, se = Math.sqrt(V) / W;
+    zmax = Math.max(zmax, Math.abs(z)); zmin = Math.min(zmin, z); ztop = Math.max(ztop, z);
+    return { i, j, x, y, z, lo: z - 1.96 * se, hi: z + 1.96 * se, n: W };
+  }));
+  const out = { xs, ys, pts, zmax: Math.max(zmax, 0.5), zmin, ztop };
+  mmSurfKept.set(co, out);
+  return out;
+}
+const mmSurfOn = () => state.mm.view === "3d" && state.mm.show !== "points";
+const mmPtsOn = () => state.mm.view === "3d" && state.mm.show !== "surface";
+// A height's colour on the diverging scale: orange below 0, neutral at 0, teal above.
+function mmSurfFill(z, zs) {
+  const t = Math.max(-1, Math.min(1, z / zs));
+  return `color-mix(in srgb,var(${t < 0 ? "--surf-lo" : "--surf-hi"}) ${Math.round(Math.abs(t) * 100)}%,var(--surf-mid))`;
+}
+const mmPtsText = (v, d = 0) => (Math.abs(v) < 0.5 * 10 ** -d ? (0).toFixed(d) : `${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`);
+function mmSurfDescribe(q) {
+  const about = q.n >= 1000 ? Math.round(q.n / 100) * 100 : Math.round(q.n / 10) * 10;
+  const x = Number.isInteger(q.x) ? `${q.x}` : q.x.toFixed(1);
+  return `Market's chance ${x}% · model minus market ${mmPtsText(q.y)} pts · happened ${mmPtsText(q.z, 1)} pts vs the market · 95% range about ${mmPtsText(q.lo, 1)} to ${mmPtsText(q.hi, 1)} · smoothed from about ${mmNum(about)} outcomes`;
+}
+// Iso-lines at every whole point of height, by marching squares on the grid (floor contours).
+function mmContours(sf) {
+  const segs = [];
+  for (let j = 0; j < sf.ys.length - 1; j++) {
+    for (let i = 0; i < sf.xs.length - 1; i++) {
+      const q = [sf.pts[j][i], sf.pts[j][i + 1], sf.pts[j + 1][i + 1], sf.pts[j + 1][i]];
+      if (q.some((v) => !v)) continue;
+      const zs = q.map((v) => v.z);
+      for (let L = Math.ceil(Math.min(...zs)); L <= Math.floor(Math.max(...zs)); L++) {
+        const hits = [];
+        for (let k = 0; k < 4; k++) {
+          const a = q[k], b = q[(k + 1) % 4];
+          if ((a.z < L) === (b.z < L)) continue;
+          const t = (L - a.z) / (b.z - a.z);
+          hits.push([a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)]);
+        }
+        for (let k = 0; k + 1 < hits.length; k += 2) segs.push({ L, a: hits[k], b: hits[k + 1] });
+      }
+    }
+  }
+  return segs;
+}
+let mmLast = null;
+const mmX = (x) => (x * 100 - 50) / 50 * 1.2;
+const mmY = (y) => Math.max(-1, Math.min(1, (y * 100) / 22));
+function mm3dSvg() {
+  // The height scale is the points' in every mode, so the sheet's tilt isn't exaggerated.
+  const shown = mmShown(), thin = mmThin(), zmax = mmZmax(shown);
+  const cs = mmPtsOn() ? shown : [];
+  const sf = mmSurfOn() ? mmSurface() : null;
+  const sq = sf ? sf.pts.flat().filter(Boolean) : [];
+  const Z = (z) => (z / zmax) * MM_ZH;
+  const R = (x, y, z) => mmProject(mmX(x), mmY(y), Z(z));
+  // Which edges face the viewer: the nearer depth edge carries the market's ticks, the edge
+  // further right the depth ticks, and the near corner on the other side the height axis (its
+  // ticks then sit outside the cloud).
+  const front = R(0.5, -0.22, 0).d < R(0.5, 0.22, 0).d ? -0.22 : 0.22;
+  const right = R(1, 0, 0).x > R(0, 0, 0).x ? 1 : 0;
+  const fr = mmFit([
+    ...[[0, -0.22], [1, -0.22], [1, 0.22], [0, 0.22]].map(([x, y]) => R(x, y, 0)),
+    R(1 - right, front, -zmax), R(1 - right, front, zmax),
+    ...cs.flatMap((c) => [R(c.x, c.y, c.z), ...(c.z_ci95 ? [R(c.x, c.y, c.z_ci95[0]), R(c.x, c.y, c.z_ci95[1])] : [])]),
+    ...sq.map((q) => R(q.x / 100, q.y / 100, q.z / 100)),
+  ]);
+  const P = (x, y, z) => mmProject(mmX(x), mmY(y), Z(z), fr);
+  const f = (v) => v.toFixed(1);
+  const line = (a, b, cls) => `<line class="${cls}" x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(b.x)}" y2="${f(b.y)}"/>`;
+  const text = (x, y, t, cls = "mm-tick", anchor = "middle") => `<text class="${cls}" x="${f(x)}" y="${f(y)}" text-anchor="${anchor}">${t}</text>`;
+  let g = "";
+  // The floor (happened = the market) with its grid, and the height axis at a back corner.
+  const corners = [[0, -0.22], [1, -0.22], [1, 0.22], [0, 0.22]].map(([x, y]) => P(x, y, 0));
+  g += `<polygon class="mm-floor" points="${corners.map((p) => `${f(p.x)},${f(p.y)}`).join(" ")}"/>`;
+  for (const x of [0.25, 0.5, 0.75]) g += line(P(x, -0.22, 0), P(x, 0.22, 0), "mm-gridline");
+  for (const y of [-0.1, 0, 0.1]) g += line(P(0, y, 0), P(1, y, 0), y === 0 ? "mm-gridline zero" : "mm-gridline");
+  const zb = P(1 - right, front, -zmax), zt = P(1 - right, front, zmax);
+  g += line(zb, zt, "mm-axisline");
+  let low = Math.max(...corners.map((p) => p.y), zb.y);
+  // The surface's whole-point contours, projected on the floor.
+  const SP = (q) => P(q.x / 100, q.y / 100, q.z / 100);
+  if (sf) {
+    for (const c of mmContours(sf)) {
+      g += `<line class="mm-contour" style="stroke:${mmSurfFill(c.L, sf.zmax)}" x1="${f(P(c.a[0] / 100, c.a[1] / 100, 0).x)}" y1="${f(P(c.a[0] / 100, c.a[1] / 100, 0).y)}" x2="${f(P(c.b[0] / 100, c.b[1] / 100, 0).x)}" y2="${f(P(c.b[0] / 100, c.b[1] / 100, 0).y)}"/>`;
+    }
+  }
+  // Everything above the floor, farthest first (painter's order, re-sorted as the view
+  // turns): the surface's quads, and each point (a stem from the floor, the 95% range, a head
+  // sized by n).
+  const items = [];
+  if (sf) {
+    const both = cs.length ? " both" : "";
+    for (let j = 0; j < sf.ys.length - 1; j++) {
+      for (let i = 0; i < sf.xs.length - 1; i++) {
+        const q = [sf.pts[j][i], sf.pts[j][i + 1], sf.pts[j + 1][i + 1], sf.pts[j + 1][i]];
+        if (q.some((v) => !v)) continue;
+        const pr = q.map(SP);
+        const z = (q[0].z + q[1].z + q[2].z + q[3].z) / 4;
+        pr.forEach((p) => { low = Math.max(low, p.y); });
+        items.push({ d: (pr[0].d + pr[1].d + pr[2].d + pr[3].d) / 4, svg: `<polygon class="mm-quad${both}" data-mmq="${j},${i}" style="fill:${mmSurfFill(z, sf.zmax)}" points="${pr.map((p) => `${f(p.x)},${f(p.y)}`).join(" ")}"/>` });
+      }
+    }
+  }
+  cs.forEach((c, i) => {
+    const base = P(c.x, c.y, 0), head = P(c.x, c.y, c.z);
+    const tone = mmTone(c), faint = c.n < thin ? " thin" : "";
+    let h = `<g class="mm-pt t-${tone}${faint}${state.mm.sel3d === i ? " sel" : ""}">`;
+    if (c.z_ci95) {
+      const lo = P(c.x, c.y, c.z_ci95[0]);
+      h += line(lo, P(c.x, c.y, c.z_ci95[1]), "mm-whisker");
+      low = Math.max(low, lo.y);
+    }
+    h += line(base, head, "mm-stem");
+    h += `<circle data-mmi="${i}" cx="${f(head.x)}" cy="${f(head.y)}" r="${(3 + Math.min(6, Math.sqrt(c.n) / 9)).toFixed(1)}"${mmSig(c) ? ' class="sig"' : ""}/>`;
+    items.push({ d: head.d, svg: `${h}</g>` });
+    low = Math.max(low, head.y);
+  });
+  items.sort((a, b) => b.d - a.d).forEach((it) => { g += it.svg; });
+  // The surface's picked grid point (a tap, or a mouse over the sheet).
+  const pick = sf && state.mm.ssurf ? sf.pts[state.mm.ssurf[0]]?.[state.mm.ssurf[1]] : null;
+  const pp = pick ? SP(pick) : null;
+  if (sf) g += `<circle class="mm-sdot" id="mm-sdot" r="4" cx="${pp ? f(pp.x) : 0}" cy="${pp ? f(pp.y) : 0}"${pp ? "" : ' visibility="hidden"'}/>`;
+  mmLast = sf ? { sf, SP } : null;
+  // Labels last, each with a halo (CSS paint-order) so nothing under them hides them. The
+  // market's ticks and name sit below everything drawn, under their own x positions.
+  const by = Math.min(MM3D.h - 22, low + 13);
+  for (const x of [0, 0.5, 1]) g += text(P(x, front, 0).x, by, `${Math.round(x * 100)}%`);
+  g += text(P(0.5, front, 0).x, by + 14, "Market's chance", "mm-axtitle");
+  // The depth ticks and name hang off the box's right edge (end-anchored), level with their
+  // places on the floor's right edge, so no font can push them out of the box.
+  const ex = MM3D.w - 3;
+  for (const y of [-0.2, 0, 0.2]) {
+    const q = P(right ? 1 : 0, y, 0);
+    g += text(ex, q.y + 3, y ? `${y > 0 ? "+" : "−"}${Math.abs(y * 100)} pts` : "0", "mm-tick", "end");
+  }
+  const yt = P(right ? 1 : 0, front > 0 ? 0.2 : -0.2, 0);
+  g += text(ex, yt.y + 16, "Model − market", "mm-axtitle", "end");
+  // The height axis carries no tick labels (they read as stray labels among the points); its
+  // name in the box's top-left corner gives the range at its ends.
+  g += text(4, 13, `Height: happened − market, ±${(zmax * 100).toFixed(0)} pts at the axis ends`, "mm-axtitle", "start");
+  const what = sf ? (cs.length ? "a smoothed surface and the groups as points" : "a smoothed surface") : "the groups as points";
+  return `<svg viewBox="0 0 ${MM3D.w} ${MM3D.h}" role="img" aria-label="3D map, ${what}: the market's chance across, the model minus the market in depth, and how often the outcome happened against the market in height">${g}</svg>`;
+}
+function mmDefaultReadout() {
+  if (mmSurfOn()) {
+    const sf = mmSurface();
+    return `Drag to turn the map; tap the sheet${mmPtsOn() ? " or a point" : ""} for its numbers. On the ${state.mm.price === "early" ? "early" : "closing"} price the sheet runs from ${mmPtsText(sf.zmin, 1)} to ${mmPtsText(sf.ztop, 1)} pts against the market.`;
+  }
+  const best = mmCore().cells.filter((c) => c.n >= mmThin()).sort((a, b) => b.n - a.n)[0];
+  return `${state.mm.view === "3d" ? "Drag to turn the map; tap a point for its numbers. " : "Tap a square for its numbers. "}The biggest group:<br>${mmDescribe(best)}`;
+}
+function mmMapReadout() {
+  const s = state.mm;
+  if (s.view === "3d" && s.sel3d != null && mmPtsOn()) return mmDescribe(mmShown()[s.sel3d]);
+  const q = mmSurfOn() && s.ssurf ? mmSurface().pts[s.ssurf[0]]?.[s.ssurf[1]] : null;
+  if (q) return mmSurfDescribe(q);
+  if (s.view === "flat" && s.sel) return mmDescribe(mmCore().cells.find((c) => `${c.xi}:${c.yi}` === s.sel));
+  return mmDefaultReadout();
+}
+function mmFindings(D) {
+  const mt = D.multiplicity || {};
+  const side = D.slices.side?.cells || [];
+  const homeLow = side.find((c) => c.level === "home" && c.band === "< -0.05");
+  const drawMid = side.find((c) => c.level === "draw" && c.band === "+0.02 to +0.05");
+  const hl = (D.slices.home_league?.cells || []).filter((c) => c.band === "< -0.05" && c.n);
+  const out = [{ cls: "", html: `<b>Mostly noise.</b> ${mt.range_excludes_0} of ${mt.cells_200_plus} groups with 200+ outcomes have a range clear of zero. With no real pattern at all, about ${Math.round(mt.expected_by_chance)} would. Nearly everything that looks striking here is what chance alone would draw.` }];
+  if (homeLow?.z_ci95) {
+    const clear = mmSig(homeLow), up = hl.filter((c) => c.z > 0).length;
+    out.push({ cls: clear ? "neg" : "", html: `<b>Home sides the model rates 5+ points below the market:</b> they win ${mmPts(homeLow.z)} more often than the market says (range ${mmPts(homeLow.z_ci95[0])} to ${mmPts(homeLow.z_ci95[1])}) on ${mmNum(homeLow.n)} matches. ${clear ? "So the market was closer than the model." : "That range includes zero, so it is not a real pattern."} ${hl.length ? `By league it is above zero in ${up} of ${hl.length} (${hl.map((c) => `${esc(leagueName(c.level))} ${mmPts(c.z)}`).join(", ")}), and no league alone is clear of zero.` : ""} On the first map (the four English leagues only) it looked like +2.2 points; with all eight leagues it mostly disappears, and in the five xG leagues it sits near zero.` });
+  }
+  if (drawMid?.z_ci95) {
+    const clear = mmSig(drawMid);
+    out.push({ cls: clear ? "neg" : "", html: `<b>Draws the model likes by 2 to 5 points:</b> they happen ${mmPts(drawMid.z)} against what the market says (range ${mmPts(drawMid.z_ci95[0])} to ${mmPts(drawMid.z_ci95[1])}). ${clear ? (drawMid.z < 0 ? "The market was closer." : "The model was closer.") : "That range includes zero: no pattern."}` });
+  }
+  out.push({ cls: "", html: `<b>What it means for the model.</b> Where the model disagrees with the price, the price is usually closer. That matches every test so far: the factors the model could add are already in the price. Anything that looks like a lead here would need its own pre-registered test on the locked 2024/25 season before we trust it.` });
+  return `<ul class="mm-findings">${out.map((f) => `<li class="${f.cls}">${f.html}</li>`).join("")}</ul>`;
+}
+const mmLevelName = (k, lv) => (k === "league" || k === "home_league" ? leagueName(lv) : lv);
+function mmSliceHtml() {
+  const D = mmData(), k = state.mm.factor, s = D.slices[k];
+  if (!s) return "";
+  const by = new Map(s.cells.map((c) => [`${c.level}|${c.band}`, c]));
+  const rows = s.levels.filter((lv) => s.cells.some((c) => c.level === lv && c.n));
+  let h = `<table class="mm-grid mm-slice" data-mmgrid="slice"><thead><tr><th></th>${s.bands.map((b, i) => `<th title="${esc(b)}">${MM_BAND_HEAD[i] || esc(b)}</th>`).join("")}</tr></thead><tbody>`;
+  rows.forEach((lv) => {
+    h += `<tr><th class="rowh">${esc(mmLevelName(k, lv))}</th>`;
+    s.bands.forEach((b) => {
+      const c = by.get(`${lv}|${b}`);
+      h += !c || !c.n ? `<td class="mm-cell empty">·</td>` : mmSquare(c, `${lv}|${b}`, "slice");
+    });
+    h += `</tr>`;
+  });
+  h += `</tbody></table><p class="mm-axis">Columns: the model below the market by 5+ pts, 2–5, within 2, above by 2–5, by 5+. Squares: how often it happened against the market (pts).</p>`;
+  return rows.length ? h : `<p class="note">No outcomes for this factor.</p>`;
+}
+function mmSliceReadout() {
+  const D = mmData(), k = state.mm.factor, s = D.slices[k];
+  const key = state.mm.ssel;
+  const c = key && s?.cells.find((x) => `${x.level}|${x.band}` === key);
+  if (!c) return "Tap a square, or drag across them, for its numbers.";
+  const [lv, b] = key.split("|");
+  return mmDescribe(c, `${s.label}: ${mmLevelName(k, lv)} · model ${b.replace("<", "below").replace(">", "above")} vs market`);
+}
+function mmPageHtml() {
+  const D = mmData(), s = mmState();
+  const seasons = (D.seasons || []).map(mmSeason);
+  const all8 = (D.leagues || []).length >= 8;
+  const lock = D.locked_from ? mmSeason(`${String(D.locked_from).slice(2, 4)}${String(Number(String(D.locked_from).slice(2, 4)) + 1).padStart(2, "0")}`) : "2024/25";
+  const chips = [
+    all8 ? "All 8 leagues" : `Partial: ${(D.leagues || []).length} of 8 leagues`,
+    `${mmNum(D.matches)} matches · ${mmNum(D.rows)} outcomes`,
+    seasons.length ? `${seasons[0]} to ${seasons[seasons.length - 1]}` : "",
+    `${lock} on kept locked for testing`,
+  ].filter(Boolean).map((t, i) => `<span class="mm-chip${i === 0 && !all8 ? " partial" : ""}">${esc(t)}</span>`).join("");
+  const goalsOnly = Object.entries(D.xg_files || {}).flatMap(([k, ys]) => Object.entries(ys).filter(([, v]) => /^(missing|bad)/.test(String(v))).map(([y]) => `${leagueName(k)} ${y}/${String(Number(y) + 1).slice(2)}`));
+  const xgNote = `<b>Where the xG came from.</b> Understat has been down for maintenance since 2 Nov, so the older seasons' xG comes from archived copies of Understat's own pages (the Wayback Machine), checked match by match against the files we still held: identical on 1,446 matches, and every score agrees with our results data.${goalsOnly.length ? ` ${esc(goalsOnly.join(", "))} ${goalsOnly.length === 1 ? "has" : "have"} no complete archived copy, so ${goalsOnly.length === 1 ? "it runs" : "they run"} on goals only.` : ""} The Championship, League One and League Two have no xG source and always run on goals.`;
+  const seg = (attr, cur, opts) => `<div class="segmented small-seg" role="group">${opts.map(([k, l]) => `<button data-${attr}="${k}" class="${cur === k ? "on" : ""}" aria-pressed="${cur === k}">${l}</button>`).join("")}</div>`;
+  const factors = MM_FACTORS.filter((k) => D.slices[k]);
+  const sl = D.slices[s.factor] || D.slices[factors[0]];
+  if (!D.slices[s.factor]) s.factor = factors[0];
+  const runs = Object.values(D.runs || {}).join(", ");
+  return `
+    <nav class="crumbs" aria-label="Back to"><button class="crumb" data-mmopen="0">‹ Research</button></nav>
+    <h2 class="pf-title">Model vs Market Map</h2>
+    <p class="note mm-lede">Where our match model disagreed with Pinnacle's price, and who turned out to be right. Every home, draw and away outcome, grouped by what the market said and how far the model differed.</p>
+    <div class="mm-chips">${chips}</div>
+    <div class="mm-xg">${xgNote}</div>
+    <div class="section-title">The map</div>
+    <p class="note">Each point is a group of outcomes. <b>Across</b>: the market's chance. <b>Depth</b> (down, in the flat view): how far the model's chance was above or below it. <b>Height</b> (the square's number): how much more, or less, often the outcome happened than the market said. Blue: the model's disagreement was right. Red: the market was closer. Grey: the two agreed within 2 points. Faint groups have under ${mmThin()} outcomes; a ringed one's range stays clear of zero.</p>
+    <div class="card mm-panel">
+      <div class="mm-controls">
+        ${seg("mmview", s.view, [["3d", "3D"], ["flat", "Flat"]])}
+        ${seg("mmprice", s.price, [["close", "Closing price"], ["early", "Early price"]])}
+        ${s.view === "3d" ? seg("mmshow", s.show, [["surface", "Surface"], ["points", "Points"], ["both", "Both"]]) : ""}
+        <label class="mm-tog"><input type="checkbox" id="mm-thin"${s.hideThin ? " checked" : ""}> Hide groups under ${mmThin()}</label>
+      </div>
+      ${s.view === "3d" ? `<div class="mm-3d" data-mm3d>${mm3dSvg()}</div>` : `<div class="mm-wrap">${mmFlatHtml()}</div>`}
+      ${mmSurfOn() ? mmKeyHtml() : ""}
+      ${s.view === "3d" && s.show === "surface" ? "" : `<div class="mm-legend"><span class="t-pos">Model was right</span><span class="t-neg">Market was closer</span><span class="t-agree">Agreed within 2 pts</span></div>`}
+      <div class="mm-readout" id="mm-readout" aria-live="polite">${mmMapReadout()}</div>
+      ${mmSurfOn() ? `<p class="note mm-surfnote">${MM_SURF_NOTE}</p>` : ""}
+    </div>
+    <div class="section-title">What stands out</div>
+    <div class="card">${mmFindings(D)}</div>
+    <div class="section-title">By factor</div>
+    <p class="note">The same question cut by one factor at a time. Rows are the factor's levels; columns are how far the model's chance was from the market's, from far below on the left to far above on the right. Each square shows how many points more, or less, often the outcome happened than the market said.</p>
+    <div class="chips" role="group" aria-label="Factor">${factors.map((k) => `<button class="chip${k === s.factor ? " on" : ""}" data-mmfactor="${k}" aria-pressed="${k === s.factor}">${esc(D.slices[k].label)}</button>`).join("")}</div>
+    <div class="card mm-panel">
+      ${sl.note || s.factor === "xg_luck" ? `<p class="note">${esc([sl.note, s.factor === "xg_luck" ? "xG luck is only defined in the five Understat leagues." : ""].filter(Boolean).join(" "))}</p>` : ""}
+      <div class="mm-wrap">${mmSliceHtml()}</div>
+      <div class="mm-readout" id="mm-sreadout" aria-live="polite">${mmSliceReadout()}</div>
+    </div>
+    <div class="section-title">Read with care</div>
+    <div class="mm-warn">This is exploration, not a test. ${esc(String(D.warning || "").replace(/`([^`]+)`/g, "$1").replace(/^Exploratory\.\s*/, ""))}</div>
+    <details class="fold mm-how"><summary>How this was measured</summary>
+      <p class="note">${esc(String(D.note || "").replace(/`([^`]+)`/g, "$1"))}</p>
+      <p class="note">${runs ? `Run ${esc(runs)} · ` : ""}generated ${esc(String(D.generated_at || "").slice(0, 10))} · groups under ${mmThin()} outcomes marked thin.</p>
+    </details>`;
+}
+// The surface's colour key, symmetric about 0 at the sheet's largest height.
+function mmKeyHtml() {
+  const zs = mmSurface().zmax;
+  return `<div class="mm-key"><div class="mm-key-title">Happened vs market (pts)</div><div class="mm-key-bar" aria-hidden="true"></div><div class="mm-key-ticks"><span>${mmPtsText(-zs, 1)}</span><span>0</span><span>${mmPtsText(zs, 1)}</span></div></div>`;
+}
+// The reference page's #surfnote, word for word.
+const MM_SURF_NOTE = "<b>The surface</b> is the groups smoothed into one sheet: at each spot it averages the nearby groups, weighted by how many outcomes they hold (about ±7 points of market chance and ±3 points of the model's gap count as nearby). It is left blank where few outcomes sit, and its height uses the same scale as the points. If the model's disagreements were as often right as wrong, the sheet would lie flat on the grey zero plane. Instead it tilts: where the model rated a side well below the market, the outcome happened more often than the market said, and where it rated a side above, less often. So in both directions the market was closer. Hover the sheet for its height and an approximate 95% range.";
+// Picking a square or a point updates its readout in place (no re-render while dragging).
+function mmPick(grid, key) {
+  const core = grid.dataset.mmgrid === "core";
+  if (core) state.mm.sel = key; else state.mm.ssel = key;
+  grid.querySelectorAll("td.sel").forEach((td) => td.classList.remove("sel"));
+  grid.querySelector(`td[data-mmk="${CSS.escape(key)}"]`)?.classList.add("sel");
+  const out = document.getElementById(core ? "mm-readout" : "mm-sreadout");
+  if (out) out.innerHTML = core ? mmMapReadout() : mmSliceReadout();
+}
+// The sheet's grid point nearest a pointer on a quad: its readout, and the dot moved there.
+function mmSurfAt(poly, ev) {
+  if (!mmLast) return null;
+  const svg = poly.ownerSVGElement, m = svg?.getScreenCTM?.();
+  if (!m) return null;
+  const pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
+  const [j, i] = poly.dataset.mmq.split(",").map(Number);
+  let best = null;
+  for (const [dj, di] of [[0, 0], [0, 1], [1, 1], [1, 0]]) {
+    const q = mmLast.sf.pts[j + dj]?.[i + di];
+    if (!q) continue;
+    const p = mmLast.SP(q), dd = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
+    if (!best || dd < best.dd) best = { q, p, dd };
+  }
+  return best;
+}
+function mmPickSurf(best, keep) {
+  if (!best) return;
+  if (keep) { state.mm.ssurf = [best.q.j, best.q.i]; state.mm.sel3d = null; }
+  const dot = document.getElementById("mm-sdot");
+  if (dot) { dot.setAttribute("cx", best.p.x.toFixed(1)); dot.setAttribute("cy", best.p.y.toFixed(1)); dot.removeAttribute("visibility"); }
+  if (keep) document.querySelectorAll("[data-mm3d] .mm-pt.sel").forEach((e) => e.classList.remove("sel"));
+  const out = document.getElementById("mm-readout");
+  if (out) out.innerHTML = mmSurfDescribe(best.q);
+}
+function mmPick3d(i) {
+  state.mm.sel3d = i; state.mm.ssurf = null;
+  const box = document.querySelector("[data-mm3d]");
+  if (box) box.innerHTML = mm3dSvg();
+  const out = document.getElementById("mm-readout");
+  if (out) out.innerHTML = mmMapReadout();
+}
+const mmCellAt = (x, y) => document.elementFromPoint(x, y)?.closest?.("td[data-mmk]");
+let mmDrag = null;
+document.addEventListener("pointerdown", (ev) => {
+  const td = ev.target.closest?.(".mm-grid td[data-mmk]");
+  if (td) { mmDrag = { grid: td.closest(".mm-grid") }; mmPick(mmDrag.grid, td.dataset.mmk); return; }
+  const box = ev.target.closest?.("[data-mm3d]");
+  if (box) {
+    mmDrag = { box, x: ev.clientX, y: ev.clientY, az: state.mm.az, el: state.mm.el, moved: false, target: ev.target };
+    try { box.setPointerCapture(ev.pointerId); } catch { /* a synthetic or ended pointer */ }
+  }
+});
+document.addEventListener("pointermove", (ev) => {
+  if (mmDrag?.box) {
+    const dx = ev.clientX - mmDrag.x, dy = ev.clientY - mmDrag.y;
+    if (!mmDrag.moved && Math.hypot(dx, dy) < 5) return;
+    mmDrag.moved = true;
+    state.mm.az = mmDrag.az + dx * 0.5;
+    state.mm.el = Math.max(5, Math.min(85, mmDrag.el + dy * 0.4));
+    mmDrag.box.innerHTML = mm3dSvg();
+    return;
+  }
+  // A mouse over the sheet reads the nearest grid point (a tap keeps it).
+  if (!mmDrag && ev.pointerType === "mouse") {
+    const q = ev.target.closest?.("[data-mm3d] polygon[data-mmq]");
+    if (q) { mmPickSurf(mmSurfAt(q, ev), false); return; }
+  }
+  // The grids scrub: a mouse on hover, a finger or pen while pressed.
+  const grid = mmDrag?.grid || (ev.pointerType === "mouse" ? ev.target.closest?.(".mm-grid") : null);
+  if (!grid) return;
+  const td = mmCellAt(ev.clientX, ev.clientY);
+  if (td && grid.contains(td) && td.dataset.mmk !== (grid.dataset.mmgrid === "core" ? state.mm.sel : state.mm.ssel)) mmPick(grid, td.dataset.mmk);
+});
+const mmEnd = (ev) => {
+  if (mmDrag?.box && !mmDrag.moved) {
+    const i = mmDrag.target?.closest?.("circle[data-mmi]")?.dataset.mmi;
+    const q = mmDrag.target?.closest?.("polygon[data-mmq]");
+    if (i != null) mmPick3d(Number(i));
+    else if (q) mmPickSurf(mmSurfAt(q, ev), true);
+  }
+  mmDrag = null;
+};
+document.addEventListener("pointerup", mmEnd);
+document.addEventListener("pointercancel", () => { mmDrag = null; });
+document.addEventListener("keydown", (ev) => {
+  const td = document.activeElement?.closest?.(".mm-grid td[data-mmk]");
+  if (!td || (ev.key !== "Enter" && ev.key !== " ")) return;
+  ev.preventDefault();
+  mmPick(td.closest(".mm-grid"), td.dataset.mmk);
+});
+
 function viewResearch() {
+  if (state.mm.open && mmData()) return mmPageHtml();
   const d = rsData();
   if (!d || !Array.isArray(d.studies)) return `<div class="section-title">Research</div><div class="card"><p class="muted">The research overview isn't in this build yet.</p></div>`;
   const st = d.studies;
@@ -2101,6 +2580,7 @@ function viewResearch() {
   }).join("");
   return `
     <div class="section-title">Research</div>
+    ${mmData() ? `<div class="card list folders mm-link"><button class="row-btn folder" data-mmopen="1"><span class="who"><b>Model vs Market Map</b><span class="meta">Where the model disagreed with Pinnacle's price, and who was right: ${mmNum(mmData().matches)} matches in ${(mmData().leagues || []).length} leagues, by price and by factor</span></span>${CHEV}</button></div>` : ""}
     <div class="card rs-head">
       <p class="rs-thesis">${st.length} studies so far.${beat ? "" : " None has beaten Pinnacle's closing price."}</p>
       <p class="note">Every test the research lab has run, in one place. Each asks whether a rule, model or signal beats Pinnacle's closing price, the sharpest price there is; beating it over many bets is the clearest sign of a real edge.</p>
@@ -5548,7 +6028,12 @@ function setUpdated() {
   const old = document.getElementById("xg-banner");
   if (old) old.remove();
   if (d.xg_error) {
-    $("#view").insertAdjacentHTML("beforebegin", '<div id="xg-banner" class="banner" style="margin:0 16px">xG was unavailable at the last update, so ratings use goals only.</div>');
+    // Understat's refresh failed (owner, 9 Nov): with the last good file the ratings use xG up
+    // to its last match (`xg_through`) and goals after; with no xG at all, goals only.
+    const partial = isNum(d.xg_coverage) && d.xg_coverage > 0 && d.xg_through;
+    const text = partial ? `Understat (xG) hasn't updated since ${goalDay(d.xg_through)}. Ratings use xG up to then and goals for later matches.`
+      : "xG was unavailable at the last update, so ratings use goals only.";
+    $("#view").insertAdjacentHTML("beforebegin", `<div id="xg-banner" class="banner" style="margin:0 16px">${esc(text)}</div>`);
   }
 }
 
@@ -5559,7 +6044,24 @@ document.addEventListener("click", (ev) => {
   if (t.dataset.tab) {
     // The Portfolio tab, tapped again, goes back to its folders.
     if (t.dataset.tab === "portfolio" && state.tab === "portfolio") state.pfLevel = "home";
+    if (t.dataset.tab === "research" && state.tab === "research") state.mm.open = false;
     setTab(t.dataset.tab);
+  } else if (t.dataset.mmopen !== undefined) {
+    state.mm.open = t.dataset.mmopen === "1";
+    render();
+    window.scrollTo(0, 0);
+  } else if (t.dataset.mmview) {
+    state.mm.view = t.dataset.mmview; state.mm.sel = null; state.mm.sel3d = null; state.mm.ssurf = null;
+    render();
+  } else if (t.dataset.mmprice) {
+    state.mm.price = t.dataset.mmprice; state.mm.sel = null; state.mm.sel3d = null; state.mm.ssurf = null;
+    render();
+  } else if (t.dataset.mmshow) {
+    state.mm.show = t.dataset.mmshow; state.mm.sel3d = null; state.mm.ssurf = null;
+    render();
+  } else if (t.dataset.mmfactor) {
+    state.mm.factor = t.dataset.mmfactor; state.mm.ssel = null;
+    render();
   } else if (t.dataset.rscard) {
     // From a Portfolio page to its study's card in the Research tab.
     setTab("research");
@@ -5690,6 +6192,7 @@ document.addEventListener("change", (ev) => {
     refreshPlayerList();
   }
   if (ev.target.id === "pf-market") { state.pfMarket = ev.target.value; state.pfShown = 15; render(); }
+  if (ev.target.id === "mm-thin") { state.mm.hideThin = ev.target.checked; state.mm.sel = null; state.mm.sel3d = null; state.mm.ssurf = null; render(); }
   if (ev.target.id === "pf-season") { state.pfSeason = ev.target.value; state.pfShown = 15; render(); }
 });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); });

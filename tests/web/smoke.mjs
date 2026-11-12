@@ -58,6 +58,32 @@ const click = (sel) => async (p) => { await p.click(sel); };
 const sheet = async (p) => { await p.waitForSelector("#sheet:not([hidden])"); };
 // (a no-op when no sheet is open, so a step can follow one that already closed it)
 const closeSheet = async (p) => { if (await p.locator("#sheet:not([hidden])").count()) await p.click(".sheet-close"); };
+// The 3D map: every text label inside the SVG's box (lead, 10 Nov).
+const labelsInBox = async (p) => {
+  const out = await p.evaluate(() => {
+    const svg = document.querySelector("[data-mm3d] svg"), vb = svg.viewBox.baseVal;
+    return [...svg.querySelectorAll("text")].map((t) => ({ t: t.textContent, b: t.getBBox() }))
+      .filter(({ b }) => b.x < -0.5 || b.y < -0.5 || b.x + b.width > vb.width + 0.5 || b.y + b.height > vb.height + 0.5).map(({ t }) => t);
+  });
+  if (out.length) throw new Error(`3D labels outside the box: ${out.join(", ")}`);
+};
+// A tap on the surface's biggest-weight quad reads its nearest grid point.
+const surfaceTap = async (p) => {
+  await p.evaluate(() => document.querySelector("[data-mm3d]").scrollIntoView({ block: "center" }));
+  const at = await p.evaluate(() => {
+    const polys = [...document.querySelectorAll("[data-mm3d] polygon[data-mmq]")];
+    const sf = mmSurface();
+    const pick = polys.map((e) => { const [j, i] = e.dataset.mmq.split(",").map(Number); return { e, n: sf.pts[j][i].n, key: e.dataset.mmq }; }).sort((a, b) => b.n - a.n)[0];
+    const r = pick.e.getBoundingClientRect();
+    return { key: pick.key, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  await p.locator(`[data-mm3d] polygon[data-mmq="${at.key}"]`).dispatchEvent("pointerdown", { bubbles: true, clientX: at.x, clientY: at.y });
+  await p.evaluate((at) => document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: at.x, clientY: at.y })), at);
+  const res = await p.evaluate(() => ({ ss: state.mm.ssurf, text: document.getElementById("mm-readout").textContent, dot: document.getElementById("mm-sdot")?.getAttribute("visibility") }));
+  if (!res.ss) throw new Error("a tap on the surface should pick a grid point");
+  for (const w of ["Market's chance", "model minus market", "vs the market", "95% range about", "smoothed from about", "outcomes"]) if (!res.text.includes(w)) throw new Error(`surface readout lacks "${w}": ${res.text}`);
+  if (/NaN|undefined/.test(res.text) || res.dot === "hidden") throw new Error(`surface pick: ${JSON.stringify(res)}`);
+};
 // Portfolio folders (owner, 24 Oct): the tab opens on one folder per portfolio, then one per
 // strategy. pfUp goes back to the open portfolio's strategy folders, pfHome to the top;
 // pfOpenPf / pfOpenStrat open a portfolio or one of its strategies from wherever we are.
@@ -1596,6 +1622,23 @@ const STEPS = [
     for (const w of ["Compared with Anytime goalscorer, model B at 20%", "DraftKings only", "Best of nine books", "This line is descriptive and never judged", "DraftKings' quotes (its only book)"]) if (!box.includes(w)) throw new Error(`DraftKings line lacks "${w}": ${box}`);
     if ((await p.locator("#view .trade-row").count()) !== 3) throw new Error("DraftKings line rows");
   }],
+  // The xG banner (owner, 9 Nov): a failed Understat refresh that kept the last good file
+  // names its date; a fit with no xG at all says goals only; no error, no banner.
+  ["xg-banner", async (p) => {
+    const banner = await p.evaluate(() => {
+      const d = state.data, keep = [d.xg_error, d.xg_coverage, d.xg_through], out = [];
+      const read = () => document.getElementById("xg-banner")?.textContent || "";
+      Object.assign(d, { xg_error: "Understat refresh failed, using the last good file for E0 2627", xg_coverage: 0.99, xg_through: "2026-11-01T00:00:00" });
+      setUpdated(); out.push(read());
+      Object.assign(d, { xg_coverage: 0, xg_through: null }); setUpdated(); out.push(read());
+      Object.assign(d, { xg_error: null }); setUpdated(); out.push(read());
+      [d.xg_error, d.xg_coverage, d.xg_through] = keep; setUpdated();
+      return out;
+    });
+    if (banner[0] !== "Understat (xG) hasn't updated since 1 Nov. Ratings use xG up to then and goals for later matches.") throw new Error(`stale xG banner: ${banner[0]}`);
+    if (banner[1] !== "xG was unavailable at the last update, so ratings use goals only.") throw new Error(`no-xG banner: ${banner[1]}`);
+    if (banner[2]) throw new Error("a banner without an xG error");
+  }],
   // Both ways with the Research tab: the page's link opens the test's card; the card opens the page.
   ["portfolio-goalscorer-research", async (p) => {
     await p.click('.goal-judged button[data-rscard="goalscorer_priced"]');
@@ -1873,6 +1916,157 @@ const STEPS = [
     if (!(await p.locator('.tabbar button[data-tab="portfolio"].active').count())) throw new Error("a study link opens Portfolio");
     const text = (await p.textContent("#view")).replace(/\s+/g, " ");
     if (!text.includes("Strategy search") || !(await p.locator('[data-pfnav="portfolio"]').count())) throw new Error("the link should open the strategy search's page");
+  }],
+  // The Model vs Market Map (owner, 9 Nov): its own page in Research, linked from the tab's top.
+  // Flat grid, the price switch, thin groups, the readout on tap and drag; then the SVG 3D
+  // view (no CDN: drag turns it, a tap reads a point); then every factor's grid.
+  ["research-map-flat", async (p) => {
+    await closeSheet(p); await tab("research")(p);
+    await p.click('[data-mmopen="1"]');
+    if (!(await p.locator(".pf-title", { hasText: "Model vs Market Map" }).count())) throw new Error("the map page didn't open");
+    // Phones open on the flat grid, laptops on 3D.
+    const first = await p.evaluate(() => state.mm.view);
+    const phone = (await p.evaluate(() => window.innerWidth)) <= 520;
+    if (first !== (phone ? "flat" : "3d")) throw new Error(`map opened on ${first}`);
+    await p.click('button[data-mmview="flat"]');
+    const d = await p.evaluate(() => state.data.residual_map);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    const n = (v) => v.toLocaleString("en-US");
+    for (const w of ["All 8 leagues", `${n(d.matches)} matches · ${n(d.rows)} outcomes`, "2019/20 to 2023/24", "2024/25 on kept locked for testing", "Where the xG came from", "the Wayback Machine",
+      "Serie A 2022/23 has no complete archived copy", "The Championship, League One and League Two have no xG source", "What stands out", "Mostly noise.", "Home sides the model rates 5+ points below the market",
+      "By factor", "Read with care", "This is exploration, not a test.", "How this was measured", `Run ${Object.values(d.runs).join(", ")}`]) if (!text.includes(w)) throw new Error(`map page lacks "${w}"`);
+    const thin = d.thin_below;
+    const grid = '[data-mmgrid="core"] td[data-mmk]';
+    const want = d.core.close.cells.filter((c) => c.n >= thin).length;
+    if ((await p.locator(grid).count()) !== want) throw new Error(`core squares ${await p.locator(grid).count()} vs ${want}`);
+    await p.click("#mm-thin");
+    if ((await p.locator(grid).count()) !== d.core.close.cells.filter((c) => c.n).length) throw new Error("showing thin groups");
+    await p.click("#mm-thin");
+    // A tap reads its square; a drag across the squares follows the pointer.
+    const keys = await p.locator(grid).evaluateAll((els) => els.map((e) => e.dataset.mmk));
+    await p.click(`${grid}[data-mmk="${keys[0]}"]`);
+    const same = await p.evaluate((k) => document.getElementById("mm-readout").innerHTML === mmDescribe(mmCore().cells.find((c) => `${c.xi}:${c.yi}` === k)), keys[0]);
+    if (!same) throw new Error("the readout doesn't match the tapped square");
+    await p.evaluate(() => document.querySelector('[data-mmgrid="core"]').scrollIntoView({ block: "center" }));
+    const a = await p.locator(`${grid}[data-mmk="${keys[1]}"]`).boundingBox(), b = await p.locator(`${grid}[data-mmk="${keys[keys.length - 1]}"]`).boundingBox();
+    await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await p.mouse.down();
+    await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 }); await p.mouse.up();
+    if ((await p.evaluate(() => state.mm.sel)) !== keys[keys.length - 1]) throw new Error("a drag across the grid should move the readout");
+    if ((await p.locator(`${grid}.sel`).count()) !== 1) throw new Error("one square selected");
+    // The early price: its own grid.
+    await p.click('button[data-mmprice="early"]');
+    if ((await p.locator(grid).count()) !== d.core.early.cells.filter((c) => c.n >= thin).length) throw new Error("early price squares");
+    await p.click('button[data-mmprice="close"]');
+  }],
+  ["research-map-3d", async (p) => {
+    await p.click('button[data-mmview="3d"]');
+    // The 3D view opens on the surface (owner, 10 Nov); the points are one switch away.
+    if ((await p.evaluate(() => state.mm.show)) !== "surface") throw new Error("the 3D view should open on the surface");
+    if (await p.locator('button[data-mmshow]').count() !== 3) throw new Error("the Surface | Points | Both switch");
+    await p.click('button[data-mmshow="points"]');
+    if (await p.locator("[data-mm3d] polygon[data-mmq], .mm-key, .mm-surfnote").count()) throw new Error("Points shows no surface, key or note");
+    if (!(await p.locator(".mm-legend").count())) throw new Error("Points keeps the point legend");
+    const want = await p.evaluate(() => mmShown().length);
+    if ((await p.locator("[data-mm3d] circle[data-mmi]").count()) !== want) throw new Error("3D points");
+    const svg = (await p.textContent("[data-mm3d] svg")).replace(/\s+/g, " ");
+    for (const w of ["Market's chance", "Model − market", "Height: happened − market", "pts at the axis ends", "100%", "+20 pts"]) if (!svg.includes(w)) throw new Error(`3D axes lack "${w}"`);
+    // The cloud fills the box (lead, 10 Nov): points, floor and axis span most of its width and height.
+    const fill = await p.evaluate(() => {
+      const svg = document.querySelector("[data-mm3d] svg"), vb = svg.viewBox.baseVal, b = svg.querySelector("polygon").getBBox();
+      const pts = [...svg.querySelectorAll("circle, line")].map((e) => e.getBBox());
+      const y0 = Math.min(b.y, ...pts.map((r) => r.y)), y1 = Math.max(b.y + b.height, ...pts.map((r) => r.y + r.height));
+      const x0 = Math.min(b.x, ...pts.map((r) => r.x)), x1 = Math.max(b.x + b.width, ...pts.map((r) => r.x + r.width));
+      return { w: (x1 - x0) / vb.width, h: (y1 - y0) / vb.height };
+    });
+    if (fill.w < 0.7 || fill.h < 0.65) throw new Error(`the 3D cloud should fill its box: ${JSON.stringify(fill)}`);
+    // Every label lies inside the SVG's box (lead, 10 Nov: nothing clipped at 390px or 375px).
+    const out = await p.evaluate(() => {
+      const svg = document.querySelector("[data-mm3d] svg"), vb = svg.viewBox.baseVal;
+      return [...svg.querySelectorAll("text")].map((t) => ({ t: t.textContent, b: t.getBBox() }))
+        .filter(({ b }) => b.x < -0.5 || b.y < -0.5 || b.x + b.width > vb.width + 0.5 || b.y + b.height > vb.height + 0.5).map(({ t }) => t);
+    });
+    if (out.length) throw new Error(`3D labels outside the box: ${out.join(", ")}`);
+    // Drag turns it.
+    await p.evaluate(() => document.querySelector("[data-mm3d]").scrollIntoView({ block: "center" }));
+    const box = await p.locator("[data-mm3d]").boundingBox();
+    const az = await p.evaluate(() => state.mm.az);
+    await p.mouse.move(box.x + 30, box.y + box.height / 2); await p.mouse.down();
+    await p.mouse.move(box.x + 110, box.y + box.height / 2 - 20, { steps: 5 }); await p.mouse.up();
+    if ((await p.evaluate(() => state.mm.az)) === az) throw new Error("a drag should turn the 3D map");
+    // A tap reads a point.
+    const i = await p.evaluate(() => { const cs = mmShown(); return cs.indexOf(cs.slice().sort((a, b) => b.n - a.n)[0]); });
+    await p.locator(`[data-mm3d] circle[data-mmi="${i}"]`).dispatchEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 });
+    await p.evaluate(() => document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })));
+    const ok = await p.evaluate((i) => state.mm.sel3d === i && document.getElementById("mm-readout").innerHTML === mmDescribe(mmShown()[i]), i);
+    if (!ok) throw new Error("tapping a 3D point should read it");
+  }],
+  // The smoothed surface (owner, 10 Nov): quads drawn, nothing NaN, the colour key and the
+  // note under the chart, a tap reads the nearest grid point, every label inside the box.
+  ["research-map-surface", async (p) => {
+    await p.click('button[data-mmshow="surface"]');
+    const quads = await p.locator("[data-mm3d] polygon[data-mmq]").count();
+    if (quads < 100) throw new Error(`surface quads: ${quads}`);
+    if (await p.locator("[data-mm3d] circle[data-mmi]").count()) throw new Error("Surface shows no points");
+    if (await p.locator(".mm-legend").count()) throw new Error("Surface hides the point legend");
+    const bad = await p.evaluate(() => [...document.querySelectorAll("[data-mm3d] polygon, [data-mm3d] line, [data-mm3d] circle")]
+      .filter((e) => /NaN|undefined|Infinity/.test(e.outerHTML)).length);
+    if (bad) throw new Error(`${bad} surface shapes carry NaN`);
+    const contours = await p.locator("[data-mm3d] line.mm-contour").count();
+    if (!contours) throw new Error("floor contours");
+    const key = (await p.textContent(".mm-key")).replace(/\s+/g, " ");
+    if (!key.includes("Happened vs market (pts)") || !/[−+]\d\.\d/.test(key)) throw new Error(`colour key: ${key}`);
+    const note = (await p.textContent(".mm-surfnote")).replace(/\s+/g, " ");
+    for (const w of ["The surface is the groups smoothed into one sheet", "would lie flat on the grey zero plane", "So in both directions the market was closer."]) if (!note.includes(w)) throw new Error(`surface note lacks "${w}"`);
+    // The sheet tilts downhill as the model's gap rises: higher where the model sat below the market.
+    const tilt = await p.evaluate(() => {
+      const sf = mmSurface(), at = (y) => sf.pts.flat().filter((q) => q && q.y === y).map((q) => q.z);
+      const m = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+      return { below: m(at(-10)), above: m(at(10)), range: [sf.zmin, sf.ztop] };
+    });
+    if (!(tilt.below > tilt.above)) throw new Error(`the surface should tilt downhill: ${JSON.stringify(tilt)}`);
+    const read = (await p.textContent("#mm-readout")).replace(/\s+/g, " ");
+    if (!read.includes("tap the sheet") || !read.includes("pts against the market")) throw new Error(`surface readout: ${read}`);
+    await surfaceTap(p);
+    await labelsInBox(p);
+    // The early price redraws it from its own groups.
+    await p.click('button[data-mmprice="early"]');
+    const early = await p.evaluate(() => [mmSurface().zmin, mmSurface().ztop]);
+    if (early[0] === tilt.range[0] && early[1] === tilt.range[1]) throw new Error("the early price should give its own surface");
+    if ((await p.locator("[data-mm3d] polygon[data-mmq]").count()) < 100) throw new Error("early-price quads");
+    await p.click('button[data-mmprice="close"]');
+  }],
+  ["research-map-both", async (p) => {
+    await p.click('button[data-mmshow="both"]');
+    const want = await p.evaluate(() => mmShown().length);
+    if ((await p.locator("[data-mm3d] circle[data-mmi]").count()) !== want) throw new Error("Both shows every point");
+    if ((await p.locator("[data-mm3d] polygon.mm-quad.both").count()) < 100) throw new Error("Both shows the surface, lighter");
+    if (!(await p.locator(".mm-legend").count()) || !(await p.locator(".mm-key").count()) || !(await p.locator(".mm-surfnote").count())) throw new Error("Both shows the legend, the key and the note");
+    await surfaceTap(p);
+    await labelsInBox(p);
+    // A point still reads as a point.
+    const i = await p.evaluate(() => { const cs = mmShown(); return cs.indexOf(cs.slice().sort((a, b) => b.n - a.n)[0]); });
+    await p.locator(`[data-mm3d] circle[data-mmi="${i}"]`).dispatchEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 });
+    await p.evaluate(() => document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })));
+    if (!(await p.evaluate((i) => state.mm.sel3d === i && state.mm.ssurf === null && document.getElementById("mm-readout").innerHTML === mmDescribe(mmShown()[i]), i))) throw new Error("Both: tapping a point should read it");
+  }],
+  ["research-map-factors", async (p) => {
+    const d = await p.evaluate(() => state.data.residual_map);
+    const chips = await p.locator("button[data-mmfactor]").evaluateAll((els) => els.map((e) => e.dataset.mmfactor));
+    if (chips.length !== 10) throw new Error(`factor chips ${chips}`);
+    for (const k of chips) {
+      await p.click(`button[data-mmfactor="${k}"]`);
+      const s = d.slices[k];
+      const rows = s.levels.filter((lv) => s.cells.some((c) => c.level === lv && c.n)).length;
+      if ((await p.locator('[data-mmgrid="slice"] tbody tr').count()) !== rows) throw new Error(`${k} rows`);
+      await p.click('[data-mmgrid="slice"] td[data-mmk] >> nth=0');
+      const r = await p.textContent("#mm-sreadout");
+      if (!r.startsWith(`${s.label}: `)) throw new Error(`${k} readout: ${r}`);
+    }
+    await p.click('button[data-mmfactor="side"]');
+  }],
+  ["research-map-back", async (p) => {
+    await p.click('[data-mmopen="0"]');
+    if (!(await p.locator('[data-mmopen="1"]').count()) || (await p.locator(".rs-card").count()) < 20) throw new Error("back to the Research list");
   }],
   ["research-link-backtest", async (p) => {
     await tab("research")(p);

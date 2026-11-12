@@ -403,7 +403,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 | File | What | Credits |
 | --- | --- | --- |
 | `publish.yml` | `soccer-stats publish` builds the site for every live league, then on `data-log` logs FPL news (`log-news`), DraftKings prices (`log-odds`), ESPN team news (`log-team-news`), team totals (`log-team-totals`), corners (`log-corners`) and paper trades (`paper`), and deploys Pages. Since 1 Nov it also logs live anytime-goalscorer prices (`log-goalscorer`, §16 step 2; `GOALSCORER_DIR`/`GOALSCORER_STATE`, default branch only). Since 5 Nov, right after `paper`, `bet-alerts --log-dir ../log --state $RUNNER_TEMP/alerts_sent.jsonl` sends the phone alerts (secrets `ALERT_URL`, `ALERT_TOKEN`; never fails the step), and the build gets `ALERT_URL` for `data.json` → `bet_alerts.worker`. Dispatch input `send_test_alert` ("Send a test alert", default branch only) runs `bet-alerts --test` first: one test alert, log "Bet alerts: test sent to N phones". Team totals and corners are fetched only on the default branch (`TEAM_TOTALS_DIR`, `CORNERS_DIR`), after copying data-log's call records and price files into `TEAM_TOTALS_STATE` / `CORNERS_STATE`. ESPN team news runs on every branch (free; ≤120 s or 3 failures a run). Restores `raw-data-*` and `cup-espn-*`; copies data-log's `match_blends.json` (`MATCH_BLENDS_FILE`) and `E0_dk.json` (`DK_BACKTEST_FILE`). Only the default branch publishes. Hourly cron plus every 15 min 10:00–22:00 UTC (GitHub throttles it; `closes.yml` fills the gaps); `cancel-in-progress: false`. | 1 per DraftKings h2h refresh per league (E0 hourly; matchday leagues only within 48 h of a kickoff, pausing below 3,000), 2 per team-total snapshot (cap 20,000 a month since 28 Oct), 1 per corner snapshot (cap 20,000 a month, eight leagues); the ten-book h2h call should still bill 1, plus live player lines near kickoff |
-| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself at every 5.5 h horizon (always since 9 Nov, for the heartbeat); cron every 3 h at :41 as a safety net. Publish heartbeat (lead, 9 Nov: cron skipped publish from 06:03 to 12:39 UTC on a Monday without kickoffs): while it sleeps it checks every 5 min (`close_runs.HEARTBEAT_POLL`) the newest publish.yml run on the default branch and dispatches one when it was created 75 min or more ago (`HEARTBEAT`, `heartbeat_due`, CLI `publish-heartbeat --last`), log "Heartbeat: dispatched publish.yml …". Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Since 7 Nov (lead) also a goalscorer entry publish at kickoff − 25 min for each cluster (5-min span) of E0, SP1, D1, I1, F1 kickoffs (`close_runs.goalscorer_kickoffs` from those leagues' DraftKings logs, kind `goalscorer`), so `player_goal_live`'s entry lands 20–30 min before kickoff; a publish already planned from 5 min before to 2 min after takes it instead, and the −15 close run is never replaced (`GOALSCORER_LEAD`, `GOALSCORER_SPAN`, `GOALSCORER_MERGE`). Default branch only; concurrency `closes`. | 0 extra for close and settle runs (the call records never fetch twice); a goalscorer entry run adds about 1 credit per match (the entry call it lets land) plus whatever refreshes that publish would make anyway |
+| `closes.yml` | Planner: reads the coming kickoffs from data-log's odds logs, dispatches `publish.yml` 15 min before each kickoff cluster (`close_runs.plan`, CLI `close-plan`) and a settlement run 2 h 15 min after each cluster's last kickoff (`SETTLE_AFTER`, merged into a close run starting within 20 min, `SETTLE_MERGE`); re-dispatches itself at every 5.5 h horizon (always since 9 Nov, for the heartbeat); cron every 3 h at :41 as a safety net. Publish heartbeat (lead, 9 Nov: cron skipped publish from 06:03 to 12:39 UTC on a Monday without kickoffs): while it sleeps it checks every 5 min (`close_runs.HEARTBEAT_POLL`) the newest publish.yml run on the default branch and dispatches one when it was created 75 min or more ago (`HEARTBEAT`, `heartbeat_due`, CLI `publish-heartbeat --last`), log "Heartbeat: dispatched publish.yml …". Caches heartbeat (lead, 12 Nov: GitHub never started the 04:23 caches.yml cron that Thursday): about hourly (`CACHES_HEARTBEAT_POLL`) it reads the newest caches.yml run on the default branch that was not cancelled (any event) and dispatches caches.yml with its defaults when it was created 84 h or more ago (`CACHES_HEARTBEAT`, `caches_due`, CLI `publish-heartbeat --workflow caches --last`), log "Heartbeat: dispatched caches.yml (last run Nh ago)". Since 28 Oct also `inplay.yml` at each cluster's first kickoff + 58 and + 78 min (`close_runs.INPLAY`). Since 7 Nov (lead) also a goalscorer entry publish at kickoff − 25 min for each cluster (5-min span) of E0, SP1, D1, I1, F1 kickoffs (`close_runs.goalscorer_kickoffs` from those leagues' DraftKings logs, kind `goalscorer`), so `player_goal_live`'s entry lands 20–30 min before kickoff; a publish already planned from 5 min before to 2 min after takes it instead, and the −15 close run is never replaced (`GOALSCORER_LEAD`, `GOALSCORER_SPAN`, `GOALSCORER_MERGE`). Default branch only; concurrency `closes`. | 0 extra for close and settle runs (the call records never fetch twice); a goalscorer entry run adds about 1 credit per match (the entry call it lets land) plus whatever refreshes that publish would make anyway |
 | `inplay.yml` | Half-time in-play snapshots (lead brief 2, 28 Oct; `docs/leagues.md` "In-play snapshots"): dispatched by `closes.yml`; `soccer-stats log-inplay` reads data-log's DraftKings logs, the odds-only competitions' `<code>_events_*` files and `inplay_calls_*`, makes one live h2h call (ten books) per league with a kickoff 45–65 or 65–90 min ago not yet snapshotted, and appends `odds_log/<code>_inplay_<YYYY-MM>.jsonl` (prices per book with ESPN's score) and the call record to data-log. Key and data-log only on the default branch; concurrency `inplay`. | 1 per league per cluster per snapshot (~580 a month for the nine live competitions, ~1,100 more for the odds-only ones; guard `MONTHLY_CAP` 3,000; 3,000 reserve) |
 | `backfill.yml` | Inputs: `estimate_month` (credit estimates per league, team-total and corner snapshots; no key), `league` + `books` (`ten` = the multi-league ten-book h2h backfill, no backtest; `draftkings` = the original E0 run then `backtest-dk`), `cups` (+ `cup_seasons`: `estimate-cups`), `match_blends` (`fit-match-blends` → `backtest/match_blends.json`), `lean_backtest` (`backtest-lean` → `lean_backtest.json`), `edge12_backtest` (`backtest-edge12` → `edge12_backtest.json`), `edge12_filters` (`backtest-edge12-filters`, research, prints), `dnb_backtest` (`backtest-dnb` → `dnb_backtest.json`, draw no bet research), `dk_price_backtest` (`backtest-dk-prices` → `lean_backtest_dk.json`, `edge12_backtest_dk.json`: both rules at DraftKings' historical prices, every league bought), `match_markets` (+ `markets_seasons`, research, prints), `print_only` (`backtest-dk` on cached odds), `cup_odds` (+ `cup_seasons`; `backfill-cup-odds`, cap = `max_credits`, `dry_run`/0 = plan only). Otherwise: historical DraftKings odds (`seasons`, `max_credits`, `keep_credits`, `dry_run`) then `backtest-dk` → `E0_dk.json`. Writes to data-log only from the default branch; elsewhere log + 7-day artifact. | 0 for every no-key input; `max_credits` 0 = download nothing; historical ~20 per snapshot; `cup_odds` ~10 per kickoff slot |
 | `players.yml` | Player model stage 1, the priced shots backtest on cached FanDuel lines and goalscorer stage 1 → `backtest/E0_players*.json`, `E0_goals.json`. Weekly (Mon) plus dispatch. Inputs: `seasons` (default `2023-now`), `odds_seasons` (blank = download nothing), `max_credits`, `dry_run`, `goal_forward_reason` (opens the goalscorer forward window; blank uses the recorded 1 Nov opening, `player_goals.FORWARD_OPENED`). | 0 unless `odds_seasons` is set |
@@ -417,7 +417,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 - Caches: `raw-data-*` (Understat), `xg-good-*` (the last good Understat league files), `odds-history-*`, `player-odds-history-*`,
   `cup-odds-history-*`, `comeback-odds-*`, `inplay-probe-*` (paid odds), `cup-espn-*` (ESPN cup days),
   `understat-<league>-*` (the Understat match files: five shards on `data/raw/understat_matches`, restored together, each saved from the default branch only when a run added files, archived as `ARCHIVED_FREE`; `docs/caches.md`), `comebacks-<league>-*`, `espn-timelines-*`, `cup-corners-*`. Never
-  delete the paid ones. `caches.yml` keeps every cache in use twice a week and archives the paid ones,
+  delete the paid ones. `caches.yml` keeps every cache in use twice a week (a missed cron is covered by `closes.yml`'s
+  caches heartbeat: a dispatch once its newest run that was not cancelled is 84 h old) and archives the paid ones,
   plus `xg-good-` (free, `cache_archive.ARCHIVED_FREE`, lead, 7 Nov),
   as release assets (`paid-odds-archive`, manifest on data-log `archive/manifest.json`); every
   step that restores a paid cache is followed by `.github/actions/paid-archive-restore`, which
@@ -884,7 +885,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   which plans in-play runs and the hand-over from them but never a close or settle run;
   `plan`,
   `SETTLE_AFTER`, `SETTLE_MERGE`, `settle_pending`, `INPLAY`, `WORKFLOWS`, the publish heartbeat
-  `heartbeat_due(last_created, now)` (`HEARTBEAT` 75 min; none or unreadable = due); `to_json` names each
+  `heartbeat_due(last_created, now)` (`HEARTBEAT` 75 min; none or unreadable = due), the caches
+  heartbeat `caches_due(last_created, now)` (`CACHES_HEARTBEAT` 84 h, polled hourly); `to_json` names each
   dispatch's `workflow`).
 - `cup_model.py`: the cross-league model for UCL. One goals-only Dixon-Coles fit (`XI` 0.0019,
   `RIDGE` 0.1, `WINDOW_DAYS` 730, matches before `as_of` only) over football-data's top and
@@ -1100,7 +1102,9 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   lists each `gap`; the CLI refuses an empty live record. Per league and UTC match day (football-data kickoffs) one
   events list 3 h before the first kickoff (1 credit), then each event at kickoff − 50 and − 2 min
   (`SNAPSHOTS`) with §16's ten books (`BOOKS`; `JUDGED_BOOKS` = the nine bookmakers), 10 credits a
-  snapshot. `CappedBudget` with the 3,000 reserve, a call over `MAX_CALL_COST` 10 or a
+  snapshot. A dry run prints the cost after the cache (`net_estimate`: bodies not already held
+  nor answered before) beside the gross `estimate` (lead, 11 Nov: the net cost is what counts
+  against a cap). `CappedBudget` with the 3,000 reserve, a call over `MAX_CALL_COST` 10 or a
   network/401/429/5xx error stops, a 404/422 for one event is recorded and skipped (`KEEP_GOING`);
   `calls.jsonl` and every body in `data/raw/player_odds_history/goalscorer_test/` (paid cache,
   never bought twice); cap 0 = dry run; resumable within `--minutes`. Log line
@@ -1627,7 +1631,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v80) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v84) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2074,6 +2078,56 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   DraftKings' prices, the corners under-60% line, the goals-markets study), only when that page is
   in the build (`rsLink`); otherwise it names its write-up (`doc`). The fixture carries the file
   whole (`make_fixture`), about 1.49 MB in all, 8 Nov.
+- **Model vs Market Map** (owner via the lead, 9 Nov; v82): the owner's artifact (reference page
+  `docs/reference/model_vs_market_map.html` on branch `claude/fervent-brown-3antck`) ported into
+  the Research tab as its own page, linked from the tab's top (`data-mmopen`, `state.mm.open`;
+  "‹ Research" goes back, and so does tapping the tab again). Data: Research lab's committed
+  `lab/residual_map.json`, passed through by `publish.residual_map` as `data.json` →
+  `residual_map` (its own try; None when missing or not `kind: "residual_map"` with `core` and
+  `slices`; log "Model vs Market Map: …"). `mmPageHtml`: header chips (leagues, matches and
+  outcomes, seasons, the locked season), the xG note (Wayback copies, goals-only seasons from
+  `xg_files`, E1–E3 no xG), the map (`mmFlatHtml`: market chance across × model minus market
+  down, each square won minus market, toned blue/red/grey by who was right via `mmTone`,
+  strength by |z|, thin under `thin_below` faint, ringed when the range clears 0), the switches
+  3D | Flat (`data-mmview`; phones open on Flat), Closing | Early price (`data-mmprice`) and
+  "Hide groups under 200" (`#mm-thin`), the readout (`mmDescribe`, the artifact's wording) on
+  tap, Enter or a drag across the squares (pointer handlers on `.mm-grid`, `touch-action:
+  pan-y`); "What stands out" (`mmFindings`), "By factor" (ten chips `data-mmfactor`, `MM_FACTORS`
+  order, grid `mmSliceHtml`, readout), "Read with care" (`warning`) and "How this was measured"
+  (`note`, run ids). 3D (`mm3dSvg`): no CDN (the artifact's Plotly never loaded for the owner);
+  an SVG orthographic projection (`mmProject`, `state.mm.az`/`el`, default −20° / 34° since v83 so
+  the depth axis has length) of the same points: floor grid, axes with tick labels and names,
+  stems, 95% ranges, heads sized by n, theme colours by class; a drag (one finger on a phone,
+  `touch-action: none`) turns it, a tap on a point reads it (`mmPick3d`). Since v83 (lead, 10
+  Nov) the scale is fitted to what is drawn at the current turn (`mmFit` over the floor, the
+  height axis, the points and their ranges, inside `MM3D`'s margins), so the cloud fills the box;
+  the labels are drawn last with a halo (`paint-order: stroke`) and outside the cloud: the
+  market's ticks and name under everything, the depth ticks and name end-anchored at the box's right
+  edge, level with their places on the floor (never clipped), the height axis at the near corner
+  with no tick labels, its name and range ("±N pts at the axis ends") in the box's top-left corner;
+  the smoke step checks every label lies inside the SVG's box (`labelsInBox`).
+  **The surface** (owner, 10 Nov; v84; the reference page's `surface()`, commit a5e18c4): a
+  switch "Surface | Points | Both" (`data-mmshow`, `state.mm.show`, default Surface, only in 3D;
+  phones still open on Flat). `mmSurface(core)` (kept per price in a WeakMap, so Closing | Early
+  redraws it): grid x 7.5–77.5% by 2.5, y −14 to +14 pts by 1 (`MM_SURF`); at each point every
+  group with n > 0 (thin too), w = n·exp(−½((x_c − x)/7)² − ½((y_c − y)/3)²), z = Σw·z/Σw, blank
+  under Σw 300; se ≈ √(Σw²·var)/Σw with var from the group's range (width ÷ 3.92, squared), else
+  x(1 − x)/n; all in pts. Drawn as SVG quads between four non-blank points, sorted back to front
+  with the points by projected depth (re-sorted as it turns), filled on a diverging scale
+  symmetric at the sheet's largest |height| (`mmSurfFill`: `color-mix` of `--surf-lo` orange /
+  `--surf-mid` / `--surf-hi` teal, light and dark tokens; never the blue/red of who was right),
+  a faint mesh outline, lighter in Both; whole-point contours on the floor by marching squares
+  (`mmContours`). The height scale stays the points' (`mmZmax(mmShown())`) in every mode. Under
+  the chart a key "Happened vs market (pts)" (`mmKeyHtml`), the point legend only when points
+  show, and the reference's #surfnote word for word (`MM_SURF_NOTE`). A tap on the sheet (or a
+  mouse over it) reads the nearest grid point (`mmSurfAt`, `mmPickSurf`, `state.mm.ssurf`, dot
+  `#mm-sdot`; `mmSurfDescribe`: "Market's chance 40% · model minus market +3 pts · happened +0.4
+  pts vs the market · 95% range about −0.6 to +1.4 · smoothed from about 5,200 outcomes"); a drag
+  still turns it. On the committed map the closing-price sheet runs −2.4 to +3.9 pts, early
+  −1.6 to +3.3, higher where the model sat below the market (smoke steps `research-map-surface`,
+  `research-map-both`). The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
+  empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
+  goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows
   again (`PF_HIDDEN` empty). `live.strategies` = `goalscorer` (main line, model B 20%+ over the
   best of nine books, the lead) and `goalscorer_dk` (`variant_of`, DraftKings' price only, right
@@ -2095,6 +2149,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   chance). Sheet: `GOAL_FIELDS` (player and team, book, B's chance, break-even, edge, player data
   up to, best and same-book closes, both CLVs, status with `void_reason`, his goals, result
   source, the Understat `result_check`).
+- The xG banner (`setUpdated`, shown while `data.xg_error` is set; owner via the lead, 9 Nov;
+  v81): when the fit still has xG (`xg_coverage` > 0) it reads "Understat (xG) hasn't updated
+  since <date>. Ratings use xG up to then and goals for later matches." from `data.xg_through`
+  (`build_data`: the last match with xG, a display field); with no xG at all it keeps "xG was
+  unavailable at the last update, so ratings use goals only."
 - The odds line (`oddsAge`, Matches and Moneyline's notes; v77, lead 7 Nov): "DraftKings odds
   updated N min ago. Refreshed hourly, and every 15 minutes near kickoff." (the policy floor since
   the 28 Oct plan upgrade), or "Paused while the odds credits are at their reserve." when the

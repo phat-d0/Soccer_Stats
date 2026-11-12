@@ -262,3 +262,16 @@ def test_gaps_dry_run_estimates_and_needs_the_live_record(tmp_path):
 
     with pytest.raises(ValueError):
         gb.run("gaps", 0, raw_dir=tmp_path, leagues=("E0",), kickoffs=gap_kickoffs)
+
+
+def test_dry_run_prints_the_cost_after_the_cache(tmp_path):
+    """The gross estimate ignores the cache; net_estimate counts only bodies not held."""
+    args = dict(api_key="k", raw_dir=tmp_path, leagues=("E0",), kickoffs=kickoffs)
+    before = gb.run("dev", 0, get=fake_api([]), **args)
+    assert before["net_estimate"] == before["estimate"] == 2 * 1 + 3 * 2 * 10
+    gb.run("dev", 500, get=fake_api([]), **args)  # buys everything
+    after = gb.run("dev", 0, get=fake_api([]), **args)
+    assert after["net_estimate"] == 0 and after["estimate"] == 3 * 2 * 10  # lists held
+    lines = gb.summary_lines(after)
+    assert any("about 0 credits after the cache" in x and "before what the cache" in x
+               for x in lines)  # fmt: skip

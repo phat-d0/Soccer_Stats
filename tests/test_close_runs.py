@@ -296,3 +296,34 @@ def test_publish_heartbeat_cli(capsys):
     ):
         cli.main(["publish-heartbeat", "--last", last, "--now", "2026-11-09T12:39:00Z"])
         assert capsys.readouterr().out.strip() == want
+
+
+def test_caches_due_after_84_hours():
+    now = pd.Timestamp("2026-11-12T05:00:00Z")
+    assert cr.CACHES_HEARTBEAT == pd.Timedelta(hours=84)
+    assert cr.caches_due("2026-11-08T17:00:00Z", now)  # exactly 84 h
+    assert not cr.caches_due("2026-11-08T17:01:00Z", now)  # 83 h 59 min
+    assert cr.caches_due("2026-11-06T04:23:00Z", now)  # Thursday's run, a week back
+    assert not cr.caches_due("2026-11-09T04:23:00Z", now)  # Monday's run, 72.6 h
+
+
+def test_caches_due_with_no_run_or_a_bad_time():
+    now = pd.Timestamp("2026-11-12T05:00:00Z")
+    assert cr.caches_due(None, now)
+    assert cr.caches_due("", now)
+    assert cr.caches_due("  ", now)
+    assert cr.caches_due("not a time", now)
+    assert not cr.caches_due("2026-11-10 12:00", now)  # naive = UTC
+
+
+def test_caches_heartbeat_cli(capsys):
+    from soccer_stats import cli
+
+    for last, want in (
+        ("2026-11-08T17:00:00Z", "due"),
+        ("2026-11-09T04:23:00Z", "ok"),
+        ("", "due"),
+    ):
+        args = ["publish-heartbeat", "--workflow", "caches", "--last", last]
+        cli.main(args + ["--now", "2026-11-12T05:00:00Z"])
+        assert capsys.readouterr().out.strip() == want

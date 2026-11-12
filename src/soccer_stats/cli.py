@@ -564,12 +564,15 @@ def cmd_close_plan(args: argparse.Namespace) -> None:
 
 
 def cmd_publish_heartbeat(args: argparse.Namespace) -> None:
-    """Print "due" when closes.yml should dispatch publish.yml (the newest publish run was
-    created HEARTBEAT or more ago, or there is none), else "ok" (lead, 9 Nov)."""
+    """Print "due" when closes.yml should dispatch the workflow (publish: the newest publish
+    run was created HEARTBEAT or more ago, lead 9 Nov; caches: the newest caches run not
+    cancelled was created CACHES_HEARTBEAT or more ago, lead 12 Nov; or there is none),
+    else "ok"."""
     from soccer_stats import close_runs
 
     now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
-    print("due" if close_runs.heartbeat_due(args.last, now) else "ok")
+    due = close_runs.caches_due if args.workflow == "caches" else close_runs.heartbeat_due
+    print("due" if due(args.last, now) else "ok")
 
 
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
@@ -3547,7 +3550,13 @@ def main(argv: list[str] | None = None) -> None:
     hb = sub.add_parser(
         "publish-heartbeat", help="is a publish run overdue? prints due or ok (closes.yml)"
     )
-    hb.add_argument("--last", default="", help="created_at of the newest publish.yml run")
+    hb.add_argument("--last", default="", help="created_at of the newest run checked")
+    hb.add_argument(
+        "--workflow",
+        choices=["publish", "caches"],
+        default="publish",
+        help="publish (75 min) or caches (84 h, runs not cancelled)",
+    )
     hb.add_argument("--now", help="check at this time (default: now)")
     hb.set_defaults(func=cmd_publish_heartbeat)
 

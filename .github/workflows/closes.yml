@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write # dispatch publish.yml, inplay.yml and the next planner run
+  actions: write # dispatch publish.yml, inplay.yml, caches.yml and the next planner run
   contents: read
 
 # One planner at a time. A new run waits for the sleeping one rather than cancelling it.
@@ -58,6 +58,9 @@ jobs:
       # this branch was created 75 minutes or more ago (cron skipped it for 6.5 h on 9 Nov).
       # The run then sleeps to its horizon and always hands over to the next planner run,
       # so the heartbeat keeps going on days without kickoffs.
+      # Caches heartbeat (lead, 12 Nov; close_runs.CACHES_HEARTBEAT): about hourly, caches.yml
+      # is dispatched with its defaults when its newest run on this branch that was not
+      # cancelled was created 84 h or more ago (GitHub dropped the 04:23 cron on 12 Nov).
       - name: Dispatch publish at each planned time
         if: github.ref_name == github.event.repository.default_branch
         env:
@@ -77,9 +80,28 @@ jobs:
               fi
             fi
           }
+          caches_checked=0
+          caches_heartbeat() {
+            now=$(date +%s)
+            if [ $(( now - caches_checked )) -lt 3600 ]; then return 0; fi
+            caches_checked=$now
+            last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/caches.yml/runs?branch=$REF&per_page=30" \
+              --jq '[.workflow_runs[] | select(.conclusion != "cancelled")][0].created_at // ""' 2>/dev/null || echo "?")
+            if [ "$last" = "?" ]; then echo "Heartbeat: could not read caches runs"; return 0; fi
+            if [ "$(uv run --frozen soccer-stats publish-heartbeat --workflow caches --last "$last")" = "due" ]; then
+              ago="none"
+              if [ -n "$last" ]; then ago="$(( (now - $(date -d "$last" +%s)) / 3600 ))h ago"; fi
+              if gh workflow run caches.yml --ref "$REF" < /dev/null; then
+                echo "Heartbeat: dispatched caches.yml (last run $ago)"
+              else
+                echo "Heartbeat: dispatch of caches.yml failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              fi
+            fi
+          }
           sleep_until() {
             while :; do
               heartbeat
+              caches_heartbeat
               left=$(( $1 - $(date +%s) ))
               if [ "$left" -le 0 ]; then return 0; fi
               if [ "$left" -gt 300 ]; then sleep 300; else sleep "$left"; return 0; fi
