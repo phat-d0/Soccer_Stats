@@ -2077,7 +2077,7 @@ five leagues. Every Pinnacle line logged is a half line.
 - Its fits are stored with their dates, and every bet records its fit's date, a, b, c and σ.
 - The track counts its bets toward 300 in its section, as the line shop does.
 
-**Amendment 1 (12 Nov 2026, 15:25 UTC; the lead's review of PR #249; written before any fit or
+**Amendment 1 (12 Nov 2026, 15:14 UTC; the lead's review of PR #249; written before any fit or
 outcome read).** Two timing rules replace the wording in §2 where they differ; nothing else
 changes.
 - **(a) When fits happen.** §2's "refit every 28 days, from 14 Oct" read literally gives fit
