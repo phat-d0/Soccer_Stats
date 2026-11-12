@@ -2076,3 +2076,22 @@ five leagues. Every Pinnacle line logged is a half line.
   first fit has 300 lines, the backcast simply has no picks.
 - Its fits are stored with their dates, and every bet records its fit's date, a, b, c and σ.
 - The track counts its bets toward 300 in its section, as the line shop does.
+
+**Amendment 1 (12 Nov 2026, 15:25 UTC; the lead's review of PR #249; written before any fit or
+outcome read).** Two timing rules replace the wording in §2 where they differ; nothing else
+changes.
+- **(a) When fits happen.** §2's "refit every 28 days, from 14 Oct" read literally gives fit
+  dates of 11 Nov and 9 Dec, and the minimum was not met on 11 Nov, so the first fit would be
+  9 Dec, not "about one weekend away". What is meant instead: the **first fit** is made at the
+  first paper run (live) or the first look snapshot (backcast) at which the minimum (300
+  settled lines from at least 150 matches, unlocked leagues) is met; **then every 28 days from
+  that fit's date**. The backcast applies the same rule on dates, so it and the live track fit
+  on the same days.
+- **(b) Which rows a fit may use.** A row enters a fit only if its result was known before the
+  fit. Live: the match settled (its corner result recorded by the corner tracks' settlement)
+  before the fit is made. Backcast: kickoff + 1 day before the fit, as a stand-in for
+  settlement. The backcast therefore never uses a result the live track would not have had.
+  The minimum in (a) counts only rows that pass this rule.
+- **Separate test.** Entering above Pinnacle's fair price without a model is a different
+  question: the corner line shop vs Pinnacle (pre-registered 8 Nov, "Corner line shop vs
+  Pinnacle") tests it. This test is about whether model (f) adds anything to Pinnacle's price.
