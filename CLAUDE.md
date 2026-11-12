@@ -113,8 +113,12 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   `docs/totals.md` "Cup corners model").
 
 **Team totals:** logged for data only (FanDuel team totals plus the match total at FanDuel,
-Bovada and Pinnacle; cap 20,000 a month since 28 Oct, 800 before). Nothing is scored until the round-13 gate (50 settled
-matches for each anchor; `docs/totals.md` "Team totals against the main market").
+Bovada and Pinnacle; cap 20,000 a month since 28 Oct, 800 before). The round-13 test's single
+development read (12 Nov, run 43243468899; `docs/totals.md` "Team totals: development result")
+**fails**: no candidate passes at 99.58%. The model's 199 bets at 2% had CLV −4.7% (−6.1% to
+−3.3%) against FanDuel's close and blend weight −0.13 (−0.94 to +0.78); the FanDuel- and
+Pinnacle-anchored prices made 1 and 2 bets. No confirmation stage, no app change; logging
+continues (lead), the only data for any later team-goals idea.
 
 **Players:** Anytime goalscorer is testing. Its five-league forward check (2026/27 from 10 Oct)
 was opened once on 1 Nov (lead's reason; runs 41325824036 and 41325826728) and **passes**,

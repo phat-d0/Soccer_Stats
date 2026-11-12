@@ -1,6 +1,6 @@
 {
  "kind": "research_overview",
- "generated": "2026-11-08",
+ "generated": "2026-11-12",
  "note": "Every research study to date, one row each, from the verdicts recorded in docs/lab.md, docs/edge.md, docs/totals.md, docs/leagues.md and docs/player_props.md. CLV and ROI are per $1 against Pinnacle's margin-free close; ranges are 95% and resample matches. Nothing here has beaten Pinnacle's close.",
  "areas": [
   {
@@ -398,6 +398,22 @@
    "sample": "Bake-offs 1 and 2, recalibration",
    "result": "Nothing beats the close. One finalist has a locked test left.",
    "doc": "docs/totals.md"
+  },
+  {
+   "id": "team_totals",
+   "area": "markets",
+   "name": "Team totals against FanDuel",
+   "when": "2026-11-12",
+   "verdict": "fail",
+   "question": "Do our model, or prices built from FanDuel's or Pinnacle's own match totals, beat FanDuel's team-total prices?",
+   "sample": "213 matches, top five leagues, logged live from 9 Oct; 12 tests at 99.58%",
+   "measure": "clv",
+   "value": -0.0472,
+   "lo": -0.0611,
+   "hi": -0.033,
+   "bets": 199,
+   "result": "No edge. The model's 199 bets at a 2% edge had CLV −4.7% against FanDuel's close, and it earns no weight beside FanDuel's price (c −0.13, −0.94 to +0.78). Prices from the match totals almost never disagree with FanDuel's team totals (1 and 2 bets). Logging continues.",
+   "doc": "docs/totals.md: Team totals against the main market"
   },
   {
    "id": "corners2_locked",
