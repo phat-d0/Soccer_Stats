@@ -1788,7 +1788,7 @@ function teamTotalsResultHtml(res) {
         <thead><tr><th>Prices from</th><th>Matches</th><th>Bets</th><th>CLV</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="note" style="margin:8px 0 0">Blend weight of the model beside FanDuel's price: c = ${gainFmt(m.blend_c, 2)}${m.blend_c_range ? ` (${ttRange(m.blend_c_range, (v) => gainFmt(v, 2))})` : ""}. A range across 0 means the model adds nothing FanDuel's price doesn't already hold. Its log-loss gain against FanDuel's early price: ${gainFmt(m.gain, 4)}${m.gain_range ? ` (${ttRange(m.gain_range, (v) => gainFmt(v, 4))})` : ""}.</p>
+      <p class="note" style="margin:8px 0 0">Blend weight of the model beside FanDuel's price: c&nbsp;=&nbsp;${gainFmt(m.blend_c, 2)}${m.blend_c_range ? ` (${ttRange(m.blend_c_range, (v) => gainFmt(v, 2))})` : ""}. A range across 0 means the model adds nothing FanDuel's price doesn't already hold. Its log-loss gain against FanDuel's early price: ${gainFmt(m.gain, 4)}${m.gain_range ? ` (${ttRange(m.gain_range, (v) => gainFmt(v, 4))})` : ""}.</p>
       <p class="note" style="margin:8px 0 0">An edge needed a candidate with 30+ bets and its CLV range above 0. ${res.level ? `Ranges at ${esc(res.level)}, read once` : "Read once"}${res.run ? ` (run ${esc(res.run)})` : ""}. <b>Logging continues</b>: it is cheap and it is the only data a later team-goals idea would have.</p>
     </div>`;
 }

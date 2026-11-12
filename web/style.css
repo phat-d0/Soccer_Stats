@@ -626,7 +626,8 @@ details.edge-explore > summary { padding: 8px 0 0; border: 0; background: none; 
 table.mk-table { table-layout: fixed; font-size: 13px; }
 table.mk-table th:first-child { width: 28%; }
 table.tt-table th:first-child { width: 42%; }
-table.tt-table td small { color: var(--text-muted); white-space: nowrap; }
+table.tt-table td small { color: var(--text-muted); display: inline-block; line-height: 1.25; }
+table.tt-table th:not(:first-child) { width: 19%; }
 .tt-result .mk-progress-head { line-height: 1.4; }
 .mk-range { display: block; font-size: 11px; color: var(--text-muted); }
 table.mk-table.mk-wide td, table.mk-table.mk-wide th { padding-left: 2px; padding-right: 2px; }
