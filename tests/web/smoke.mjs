@@ -214,8 +214,10 @@ async function scrubCheck(p, sel) {
   const centre = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
   let a, b, ia = null, ib = null;
   if (await marks.count()) {
-    // (a tall row chart: the fifth row at most, so both stay on screen)
+    // (a tall row chart: the fifth row at most, so both stay on screen; a chart taller than
+    // the screen is scrolled to centre its first row, which would else sit under the header)
     ia = 0; ib = info.rows ? Math.min(info.n - 1, 4) : info.n - 1;
+    if (info.rows) await wrap.locator('[data-stop="0"]').first().evaluate((e) => e.scrollIntoView({ block: "center" }));
     a = centre(await wrap.locator('[data-stop="0"]').first().boundingBox());
     b = centre(await wrap.locator(`[data-stop="${ib}"]`).first().boundingBox());
   } else {
