@@ -2124,3 +2124,11 @@ changes.
 - **Separate test.** Entering above Pinnacle's fair price without a model is a different
   question: the corner line shop vs Pinnacle (pre-registered 8 Nov, "Corner line shop vs
   Pinnacle") tests it. This test is about whether model (f) adds anything to Pinnacle's price.
+
+**Development gate: code (12 Nov 2026, before any fit or outcome read).** `lab/corner_lean.py`,
+`odds-check.yml` `task=corner-lean-gate`, implements §2 with Amendment 1. Results come from
+football-data's HC/AC only: a match without a football-data count yet is unsettled and enters
+nothing (ESPN's counts are not fetched; that only delays rows, never changes one). The replay's
+picks are made in the unlocked leagues only, as the gate is a development read on them. It will
+run once, on the default branch, on or after 16 Nov, if the minimum is met (`design=counts`
+checks that first, without a fit).

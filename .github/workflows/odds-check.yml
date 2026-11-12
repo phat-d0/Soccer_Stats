@@ -150,6 +150,10 @@
 #            the better side beats Pinnacle's Shin-fair price. Prices only; cap 0 = nothing fetched (no key).
 #   corner-moves: does model (f)'s side predict Pinnacle's look -> close move (docs/totals.md
 #            "Corner price moves"; pre-registered)? data-log's corner price logs, no key.
+#   corner-lean-gate: the corner Blend Lean's development gate (docs/totals.md "Corner Blend
+#            Lean: pre-registration" §4 and Amendment 1): c's 95% range, unlocked leagues only;
+#            `design=counts` prints the eligible counts only (no fit). No key. Log line
+#            CORNER_LEAN_GATE_JSON.
 #   auc: ROC AUC for the match model, blend and prices, corners model (f) and goalscorer B
 #            (docs/lab.md "ROC AUC"; exploratory, 2019/20-2023/24, no key).
 #   lasso-residual: LASSO on the market residual (docs/lab.md "LASSO on the market
@@ -179,9 +183,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -211,9 +215,9 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       design:
-        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov); understat-wayback: probe (counts), compare (copies vs the files held) or load (complete copies into xg-good-, default branch only) or goals (loaded copies vs football-data's goals)"
+        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov); understat-wayback: probe (counts), compare (copies vs the files held) or load (complete copies into xg-good-, default branch only) or goals (loaded copies vs football-data's goals); corner-lean-gate: counts (eligible counts only, no fit; any other value runs the gate)"
         type: choice
-        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps, probe, compare, load, goals]
+        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps, probe, compare, load, goals, counts]
         default: B
       restore_key:
         description: "understat-restore: the run id of an older raw-data cache holding good Understat files (e.g. 41369190298)"
@@ -775,6 +779,18 @@ jobs:
               done
               uv run python -m soccer_stats.edge.corner_moves --log-dir out/log \
                 --json out/corner_moves.json ;;
+            corner-lean-gate)  # no key: data-log's corner price logs, football-data's corner counts
+              git fetch -q --depth=1 origin data-log
+              mkdir -p out/log/odds_log
+              for f in $(git ls-tree --name-only FETCH_HEAD odds_log/ | grep '_corners_2' ); do
+                git show "FETCH_HEAD:$f" > "out/log/odds_log/$(basename "$f")"
+              done
+              if [ "$DESIGN" = "counts" ]; then
+                uv run python -m soccer_stats.lab.corner_lean --log-dir out/log/odds_log --counts
+              else
+                uv run python -m soccer_stats.lab.corner_lean --log-dir out/log/odds_log \
+                  --json out/corner_lean_gate.json
+              fi ;;
             auc)  # no key: the corner price logs from data-log, goalscorer rows from run 41346853368
               git fetch -q --depth=1 origin data-log
               mkdir -p out/log/odds_log

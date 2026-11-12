@@ -1419,6 +1419,16 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   committed `lab/auc_research.json` (run 42457943922): model 0.662 vs Pinnacle early 0.680, no
   ranking beyond the price (within-band 0.499); goalscorer B 0.746 = the best price 0.746.
 
+- `lab/corner_lean.py` (lead, 12 Nov; `docs/totals.md` "Corner Blend Lean: pre-registration"
+  §4 with Amendment 1; no key): the corner Blend Lean's development gate. `look_rows` (Pinnacle's
+  first two-sided look per team half line from 14 Oct, the newest close beside it),
+  `attach_counts` (football-data HC/AC), `eligible` (`FIT_LEAGUES` SP1, D1, E1, E2, E3 only,
+  never `LOCKED`; kickoff + 1 day before the fit; count known), `meets_minimum` (300 lines, 150
+  matches), `fit` (logit p = a + b·logit(fair) + c·logit(model), σ), `c_range` (match bootstrap),
+  `schedule` (first fit at the first look meeting the minimum, then every 28 days), `replay`
+  (§3's picks, descriptive: z, driver, CLV vs Pinnacle's close). `odds-check.yml`
+  `task=corner-lean-gate` (`design=counts`: counts only), log line `CORNER_LEAN_GATE_JSON`.
+
 - `lab/lasso_residual.py` (owner, 8 Nov; `docs/lab.md` "LASSO on the market residual",
   pre-registered before any fit; development only, no key): one row per match, eight leagues,
   a multinomial logistic (draw reference) with Pinnacle's Shin-fair early 1X2 as a fixed
