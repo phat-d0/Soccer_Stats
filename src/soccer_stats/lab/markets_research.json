@@ -1,6 +1,6 @@
 {
   "about": "Research results for goal and corner markets, shown on Record > Goals & corners. Every number is copied verbatim from docs/totals.md (rounds 8, 11, 12 and 13) and CLAUDE.md's Status; nothing here is recomputed. Ranges are as published (Bonferroni-widened where the doc says so).",
-  "updated": "2026-10-10",
+  "updated": "2026-11-12",
   "total_goals": {
     "verdict": "No edge. The model loses to Pinnacle's price at 2.5 goals in all six leagues.",
     "pinnacle": {
@@ -37,7 +37,7 @@
     }
   },
   "team_goals": {
-    "verdict": "Promising but unproven. The model is well calibrated and beats the league average, but it hasn't been tested against a bookmaker yet.",
+    "verdict": "No edge. The model beat the league average in past seasons, but against FanDuel's team-total prices it adds nothing: the pre-registered test found no edge (12 Nov).",
     "research": {
       "title": "Against the league's recent average, 0.5 to 2.5 goals a team",
       "seasons": "2017/18–2024/25",
@@ -59,10 +59,11 @@
       ]
     },
     "live": {
-      "title": "Live test against FanDuel",
+      "title": "Test against FanDuel: no edge (12 Nov)",
       "source": "docs/totals.md, Live team-total logging (owner approved 9 Oct); team_totals.report",
       "target": 50,
-      "plan": "FanDuel's team-total prices are logged about a day before kickoff and again just before it, in the Premier League, La Liga, Bundesliga, Serie A and Ligue 1. Once 50 matches have both prices and a result, the model is scored against FanDuel's closing price."
+      "plan": "FanDuel's team-total prices were logged about a day before kickoff and again just before it, in the top five leagues. The one pre-registered read (run 43243468899, 213 matches, 12 Nov) found no edge: at a 2% edge the model made 199 bets with closing line value −4.7% (−6.1% to −3.3%) against FanDuel's close, and prices built from FanDuel's or Pinnacle's own match totals almost never disagreed with FanDuel's team totals. Logging continues for later ideas.",
+      "result": {"run": "43243468899", "level": "99.58%", "passes": false, "matches": {"fanduel_anchor": 71, "pinnacle_anchor": 203, "model": 213}, "model": {"gain": -0.0126, "gain_range": [-0.0331, 0.0073], "bets": 199, "clv": -0.0472, "clv_range": [-0.0611, -0.033], "roi": -0.128, "blend_c": -0.13, "blend_c_range": [-0.94, 0.78]}, "fanduel_anchor": {"gain": -0.0019, "gain_range": [-0.0084, 0.0045], "bets": 1}, "pinnacle_anchor": {"gain": 0.00004, "gain_range": [-0.0038, 0.0041], "bets": 2}, "blend": {"gain": -0.0042, "gain_range": [-0.015, 0.0069], "bets": 91, "clv": -0.0465}, "source": "docs/totals.md, Team totals: development result"}
     }
   },
   "corners": {

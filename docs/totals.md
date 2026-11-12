@@ -981,6 +981,35 @@ model-vs-close `report`, which `task=team-totals` also prints, scores the model'
 so it now waits for this test's gate too (`team_totals.gated_min_matches`); otherwise a run
 before the anchors had 50 matches would have looked at candidate (b) early.
 
+### Team totals: development result (run 43243468899, 12 Nov 2026; read once)
+
+The gate was reached on 12 Nov (FanDuel-anchored 71 settled matches, Pinnacle-anchored 203),
+and the lead dispatched the single pre-registered development run: `odds-check.yml`
+`task=team-totals`, other inputs blank (run 43243468899, job 131269810515, log line
+`MARKET_TEST_JSON`). 12 tests at 99.58% ranges; last kickoff 8 Nov 20:00 UTC.
+
+| Candidate | Matches (rows) | Log loss gain vs FanDuel's look | Rule t = 2%: bets, CLV vs FanDuel's close | ROI |
+| --- | --- | --- | --- | --- |
+| (a′) FanDuel-anchored | 71 (127) | −0.0019 (−0.0084 to +0.0045) | 1 bet, −7.8% | – |
+| (a″) Pinnacle-anchored | 203 (372) | +0.00004 (−0.0038 to +0.0041) | 2 bets, −5.4% (−7.8% to −3.0%) | – |
+| (b) our model | 213 (389) | −0.0126 (−0.0331 to +0.0073) | 199 bets, **−4.7% (−6.1% to −3.3%)** | −12.8% (−32.9% to +7.6%) |
+| (c) 50/50 blend of (a″) and (b) | 203 (372) | −0.0042 (−0.0150 to +0.0069) | 91 bets, −4.6% (−7.0% to −2.5%) | −18.7% |
+| (a) h2h-only (descriptive) | 213 (389) | −0.0086 (−0.0261 to +0.0097) | 261 bets, −5.1% (−6.3% to −4.0%) | −7.1% |
+
+- **Verdict: fail.** `passes: []`. No candidate reaches 30 bets with a CLV range above 0 at
+  any threshold; at 5% and 10% the model's CLV is −4.6% and −4.9%, every range below 0. The
+  anchored candidates almost never disagree with FanDuel by 2%: FanDuel prices its team totals
+  in line with its own main totals and with Pinnacle's.
+- **The model adds nothing beside FanDuel's price:** its blend weight is c = −0.13 (−0.94 to
+  +0.78). The anchored candidates' weights are +0.24 (FanDuel) and +0.31 (Pinnacle), both
+  ranges across 0.
+- **As pre-registered, nothing passes, so the test stops**: no frozen rule, no confirmation
+  sample, no app change. Logging continues (lead, 12 Nov): it is cheap and it is the only data
+  any later team-goals idea would have.
+- This also answers the owner's 12 Nov question for team goals: there is nothing for a Blend
+  Lean on team goals to build on, since neither our model nor the anchors carry signal beside
+  FanDuel's price.
+
 ## Corners: what's left to try (round 13, task 2; plan only, no runs, nothing spent)
 
 **Where things stand.** Rounds 8, 11 and 12 used up both recent seasons for corners: 2024/25
