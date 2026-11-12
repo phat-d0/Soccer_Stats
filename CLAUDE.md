@@ -2216,6 +2216,12 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   won, lost, a non-starter void, open, three stale, one backcast; `GOALSCORER_TRADES`, the track
   moved back to 14 Sep / 27 Sep like the line shop's) cover states the real data lacks; about
   1.44 MB in all, 9 Nov.
+- Fixture refresh (lead, 12 Nov): rebuilt from that day's data-log with no step needing new
+  data. The ~40 Moneyline failures seen on a rebuild during v85 were one step's knock-on: a
+  check that stops mid-way leaves the page elsewhere, so every later step that clicks fails.
+  Counts that follow the app's own lists are read from the page (Moneyline's "N archived" from
+  the Archive list), not written into the step; states the real ledgers lack stay synthetic
+  (the `add_*` blocks). After a step fails, fix the first failure and rerun before reading the rest.
 - Smoke test (its `closeSheet` is a no-op when no sheet is open): `node tests/web/smoke.mjs [--shots DIR]` visits every tab, view and sheet at 390px
   light and dark and at 1280px; fails on console errors, horizontal scroll, or "undefined", "NaN"
   or "${" in the text. `tests/test_web_smoke.py` runs it under pytest (skips without node or
