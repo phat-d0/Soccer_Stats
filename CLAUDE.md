@@ -1653,7 +1653,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v84) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v85) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2072,8 +2072,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   "Goals markets: total goals and each team's goals" (`goals_markets`, verdict "closed", pill
   Closed, in the Archive; the total-goals CLV `rangeChart` `tg`, the league tables folded, each
   team's goals' research with its live part pointing at the next row) and "Team totals (logging
-  only)" (`team_totals_log`, verdict "testing", pill Testing, in the main list;
-  `teamTotalsProgressHtml`: settled of 50 toward the round-13 gate). Neither has Result/Why.
+  only)" (`team_totals_log`). Since v85 (lead, 12 Nov: the test was read, no edge, PR #248) a
+  `live.result` makes it verdict "closed", pill Closed, in the Archive after Goals markets
+  (closed `markets_research.updated`): row "No edge · N model bets", meta "Closed … · never
+  traded · logging continues", the model's CLV against FanDuel's close; the page shows
+  `teamTotalsResultHtml` (per candidate in `TT_CANDIDATES` its matches, bets at the 2% rule
+  and CLV, the model's blend weight c and log-loss gain with ranges, the run and "Logging
+  continues"). Without `live.result` (older data) it stays testing in the main list with
+  `teamTotalsProgressHtml` (settled of 50 toward the round-13 gate; `teamTotalsLiveHtml` picks).
+  Neither row has Result/Why.
   **Moneyline → Model** under All or the Premier League ends with "The model replayed, Premier
   League" (`data.record`: accuracy vs the price, the 12% replay in units, goals + xG vs goals only,
   the running profit folded); other leagues get a one-line note. **Model 12% → Backtest,
