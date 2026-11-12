@@ -95,6 +95,25 @@ def heartbeat_due(last_created, now, every: pd.Timedelta = HEARTBEAT) -> bool:
     return pd.Timestamp(now) - last >= every
 
 
+# Caches heartbeat (lead, 12 Nov): GitHub never started the 04:23 scheduled caches.yml run on
+# Thu 12 Nov (Player props dispatched it by hand, run 43160278267). caches.yml is the twice-
+# weekly keep-alive against GitHub's 7-day cache eviction, so two dropped crons in a row could
+# lose a paid or Understat cache. While a planner run sleeps it checks about every
+# CACHES_HEARTBEAT_POLL the newest caches.yml run on the default branch that was not cancelled
+# (any event: schedule, dispatch or a paid run's archive dispatch) and dispatches caches.yml
+# with its defaults when that run was created CACHES_HEARTBEAT or more ago, or there is none.
+# 84 h covers the Thursday-to-Monday gap of 4 days (any run between resets the clock) and
+# still leaves more than 3 days before eviction. 0 credits.
+CACHES_HEARTBEAT = pd.Timedelta(hours=84)
+CACHES_HEARTBEAT_POLL = pd.Timedelta(hours=1)
+
+
+def caches_due(last_created, now, every: pd.Timedelta = CACHES_HEARTBEAT) -> bool:
+    """True when caches.yml needs a heartbeat dispatch: no run on record (None or blank), an
+    unreadable time, or the newest run that was not cancelled created `every` or more ago."""
+    return heartbeat_due(last_created, now, every)
+
+
 WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml", "goalscorer": "publish.yml"} | (
     dict.fromkeys(INPLAY, "inplay.yml")
 )
