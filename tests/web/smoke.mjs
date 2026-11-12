@@ -801,7 +801,7 @@ const STEPS = [
     if (!arch.includes("Old rules are still tracked") || !arch.includes("Kept out of the main list since Oct 26: Model 12% still opens a paper trade")) throw new Error(`archive note: ${arch}`);
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="moneyline"]').innerText()).replace(/\s+/g, " ");
-    if (!home.includes("Lead: Blend Lean (new rule) · 2 more · 1 draw no bet track · 5 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
+    if (!home.includes("Lead: Blend Lean (new rule) · 2 more · 1 draw no bet track · 6 archived") || home.includes("Model 12%")) throw new Error(`Moneyline row: ${home}`);
     // The headline is the lead strategy's: Lean's new-rule trades.
     const wantHead = await p.evaluate(() => { const cur = pfById("moneyline"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "lean"), "").trades); return usd(m.profit, 2); });
     if (!home.includes(wantHead)) throw new Error(`Moneyline headline ${home} vs Lean ${wantHead}`);
