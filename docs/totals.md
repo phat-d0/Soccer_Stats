@@ -2012,3 +2012,115 @@ still apply.
   data (2026/27 once the season ends, outside E0/I1/F1's locked bake-off 2 test). Its gain is
   tiny either way: about 0.003 in log loss per match, on lines far from the mean, against a
   6% margin.
+
+## Corner Blend Lean: pre-registration (Research lab, 12 Nov 2026; owner's brief of 11 Oct via the lead; FROZEN before any fit or outcome read)
+
+**Question.** Does a Blend Lean on team corners (Pinnacle's price sharpened by model (f), as
+the 1X2 Lean does for match odds) pick lines whose price beats Pinnacle's close? This answers
+the corner half of the owner's 12 Nov question ("should Blend Lean extend to team corners and
+team goals?"). The team-goals half is closed: the team-totals test failed on 12 Nov ("Team
+totals: development result").
+
+**What to expect, plainly.** Probably a fail. The corner tracks' CLV is below 0 in every
+league at both books (Pinnacle −5.8%, DraftKings −6.6%; "Corners: Task 1 read"), and almost
+all of that is Pinnacle's ~6.7% margin (median at the look). The one signal found is tiny:
+Pinnacle's price moves +0.18 points toward (f)'s side from look to close ("Corner price
+moves"), about +0.35% of value. A z ≥ 1 rule needs the blend to clear the raw price, margin
+included, by one σ, so most picks will come from the price weight b sharpening Pinnacle's own
+price rather than from (f). The 1X2 Lean is like that, and its CLV is −3.1%. This test exists
+so the question is answered on data, not assumed.
+
+**Data.** data-log `odds_log/<code>_corners_<YYYY-MM>.jsonl`, `market` "team_corners", all
+eight corner leagues, logged since 11 Oct. On 12 Nov, before this was written (counts only, no
+result read): Pinnacle has 474 team half lines with both a look and a close on 258 kicked-off
+matches (about 1.8 lines a match, 130–160 lines a week lately), and DraftKings has 272 lines in
+five leagues. Every Pinnacle line logged is a half line.
+
+**1. Unit and inputs.**
+- One row = one Pinnacle team line (match × team × line) at its **look** snapshot, the first
+  logged `look` row, with `fair_over` (Shin) and `p_model_over` as logged at that moment.
+- Outcome: over won = the team's corners > line (football-data HC/AC, else ESPN's count, as
+  the tracks settle).
+- Whole lines never enter: none are logged at Pinnacle, and a push has no binary outcome.
+
+**2. The blend.**
+- logit p_bet = a + b·logit(Pinnacle's fair over at the look) + c·logit(`p_model_over`),
+  a logistic fit on settled rows.
+- σ = the sd of (p_bet − fair_over) on the fit rows.
+- **Walk-forward:** refit every 28 days, from 14 Oct, on rows whose match kicked off before
+  the refit, pooled across leagues.
+- **Minimum:** 300 settled lines from at least 150 matches. Lines within a match are
+  correlated, so the match count guards the fit. No fit, no picks.
+- **Leagues in the fit:** SP1, D1, E1, E2 and E3 only, until bake-off 2's locked test is read
+  (3 Feb 2027, `corners2.EARLIEST_OPEN`). E0, I1 and F1's 2026/27 corner outcomes are that test's
+  data, and a fit on them would read it early. From the first refit after the locked read, their
+  rows join the fit.
+- **Picks:** made in all eight leagues. Applying a fit reads no outcome.
+- On 12 Nov the unlocked leagues held 261 settled lines on 143 matches, so the first fit is
+  about one weekend away.
+
+**3. The rule (live, paper, $10).**
+- **Entry:** at the look snapshot, Pinnacle's quote no more than 3 hours old and before
+  kickoff (the corner tracks' freshness gate).
+- **z per side:** z_over = (p_bet − 1/over price)/σ and z_under = ((1 − p_bet) − 1/under
+  price)/σ, on Pinnacle's raw prices, as the 1X2 Lean uses DraftKings' raw price.
+- **Bet:** the side with the larger z if z ≥ 1; "strong" at z ≥ 2.
+- **Volume:** one bet per match × team, the line with the largest z; so at most two a match.
+- **Driver:** every pick also records z_market, the same z with c = 0, and is labelled
+  market-driven (z_market ≥ 1) or model-driven, as the 1X2 Lean does.
+- **DraftKings line (descriptive, the owner bets there):** the same p_bet and σ against
+  DraftKings' raw price at the same line in the same look call, one-sided lines included when
+  the bet side is quoted. It is never judged.
+- **Closes:** CLV = entry price × Pinnacle's Shin-fair close at the same line − 1 (the newest
+  close-snapshot quote before kickoff). DraftKings' line also records its own close.
+
+**4. Development gate (once, before the track is built).**
+- One development read on the unlocked leagues' settled rows from 14 Oct to the build date.
+- **c's 95% range**, resampling matches, 2,000 draws, on a single fit to all those rows.
+- The same walk-forward replayed over those rows, giving the picks' count, driver mix and CLV
+  (descriptive only).
+- **If c's range is above 0:** the Corners team builds the track as specified.
+- **If c's range includes or sits below 0:** the rule is a pure market-sharpening rule. The
+  lead and owner decide whether to build it anyway, knowing that. Nothing changes this
+  pre-registration either way.
+
+**5. The judged read (once).**
+- **When:** the first **300 Pinnacle bets** opened from `defined_at` (the first paper run
+  after the build merges; backcast bets from 14 Oct are descriptive and never counted), each
+  with a final close. If 300 haven't arrived by **31 May 2027**, the read is taken then, on
+  whatever is there.
+- **Measure:** mean CLV vs Pinnacle's close.
+- **Pass:** the CLV's 95% range, resampling matches (2,000 draws, seed 0), lies above 0, on at
+  least 300 bets.
+- **Other outcomes:** fewer than 300 bets on 31 May is **inconclusive**; otherwise it is a
+  **fail**.
+- **Never judged:** ROI, the DraftKings line and the strong tier are descriptive.
+- **What a pass leads to:** it would go to the owner as a proposal; nothing changes
+  automatically.
+
+**6. Build (Corners team, then UI Design).**
+- A side-by-side paper track beside the two corner tracks, with its own ledger and its own
+  `defined_at`.
+- Backcast from 14 Oct on the logged look rows: descriptive, as every new track. Before the
+  first fit has 300 lines, the backcast simply has no picks.
+- Its fits are stored with their dates, and every bet records its fit's date, a, b, c and σ.
+- The track counts its bets toward 300 in its section, as the line shop does.
+
+**Amendment 1 (12 Nov 2026, 15:14 UTC; the lead's review of PR #249; written before any fit or
+outcome read).** Two timing rules replace the wording in §2 where they differ; nothing else
+changes.
+- **(a) When fits happen.** §2's "refit every 28 days, from 14 Oct" read literally gives fit
+  dates of 11 Nov and 9 Dec, and the minimum was not met on 11 Nov, so the first fit would be
+  9 Dec, not "about one weekend away". What is meant instead: the **first fit** is made at the
+  first paper run (live) or the first look snapshot (backcast) at which the minimum (300
+  settled lines from at least 150 matches, unlocked leagues) is met; **then every 28 days from
+  that fit's date**. The backcast applies the same rule on dates, so it and the live track fit
+  on the same days.
+- **(b) Which rows a fit may use.** A row enters a fit only if its result was known before the
+  fit. Live: the match settled (its corner result recorded by the corner tracks' settlement)
+  before the fit is made. Backcast: kickoff + 1 day before the fit, as a stand-in for
+  settlement. The backcast therefore never uses a result the live track would not have had.
+  The minimum in (a) counts only rows that pass this rule.
+- **Separate test.** Entering above Pinnacle's fair price without a model is a different
+  question: the corner line shop vs Pinnacle (pre-registered 8 Nov, "Corner line shop vs
+  Pinnacle") tests it. This test is about whether model (f) adds anything to Pinnacle's price.
