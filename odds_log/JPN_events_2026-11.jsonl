@@ -12,3 +12,6 @@
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"7795be80740fab846b231e854e1adb4f","home":"Vissel Kobe","away":"Urawa Red Diamonds","kickoff":"2026-11-08T05:00:00+00:00","fetched_at":"2026-11-01T07:24:58+00:00"}
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"bfe6ef3178b863b49cced3ee6054f5a3","home":"Gamba Osaka","away":"Cerezo Osaka","kickoff":"2026-11-08T06:00:00+00:00","fetched_at":"2026-11-01T07:24:58+00:00"}
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"75f6d790b41b54226cfebd3a4677531a","home":"JEF United Chiba","away":"Mito HollyHock","kickoff":"2026-11-08T08:00:00+00:00","fetched_at":"2026-11-01T11:15:40+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"c030e04e8ad2891f3a32a74ad9860e56","home":"Kashiwa Reysol","away":"JEF United Chiba","kickoff":"2026-11-20T10:00:00+00:00","fetched_at":"2026-11-13T14:13:12+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"8eda6b8ed5927037bc464f3f017b2f75","home":"Kashima Antlers","away":"Shimizu S Pulse","kickoff":"2026-11-20T10:00:00+00:00","fetched_at":"2026-11-13T14:13:12+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"3ec7910209134ddd40acda56e2518f08","home":"Vissel Kobe","away":"Mito HollyHock","kickoff":"2026-11-20T10:00:00+00:00","fetched_at":"2026-11-13T14:13:12+00:00"}
