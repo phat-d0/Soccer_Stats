@@ -591,3 +591,4 @@
 {"league":"CDR","kinds":["inplay75"],"kickoffs":["2026-11-10T20:00:00+00:00"],"fetched_at":"2026-11-10T21:18:19+00:00","status":200,"cost":1,"credits_left":4958818,"events":4,"rows":0}
 {"league":"CDR","kinds":["inplay55"],"kickoffs":["2026-11-12T17:30:00+00:00"],"fetched_at":"2026-11-12T18:28:20+00:00","status":200,"cost":1,"credits_left":4958710,"events":5,"rows":3}
 {"league":"CDR","kinds":["inplay55","inplay75"],"kickoffs":["2026-11-12T17:30:00+00:00","2026-11-12T18:00:00+00:00"],"fetched_at":"2026-11-12T18:48:20+00:00","status":200,"cost":1,"credits_left":4958709,"events":5,"rows":3}
+{"league":"CDF","kinds":["inplay55"],"kickoffs":["2026-11-13T19:00:00+00:00"],"fetched_at":"2026-11-13T19:58:21+00:00","status":200,"cost":1,"credits_left":4958687,"events":13,"rows":1}
