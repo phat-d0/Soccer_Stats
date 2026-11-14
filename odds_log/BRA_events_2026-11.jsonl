@@ -25,3 +25,6 @@
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"dddc911eddfe6a3943d037b9494921be","home":"Atletico Paranaense","away":"Remo","kickoff":"2026-11-22T19:00:00+00:00","fetched_at":"2026-11-12T19:39:12+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"fe93738d5c6aca8b60e7f18e1d685e98","home":"Fluminense","away":"Mirassol","kickoff":"2026-11-22T21:30:00+00:00","fetched_at":"2026-11-12T23:25:13+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"08f1d5a366e711c1e29845352bb8137d","home":"Bragantino-SP","away":"Vasco da Gama","kickoff":"2026-11-22T22:30:00+00:00","fetched_at":"2026-11-12T23:25:13+00:00"}
+{"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"c1339bf6458b24fdfaa62305a6947a8c","home":"Internacional","away":"Vitoria","kickoff":"2026-11-23T22:30:00+00:00","fetched_at":"2026-11-14T01:30:45+00:00"}
+{"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"d0352a1171c0a09774d5854eef621421","home":"Botafogo","away":"Sao Paulo","kickoff":"2026-11-23T23:00:00+00:00","fetched_at":"2026-11-14T01:30:45+00:00"}
+{"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"c70e8cc8f8aedeee2ed518993aaced38","home":"Santos","away":"Gr\u00eamio","kickoff":"2026-11-24T00:00:00+00:00","fetched_at":"2026-11-14T01:30:45+00:00"}
