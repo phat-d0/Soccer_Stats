@@ -634,3 +634,4 @@
 {"league":"SP2","kinds":["inplay75"],"kickoffs":["2026-11-15T13:00:00+00:00"],"fetched_at":"2026-11-15T14:18:22+00:00","status":200,"cost":1,"credits_left":4958559,"events":11,"rows":6}
 {"league":"CDF","kinds":["inplay55"],"kickoffs":["2026-11-15T14:00:00+00:00"],"fetched_at":"2026-11-15T14:58:20+00:00","status":200,"cost":1,"credits_left":4958557,"events":4,"rows":3}
 {"league":"CDF","kinds":["inplay75"],"kickoffs":["2026-11-15T14:00:00+00:00"],"fetched_at":"2026-11-15T15:18:20+00:00","status":200,"cost":1,"credits_left":4958556,"events":2,"rows":2}
+{"league":"SP2","kinds":["inplay55"],"kickoffs":["2026-11-15T15:15:00+00:00"],"fetched_at":"2026-11-15T16:13:18+00:00","status":200,"cost":1,"credits_left":4958554,"events":11,"rows":7}
