@@ -40,3 +40,7 @@
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"43f5122119133c6e63f2d99176c555e6","home":"Tenerife","away":"Mallorca","kickoff":"2026-11-21T20:00:00+00:00","fetched_at":"2026-11-14T23:54:27+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"f241b0cec31506c2eb749ff9be97667c","home":"Tenerife","away":"AD Ceuta FC","kickoff":"2026-11-15T13:03:00+00:00","fetched_at":"2026-11-15T14:23:56+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"a71098c545fa2df8b0c32df17d8a7458","home":"C\u00f3rdoba","away":"Oviedo","kickoff":"2026-11-22T13:00:00+00:00","fetched_at":"2026-11-15T14:23:56+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"12b34c0f22c4208647c5a5472269b735","home":"SD Eibar","away":"C\u00e1diz CF","kickoff":"2026-11-15T17:31:00+00:00","fetched_at":"2026-11-15T18:34:04+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"ee7af5aaba39b23210e98e1cb8faadf1","home":"Sporting Gij\u00f3n","away":"Las Palmas","kickoff":"2026-11-22T15:15:00+00:00","fetched_at":"2026-11-15T18:34:04+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"d1a26f1644faa09a236a5037423f976a","home":"Celta Fortuna","away":"Real Valladolid CF","kickoff":"2026-11-22T17:30:00+00:00","fetched_at":"2026-11-15T18:34:04+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"b05eb76c85a149aae6c592e1cacc348c","home":"Girona FC","away":"SD Eibar","kickoff":"2026-11-22T17:30:00+00:00","fetched_at":"2026-11-15T18:34:04+00:00"}
