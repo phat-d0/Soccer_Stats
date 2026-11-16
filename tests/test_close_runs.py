@@ -405,6 +405,23 @@ def test_overlapping_clusters_share_lineup_runs():
     assert len(lin) == len(set(lin))
 
 
+def test_every_kickoff_keeps_a_close_run_that_takes_its_close():
+    """Close never lost (Corners, 16 Nov): with lineup and goalscorer runs planned, every
+    kickoff still has a close-kind run whose start (1-3 minutes after dispatch) is a close
+    snapshot for it, so the runs that skip the close never leave a match without one."""
+    from soccer_stats import team_totals as tt
+
+    now = T("2026-10-17 10:00")
+    ks = [T(f"2026-10-17 {h}") for h in ("11:30", "12:00", "12:05", "12:20", "13:00", "14:00")]
+    p = cr.plan(ks, now, goalscorer_ks=ks, lineup_ks=ks)
+    for k in ks:
+        runs = [d for d in closes(p) if k in d["kickoffs"]]
+        assert len(runs) == 1
+        for delay in (1, 3):
+            at = runs[0]["at"] + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at, kind="close") == "close"
+
+
 def test_lineup_runs_leave_the_rest_of_the_plan_alone():
     now = T("2026-10-17 10:00")
     ks = [T("2026-10-17 11:00"), T("2026-10-17 13:00"), T("2026-10-17 15:10")]

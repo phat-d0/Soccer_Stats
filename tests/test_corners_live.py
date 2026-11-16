@@ -233,6 +233,21 @@ def test_a_lineup_run_takes_no_corner_close_and_the_close_run_does(tmp_path, mon
     assert sorted(c["snapshot"] for c in rec) == ["close", "look"]
 
 
+def test_a_late_goalscorer_run_still_takes_the_corner_close(tmp_path, monkeypatch):
+    """Close never lost: with 16 minutes left no -15 close run can follow, so a goalscorer
+    run takes the corner close."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "goalscorer")
+    at = K - pd.Timedelta(minutes=16)
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+    assert s["calls"] == 1
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert [c["snapshot"] for c in rec] == ["close"]
+
+
 def test_run_fetches_each_snapshot_once_in_every_league(tmp_path):
     raw, out = tmp_path / "raw", tmp_path / "out"
     raw.mkdir()

@@ -89,8 +89,12 @@ def _iso(t) -> str:
 # in E0, SP1, D1, I1 and F1 (median 24 minutes before kickoff instead of 14.5). They take no
 # close snapshot, so the -15 close run takes it. Scheduled, heartbeat, close and settle runs
 # have no kind or "close" and behave as before. Looks are unchanged.
+# A close is never lost (Corners, 16 Nov): such a run still takes it once the kickoff is
+# NO_CLOSE_UNTIL or less away, when no -15 close run can follow (that run starts 12-14
+# minutes before its first kickoff).
 RUN_KIND_ENV = "PUBLISH_RUN_KIND"
 NO_CLOSE_KINDS = ("lineup", "goalscorer")
+NO_CLOSE_UNTIL = pd.Timedelta(minutes=18)
 
 
 def run_kind(env=None) -> str:
@@ -109,10 +113,12 @@ def due_snapshot(
 
     `runs` are the scheduled publish times (default: publish_runs around now); they only
     decide whether a close earlier than CLOSE_MINUTES is the last chance. A run of a kind in
-    NO_CLOSE_KINDS never takes a close.
+    NO_CLOSE_KINDS takes a close only with NO_CLOSE_UNTIL or less left before kickoff.
     """
     snap = _due_snapshot(kickoff, now, runs)
-    return None if snap == "close" and kind in NO_CLOSE_KINDS else snap
+    if snap == "close" and kind in NO_CLOSE_KINDS and _ts(kickoff) - _ts(now) > NO_CLOSE_UNTIL:
+        return None
+    return snap
 
 
 def _due_snapshot(kickoff, now, runs) -> str | None:

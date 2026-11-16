@@ -103,15 +103,23 @@ def test_lineup_and_goalscorer_runs_take_no_close():
     """Lead, 16 Nov: from 7 Nov the -25 goalscorer run took most closes (median 24 minutes
     before kickoff); lineup and goalscorer runs now leave the close to the -15 run."""
     assert tt.NO_CLOSE_KINDS == ("lineup", "goalscorer")
-    for minutes in (29, 24, 20, 5):
+    for minutes in (29, 24, 20, 19):
         at = K - pd.Timedelta(minutes=minutes)
         assert tt.due_snapshot(K, at) == "close"
         assert tt.due_snapshot(K, at, kind="close") == "close"
         assert tt.due_snapshot(K, at, kind="lineup") is None
         assert tt.due_snapshot(K, at, kind="goalscorer") is None
-    # The last-chance close (no later scheduled run) is a close too.
+    # A close is never lost: with 18 minutes or less left no -15 close run can follow, so a
+    # lineup or goalscorer run takes it (a late-started planner, say).
+    for minutes in (18, 12, 5):
+        at = K - pd.Timedelta(minutes=minutes)
+        for kind in ("close", "lineup", "goalscorer"):
+            assert tt.due_snapshot(K, at, kind=kind) == "close"
+    # The last-chance close (no later scheduled run) waits for the planner's -15 close run
+    # in a lineup run; a run without a kind (cron, a manual dispatch) still takes it.
     k = pd.Timestamp("2026-10-17 08:00", tz="UTC")
     assert tt.due_snapshot(k, k - pd.Timedelta(minutes=53), kind="lineup") is None
+    assert tt.due_snapshot(k, k - pd.Timedelta(minutes=53)) == "close"
     # Looks are unchanged in every kind.
     for kind in ("close", "lineup", "goalscorer", "settle"):
         assert tt.due_snapshot(K, K - pd.Timedelta(hours=24), kind=kind) == "look"
@@ -139,6 +147,20 @@ def test_a_lineup_run_writes_no_close_row_and_the_close_run_does(tmp_path, monke
     rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
     assert {r["snapshot"] for r in rows} == {"close"}
     assert {r["minutes_before"] for r in rows} == {13.0}
+
+
+def test_a_late_goalscorer_run_still_takes_the_close(tmp_path, monkeypatch):
+    """Close never lost (Corners, 16 Nov): a goalscorer run that starts with 16 minutes
+    left (no -15 run can follow it) takes the close."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "goalscorer")
+    s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=16), fake_get(calls))
+    assert s["calls"] == 1
+    rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
+    assert {r["snapshot"] for r in rows} == {"close"}
 
 
 # ---------- one publish run ----------
