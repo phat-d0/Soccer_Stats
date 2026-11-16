@@ -352,9 +352,17 @@ on 4 Nov; trigger ids):
   corners Lean (blend on Pinnacle's fair and model (f), σ, walk-forward, pooled; z ≥ 1; CLV vs
   Pinnacle's close) and the Corners team then builds it as a side-by-side paper track backcast
   from 14 Oct, then UI Design.
-- 16 Nov 2026 (`trig_01NQ9nZxt3QWgmvdestPM8QG`): late team news vs the DraftKings odds log
-  (Research lab; ≥100 logged matches). Measure how fast DraftKings reacts compared with
-  Pinnacle after a lineup surprise; data-log `team_news/` has `first_confirmed_at` per match.
+- 16 Nov 2026 (`trig_01NQ9nZxt3QWgmvdestPM8QG`, done): late team news. Research's step 1
+  (counts only): 89 usable matches (quotes on both sides of `first_confirmed_at` by download
+  time), and the log was too coarse: ESPN first saw XIs a median 29 min before kickoff, with
+  one logged moment after them. So the lineup-window publish runs (PR #253; −75/−60/−45/−30)
+  and the close-snapshot fix (PR #254) went in on 16 Nov. Research takes the counts again on
+  30 Nov (its own scheduled task), then pre-registers (entry at the first moment after the XI,
+  close at the −15 run; Model evaluation reviews it first); `docs/lab.md` "Late team news".
+- 24 Nov 2026 (Research's own scheduled task): corner Blend Lean counts, then the §4
+  development gate once the minimum (300 lines, 150 matches, unlocked leagues) is met; 16 Nov:
+  270 lines on 135 matches (`odds-check.yml` `task=corner-lean-gate`, run 43864931801).
+- 17 Nov 2026 (`trig_01RHiY3mRNQEGJu5wyNJKGfZ`, lead's follow-up): the corner Lean gate.
 - 8 Dec 2026 (`trig_01QomAS25ieAih4kV7hus35o`): live team-corners review: per league, book and
   pooled trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from the rest, the "below 60%"
   shadow filter's judged read, credit use vs the cap; record in `docs/totals.md`.
