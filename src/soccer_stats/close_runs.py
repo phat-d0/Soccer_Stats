@@ -69,6 +69,29 @@ GOALSCORER_SPAN = pd.Timedelta(minutes=5)
 GOALSCORER_MERGE = (pd.Timedelta(minutes=5), pd.Timedelta(minutes=2))
 GOALSCORER_MIN_LEFT = pd.Timedelta(minutes=23)
 
+# Lineup-window runs (lead, 16 Nov; the late-team-news test): ESPN's step first sees the
+# confirmed XIs a median of 29 minutes before kickoff (10th-90th percentile 14-44), and
+# without these the -15 close run is usually the only logged moment after that, so neither
+# DraftKings' reaction speed nor a news-time entry can be measured. One more publish at each
+# kickoff cluster's first kickoff minus every LINEUP_OFFSETS, in every live league (the
+# clusters span LINEUP_SPAN). A publish already planned within LINEUP_MERGE either side of
+# that time (a close, settle or goalscorer run, or a lineup run for an overlapping cluster)
+# takes its place: the -25 goalscorer run stands in for -30, and the -15 close run is never
+# moved or dropped. A time already past when the planner starts is skipped (the next offset
+# covers it). closes.yml sends a lineup run only while no publish is running or waiting,
+# so it can never displace a queued close or settle run (publish's concurrency group keeps
+# just the newest pending run).
+LINEUP_OFFSETS = tuple(pd.Timedelta(minutes=m) for m in (75, 60, 45, 30))
+LINEUP_SPAN = pd.Timedelta(minutes=5)
+LINEUP_MERGE = pd.Timedelta(minutes=5)
+# A publish within team_totals.CLOSE_MINUTES of a kickoff takes that match's team-total and
+# corner "close" snapshot (once: the -15 close run then finds it done). A lineup run that
+# starts 1-3 minutes after its dispatch must not do that, so none is planned while any
+# kickoff lies within LINEUP_CLOSE_GUARD after it: the -30 offset is always dropped (in the
+# goalscorer leagues the -25 entry run is there instead), and so is any offset that falls
+# under 33 minutes before another cluster's kickoff.
+LINEUP_CLOSE_GUARD = pd.Timedelta(minutes=CLOSE_MINUTES + 3)
+
 # Publish heartbeat (lead, 9 Nov): GitHub's cron skipped publish.yml from 06:03 to 12:39
 # UTC on 9 Nov, a Monday with no kickoff, so no close or settle run filled the gap and E0's
 # hourly refresh and settlements stalled. While a planner run sleeps it checks every
@@ -114,10 +137,8 @@ def caches_due(last_created, now, every: pd.Timedelta = CACHES_HEARTBEAT) -> boo
     return heartbeat_due(last_created, now, every)
 
 
-WORKFLOWS = {"close": "publish.yml", "settle": "publish.yml", "goalscorer": "publish.yml"} | (
-    dict.fromkeys(INPLAY, "inplay.yml")
-)
-PUBLISH_KINDS = ("close", "settle", "goalscorer")
+PUBLISH_KINDS = ("close", "settle", "goalscorer", "lineup")
+WORKFLOWS = dict.fromkeys(PUBLISH_KINDS, "publish.yml") | dict.fromkeys(INPLAY, "inplay.yml")
 
 
 def kickoffs(log_dir) -> list[pd.Timestamp]:
@@ -173,7 +194,14 @@ def inplay_kickoffs(log_dir) -> list[pd.Timestamp]:
     return sorted({k for ks in event_kickoffs(d).values() for k in ks}) if d.is_dir() else []
 
 
-def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=(), goalscorer_ks=()) -> dict:
+def plan(
+    ks,
+    now,
+    horizon_hours: float = HORIZON_HOURS,
+    inplay_ks=(),
+    goalscorer_ks=(),
+    lineup_ks=(),
+) -> dict:
     """The dispatch times for kickoffs whose close falls in the next `horizon_hours`.
 
     Greedy over sorted kickoffs: a dispatch at the first uncovered kickoff minus
@@ -183,7 +211,9 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=(), goalscorer
     for a throttled cron. `inplay_ks` (the odds-only competitions' kickoffs) get in-play
     runs and keep the planner going, but no close or settlement run. `goalscorer_ks` (the
     goalscorer leagues' kickoffs, also in `ks`) get an entry publish GOALSCORER_LEAD before
-    each cluster unless a planned publish starts close enough to that time.
+    each cluster unless a planned publish starts close enough to that time. `lineup_ks`
+    (every live league's kickoffs, also in `ks`) get lineup-window runs at LINEUP_OFFSETS
+    before each cluster, each dropped when a planned publish starts within LINEUP_MERGE.
     """
     now = _ts(now)
     end = now + pd.Timedelta(hours=horizon_hours)
@@ -235,6 +265,30 @@ def plan(ks, now, horizon_hours: float = HORIZON_HOURS, inplay_ks=(), goalscorer
         if any(lo <= d["at"] <= hi for d in dispatch if d["kind"] in PUBLISH_KINDS):
             continue
         dispatch.append({"at": at, "kickoffs": covered, "kind": "goalscorer"})
+    # Lineup-window runs, earliest first, each merged into any publish within LINEUP_MERGE.
+    wanted = []
+    lks = sorted({_ts(k) for k in lineup_ks})
+    lks = [k for k in lks if k > now and k - LINEUP_OFFSETS[0] < end]
+    i = 0
+    while i < len(lks):
+        first = lks[i]
+        covered = [k for k in lks[i:] if k <= first + LINEUP_SPAN]
+        i += len(covered)
+        for off in LINEUP_OFFSETS:
+            at = first - off
+            if now <= at < end:
+                wanted.append({"at": at, "kickoffs": covered, "kind": "lineup", "offset": off})
+    for w in sorted(wanted, key=lambda d: d["at"]):
+        if any(w["at"] < k <= w["at"] + LINEUP_CLOSE_GUARD for k in ks):
+            continue
+        near = [
+            d
+            for d in dispatch
+            if d["kind"] in PUBLISH_KINDS and abs(d["at"] - w["at"]) <= LINEUP_MERGE
+        ]
+        if near:
+            continue
+        dispatch.append(w)
     dispatch.sort(key=lambda d: d["at"])
     later = [k for k in every if k - lead >= end and k <= now + pd.Timedelta(hours=CONTINUE_HOURS)]
     # A cluster whose settlement falls after this window hands over to the next planner too.
@@ -290,6 +344,8 @@ def describe(p: dict) -> str:
         why = {"settle": "settle kickoffs", "goalscorer": "goalscorer entry for kickoffs"}.get(
             kind, "for kickoffs"
         )
+        if kind == "lineup":
+            why = f"lineup window (-{int(d['offset'].total_seconds() // 60)} min) for kickoffs"
         lines.append(f"  publish at {d['at']:%Y-%m-%d %H:%M} UTC {why} {ks}")
     if not p["dispatch"]:
         lines.append("  none (no kickoff in this window)")
