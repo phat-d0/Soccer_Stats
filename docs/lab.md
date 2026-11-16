@@ -5251,8 +5251,10 @@ below about 15 min. The entry moment is nearly always Pinnacle's last pre-kickof
 itself, so a rule's CLV would only be the DraftKings vs Pinnacle gap at the close (a line
 shop, which the live "Line shop vs Pinnacle" track already tests), not a news effect.
 
-**Next.** The lead has asked Moneyline for publish runs at kickoff −75, −60, −45 and −30 min
-in each cluster. About two weeks after they go live, Research takes these counts again. It
+**Next.** Moneyline's lineup-window publish runs at kickoff −75, −60 and −45 min in each
+cluster went live on 16 Nov (PR #253; −30 waits on Moneyline's close-snapshot fix; the −25
+goalscorer run still lands in E0, SP1, D1, I1 and F1). About two weeks later (around 30 Nov),
+Research takes these counts again on the log from 16 Nov. It
 then pre-registers the rule here before any CLV is read, and Model evaluation reviews it first:
 - entry at the first logged moment after the XI;
 - the close at the −15 run;
