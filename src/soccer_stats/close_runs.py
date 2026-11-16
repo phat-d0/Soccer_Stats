@@ -78,19 +78,14 @@ GOALSCORER_MIN_LEFT = pd.Timedelta(minutes=23)
 # that time (a close, settle or goalscorer run, or a lineup run for an overlapping cluster)
 # takes its place: the -25 goalscorer run stands in for -30, and the -15 close run is never
 # moved or dropped. A time already past when the planner starts is skipped (the next offset
-# covers it). closes.yml sends a lineup run only while no publish is running or waiting,
-# so it can never displace a queued close or settle run (publish's concurrency group keeps
-# just the newest pending run).
+# covers it). closes.yml passes each publish run's kind, and lineup and goalscorer runs take
+# no team-total or corner close snapshot (team_totals.NO_CLOSE_KINDS; from 7 Nov to the fix
+# the -25 goalscorer run took most of them in its five leagues). closes.yml sends a lineup
+# run only while no publish is running or waiting, so it can never displace a queued close
+# or settle run (publish's concurrency group keeps just the newest pending run).
 LINEUP_OFFSETS = tuple(pd.Timedelta(minutes=m) for m in (75, 60, 45, 30))
 LINEUP_SPAN = pd.Timedelta(minutes=5)
 LINEUP_MERGE = pd.Timedelta(minutes=5)
-# A publish within team_totals.CLOSE_MINUTES of a kickoff takes that match's team-total and
-# corner "close" snapshot (once: the -15 close run then finds it done). A lineup run that
-# starts 1-3 minutes after its dispatch must not do that, so none is planned while any
-# kickoff lies within LINEUP_CLOSE_GUARD after it: the -30 offset is always dropped (in the
-# goalscorer leagues the -25 entry run is there instead), and so is any offset that falls
-# under 33 minutes before another cluster's kickoff.
-LINEUP_CLOSE_GUARD = pd.Timedelta(minutes=CLOSE_MINUTES + 3)
 
 # Publish heartbeat (lead, 9 Nov): GitHub's cron skipped publish.yml from 06:03 to 12:39
 # UTC on 9 Nov, a Monday with no kickoff, so no close or settle run filled the gap and E0's
@@ -279,8 +274,6 @@ def plan(
             if now <= at < end:
                 wanted.append({"at": at, "kickoffs": covered, "kind": "lineup", "offset": off})
     for w in sorted(wanted, key=lambda d: d["at"]):
-        if any(w["at"] < k <= w["at"] + LINEUP_CLOSE_GUARD for k in ks):
-            continue
         near = [
             d
             for d in dispatch

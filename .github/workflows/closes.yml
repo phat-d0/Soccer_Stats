@@ -10,10 +10,10 @@
 # Since 28 Oct it also dispatches inplay.yml at each cluster's first kickoff + 58 and + 78
 # minutes: the half-time in-play snapshots (close_runs.INPLAY, inplay_log.py).
 # Since 16 Nov (lead; the late-team-news test) it also dispatches lineup-window publish runs
-# at each cluster's first kickoff - 75, - 60 and - 45 minutes (close_runs.LINEUP_OFFSETS; - 30
-# and any run under 33 minutes before a kickoff are dropped so they never take the team-total
-# or corner close), each sent only while no publish run is running or waiting, so it can't
-# displace a queued close or settle run.
+# at each cluster's first kickoff - 75, - 60, - 45 and - 30 minutes (close_runs.LINEUP_OFFSETS),
+# each sent only while no publish run is running or waiting, so it can't displace a queued
+# close or settle run. Every publish dispatch passes its kind (run_kind): lineup and
+# goalscorer runs take no team-total or corner close snapshot.
 name: Close snapshots
 
 on:
@@ -128,7 +128,11 @@ jobs:
               echo "Lineup run skipped at $(date -u +%Y-%m-%dT%H:%M:%SZ): a publish run is going or waiting"
               continue
             fi
-            if gh workflow run "$wf" --ref "$REF" < /dev/null; then
+            # publish.yml learns the run's kind (lineup and goalscorer runs take no team-total
+            # or corner close snapshot); inplay.yml takes no inputs.
+            args=()
+            if [ "$wf" = "publish.yml" ]; then args=(-f "run_kind=$kind"); fi
+            if gh workflow run "$wf" --ref "$REF" "${args[@]}" < /dev/null; then
               echo "Dispatched $wf ($kind) at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             else
               echo "Dispatch of $wf failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"

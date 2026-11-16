@@ -99,6 +99,48 @@ def test_close_is_taken_early_only_when_no_later_scheduled_run():
     assert tt.due_snapshot(K, K - pd.Timedelta(minutes=4)) == "close"
 
 
+def test_lineup_and_goalscorer_runs_take_no_close():
+    """Lead, 16 Nov: from 7 Nov the -25 goalscorer run took most closes (median 24 minutes
+    before kickoff); lineup and goalscorer runs now leave the close to the -15 run."""
+    assert tt.NO_CLOSE_KINDS == ("lineup", "goalscorer")
+    for minutes in (29, 24, 20, 5):
+        at = K - pd.Timedelta(minutes=minutes)
+        assert tt.due_snapshot(K, at) == "close"
+        assert tt.due_snapshot(K, at, kind="close") == "close"
+        assert tt.due_snapshot(K, at, kind="lineup") is None
+        assert tt.due_snapshot(K, at, kind="goalscorer") is None
+    # The last-chance close (no later scheduled run) is a close too.
+    k = pd.Timestamp("2026-10-17 08:00", tz="UTC")
+    assert tt.due_snapshot(k, k - pd.Timedelta(minutes=53), kind="lineup") is None
+    # Looks are unchanged in every kind.
+    for kind in ("close", "lineup", "goalscorer", "settle"):
+        assert tt.due_snapshot(K, K - pd.Timedelta(hours=24), kind=kind) == "look"
+
+
+def test_run_kind_from_the_environment():
+    assert tt.run_kind({}) == "close"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": ""}) == "close"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": " Lineup "}) == "lineup"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": "goalscorer"}) == "goalscorer"
+
+
+def test_a_lineup_run_writes_no_close_row_and_the_close_run_does(tmp_path, monkeypatch):
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    for kind in ("lineup", "goalscorer"):
+        monkeypatch.setenv("PUBLISH_RUN_KIND", kind)
+        s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=27), fake_get(calls))
+        assert s["calls"] == 0 and s["run_kind"] == kind and not calls
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "close")
+    s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=13), fake_get(calls))
+    assert s["calls"] == 1 and s["run_kind"] == "close"
+    rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
+    assert {r["snapshot"] for r in rows} == {"close"}
+    assert {r["minutes_before"] for r in rows} == {13.0}
+
+
 # ---------- one publish run ----------
 
 

@@ -336,11 +336,10 @@ def lineups(p):
     return [d for d in p["dispatch"] if d["kind"] == "lineup"]
 
 
-def test_lineup_window_runs_at_75_60_45_before_each_cluster():
+def test_lineup_window_runs_at_75_60_45_30_before_each_cluster():
     """Lead, 16 Nov: publish runs at kickoff -75, -60, -45 and -30 so the logged prices
-    straddle the lineup news. -30 would take the team-total and corner close snapshot
-    (inside CLOSE_MINUTES), so it is dropped; in a goalscorer league the -25 entry run is
-    there. The -15 close run is unchanged."""
+    straddle the lineup news; -30 falls to the -25 goalscorer run where there is one, and
+    the -15 close run is unchanged. Lineup runs take no close (team_totals.NO_CLOSE_KINDS)."""
     from soccer_stats import team_totals as tt
 
     assert cr.LINEUP_OFFSETS == tuple(pd.Timedelta(minutes=m) for m in (75, 60, 45, 30))
@@ -351,14 +350,18 @@ def test_lineup_window_runs_at_75_60_45_before_each_cluster():
         (T("2026-10-17 12:45"), ks),
         (T("2026-10-17 13:00"), ks),
         (T("2026-10-17 13:15"), ks),
+        (T("2026-10-17 13:30"), ks),
     ]
     assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45")]
-    # No lineup run, started 1-3 minutes late, is a close snapshot for any kickoff.
-    for d in lineups(p):
-        for k in ks:
-            for delay in (1, 3):
-                at = d["at"] + pd.Timedelta(minutes=delay)
-                assert tt.due_snapshot(k, at) != "close"
+    # The -30 run, started 1-3 minutes late, is inside the close window: as a lineup run it
+    # takes no close; the close run (1-3 minutes after 13:45) does.
+    for k in ks[:1]:
+        for delay in (1, 3):
+            at = T("2026-10-17 13:30") + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at) == "close"
+            assert tt.due_snapshot(k, at, kind="lineup") is None
+            at = T("2026-10-17 13:45") + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at, kind="close") == "close"
     p = cr.plan(ks, now, goalscorer_ks=ks, lineup_ks=ks)
     assert [d["at"] for d in lineups(p)] == [
         T("2026-10-17 12:45"),
@@ -376,22 +379,22 @@ def test_lineup_window_runs_at_75_60_45_before_each_cluster():
     )
 
 
-def test_overlapping_clusters_share_lineup_runs_and_never_take_a_close():
-    from soccer_stats import team_totals as tt
-
+def test_overlapping_clusters_share_lineup_runs():
     now = T("2026-10-17 10:00")
-    # 14:00 and 14:30 (two leagues): 14:30's -75 (13:15) is 14:00's -45; its -60 (13:30)
-    # is under 33 minutes before 14:00 and its -45 (13:45) is 14:00's close run.
+    # 14:00 and 14:30 (two leagues): 14:30's -75 (13:15) and -60 (13:30) are 14:00's -45
+    # and -30, its -45 (13:45) is 14:00's close run; only its -30 (14:00) stands alone.
     ks = [T("2026-10-17 14:00"), T("2026-10-17 14:30")]
     p = cr.plan(ks, now, lineup_ks=ks)
     assert [d["at"] for d in lineups(p)] == [
         T("2026-10-17 12:45"),
         T("2026-10-17 13:00"),
         T("2026-10-17 13:15"),
+        T("2026-10-17 13:30"),
+        T("2026-10-17 14:00"),
     ]
     assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45"), T("2026-10-17 14:15")]
     # A dense afternoon: close and settle runs are exactly those planned without lineup
-    # runs, no lineup run is within 5 minutes of another publish or a close snapshot.
+    # runs, and no lineup run is within 5 minutes of another publish.
     many = [T(f"2026-10-17 {h}") for h in ("11:30", "12:00", "12:20", "13:00", "14:00", "14:30")]
     p = cr.plan(many, now, lineup_ks=many)
     without = cr.plan(many, now)
@@ -400,9 +403,6 @@ def test_overlapping_clusters_share_lineup_runs_and_never_take_a_close():
     others = [d["at"] for d in without["dispatch"] if d["kind"] in cr.PUBLISH_KINDS]
     assert lin and all(abs(a - b) > cr.LINEUP_MERGE for a in lin for b in others)
     assert len(lin) == len(set(lin))
-    for at in lin:
-        for k in many:
-            assert tt.due_snapshot(k, at + pd.Timedelta(minutes=1)) != "close"
 
 
 def test_lineup_runs_leave_the_rest_of_the_plan_alone():
@@ -427,6 +427,7 @@ def test_a_late_planner_skips_lineup_times_already_past():
     assert [d["at"] for d in lineups(cr.plan([k], T("2026-10-17 13:50"), lineup_ks=[k]))] == [
         T("2026-10-17 14:00"),
         T("2026-10-17 14:15"),
+        T("2026-10-17 14:30"),
     ]
     # Lineup times past the horizon wait for the next planner run.
     early = T("2026-10-17 08:00")
