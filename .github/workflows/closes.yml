@@ -9,6 +9,11 @@
 # time; DraftKings refreshes in that run still follow the per-league refresh floors.
 # Since 28 Oct it also dispatches inplay.yml at each cluster's first kickoff + 58 and + 78
 # minutes: the half-time in-play snapshots (close_runs.INPLAY, inplay_log.py).
+# Since 16 Nov (lead; the late-team-news test) it also dispatches lineup-window publish runs
+# at each cluster's first kickoff - 75, - 60 and - 45 minutes (close_runs.LINEUP_OFFSETS; - 30
+# and any run under 33 minutes before a kickoff are dropped so they never take the team-total
+# or corner close), each sent only while no publish run is running or waiting, so it can't
+# displace a queued close or settle run.
 name: Close snapshots
 
 on:
@@ -107,11 +112,24 @@ jobs:
               if [ "$left" -gt 300 ]; then sleep 300; else sleep "$left"; return 0; fi
             done
           }
-          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
-          while read -r at wf; do
+          # A lineup-window run is sent only while no publish run on this branch is running or
+          # waiting: publish's concurrency group keeps just the newest pending run, so a lineup
+          # dispatch behind a waiting close or settle run would cancel it. A run already going
+          # gives the logged moment anyway; an unreadable answer skips the lineup run too.
+          publish_busy() {
+            busy=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/runs?branch=$REF&per_page=20" \
+              --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo "?")
+            [ "$busy" != "0" ]
+          }
+          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml") \(.kind // "close")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
+          while read -r at wf kind; do
             sleep_until "$at"
+            if [ "$kind" = "lineup" ] && publish_busy; then
+              echo "Lineup run skipped at $(date -u +%Y-%m-%dT%H:%M:%SZ): a publish run is going or waiting"
+              continue
+            fi
             if gh workflow run "$wf" --ref "$REF" < /dev/null; then
-              echo "Dispatched $wf at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Dispatched $wf ($kind) at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             else
               echo "Dispatch of $wf failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             fi

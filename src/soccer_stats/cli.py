@@ -550,12 +550,14 @@ def cmd_close_plan(args: argparse.Namespace) -> None:
     from soccer_stats import close_runs
 
     now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
+    ks = close_runs.kickoffs(args.log_dir)
     p = close_runs.plan(
-        close_runs.kickoffs(args.log_dir),
+        ks,
         now,
         args.horizon_hours,
         inplay_ks=close_runs.inplay_kickoffs(args.log_dir),
         goalscorer_ks=close_runs.goalscorer_kickoffs(args.log_dir),
+        lineup_ks=ks,
     )
     print(close_runs.describe(p))
     if args.out:
