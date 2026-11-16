@@ -209,6 +209,45 @@ def test_rows_are_pinnacle_team_corners_with_the_model(tmp_path):
     assert home["minutes_before"] == 1440.0 and home["snapshot"] == "look"
 
 
+def test_a_lineup_run_takes_no_corner_close_and_the_close_run_does(tmp_path, monkeypatch):
+    """Lead, 16 Nov: from 7 Nov the -25 goalscorer run took most corner closes (median 24
+    minutes before kickoff); lineup and goalscorer runs leave them to the -15 close run.
+    Looks are taken in every kind."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    for kind in ("lineup", "goalscorer"):
+        monkeypatch.setenv("PUBLISH_RUN_KIND", kind)
+        at = K - pd.Timedelta(minutes=27)
+        s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+        assert s["calls"] == 0 and s["run_kind"] == kind and not calls
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "lineup")
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
+    assert s["calls"] == 1  # the look
+    monkeypatch.delenv("PUBLISH_RUN_KIND")  # cron and heartbeat runs: "close"
+    at = K - pd.Timedelta(minutes=13)
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+    assert s["calls"] == 1 and s["run_kind"] == "close"
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert sorted(c["snapshot"] for c in rec) == ["close", "look"]
+
+
+def test_a_late_goalscorer_run_still_takes_the_corner_close(tmp_path, monkeypatch):
+    """Close never lost: with 16 minutes left no -15 close run can follow, so a goalscorer
+    run takes the corner close."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "goalscorer")
+    at = K - pd.Timedelta(minutes=16)
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+    assert s["calls"] == 1
+    rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
+    assert [c["snapshot"] for c in rec] == ["close"]
+
+
 def test_run_fetches_each_snapshot_once_in_every_league(tmp_path):
     raw, out = tmp_path / "raw", tmp_path / "out"
     raw.mkdir()

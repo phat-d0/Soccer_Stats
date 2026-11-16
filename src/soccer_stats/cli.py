@@ -577,6 +577,23 @@ def cmd_publish_heartbeat(args: argparse.Namespace) -> None:
     print("due" if due(args.last, now) else "ok")
 
 
+def cmd_close_watchdog(args: argparse.Namespace) -> None:
+    """Print "redispatch" when a close or settle dispatch has no publish run to show for it
+    (close_runs.watchdog_due; lead, 16 Nov), else "ok". --runs: a JSON list of publish.yml
+    runs {created_at, status, conclusion}; a missing or unreadable file counts as none."""
+    import json
+
+    from soccer_stats import close_runs
+
+    now = pd.Timestamp(args.now) if args.now else pd.Timestamp.now(tz="UTC")
+    try:
+        runs = json.loads(Path(args.runs).read_text()) if args.runs else None
+    except (OSError, ValueError):
+        runs = None
+    due = close_runs.watchdog_due(args.kind, args.dispatched, args.kickoff or None, runs, now)
+    print("redispatch" if due else "ok")
+
+
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
     """Credits to log team-total prices per match under each snapshot plan (estimate only:
     no key, no calls). Replays each league's real fixture calendar (Understat)."""
@@ -3561,6 +3578,16 @@ def main(argv: list[str] | None = None) -> None:
     )
     hb.add_argument("--now", help="check at this time (default: now)")
     hb.set_defaults(func=cmd_publish_heartbeat)
+
+    wd = sub.add_parser(
+        "close-watchdog", help="did a close or settle dispatch start a publish run? (closes.yml)"
+    )
+    wd.add_argument("--kind", required=True, help="close or settle")
+    wd.add_argument("--dispatched", required=True, help="when the run was dispatched (UTC)")
+    wd.add_argument("--kickoff", default="", help="the cluster's first kickoff (UTC)")
+    wd.add_argument("--runs", default="", help="JSON file of publish.yml runs")
+    wd.add_argument("--now", help="check at this time (default: now)")
+    wd.set_defaults(func=cmd_close_watchdog)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")

@@ -78,19 +78,14 @@ GOALSCORER_MIN_LEFT = pd.Timedelta(minutes=23)
 # that time (a close, settle or goalscorer run, or a lineup run for an overlapping cluster)
 # takes its place: the -25 goalscorer run stands in for -30, and the -15 close run is never
 # moved or dropped. A time already past when the planner starts is skipped (the next offset
-# covers it). closes.yml sends a lineup run only while no publish is running or waiting,
-# so it can never displace a queued close or settle run (publish's concurrency group keeps
-# just the newest pending run).
+# covers it). closes.yml passes each publish run's kind, and lineup and goalscorer runs take
+# no team-total or corner close snapshot (team_totals.NO_CLOSE_KINDS; from 7 Nov to the fix
+# the -25 goalscorer run took most of them in its five leagues). closes.yml sends a lineup
+# run only while no publish is running or waiting, so it can never displace a queued close
+# or settle run (publish's concurrency group keeps just the newest pending run).
 LINEUP_OFFSETS = tuple(pd.Timedelta(minutes=m) for m in (75, 60, 45, 30))
 LINEUP_SPAN = pd.Timedelta(minutes=5)
 LINEUP_MERGE = pd.Timedelta(minutes=5)
-# A publish within team_totals.CLOSE_MINUTES of a kickoff takes that match's team-total and
-# corner "close" snapshot (once: the -15 close run then finds it done). A lineup run that
-# starts 1-3 minutes after its dispatch must not do that, so none is planned while any
-# kickoff lies within LINEUP_CLOSE_GUARD after it: the -30 offset is always dropped (in the
-# goalscorer leagues the -25 entry run is there instead), and so is any offset that falls
-# under 33 minutes before another cluster's kickoff.
-LINEUP_CLOSE_GUARD = pd.Timedelta(minutes=CLOSE_MINUTES + 3)
 
 # Publish heartbeat (lead, 9 Nov): GitHub's cron skipped publish.yml from 06:03 to 12:39
 # UTC on 9 Nov, a Monday with no kickoff, so no close or settle run filled the gap and E0's
@@ -138,6 +133,44 @@ def caches_due(last_created, now, every: pd.Timedelta = CACHES_HEARTBEAT) -> boo
 
 
 PUBLISH_KINDS = ("close", "settle", "goalscorer", "lineup")
+# Close watchdog (lead, 16 Nov): GitHub sometimes starts no job for a dispatched run (twice
+# on 9-10 Nov), and lineup and goalscorer runs no longer stand in for a lost close. About
+# WATCH_AFTER after each close or settle dispatch, closes.yml lists publish.yml's runs on its
+# branch; with none created since the dispatch (WATCH_SKEW allowed for the two clocks) that
+# is queued, running or completed without being cancelled, it dispatches publish.yml once
+# more (kind "close"), at most once per dispatch. A close is re-sent only while its first
+# kickoff is WATCH_MIN_LEFT or more away; a settle run always.
+WATCH_KINDS = ("close", "settle")
+WATCH_AFTER = pd.Timedelta(minutes=4)
+WATCH_MIN_LEFT = pd.Timedelta(minutes=4)
+WATCH_SKEW = pd.Timedelta(seconds=60)
+LIVE_STATUSES = ("queued", "pending", "waiting", "requested", "in_progress")
+
+
+def watchdog_due(kind, dispatched_at, first_kickoff, runs, now) -> bool:
+    """True when the watched close or settle dispatch should be sent again: no publish run
+    created at or after `dispatched_at` - WATCH_SKEW is live (LIVE_STATUSES) or completed
+    without being cancelled, and (for a close) its first kickoff is WATCH_MIN_LEFT or more
+    after `now`. `runs` = [{created_at, status, conclusion}]; None (unreadable) counts as no
+    run, since one extra publish costs nothing a call record would not stop."""
+    if kind not in WATCH_KINDS:
+        return False
+    now, since = _ts(now), _ts(dispatched_at) - WATCH_SKEW
+    if kind == "close" and (first_kickoff is None or _ts(first_kickoff) - now < WATCH_MIN_LEFT):
+        return False
+    for r in runs or []:
+        try:
+            created = _ts(r.get("created_at"))
+        except (TypeError, ValueError):
+            continue
+        if created < since:
+            continue
+        status, conclusion = r.get("status"), r.get("conclusion")
+        if status in LIVE_STATUSES or (status == "completed" and conclusion != "cancelled"):
+            return False
+    return True
+
+
 WORKFLOWS = dict.fromkeys(PUBLISH_KINDS, "publish.yml") | dict.fromkeys(INPLAY, "inplay.yml")
 
 
@@ -279,8 +312,6 @@ def plan(
             if now <= at < end:
                 wanted.append({"at": at, "kickoffs": covered, "kind": "lineup", "offset": off})
     for w in sorted(wanted, key=lambda d: d["at"]):
-        if any(w["at"] < k <= w["at"] + LINEUP_CLOSE_GUARD for k in ks):
-            continue
         near = [
             d
             for d in dispatch

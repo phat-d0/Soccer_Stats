@@ -82,12 +82,46 @@ def _iso(t) -> str:
 # ---------- timing ----------
 
 
-def due_snapshot(kickoff, now: pd.Timestamp, runs: list[pd.Timestamp] | None = None) -> str | None:
+# What kind of publish run this is (lead, 16 Nov): closes.yml dispatches publish.yml with
+# the planner's kind as the `run_kind` input, which publish.yml passes on as PUBLISH_RUN_KIND.
+# Lineup-window and goalscorer-entry runs start 25-75 minutes before a kickoff, inside the
+# close window, and from 7 Nov the -25 goalscorer run took most team-total and corner closes
+# in E0, SP1, D1, I1 and F1 (median 24 minutes before kickoff instead of 14.5). They take no
+# close snapshot, so the -15 close run takes it. Scheduled, heartbeat, close and settle runs
+# have no kind or "close" and behave as before. Looks are unchanged.
+# A close is never lost (Corners, 16 Nov): such a run still takes it once the kickoff is
+# NO_CLOSE_UNTIL or less away, when no -15 close run can follow (that run starts 12-14
+# minutes before its first kickoff).
+RUN_KIND_ENV = "PUBLISH_RUN_KIND"
+NO_CLOSE_KINDS = ("lineup", "goalscorer")
+NO_CLOSE_UNTIL = pd.Timedelta(minutes=18)
+
+
+def run_kind(env=None) -> str:
+    """The publish run's kind from PUBLISH_RUN_KIND ("close" when unset or blank)."""
+    env = os.environ if env is None else env
+    return (env.get(RUN_KIND_ENV) or "").strip().lower() or "close"
+
+
+def due_snapshot(
+    kickoff,
+    now: pd.Timestamp,
+    runs: list[pd.Timestamp] | None = None,
+    kind: str = "close",
+) -> str | None:
     """ "look", "close" or None for a match at this run.
 
     `runs` are the scheduled publish times (default: publish_runs around now); they only
-    decide whether a close earlier than CLOSE_MINUTES is the last chance.
+    decide whether a close earlier than CLOSE_MINUTES is the last chance. A run of a kind in
+    NO_CLOSE_KINDS takes a close only with NO_CLOSE_UNTIL or less left before kickoff.
     """
+    snap = _due_snapshot(kickoff, now, runs)
+    if snap == "close" and kind in NO_CLOSE_KINDS and _ts(kickoff) - _ts(now) > NO_CLOSE_UNTIL:
+        return None
+    return snap
+
+
+def _due_snapshot(kickoff, now, runs) -> str | None:
     k, now = _ts(kickoff), _ts(now)
     left = k - now
     if left <= pd.Timedelta(0):
@@ -313,6 +347,8 @@ def run(
         summary["stop"] = "no ODDS_API_KEY"
         return summary
     runs = publish_runs(now, now + pd.Timedelta(hours=2))
+    kind = run_kind()
+    summary["run_kind"] = kind
     by_league: dict[str, list[dict]] = {}
     for c in cards:
         if c.get("league") in TEAM_TOTAL_LEAGUES and c.get("kickoff"):
@@ -320,7 +356,7 @@ def run(
     new_rows, new_calls = [], []
     try:  # a crash part-way still writes the calls already made (below)
         for league, lcards in by_league.items():
-            due = [(c, s) for c in lcards if (s := due_snapshot(c["kickoff"], now, runs))]
+            due = [(c, s) for c in lcards if (s := due_snapshot(c["kickoff"], now, runs, kind))]
             if not due:
                 continue
             known = {c["home"] for c in lcards} | {c["away"] for c in lcards}
