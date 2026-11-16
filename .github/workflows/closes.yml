@@ -13,7 +13,8 @@
 # at each cluster's first kickoff - 75, - 60, - 45 and - 30 minutes (close_runs.LINEUP_OFFSETS),
 # each sent only while no publish run is running or waiting, so it can't displace a queued
 # close or settle run. Every publish dispatch passes its kind (run_kind): lineup and
-# goalscorer runs take no team-total or corner close snapshot.
+# goalscorer runs take no team-total or corner close snapshot while more than 18 minutes
+# remain, and a close watchdog re-sends a close or settle run GitHub never started.
 name: Close snapshots
 
 on:
@@ -103,13 +104,48 @@ jobs:
               fi
             fi
           }
+          # Close watchdog (lead, 16 Nov; close_runs.watchdog_due): about 4 min after each
+          # close or settle dispatch, if no publish run on this branch created since then is
+          # queued, running or completed without being cancelled, dispatch publish.yml once
+          # more (kind close); a close only while its first kickoff is 4 min or more away.
+          watches="$RUNNER_TEMP/watches.txt"
+          : > "$watches"
+          watchdog() {
+            [ -s "$watches" ] || return 0
+            now=$(date +%s)
+            : > "$watches.next"
+            while read -r due wkind wat wkick wlabel; do
+              if [ "$due" -gt "$now" ]; then echo "$due $wkind $wat $wkick $wlabel" >> "$watches.next"; continue; fi
+              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/runs?branch=$REF&per_page=20" \
+                --jq '[.workflow_runs[] | {created_at, status, conclusion}]' < /dev/null > "$RUNNER_TEMP/runs.json" 2>/dev/null \
+                || : > "$RUNNER_TEMP/runs.json"
+              kick=""
+              if [ "$wkick" != "-" ]; then kick="$wkick"; fi
+              if [ "$(uv run --frozen soccer-stats close-watchdog --kind "$wkind" --dispatched "$wat" \
+                    --kickoff "$kick" --runs "$RUNNER_TEMP/runs.json" < /dev/null)" = "redispatch" ]; then
+                if gh workflow run publish.yml --ref "$REF" -f run_kind=close < /dev/null; then
+                  echo "Close watchdog: re-dispatched publish.yml (no run started for the $wlabel $wkind)"
+                else
+                  echo "Close watchdog: re-dispatch of publish.yml failed for the $wlabel $wkind at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                fi
+              fi
+            done < "$watches"
+            mv "$watches.next" "$watches"
+          }
           sleep_until() {
             while :; do
               heartbeat
               caches_heartbeat
-              left=$(( $1 - $(date +%s) ))
+              watchdog
+              now=$(date +%s)
+              left=$(( $1 - now ))
               if [ "$left" -le 0 ]; then return 0; fi
-              if [ "$left" -gt 300 ]; then sleep 300; else sleep "$left"; return 0; fi
+              step=300
+              next_watch=$(sort -n "$watches" | head -n1 | cut -d' ' -f1)
+              if [ -n "$next_watch" ] && [ $(( next_watch - now )) -lt "$step" ]; then
+                step=$(( next_watch - now )); if [ "$step" -lt 1 ]; then step=1; fi
+              fi
+              if [ "$left" -gt "$step" ]; then sleep "$step"; else sleep "$left"; return 0; fi
             done
           }
           # A lineup-window run is sent only while no publish run on this branch is running or
@@ -121,8 +157,8 @@ jobs:
               --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo "?")
             [ "$busy" != "0" ]
           }
-          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml") \(.kind // "close")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
-          while read -r at wf kind; do
+          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml") \(.kind // "close") \(.kickoffs[0] // "-")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
+          while read -r at wf kind kick; do
             sleep_until "$at"
             if [ "$kind" = "lineup" ] && publish_busy; then
               echo "Lineup run skipped at $(date -u +%Y-%m-%dT%H:%M:%SZ): a publish run is going or waiting"
@@ -132,11 +168,21 @@ jobs:
             # or corner close snapshot); inplay.yml takes no inputs.
             args=()
             if [ "$wf" = "publish.yml" ]; then args=(-f "run_kind=$kind"); fi
+            sent=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             if gh workflow run "$wf" --ref "$REF" "${args[@]}" < /dev/null; then
-              echo "Dispatched $wf ($kind) at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Dispatched $wf ($kind) at $sent"
             else
-              echo "Dispatch of $wf failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Dispatch of $wf failed at $sent"
+            fi
+            # A failed dispatch is watched too: no run will show, so it is sent again.
+            if [ "$kind" = "close" ] || [ "$kind" = "settle" ]; then
+              label="-"
+              if [ "$kick" != "-" ]; then label=$(date -u -d "$kick" +%H:%M); fi
+              echo "$(( $(date +%s) + 240 )) $kind $sent $kick $label" >> "$watches"
             fi
           done < "$RUNNER_TEMP/dispatch.txt"
           sleep_until "$(jq -r '.horizon_end.epoch' "$plan")"
+          # A close dispatched in the last minutes of the window still gets its check.
+          last_watch=$(sort -n "$watches" | tail -n1 | cut -d' ' -f1)
+          if [ -n "$last_watch" ]; then sleep_until "$last_watch"; watchdog; fi
           gh workflow run closes.yml --ref "$REF" && echo "Next planner run requested"

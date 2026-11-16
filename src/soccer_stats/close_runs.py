@@ -133,6 +133,44 @@ def caches_due(last_created, now, every: pd.Timedelta = CACHES_HEARTBEAT) -> boo
 
 
 PUBLISH_KINDS = ("close", "settle", "goalscorer", "lineup")
+# Close watchdog (lead, 16 Nov): GitHub sometimes starts no job for a dispatched run (twice
+# on 9-10 Nov), and lineup and goalscorer runs no longer stand in for a lost close. About
+# WATCH_AFTER after each close or settle dispatch, closes.yml lists publish.yml's runs on its
+# branch; with none created since the dispatch (WATCH_SKEW allowed for the two clocks) that
+# is queued, running or completed without being cancelled, it dispatches publish.yml once
+# more (kind "close"), at most once per dispatch. A close is re-sent only while its first
+# kickoff is WATCH_MIN_LEFT or more away; a settle run always.
+WATCH_KINDS = ("close", "settle")
+WATCH_AFTER = pd.Timedelta(minutes=4)
+WATCH_MIN_LEFT = pd.Timedelta(minutes=4)
+WATCH_SKEW = pd.Timedelta(seconds=60)
+LIVE_STATUSES = ("queued", "pending", "waiting", "requested", "in_progress")
+
+
+def watchdog_due(kind, dispatched_at, first_kickoff, runs, now) -> bool:
+    """True when the watched close or settle dispatch should be sent again: no publish run
+    created at or after `dispatched_at` - WATCH_SKEW is live (LIVE_STATUSES) or completed
+    without being cancelled, and (for a close) its first kickoff is WATCH_MIN_LEFT or more
+    after `now`. `runs` = [{created_at, status, conclusion}]; None (unreadable) counts as no
+    run, since one extra publish costs nothing a call record would not stop."""
+    if kind not in WATCH_KINDS:
+        return False
+    now, since = _ts(now), _ts(dispatched_at) - WATCH_SKEW
+    if kind == "close" and (first_kickoff is None or _ts(first_kickoff) - now < WATCH_MIN_LEFT):
+        return False
+    for r in runs or []:
+        try:
+            created = _ts(r.get("created_at"))
+        except (TypeError, ValueError):
+            continue
+        if created < since:
+            continue
+        status, conclusion = r.get("status"), r.get("conclusion")
+        if status in LIVE_STATUSES or (status == "completed" and conclusion != "cancelled"):
+            return False
+    return True
+
+
 WORKFLOWS = dict.fromkeys(PUBLISH_KINDS, "publish.yml") | dict.fromkeys(INPLAY, "inplay.yml")
 
 

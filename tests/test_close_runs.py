@@ -454,3 +454,64 @@ def test_a_late_planner_skips_lineup_times_already_past():
     ]
     # Without lineup kickoffs nothing changes.
     assert lineups(cr.plan([k], T("2026-10-17 10:00"))) == []
+
+
+def test_close_watchdog_decision():
+    """Lead, 16 Nov: about 4 minutes after a close or settle dispatch, send it once more
+    when no publish run created since then is queued, running or completed (not cancelled);
+    a close only while its first kickoff is 4 minutes or more away."""
+    sent = T("2026-11-21 14:45")
+    kick = T("2026-11-21 15:00")
+    now = sent + cr.WATCH_AFTER
+
+    def run(created, status, conclusion=None):
+        return {"created_at": created, "status": status, "conclusion": conclusion}
+
+    # No run at all (or an unreadable list): re-send.
+    assert cr.watchdog_due("close", sent, kick, [], now)
+    assert cr.watchdog_due("close", sent, kick, None, now)
+    # Only an older run (before the dispatch): re-send.
+    assert cr.watchdog_due(
+        "close", sent, kick, [run("2026-11-21T14:30:00Z", "completed", "success")], now
+    )
+    # Cancelled (GitHub kept a newer pending run, or never started it): re-send.
+    assert cr.watchdog_due(
+        "close", sent, kick, [run("2026-11-21T14:45:05Z", "completed", "cancelled")], now
+    )
+    # Queued, pending, running or completed since the dispatch: fine.
+    for status, conclusion in (
+        ("queued", None),
+        ("pending", None),
+        ("in_progress", None),
+        ("completed", "success"),
+        ("completed", "failure"),
+    ):
+        runs = [run("2026-11-21T14:45:05Z", status, conclusion)]
+        assert not cr.watchdog_due("close", sent, kick, runs, now)
+    # A run created a few seconds before the dispatch time (two clocks) counts.
+    assert not cr.watchdog_due("close", sent, kick, [run("2026-11-21T14:44:30Z", "queued")], now)
+    # Too close to kickoff: a close is not re-sent with under 4 minutes left.
+    assert cr.watchdog_due("close", sent, kick, [], kick - pd.Timedelta(minutes=4))
+    assert not cr.watchdog_due("close", sent, kick, [], kick - pd.Timedelta(minutes=3))
+    assert not cr.watchdog_due("close", sent, None, [], now)
+    # A settle run has no kickoff limit; other kinds are never watched.
+    late = T("2026-11-21 17:20")
+    assert cr.watchdog_due("settle", late - cr.WATCH_AFTER, kick, [], late)
+    assert not cr.watchdog_due("lineup", sent, kick, [], now)
+    assert not cr.watchdog_due("goalscorer", sent, kick, [], now)
+
+
+def test_close_watchdog_cli(tmp_path, capsys):
+    from soccer_stats import cli
+
+    runs = tmp_path / "runs.json"
+    runs.write_text(json.dumps([{"created_at": "2026-11-21T14:45:20Z", "status": "in_progress"}]))
+    base = ["close-watchdog", "--kind", "close", "--dispatched", "2026-11-21T14:45:00Z"]
+    base += ["--kickoff", "2026-11-21T15:00+00:00", "--now", "2026-11-21T14:49:00Z"]
+    cli.main(base + ["--runs", str(runs)])
+    assert capsys.readouterr().out.strip() == "ok"
+    runs.write_text("")  # gh api failed: no list
+    cli.main(base + ["--runs", str(runs)])
+    assert capsys.readouterr().out.strip() == "redispatch"
+    cli.main(base + ["--runs", str(tmp_path / "missing.json")])
+    assert capsys.readouterr().out.strip() == "redispatch"
