@@ -28,3 +28,5 @@
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"c42d1c7099dddc8a3b6e8e23a14ebcd9","home":"Guadalajara","away":"Cruz Azul","kickoff":"2026-11-22T23:07:00+00:00","fetched_at":"2026-11-13T17:27:37+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"3030284e28d18889f35f9c419d8b0fee","home":"Quer\u00e9taro","away":"Necaxa","kickoff":"2026-11-23T01:00:00+00:00","fetched_at":"2026-11-13T17:27:37+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"0380db9fc7de24aed0c27138c02467e5","home":"Quer\u00e9taro","away":"Monterrey","kickoff":"2026-11-14T23:01:00+00:00","fetched_at":"2026-11-14T23:54:27+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"264c6eae15dd1aa5e2189c58d409c5b0","home":"Tijuana","away":"Atlante FC","kickoff":"2026-11-21T03:10:00+00:00","fetched_at":"2026-11-17T13:08:08+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"3030284e28d18889f35f9c419d8b0fee","home":"Quer\u00e9taro","away":"Necaxa","kickoff":"2026-11-23T01:10:00+00:00","fetched_at":"2026-11-17T13:08:08+00:00"}
