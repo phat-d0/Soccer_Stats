@@ -28,3 +28,5 @@
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"1ed6ce5484f2a65ed50be17f8e06f425","home":"Torku Konyaspor","away":"Besiktas JK","kickoff":"2026-11-22T13:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"2f3dfa781742b66f1412e15c132ff871","home":"Trabzonspor","away":"Ey\u00fcpspor","kickoff":"2026-11-22T16:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"T1","sport":"soccer_turkey_super_league","event_id":"c1958a1dcd4f8228f4d09148fd6ea216","home":"Basaksehir","away":"\u00c7orum FK","kickoff":"2026-11-23T17:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"T1","sport":"soccer_turkey_super_league","event_id":"ffcd87d9e41dbce42bd91952669b2e47","home":"Alanyaspor","away":"Torku Konyaspor","kickoff":"2026-11-27T17:00:00+00:00","fetched_at":"2026-11-20T17:42:03+00:00"}
+{"league":"T1","sport":"soccer_turkey_super_league","event_id":"b50ce64bf9ca7a1a03eb6b9d534e93ce","home":"\u00c7aykur Rizespor","away":"Kasimpasa SK","kickoff":"2026-11-27T17:00:00+00:00","fetched_at":"2026-11-20T17:42:03+00:00"}
