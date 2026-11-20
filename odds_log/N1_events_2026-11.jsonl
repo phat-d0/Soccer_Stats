@@ -28,3 +28,4 @@
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"a846e6934bbb0f1a707bae28d3c52e9b","home":"Feyenoord","away":"Ajax","kickoff":"2026-11-29T13:30:00+00:00","fetched_at":"2026-11-19T15:29:03+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"2bebeea09c64f8187e5b44dd6ab27b53","home":"Fortuna Sittard","away":"Heerenveen","kickoff":"2026-11-29T13:30:00+00:00","fetched_at":"2026-11-19T15:29:03+00:00"}
 {"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"523fa336e1cf685100957e5e6359fc4c","home":"FC Zwolle","away":"AZ Alkmaar","kickoff":"2026-11-29T15:45:00+00:00","fetched_at":"2026-11-19T19:02:27+00:00"}
+{"league":"N1","sport":"soccer_netherlands_eredivisie","event_id":"8b09095f4f6b0fe4d90d591fa38daa61","home":"NEC Nijmegen","away":"FC Twente Enschede","kickoff":"2026-11-29T19:00:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
