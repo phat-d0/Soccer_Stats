@@ -24,6 +24,12 @@ on:
         description: "Planner run kind (closes.yml sets it)"
         type: string
         default: ""
+      close_until:
+        # Set by closes.yml for a close run (lead, 21 Nov): its cluster's last kickoff. The
+        # run takes team-total and corner closes only up to it, never the next cluster's.
+        description: "Close run: its cluster's last kickoff (closes.yml sets it)"
+        type: string
+        default: ""
   push:
     # Only the default branch publishes: a push to a team branch must never write
     # data-log or try to deploy.
@@ -190,9 +196,10 @@ jobs:
           # The planner's kind for a closes.yml dispatch (blank for cron, push and the
           # heartbeat = "close"): lineup and goalscorer runs take no close snapshot.
           PUBLISH_RUN_KIND: ${{ inputs.run_kind }}
+          PUBLISH_CLOSE_UNTIL: ${{ inputs.close_until }}
         run: |
           uv sync --frozen
-          echo "Run kind: ${PUBLISH_RUN_KIND:-close}"
+          echo "Run kind: ${PUBLISH_RUN_KIND:-scheduled}${PUBLISH_CLOSE_UNTIL:+ (closes kickoffs up to $PUBLISH_CLOSE_UNTIL)}"
           uv run soccer-stats publish --out _site
 
       # Paper trades, team-news history and the DraftKings odds log live on the data-log
