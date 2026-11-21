@@ -514,7 +514,9 @@ def run(
         summary["stop"] = "no ODDS_API_KEY"
         return summary
     runs = tt.publish_runs(now, now + pd.Timedelta(hours=2))
-    kind = tt.run_kind()  # lineup and goalscorer runs take no close (team_totals.NO_CLOSE_KINDS)
+    # Lineup and goalscorer runs take no close, a planner close run only its own cluster's
+    # (team_totals.due_snapshot).
+    kind, until = tt.run_kind(), tt.close_until()
     summary["run_kind"] = kind
     by_league: dict[str, list[dict]] = {}
     for c in cards:
@@ -525,7 +527,11 @@ def run(
         for league in [lg for lg in LEAGUES if lg in by_league]:
             lcards = by_league[league]
             books = ",".join(books_for(league, shop))
-            due = [(c, s) for c in lcards if (s := tt.due_snapshot(c["kickoff"], now, runs, kind))]
+            due = [
+                (c, s)
+                for c in lcards
+                if (s := tt.due_snapshot(c["kickoff"], now, runs, kind, until))
+            ]
             if not due:
                 continue
             known = {c["home"] for c in lcards} | {c["away"] for c in lcards}

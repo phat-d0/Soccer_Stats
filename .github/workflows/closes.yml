@@ -157,8 +157,8 @@ jobs:
               --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo "?")
             [ "$busy" != "0" ]
           }
-          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml") \(.kind // "close") \(.kickoffs[0] // "-")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
-          while read -r at wf kind kick; do
+          jq -r '.dispatch[] | "\(.epoch) \(.workflow // "publish.yml") \(.kind // "close") \(.kickoffs[0] // "-") \(.kickoffs[-1] // "-")"' "$plan" > "$RUNNER_TEMP/dispatch.txt"
+          while read -r at wf kind kick lastkick; do
             sleep_until "$at"
             if [ "$kind" = "lineup" ] && publish_busy; then
               echo "Lineup run skipped at $(date -u +%Y-%m-%dT%H:%M:%SZ): a publish run is going or waiting"
@@ -168,6 +168,8 @@ jobs:
             # or corner close snapshot); inplay.yml takes no inputs.
             args=()
             if [ "$wf" = "publish.yml" ]; then args=(-f "run_kind=$kind"); fi
+            # A close run closes only its own cluster (up to its last kickoff).
+            if [ "$kind" = "close" ] && [ "$lastkick" != "-" ]; then args+=(-f "close_until=$lastkick"); fi
             sent=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             if gh workflow run "$wf" --ref "$REF" "${args[@]}" < /dev/null; then
               echo "Dispatched $wf ($kind) at $sent"

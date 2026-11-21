@@ -225,12 +225,30 @@ def test_a_lineup_run_takes_no_corner_close_and_the_close_run_does(tmp_path, mon
     monkeypatch.setenv("PUBLISH_RUN_KIND", "lineup")
     s = cl.run([card()], out, raw_dir=raw, api_key="k", now=LOOK, get=fake_get(calls))
     assert s["calls"] == 1  # the look
-    monkeypatch.delenv("PUBLISH_RUN_KIND")  # cron and heartbeat runs: "close"
+    monkeypatch.delenv("PUBLISH_RUN_KIND")  # cron and heartbeat runs: "scheduled"
     at = K - pd.Timedelta(minutes=13)
     s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
-    assert s["calls"] == 1 and s["run_kind"] == "close"
+    assert s["calls"] == 1 and s["run_kind"] == "scheduled"
     rec = [json.loads(x) for x in (out / "calls.jsonl").read_text().splitlines()]
     assert sorted(c["snapshot"] for c in rec) == ["close", "look"]
+
+
+def test_a_close_run_takes_no_corner_close_of_the_next_cluster(tmp_path, monkeypatch):
+    """Lead, 21 Nov: a close run for a 13:30 kickoff, starting at 13:31, must not take the
+    corner close of a 14:00 kickoff (29 minutes out); the 14:00 cluster's own run does."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "close")
+    monkeypatch.setenv("PUBLISH_CLOSE_UNTIL", (K - pd.Timedelta(minutes=30)).isoformat())
+    at = K - pd.Timedelta(minutes=29)
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+    assert s["calls"] == 0 and not calls
+    monkeypatch.setenv("PUBLISH_CLOSE_UNTIL", K.isoformat())
+    at = K - pd.Timedelta(minutes=14)
+    s = cl.run([card()], out, raw_dir=raw, api_key="k", now=at, get=fake_get(calls))
+    assert s["calls"] == 1
 
 
 def test_a_late_goalscorer_run_still_takes_the_corner_close(tmp_path, monkeypatch):
