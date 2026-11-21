@@ -44,3 +44,4 @@
 {"league":"USA","sport":"soccer_usa_mls","event_id":"e6adbcba99b6b66ca3d16db6fb5d805d","home":"Nashville SC","away":"FC Cincinnati","kickoff":"2026-11-22T21:00:00+00:00","fetched_at":"2026-11-20T06:49:52+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"78c0145b05f2691b49576d6d5b8a0eb3","home":"Vancouver Whitecaps FC","away":"Real Salt Lake","kickoff":"2026-11-23T01:30:00+00:00","fetched_at":"2026-11-20T06:49:52+00:00"}
 {"league":"USA","sport":"soccer_usa_mls","event_id":"d4043fc3300abf156c6ace6e58e0cef7","home":"Columbus Crew SC","away":"Inter Miami CF","kickoff":"2026-11-28T01:00:00+00:00","fetched_at":"2026-11-21T01:16:02+00:00"}
+{"league":"USA","sport":"soccer_usa_mls","event_id":"72191f41ab50634823aaf7225bc9655d","home":"Real Salt Lake","away":"Vancouver Whitecaps FC","kickoff":"2026-11-28T03:00:00+00:00","fetched_at":"2026-11-21T05:14:36+00:00"}
