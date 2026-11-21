@@ -14,3 +14,5 @@
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"eb0975c520d98a85bfc02c40f8be23eb","home":"FC Zurich","away":"FC St Gallen","kickoff":"2026-11-22T13:00:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"81d367b0e275d4f5d904d59af2a46bd7","home":"FC Basel","away":"FC Luzern","kickoff":"2026-11-22T15:30:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"817d0619127140a19785bc04419e057d","home":"FC Vaduz","away":"FC Lausanne-Sport","kickoff":"2026-11-22T15:30:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
+{"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"16118fac0e7f193a916aac957dadd4b3","home":"FC Lugano","away":"Grasshopper Z\u00fcrich","kickoff":"2026-11-21T17:01:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
+{"league":"SWZ","sport":"soccer_switzerland_superleague","event_id":"f1a6ef364461720291fb102552c8ef29","home":"Grasshopper Z\u00fcrich","away":"FC Basel","kickoff":"2026-11-28T17:00:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}

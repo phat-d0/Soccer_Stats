@@ -49,3 +49,7 @@
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"a5546f507831eba65f9b5da518f228e8","home":"Legan\u00e9s","away":"Sabadell FC","kickoff":"2026-11-27T19:30:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"c69ef5cf8bce018e5b2bcea9872e54b3","home":"Real Sociedad B","away":"C\u00e1diz CF","kickoff":"2026-11-21T15:14:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"39696af332003b194c8cb15d82735fc3","home":"Las Palmas","away":"Andorra CF","kickoff":"2026-11-28T13:00:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"ba701174c6f1be511c4e1c9bb8e64da0","home":"CD Castell\u00f3n","away":"CD Eldense","kickoff":"2026-11-21T17:33:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"ae50a7300cd534a4c83d3cb35d618463","home":"Albacete","away":"Tenerife","kickoff":"2026-11-28T15:15:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"075a62d557b6f549eed6c35aede8a738","home":"CD Eldense","away":"Girona FC","kickoff":"2026-11-28T15:15:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"80c3b1eccde4b39e3e000a65c0b4422b","home":"SD Eibar","away":"Burgos CF","kickoff":"2026-11-28T17:30:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
