@@ -42,3 +42,7 @@
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"8cf80807dee1ee73aefb295b560dc78e","home":"Pisa","away":"Modena","kickoff":"2026-11-25T19:00:00+00:00","fetched_at":"2026-11-18T21:24:19+00:00"}
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"30fb25fc45cd386b33e223302ff98f4d","home":"Padova","away":"Sampdoria","kickoff":"2026-11-25T19:00:00+00:00","fetched_at":"2026-11-18T21:24:19+00:00"}
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"0cdc042500af4bbcd1fec92981ed3005","home":"Hellas Verona","away":"Cesena FC","kickoff":"2026-11-20T19:31:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"8441b1fca75ec64fd6dbb8e30bae837c","home":"S\u00fcdtirol","away":"Cremonese","kickoff":"2026-11-21T14:01:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"8d75d4c8f342e83c75febead12de7eaa","home":"Ascoli","away":"Virtus Entella","kickoff":"2026-11-28T14:00:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"9beee8f80a22730b4f399165f8efe447","home":"Carrarese","away":"Juve Stabia","kickoff":"2026-11-28T14:00:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"12cb6fab4268f2b1297b47835df4f7ee","home":"Empoli","away":"Hellas Verona","kickoff":"2026-11-28T14:00:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}

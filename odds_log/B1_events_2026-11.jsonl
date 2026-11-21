@@ -28,3 +28,5 @@
 {"league":"B1","sport":"soccer_belgium_first_div","event_id":"0a8990d4206c802cdba25a03b50e5d95","home":"Anderlecht","away":"Leuven","kickoff":"2026-11-22T17:30:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"B1","sport":"soccer_belgium_first_div","event_id":"7aa1bde245aaf2cce32c37a7f177ed0f","home":"Lommel SK","away":"Standard Liege","kickoff":"2026-11-22T18:15:00+00:00","fetched_at":"2026-11-09T14:16:22+00:00"}
 {"league":"B1","sport":"soccer_belgium_first_div","event_id":"dcff8b9a58479664e15d7e175fbeb6ba","home":"Leuven","away":"KV Kortrijk","kickoff":"2026-11-27T19:45:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
+{"league":"B1","sport":"soccer_belgium_first_div","event_id":"a7c35a9c11e298455feebbf60a433f1c","home":"Charleroi","away":"Sint Truiden","kickoff":"2026-11-21T15:02:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
+{"league":"B1","sport":"soccer_belgium_first_div","event_id":"7662387ad941cba51f359a6c76f7f659","home":"Westerlo","away":"RAAL La Louvi\u00e8re","kickoff":"2026-11-28T15:00:00+00:00","fetched_at":"2026-11-21T15:16:11+00:00"}
