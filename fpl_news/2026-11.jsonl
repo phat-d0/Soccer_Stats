@@ -548,3 +548,6 @@
 {"at": "2026-11-21T18:30+00:00", "team": "Sunderland", "name": "Brobbey", "status": "i", "chance": 0, "news": "Muscular injury - Unknown return date"}
 {"at": "2026-11-21T19:00+00:00", "team": "Arsenal", "name": "Raya", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
 {"at": "2026-11-21T19:45+00:00", "team": "Newcastle", "name": "Hall", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-21T21:03+00:00", "team": "Arsenal", "name": "Raya", "status": "d", "chance": 75, "news": "Shoulder injury - 75% chance of playing"}
+{"at": "2026-11-21T21:03+00:00", "team": "Arsenal", "name": "Dowman", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-11-21T21:03+00:00", "team": "Tottenham", "name": "Tonali", "status": "a", "chance": 100, "news": ""}
