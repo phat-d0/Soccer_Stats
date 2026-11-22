@@ -852,3 +852,11 @@
 {"league":"SWZ","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957330,"events":5,"rows":5}
 {"league":"T1","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957329,"events":10,"rows":9}
 {"league":"SP1","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957328,"events":15,"rows":7}
+{"league":"AUT","kinds":["inplay55"],"kickoffs":["2026-11-22T13:30:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957312,"events":8,"rows":16}
+{"league":"DNK","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957311,"events":8,"rows":10}
+{"league":"N1","kinds":["inplay55"],"kickoffs":["2026-11-22T13:30:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957310,"events":12,"rows":6}
+{"league":"SP2","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957309,"events":13,"rows":7}
+{"league":"SWE","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957308,"events":12,"rows":10}
+{"league":"SWZ","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957307,"events":5,"rows":5}
+{"league":"T1","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957306,"events":10,"rows":10}
+{"league":"SP1","kinds":["inplay75"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T14:18:21+00:00","status":200,"cost":1,"credits_left":4957305,"events":15,"rows":7}
