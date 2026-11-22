@@ -844,3 +844,11 @@
 {"league":"B1","kinds":["inplay55"],"kickoffs":["2026-11-22T12:30:00+00:00"],"fetched_at":"2026-11-22T13:18:19+00:00","status":200,"cost":1,"credits_left":4957370,"events":10,"rows":5}
 {"league":"D2","kinds":["inplay55"],"kickoffs":["2026-11-22T12:30:00+00:00"],"fetched_at":"2026-11-22T13:18:19+00:00","status":200,"cost":1,"credits_left":4957369,"events":12,"rows":21}
 {"league":"E1","kinds":["inplay75"],"kickoffs":["2026-11-22T12:00:00+00:00"],"fetched_at":"2026-11-22T13:18:19+00:00","status":200,"cost":1,"credits_left":4957368,"events":25,"rows":7}
+{"league":"B1","kinds":["inplay75"],"kickoffs":["2026-11-22T12:30:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957335,"events":10,"rows":5}
+{"league":"D2","kinds":["inplay75"],"kickoffs":["2026-11-22T12:30:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957334,"events":12,"rows":20}
+{"league":"DNK","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957333,"events":8,"rows":10}
+{"league":"SP2","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957332,"events":13,"rows":7}
+{"league":"SWE","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957331,"events":5,"rows":10}
+{"league":"SWZ","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957330,"events":5,"rows":5}
+{"league":"T1","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957329,"events":10,"rows":9}
+{"league":"SP1","kinds":["inplay55"],"kickoffs":["2026-11-22T13:00:00+00:00"],"fetched_at":"2026-11-22T13:48:22+00:00","status":200,"cost":1,"credits_left":4957328,"events":15,"rows":7}
