@@ -14,3 +14,5 @@
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"7f35e6b5b60cdd53ff0767e8ec5c7d50","home":"Dover Athletic FC","away":"Leicester City","kickoff":"2026-12-05T17:15:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"6bab2818e4b7fcf988919fd80b87177b","home":"Barrow AFC","away":"Kidderminster Harriers FC","kickoff":"2026-12-05T20:00:00+00:00","fetched_at":"2026-11-21T22:00:49+00:00"}
 {"league":"FAC","sport":"soccer_fa_cup","event_id":"2340b9cd6f5d4642539e1649205d9845","home":"Salisbury FC","away":"Blackpool","kickoff":"2026-12-06T12:15:00+00:00","fetched_at":"2026-11-22T12:36:06+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"9101e7a827a89f6e1deed9c9c59615bd","home":"AFC Fylde","away":"Luton Town","kickoff":"2026-12-06T14:30:00+00:00","fetched_at":"2026-11-22T15:50:50+00:00"}
+{"league":"FAC","sport":"soccer_fa_cup","event_id":"ae7b345fdd4831586d7a2adb95bde2e7","home":"Crewe Alexandra","away":"Plymouth Argyle","kickoff":"2026-12-06T15:15:00+00:00","fetched_at":"2026-11-22T15:50:50+00:00"}

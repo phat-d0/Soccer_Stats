@@ -55,3 +55,6 @@
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"80c3b1eccde4b39e3e000a65c0b4422b","home":"SD Eibar","away":"Burgos CF","kickoff":"2026-11-28T17:30:00+00:00","fetched_at":"2026-11-21T18:31:16+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"43f5122119133c6e63f2d99176c555e6","home":"Tenerife","away":"Mallorca","kickoff":"2026-11-21T20:02:00+00:00","fetched_at":"2026-11-21T22:00:49+00:00"}
 {"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"47ae19df7db7edc8ff768d66493a1f5a","home":"Real Valladolid CF","away":"Real Sociedad B","kickoff":"2026-11-28T20:00:00+00:00","fetched_at":"2026-11-21T22:00:49+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"ee7af5aaba39b23210e98e1cb8faadf1","home":"Sporting Gij\u00f3n","away":"Las Palmas","kickoff":"2026-11-22T15:18:00+00:00","fetched_at":"2026-11-22T15:50:50+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"468ebf38336fb839032102bc570787b7","home":"Granada CF","away":"AD Ceuta FC","kickoff":"2026-11-29T13:00:00+00:00","fetched_at":"2026-11-22T15:50:50+00:00"}
+{"league":"SP2","sport":"soccer_spain_segunda_division","event_id":"f745c0453880329819da1ecfde118f1c","home":"Mallorca","away":"CD Castell\u00f3n","kickoff":"2026-11-29T15:15:00+00:00","fetched_at":"2026-11-22T15:50:50+00:00"}
