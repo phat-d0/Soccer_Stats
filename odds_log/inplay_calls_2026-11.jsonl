@@ -960,3 +960,4 @@
 {"league":"USA","kinds":["inplay55"],"kickoffs":["2026-11-23T01:30:00+00:00"],"fetched_at":"2026-11-23T02:18:21+00:00","status":200,"cost":1,"credits_left":4957095,"events":11,"rows":8}
 {"league":"USA","kinds":["inplay75"],"kickoffs":["2026-11-23T01:30:00+00:00"],"fetched_at":"2026-11-23T02:48:20+00:00","status":200,"cost":1,"credits_left":4957094,"events":11,"rows":8}
 {"league":"G1","kinds":["inplay55"],"kickoffs":["2026-11-23T15:00:00+00:00"],"fetched_at":"2026-11-23T15:58:28+00:00","status":200,"cost":1,"credits_left":4957043,"events":8,"rows":6}
+{"league":"G1","kinds":["inplay75"],"kickoffs":["2026-11-23T15:00:00+00:00"],"fetched_at":"2026-11-23T16:18:23+00:00","status":200,"cost":1,"credits_left":4957039,"events":8,"rows":6}
