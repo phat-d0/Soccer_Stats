@@ -270,12 +270,11 @@ def test_draftkings_trade_has_its_own_id_book_and_strategy(tmp_path):
     assert t["odds"] == 2.2 and t["edge"] == pytest.approx(0.6 * 2.2 - 1)
     assert (t["threshold"], t["rule"], t["p_source"]) == (0.12, "fixed_raw", "model_f")
     assert t["stake"] == 10.0 and t["side"] == "over" and t["line"] == 4.5
-    # Entry price as the close, both yardsticks from the start.
-    fair_dk = tr.devig_pair(2.2, 1.65)[0]
-    fair_pin = tr.devig_pair(2.0, 1.85)[0]
-    assert t["close_odds"] == 2.2 and t["clv_dk"] == pytest.approx(2.2 * fair_dk - 1)
-    assert t["clv_pinnacle"] == pytest.approx(2.2 * fair_pin - 1) and t["beat_close_pinnacle"]
-    assert t["pinnacle_close_prices"] == {"over": 2.0, "under": 1.85}
+    # A look entry has no close until a later quote at its line (23 Nov): its own price
+    # isn't a close.
+    assert t.get("close_odds") is None and t.get("clv_dk") is None
+    assert t.get("clv_pinnacle") is None and t.get("pinnacle_close_prices") is None
+    assert t["close_missing"] == paper.NO_CLOSE_AT_LINE
     _, ev2 = _book(tmp_path, [card()], rows, NOW + pd.Timedelta(minutes=30))
     assert not any(e["type"] == "open" for e in ev2)  # one per match, team, line and book
 
@@ -283,22 +282,31 @@ def test_draftkings_trade_has_its_own_id_book_and_strategy(tmp_path):
 def test_draftkings_only_line_trades_without_a_pinnacle_yardstick(tmp_path):
     led, _ = _book(tmp_path, [card()], [dk_quote(line=3.5, over=3.0, under=1.3)], NOW)
     tid = "E0|2627|Arsenal|Leeds|corners|home|3.5|dk"
+    assert led[tid]["close_missing"] == paper.NO_CLOSE_AT_LINE  # a look entry
+    close = dk_quote(line=3.5, over=2.8, under=1.35, at=K - pd.Timedelta(minutes=14))
+    close["snapshot"] = "close"
+    led, _ = _book(tmp_path, [card()], [close], K - pd.Timedelta(minutes=10))
     t = led[tid]  # P(over 3.5) = 0.78: 0.78 x 3.0 - 1 = 134%
-    assert t["clv_pinnacle"] is None and t.get("pinnacle_close_prices") is None
-    assert t["clv_dk"] is not None
+    assert t.get("clv_pinnacle") is None and t.get("pinnacle_close_prices") is None
+    assert t["clv_dk"] is not None and t["close_missing"] is None
 
 
 def test_one_sided_draftkings_quote_trades_but_has_no_fair_close(tmp_path):
     q = dk_quote(line=3.5, over=3.0, under=None)
     led, ev = _book(tmp_path, [card()], [q], NOW)
     t = led["E0|2627|Arsenal|Leeds|corners|home|3.5|dk"]
-    assert t["side"] == "over" and t["close_odds"] == 3.0
-    assert t["close_prices"] == {"over": 3.0, "under": None}
-    assert t["clv_dk"] is None and t["beat_close_dk"] is None
-    # An under-only quote can't price an over trade's close: the close isn't moved.
+    assert t["side"] == "over" and t["close_missing"] == paper.NO_CLOSE_AT_LINE
+    # An under-only quote can't price an over trade's close: it stays without one.
     late = dk_quote(line=3.5, over=None, under=1.4, at=K - pd.Timedelta(minutes=20))
     led, ev = _book(tmp_path, [card()], [q, late], K - pd.Timedelta(minutes=15))
-    assert not ev and led["E0|2627|Arsenal|Leeds|corners|home|3.5|dk"]["close_odds"] == 3.0
+    t = led["E0|2627|Arsenal|Leeds|corners|home|3.5|dk"]
+    assert not ev and t.get("close_odds") is None and t["close_missing"] == paper.NO_CLOSE_AT_LINE
+    # A one-sided over close prices it, but has no fair close.
+    late2 = dk_quote(line=3.5, over=2.9, under=None, at=K - pd.Timedelta(minutes=14))
+    led, ev = _book(tmp_path, [card()], [q, late, late2], K - pd.Timedelta(minutes=10))
+    t = led["E0|2627|Arsenal|Leeds|corners|home|3.5|dk"]
+    assert t["close_odds"] == 2.9 and t["close_prices"] == {"over": 2.9, "under": None}
+    assert t["clv_dk"] is None and t["beat_close_dk"] is None and t["close_missing"] is None
 
 
 def test_draftkings_close_and_both_clvs_then_settlement(tmp_path):

@@ -1019,7 +1019,10 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     `look` (the quote's snapshot), `bookmaker`, `model_mean` (`CORNER_ENTRY_FIELDS`). Close = the
     newest quote at its line before kickoff (`close_odds`, `close_prices {over, under}`,
     `close_fetched_at`, `close_minutes_before`, `close_snapshot`; CLV = entry odds × Shin-fair
-    close − 1). A moved match or no result in 14 days: void. Ledger
+    close − 1; since 23 Nov the close must be a quote from the close snapshot or logged after
+    the entry (`_is_close`), else the close fields stay empty and `close_missing` = `NO_CLOSE_AT_LINE`
+    "no quote at line": a look entry whose line moved used to keep its own price as the close).
+    A moved match or no result in 14 days: void. Ledger
     `paper_trades/<code>_corners_<season>.jsonl` (`load_corner_ledger`, `append_corner_events`).
     Pinnacle trades close on Pinnacle's quotes (`clv_pinnacle`,
     `beat_close_pinnacle`); DraftKings trades on DraftKings' (`_dk_close`: `clv_dk`, null on a
@@ -1052,7 +1055,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     `defined_at`) and `since_defined` (`variant_since`: `{defined_at, parent: {trades, summary},
     variant: {trades, summary}, clv_diff: {clv_pinnacle, clv_dk}}` on trades opened at or after
     `defined_at`; `clv_difference` = mean of the kept minus mean of all, on the summaries' CLV
-    trades (won or lost with a value; pushes and voids counted as `left_out`), 95% range
+    trades (won or lost with a value; pushes and voids counted as `left_out`, won or lost
+    trades without a value as `no_value`), 95% range
     resampling matches, 2,000 draws, seed 0, `{field, trades, left_out, kept, matches, mean_all,
     mean_kept, diff, ci95, draws}`). A failing variant is `{key, label, variant_of,
     filter, defined_at, error}`. `by_league` per section when trades span 2+ leagues. Corners' backtest =
