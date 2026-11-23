@@ -1670,7 +1670,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v85) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v86) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -1974,7 +1974,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   3.5 / 4.5 / 5.5 corners against the team's expected corners, 2 to 9, NB2 via `nbOver` with the
   league's `alpha_home`; under All the Premier League's fit) and the diagonal reliability chart
   over every logged half line (model (f) ring, the book's fair price tick), with the per-bin rows
-  folded below it. Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
+  folded below it. A corner trade with `close_missing` (corners team, 23 Nov, PR #258: its line
+  moved and had no real closing quote; close and CLV fields empty) reads "No close: the line
+  moved and had no closing quote" in the sheet's Closing odds row (`NO_CLOSE_TEXT`, v86); its row
+  shows no CLV figure (fixture: the settled Wolves v Leeds trade; smoke step `portfolio-corners-no-close`).
+  Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
 - **Sizing switch** (owner, 7 Nov; v75): "Sizing: Flat $10 | ¼ Kelly" at the top of every

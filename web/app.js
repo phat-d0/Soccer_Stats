@@ -47,7 +47,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v85";
+const APP_VERSION = "v86";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2725,6 +2725,9 @@ function closeLine(t) {
   const clv = tradeClv(t);
   return `<div class="meta">${closeWho(t)} ${priceBoth(t.close_odds)}${m != null ? ` · ${minutesText(m)} before` : ""} · <span class="nowrap">CLV <span class="${plClass(clv)}">${signedPct(clv)}</span></span>${closeApprox(t) ? ' · <span class="approx">approx.</span>' : ""}</div>${isDkCorner(t) && t.clv_pinnacle != null ? `<div class="meta">CLV <span class="${plClass(t.clv_pinnacle)}">${signedPct(t.clv_pinnacle)}</span> vs Pinnacle's close</div>` : ""}`;
 }
+// A corner trade whose line moved and had no real closing quote (corners team, 23 Nov:
+// `close_missing` "no quote at line"; its close and CLV fields stay empty).
+const NO_CLOSE_TEXT = "No close: the line moved and had no closing quote";
 const plClass = (v) => (v == null || Math.abs(v) < 0.005 ? "" : v > 0 ? "gain" : "loss");
 
 function openPL(trades) {
@@ -5963,7 +5966,7 @@ const TRADE_FIELDS = [
   ["Threshold", (t) => (isLean(t) ? `+${Number(t.threshold).toFixed(0)}σ` : isLineshop(t) ? `${pct(t.threshold)} gap` : pct(t.threshold))],
   ["Rule", (t) => (isLineshop(t) ? "Best of four US books vs Pinnacle's fair price, no model" : isDnb(t) ? (t.strategy === "lean_dnb" ? "Draw no bet: blend 1σ+ above the price's break-even" : "Draw no bet: fixed edge, model alone") : isCorner(t) ? `Fixed edge, model (f) vs ${BOOK_NAME[cornerBook(t)]} (live test)` : t.rule === "fixed_raw" ? "Fixed edge, model alone (live test)" : t.rule === "lean_1sigma" ? "Blend 1σ+ above the price's break-even" : "Learned minimum, blended chance"), (t) => !isPlayer(t) && !!t.rule],
   ["Stake", (t) => `$${t.stake}`],
-  [(t) => (tradePhase(t) === "upcoming" ? "Latest odds" : "Closing odds"), (t) => priceBoth(t.close_odds)],
+  [(t) => (tradePhase(t) === "upcoming" ? "Latest odds" : "Closing odds"), (t) => (t.close_missing && t.close_odds == null ? NO_CLOSE_TEXT : priceBoth(t.close_odds))],
   [(t) => (tradePhase(t) === "upcoming" ? "Latest price taken" : "Close taken"), (t) => { const m = closeMinutes(t); return m == null ? "–" : `${minutesText(m)} before kickoff${closeApprox(t) ? " (approximate close)" : ""}`; }, (t) => !isPlayer(t)],
   ["Bookmaker", (t) => (isLineshop(t) ? lsBook(t) : isCorner(t) ? BOOK_NAME[cornerBook(t)] : ({ pinnacle: "Pinnacle", draftkings: "DraftKings", fanduel: "FanDuel" })[t.bookmaker] || t.bookmaker || (isPlayer(t) ? "FanDuel" : "DraftKings"))],
   [(t) => `${tradePhase(t) === "upcoming" ? "Latest" : "Closing"} over / under`, (t) => `${american(t.close_prices?.over)} / ${american(t.close_prices?.under)}`, (t) => isCorner(t) && !!t.close_prices],
