@@ -1534,6 +1534,17 @@ def add_corners(data: dict) -> None:
         t |= tr.settle_corner(t, count) | {"score": f"{hc}-{ac} corners"}
         t["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
         settled.append(t)
+    # A settled trade whose line moved and had no closing quote (corners team, 23 Nov:
+    # `close_missing`, no close fields, CLV None): the sheet says so instead of a bare "–".
+    kick = pd.Timestamp("2026-09-21T14:00:00Z")
+    c = {"league": "E0", "home": "Wolves", "away": "Leeds", "kickoff": kick.isoformat()}
+    pk = {"side": "over", "odds": 2.15, "model_p": 0.53, "p_push": 0.0, "edge": 0.1395}
+    nc = trade(c, "home", 4.5, pk, kick - pd.Timedelta(hours=26))
+    nc |= {"model_mean": 5.4, "close_missing": paper.NO_CLOSE_AT_LINE}
+    nc |= {"clv_pinnacle": None, "beat_close_pinnacle": None}
+    nc |= tr.settle_corner(nc, 6) | {"score": "6-3 corners"}
+    nc["settled_at"] = (kick + pd.Timedelta(hours=3)).isoformat()
+    settled.append(nc)
     # A finished match whose corner count hasn't arrived yet (open, awaiting its result).
     kick = NOW - pd.Timedelta(hours=6)
     c = {"league": "E0", "home": "Crystal Palace", "away": "Brentford", "kickoff": kick}
