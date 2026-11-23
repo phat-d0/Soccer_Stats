@@ -1838,12 +1838,12 @@ const STEPS = [
     if (!text.includes("a push (stake back)") || !text.includes("CLV vs Pinnacle's close")) throw new Error("push trade sheet");
   }, true],
   // A corner trade whose line moved and had no closing quote (`close_missing`, 23 Nov): the
-  // sheet says so; the row's CLV stays "–".
+  // sheet says so; the row shows no CLV figure.
   ["portfolio-corners-no-close", async (p) => {
     await closeSheet(p);
     const id = "E0|2627|Wolves|Leeds|corners|home|4.5";
     const row = (await p.locator(`button[data-trade="${id}"]`).innerText()).replace(/\s+/g, " ");
-    if (!row.includes("CLV –")) throw new Error(`no-close corner row: ${row}`);
+    if (/CLV [+−]\d/.test(row)) throw new Error(`a no-close corner row shows a CLV figure: ${row}`);
     await p.click(`button[data-trade="${id}"]`); await sheet(p);
     const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
     if (!text.includes("No close: the line moved and had no closing quote")) throw new Error(`no-close corner sheet: ${text.slice(0, 300)}`);

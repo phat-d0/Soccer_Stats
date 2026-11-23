@@ -1976,8 +1976,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   over every logged half line (model (f) ring, the book's fair price tick), with the per-bin rows
   folded below it. A corner trade with `close_missing` (corners team, 23 Nov, PR #258: its line
   moved and had no real closing quote; close and CLV fields empty) reads "No close: the line
-  moved and had no closing quote" in the sheet's Closing odds row (`NO_CLOSE_TEXT`, v86); its row's
-  CLV stays "–" (fixture: the settled Wolves v Leeds trade; smoke step `portfolio-corners-no-close`).
+  moved and had no closing quote" in the sheet's Closing odds row (`NO_CLOSE_TEXT`, v86); its row
+  shows no CLV figure (fixture: the settled Wolves v Leeds trade; smoke step `portfolio-corners-no-close`).
   Every chart scrubs (see below). Missing blocks or `error` give a plain note; the data files' own notes are
   folded under "How this is measured". On Moneyline's Model view the chips list every league in
   the backtest files, as on Backtest.
