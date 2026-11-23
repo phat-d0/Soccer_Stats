@@ -358,7 +358,8 @@ def test_lineup_window_runs_at_75_60_45_30_before_each_cluster():
     for k in ks[:1]:
         for delay in (1, 3):
             at = T("2026-10-17 13:30") + pd.Timedelta(minutes=delay)
-            assert tt.due_snapshot(k, at) == "close"
+            assert tt.due_snapshot(k, at, kind="settle") == "close"
+            assert tt.due_snapshot(k, at) is None  # a cron run leaves it too (23 Nov)
             assert tt.due_snapshot(k, at, kind="lineup") is None
             at = T("2026-10-17 13:45") + pd.Timedelta(minutes=delay)
             assert tt.due_snapshot(k, at, kind="close") == "close"

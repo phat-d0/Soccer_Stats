@@ -808,7 +808,7 @@ def test_a_paused_snapshot_makes_no_call_and_the_log_line_says_so(tmp_path):
     assert set(s["paused"]) == {"E2 look"}
     assert "paused (no prices in the last 6 calls): E2 look until" in cl.summary_line(s)
     # Its close, just before kickoff, still goes out.
-    close = K - pd.Timedelta(minutes=20)
+    close = K - pd.Timedelta(minutes=15)
     s = cl.run(
         cards, tmp_path / "o", [state], raw_dir=raw, api_key="k", now=close, get=fake_get(calls)
     )

@@ -100,9 +100,13 @@ def _iso(t) -> str:
 # up to it (within CLOSE_MINUTES). Without it (a watchdog re-send) the run takes a close only
 # within PLANNER_CLOSE_MINUTES: the -15 run starts 12-14 minutes before its cluster's first
 # kickoff and a cluster spans close_runs.SPAN_MINUTES (12), so its own kickoffs are 12-27
-# minutes away. Runs with no kind (cron, heartbeat, a manual dispatch: "scheduled") and settle
-# runs keep CLOSE_MINUTES and the CLOSE_LATEST_MINUTES last chance, so a lost close run is
-# still covered.
+# minutes away. Settle runs keep CLOSE_MINUTES and the CLOSE_LATEST_MINUTES last chance.
+# Scheduled runs (lead, 23 Nov: cron, heartbeat, a manual dispatch): on 22 Nov the 11:05 cron
+# took I1's 11:30 closes 24 minutes out (39 corner, 5 team-total rows), before its -15 close
+# run. A scheduled run now takes a close only with NO_CLOSE_UNTIL or less left, or as the last
+# chance: no later scheduled publish run is left before kickoff (the CLOSE_LATEST_MINUTES rule,
+# now also inside CLOSE_MINUTES). closes.yml's watchdog re-sends a lost close run, so a close
+# is still covered.
 RUN_KIND_ENV = "PUBLISH_RUN_KIND"
 CLOSE_UNTIL_ENV = "PUBLISH_CLOSE_UNTIL"
 NO_CLOSE_KINDS = ("lineup", "goalscorer")
@@ -143,7 +147,8 @@ def due_snapshot(
     decide whether a close earlier than CLOSE_MINUTES is the last chance. A run of a kind in
     NO_CLOSE_KINDS takes a close only with NO_CLOSE_UNTIL or less left before kickoff; a
     "close" run only for kickoffs up to `until` (its cluster's last), or without `until`
-    within PLANNER_CLOSE_MINUTES. Looks are the same in every kind.
+    within PLANNER_CLOSE_MINUTES; a "scheduled" run only with NO_CLOSE_UNTIL or less left or
+    when no later scheduled run is left before kickoff. Looks are the same in every kind.
     """
     snap = _due_snapshot(kickoff, now, runs)
     if snap != "close":
@@ -157,7 +162,17 @@ def due_snapshot(
         if until is not None:
             return snap if _ts(kickoff) <= _ts(until) else None
         return snap if left <= pd.Timedelta(minutes=PLANNER_CLOSE_MINUTES) else None
+    if kind == DEFAULT_KIND and left > NO_CLOSE_UNTIL:
+        return None if _later_run(kickoff, now, runs) else snap
     return snap
+
+
+def _later_run(kickoff, now, runs) -> bool:
+    """Is a scheduled publish run left between now and 5 minutes before kickoff?"""
+    k, now = _ts(kickoff), _ts(now)
+    if runs is None:
+        runs = publish_runs(now, k)
+    return any(now < t < k - pd.Timedelta(minutes=5) for t in runs)
 
 
 def _due_snapshot(kickoff, now, runs) -> str | None:
@@ -171,10 +186,7 @@ def _due_snapshot(kickoff, now, runs) -> str | None:
     if left <= pd.Timedelta(minutes=CLOSE_MINUTES):
         return "close"
     if left <= pd.Timedelta(minutes=CLOSE_LATEST_MINUTES):
-        if runs is None:
-            runs = publish_runs(now, k)
-        later = [t for t in runs if now < t < k - pd.Timedelta(minutes=5)]
-        return None if later else "close"
+        return None if _later_run(k, now, runs) else "close"
     return None
 
 
