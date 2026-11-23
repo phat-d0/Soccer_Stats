@@ -2132,3 +2132,27 @@ nothing (ESPN's counts are not fetched; that only delays rows, never changes one
 picks are made in the unlocked leagues only, as the gate is a development read on them. It will
 run once, on the default branch, on or after 16 Nov, if the minimum is met (`design=counts`
 checks that first, without a fit).
+
+## Corner closes: no quote at the trade's line (corners team, 23 Nov 2026; lead-approved)
+
+Moneyline's 20–22 Nov round report found corner trades whose "close" was their own entry
+quote: when the close snapshot held no quote at the trade's team line (the line had moved),
+`paper._quote_at` fell back to the newest earlier quote at that line, which was the look
+itself, about 29 h out. Such a trade's CLV compares the entry with itself (about minus the
+margin), so it isn't a CLV. On data-log by 23 Nov: **30 of 336 settled corner trades** (Pinnacle
+21, DraftKings 9) have `close_snapshot: "look"`.
+
+- **From now (future trades only, no ledger rewrite):** a corner trade's close must be a quote
+  from the close snapshot, or one logged after the trade's entry (`paper._is_close`).
+  Otherwise the close fields stay empty and the trade records `close_missing: "no quote at
+  line"`, cleared when a real close arrives. An entry taken at the close snapshot is its own
+  close, as before.
+- **Counting:** a trade without a close has no CLV, so the summaries leave it out as they leave
+  out any null CLV. `clv_difference` now also counts won or lost trades without a value as
+  `no_value`, beside `left_out` (voids).
+- **The 8 Dec review:** trades with `close_snapshot == "look"` count as "no close at line".
+  They are left out of the CLV means and reported apart, as voids are. The shadow filter's
+  judged read is reported both ways, with and without them, saying that a look isn't a close,
+  so the corrected figure is the one that measures what the pre-registration meant. Trades
+  are also split at `close_minutes_before` ≤ 20 (the 7–16 Nov early closes in the five
+  goalscorer leagues).
