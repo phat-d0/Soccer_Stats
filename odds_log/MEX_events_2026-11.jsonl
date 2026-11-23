@@ -30,3 +30,11 @@
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"0380db9fc7de24aed0c27138c02467e5","home":"Quer\u00e9taro","away":"Monterrey","kickoff":"2026-11-14T23:01:00+00:00","fetched_at":"2026-11-14T23:54:27+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"264c6eae15dd1aa5e2189c58d409c5b0","home":"Tijuana","away":"Atlante FC","kickoff":"2026-11-21T03:10:00+00:00","fetched_at":"2026-11-17T13:08:08+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"3030284e28d18889f35f9c419d8b0fee","home":"Quer\u00e9taro","away":"Necaxa","kickoff":"2026-11-23T01:10:00+00:00","fetched_at":"2026-11-17T13:08:08+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"34d5c0d472e35c2ac3bfd3b770f111c2","home":"Monterrey","away":"Am\u00e9rica","kickoff":"2026-11-25T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"1232f13b5e8192d04c0ce84439293f19","home":"Toluca","away":"Atlas","kickoff":"2026-11-25T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"da80fe9f169f8284ef68a47ec14e56df","home":"Le\u00f3n","away":"Cruz Azul","kickoff":"2026-11-25T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"4d697288d093fe9c90157e364631133f","home":"Pachuca","away":"Guadalajara","kickoff":"2026-11-25T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"c0495bf013dd25c82f02f5cf7856475e","home":"Am\u00e9rica","away":"Monterrey","kickoff":"2026-11-28T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"02b2180e0b4d8c8402380f920e64c107","home":"Atlas","away":"Toluca","kickoff":"2026-11-28T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"6a6e4753173f8db212cb4b448a892c6f","home":"Cruz Azul","away":"Le\u00f3n","kickoff":"2026-11-28T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"a648e84f07617a98535305954fc21467","home":"Guadalajara","away":"Pachuca","kickoff":"2026-11-28T00:00:00+00:00","fetched_at":"2026-11-23T11:26:26+00:00"}
