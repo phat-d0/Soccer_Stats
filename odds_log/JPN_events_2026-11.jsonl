@@ -35,3 +35,7 @@
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"7172e7dc52a9e11f4db549b97e0694a5","home":"Vissel Kobe","away":"JEF United Chiba","kickoff":"2026-11-28T06:00:00+00:00","fetched_at":"2026-11-23T08:20:48+00:00"}
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"011f4ffca58df74bfce11614845e7122","home":"Kashiwa Reysol","away":"Hiroshima Sanfrecce FC","kickoff":"2026-11-28T07:00:00+00:00","fetched_at":"2026-11-23T08:20:48+00:00"}
 {"league":"JPN","sport":"soccer_japan_j_league","event_id":"f7632c77b259388080dddd4000da2dd9","home":"Mito HollyHock","away":"V-Varen Nagasaki","kickoff":"2026-11-29T05:00:00+00:00","fetched_at":"2026-11-24T05:05:26+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"be503098b31cd073b2c26f4bd199e611","home":"Yokohama F Marinos","away":"FC Tokyo","kickoff":"2026-11-29T05:00:00+00:00","fetched_at":"2026-11-24T08:28:43+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"a707ee387c098265b14f9ccdba249293","home":"Nagoya Grampus","away":"Avispa Fukuoka","kickoff":"2026-11-29T06:00:00+00:00","fetched_at":"2026-11-24T08:28:43+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"74f6bfe1913aec3422567b45b17529ee","home":"Kawasaki Frontale","away":"Gamba Osaka","kickoff":"2026-11-29T06:00:00+00:00","fetched_at":"2026-11-24T08:28:43+00:00"}
+{"league":"JPN","sport":"soccer_japan_j_league","event_id":"ed8d8a36e0aa7792f9fd2b41b40ba6c6","home":"FC Machida Zelvia","away":"Tokyo Verdy","kickoff":"2026-11-29T07:00:00+00:00","fetched_at":"2026-11-24T08:28:43+00:00"}
