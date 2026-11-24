@@ -1,6 +1,6 @@
 {
  "kind": "research_overview",
- "generated": "2026-11-12",
+ "generated": "2026-11-24",
  "note": "Every research study to date, one row each, from the verdicts recorded in docs/lab.md, docs/edge.md, docs/totals.md, docs/leagues.md and docs/player_props.md. CLV and ROI are per $1 against Pinnacle's margin-free close; ranges are 95% and resample matches. Nothing here has beaten Pinnacle's close.",
  "areas": [
   {
@@ -414,6 +414,17 @@
    "bets": 199,
    "result": "No edge. The model's 199 bets at a 2% edge had CLV −4.7% against FanDuel's close, and it earns no weight beside FanDuel's price (c −0.13, −0.94 to +0.78). Prices from the match totals almost never disagree with FanDuel's team totals (1 and 2 bets). Logging continues.",
    "doc": "docs/totals.md: Team totals against the main market"
+  },
+  {
+   "id": "corner_lean",
+   "area": "markets",
+   "name": "Blend Lean for team corners",
+   "when": "2026-11-24",
+   "verdict": "fail",
+   "question": "Does model (f) add anything to Pinnacle's team-corner price, so a Blend Lean could sharpen it?",
+   "sample": "Development gate: 396 Pinnacle half lines on 198 matches (SP1, D1, E1, E2, E3), logged live from 14 Oct; runs 45390998977 and 45391131059",
+   "result": "No. Model (f)'s weight beside Pinnacle's fair price is c −0.178 (−0.866 to +0.499), and the blend flattens Pinnacle's price (b 0.39) rather than sharpening it. Not built (owner).",
+   "doc": "docs/totals.md: Corner Blend Lean: development gate result"
   },
   {
    "id": "corners2_locked",
