@@ -802,3 +802,13 @@
 {"type":"update","id":"SP1|2627|Levante|Elche|lineshop1","at":"2026-11-23T19:46:19+00:00","close_odds":3.63,"close_prices":{"home":2.11,"draw":3.61,"away":3.63},"close_fetched_at":"2026-11-23T19:45:50+00:00","close_minutes_before":14.2,"clv_pinnacle":-0.06511551574839691,"beat_close_pinnacle":false,"book_close_odds":3.5,"book_close_prices":{"home":2.05,"draw":3.5,"away":3.5},"book_close_fetched_at":"2026-11-23T19:45:33+00:00","book_close_minutes_before":14.4,"clv_book":-0.065695801491235}
 {"type":"update","id":"SP1|2627|Levante|Elche|lineshop","at":"2026-11-23T22:05:45+00:00","status":"lost","score":"1-1","profit":-10.0,"settled_at":"2026-11-23T22:05:45+00:00","result_source":"espn"}
 {"type":"update","id":"SP1|2627|Levante|Elche|lineshop1","at":"2026-11-23T22:05:45+00:00","status":"lost","score":"1-1","profit":-10.0,"settled_at":"2026-11-23T22:05:45+00:00","result_source":"espn"}
+{"type":"update","id":"SP1|2627|Barcelona|Villarreal|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-2"}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-1"}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-1"}
+{"type":"update","id":"SP1|2627|Getafe|Ath Madrid|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-3"}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}
+{"type":"update","id":"SP1|2627|Alaves|La Coruna|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-1"}
+{"type":"update","id":"SP1|2627|Alaves|La Coruna|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-1"}
+{"type":"update","id":"SP1|2627|Levante|Elche|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}
+{"type":"update","id":"SP1|2627|Levante|Elche|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}

@@ -185,3 +185,17 @@
 {"type":"update","id":"SP1|2627|Levante|Elche|corners|home|5.5|dk","at":"2026-11-23T22:05:45+00:00","status":"won","actual":5,"push":false,"profit":6.5,"score":"5-1 corners","settled_at":"2026-11-23T22:05:45+00:00","result_source":"espn"}
 {"type":"update","id":"SP1|2627|Levante|Elche|corners|home|4.5","at":"2026-11-23T22:05:45+00:00","status":"lost","actual":5,"push":false,"profit":-10.0,"score":"5-1 corners","settled_at":"2026-11-23T22:05:45+00:00","result_source":"espn"}
 {"type":"update","id":"SP1|2627|Levante|Elche|corners|home|4.5|dk","at":"2026-11-23T22:05:45+00:00","status":"lost","actual":5,"push":false,"profit":-10.0,"score":"5-1 corners","settled_at":"2026-11-23T22:05:45+00:00","result_source":"espn"}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|corners|away|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"9-2 corners"}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|corners|away|3.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"9-2 corners"}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|corners|away|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-2 corners"}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|corners|away|4.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-2 corners"}
+{"type":"update","id":"SP1|2627|Santander|Sociedad|corners|away|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-14 corners"}
+{"type":"update","id":"SP1|2627|Santander|Sociedad|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-14 corners"}
+{"type":"update","id":"SP1|2627|Osasuna|Malaga|corners|home|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-1 corners"}
+{"type":"update","id":"SP1|2627|Getafe|Ath Madrid|corners|away|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-7 corners"}
+{"type":"update","id":"SP1|2627|Getafe|Ath Madrid|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-7 corners"}
+{"type":"update","id":"SP1|2627|Real Madrid|Celta|corners|home|6.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"8-3 corners"}
+{"type":"update","id":"SP1|2627|Levante|Elche|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"5-1 corners"}
+{"type":"update","id":"SP1|2627|Levante|Elche|corners|home|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"5-1 corners"}
+{"type":"update","id":"SP1|2627|Levante|Elche|corners|home|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"5-1 corners"}
+{"type":"update","id":"SP1|2627|Levante|Elche|corners|home|4.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"5-1 corners"}

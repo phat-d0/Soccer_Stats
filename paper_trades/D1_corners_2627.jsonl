@@ -142,3 +142,12 @@
 {"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|corners|home|4.5|dk","at":"2026-11-21T16:35:57+00:00","status":"lost","actual":4,"push":false,"profit":-10.0,"score":"4-8 corners","settled_at":"2026-11-21T16:35:57+00:00","result_source":"espn"}
 {"type":"update","id":"D1|2627|M'gladbach|Dortmund|corners|away|5.5|dk","at":"2026-11-21T16:35:57+00:00","status":"lost","actual":7,"push":false,"profit":-10.0,"score":"7-7 corners","settled_at":"2026-11-21T16:35:57+00:00","result_source":"espn"}
 {"type":"update","id":"D1|2627|Ein Frankfurt|Hoffenheim|corners|away|4.5|dk","at":"2026-11-21T16:35:57+00:00","status":"lost","actual":5,"push":false,"profit":-10.0,"score":"9-5 corners","settled_at":"2026-11-21T16:35:57+00:00","result_source":"espn"}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|corners|away|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-7 corners"}
+{"type":"update","id":"D1|2627|Ein Frankfurt|Hoffenheim|corners|away|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"9-5 corners"}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|corners|away|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-8 corners"}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|corners|home|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-8 corners"}
+{"type":"update","id":"D1|2627|Ein Frankfurt|Hoffenheim|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"9-5 corners"}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-8 corners"}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|corners|home|4.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-8 corners"}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-7 corners"}
+{"type":"update","id":"D1|2627|Ein Frankfurt|Hoffenheim|corners|away|4.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"9-5 corners"}

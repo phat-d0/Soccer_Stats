@@ -1096,3 +1096,9 @@
 {"type":"update","id":"E3|2627|Accrington|Salford","at":"2026-11-21T17:06:02+00:00","status":"lost","score":"1-1","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs","at":"2026-11-21T17:06:02+00:00","status":"lost","score":"0-3","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|York|Walsall","at":"2026-11-21T17:06:02+00:00","status":"lost","score":"0-0","profit":-10.0,"clv_pinnacle":null,"settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Newport County|Swindon","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-0","clv_pinnacle":-0.1347781200897855}
+{"type":"update","id":"E3|2627|Accrington|Salford","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.10281472749761134}
+{"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-3","clv_pinnacle":-0.019351032139397484}
+{"type":"update","id":"E3|2627|Tranmere|Colchester","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-1","clv_pinnacle":-0.10694742462871276}
+{"type":"update","id":"E3|2627|York|Walsall","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-0","clv_pinnacle":-0.19188467138065968}
+{"type":"update","id":"E3|2627|Northampton|Rochdale","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-2","clv_pinnacle":-0.08021438275492376}

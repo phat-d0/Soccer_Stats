@@ -69,3 +69,10 @@
 {"type":"update","id":"E3|2627|Barnet|Port Vale|corners|away|3.5","at":"2026-11-21T17:06:02+00:00","status":"lost","actual":4,"push":false,"profit":-10.0,"score":"4-4 corners","settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Chesterfield|Shrewsbury|corners|home|5.5","at":"2026-11-21T17:06:02+00:00","status":"lost","actual":7,"push":false,"profit":-10.0,"score":"7-4 corners","settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Barnet|Port Vale|corners|home|5.5","at":"2026-11-21T17:06:02+00:00","status":"lost","actual":4,"push":false,"profit":-10.0,"score":"4-4 corners","settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Barnet|Port Vale|corners|away|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E3|2627|Chesterfield|Shrewsbury|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-4 corners"}
+{"type":"update","id":"E3|2627|Tranmere|Colchester|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"6-2 corners"}
+{"type":"update","id":"E3|2627|Newport County|Swindon|corners|away|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-6 corners"}
+{"type":"update","id":"E3|2627|Newport County|Swindon|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-6 corners"}
+{"type":"update","id":"E3|2627|Barnet|Port Vale|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-4 corners"}
+{"type":"update","id":"E3|2627|Crawley Town|Fleetwood Town|corners|home|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-5 corners"}

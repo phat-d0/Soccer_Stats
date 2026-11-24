@@ -144,3 +144,13 @@
 {"type":"update","id":"E0|2627|Hull|Brighton|corners|home|3.5","at":"2026-11-22T16:01:09+00:00","status":"lost","actual":3,"push":false,"profit":-10.0,"score":"3-5 corners","settled_at":"2026-11-22T16:01:09+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Hull|Brighton|corners|away|6.5|dk","at":"2026-11-22T16:01:09+00:00","status":"won","actual":5,"push":false,"profit":6.7,"score":"3-5 corners","settled_at":"2026-11-22T16:01:09+00:00","result_source":"espn"}
 {"type":"update","id":"E0|2627|Hull|Brighton|corners|home|3.5|dk","at":"2026-11-22T16:01:09+00:00","status":"lost","actual":3,"push":false,"profit":-10.0,"score":"3-5 corners","settled_at":"2026-11-22T16:01:09+00:00","result_source":"espn"}
+{"type":"update","id":"E0|2627|Coventry|Crystal Palace|corners|away|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"E0|2627|Chelsea|Leeds|corners|away|3.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"3-2 corners"}
+{"type":"update","id":"E0|2627|Coventry|Crystal Palace|corners|away|4.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-6 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|away|6.5","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|away|5.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}
+{"type":"update","id":"E0|2627|Aston Villa|Sunderland|corners|away|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"7-2 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|away|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|home|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|away|6.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}
+{"type":"update","id":"E0|2627|Hull|Brighton|corners|home|3.5|dk","at":"2026-11-24T05:05:32+00:00","result_check":"mismatch","check_score":"3-4 corners"}

@@ -86,3 +86,8 @@
 {"type":"update","id":"E3|2627|Crawley Town|Fleetwood Town|lineshop1","at":"2026-11-21T16:52:15+00:00","status":"lost","score":"2-1","profit":-10.0,"settled_at":"2026-11-21T16:52:15+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs|lineshop","at":"2026-11-21T17:06:02+00:00","status":"lost","score":"0-3","profit":-10.0,"settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs|lineshop1","at":"2026-11-21T17:06:02+00:00","status":"lost","score":"0-3","profit":-10.0,"settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
+{"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-3"}
+{"type":"update","id":"E3|2627|Cheltenham|Bristol Rvs|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"0-3"}
+{"type":"update","id":"E3|2627|Crawley Town|Fleetwood Town|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"E3|2627|Crawley Town|Fleetwood Town|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-1"}
+{"type":"update","id":"E3|2627|Newport County|Swindon|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-0"}

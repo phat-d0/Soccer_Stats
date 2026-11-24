@@ -53,3 +53,8 @@
 {"type":"update","id":"E2|2627|Notts County|Stevenage|corners|home|4.5","at":"2026-11-21T16:52:15+00:00","status":"lost","actual":6,"push":false,"profit":-10.0,"score":"6-5 corners","settled_at":"2026-11-21T16:52:15+00:00","result_source":"espn"}
 {"type":"update","id":"E2|2627|Oxford|Wycombe|corners|home|5.5","at":"2026-11-21T17:06:02+00:00","status":"lost","actual":8,"push":false,"profit":-10.0,"score":"8-4 corners","settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
 {"type":"update","id":"E2|2627|Cambridge|Stockport|corners|home|5.5","at":"2026-11-21T17:06:02+00:00","status":"won","actual":2,"push":false,"profit":7.8,"score":"2-6 corners","settled_at":"2026-11-21T17:06:02+00:00","result_source":"espn"}
+{"type":"update","id":"E2|2627|Oxford|Wycombe|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"8-4 corners"}
+{"type":"update","id":"E2|2627|Reading|Bromley|corners|away|3.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"12-2 corners"}
+{"type":"update","id":"E2|2627|Reading|Bromley|corners|home|6.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"12-2 corners"}
+{"type":"update","id":"E2|2627|Cambridge|Stockport|corners|home|5.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-6 corners"}
+{"type":"update","id":"E2|2627|Notts County|Stevenage|corners|home|4.5","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"6-5 corners"}

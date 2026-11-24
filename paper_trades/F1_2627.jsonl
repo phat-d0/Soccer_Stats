@@ -2306,3 +2306,8 @@
 {"type":"update","id":"F1|2627|Paris SG|Lorient","at":"2026-11-22T19:20:56+00:00","close_odds":11.0,"close_prices":{"home":1.21,"draw":6.5,"away":11.0},"close_fetched_at":"2026-11-22T19:20:25+00:00","close_minutes_before":8664.6,"clv_dk":-0.20684301755790457,"beat_close_dk":false}
 {"type":"update","id":"F1|2627|Brest|Paris FC","at":"2026-11-22T19:20:56+00:00","pinnacle_live_close_prices":{"home":3.32,"draw":3.37,"away":2.31},"pinnacle_live_fetched_at":"2026-11-22T19:20:25+00:00","pinnacle_live_minutes_before":7224.6,"clv_pinnacle_live":-0.0971326304925646}
 {"type":"update","id":"F1|2627|Paris SG|Lorient","at":"2026-11-22T19:20:56+00:00","pinnacle_live_close_prices":{"home":1.21,"draw":7.51,"away":11.58},"pinnacle_live_fetched_at":"2026-11-22T19:20:26+00:00","pinnacle_live_minutes_before":8664.6,"clv_pinnacle_live":-0.18481025895527836}
+{"type":"update","id":"F1|2627|Lorient|Rennes|lean","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":0.15795349706449402}
+{"type":"update","id":"F1|2627|Nice|Paris SG","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-3","clv_pinnacle":-0.09064076661184683}
+{"type":"update","id":"F1|2627|Paris FC|Angers","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"4-0","clv_pinnacle":-0.1604712346726903}
+{"type":"update","id":"F1|2627|Lorient|Rennes","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.321535295956733}
+{"type":"update","id":"F1|2627|Monaco|Auxerre","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.1646137860837228}

@@ -218,3 +218,9 @@
 {"type":"update","id":"F1|2627|Marseille|Le Mans|lineshop1","at":"2026-11-22T19:20:56+00:00","close_odds":6.4,"close_prices":{"home":1.49,"draw":4.95,"away":6.4},"close_fetched_at":"2026-11-22T19:20:25+00:00","close_minutes_before":24.6,"clv_pinnacle":0.03470638421881356,"beat_close_pinnacle":true,"book_close_odds":7.0,"book_close_prices":{"home":1.4,"draw":4.75,"away":7.0},"book_close_fetched_at":"2026-11-22T19:20:10+00:00","book_close_minutes_before":24.8,"clv_book":-0.13253788782393205}
 {"type":"update","id":"F1|2627|Marseille|Le Mans|lineshop","at":"2026-11-22T22:01:15+00:00","status":"won","score":"2-3","profit":60.0,"settled_at":"2026-11-22T22:01:15+00:00","result_source":"espn"}
 {"type":"update","id":"F1|2627|Marseille|Le Mans|lineshop1","at":"2026-11-22T22:01:15+00:00","status":"won","score":"2-3","profit":60.0,"settled_at":"2026-11-22T22:01:15+00:00","result_source":"espn"}
+{"type":"update","id":"F1|2627|Lens|Toulouse|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}
+{"type":"update","id":"F1|2627|Lens|Toulouse|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"1-1"}
+{"type":"update","id":"F1|2627|Nice|Paris SG|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-3"}
+{"type":"update","id":"F1|2627|Nice|Paris SG|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-3"}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|lineshop","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-3"}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|lineshop1","at":"2026-11-24T05:05:32+00:00","result_check":"ok","check_score":"2-3"}
