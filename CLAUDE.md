@@ -113,7 +113,8 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   the §4 development gate (24 Nov, run 45391131059; one fit on 396 Pinnacle half lines, 198
   matches, SP1, D1, E1, E2, E3) gives model (f)'s weight c −0.178 (−0.866 to +0.499) beside
   Pinnacle's fair price at the look, with b 0.39 (the blend flattens Pinnacle's price): **c not
-  above 0**. Research recommends not building the track; not built (owner).
+  above 0**. Research recommended not building it; the owner had it built anyway (24 Nov),
+  with the corner line shop, under their frozen pre-registrations (Corners team).
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -367,7 +368,7 @@ on 4 Nov; trigger ids):
 - 24 Nov 2026 (Research's own scheduled task, done): the corner Blend Lean's §4 development
   gate. 16 Nov's count was short (270 lines on 135 matches, run 43864931801); 24 Nov's met the
   minimum (396 lines on 198 matches, run 45390998977), so the gate ran once (run 45391131059):
-  **c not above 0** (see Team corners). Not built (owner); `docs/totals.md` "Corner Blend Lean:
+  **c not above 0** (see Team corners). Built anyway (owner, 24 Nov); `docs/totals.md` "Corner Blend Lean:
   development gate result".
 - 17 Nov 2026 (`trig_01RHiY3mRNQEGJu5wyNJKGfZ`, lead's follow-up): the corner Lean gate.
 - 8 Dec 2026 (`trig_01QomAS25ieAih4kV7hus35o`): live team-corners review: per league, book and
