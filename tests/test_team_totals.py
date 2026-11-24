@@ -84,7 +84,7 @@ def test_due_snapshot_windows():
     assert tt.due_snapshot(K, at(18)) == "look"
     assert tt.due_snapshot(K, at(17.9)) is None
     assert tt.due_snapshot(K, at(3)) is None
-    assert tt.due_snapshot(K, K - pd.Timedelta(minutes=29)) == "close"
+    assert tt.due_snapshot(K, K - pd.Timedelta(minutes=29), []) == "close"
     assert tt.due_snapshot(K, K) is None and tt.due_snapshot(K, K + pd.Timedelta(minutes=5)) is None
 
 
@@ -97,6 +97,152 @@ def test_close_is_taken_early_only_when_no_later_scheduled_run():
     # Skipped runs: whatever run comes first inside a window takes it.
     assert tt.due_snapshot(K, K - pd.Timedelta(hours=19, minutes=5)) == "look"
     assert tt.due_snapshot(K, K - pd.Timedelta(minutes=4)) == "close"
+
+
+def test_lineup_and_goalscorer_runs_take_no_close():
+    """Lead, 16 Nov: from 7 Nov the -25 goalscorer run took most closes (median 24 minutes
+    before kickoff); lineup and goalscorer runs now leave the close to the -15 run."""
+    assert tt.NO_CLOSE_KINDS == ("lineup", "goalscorer")
+    for minutes in (29, 24, 20, 19):
+        at = K - pd.Timedelta(minutes=minutes)
+        assert tt.due_snapshot(K, at, [], kind="settle") == "close"
+        assert tt.due_snapshot(K, at, kind="close", until=K) == "close"
+        assert tt.due_snapshot(K, at, kind="lineup") is None
+        assert tt.due_snapshot(K, at, kind="goalscorer") is None
+    # A close is never lost: with 18 minutes or less left no -15 close run can follow, so a
+    # lineup or goalscorer run takes it (a late-started planner, say).
+    for minutes in (18, 12, 5):
+        at = K - pd.Timedelta(minutes=minutes)
+        for kind in ("close", "lineup", "goalscorer", "scheduled"):
+            assert tt.due_snapshot(K, at, kind=kind) == "close"
+    # The last-chance close (no later scheduled run) waits for the planner's -15 close run
+    # in a lineup run; a run without a kind (cron, a manual dispatch) still takes it.
+    k = pd.Timestamp("2026-10-17 08:00", tz="UTC")
+    assert tt.due_snapshot(k, k - pd.Timedelta(minutes=53), kind="lineup") is None
+    assert tt.due_snapshot(k, k - pd.Timedelta(minutes=53)) == "close"
+    # Looks are unchanged in every kind.
+    for kind in ("close", "lineup", "goalscorer", "settle"):
+        assert tt.due_snapshot(K, K - pd.Timedelta(hours=24), kind=kind) == "look"
+
+
+def test_run_kind_from_the_environment():
+    assert tt.run_kind({}) == "scheduled"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": ""}) == "scheduled"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": "close"}) == "close"
+    assert tt.close_until({}) is None and tt.close_until({"PUBLISH_CLOSE_UNTIL": "x"}) is None
+    assert tt.close_until({"PUBLISH_CLOSE_UNTIL": "2026-11-20T19:45+00:00"}) == pd.Timestamp(
+        "2026-11-20 19:45", tz="UTC"
+    )
+    assert tt.run_kind({"PUBLISH_RUN_KIND": " Lineup "}) == "lineup"
+    assert tt.run_kind({"PUBLISH_RUN_KIND": "goalscorer"}) == "goalscorer"
+
+
+def test_a_lineup_run_writes_no_close_row_and_the_close_run_does(tmp_path, monkeypatch):
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    for kind in ("lineup", "goalscorer"):
+        monkeypatch.setenv("PUBLISH_RUN_KIND", kind)
+        s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=27), fake_get(calls))
+        assert s["calls"] == 0 and s["run_kind"] == kind and not calls
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "close")
+    monkeypatch.setenv("PUBLISH_CLOSE_UNTIL", K.isoformat())
+    s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=13), fake_get(calls))
+    assert s["calls"] == 1 and s["run_kind"] == "close"
+    rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
+    assert {r["snapshot"] for r in rows} == {"close"}
+    assert {r["minutes_before"] for r in rows} == {13.0}
+
+
+def test_a_late_goalscorer_run_still_takes_the_close(tmp_path, monkeypatch):
+    """Close never lost (Corners, 16 Nov): a goalscorer run that starts with 16 minutes
+    left (no -15 run can follow it) takes the close."""
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    dk_cache(raw)
+    calls = []
+    monkeypatch.setenv("PUBLISH_RUN_KIND", "goalscorer")
+    s = tt.run([card()], out, [], raw, "k", K - pd.Timedelta(minutes=16), fake_get(calls))
+    assert s["calls"] == 1
+    rows = [json.loads(x) for x in (out / "rows.jsonl").read_text().splitlines()]
+    assert {r["snapshot"] for r in rows} == {"close"}
+
+
+FRI = pd.Timestamp("2026-11-20 19:30", tz="UTC")
+
+
+def test_a_close_run_closes_only_its_own_cluster():
+    """Lead, 21 Nov: on 20 Nov (D1 19:30, F1 19:45, SP1 and E2 20:00; close runs at 19:15,
+    19:30, 19:45, starting about a minute later) the 19:15 and 19:30 runs took the next
+    cluster's closes 29 minutes out. Each close run now takes only its own."""
+    m = lambda x: pd.Timedelta(minutes=x)  # noqa: E731
+    d1, f1, sp1 = FRI, FRI + m(15), FRI + m(30)
+    clusters = [(FRI - m(15), d1), (f1 - m(15), f1), (sp1 - m(15), sp1)]
+    for start in (1, 3):  # each run starts 1-3 minutes after its dispatch
+        taken = {}
+        for at, last in clusters:
+            now = at + m(start)
+            for k in (d1, f1, sp1):
+                if k not in taken and tt.due_snapshot(k, now, [], "close", last) == "close":
+                    taken[k] = k - now
+        assert taken == {k: m(15 - start) for k in (d1, f1, sp1)}
+    # Without the cluster (a watchdog re-send): 28 minutes, not the next cluster's 29.
+    assert tt.due_snapshot(f1, d1 - m(14), [], "close") is None
+    assert tt.due_snapshot(d1, d1 - m(14), [], "close") == "close"
+    # A close run never takes a last-chance close 30-75 minutes out.
+    k = pd.Timestamp("2026-10-17 08:00", tz="UTC")
+    assert tt.due_snapshot(k, k - m(53), [], "close", k) is None
+
+
+def test_a_cluster_spanning_12_minutes_is_closed_by_its_own_run():
+    m = lambda x: pd.Timedelta(minutes=x)  # noqa: E731
+    first, last = FRI, FRI + m(12)
+    for start in (1, 2, 3):
+        now = first - m(15) + m(start)
+        for k in (first, first + m(5), last):
+            assert tt.due_snapshot(k, now, [], "close", last) == "close"
+            assert tt.due_snapshot(k, now, [], "close") == "close"  # 24-27 min <= 28
+
+
+def test_a_lost_close_run_is_still_covered_by_a_scheduled_run():
+    """Runs with no kind (cron, heartbeat, manual) take a close as the last chance (no later
+    scheduled run before kickoff), 30-75 minutes out or inside 30; settle runs keep the
+    30-minute window and the last chance."""
+    m = lambda x: pd.Timedelta(minutes=x)  # noqa: E731
+    k = FRI + m(30)
+    assert tt.due_snapshot(k, k - m(29), []) == "close"  # kind "scheduled", no later run
+    assert tt.due_snapshot(k, k - m(29), kind="settle") == "close"
+    assert tt.due_snapshot(k, k - m(29), [], "close", FRI + m(15)) is None
+    early = pd.Timestamp("2026-10-17 08:00", tz="UTC")
+    assert tt.due_snapshot(early, early - m(53), []) == "close"
+    # 08:00 kickoff, hourly runs only (at :07): a cron at 07:35 has no later run, so it
+    # takes the close 25 minutes out.
+    assert tt.due_snapshot(early, early - m(25)) == "close"
+
+
+SUN = pd.Timestamp("2026-11-22 11:30", tz="UTC")
+
+
+def test_a_cron_run_leaves_the_close_to_the_close_run():
+    """Lead, 23 Nov: on 22 Nov the 11:05 cron took I1's 11:30 closes 24 minutes out, before
+    the 11:15 close run. A scheduled run now takes a close only with NO_CLOSE_UNTIL (18
+    minutes) or less left, unless no later scheduled run is left (the last chance)."""
+    m = lambda x: pd.Timedelta(minutes=x)  # noqa: E731
+    cron = SUN - m(25)  # 11:05 (scheduled runs at 11:07, 11:22: one later before 11:25)
+    assert tt.due_snapshot(SUN, cron) is None
+    assert tt.due_snapshot(SUN, cron, kind="scheduled") is None
+    assert tt.due_snapshot(SUN, SUN - m(14), kind="close", until=SUN) == "close"
+    for minutes in (29, 24, 19):
+        assert tt.due_snapshot(SUN, SUN - m(minutes)) is None
+    # A cron 15 minutes out with no close run planned (or one lost) still takes it.
+    for minutes in (18, 15, 5):
+        assert tt.due_snapshot(SUN, SUN - m(minutes)) == "close"
+    # The last chance: no later scheduled run before kickoff.
+    assert tt.due_snapshot(SUN, cron, []) == "close"
+    assert tt.due_snapshot(SUN, SUN - m(53), []) == "close"
+    # Settle runs are unchanged.
+    assert tt.due_snapshot(SUN, cron, kind="settle") == "close"
 
 
 # ---------- one publish run ----------
@@ -118,7 +264,7 @@ def test_run_fetches_each_snapshot_once(tmp_path):
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(hours=23), fake_get(calls))
     assert s["calls"] == 0 and len(calls) == 1
     # The close is a separate snapshot, taken once.
-    s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=20), fake_get(calls))
+    s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=15), fake_get(calls))
     assert s["calls"] == 1 and len(calls) == 2
     s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=5), fake_get(calls))
     assert s["calls"] == 0 and len(calls) == 2
@@ -342,7 +488,7 @@ def test_a_crash_part_way_keeps_the_calls_already_made(tmp_path):
 
     odd = Odd(None)
     odd.headers = {"x-requests-last": "n/a", "x-requests-remaining": ""}
-    s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=20), lambda *a, **k: odd)
+    s = tt.run(cards, out, [], raw, "k", K - pd.Timedelta(minutes=15), lambda *a, **k: odd)
     assert s["calls"] == 2 and s["credits"] == 2 * tt.COST_PER_CALL and s["rows"] == 0
     assert s["stop"] is None
 

@@ -896,6 +896,7 @@ CORNER_UPDATE_FIELDS = {
     # duplicate_sweep (9 Nov): a later twin of a corner trade under a club's old name.
     "void_reason",
     "duplicate_of",
+    "close_missing",  # NO_CLOSE_AT_LINE until a real close comes (23 Nov), then None
 }
 KICKOFF_TOLERANCE = pd.Timedelta(hours=3)
 
@@ -1019,6 +1020,28 @@ def _pinnacle_ref(t: dict, q: dict) -> dict:
     }
 
 
+# A corner trade's close must be a real close (corners team, lead-approved 23 Nov): a quote
+# from the close snapshot, or one logged after the trade's entry quote. Before, a trade
+# whose line had no close quote kept its entry (look) quote as the "close", so its CLV was
+# entry vs entry (about minus the margin): 30 of 336 settled trades by 23 Nov. Now such a
+# trade keeps no close fields and records `close_missing`; summaries and clv_difference
+# leave it out as they leave out any null CLV. Trades opened before keep their fields.
+NO_CLOSE_AT_LINE = "no quote at line"
+
+
+def _is_close(t: dict, q: dict | None, kickoff) -> bool:
+    """Whether quote `q` can be trade `t`'s close: downloaded before kickoff, and from the
+    close snapshot or logged after the trade's entry quote."""
+    from soccer_stats import corners_live as cl
+
+    if q is None or cl._ts(q["downloaded_at"]) >= cl._ts(kickoff):
+        return False
+    if q.get("snapshot") == "close":
+        return True
+    entry = t.get("odds_fetched_at")
+    return bool(entry) and cl._ts(q["downloaded_at"]) > cl._ts(entry)
+
+
 def _quote_at(quotes: dict, t: dict) -> dict | None:
     """The newest quote at a trade's team line (kickoff within KICKOFF_TOLERANCE)."""
     from soccer_stats import corners_live as cl
@@ -1112,13 +1135,16 @@ def update_corner_ledger(
             if tr.holds(ledger, t["id"]):
                 continue
             t["model_mean"] = model.get("mean")
-            # Until a later quote, the entry price is the close.
-            if book == cl.BOOK:
+            # An entry at the close snapshot is its own close; any other entry waits for a
+            # later quote at its line (NO_CLOSE_AT_LINE until one comes).
+            if not _is_close(t, q, kickoff):
+                t["close_missing"] = NO_CLOSE_AT_LINE
+            elif book == cl.BOOK:
                 t.update(_corner_close(t, q))
             else:
                 t.update(_dk_close(t, q) or {})
                 pq = _quote_at(quotes[cl.BOOK], t)
-                if pq is not None and cl._ts(pq["downloaded_at"]) < kickoff:
+                if _is_close(t, pq, kickoff):
                     t.update(_pinnacle_ref(t, pq))
             ledger[t["id"]] = t
             events.append({"type": "open", **t})
@@ -1135,20 +1161,23 @@ def update_corner_ledger(
         if tr.corner_strategy_of(t) == "draftkings":
             fields: dict = {}
             q = _quote_at(quotes[cl.DK], t)
-            if q is not None and cl._ts(q["downloaded_at"]) < k:
+            if _is_close(t, q, k):
                 if _newer(q["downloaded_at"], t.get("close_fetched_at")):
                     fields.update(_dk_close(t, q) or {})
             pq = _quote_at(quotes[cl.BOOK], t)
-            if pq is not None and cl._ts(pq["downloaded_at"]) < k:
+            if _is_close(t, pq, k):
                 if _newer(pq["downloaded_at"], t.get("pinnacle_close_fetched_at")):
                     fields.update(_pinnacle_ref(t, pq))
+            if "close_odds" in fields and t.get("close_missing"):
+                fields["close_missing"] = None
             if fields:
                 events.append(_update(t, now, **fields))
         else:
             q = _quote_at(quotes[cl.BOOK], t)
-            if q is not None and cl._ts(q["downloaded_at"]) < k:
+            if _is_close(t, q, k):
                 if _newer(q["downloaded_at"], t.get("close_fetched_at")):
-                    events.append(_update(t, now, **_corner_close(t, q)))
+                    extra = {"close_missing": None} if t.get("close_missing") else {}
+                    events.append(_update(t, now, **_corner_close(t, q), **extra))
         if t["status"] != "open" or k > now:
             continue
         res = _corner_result(results, t)
@@ -1618,6 +1647,11 @@ def clv_difference(
         "field": field,
         "trades": len(rows),
         "left_out": sum(1 for t in parent if t.get("status") == "void"),
+        # Won or lost but without a value (e.g. a corner trade with no close at its line,
+        # `close_missing`, 23 Nov): out of the means as before, now counted.
+        "no_value": sum(
+            1 for t in parent if t.get("status") in ("won", "lost") and not _has_value(t.get(field))
+        ),
         "kept": len(kept),
         "matches": len({m for m, _, _ in rows}),
         "mean_all": float(np.mean([c for _, c, _ in rows])) if rows else None,

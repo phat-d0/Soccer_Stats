@@ -266,8 +266,11 @@ def test_cli_plans_the_goalscorer_runs(tmp_path, capsys):
     out = tmp_path / "plan.json"
     main(["close-plan", "--log-dir", str(logs), "--out", str(out), "--now", "2026-10-17T10:00Z"])
     kinds = [d["kind"] for d in json.loads(out.read_text())["dispatch"]]
-    assert kinds[:2] == ["goalscorer", "close"]
-    assert "goalscorer entry for kickoffs 14:00" in capsys.readouterr().out
+    # Lineup runs at -75/-60/-45 (the goalscorer run takes -30), then the entry and close.
+    assert kinds[:5] == ["lineup", "lineup", "lineup", "goalscorer", "close"]
+    text = capsys.readouterr().out
+    assert "goalscorer entry for kickoffs 14:00" in text
+    assert "lineup window (-45 min) for kickoffs 14:00" in text
 
 
 def test_heartbeat_due_after_75_minutes_without_a_publish():
@@ -327,3 +330,189 @@ def test_caches_heartbeat_cli(capsys):
         args = ["publish-heartbeat", "--workflow", "caches", "--last", last]
         cli.main(args + ["--now", "2026-11-12T05:00:00Z"])
         assert capsys.readouterr().out.strip() == want
+
+
+def lineups(p):
+    return [d for d in p["dispatch"] if d["kind"] == "lineup"]
+
+
+def test_lineup_window_runs_at_75_60_45_30_before_each_cluster():
+    """Lead, 16 Nov: publish runs at kickoff -75, -60, -45 and -30 so the logged prices
+    straddle the lineup news; -30 falls to the -25 goalscorer run where there is one, and
+    the -15 close run is unchanged. Lineup runs take no close (team_totals.NO_CLOSE_KINDS)."""
+    from soccer_stats import team_totals as tt
+
+    assert cr.LINEUP_OFFSETS == tuple(pd.Timedelta(minutes=m) for m in (75, 60, 45, 30))
+    now = T("2026-10-17 10:00")
+    ks = [T("2026-10-17 14:00"), T("2026-10-17 14:03")]
+    p = cr.plan(ks, now, lineup_ks=ks)
+    assert [(d["at"], d["kickoffs"]) for d in lineups(p)] == [
+        (T("2026-10-17 12:45"), ks),
+        (T("2026-10-17 13:00"), ks),
+        (T("2026-10-17 13:15"), ks),
+        (T("2026-10-17 13:30"), ks),
+    ]
+    assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45")]
+    # The -30 run, started 1-3 minutes late, is inside the close window: as a lineup run it
+    # takes no close; the close run (1-3 minutes after 13:45) does.
+    for k in ks[:1]:
+        for delay in (1, 3):
+            at = T("2026-10-17 13:30") + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at, kind="settle") == "close"
+            assert tt.due_snapshot(k, at) is None  # a cron run leaves it too (23 Nov)
+            assert tt.due_snapshot(k, at, kind="lineup") is None
+            at = T("2026-10-17 13:45") + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at, kind="close") == "close"
+    p = cr.plan(ks, now, goalscorer_ks=ks, lineup_ks=ks)
+    assert [d["at"] for d in lineups(p)] == [
+        T("2026-10-17 12:45"),
+        T("2026-10-17 13:00"),
+        T("2026-10-17 13:15"),
+    ]
+    assert [d["at"] for d in goalscorers(p)] == [T("2026-10-17 13:35")]
+    assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45")]
+    j = cr.to_json(p)
+    lj = [d for d in j["dispatch"] if d["kind"] == "lineup"]
+    assert {d["workflow"] for d in lj} == {"publish.yml"}
+    assert lj[0]["epoch"] == int(T("2026-10-17 12:45").timestamp())
+    assert "publish at 2026-10-17 12:45 UTC lineup window (-75 min) for kickoffs 14:00, 14:03" in (
+        cr.describe(p)
+    )
+
+
+def test_overlapping_clusters_share_lineup_runs():
+    now = T("2026-10-17 10:00")
+    # 14:00 and 14:30 (two leagues): 14:30's -75 (13:15) and -60 (13:30) are 14:00's -45
+    # and -30, its -45 (13:45) is 14:00's close run; only its -30 (14:00) stands alone.
+    ks = [T("2026-10-17 14:00"), T("2026-10-17 14:30")]
+    p = cr.plan(ks, now, lineup_ks=ks)
+    assert [d["at"] for d in lineups(p)] == [
+        T("2026-10-17 12:45"),
+        T("2026-10-17 13:00"),
+        T("2026-10-17 13:15"),
+        T("2026-10-17 13:30"),
+        T("2026-10-17 14:00"),
+    ]
+    assert [d["at"] for d in closes(p)] == [T("2026-10-17 13:45"), T("2026-10-17 14:15")]
+    # A dense afternoon: close and settle runs are exactly those planned without lineup
+    # runs, and no lineup run is within 5 minutes of another publish.
+    many = [T(f"2026-10-17 {h}") for h in ("11:30", "12:00", "12:20", "13:00", "14:00", "14:30")]
+    p = cr.plan(many, now, lineup_ks=many)
+    without = cr.plan(many, now)
+    assert [d for d in p["dispatch"] if d["kind"] != "lineup"] == without["dispatch"]
+    lin = [d["at"] for d in lineups(p)]
+    others = [d["at"] for d in without["dispatch"] if d["kind"] in cr.PUBLISH_KINDS]
+    assert lin and all(abs(a - b) > cr.LINEUP_MERGE for a in lin for b in others)
+    assert len(lin) == len(set(lin))
+
+
+def test_every_kickoff_keeps_a_close_run_that_takes_its_close():
+    """Close never lost (Corners, 16 Nov): with lineup and goalscorer runs planned, every
+    kickoff still has a close-kind run whose start (1-3 minutes after dispatch) is a close
+    snapshot for it, so the runs that skip the close never leave a match without one."""
+    from soccer_stats import team_totals as tt
+
+    now = T("2026-10-17 10:00")
+    ks = [T(f"2026-10-17 {h}") for h in ("11:30", "12:00", "12:05", "12:20", "13:00", "14:00")]
+    p = cr.plan(ks, now, goalscorer_ks=ks, lineup_ks=ks)
+    for k in ks:
+        runs = [d for d in closes(p) if k in d["kickoffs"]]
+        assert len(runs) == 1
+        for delay in (1, 3):
+            at = runs[0]["at"] + pd.Timedelta(minutes=delay)
+            assert tt.due_snapshot(k, at, kind="close") == "close"
+
+
+def test_lineup_runs_leave_the_rest_of_the_plan_alone():
+    now = T("2026-10-17 10:00")
+    ks = [T("2026-10-17 11:00"), T("2026-10-17 13:00"), T("2026-10-17 15:10")]
+    p = cr.plan(ks, now, goalscorer_ks=ks[:1], lineup_ks=ks)
+    rest = [(d["at"], d["kind"]) for d in p["dispatch"] if d["kind"] != "lineup"]
+    without = cr.plan(ks, now, goalscorer_ks=ks[:1])
+    assert rest == [(d["at"], d["kind"]) for d in without["dispatch"]]
+    assert {k: v for k, v in p.items() if k != "dispatch"} == {
+        k: v for k, v in without.items() if k != "dispatch"
+    }
+    assert [d["at"] for d in closes(p)] == [
+        T("2026-10-17 10:45"),
+        T("2026-10-17 12:45"),
+        T("2026-10-17 14:55"),
+    ]
+
+
+def test_a_late_planner_skips_lineup_times_already_past():
+    k = T("2026-10-17 15:00")
+    assert [d["at"] for d in lineups(cr.plan([k], T("2026-10-17 13:50"), lineup_ks=[k]))] == [
+        T("2026-10-17 14:00"),
+        T("2026-10-17 14:15"),
+        T("2026-10-17 14:30"),
+    ]
+    # Lineup times past the horizon wait for the next planner run.
+    early = T("2026-10-17 08:00")
+    assert lineups(cr.plan([k], early, horizon_hours=5.5, lineup_ks=[k])) == []
+    assert [d["at"] for d in lineups(cr.plan([k], early, horizon_hours=6.0, lineup_ks=[k]))] == [
+        T("2026-10-17 13:45")
+    ]
+    # Without lineup kickoffs nothing changes.
+    assert lineups(cr.plan([k], T("2026-10-17 10:00"))) == []
+
+
+def test_close_watchdog_decision():
+    """Lead, 16 Nov: about 4 minutes after a close or settle dispatch, send it once more
+    when no publish run created since then is queued, running or completed (not cancelled);
+    a close only while its first kickoff is 4 minutes or more away."""
+    sent = T("2026-11-21 14:45")
+    kick = T("2026-11-21 15:00")
+    now = sent + cr.WATCH_AFTER
+
+    def run(created, status, conclusion=None):
+        return {"created_at": created, "status": status, "conclusion": conclusion}
+
+    # No run at all (or an unreadable list): re-send.
+    assert cr.watchdog_due("close", sent, kick, [], now)
+    assert cr.watchdog_due("close", sent, kick, None, now)
+    # Only an older run (before the dispatch): re-send.
+    assert cr.watchdog_due(
+        "close", sent, kick, [run("2026-11-21T14:30:00Z", "completed", "success")], now
+    )
+    # Cancelled (GitHub kept a newer pending run, or never started it): re-send.
+    assert cr.watchdog_due(
+        "close", sent, kick, [run("2026-11-21T14:45:05Z", "completed", "cancelled")], now
+    )
+    # Queued, pending, running or completed since the dispatch: fine.
+    for status, conclusion in (
+        ("queued", None),
+        ("pending", None),
+        ("in_progress", None),
+        ("completed", "success"),
+        ("completed", "failure"),
+    ):
+        runs = [run("2026-11-21T14:45:05Z", status, conclusion)]
+        assert not cr.watchdog_due("close", sent, kick, runs, now)
+    # A run created a few seconds before the dispatch time (two clocks) counts.
+    assert not cr.watchdog_due("close", sent, kick, [run("2026-11-21T14:44:30Z", "queued")], now)
+    # Too close to kickoff: a close is not re-sent with under 4 minutes left.
+    assert cr.watchdog_due("close", sent, kick, [], kick - pd.Timedelta(minutes=4))
+    assert not cr.watchdog_due("close", sent, kick, [], kick - pd.Timedelta(minutes=3))
+    assert not cr.watchdog_due("close", sent, None, [], now)
+    # A settle run has no kickoff limit; other kinds are never watched.
+    late = T("2026-11-21 17:20")
+    assert cr.watchdog_due("settle", late - cr.WATCH_AFTER, kick, [], late)
+    assert not cr.watchdog_due("lineup", sent, kick, [], now)
+    assert not cr.watchdog_due("goalscorer", sent, kick, [], now)
+
+
+def test_close_watchdog_cli(tmp_path, capsys):
+    from soccer_stats import cli
+
+    runs = tmp_path / "runs.json"
+    runs.write_text(json.dumps([{"created_at": "2026-11-21T14:45:20Z", "status": "in_progress"}]))
+    base = ["close-watchdog", "--kind", "close", "--dispatched", "2026-11-21T14:45:00Z"]
+    base += ["--kickoff", "2026-11-21T15:00+00:00", "--now", "2026-11-21T14:49:00Z"]
+    cli.main(base + ["--runs", str(runs)])
+    assert capsys.readouterr().out.strip() == "ok"
+    runs.write_text("")  # gh api failed: no list
+    cli.main(base + ["--runs", str(runs)])
+    assert capsys.readouterr().out.strip() == "redispatch"
+    cli.main(base + ["--runs", str(tmp_path / "missing.json")])
+    assert capsys.readouterr().out.strip() == "redispatch"
