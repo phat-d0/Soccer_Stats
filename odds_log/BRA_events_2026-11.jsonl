@@ -40,3 +40,4 @@
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"ab6bd8fa92a7a680d328f2a92431b856","home":"Internacional","away":"Bragantino-SP","kickoff":"2026-11-29T21:30:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"bef367df5f1268aa54d5028a259f91e5","home":"Corinthians","away":"Gr\u00eamio","kickoff":"2026-11-29T21:30:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
 {"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"c171096dbd17cc792253463f8cf09a6b","home":"Atletico Mineiro","away":"Vasco da Gama","kickoff":"2026-11-29T22:30:00+00:00","fetched_at":"2026-11-20T21:34:09+00:00"}
+{"league":"BRA","sport":"soccer_brazil_campeonato","event_id":"c70e8cc8f8aedeee2ed518993aaced38","home":"Santos","away":"Gr\u00eamio","kickoff":"2026-11-24T00:04:00+00:00","fetched_at":"2026-11-24T01:16:06+00:00"}
