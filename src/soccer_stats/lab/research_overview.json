@@ -442,6 +442,19 @@
    "due_date": "2027-05-31"
   },
   {
+   "id": "corner_lean_live",
+   "area": "markets",
+   "name": "Blend Lean for team corners: live judged read",
+   "when": "2026-11-24",
+   "verdict": "running",
+   "question": "Does the corner Blend Lean's paper track, z ≥ 1 against Pinnacle's price at the look, beat Pinnacle's close?",
+   "sample": "Paper track from its defined_at, judged once at 300 Pinnacle bets or 31 May 2027 (CLV vs Pinnacle's close)",
+   "due": "300 Pinnacle bets or 31 May 2027",
+   "due_date": "2027-05-31",
+   "result": "Its development gate failed (model (f) adds nothing beside Pinnacle's price); built anyway (owner, 24 Nov).",
+   "doc": "docs/totals.md: Corner Blend Lean: pre-registration"
+  },
+  {
    "id": "corners2_locked",
    "area": "markets",
    "name": "Corners finalist (f), locked test",
