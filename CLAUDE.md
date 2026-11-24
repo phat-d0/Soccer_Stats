@@ -109,6 +109,11 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   plain 12% tracks sit in the Archive; every ledger is unchanged. Since v71 (owner, 5 Nov: he bets
   at DraftKings) DraftKings' line leads, in the list and the Archive, and its under-60% line is the
   portfolio's headline; Pinnacle runs beside it and its close stays the judged CLV.
+- Corner Blend Lean (pre-registered 12 Nov in `docs/totals.md`, Amendment 1; `lab/corner_lean.py`):
+  the §4 development gate (24 Nov, run 45391131059; one fit on 396 Pinnacle half lines, 198
+  matches, SP1, D1, E1, E2, E3) gives model (f)'s weight c −0.178 (−0.866 to +0.499) beside
+  Pinnacle's fair price at the look, with b 0.39 (the blend flattens Pinnacle's price): **c not
+  above 0**. Research recommends not building the track; not built (owner).
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -359,9 +364,11 @@ on 4 Nov; trigger ids):
   and the close-snapshot fix (PR #254) went in on 16 Nov. Research takes the counts again on
   30 Nov (its own scheduled task), then pre-registers (entry at the first moment after the XI,
   close at the −15 run; Model evaluation reviews it first); `docs/lab.md` "Late team news".
-- 24 Nov 2026 (Research's own scheduled task): corner Blend Lean counts, then the §4
-  development gate once the minimum (300 lines, 150 matches, unlocked leagues) is met; 16 Nov:
-  270 lines on 135 matches (`odds-check.yml` `task=corner-lean-gate`, run 43864931801).
+- 24 Nov 2026 (Research's own scheduled task, done): the corner Blend Lean's §4 development
+  gate. 16 Nov's count was short (270 lines on 135 matches, run 43864931801); 24 Nov's met the
+  minimum (396 lines on 198 matches, run 45390998977), so the gate ran once (run 45391131059):
+  **c not above 0** (see Team corners). Not built (owner); `docs/totals.md` "Corner Blend Lean:
+  development gate result".
 - 17 Nov 2026 (`trig_01RHiY3mRNQEGJu5wyNJKGfZ`, lead's follow-up): the corner Lean gate.
 - 8 Dec 2026 (`trig_01QomAS25ieAih4kV7hus35o`): live team-corners review: per league, book and
   pooled trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from the rest, the "below 60%"

@@ -2156,3 +2156,18 @@ margin), so it isn't a CLV. On data-log by 23 Nov: **30 of 336 settled corner tr
   so the corrected figure is the one that measures what the pre-registration meant. Trades
   are also split at `close_minutes_before` ≤ 20 (the 7–16 Nov early closes in the five
   goalscorer leagues).
+
+### Corner Blend Lean: development gate result (24 Nov 2026; read once, §4 with Amendment 1)
+
+Counts run 45390998977, then the gate once, run 45391131059 (0 credits). 16 Nov's count (run
+43864931801) was 270 lines on 135 matches, short of the minimum after the international break.
+- **Eligible rows:** 396 Pinnacle half lines on 198 matches in SP1, D1, E1, E2 and E3 (SP1 86,
+  D1 78, E1 112, E2 56, E3 64). E0, I1 and F1 never entered.
+- **Fit on all of them:** a +0.006, b 0.393, **c −0.178 (−0.866 to +0.499)**, σ 0.0392.
+- **Verdict: c's range includes 0.** Model (f) adds nothing measurable beside Pinnacle's fair
+  price at the look. With b well under 1, the blend also pulls Pinnacle's price toward 50%
+  rather than sharpening it. So by §4 any picks would come from that flattening, not from (f),
+  and the lead and owner decide whether to build the track anyway.
+- **Walk-forward replay (descriptive):** the minimum was first met only in the last few days,
+  so there was one fit and one pick (SP1, over, odds 2.20, z 1.05, model-driven), with no
+  final close yet. The replay says nothing about CLV.

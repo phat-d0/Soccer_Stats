@@ -5221,3 +5221,41 @@ once.
 
 **Verdict:** fail in both designs, on the CLV condition. The study closes. 2024/25 is not spent and
 nothing live changes.
+
+## Late team news (Research lab, 16 Nov 2026; lead's brief; no verdict)
+
+**Question** (the owner's of 8 Oct; the tuning ceiling's one open lead): do team-news events
+arrive before DraftKings' price moves, how fast does DraftKings react compared with Pinnacle,
+and does betting DraftKings' price after the news, before it moves, beat the close?
+
+**Step 1: counts only** (16 Nov; data-log `team_news/` and the every-book log
+`odds_log/<code>_books_*.jsonl`; no close, CLV or result read; 0 credits):
+- 468 matches have a `first_confirmed_at`. 278 have no every-book rows: that log started on
+  28 Oct.
+- A match is usable when Pinnacle and DraftKings have a quote downloaded before the XI was
+  first seen and another downloaded after it, before kickoff. Each publish run downloads its
+  odds before it checks ESPN, so the rows logged in the run that first sees the XI were
+  downloaded before the news. Counted by download time, **89 matches** are usable (190 by
+  log time).
+- We see the XI late: the median `first_confirmed_at` is **29 min before kickoff** (10th–90th
+  percentile 14–44 min), while lineups are public about an hour before. That is ESPN's step
+  running at the publish cadence.
+- After the XI there is usually **one** logged moment before kickoff (median 1, 90th
+  percentile 2), normally the −15 close run.
+- At entry prices only: in 41 of the 89 matches Pinnacle's fair price moved at least 1 point
+  after the XI. In 12 of them DraftKings' quote on that side was unmoved and under 15 min
+  old: about 12 candidate bets in 19 days.
+
+**Why it isn't testable yet.** The lag from the XI to a book's first move can't be measured
+below about 15 min. The entry moment is nearly always Pinnacle's last pre-kickoff quote
+itself, so a rule's CLV would only be the DraftKings vs Pinnacle gap at the close (a line
+shop, which the live "Line shop vs Pinnacle" track already tests), not a news effect.
+
+**Next.** Moneyline's lineup-window publish runs at kickoff −75, −60 and −45 min in each
+cluster went live on 16 Nov (PR #253). The −30 run came back with the close-snapshot fix (PR
+#254); in E0, SP1, D1, I1 and F1 the −25 goalscorer run stands in for it. About two weeks later (around 30 Nov),
+Research takes these counts again on the log from 16 Nov. It
+then pre-registers the rule here before any CLV is read, and Model evaluation reviews it first:
+- entry at the first logged moment after the XI;
+- the close at the −15 run;
+- a minimum number of bets set from those counts.
