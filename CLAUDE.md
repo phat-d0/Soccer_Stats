@@ -1752,7 +1752,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v86) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v87) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2281,6 +2281,42 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   chance). Sheet: `GOAL_FIELDS` (player and team, book, B's chance, break-even, edge, player data
   up to, best and same-book closes, both CLVs, status with `void_reason`, his goals, result
   source, the Understat `result_check`).
+- **Corner Blend Lean and corner line shop** (owner, 24 Nov; v87; `paper_corner_lean`,
+  `paper_corner_shop`): Team corners' `live.strategies` adds `corner_lean` (judged) with
+  `corner_lean_dk` (`variant_of`, DraftKings' price, descriptive) and `corner_shop` (2%, judged)
+  with `corner_shop_1pct` (`variant_of`, descriptive), in the main list after the under-60% lines
+  (`leadOrder` keeps DraftKings under 60% the lead and headline). Trades resolve against
+  `live.corner_lean_trades` / `live.corner_shop_trades` (`isCornerLeanStrat` / `isCornerShopStrat`
+  by rule; `isCornerLean` / `isCornerShop` / `isCornerTrack` by `bet_type`; `isCornerAny` for
+  labels; `strategyLiveSet`, `allTrades`); CLV is `clv_pinnacle` on both lines of both tracks
+  (`tradeClv`, `tradeBeat`, `closeWho`). `isShopStrat` = the 1X2 or corner line shop (live paper
+  only, `lsJudgedHtml`, `lsCompareHtml`). `lsJudgedLine`/`lsJudgedHtml` read `deadline` ("Judged
+  at 300 bets or on 31 May 2027") and an `inconclusive` verdict (`VERDICT_WORD`, `deadlineDay`);
+  `lsCompareHtml(..., labels)` names the corner Lean's lines "DraftKings' price" / "Pinnacle
+  (judged)".
+  - Corner Blend Lean: row meta "Built knowing the development gate found no model signal ·
+    judged once at 300 bets or 31 May 2027 · backcast from …" and the judged line; views Live
+    paper and Model (no backtest). Live: the judged box, the generic backcast note, "What carried
+    each pick" (`cornerLeanDriverHtml`), "The fits" (`cornerLeanFitsHtml`: one wrapped line per
+    fit, date, a, b, c, σ, lines and matches; "no picks before the first fit"; the `gate_note`),
+    the overlay "Pinnacle (judged)" / "DraftKings' price". Rows: the line and side, the odds "at
+    Pinnacle" (or DraftKings), blend `p_bet` and σ, the driver chip, Pinnacle's fair and model
+    (f)'s chance, CLV vs Pinnacle's close (DraftKings' line adds its own close's), "no close: the
+    line moved" on a `close_missing` trade after kickoff. Model (`cornerLeanModelHtml`): the
+    blend's equation with the latest fit's numbers, in words (b under 1 flattens, c ≤ 0 adds
+    nothing), the fit leagues and the locked ones, and the fits.
+  - Corner line shop: row meta "Counted from <judged_from> · 2%+ over Pinnacle's fair price ·
+    best of 4 books"; the chart's marker "counted from here" at `judged_from`; "Counted from …"
+    note with the `from_log` entries (counted, never a backcast chip; rows say "opened from the
+    logged look"); "Where the price was" (`cornerShopBooksHtml`: the four books' counts and
+    "Bovada: recorded, never bet", with `seen_books.bovada_at_threshold`). Rows: gap and book,
+    Pinnacle's fair chance.
+  - Sheet: `CORNER_TRACK_FIELDS` (strategy, book, entry; the shop's gap, Pinnacle at entry and
+    every book's gap, Bovada marked; the Lean's Pinnacle at entry, model (f), blend, break-even,
+    σ, driver and fit; closes with `NO_CLOSE_TEXT`, CLV vs Pinnacle's close "(judged)" on the
+    judged lines, DraftKings' close on its line, the shop book's own close, the corner count).
+  - `RS_LINKS`: `corner_lean_live` and `corner_lineshop` open these pages. Kelly reads
+    `p_source` "corner_blend" (`KELLY_CHANCE`).
 - The xG banner (`setUpdated`, shown while `data.xg_error` is set; owner via the lead, 9 Nov;
   v81): when the fit still has xG (`xg_coverage` > 0) it reads "Understat (xG) hasn't updated
   since <date>. Ratings use xG up to then and goals for later matches." from `data.xg_through`
@@ -2317,8 +2353,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `add_champions_league`, `STARTED_OPEN`, `add_second_league`, `add_goalscorer`: ten synthetic
   goalscorer trades through `player_goal_paper._new_trade`, `close_fields` and `settle_fields`,
   won, lost, a non-starter void, open, three stale, one backcast; `GOALSCORER_TRADES`, the track
-  moved back to 14 Sep / 27 Sep like the line shop's) cover states the real data lacks; about
-  1.44 MB in all, 9 Nov.
+  moved back to 14 Sep / 27 Sep like the line shop's; `add_corner_tracks`, 25 Nov: the corner
+  Blend Lean's and corner line shop's trades through `paper_corner_lean.new_trade` /
+  `paper_corner_shop.new_trade`, `CORNER_LEAN_TRADES` (won, lost, open, a backcast pick, a
+  no-close trade, DraftKings' line) with one stored fit `CORNER_LEAN_FIT`, `CORNER_SHOP_TRADES`
+  (won, lost, open, a `from_log` entry, a no-close trade, the 1% line), the shop's count from
+  20 Sep) cover states the real data lacks. Room for them (25 Nov): `slim_live_trades` drops
+  null fields from every live trade list, breakdowns stay only on the lead lines
+  (`BREAKDOWN_KEYS`), side lines (`variant_of`) lose `by_league`, and the new descriptive lines
+  their sizing; about 1.49 MB in all, 25 Nov.
 - Fixture refresh (lead, 12 Nov): rebuilt from that day's data-log with no step needing new
   data. The ~40 Moneyline failures seen on a rebuild during v85 were one step's knock-on: a
   check that stops mid-way leaves the page elsewhere, so every later step that clicks fails.
