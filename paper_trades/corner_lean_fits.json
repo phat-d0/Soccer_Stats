@@ -1,0 +1,22 @@
+{
+ "note": "Corner Blend Lean fits (docs/totals.md \u00a72, Amendment 1): made once, never refitted. source backcast = at a look time before defined_at, live = at a paper run.",
+ "fit_leagues": [
+  "SP1",
+  "D1",
+  "E1",
+  "E2",
+  "E3"
+ ],
+ "fits": [
+  {
+   "fit_at": "2026-11-22T13:45:42+00:00",
+   "a": 0.012240799275874098,
+   "b": 0.09492855176981703,
+   "c": -0.01164344287664991,
+   "sigma": 0.041147124356249176,
+   "lines": 310,
+   "matches": 155,
+   "source": "backcast"
+  }
+ ]
+}
