@@ -114,7 +114,14 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   matches, SP1, D1, E1, E2, E3) gives model (f)'s weight c −0.178 (−0.866 to +0.499) beside
   Pinnacle's fair price at the look, with b 0.39 (the blend flattens Pinnacle's price): **c not
   above 0**. Research recommended not building it; the owner had it built anyway (24 Nov),
-  with the corner line shop, under their frozen pre-registrations (Corners team).
+  with the corner line shop, under their frozen pre-registrations (Corners team), knowing it is
+  a market-flattening rule: a third corner paper track, `paper_corner_lean.py`, exactly as
+  pre-registered (§2–§6, Amendment 1; `docs/totals.md` "Corner Blend Lean: the paper track").
+  Fits pool SP1, D1, E1, E2 and E3 only (E0, I1, F1 never; stored once in data-log
+  `paper_trades/corner_lean_fits.json`, then every 28 days). Picks are made in all eight leagues
+  at Pinnacle's look, z ≥ 1, one per match × team, $10, with a descriptive DraftKings line
+  beside it. Backcast from 14 Oct; judged once at 300 Pinnacle bets from `defined_at` or on 31 May
+  2027. Its own ledger `<code>_cornerlean_<season>.jsonl`, outside the corner tracks' record.
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -368,8 +375,8 @@ on 4 Nov; trigger ids):
 - 24 Nov 2026 (Research's own scheduled task, done): the corner Blend Lean's §4 development
   gate. 16 Nov's count was short (270 lines on 135 matches, run 43864931801); 24 Nov's met the
   minimum (396 lines on 198 matches, run 45390998977), so the gate ran once (run 45391131059):
-  **c not above 0** (see Team corners). Built anyway (owner, 24 Nov); `docs/totals.md` "Corner Blend Lean:
-  development gate result".
+  **c not above 0** (see Team corners). Built anyway (owner, 24 Nov) as a paper track;
+  `docs/totals.md` "Corner Blend Lean: development gate result".
 - 17 Nov 2026 (`trig_01RHiY3mRNQEGJu5wyNJKGfZ`, lead's follow-up): the corner Lean gate.
 - 8 Dec 2026 (`trig_01QomAS25ieAih4kV7hus35o`): live team-corners review: per league, book and
   pooled trades, ROI and CLV with 95% ranges, E0/I1/F1 apart from the rest, the "below 60%"
@@ -1030,7 +1037,8 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     close − 1; since 23 Nov the close must be a quote from the close snapshot or logged after
     the entry (`_is_close`), else the close fields stay empty and `close_missing` = `NO_CLOSE_AT_LINE`
     "no quote at line": a look entry whose line moved used to keep its own price as the close).
-    A moved match or no result in 14 days: void. Ledger
+    A moved match or no result in 14 days: void. Closing and settling are `corner_close_update`
+    and `corner_settle_update` (24 Nov; shared with the corner Blend Lean). Ledger
     `paper_trades/<code>_corners_<season>.jsonl` (`load_corner_ledger`, `append_corner_events`).
     Pinnacle trades close on Pinnacle's quotes (`clv_pinnacle`,
     `beat_close_pinnacle`); DraftKings trades on DraftKings' (`_dk_close`: `clv_dk`, null on a
@@ -1453,6 +1461,37 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `schedule` (first fit at the first look meeting the minimum, then every 28 days), `replay`
   (§3's picks, descriptive: z, driver, CLV vs Pinnacle's close). `odds-check.yml`
   `task=corner-lean-gate` (`design=counts`: counts only), log line `CORNER_LEAN_GATE_JSON`.
+  Shared with the live track (24 Nov): `next_due` (the next 28-day date after the latest fit),
+  `fit_at_times(df, times, fits)` (Amendment 1a at given check times; never changes a stored
+  fit; `schedule` = it on the look times), `side_pick(p, pm, sigma, over, under)` (§3 at one
+  line; an unquoted side is skipped) and `chances(row, fit)`.
+- `paper_corner_lean.py` (owner, 24 Nov; `docs/totals.md` "Corner Blend Lean: the paper track"):
+  the corner Blend Lean paper track in Team corners. `KEY` "corner_lean" (Pinnacle, judged) and
+  `DK_KEY` "corner_lean_dk" (DraftKings, `variant_of`, descriptive). `bet_type` "corner_lean"
+  (never "corners", so the corner tracks, bet alerts and `corner_strategy_of` ignore it),
+  `portfolio` "corners", `p_source` "corner_blend" (Kelly on `model_p` = `p_bet`).
+  - Ids: `<code>|<season>|<home>|<away>|cornerlean|<home/away>` (+ "|dk").
+  - Ledger: `paper_trades/<code>_cornerlean_<season>.jsonl` (`paper._is_match_ledger` skips it).
+  - `look_frame(rows, results)`: `look_rows` over every league, with counts attached for the fit
+    leagues only.
+  - `update_fits`: stored fits plus, once, the backcast's at look times before `defined_at`, then
+    a live one at `now` when due.
+  - `fit_for` (the latest fit at or before a look), `candidates`, `best_per_team`, `new_trade`
+    (the fit's `fit_at`, `fit_a`/`b`/`c`, `sigma`, `fit_lines`, `fit_matches`, `fit_source`; z,
+    driver, tier, `p_bet`, `p_model`, `p_fair`; `close_missing` until a real close).
+  - `open_trades` (a look before `defined_at` is backcast, `backcast_from` "corner_log"; a live
+    look opens only before kickoff) and `update_ledger` (duplicate sweep, open,
+    `paper.corner_close_update`, `paper.corner_settle_update`).
+  - `judged(trades, defined, now, log_dir, verdict_file, target, deadline)`: 300 bets each with a
+    final close, or the deadline (31 May 2027; under 300 = inconclusive); stored once in
+    `corner_lean_verdict.json`.
+  - `sections`: `strategy_section` plus `defined_at`, `note`, `gate_note`, `by_driver`, `fits`,
+    `backcast`, `corner_lean_trades`, and `judged` (main) or `compare` (DK).
+  - `run` (`paper.run` after the corner tracks, in its own try) and `summary_line`, log line
+    "Corner Blend Lean: …".
+  - `paper.portfolios_section(corner_lean=)` appends both sections to Team corners'
+    `strategies` and puts the trades in `live.corner_lean_trades`, never in its `trades` or
+    summary. `paper.awaiting_results` includes them.
 
 - `lab/lasso_residual.py` (owner, 8 Nov; `docs/lab.md` "LASSO on the market residual",
   pre-registered before any fit; development only, no key): one row per match, eight leagues,

@@ -269,8 +269,10 @@ def sizing_source(rule: dict | None) -> str:
     """What a live strategy sizes on, from its rule's p_source: the corners' model (f), else
     the blend (Lean trades on it; Model 12% gets its blend chance, p_blend)."""
     src = (rule or {}).get("p_source")
-    if src in ("pinnacle_fair", "model_b"):  # the line shop's Pinnacle fair chance, or
-        return "model"  # goalscorer model B's: both stored as model_p
+    # The line shop's Pinnacle fair chance, goalscorer model B's or the corner Blend Lean's
+    # chance of its side: all stored as model_p.
+    if src in ("pinnacle_fair", "model_b", "corner_blend"):
+        return "model"
     return "model_f" if src == "model_f" else "blend"
 
 
