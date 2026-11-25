@@ -60,3 +60,6 @@
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"1126881ccd5628bc2a3e896fd7e05fed","home":"Virtus Entella","away":"Hellas Verona","kickoff":"2026-11-24T19:01:00+00:00","fetched_at":"2026-11-24T19:16:00+00:00"}
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"83a913029df6521a5822f1a77e619b78","home":"Palermo","away":"S\u00fcdtirol","kickoff":"2026-11-24T19:01:00+00:00","fetched_at":"2026-11-24T19:16:00+00:00"}
 {"league":"I2","sport":"soccer_italy_serie_b","event_id":"8a83b64c5a2da01e0be02f81c52c24c1","home":"Benevento","away":"Empoli","kickoff":"2026-11-24T19:02:00+00:00","fetched_at":"2026-11-24T19:16:00+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"e9dde1a356f9972fdba7493f024c1416","home":"Cremonese","away":"Avellino","kickoff":"2026-11-25T18:02:00+00:00","fetched_at":"2026-11-25T20:02:11+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"9c57ff58a8b71d7648b7914d3fe2c839","home":"Mantova","away":"Arezzo","kickoff":"2026-11-25T19:03:00+00:00","fetched_at":"2026-11-25T20:02:11+00:00"}
+{"league":"I2","sport":"soccer_italy_serie_b","event_id":"30fb25fc45cd386b33e223302ff98f4d","home":"Padova","away":"Sampdoria","kickoff":"2026-11-25T19:03:00+00:00","fetched_at":"2026-11-25T20:02:11+00:00"}
