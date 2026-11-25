@@ -113,8 +113,9 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   the §4 development gate (24 Nov, run 45391131059; one fit on 396 Pinnacle half lines, 198
   matches, SP1, D1, E1, E2, E3) gives model (f)'s weight c −0.178 (−0.866 to +0.499) beside
   Pinnacle's fair price at the look, with b 0.39 (the blend flattens Pinnacle's price): **c not
-  above 0**. Research recommended not building it; the owner built it anyway (24 Nov), knowing
-  it is a market-flattening rule: a third corner paper track, `paper_corner_lean.py`, exactly as
+  above 0**. Research recommended not building it; the owner had it built anyway (24 Nov),
+  with the corner line shop, under their frozen pre-registrations (Corners team), knowing it is
+  a market-flattening rule: a third corner paper track, `paper_corner_lean.py`, exactly as
   pre-registered (§2–§6, Amendment 1; `docs/totals.md` "Corner Blend Lean: the paper track").
   Fits pool SP1, D1, E1, E2 and E3 only (E0, I1, F1 never; stored once in data-log
   `paper_trades/corner_lean_fits.json`, then every 28 days). Picks are made in all eight leagues
