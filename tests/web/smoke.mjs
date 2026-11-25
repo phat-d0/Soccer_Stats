@@ -1719,14 +1719,15 @@ const STEPS = [
     // tracks they are cut from sit in the Archive list.
     const order = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
     // DraftKings leads (owner, 5 Nov: the book he bets), in the main list and the Archive.
-    if (order.join(",") !== "draftkings_below60,pinnacle_below60,draftkings,pinnacle") throw new Error(`corner rows: ${order.join(",")}`);
+    // The corner Blend Lean and the corner line shop (24 Nov) follow, each with its side line.
+    if (order.join(",") !== "draftkings_below60,pinnacle_below60,corner_lean,corner_lean_dk,corner_shop,corner_shop_1pct,draftkings,pinnacle") throw new Error(`corner rows: ${order.join(",")}`);
     const note = (await p.locator(".pf-head").innerText()).replace(/\s+/g, " ");
     if (!note.includes("DraftKings is the book the owner bets") || !note.includes("Pinnacle's closing price stays the yardstick")) throw new Error(`corners note: ${note}`);
     // The top-level row is the lead strategy's: DraftKings under 60%, named in the meta.
     await pfHome(p);
     const home = (await p.locator('button[data-pfid="corners"]').innerText()).replace(/\s+/g, " ");
     const lead = await p.evaluate(() => { const cur = pfById("corners"); const m = tradeStats(strategyLiveSet(cur, pfStrategies(cur).find((x) => x.key === "draftkings_below60"), "").trades); return { profit: usd(m.profit, 2), n: m.n }; });
-    if (!home.includes("Lead: Model (f) vs DraftKings: 12% edge, under 60% to win · 1 more · 2 archived") || !home.includes(lead.profit) || !home.includes(`${lead.n} settled`)) throw new Error(`corners home row ${home} vs ${JSON.stringify(lead)}`);
+    if (!home.includes("Lead: Model (f) vs DraftKings: 12% edge, under 60% to win · 5 more · 2 archived") || !home.includes(lead.profit) || !home.includes(`${lead.n} settled`)) throw new Error(`corners home row ${home} vs ${JSON.stringify(lead)}`);
     if (!(await p.locator('#view p.note:has-text("Profit is each portfolio\'s lead strategy")').count())) throw new Error("home note");
     await p.click('button[data-pfid="corners"]');
     if (!(await p.locator('.section-title:has-text("Archive") + .card button[data-pfstrat="pinnacle"]').count())) throw new Error("the Pinnacle track isn't archived");
@@ -1848,6 +1849,105 @@ const STEPS = [
     const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
     if (!text.includes("No close: the line moved and had no closing quote")) throw new Error(`no-close corner sheet: ${text.slice(0, 300)}`);
   }, true],
+  // The corner Blend Lean (owner, 24 Nov): after the under-60% lines, DraftKings' descriptive
+  // line right under it; the gate note and the judged read (300 bets or 31 May 2027) on the
+  // row; the judged count, the fits, the backcast, rows with blend, σ, driver and CLV vs
+  // Pinnacle's close; a Model view with the fitted blend and no backtest.
+  ["portfolio-corner-lean", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "corners"); await p.click('.chip[data-league=""]');
+    const row = (await p.locator('button[data-pfstrat="corner_lean"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Corner Blend Lean vs Pinnacle", "Built knowing the development gate found no model signal", "judged once at 300 bets or 31 May 2027", "backcast from Sep 14", "Judged at 300 bets or on 31 May 2027: 3 with a final close so far"]) if (!row.includes(w)) throw new Error(`corner Lean row lacks "${w}": ${row}`);
+    if (row.includes("Backtest:")) throw new Error("the corner Lean row shows a backtest line");
+    const dk = (await p.locator('button[data-pfstrat="corner_lean_dk"]').innerText()).replace(/\s+/g, " ");
+    if (!dk.includes("Descriptive · the same chance at DraftKings' price · never judged")) throw new Error(`corner Lean DraftKings row: ${dk}`);
+    await p.click('button[data-pfstrat="corner_lean"]');
+    const views = await p.locator("button[data-pf]").evaluateAll((els) => els.map((e) => e.dataset.pf));
+    if (views.join(",") !== "live,model") throw new Error(`corner Lean views: ${views.join(",")}`);
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["The judged test, from", "3 of 300 bets with a final close", "or on 31 May 2027 with whatever is there", "The fits", "a 0.041 · b 0.392 · c −0.178", "396 lines on 198 matches", "There are no picks before the first fit", "Built knowing the gate failed.", "Backcast before", "What carried each pick:", "under 3.5 corners", "blend ", "σ", "at Pinnacle", "vs Pinnacle's close", "no close: the line moved", "Pinnacle's fair", "model (f)"]) if (!text.includes(w)) throw new Error(`corner Lean view lacks "${w}"`);
+    if ((await p.locator("#view .trade-row .chip-backcast").count()) !== 1) throw new Error("corner Lean backcast chips");
+    if ((await p.locator("#view .trade-row .drv").count()) < 4) throw new Error("corner Lean driver chips");
+    const legend = await p.locator(".pf-curve .curve-legend").innerText();
+    if (!legend.includes("Pinnacle (judged)") || !legend.includes("DraftKings' price")) throw new Error(`corner Lean legend: ${legend}`);
+    if (!(await p.textContent(".pf-curve")).includes("rule set (judged from here)")) throw new Error("corner Lean marker");
+    // A stored inconclusive read (the deadline reached under 300 bets) replaces the count.
+    await p.evaluate(() => {
+      const s = pfById("corners").live.strategies.find((x) => x.key === "corner_lean");
+      s.judged = { ...s.judged, verdict: "inconclusive", clv: -0.012, clv_ci95: [-0.05, 0.02], read: 140, read_at: "2027-05-31T06:00:00+00:00", frozen: true };
+      render();
+    });
+    const box = (await p.textContent(".ls-judged")).replace(/\s+/g, " ");
+    for (const w of ["Inconclusive", "only 140 bets had a final close by 31 May 2027", "−1.2%", "it never changes"]) if (!box.includes(w)) throw new Error(`inconclusive read lacks "${w}": ${box}`);
+    await p.evaluate(() => { const s = pfById("corners").live.strategies.find((x) => x.key === "corner_lean"); delete s.judged.verdict; s.judged.frozen = false; render(); });
+    await p.click('button[data-pf="model"]');
+    const model = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["The blend: Pinnacle's price with model (f)", "logit p = 0.041 + 0.392 × logit(Pinnacle's fair over) − 0.178 × logit(model (f)'s over)", "so model (f) adds nothing", "Fitted on La Liga", "stay out of every fit"]) if (!model.includes(w)) throw new Error(`corner Lean model lacks "${w}"`);
+    await p.click('button[data-pf="live"]');
+  }],
+  ["portfolio-corner-lean-trade", async (p) => {
+    const id = "E0|2627|Chelsea|Fulham|cornerlean|away";
+    const row = (await p.locator(`button[data-trade="${id}"]`).innerText()).replace(/\s+/g, " ");
+    if (/CLV [+−]\d/.test(row) || !row.includes("no close: the line moved")) throw new Error(`corner Lean no-close row: ${row}`);
+    await p.click(`button[data-trade="${id}"]`); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Fulham under 3.5 corners", "Corner Blend Lean vs Pinnacle (judged)", "Pinnacle at entry", "Model (f)'s chance", "The blend's chance (used)", "Break-even at entry", "Above break-even", "Strong", "What carried it", "Market-driven", "Fit", "made in the backcast", "No close: the line moved and had no closing quote", "CLV vs Pinnacle's close (judged)", "– (no close at the line)", "Fulham had 5 corners"]) if (!text.includes(w)) throw new Error(`corner Lean sheet lacks "${w}"`);
+    await closeSheet(p);
+    await p.click('button[data-trade="SP1|2627|Betis|Celta|cornerlean|home"]'); await sheet(p);
+    const bc = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Backcast", "Descriptive only", "Pinnacle's close, over / under"]) if (!bc.includes(w)) throw new Error(`corner Lean backcast sheet lacks "${w}"`);
+  }, true],
+  ["portfolio-corner-lean-dk", async (p) => {
+    await closeSheet(p); await pfOpenStrat(p, "corner_lean_dk");
+    const box = (await p.textContent(".ls-compare")).replace(/\s+/g, " ");
+    for (const w of ["Compared with Corner Blend Lean vs Pinnacle", "DraftKings' price", "Pinnacle (judged)", "CLV vs Pinnacle", "Descriptive only"]) if (!box.includes(w)) throw new Error(`corner Lean DraftKings compare lacks "${w}": ${box}`);
+    if (await p.locator(".ls-judged").count()) throw new Error("the DraftKings line shows the judged box");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["at DraftKings", "vs DraftKings' close"]) if (!text.includes(w)) throw new Error(`corner Lean DraftKings view lacks "${w}"`);
+    await p.click('button[data-trade="SP1|2627|Sevilla|Getafe|cornerlean|home|dk"]'); await sheet(p);
+    const sh = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Corner Blend Lean at DraftKings' price (descriptive)", "DraftKings at entry", "DraftKings' close, over / under", "Pinnacle's close, over / under", "CLV vs DraftKings' close"]) if (!sh.includes(w)) throw new Error(`corner Lean DraftKings sheet lacks "${w}"`);
+  }, true],
+  // The corner line shop (owner, 24 Nov; pre-registered 8 Nov): counted from its own day,
+  // gap and book on every row, entries from the log counted with no backcast chip, Bovada
+  // recorded but never bet, the judged count; the 1% line's comparison.
+  ["portfolio-corner-shop", async (p) => {
+    await closeSheet(p); await pfOpenPf(p, "corners"); await p.click('.chip[data-league=""]');
+    const row = (await p.locator('button[data-pfstrat="corner_shop"]').innerText()).replace(/\s+/g, " ");
+    for (const w of ["Corner line shop vs Pinnacle", "Counted from Sep 20 · 2%+ over Pinnacle's fair price · best of 4 books", "Judged at 300 bets or on 31 May 2027: 4 with a final close so far"]) if (!row.includes(w)) throw new Error(`corner shop row lacks "${w}": ${row}`);
+    const row1 = (await p.locator('button[data-pfstrat="corner_shop_1pct"]').innerText()).replace(/\s+/g, " ");
+    if (!row1.includes("Descriptive comparison · a 1% gap · never judged")) throw new Error(`corner shop 1% row: ${row1}`);
+    await p.click('button[data-pfstrat="corner_shop"]');
+    if (await p.locator('button[data-pf="backtest"], button[data-pf="model"]').count()) throw new Error("the corner shop has live paper only");
+    const text = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["No model: the best of DraftKings, FanDuel, BetMGM and BetRivers", "4 of 300 bets with a final close", "Counted from", "1 bet was opened afterwards from looks logged before the track was built", "not a backcast", "Where the price was", "DraftKings 1 · FanDuel 2 · BetMGM 1 · BetRivers 1", "Bovada: recorded, never bet", "reached the 2% gap on 1 of these lines", "Avg gap", "gap +", "· FanDuel", "vs Pinnacle's close", "opened from the logged look", "no close: the line moved"]) if (!text.includes(w)) throw new Error(`corner shop view lacks "${w}"`);
+    if (await p.locator("#view .trade-row .chip-backcast").count()) throw new Error("the corner shop shows backcast chips");
+    const legend = await p.locator(".pf-curve .curve-legend").innerText();
+    if (!legend.includes("2% gap (judged)") || !legend.includes("1% gap")) throw new Error(`corner shop legend: ${legend}`);
+    if (!(await p.textContent(".pf-curve")).includes("counted from here")) throw new Error("corner shop marker");
+  }],
+  ["portfolio-corner-shop-trade", async (p) => {
+    await p.click('button[data-trade="E0|2627|Spurs|Burnley|cornershop|home"]'); await sheet(p);
+    const text = (await p.textContent("#sheet-body")).replace(/\s+/g, " ");
+    for (const w of ["Spurs over 6.5 corners", "Corner line shop vs Pinnacle, 2% gap (judged)", "Opened from the log", "not a backcast", "FanDuel", "Gap at entry", "over Pinnacle's fair price", "Pinnacle at entry", "Every book's gap on this side", "Bovada +0.4% (recorded, never bet)", "CLV vs Pinnacle's close (judged)", "The book's own close"]) if (!text.includes(w)) throw new Error(`corner shop sheet lacks "${w}"`);
+    for (const w of ["Model (f)'s chance", "Backcast Yes"]) if (text.includes(w)) throw new Error(`corner shop sheet shows "${w}"`);
+  }, true],
+  ["portfolio-corner-shop-1pct", async (p) => {
+    await closeSheet(p); await pfOpenStrat(p, "corner_shop_1pct");
+    const box = (await p.textContent(".ls-compare")).replace(/\s+/g, " ");
+    for (const w of ["Compared with Corner line shop vs Pinnacle", "1% gap", "2% gap (judged)", "Descriptive only"]) if (!box.includes(w)) throw new Error(`corner shop 1% compare lacks "${w}": ${box}`);
+    if (await p.locator(".ls-judged").count()) throw new Error("the 1% line shows the judged box");
+  }],
+  // Research cards open these pages (RS_LINKS).
+  ["portfolio-corner-tracks-research", async (p) => {
+    await p.evaluate(() => document.querySelector('.tabbar button[data-tab="research"]').click());
+    for (const [id, title] of [["corner_lean_live", "Corner Blend Lean vs Pinnacle"], ["corner_lineshop", "Corner line shop vs Pinnacle"]]) {
+      await p.evaluate(() => document.querySelector('.tabbar button[data-tab="research"]').click());
+      await p.click(`.rs-card[data-rsid="${id}"] [data-rsgo]`);
+      if (!(await p.locator('.tabbar button[data-tab="portfolio"].active').count())) throw new Error(`${id} should open Portfolio`);
+      const t = await p.locator(".pf-title").innerText();
+      if (!t.includes(title)) throw new Error(`${id} opened ${t}`);
+    }
+  }],
   ["portfolio-corners-backtest", async (p) => {
     // An archived corner track (owner, 25 Oct) has its own subtitle, and its backtest view
     // carries none of Lean's old-rule wording.

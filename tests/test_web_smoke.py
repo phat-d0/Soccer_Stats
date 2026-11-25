@@ -58,7 +58,9 @@ def test_fixture_is_complete():
     assert [bool(f.get("no_model")) for f in ucl] == [False, True]
     assert set(pfs["moneyline"]["live"]["by_league"]) == {"E0", "SP1"}
     size = sum(p.stat().st_size for p in FIXTURE.glob("*.json"))
-    assert size < 1_500_000  # keep the committed fixture small (raised from 1 MB, 24 Oct)
+    # Keep the committed fixture small: raised from 1 MB on 24 Oct, and to 1.75 MB on 25 Nov
+    # for the two corner tracks rather than trim live-shaped data.
+    assert size < 1_750_000
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")

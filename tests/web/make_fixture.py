@@ -41,6 +41,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 from conftest import simulate_league  # noqa: E402
 
 from soccer_stats import corners_live, paper  # noqa: E402
+from soccer_stats import paper_corner_lean as pcl  # noqa: E402
+from soccer_stats import paper_corner_shop as pcs  # noqa: E402
 from soccer_stats import paper_dnb as pdnb  # noqa: E402
 from soccer_stats import paper_lineshop as plsh  # noqa: E402
 from soccer_stats import player_calibration as cal  # noqa: E402
@@ -382,6 +384,7 @@ def build(src: Path, out: Path) -> dict:
     add_lean_strategy(data)
     add_champions_league(data)
     add_goalscorer(data)
+    add_corner_tracks(data)
     # The real Lean backtest (data-log's lean_backtest.json via paper.run), with its bet
     # list cut to the newest LEAN_BETS rows to stay under 1 MB (aggregates untouched).
     # The same for Model 12%'s per-league replay (edge12_backtest.json), keeping a few of
@@ -1993,6 +1996,171 @@ def add_goalscorer(data: dict) -> None:
     for sec in live["strategies"]:
         sec.pop("calibration", None)  # no Model view (the 1.5 MB cap)
     pf["live"] = live
+
+
+# The corner Blend Lean and the corner line shop (owner, 24 Nov; paper_corner_lean,
+# paper_corner_shop): their real starts are after the fixture's NOW, so both move back with
+# the line shop's (backcast from 14 Sep, defined 27 Sep; the shop's count from 20 Sep) and
+# the trades are synthetic, built through each module's own new_trade with closes and
+# results as the ledgers write them.
+CORNER_LEAN_FIT = {"fit_at": "2026-09-16T08:00:00+00:00", "source": "backcast", "a": 0.041,
+                   "b": 0.392, "c": -0.178, "sigma": 0.0312, "lines": 396,
+                   "matches": 198}  # fmt: skip
+# Each row: track, league, home, away, kickoff, team side, line, bet side, Pinnacle's over /
+# under at the look, model (f)'s over, z (the blend's chance follows), driver, the bet's
+# odds (DraftKings' on its line), the close's over / under (None = no quote at the line), the
+# team's corners (None = open).
+CORNER_LEAN_TRADES = [
+    ("corner_lean", "SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 4.5, "under",
+     1.80, 2.02, 0.57, 1.35, "market", None, (1.84, 1.98), 3),
+    ("corner_lean", "E0", "Everton", "Wolves", "2026-09-28T14:00:00Z", "away", 4.5, "under",
+     1.95, 1.87, 0.44, 1.12, "market", None, (2.00, 1.82), 4),
+    ("corner_lean", "SP1", "Sevilla", "Getafe", "2026-09-30T19:00:00Z", "home", 5.5, "over",
+     2.25, 1.64, 0.47, 1.48, "model", None, (2.10, 1.73), 4),
+    ("corner_lean", "E0", "Chelsea", "Fulham", "2026-10-02T19:00:00Z", "away", 3.5, "under",
+     1.70, 2.15, 0.61, 2.21, "market", None, None, 5),
+    ("corner_lean", "E0", "Man United", "Brighton", "2026-10-08T14:00:00Z", "home", 5.5, "under",
+     1.90, 1.92, 0.52, 1.06, "market", None, None, None),
+    ("corner_lean_dk", "SP1", "Betis", "Celta", "2026-09-21T19:00:00Z", "home", 4.5, "under",
+     1.80, 2.02, 0.57, 1.35, "market", 2.08, (1.84, 1.98), 3),
+    ("corner_lean_dk", "SP1", "Sevilla", "Getafe", "2026-09-30T19:00:00Z", "home", 5.5, "over",
+     2.25, 1.64, 0.47, 1.48, "model", 2.20, (2.10, 1.73), 4),
+    ("corner_lean_dk", "E0", "Man United", "Brighton", "2026-10-08T14:00:00Z", "home", 5.5,
+     "under", 1.90, 1.92, 0.52, 1.06, "market", 1.95, None, None),
+]  # fmt: skip
+# Each row: track, league, home, away, kickoff, team side, line, bet side, book, look time,
+# Pinnacle's over / under, the book's price on the side, Bovada's gap on the side, Pinnacle's
+# close over / under (None = no quote at the line), the book's close on the side, corners.
+CORNER_SHOP_TRADES = [
+    ("corner_shop", "E0", "Spurs", "Burnley", "2026-09-23T19:00:00Z", "home", 6.5, "over",
+     "fanduel", "2026-09-22T18:00:00Z", 2.05, 1.80, 2.20, 0.004, (1.98, 1.86), 2.12, 8),
+    ("corner_shop", "SP1", "Betis", "Celta", "2026-09-29T19:00:00Z", "away", 4.5, "under",
+     "betrivers", "2026-09-28T18:00:00Z", 1.88, 1.95, 2.10, -0.01, (1.90, 1.93), 2.00, 6),
+    ("corner_shop", "E0", "Arsenal", "Brentford", "2026-10-02T19:00:00Z", "home", 5.5, "over",
+     "draftkings", "2026-10-01T18:00:00Z", 1.75, 2.10, 1.88, 0.024, (1.70, 2.17), 1.80, 7),
+    ("corner_shop", "E0", "Liverpool", "Spurs", "2026-10-04T14:00:00Z", "away", 3.5, "over",
+     "betmgm", "2026-10-03T13:00:00Z", 1.92, 1.90, 2.07, -0.02, None, None, 3),
+    ("corner_shop", "E0", "Newcastle", "Wolves", "2026-10-08T19:00:00Z", "home", 6.5, "under",
+     "fanduel", "2026-10-06T10:00:00Z", 2.10, 1.76, 1.88, 0.0, None, None, None),
+    ("corner_shop_1pct", "E0", "Spurs", "Burnley", "2026-09-23T19:00:00Z", "home", 6.5, "over",
+     "fanduel", "2026-09-22T18:00:00Z", 2.05, 1.80, 2.20, 0.004, (1.98, 1.86), 2.12, 8),
+    ("corner_shop_1pct", "SP1", "Sevilla", "Getafe", "2026-09-30T19:00:00Z", "away", 4.5,
+     "under", "draftkings", "2026-09-29T18:00:00Z", 1.90, 1.93, 2.05, 0.0, (1.95, 1.88), 1.95, 5),
+    ("corner_shop_1pct", "E0", "Newcastle", "Wolves", "2026-10-08T19:00:00Z", "home", 6.5,
+     "under", "fanduel", "2026-10-06T10:00:00Z", 2.10, 1.76, 1.88, 0.0, None, None, None),
+]  # fmt: skip
+CORNER_SHOP_JUDGED_FROM = "2026-09-20T00:00:00+00:00"
+
+
+def _fair_pair(over: float, under: float) -> float:
+    return (1 / over) / (1 / over + 1 / under)
+
+
+def _corner_finish(t: dict, close, count, kick: pd.Timestamp, book_close=None) -> dict:
+    """A synthetic trade's close (Pinnacle's at its line, else close_missing) and result."""
+    if close:
+        over, under = close
+        clv = tr.corner_clv(t["odds"], t["side"], over, under)
+        t.update(close_odds=over if t["side"] == "over" else under,
+                 close_prices={"over": over, "under": under},
+                 close_fetched_at=(kick - pd.Timedelta(minutes=14)).isoformat(),
+                 close_minutes_before=14.0, close_snapshot="close", close_missing=None)  # fmt: skip
+        if t.get("bookmaker") == "draftkings" and t.get("bet_type") == pcl.BET_TYPE:
+            # DraftKings' line: its own close plus Pinnacle's at the same line.
+            dko = round(t["odds"] - 0.04, 2)
+            dku = round(1 / (1.05 - 1 / dko), 2)
+            clv_dk = tr.corner_clv(
+                t["odds"], t["side"], *((dko, dku) if t["side"] == "over" else (dku, dko))
+            )
+            t.update(clv_dk=clv_dk, beat_close_dk=bool(clv_dk > 0),
+                     pinnacle_close_prices={"over": over, "under": under})  # fmt: skip
+        t.update(clv_pinnacle=clv, beat_close_pinnacle=bool(clv > 0))
+    if book_close:
+        bo, bu = (book_close, None) if t["side"] == "over" else (None, book_close)
+        t.update(book_close_odds=book_close, book_close_prices={"over": bo, "under": bu},
+                 book_close_fetched_at=(kick - pd.Timedelta(minutes=14)).isoformat(),
+                 book_close_minutes_before=14.0,
+                 clv_book=round(t["odds"] / book_close - 1, 4))  # fmt: skip
+    if count is not None:
+        t |= tr.settle_corner(t, count)
+        t.update(score=f"{count} corners", settled_at=(kick + pd.Timedelta(hours=3)).isoformat(),
+                 result_source="football-data")  # fmt: skip
+    return t
+
+
+def corner_lean_trades() -> list[dict]:
+    defined = pd.Timestamp(FIXTURE_DNB_FROM)
+    f = CORNER_LEAN_FIT
+    out = []
+    for (key, lg, home, away, ko, tside, line, side, po, pu, model, p_bet, driver, dk_odds,
+         close, count) in CORNER_LEAN_TRADES:  # fmt: skip
+        kick = pd.Timestamp(ko)
+        look = kick - pd.Timedelta(hours=26)
+        odds = dk_odds or (po if side == "over" else pu)
+        fair = _fair_pair(po, pu)
+        z = p_bet  # the table gives z; the blend's chance follows from it
+        p_bet = round(1 / odds + z * f["sigma"], 4)
+        zm = z - (0.6 if driver == "model" else 0.2)
+        row = {"league": lg, "home": home, "away": away, "side": tside, "line": line,
+               "kickoff": kick, "look_at": look, "model": model, "fair": fair, "over": po,
+               "under": pu, "age": pd.Timedelta(minutes=6)}  # fmt: skip
+        pick = {"bet": side, "odds": odds, "p_bet": p_bet, "z": z, "z_market": zm,
+                "strong": z >= 2, "driver": driver}  # fmt: skip
+        c = {"row": row, "fit": f, "pick": pick}
+        if key == pcl.DK_KEY:
+            c["quote"] = {"over": dk_odds if side == "over" else None,
+                          "under": dk_odds if side == "under" else None}  # fmt: skip
+        t = pcl.new_trade(c, key, defined)
+        t["model_mean"] = round(line + (0.4 if model > 0.5 else -0.3), 1)
+        out.append(_corner_finish(t, close, count, kick))
+    return out
+
+
+def corner_shop_trades() -> list[dict]:
+    defined = pd.Timestamp(FIXTURE_DNB_FROM)
+    out = []
+    for (key, lg, home, away, ko, tside, line, side, book, at, po, pu, odds, bov, close,
+         bclose, count) in CORNER_SHOP_TRADES:  # fmt: skip
+        kick, at = pd.Timestamp(ko), pd.Timestamp(at)
+        fo = _fair_pair(po, pu)
+        fair = {"over": fo, "under": 1 - fo}
+        gap = odds * fair[side] - 1
+        q = {"over": odds if side == "over" else None, "under": odds if side == "under" else None,
+             "fetched_at": (at - pd.Timedelta(minutes=4)).isoformat()}  # fmt: skip
+        pin = {"over": po, "under": pu, "fetched_at": (at - pd.Timedelta(minutes=2)).isoformat()}
+        call = {"league": lg, "home": home, "away": away, "side": tside, "line": line,
+                "kickoff": kick, "at": at, "quotes": {book: q}, "pin": pin}  # fmt: skip
+        gaps = {b: {"over": None, "under": None} for b in (*pcs.BET_BOOKS, *pcs.SEEN_BOOKS)}
+        gaps[book][side] = round(gap, 4)
+        gaps["bovada"][side] = bov
+        e = {"call": call, "bet": side, "book": book, "odds": odds, "fair": fair, "gap": gap,
+             "gaps": gaps}  # fmt: skip
+        t = pcs.new_trade(e, key, defined)
+        out.append(_corner_finish(t, close, count, kick, bclose))
+    return out
+
+
+def add_corner_tracks(data: dict) -> None:
+    """Team corners' two new tracks as paper.portfolios_section adds them: their sections after
+    the corner strategies and their trades in `corner_lean_trades` / `corner_shop_trades`."""
+    pf = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")
+    live = pf["live"]
+    lean, shop = corner_lean_trades(), corner_shop_trades()
+    secs = pcl.safe_sections(lean, FIXTURE_DNB_FROM, [CORNER_LEAN_FIT], NOW)
+    for sec in secs:
+        bcb = sec.get("backcast") or {}
+        bcb["started"] = FIXTURE_DNB_STARTED
+        bcb["note"] = str(bcb.get("note") or "").replace("14 Oct", "14 Sep")
+    pcs.JUDGED_FROM = CORNER_SHOP_JUDGED_FROM
+    secs += pcs.safe_sections(shop, FIXTURE_DNB_FROM, NOW)
+    for sec in secs:
+        sec.pop(
+            "calibration", None
+        )  # neither track has a calibration view (the Lean's Model reads `fits`)
+    live["strategies"] = list(live.get("strategies") or []) + secs
+
+    live["corner_lean_trades"] = paper.portfolio_section(lean)["trades"]
+    live["corner_shop_trades"] = paper.portfolio_section(shop)["trades"]
 
 
 def add_lean_strategy(data: dict) -> None:
