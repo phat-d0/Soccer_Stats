@@ -449,7 +449,6 @@ def build(src: Path, out: Path) -> dict:
     sp1_stats = add_teams_by_league(data)
     add_models(data, src)  # after every block, SP1's and E1's fits included
     trim_kelly_logs(data)
-    slim_live_trades(data)
     # Bet alerts: a made-up Worker address, so the app shows its "off" state (the smoke test
     # never calls it: push can't run headless).
     data["bet_alerts"] = {"worker": "https://alerts.example.workers.dev"}
@@ -2155,40 +2154,13 @@ def add_corner_tracks(data: dict) -> None:
     pcs.JUDGED_FROM = CORNER_SHOP_JUDGED_FROM
     secs += pcs.safe_sections(shop, FIXTURE_DNB_FROM, NOW)
     for sec in secs:
-        # The blend's Model view reads `fits`, not calibration; the per-competition splits and
-        # breakdowns go too (the 1.5 MB cap): a competition's view counts its own trades.
-        for k in ("calibration", "by_league", "breakdowns"):
-            sec.pop(k, None)
-        if sec.get("variant_of"):  # the descriptive lines: "Kelly not tracked" (room)
-            sec.pop("sizing", None)
-            sec.pop("driver_note", None)
+        sec.pop(
+            "calibration", None
+        )  # neither track has a calibration view (the Lean's Model reads `fits`)
     live["strategies"] = list(live.get("strategies") or []) + secs
 
     live["corner_lean_trades"] = paper.portfolio_section(lean)["trades"]
     live["corner_shop_trades"] = paper.portfolio_section(shop)["trades"]
-
-
-LIVE_TRADE_LISTS = ("trades", "shadow_trades", "dnb_trades", "lineshop_trades",
-                    "corner_lean_trades", "corner_shop_trades")  # fmt: skip
-
-
-def slim_live_trades(data: dict) -> None:
-    """Every live trade list without its null fields (25 Nov: room under the 1.5 MB cap for
-    the corner tracks; the app reads a missing field as a null one)."""
-    for p in data["portfolio"]["portfolios"]:
-        live = p.get("live") or {}
-        for k in LIVE_TRADE_LISTS:
-            if live.get(k):
-                live[k] = [{a: b for a, b in t.items() if b is not None} for t in live[k]]
-        # The folded breakdown tables stay on one line per portfolio (the same room).
-        for sec in live.get("strategies") or []:
-            if sec.get("key") not in BREAKDOWN_KEYS:
-                sec.pop("breakdowns", None)
-            if sec.get("variant_of"):  # a side line's per-competition split (its own trades count)
-                sec.pop("by_league", None)
-
-
-BREAKDOWN_KEYS = ("lean", "edge12", "goalscorer", "pinnacle", "draftkings")
 
 
 def add_lean_strategy(data: dict) -> None:

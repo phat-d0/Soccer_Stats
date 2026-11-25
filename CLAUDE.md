@@ -2340,8 +2340,9 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `edgeBucketsHtml`, `edgeChartSource`, `noEdgeText`) still serves `edge_threshold` data
   (`by_bucket[{edge_lo, edge_hi, n, implied, model, realized, realized_lo, realized_hi, roi, roi_lo,
   roi_hi}]`; null `min_edge` shows its `note`).
-- Test data: `tests/fixtures/web/` (all JSON files together under 1.5 MB: the cap in
-  `tests/test_web_smoke.py` was raised from 1 MB on 24 Oct rather than trim more real data). Rebuild with
+- Test data: `tests/fixtures/web/` (all JSON files together under 1.75 MB: raised 25 Nov for the
+  two corner tracks rather than trim live-shaped data; the cap in `tests/test_web_smoke.py` was
+  raised from 1 MB to 1.5 MB on 24 Oct for the same reason). Rebuild with
   `uv run python tests/web/make_fixture.py` (synthetic leagues through `publish.build_data`, the real
   ledger and backtests from `origin/data-log` through `paper.run`; fixed `NOW`, reproducible).
   To stay small it trims lists (`LEAN_BETS`, `EDGE12_BETS` 30, `DK_BT_TRADES` 20,
@@ -2358,10 +2359,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `paper_corner_shop.new_trade`, `CORNER_LEAN_TRADES` (won, lost, open, a backcast pick, a
   no-close trade, DraftKings' line) with one stored fit `CORNER_LEAN_FIT`, `CORNER_SHOP_TRADES`
   (won, lost, open, a `from_log` entry, a no-close trade, the 1% line), the shop's count from
-  20 Sep) cover states the real data lacks. Room for them (25 Nov): `slim_live_trades` drops
-  null fields from every live trade list, breakdowns stay only on the lead lines
-  (`BREAKDOWN_KEYS`), side lines (`variant_of`) lose `by_league`, and the new descriptive lines
-  their sizing; about 1.49 MB in all, 25 Nov.
+  20 Sep) cover states the real data lacks; about 1.58 MB in all, 25 Nov.
 - Fixture refresh (lead, 12 Nov): rebuilt from that day's data-log with no step needing new
   data. The ~40 Moneyline failures seen on a rebuild during v85 were one step's knock-on: a
   check that stops mid-way leaves the page elsewhere, so every later step that clicks fails.
