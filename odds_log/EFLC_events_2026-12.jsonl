@@ -9,3 +9,6 @@
 {"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"765b7188df980206a740cb9bc92da657","home":"Fleetwood Town","away":"Everton","kickoff":"2026-12-15T00:00:00+00:00","fetched_at":"2026-11-02T15:44:58+00:00"}
 {"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"55386e8f44342460292aa8ab6ad76735","home":"Fleetwood Town","away":"Everton","kickoff":"2026-12-17T20:00:00+00:00","fetched_at":"2026-11-04T17:06:33+00:00"}
 {"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"e45828357c52d8ee17b9c1d1ddb82106","home":"Crystal Palace","away":"Sunderland","kickoff":"2026-12-16T19:30:00+00:00","fetched_at":"2026-11-05T18:05:46+00:00"}
+{"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"5529c4c09f4988630f9cb92b6b915a39","home":"Liverpool","away":"Bournemouth","kickoff":"2026-12-15T16:00:00+00:00","fetched_at":"2026-11-25T13:54:42+00:00"}
+{"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"76c2626b0acd4796dcd2bd23ff1c86c8","home":"Crystal Palace","away":"Sunderland","kickoff":"2026-12-15T16:00:00+00:00","fetched_at":"2026-11-25T13:54:42+00:00"}
+{"league":"EFLC","sport":"soccer_england_efl_cup","event_id":"29491d82c4bf601a7416206316ceb66e","home":"Manchester City","away":"Bradford City","kickoff":"2026-12-15T20:00:00+00:00","fetched_at":"2026-11-25T13:54:42+00:00"}
