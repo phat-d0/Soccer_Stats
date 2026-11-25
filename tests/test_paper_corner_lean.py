@@ -270,7 +270,8 @@ def test_paper_run_adds_the_track_beside_the_corner_tracks(tmp_path):
     paper.run(data, tmp_path, None, now=NOW, corner_results=res)
     c = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")["live"]
     keys = [s["key"] for s in c["strategies"]]
-    assert keys[-2:] == [pcl.KEY, pcl.DK_KEY] and keys[0] == "pinnacle"
+    i = keys.index(pcl.KEY)
+    assert keys[i + 1] == pcl.DK_KEY and keys[0] == "pinnacle"
     assert c["corner_lean_trades"] and c["summary"]["trades"] == 0  # never in the record
     json.dumps(data, default=str)
 

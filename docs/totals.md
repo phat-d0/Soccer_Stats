@@ -2212,3 +2212,41 @@ schedule `fit_at_times` / `next_due`, the §3 choice `side_pick`).
   `corner_blend`, stored as `model_p` = `p_bet`).
 - **Ledger:** `paper_trades/<code>_cornerlean_<season>.jsonl`, outside the corner tracks' record
   and totals. The app shows it in Team corners (UI Design).
+
+### Corner line shop vs Pinnacle: the paper track (corners team, 25 Nov 2026; the owner's decision of 24 Nov)
+
+`paper_corner_shop.py` builds the rule exactly as pre-registered on 8 Nov ("Corner line shop vs
+Pinnacle: pre-registration"); nothing in the rule changed.
+- **Moment and lines:** the look only, on each team half line Pinnacle prices two-sided.
+- **Gap:** the book's price × Pinnacle's Shin-fair chance for that side − 1.
+- **Quotes:** both from the same call (same `downloaded_at`), each updated within 3 h before it.
+- **Books:** DraftKings, FanDuel, BetMGM and BetRivers can be bet; ties go in that order. Bovada's
+  gaps are recorded on each trade (`gaps`) and counted in the section (`seen_books`), never bet.
+- **Entry:** one per match × team, the line with the largest gap (ties: the lower line), $10 at
+  the book named. The 2% line is judged; the 1% line is a shadow with its own entries,
+  descriptive only.
+- **Closes:** CLV = entry × Pinnacle's Shin-fair close at the same line − 1. The close must be a
+  real close (PR #258); without one the trade keeps `close_missing` and counts as missing. The
+  book's own close gives `clv_book`, descriptive.
+- **Judged read:** once, on the first 300 bets with a final close, or on 31 May 2027 (under 300:
+  inconclusive). It uses `paper_corner_lean.judged` and is stored in
+  `paper_trades/corner_shop_verdict.json`.
+- **Kelly** sizes on Pinnacle's fair chance.
+- **Ledger:** `paper_trades/<code>_cornershop_<season>.jsonl`, outside the corner tracks' record.
+
+**Note (25 Nov 2026, lead-approved 24 Nov): the count starts on 8 Nov, as pre-registered.**
+- The rule was frozen before any of these books' corner prices were logged, and it fits nothing.
+  Applying it to the log from the first look call with the extra books (8 Nov, 11:05 UTC) is
+  therefore out of sample.
+- The only reads before the build were prices only, on 20 and 22 Nov: counts of qualifying
+  entries. No close, CLV or result was read.
+- So the entries the first run opens from looks logged before the build carry `from_log: true`
+  and count toward the 300. This is not a backcast.
+- `defined_at` (data-log `paper_trades/corner_shop_defined.json`) records the build date, for
+  display only. This replaces the lead's earlier "backcast from 8 Nov" wording.
+
+**Volume (prices only, 25 Nov):** from 8 to 24 Nov the log holds 216 look lines with a two-sided
+Pinnacle quote, 96 of them with another book in the same call.
+- The rule opens 8 bets at 2% (FanDuel 6, BetRivers 2; E0 3, SP1 3, D1 1, I1 1) and 13 at 1%.
+- That is about one bet every two days, so roughly 100 bets by 31 May 2027. Unless volume rises,
+  the read is likely to be **inconclusive**.
