@@ -594,6 +594,29 @@ def cmd_close_watchdog(args: argparse.Namespace) -> None:
     print("redispatch" if due else "ok")
 
 
+def cmd_lineup_check(args: argparse.Namespace) -> None:
+    """Print "send" or "skip", a tab and the reason, for a lineup run (close_runs.lineup_decision;
+    lead, 25 Nov). --busy: publish runs running or waiting on the branch, or "?" when the runs
+    list was unreadable after the retry; --plan: the planner's JSON (its `dispatch` list)."""
+    import json
+
+    from soccer_stats import close_runs
+
+    busy = None if args.busy.strip() in ("", "?") else int(args.busy)
+    try:
+        plan = json.loads(Path(args.plan).read_text()) if args.plan else {}
+    except (OSError, ValueError):
+        plan = {}
+    planned = [
+        (pd.Timestamp(d["epoch"], unit="s", tz="UTC"), d.get("kind", "close"))
+        for d in plan.get("dispatch", [])
+        if isinstance(d, dict) and d.get("epoch") is not None
+    ]
+    at = pd.Timestamp(int(args.at), unit="s", tz="UTC") if args.at.isdigit() else args.at
+    send, reason = close_runs.lineup_decision(busy, at, planned)
+    print(("send" if send else "skip") + "\t" + reason)
+
+
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
     """Credits to log team-total prices per match under each snapshot plan (estimate only:
     no key, no calls). Replays each league's real fixture calendar (Understat)."""
@@ -3588,6 +3611,12 @@ def main(argv: list[str] | None = None) -> None:
     wd.add_argument("--runs", default="", help="JSON file of publish.yml runs")
     wd.add_argument("--now", help="check at this time (default: now)")
     wd.set_defaults(func=cmd_close_watchdog)
+
+    lc = sub.add_parser("lineup-check", help="send or skip a lineup-window run? (closes.yml)")
+    lc.add_argument("--busy", required=True, help='publish runs running or waiting, or "?"')
+    lc.add_argument("--at", required=True, help="when the lineup run is due (epoch or UTC)")
+    lc.add_argument("--plan", default="", help="the planner's JSON plan")
+    lc.set_defaults(func=cmd_lineup_check)
 
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")

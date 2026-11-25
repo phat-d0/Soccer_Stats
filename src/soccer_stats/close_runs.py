@@ -171,6 +171,42 @@ def watchdog_due(kind, dispatched_at, first_kickoff, runs, now) -> bool:
     return True
 
 
+# Lineup runs and a busy publish queue (lead, 25 Nov): closes.yml sends a lineup run only
+# while no publish run on the branch is running or waiting (publish's concurrency group keeps
+# just the newest pending run, so a lineup dispatch could cancel a queued close or settle run).
+# On 24 Nov all four lineup runs for the 17:45 kickoffs were skipped as busy although no
+# publish run was going: the runs list was unreadable, and that counted as busy. closes.yml
+# now reads the list again after LINEUP_RETRY when it can't, and if it is still unreadable it
+# sends the lineup run anyway when no close or settle dispatch is planned within LINEUP_CLEAR
+# either side, since a lineup run can then displace nothing.
+LINEUP_RETRY = pd.Timedelta(seconds=30)
+LINEUP_CLEAR = pd.Timedelta(minutes=10)
+
+
+def lineup_decision(busy, at, planned) -> tuple[bool, str]:
+    """(send, reason) for a lineup run due at `at`. `busy` = the number of publish runs on the
+    branch running or waiting, or None when the list was unreadable after the retry;
+    `planned` = the planner's dispatches as (time, kind). The reason is empty when sent
+    normally."""
+    if busy is None:
+        at = _ts(at)
+        near = [
+            t for t, kind in planned if kind in WATCH_KINDS and abs(_ts(t) - at) <= LINEUP_CLEAR
+        ]
+        if near:
+            return False, (
+                "runs list unreadable after retry; a close or settle run is planned within "
+                f"{int(LINEUP_CLEAR.total_seconds() // 60)} min"
+            )
+        return True, (
+            "runs list unreadable after retry; no close or settle run within "
+            f"{int(LINEUP_CLEAR.total_seconds() // 60)} min, sent anyway"
+        )
+    if busy > 0:
+        return False, f"busy ({busy} running or waiting)"
+    return True, ""
+
+
 WORKFLOWS = dict.fromkeys(PUBLISH_KINDS, "publish.yml") | dict.fromkeys(INPLAY, "inplay.yml")
 
 

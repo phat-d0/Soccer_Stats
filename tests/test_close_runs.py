@@ -516,3 +516,66 @@ def test_close_watchdog_cli(tmp_path, capsys):
     assert capsys.readouterr().out.strip() == "redispatch"
     cli.main(base + ["--runs", str(tmp_path / "missing.json")])
     assert capsys.readouterr().out.strip() == "redispatch"
+
+
+# ---------- lineup runs and a busy publish queue (lead, 25 Nov) ----------
+
+
+def test_lineup_run_is_sent_when_no_publish_run_is_going():
+    at = T("2026-11-24 16:30")
+    assert cr.lineup_decision(0, at, []) == (True, "")
+
+
+def test_lineup_run_is_skipped_while_a_publish_run_is_going_or_waiting():
+    at = T("2026-11-24 16:30")
+    send, why = cr.lineup_decision(2, at, [])
+    assert not send and why == "busy (2 running or waiting)"
+
+
+def test_an_unreadable_runs_list_sends_the_lineup_run_with_no_close_or_settle_near():
+    """24 Nov: the four lineup runs for the 17:45 kickoffs (16:30-17:15) were skipped on an
+    unreadable runs list. With the 17:30 close run 15 min or more away from 16:30, 16:45 and
+    17:00 they now go; 17:15 (a close 15 min later) does too; nothing planned is within 10."""
+    planned = [(T("2026-11-24 17:30"), "close"), (T("2026-11-24 20:00"), "settle")]
+    for at in ("16:30", "16:45", "17:00", "17:15"):
+        send, why = cr.lineup_decision(None, T(f"2026-11-24 {at}"), planned)
+        assert send and "sent anyway" in why and "unreadable after retry" in why
+
+
+def test_an_unreadable_runs_list_skips_the_lineup_run_near_a_close_or_settle():
+    planned = [(T("2026-11-24 17:30"), "close"), (T("2026-11-24 19:00"), "settle")]
+    for at in ("17:20", "17:30", "17:40", "18:50", "19:10"):
+        send, why = cr.lineup_decision(None, T(f"2026-11-24 {at}"), planned)
+        assert not send and "a close or settle run is planned within 10 min" in why
+    # Lineup, goalscorer and in-play dispatches nearby displace nothing.
+    others = [
+        (T("2026-11-24 17:25"), "goalscorer"),
+        (T("2026-11-24 17:30"), "lineup"),
+        (T("2026-11-24 17:28"), "inplay55"),
+    ]
+    assert cr.lineup_decision(None, T("2026-11-24 17:30"), others)[0]
+
+
+def test_lineup_check_cli_reads_the_plan(tmp_path, capsys):
+    import argparse
+    import json
+
+    from soccer_stats import cli
+
+    plan = tmp_path / "plan.json"
+    close = int(T("2026-11-24 17:30").timestamp())
+    plan.write_text(json.dumps({"dispatch": [{"epoch": close, "kind": "close"}]}))
+
+    def run(busy, at):
+        a = argparse.Namespace(busy=busy, at=str(int(T(at).timestamp())), plan=str(plan))
+        cli.cmd_lineup_check(a)
+        return capsys.readouterr().out.rstrip("\n").split("\t")
+
+    assert run("0", "2026-11-24 17:15") == ["send", ""]
+    assert run("1", "2026-11-24 17:15") == ["skip", "busy (1 running or waiting)"]
+    assert run("?", "2026-11-24 16:30")[0] == "send"
+    assert run("?", "2026-11-24 17:25")[0] == "skip"
+    # A missing plan file counts as nothing planned.
+    a = argparse.Namespace(busy="?", at="2026-11-24T17:25Z", plan=str(tmp_path / "none.json"))
+    cli.cmd_lineup_check(a)
+    assert capsys.readouterr().out.startswith("send\t")
