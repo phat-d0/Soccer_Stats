@@ -198,20 +198,50 @@ def c_range(rows: pd.DataFrame, draws: int = DRAWS, seed: int = SEED) -> list[fl
 # ---------- the rule, replayed ----------
 
 
+def side_pick(p: float, pm: float, sigma: float, over, under) -> dict | None:
+    """§3's choice at one line from the blend's over chance `p` (and `pm`, the same with
+    c = 0): z per quoted side on the raw prices, the larger if z >= LEAN_Z, with z_market
+    and the driver. A side without a price (a one-sided DraftKings line) is not quoted."""
+    z, zm = {}, {}
+    for side, price, q, qm in (("over", over, p, pm), ("under", under, 1 - p, 1 - pm)):
+        if price is None or not np.isfinite(price) or price <= 1:
+            continue
+        z[side] = (q - 1 / price) / sigma
+        zm[side] = (qm - 1 / price) / sigma
+    if not z:
+        return None
+    side = max(z, key=z.get)
+    if z[side] < LEAN_Z:
+        return None
+    return {
+        "bet": side,
+        "odds": float(over if side == "over" else under),
+        "p_bet": p if side == "over" else 1 - p,
+        "z": float(z[side]),
+        "z_market": float(zm[side]),
+        "strong": bool(z[side] >= STRONG_Z),
+        "driver": "market" if zm[side] >= LEAN_Z else "model",
+    }
+
+
+def chances(row: dict, f: dict) -> tuple[float, float]:
+    """The blend's over chance on one look row, and the same with c = 0."""
+    coef = (f["a"], f["b"], f["c"])
+    return (
+        float(blend(coef, row["fair"], row["model"])),
+        float(blend(coef, row["fair"], row["model"], c=0.0)),
+    )
+
+
 def pick(row: dict, f: dict) -> dict | None:
     """§3 on one look row: the side with the larger z if z ≥ 1 (raw Pinnacle prices)."""
     if row["age"] > FRESH or row["look_at"] >= row["kickoff"]:
         return None
-    coef = (f["a"], f["b"], f["c"])
-    p = float(blend(coef, row["fair"], row["model"]))
-    pm = float(blend(coef, row["fair"], row["model"], c=0.0))
-    s = f["sigma"]
-    z = {"over": (p - 1 / row["over"]) / s, "under": ((1 - p) - 1 / row["under"]) / s}
-    zm = {"over": (pm - 1 / row["over"]) / s, "under": ((1 - pm) - 1 / row["under"]) / s}
-    side = max(z, key=z.get)
-    if z[side] < LEAN_Z:
+    p, pm = chances(row, f)
+    got = side_pick(p, pm, f["sigma"], row["over"], row["under"])
+    if got is None:
         return None
-    odds = row["over"] if side == "over" else row["under"]
+    side, odds = got["bet"], got["odds"]
     cf = row["close_fair"]
     fair_close = cf if side == "over" else 1 - cf
     return {
@@ -219,34 +249,47 @@ def pick(row: dict, f: dict) -> dict | None:
         "league": row["league"],
         "side_team": row["side"],
         "line": row["line"],
-        "bet": side,
-        "odds": odds,
-        "p_bet": p if side == "over" else 1 - p,
-        "z": z[side],
-        "z_market": zm[side],
-        "strong": z[side] >= STRONG_Z,
-        "driver": "market" if zm[side] >= LEAN_Z else "model",
+        **got,
         "clv": odds * fair_close - 1 if not np.isnan(cf) else np.nan,
         "fit_at": f["fit_at"],
     }
 
 
-def schedule(df: pd.DataFrame) -> list[dict]:
-    """Amendment 1a on the look times: the first fit at the first look where the minimum is
-    met, then a refit at the first look on or after each 28-day date from that fit."""
-    fits, due = [], None
-    for t in sorted(df["look_at"].unique()):
-        t = _ts(t)
+def next_due(fits: list[dict]) -> pd.Timestamp | None:
+    """Amendment 1a: refits fall every 28 days from the first fit's date; the next one is
+    the first such date after the latest fit (None before any fit)."""
+    if not fits:
+        return None
+    due, last = _ts(fits[0]["fit_at"]) + REFIT, _ts(fits[-1]["fit_at"])
+    while due <= last:
+        due += REFIT
+    return due
+
+
+def fit_at_times(df: pd.DataFrame, times, fits: list[dict] | None = None) -> list[dict]:
+    """`fits` extended by Amendment 1a at the check times `times` (look times for the
+    backcast, paper runs live): a fit at the first time the minimum is met, then at the
+    first time on or after each 28-day date. A time at or before the latest fit is
+    skipped, so the stored fits never change."""
+    fits = list(fits or [])
+    due = next_due(fits)
+    for t in sorted(_ts(x) for x in times):
+        if fits and t <= _ts(fits[-1]["fit_at"]):
+            continue
         if due is not None and t < due:
             continue
         rows = eligible(df, t)
         if not meets_minimum(rows):
             continue
         fits.append(fit(rows, t))
-        due = (due or t) + REFIT
-        while due <= t:
-            due += REFIT
+        due = next_due(fits)
     return fits
+
+
+def schedule(df: pd.DataFrame) -> list[dict]:
+    """Amendment 1a on the look times: the first fit at the first look where the minimum is
+    met, then a refit at the first look on or after each 28-day date from that fit."""
+    return fit_at_times(df, df["look_at"].unique())
 
 
 def replay(df: pd.DataFrame, leagues=FIT_LEAGUES) -> tuple[list[dict], list[dict]]:

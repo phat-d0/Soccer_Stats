@@ -2171,3 +2171,44 @@ Counts run 45390998977, then the gate once, run 45391131059 (0 credits). 16 Nov'
 - **Walk-forward replay (descriptive):** the minimum was first met only in the last few days,
   so there was one fit and one pick (SP1, over, odds 2.20, z 1.05, model-driven), with no
   final close yet. The replay says nothing about CLV.
+- **Built anyway (owner, 24 Nov), knowing c is not above 0: a market-flattening rule (b 0.39).**
+
+### Corner Blend Lean: the paper track (corners team, 24 Nov 2026; built as §2–§6 with Amendment 1)
+
+`paper_corner_lean.py`. Nothing in the rule changed after the gate. The live track and the gate
+share one implementation (`lab/corner_lean.py`: `look_rows`, `eligible`, `fit`, the Amendment 1a
+schedule `fit_at_times` / `next_due`, the §3 choice `side_pick`).
+- **Fits:** pooled over SP1, D1, E1, E2 and E3 only. E0, I1 and F1's corner counts are never
+  attached to a row (`look_frame`), so they can't enter a fit. They stay out after 3 Feb too, until
+  a code change made once bake-off 2's locked test has been read.
+  - Fits are stored once in data-log `paper_trades/corner_lean_fits.json` and never refitted.
+  - The backcast's fits are made at the look times before `defined_at`, in one pass on the first
+    run. Those use results with kickoff + 1 day before the fit, as Amendment 1b's stand-in.
+  - The live fits are made at paper runs, at the first run once each 28-day date from the first
+    fit has passed. Rows need kickoff + 1 day before the run and a known count (football-data,
+    else ESPN).
+- **Picks:** all eight corner leagues, at Pinnacle's first two-sided look quote per team half line
+  (quote ≤ 3 h old, before kickoff).
+  - Each line is priced by the latest fit made at or before its look. No fit, no pick.
+  - z per side on Pinnacle's raw price, z ≥ 1 ("strong" at 2).
+  - One bet per match × team, the line with the largest z. $10.
+  - Driver: "market" when z with c = 0 also reaches 1.
+  - Each trade records `fit_at`, `fit_a`, `fit_b`, `fit_c`, `sigma`, `fit_lines`, `fit_matches`,
+    `p_bet`, `p_model`, `p_fair`, `z`, `z_market`, `tier` and `driver`.
+  - A live look opens only while its kickoff is ahead.
+- **DraftKings line (`corner_lean_dk`, descriptive):** the same p_bet and σ against DraftKings'
+  price at the same line in the same look call (one-sided lines when the side is quoted).
+  - It picks its own largest z per match × team.
+  - Its CLV is against DraftKings' own close (`clv_dk`) and Pinnacle's at the same line
+    (`clv_pinnacle`). It is never judged.
+- **Closes** follow PR #258: a real close at the trade's line, or `close_missing`. Settlement is
+  the corner tracks' (`paper.corner_close_update` and `paper.corner_settle_update`, now shared).
+- **Judged read (§5):** the first 300 Pinnacle bets opened from `defined_at` (data-log
+  `paper_trades/corner_lean_defined.json`; backcast bets never count), once each has a final close.
+  - If 300 haven't arrived by 31 May 2027, the read is taken then, on the bets with a final close
+    (under 300: inconclusive).
+  - It is read once and stored in `paper_trades/corner_lean_verdict.json`.
+- **Kelly** ($1,000, ¼, $50 cap) sizes on the blend's chance of the bet side (`p_source`
+  `corner_blend`, stored as `model_p` = `p_bet`).
+- **Ledger:** `paper_trades/<code>_cornerlean_<season>.jsonl`, outside the corner tracks' record
+  and totals. The app shows it in Team corners (UI Design).

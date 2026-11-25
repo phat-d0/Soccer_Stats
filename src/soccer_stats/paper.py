@@ -42,6 +42,7 @@ from soccer_stats import lean_backtest as lb
 from soccer_stats import match_calibration as mc
 from soccer_stats import odds_feed
 from soccer_stats import odds_log as ol
+from soccer_stats import paper_corner_lean as pcl
 from soccer_stats import paper_dnb as pdnb
 from soccer_stats import paper_lineshop as plsh
 from soccer_stats import player_goal_paper as pgp
@@ -105,7 +106,7 @@ def ledger_dir(log_dir: Path) -> Path:
 
 def _is_match_ledger(path: Path, league: str) -> bool:
     """A league's match ledger file, not its corners ledger, Lean shadow, draw no bet,
-    line-shop or goalscorer file."""
+    line-shop, goalscorer or corner Lean file."""
     name = path.name
     return not name.startswith(
         (
@@ -114,6 +115,7 @@ def _is_match_ledger(path: Path, league: str) -> bool:
             f"{league}_dnb_",
             f"{league}_lineshop_",
             f"{league}_goalscorer_",
+            f"{league}_cornerlean_",
         )
     )
 
@@ -1157,59 +1159,78 @@ def update_corner_ledger(
                 events.append(ev)
         if t.get("source") != "live" or t.get("status") == "void":
             continue
-        k = cl._ts(t["kickoff"])
-        if tr.corner_strategy_of(t) == "draftkings":
-            fields: dict = {}
-            q = _quote_at(quotes[cl.DK], t)
-            if _is_close(t, q, k):
-                if _newer(q["downloaded_at"], t.get("close_fetched_at")):
-                    fields.update(_dk_close(t, q) or {})
-            pq = _quote_at(quotes[cl.BOOK], t)
-            if _is_close(t, pq, k):
-                if _newer(pq["downloaded_at"], t.get("pinnacle_close_fetched_at")):
-                    fields.update(_pinnacle_ref(t, pq))
-            if "close_odds" in fields and t.get("close_missing"):
-                fields["close_missing"] = None
-            if fields:
-                events.append(_update(t, now, **fields))
-        else:
-            q = _quote_at(quotes[cl.BOOK], t)
-            if _is_close(t, q, k):
-                if _newer(q["downloaded_at"], t.get("close_fetched_at")):
-                    extra = {"close_missing": None} if t.get("close_missing") else {}
-                    events.append(_update(t, now, **_corner_close(t, q), **extra))
-        if t["status"] != "open" or k > now:
-            continue
-        res = _corner_result(results, t)
-        if not _has_corners(res):
-            res = _espn_result(espn, t)
-        if _has_corners(res):
-            moved = (
-                abs((pd.Timestamp(res["date"]) - k.tz_convert(None).normalize()).days)
-                > VOID_MOVED_HOURS / 24
-            )
-            count = res["home_corners" if t["team_side"] == "home" else "away_corners"]
-            fields = tr.settle_corner(t, None if moved else count)
-            events.append(
-                _update(
-                    t,
-                    now,
-                    **fields,
-                    score=_corner_score(res),
-                    settled_at=now.isoformat(timespec="seconds"),
-                    result_source=_source(res),
-                )
-            )
-        elif now - k > pd.Timedelta(days=VOID_AFTER_DAYS):
-            events.append(
-                _update(
-                    t,
-                    now,
-                    **tr.settle_corner(t, None),
-                    settled_at=now.isoformat(timespec="seconds"),
-                )
-            )
+        book = cl.DK if tr.corner_strategy_of(t) == "draftkings" else cl.BOOK
+        ev = corner_close_update(t, quotes, now, book)
+        if ev:
+            events.append(ev)
+        ev = corner_settle_update(t, results, espn, now)
+        if ev:
+            events.append(ev)
     return events
+
+
+def corner_close_update(t: dict, quotes: dict, now: pd.Timestamp, book: str) -> dict | None:
+    """A corner trade's close update, or None: the newest real close (_is_close) at its
+    team line. `quotes` = {book: corners_live.newest_quotes(rows, book=book)}. A Pinnacle
+    trade (`book` pinnacle) closes on Pinnacle's quote (`clv_pinnacle`); a DraftKings trade
+    on DraftKings' own (`clv_dk`) plus Pinnacle's at the same line (_pinnacle_ref). A real
+    close clears `close_missing`. Shared by the corner tracks and the corner Blend Lean."""
+    from soccer_stats import corners_live as cl
+
+    k = cl._ts(t["kickoff"])
+    if book != cl.BOOK:
+        fields: dict = {}
+        q = _quote_at(quotes.get(book) or {}, t)
+        if _is_close(t, q, k):
+            if _newer(q["downloaded_at"], t.get("close_fetched_at")):
+                fields.update(_dk_close(t, q) or {})
+        pq = _quote_at(quotes.get(cl.BOOK) or {}, t)
+        if _is_close(t, pq, k):
+            if _newer(pq["downloaded_at"], t.get("pinnacle_close_fetched_at")):
+                fields.update(_pinnacle_ref(t, pq))
+        if "close_odds" in fields and t.get("close_missing"):
+            fields["close_missing"] = None
+        return _update(t, now, **fields) if fields else None
+    q = _quote_at(quotes.get(cl.BOOK) or {}, t)
+    if _is_close(t, q, k) and _newer(q["downloaded_at"], t.get("close_fetched_at")):
+        extra = {"close_missing": None} if t.get("close_missing") else {}
+        return _update(t, now, **_corner_close(t, q), **extra)
+    return None
+
+
+def corner_settle_update(
+    t: dict, results: pd.DataFrame | None, espn: pd.DataFrame | None, now: pd.Timestamp
+) -> dict | None:
+    """An open corner trade's settlement after kickoff, or None: football-data's HC/AC,
+    else ESPN's count (`result_source`); a moved match, or no result after
+    VOID_AFTER_DAYS, voids. Shared by the corner tracks and the corner Blend Lean."""
+    from soccer_stats import corners_live as cl
+
+    k = cl._ts(t["kickoff"])
+    if t["status"] != "open" or k > now:
+        return None
+    res = _corner_result(results, t)
+    if not _has_corners(res):
+        res = _espn_result(espn, t)
+    settled_at = now.isoformat(timespec="seconds")
+    if _has_corners(res):
+        moved = (
+            abs((pd.Timestamp(res["date"]) - k.tz_convert(None).normalize()).days)
+            > VOID_MOVED_HOURS / 24
+        )
+        count = res["home_corners" if t["team_side"] == "home" else "away_corners"]
+        fields = tr.settle_corner(t, None if moved else count)
+        return _update(
+            t,
+            now,
+            **fields,
+            score=_corner_score(res),
+            settled_at=settled_at,
+            result_source=_source(res),
+        )
+    if now - k > pd.Timedelta(days=VOID_AFTER_DAYS):
+        return _update(t, now, **tr.settle_corner(t, None), settled_at=settled_at)
+    return None
 
 
 CORNERS_RESEARCH_FILE = Path(__file__).resolve().parent / "lab" / "markets_research.json"
@@ -1865,6 +1886,7 @@ def portfolios_section(
     dnb_rules: dict[str, dict] | None = None,
     lineshop: dict | None = None,
     goalscorer: dict | None = None,
+    corner_lean: dict | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1889,7 +1911,10 @@ def portfolios_section(
     line-shop track, paper_lineshop) adds its two sections right after Blend Lean's and
     goes on it as `lineshop_trades`, never in its `trades` or summary. `goalscorer`
     ({trades, defined_at}: player_goal_paper, owner 9 Nov) gives Anytime goalscorer's live
-    section its two `strategies` (its trades are passed in `live_trades`).
+    section its two `strategies` (its trades are passed in `live_trades`). `corner_lean`
+    ({trades, defined_at, fits, judged}: paper_corner_lean, owner 24 Nov) adds its two
+    sections after Team corners' strategies and goes on it as `corner_lean_trades`, never in
+    its `trades` or summary.
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1954,6 +1979,15 @@ def portfolios_section(
             section["dnb_trades"] = portfolio_section(dnb_trades or [])["trades"]
             if lineshop is not None:
                 section["lineshop_trades"] = portfolio_section(lineshop["trades"])["trades"]
+        if p["id"] == "corners" and corner_lean is not None:
+            section["strategies"] = list(section.get("strategies") or []) + pcl.safe_sections(
+                corner_lean["trades"],
+                corner_lean["defined_at"],
+                corner_lean["fits"],
+                now,
+                corner_lean.get("judged"),
+            )
+            section["corner_lean_trades"] = portfolio_section(corner_lean["trades"])["trades"]
         if p["id"] == "goalscorer" and goalscorer is not None:
             section["strategies"] = pgp.safe_sections(
                 goalscorer["trades"], goalscorer["defined_at"], now
@@ -2097,6 +2131,7 @@ def run(
     dnb_trades: list[dict] = []
     lineshop: dict | None = None
     goalscorer: dict | None = None
+    corner_lean: dict | None = None
     portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
@@ -2209,6 +2244,13 @@ def run(
                     f"The corners ledger couldn't be updated ({type(exc).__name__}), "
                     "so nothing was opened this update."
                 )
+            try:  # the corner Blend Lean (owner, 24 Nov): its own ledger, fits and read
+                corner_lean = pcl.run(log_dir, codes, now, corner_results, espn_results)
+                written += corner_lean["events"]
+                print(pcl.summary_line(corner_lean))
+            except Exception as exc:  # noqa: BLE001  never costs the corner tracks
+                corner_lean = None
+                print(f"Corner Blend Lean not updated ({type(exc).__name__}: {exc})")
             try:  # every logged corner line against its result (file reads only)
                 from soccer_stats import corners_live as cl
 
@@ -2271,6 +2313,7 @@ def run(
         },
         lineshop=lineshop,
         goalscorer=goalscorer,
+        corner_lean=corner_lean,
     )
     return written
 
@@ -2378,6 +2421,7 @@ def awaiting_results(
             ("match", pdnb.load_ledger(log_dir, lg)),
             ("match", plsh.load_ledger(log_dir, lg)),
             ("corners", load_corner_ledger(log_dir, lg)),
+            ("corners", pcl.load_ledger(log_dir, lg)),
         )
         for kind, ledger in books:
             for t in ledger.values():
