@@ -367,8 +367,9 @@ def test_paper_run_splits_corner_strategies(tmp_path):
         "pinnacle_below60",
         "draftkings",
         "draftkings_below60",
-    ]  # each track, then its below-60% shadow (test_corner_variants.py); the corner Blend
-    # Lean's sections follow (test_paper_corner_lean.py)
+    ]  # each track, then its below-60% shadow (test_corner_variants.py)
+    # The corner Blend Lean's two sections always follow, fitted or not (paper_corner_lean).
+    assert [s["key"] for s in c["strategies"]][4:6] == ["corner_lean", "corner_lean_dk"]
     assert st["pinnacle"]["label"] == "Model (f) 12% vs Pinnacle"
     assert st["draftkings"]["label"] == "Model (f) 12% vs DraftKings"
     assert st["pinnacle"]["trade_ids"] == [TID]
