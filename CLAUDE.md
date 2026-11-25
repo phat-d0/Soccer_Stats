@@ -95,7 +95,7 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   rows on data-log's corner log with `book`. No paper track reads them; they are dropped for
   the month if a call with them bills more than 1 (`shop_off`). For the pre-registered "Corner
   line shop vs Pinnacle" (`docs/totals.md`: look snapshot, 2% judged / 1% shadow, CLV vs
-  Pinnacle's close, read once at 300 bets or 31 May 2027); the track isn't built (owner first).
+  Pinnacle's close, read once at 300 bets or 31 May 2027); the track is built (owner, 24 Nov; `paper_corner_shop.py`; below).
 - One call per match snapshot asks both books (`bookmakers=pinnacle,draftkings`, 1 credit; plus the
   four logged-only books since 8 Nov);
   corner cap 20,000 credits a month since 28 Oct (750 before, 550 until 24 Oct; estimate 676 a month with E2/E3,
@@ -121,6 +121,15 @@ E1, E2 and E3 are goals-only (no Understat). UCL runs on the cross-league model
   at Pinnacle's look, z ≥ 1, one per match × team, $10, with a descriptive DraftKings line
   beside it. Backcast from 14 Oct; judged once at 300 Pinnacle bets from `defined_at` or on 31 May
   2027. Its own ledger `<code>_cornerlean_<season>.jsonl`, outside the corner tracks' record.
+- Corner line shop vs Pinnacle (owner, 24 Nov; pre-registered 8 Nov; `paper_corner_shop.py`,
+  `docs/totals.md` "Corner line shop vs Pinnacle: the paper track"): a paper track in Team
+  corners, no model. At the look, the best of DraftKings, FanDuel, BetMGM and BetRivers (Bovada
+  recorded, never bet) against Pinnacle's Shin-fair price in the same call, both quotes ≤ 3 h old.
+  2% judged, 1% shadow; one per match × team; $10. CLV is against Pinnacle's real close at the
+  line. Read once at 300 bets or 31 May 2027. The count starts 8 Nov, as pre-registered (lead,
+  24 Nov): entries from the log before the build carry `from_log` and count; there is no backcast.
+  On 8–24 Nov prices it makes 8 bets at 2%, so the read is likely inconclusive. Own ledger
+  `<code>_cornershop_<season>.jsonl`.
 - No corners in the cups: the cup corner model failed its pre-registered test (PR #69;
   `docs/totals.md` "Cup corners model").
 
@@ -1491,6 +1500,32 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   - `paper.portfolios_section(corner_lean=)` appends both sections to Team corners'
     `strategies` and puts the trades in `live.corner_lean_trades`, never in its `trades` or
     summary. `paper.awaiting_results` includes them.
+- `paper_corner_shop.py` (owner, 24 Nov; `docs/totals.md` "Corner line shop vs Pinnacle: the
+  paper track"): the corner line shop in Team corners.
+  - `KEY` "corner_shop" (2%, judged) and `SHADOW_KEY` "corner_shop_1pct" (1%, `variant_of`,
+    descriptive, its own entries).
+  - `bet_type` "corner_shop", `portfolio` "corners", `p_source` "pinnacle_fair" (Kelly on
+    `model_p`).
+  - Ids: `<code>|<season>|<home>|<away>|cornershop|<home/away>` (`cornershop1` for the 1%).
+  - Ledger: `paper_trades/<code>_cornershop_<season>.jsonl` (`paper._is_match_ledger` skips it).
+  - `BET_BOOKS` (draftkings, fanduel, betmgm, betrivers; also the tie order), `SEEN_BOOKS`
+    (bovada), `FRESH` 3 h, `JUDGED_FROM` 8 Nov.
+  - `look_calls(rows)`: each team half line's first look call from 8 Nov with Pinnacle
+    two-sided and fresh, plus every other book's row from the same call.
+  - `evaluate(call)`: the best bettable gap, plus `gaps` per book (Bovada included).
+  - `entries(rows)`: per track, one per match × team, the largest gap ≥ T.
+  - `new_trade`: `book`, `book_name`, `gap`, `pinnacle_fair` (= `model_p`), Pinnacle's and the
+    book's entry prices, `gaps`, `close_missing` until a real close, `from_log` for a look
+    logged before `defined_at`.
+  - `update_ledger`: duplicate sweep, open (a later look only before kickoff),
+    `paper.corner_close_update` (Pinnacle), `_book_close` (`book_close_*`, `clv_book`),
+    `paper.corner_settle_update`.
+  - `sections`: `strategy_section` plus `defined_at`, `note`, `books`, `seen_books`,
+    `judged_from`, `from_log` {trades, note}, `corner_shop_trades`, and `judged`
+    (`paper_corner_lean.judged` from 8 Nov, `corner_shop_verdict.json`) or `compare`.
+  - `run`, and `summary_line`: log line "Corner line shop vs Pinnacle: …".
+  - `paper.portfolios_section(corner_shop=)` puts its sections after the corner Lean's and the
+    trades in `live.corner_shop_trades`.
 
 - `lab/lasso_residual.py` (owner, 8 Nov; `docs/lab.md` "LASSO on the market residual",
   pre-registered before any fit; development only, no key): one row per match, eight leagues,

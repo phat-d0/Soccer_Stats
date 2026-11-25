@@ -43,6 +43,7 @@ from soccer_stats import match_calibration as mc
 from soccer_stats import odds_feed
 from soccer_stats import odds_log as ol
 from soccer_stats import paper_corner_lean as pcl
+from soccer_stats import paper_corner_shop as pcs
 from soccer_stats import paper_dnb as pdnb
 from soccer_stats import paper_lineshop as plsh
 from soccer_stats import player_goal_paper as pgp
@@ -106,7 +107,7 @@ def ledger_dir(log_dir: Path) -> Path:
 
 def _is_match_ledger(path: Path, league: str) -> bool:
     """A league's match ledger file, not its corners ledger, Lean shadow, draw no bet,
-    line-shop, goalscorer or corner Lean file."""
+    line-shop, goalscorer, corner Lean or corner line-shop file."""
     name = path.name
     return not name.startswith(
         (
@@ -116,6 +117,7 @@ def _is_match_ledger(path: Path, league: str) -> bool:
             f"{league}_lineshop_",
             f"{league}_goalscorer_",
             f"{league}_cornerlean_",
+            f"{league}_cornershop_",
         )
     )
 
@@ -1887,6 +1889,7 @@ def portfolios_section(
     lineshop: dict | None = None,
     goalscorer: dict | None = None,
     corner_lean: dict | None = None,
+    corner_shop: dict | None = None,
 ) -> list[dict]:
     """One entry per trades.PORTFOLIOS: id, name, status, note, and its own live and
     backtest sections (portfolio_section over that portfolio's trades only).
@@ -1914,7 +1917,8 @@ def portfolios_section(
     section its two `strategies` (its trades are passed in `live_trades`). `corner_lean`
     ({trades, defined_at, fits, judged}: paper_corner_lean, owner 24 Nov) adds its two
     sections after Team corners' strategies and goes on it as `corner_lean_trades`, never in
-    its `trades` or summary.
+    its `trades` or summary. `corner_shop` ({trades, defined_at, judged}: paper_corner_shop,
+    owner 24 Nov) does the same after it, as `corner_shop_trades`.
     """
     out = []
     for p in tr.PORTFOLIOS:
@@ -1988,6 +1992,11 @@ def portfolios_section(
                 corner_lean.get("judged"),
             )
             section["corner_lean_trades"] = portfolio_section(corner_lean["trades"])["trades"]
+        if p["id"] == "corners" and corner_shop is not None:
+            section["strategies"] = list(section.get("strategies") or []) + pcs.safe_sections(
+                corner_shop["trades"], corner_shop["defined_at"], now, corner_shop.get("judged")
+            )
+            section["corner_shop_trades"] = portfolio_section(corner_shop["trades"])["trades"]
         if p["id"] == "goalscorer" and goalscorer is not None:
             section["strategies"] = pgp.safe_sections(
                 goalscorer["trades"], goalscorer["defined_at"], now
@@ -2132,6 +2141,7 @@ def run(
     lineshop: dict | None = None
     goalscorer: dict | None = None
     corner_lean: dict | None = None
+    corner_shop: dict | None = None
     portfolio["strategy_order"] = list(tr.STRATEGY_ORDER)
     portfolio.setdefault("rule", {}).update(
         threshold=rule["threshold"],
@@ -2251,6 +2261,13 @@ def run(
             except Exception as exc:  # noqa: BLE001  never costs the corner tracks
                 corner_lean = None
                 print(f"Corner Blend Lean not updated ({type(exc).__name__}: {exc})")
+            try:  # the corner line shop vs Pinnacle (owner, 24 Nov): its own ledger and read
+                corner_shop = pcs.run(log_dir, codes, now, corner_results, espn_results)
+                written += corner_shop["events"]
+                print(pcs.summary_line(corner_shop))
+            except Exception as exc:  # noqa: BLE001  never costs the corner tracks
+                corner_shop = None
+                print(f"Corner line shop not updated ({type(exc).__name__}: {exc})")
             try:  # every logged corner line against its result (file reads only)
                 from soccer_stats import corners_live as cl
 
@@ -2314,6 +2331,7 @@ def run(
         lineshop=lineshop,
         goalscorer=goalscorer,
         corner_lean=corner_lean,
+        corner_shop=corner_shop,
     )
     return written
 
@@ -2422,6 +2440,7 @@ def awaiting_results(
             ("match", plsh.load_ledger(log_dir, lg)),
             ("corners", load_corner_ledger(log_dir, lg)),
             ("corners", pcl.load_ledger(log_dir, lg)),
+            ("corners", pcs.load_ledger(log_dir, lg)),
         )
         for kind, ledger in books:
             for t in ledger.values():
