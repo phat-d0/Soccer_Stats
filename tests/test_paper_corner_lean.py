@@ -288,3 +288,10 @@ def test_a_failure_costs_only_the_track(tmp_path, monkeypatch):
     c = next(p for p in data["portfolio"]["portfolios"] if p["id"] == "corners")["live"]
     assert [s["key"] for s in c["strategies"]][:1] == ["pinnacle"]
     assert pcl.KEY not in [s["key"] for s in c["strategies"]] and c["error"] is None
+
+
+def test_a_log_without_look_rows_fits_nothing_and_opens_nothing(tmp_path):
+    rows, res = synth()
+    closes = [r for r in rows if r["snapshot"] == "close"]
+    out = run(tmp_path, closes, res)
+    assert out["fits"] == [] and out["trades"] == [] and out["new_fits"] == 0

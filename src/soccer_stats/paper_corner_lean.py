@@ -233,6 +233,8 @@ def update_fits(
     `defined` (from 14 Oct); then, live, at `now`. Returns (fits, new)."""
     fits = list(store["fits"])
     n0 = len(fits)
+    if df.empty:  # no look rows logged: nothing to fit on
+        return fits, 0
     if not store["backcast_done"] and not df.empty:
         times = [t for t in df["look_at"].unique() if lean.START <= _utc(t) < defined]
         for f in lean.fit_at_times(df, times, fits)[len(fits) :]:
