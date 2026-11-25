@@ -92,10 +92,22 @@ SHADOW_NOTE = (
 )
 FROM_LOG_NOTE = (
     "Counted from {started}, as pre-registered: the rule was written on 8 Nov before any of "
-    "these books' corner prices were logged, and it fits nothing, so the {n} bets opened from "
-    "looks logged before the track was built ({defined}) are part of the test, not a backcast. "
-    "They were opened from the look prices logged at the time."
+    "these books' corner prices were logged, and it fits nothing, so {bets} opened from "
+    "looks logged before the track was built ({defined}) {are} part of the test, not a "
+    "backcast. {they} opened from the look prices logged at the time."
 )
+
+
+def from_log_note(n: int, started: str, defined: str) -> str:
+    """FROM_LOG_NOTE for n bets, singular when n is 1."""
+    one = n == 1
+    return FROM_LOG_NOTE.format(
+        started=started,
+        defined=defined,
+        bets="the 1 bet" if one else f"the {n} bets",
+        are="is" if one else "are",
+        they="It was" if one else "They were",
+    )
 
 
 def rule(key: str = KEY) -> dict:
@@ -456,10 +468,10 @@ def sections(trades: list[dict], defined: str, now=None, read: dict | None = Non
             judged_from=JUDGED_FROM,
             from_log={
                 "trades": sum(1 for t in mine if t.get("from_log")),
-                "note": FROM_LOG_NOTE.format(
-                    started=_utc(JUDGED_FROM).strftime("%-d %b"),
-                    defined=_utc(defined).strftime("%-d %b"),
-                    n=sum(1 for t in mine if t.get("from_log")),
+                "note": from_log_note(
+                    sum(1 for t in mine if t.get("from_log")),
+                    _utc(JUDGED_FROM).strftime("%-d %b"),
+                    _utc(defined).strftime("%-d %b"),
                 ),
             },
         )
