@@ -771,3 +771,197 @@
 {"at": "2026-11-25T15:10+00:00", "team": "Sunderland", "name": "Adingra", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-11-25T15:10+00:00", "team": "Sunderland", "name": "Mundle", "status": "a", "chance": 100, "news": ""}
 {"at": "2026-11-25T15:10+00:00", "team": "Sunderland", "name": "Brobbey", "status": "a", "chance": 100, "news": ""}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Raya", "status": "d", "chance": 50, "news": "Shoulder injury - 50% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Saka", "status": "i", "chance": 0, "news": "Thigh injury - Expected back 20 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Martinelli", "status": "u", "chance": 0, "news": "Has joined Al Hilal permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Zubimendi", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Nwaneri", "status": "u", "chance": 0, "news": "Has joined Borussia Dortmund on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "F\u00e1bio Vieira", "status": "u", "chance": 0, "news": "Has joined Hamburger SV permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "Nelson", "status": "u", "chance": 0, "news": "has departed the club as a free agent."}
+{"at": "2026-11-25T16:25+00:00", "team": "Arsenal", "name": "G.Jesus", "status": "u", "chance": 0, "news": "Has joined FC Barcelona permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Digne", "status": "u", "chance": 0, "news": "Has joined Paris Saint-Germain permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Cash", "status": "d", "chance": 75, "news": "Concussion - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "A.Garc\u00eda", "status": "u", "chance": 0, "news": "Has joined Getafe on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Nedeljkovic", "status": "u", "chance": 0, "news": "Has joined Rangers on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Bailey", "status": "u", "chance": 0, "news": "Has joined Olympiakos permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Onana", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Iling Jr", "status": "u", "chance": 0, "news": "Has joined Bolton Wanderers on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Watkins", "status": "u", "chance": 0, "news": "Has joined Al Hilal permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Ruggeri", "status": "i", "chance": 0, "news": "Hamstring injury - Expected back 2 Jan"}
+{"at": "2026-11-25T16:25+00:00", "team": "Aston Villa", "name": "Lynch", "status": "u", "chance": 0, "news": "Has joined Oxford United on loan until January"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "Dennis", "status": "u", "chance": 0, "news": "Has joined MK Dons permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "Milosavljevi\u0107", "status": "i", "chance": 0, "news": "Thigh injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "J.Araujo", "status": "i", "chance": 0, "news": "Thigh injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "T\u00f3th.A", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "Enes \u00dcnal", "status": "u", "chance": 0, "news": "Has joined Getafe permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Bournemouth", "name": "Sanchez", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Collins", "status": "i", "chance": 0, "news": "Knee injury - Expected back 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Henry", "status": "i", "chance": 0, "news": "Hip injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Hickey", "status": "i", "chance": 0, "news": "Hamstring injury - Expected back 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Milambo", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Dasilva", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Thiago", "status": "s", "chance": 0, "news": "Suspended until 5 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brentford", "name": "Furo", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Boscagli", "status": "d", "chance": 75, "news": "Illness - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Igor", "status": "u", "chance": 0, "news": "Has joined Burnley permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Costinha", "status": "s", "chance": 0, "news": "Suspended until 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Mitoma", "status": "i", "chance": 0, "news": "Hamstring injury - Expected back 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Buonanotte", "status": "u", "chance": 0, "news": "Has joined Elche on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Howell", "status": "u", "chance": 0, "news": "Has joined Leicester City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Watson", "status": "u", "chance": 0, "news": "Has joined Leicester City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Yohanna", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Tzimas", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Ferguson", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Yalcouy\u00e9", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Hadjam", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Brighton", "name": "Cozier-Duberry", "status": "u", "chance": 0, "news": "Has joined Middlesbrough on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "S\u00e1nchez", "status": "u", "chance": 0, "news": "Has joined Como on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "J\u00f6rgensen", "status": "u", "chance": 0, "news": "Has joined RC Strasbourg on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "James", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Chalobah", "status": "u", "chance": 0, "news": "Has joined Como permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "B.Badiashile", "status": "u", "chance": 0, "news": "Has joined Napoli on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Hato", "status": "i", "chance": 0, "news": "Back injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "M.Sarr", "status": "u", "chance": 0, "news": "Has joined Real Sociedad on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Gittens", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Caicedo", "status": "d", "chance": 75, "news": "Back injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "D.Essugo", "status": "u", "chance": 0, "news": "Has joined RC Strasbourg on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Jo\u00e3o Pedro", "status": "i", "chance": 0, "news": "Thigh injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Marc Guiu", "status": "u", "chance": 0, "news": "Has joined RB Leipzig permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Chelsea", "name": "Lacroix", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Dovin", "status": "u", "chance": 0, "news": "not included in squad."}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Kitching", "status": "u", "chance": 0, "news": "Has joined Sheffield United on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Woolfenden", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Brau", "status": "u", "chance": 0, "news": "Has joined Academico de Viseu on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Amenda", "status": "i", "chance": 0, "news": "Calf injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Mason-Clark", "status": "d", "chance": 75, "news": "Knee injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Eccles", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Borges Rodrigues", "status": "u", "chance": 0, "news": "Has joined Burton Albion on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Andrews", "status": "u", "chance": 0, "news": "Has joined Oxford United on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Wright", "status": "i", "chance": 0, "news": "Lack of match fitness - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Markelo", "status": "u", "chance": 0, "news": "Has joined Shabab Al-Ahli Dubai permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Bassette", "status": "u", "chance": 0, "news": "Has joined KVC Westerlo on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Awoniyi", "status": "d", "chance": 75, "news": "Ankle injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Coventry", "name": "Yirenkyi", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Sosa", "status": "u", "chance": 0, "news": "Has joined FC Cologne on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Chadi Riad", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Mingueza", "status": "d", "chance": 75, "news": "Thigh injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Sarr", "status": "i", "chance": 0, "news": "Groin injury - Expected back 29 Nov"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Yeremy", "status": "s", "chance": 0, "news": "Suspended until 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Devenny", "status": "u", "chance": 0, "news": "Has joined Stoke City permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Esse", "status": "u", "chance": 0, "news": "Has joined Millwall on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "M.Fran\u00e7a", "status": "u", "chance": 0, "news": "Has joined Alverca on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "J.Rak-Sakyi", "status": "u", "chance": 0, "news": "has joined  Kasimpasa on loan for the rest of the seaon."}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Cardines", "status": "u", "chance": 0, "news": "Has joined Bristol City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Mateta", "status": "s", "chance": 0, "news": "Suspended until 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Uche", "status": "u", "chance": 0, "news": "has returned to Getafe CF"}
+{"at": "2026-11-25T16:25+00:00", "team": "Crystal Palace", "name": "Tomiyasu", "status": "i", "chance": 0, "news": "Calf injury - Expected back 29 Nov"}
+{"at": "2026-11-25T16:25+00:00", "team": "Everton", "name": "Tarkowski", "status": "s", "chance": 0, "news": "Suspended until 13 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Everton", "name": "Patterson", "status": "u", "chance": 0, "news": "Has joined Torino permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Everton", "name": "Aznou", "status": "u", "chance": 0, "news": "Has joined Malaga on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Everton", "name": "Beto", "status": "u", "chance": 0, "news": "Has joined Fiorentina permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Fulham", "name": "Lecomte", "status": "i", "chance": 0, "news": "Achilles injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Fulham", "name": "McNally", "status": "u", "chance": 0, "news": "Has joined York City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Fulham", "name": "Smith Rowe", "status": "i", "chance": 0, "news": "Hip injury - Expected back 29 Nov"}
+{"at": "2026-11-25T16:25+00:00", "team": "Fulham", "name": "De Fougerolles", "status": "u", "chance": 0, "news": "has joined  Real Salt Lake on loan for the rest of the seaon."}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Iroegbunam", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Cartwright", "status": "u", "chance": 0, "news": "Has joined Grimsby Town on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Lo-Tutala", "status": "u", "chance": 0, "news": "Has joined Colchester United on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Hughes", "status": "i", "chance": 0, "news": "Groin injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Drameh", "status": "u", "chance": 0, "news": "Has joined Genoa permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Jacob", "status": "u", "chance": 0, "news": "Has joined Newport County on loan until January"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Millar", "status": "u", "chance": 0, "news": "Has joined Birmingham on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Matazo", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Kamara", "status": "u", "chance": 0, "news": "Has joined Portsmouth permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Akintola", "status": "u", "chance": 0, "news": "Has joined Omonoia FC permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Gyabi", "status": "d", "chance": 75, "news": "Thigh injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Destan", "status": "u", "chance": 0, "news": "Has joined Konyaspor permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Burstow", "status": "u", "chance": 0, "news": "Has joined Sheffield Wednesday on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Gelhardt", "status": "i", "chance": 0, "news": "Thigh injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Targett", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Morita", "status": "i", "chance": 0, "news": "Groin injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Hull", "name": "Ansah", "status": "i", "chance": 0, "news": "Back injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Davis", "status": "d", "chance": 75, "news": "Calf injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Johnson", "status": "u", "chance": 0, "news": "Has joined Stoke City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Burns", "status": "u", "chance": 0, "news": "Has joined Leicester City permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Ogbene", "status": "u", "chance": 0, "news": "Has joined Lincoln City on loan until January"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Hirst", "status": "u", "chance": 0, "news": "Has joined Stoke City permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Szmodics", "status": "u", "chance": 0, "news": "Has joined Derby County on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Al-Hamadi", "status": "u", "chance": 0, "news": "Has joined Sheffield Wednesday on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Van Oevelen", "status": "u", "chance": 0, "news": "Has joined Valencia on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Ipswich", "name": "Humphreys", "status": "u", "chance": 0, "news": "Has joined Huddersfield Town on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Perri", "status": "u", "chance": 0, "news": "Has joined Torino on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Bornauw", "status": "u", "chance": 0, "news": "Has joined Hamburg SV on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Gnonto", "status": "u", "chance": 0, "news": "Has joined ACF Fiorentina on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Harrison", "status": "u", "chance": 0, "news": "Has joined New England Revolution permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Piroe", "status": "u", "chance": 0, "news": "Has joined West Ham United on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Leeds", "name": "Mateo Joseph", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Pecsi", "status": "u", "chance": 0, "news": "Has joined TSV Hartberg on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Jaros", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Bradley", "status": "i", "chance": 0, "news": "Knee injury - Expected back 12 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Leoni", "status": "i", "chance": 0, "news": "Knee injury - Expected back 12 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Ramsay", "status": "u", "chance": 0, "news": "Has joined St Mirren on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Gakpo", "status": "i", "chance": 0, "news": "Calf injury - Expected back 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Gravenberch", "status": "i", "chance": 0, "news": "Foot injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "C.Jones", "status": "u", "chance": 0, "news": "Has joined Internazionale permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Bajcetic", "status": "u", "chance": 0, "news": "Has joined Celta Vigo permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Ekitik\u00e9", "status": "i", "chance": 0, "news": "Achilles injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Liverpool", "name": "Elliott", "status": "u", "chance": 0, "news": "Has joined Valencia on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Alleyne", "status": "u", "chance": 0, "news": "Has joined Burnley on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Semenyo", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Rodrigo", "status": "u", "chance": 0, "news": "Has joined Barcelona permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Reijnders", "status": "u", "chance": 0, "news": "Has joined Al Qadsiah permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Echeverri", "status": "u", "chance": 0, "news": "Has joined Benfica on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Phillips", "status": "u", "chance": 0, "news": "Has joined Sheffield United on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Mukasa", "status": "u", "chance": 0, "news": "has joined West Ham on loan for the rest of the seaon."}
+{"at": "2026-11-25T16:25+00:00", "team": "Man City", "name": "Monga", "status": "u", "chance": 0, "news": "Has joined Swansea City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Baleba", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Darlow", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Bayindir", "status": "u", "chance": 0, "news": "Has joined Celta Vigo on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Shaw", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Fredricson", "status": "u", "chance": 0, "news": "Has joined Lausanne-Sport permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Rashford", "status": "i", "chance": 0, "news": "Hip injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Ugarte", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Collyer", "status": "u", "chance": 0, "news": "Has joined West Brom permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "\u0160e\u0161ko", "status": "i", "chance": 0, "news": "Shin injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Man United", "name": "Obi", "status": "u", "chance": 0, "news": "Has joined Willem II on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Jaouen", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Hall", "status": "d", "chance": 75, "news": "Unspecified injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "A.Murphy", "status": "u", "chance": 0, "news": "Has joined FC Kaiserslautern on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Joelinton", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Woltemade", "status": "u", "chance": 0, "news": "Has joined Juventus on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Neave", "status": "u", "chance": 0, "news": "Has joined Wolves on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Newcastle", "name": "Shahar", "status": "u", "chance": 0, "news": "has joined Arouca on loan for the rest of the seaon."}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Morato", "status": "u", "chance": 0, "news": "Has joined West Ham on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Savona", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Abbott", "status": "u", "chance": 0, "news": "Has joined Southampton on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Bindon", "status": "u", "chance": 0, "news": "Has joined Charlton Athletic on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Hudson-Odoi", "status": "i", "chance": 0, "news": "Unspecified injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Hutchinson", "status": "u", "chance": 0, "news": "Has joined AC Milan on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Bakwa", "status": "u", "chance": 0, "news": "Has joined Lille on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Nott'm Forest", "name": "Dominguez", "status": "i", "chance": 0, "news": "Muscular injury - Expected back 30 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Tosin", "status": "i", "chance": 0, "news": "Calf injury - Expected back 29 Nov"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "S\u00e1vio", "status": "d", "chance": 75, "news": "Hamstring injury - 75% chance of playing"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Vicario", "status": "u", "chance": 0, "news": "Has joined Juventus on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Romero", "status": "u", "chance": 0, "news": "Has joined Atletico Madrid permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Spence", "status": "u", "chance": 0, "news": "Has joined Internazionale permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Phillips", "status": "u", "chance": 0, "news": "Has joined Middlesbrough permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Souza", "status": "u", "chance": 0, "news": "Has joined FC Porto on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Xavi", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Tel", "status": "i", "chance": 0, "news": "Ankle injury - Expected back 6 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Odobert", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "P.M.Sarr", "status": "u", "chance": 0, "news": "Has joined Juventus on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Moore", "status": "u", "chance": 0, "news": "Has joined FC K\u00f6ln on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Richarlison", "status": "u", "chance": 0, "news": "not included in squad."}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Scarlett", "status": "u", "chance": 0, "news": "Has joined Leyton Orient permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Tottenham", "name": "Mudryk", "status": "i", "chance": 0, "news": "Ankle injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Danso", "status": "n", "chance": 0, "news": "Ineligible to face parent club - Expected back 2 Dec"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Patterson", "status": "u", "chance": 0, "news": "Has joined Wrexham permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Ballard", "status": "i", "chance": 0, "news": "Hamstring injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Seelt", "status": "u", "chance": 0, "news": "Has joined Swansea City on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Hjelde", "status": "u", "chance": 0, "news": "Has joined KV Mechelen on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Masuaku", "status": "u", "chance": 0, "news": "Has joined Konyaspor permanently"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Diarra", "status": "i", "chance": 0, "news": "Muscular injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Xhaka", "status": "i", "chance": 0, "news": "Calf injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Adingra", "status": "u", "chance": 0, "news": "Has joined Ajax on loan for the rest of the season"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Mundle", "status": "i", "chance": 0, "news": "Knee injury - Unknown return date"}
+{"at": "2026-11-25T16:25+00:00", "team": "Sunderland", "name": "Brobbey", "status": "i", "chance": 0, "news": "Muscular injury - Unknown return date"}
