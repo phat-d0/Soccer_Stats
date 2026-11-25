@@ -389,6 +389,19 @@
    "doc": "docs/lab.md: Line shop vs Pinnacle"
   },
   {
+   "id": "corner_lineshop",
+   "area": "shopping",
+   "name": "Corner line shop vs Pinnacle",
+   "when": "2026-11-08",
+   "verdict": "running",
+   "question": "On team corners, bet the best of DraftKings, FanDuel, BetMGM and BetRivers when it beats Pinnacle's fair price for the same line by 2%.",
+   "sample": "Paper track at the look snapshot, judged once at 300 bets or 31 May 2027 (CLV vs Pinnacle's close)",
+   "due": "300 bets or 31 May 2027",
+   "due_date": "2027-05-31",
+   "result": "Pre-registered 8 Nov, before any of the new books' corner prices were logged; built (owner, 24 Nov).",
+   "doc": "docs/totals.md: Corner line shop vs Pinnacle"
+  },
+  {
    "id": "totals_corners",
    "area": "markets",
    "name": "Totals and corner bake-offs",
@@ -423,8 +436,23 @@
    "verdict": "fail",
    "question": "Does model (f) add anything to Pinnacle's team-corner price, so a Blend Lean could sharpen it?",
    "sample": "Development gate: 396 Pinnacle half lines on 198 matches (SP1, D1, E1, E2, E3), logged live from 14 Oct; runs 45390998977 and 45391131059",
-   "result": "No. Model (f)'s weight beside Pinnacle's fair price is c −0.178 (−0.866 to +0.499), and the blend flattens Pinnacle's price (b 0.39) rather than sharpening it. Not built (owner).",
-   "doc": "docs/totals.md: Corner Blend Lean: development gate result"
+   "result": "No. Model (f)'s weight beside Pinnacle's fair price is c −0.178 (−0.866 to +0.499), and the blend flattens Pinnacle's price (b 0.39) rather than sharpening it. Built anyway (owner, 24 Nov) as a paper track; judged once at 300 Pinnacle bets or 31 May 2027.",
+   "doc": "docs/totals.md: Corner Blend Lean: development gate result",
+   "due": "300 Pinnacle bets or 31 May 2027",
+   "due_date": "2027-05-31"
+  },
+  {
+   "id": "corner_lean_live",
+   "area": "markets",
+   "name": "Blend Lean for team corners: live judged read",
+   "when": "2026-11-24",
+   "verdict": "running",
+   "question": "Does the corner Blend Lean's paper track, z ≥ 1 against Pinnacle's price at the look, beat Pinnacle's close?",
+   "sample": "Paper track from its defined_at, judged once at 300 Pinnacle bets or 31 May 2027 (CLV vs Pinnacle's close)",
+   "due": "300 Pinnacle bets or 31 May 2027",
+   "due_date": "2027-05-31",
+   "result": "Its development gate failed (model (f) adds nothing beside Pinnacle's price); built anyway (owner, 24 Nov).",
+   "doc": "docs/totals.md: Corner Blend Lean: pre-registration"
   },
   {
    "id": "corners2_locked",
