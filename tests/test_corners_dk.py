@@ -362,12 +362,13 @@ def test_paper_run_splits_corner_strategies(tmp_path):
     assert c["summary"]["trades"] == 3 and len(c["trades"]) == 3  # combined, for older app code
     assert c["rule"] == tr.corners_rule()
     st = {s["key"]: s for s in c["strategies"]}
-    assert [s["key"] for s in c["strategies"]] == [
+    assert [s["key"] for s in c["strategies"]][:4] == [
         "pinnacle",
         "pinnacle_below60",
         "draftkings",
         "draftkings_below60",
-    ]  # each track, then its below-60% shadow (test_corner_variants.py)
+    ]  # each track, then its below-60% shadow (test_corner_variants.py); the corner Blend
+    # Lean's sections follow (test_paper_corner_lean.py)
     assert st["pinnacle"]["label"] == "Model (f) 12% vs Pinnacle"
     assert st["draftkings"]["label"] == "Model (f) 12% vs DraftKings"
     assert st["pinnacle"]["trade_ids"] == [TID]
