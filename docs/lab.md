@@ -5259,3 +5259,77 @@ then pre-registers the rule here before any CLV is read, and Model evaluation re
 - entry at the first logged moment after the XI;
 - the close at the −15 run;
 - a minimum number of bets set from those counts.
+
+## An xG fallback without Understat (owner via the lead, 26 Nov; FROZEN before any code or fit)
+
+**Why.** Understat has been down since 2 Nov 2026 (CLAUDE.md "Understat outage"); a GitHub issue of
+24 Nov still reports it failing. Since then E0, SP1, D1, I1 and F1 run goals-only for every new
+match. This measures two things:
+- how much the outage costs the live match model;
+- whether a free proxy built from football-data's shots can stand in for xG.
+
+Football-data publishes shots for every live league, E1–E3 included, so a proxy could also help the
+three goals-only leagues. Development only: 2019/20–2023/24 scored, 2024/25 locked
+(`lab.harness.Holdout`), 0 credits, no key, no live change.
+
+**The model.** The live match model, unchanged: `dashboard.match_model(league, xg_weight)`, with
+the league's ratings ridge (`leagues.MATCH_RIDGE`). It runs through `backtest.walk_forward` from
+2019-07-01, as `cli._early_preds` does for the match backtests. Training rows start from 2017/18.
+The only difference between the three forms is the `home_xg`/`away_xg` columns the model is given,
+and its xG weight:
+
+- **(a) Understat xG as today.** `xg.with_xg` on the `xg-good-` files (the Wayback seasons
+  included), weight 0.7 (`publish.XG_WEIGHT`).
+  - I1 2022/23 has no xG, so its matches fall back to goals inside the model, as in every backtest.
+  - In E1, E2 and E3 there is no Understat, so (a) is the goals-only model, identical to (b).
+- **(b) Goals only.** Weight 0.
+- **(c) A shots proxy.** Weight 0.7. Each team's proxy goals in a match = α·HST + β·(HS − HST):
+  shots on target and the other shots, from football-data's own files.
+  - α and β are fitted per league by least squares, without an intercept, of the team's goals on
+    those two columns. The fit uses 2017/18–2018/19 only, the training seasons before anything is
+    scored. They are then frozen.
+  - The proxy uses only the match's own shot counts, as xG uses the match's own shots, so there is
+    no look-ahead: the model is fitted on earlier matches only.
+  - A match without HS uses α' · HST, with α' fitted the same way on HST alone. A match without
+    HST has no proxy, and the model falls back to goals.
+- **Descriptive beside them: (c-sot).** The proxy from shots on target alone (α' · HST), weight 0.7.
+
+**Rows.** Every match each form predicts. The three forms are compared on the same rows: matches
+all of them predict, keyed on league, season, home and away. Results come from football-data.
+
+**Measures.**
+1. **Model log loss (1X2).** The paired per-match differences (b) − (a), (c) − (a) and (c) − (b),
+   each with a 95% range over 2,000 match-resampled draws (seed 0).
+   - Pooled over the five Understat leagues: the headline.
+   - Per league and per season.
+   - In E1–E3, (c) − (b) alone, since (a) = (b) there.
+2. **The blend.** For each form, `lean_backtest.walk_forward` gives the blend `pb_*`: refits every
+   28 days on Pinnacle's close beside that form's walk-forward chances. Blend log loss uses the same
+   paired differences on matches all three forms' blends score, in the seasons the Lean backtest
+   includes (`lean_backtest.coverage`: early and close prices both on ≥ 90% of matches).
+3. **Lean's picks.** For each form, `lean_backtest.bets` (the 1σ rule at Pinnacle's early price,
+   $1, all odds), reported:
+   - bets, CLV against Pinnacle's fair close and ROI, each with 95% ranges;
+   - the share of picks the same as (a)'s on the same matches;
+   - pooled and per league.
+4. **Recovery share.** The part of xG's gain the proxy recovers: R = (LL_b − LL_c) / (LL_b − LL_a),
+   on the model's mean log loss, pooled over the five Understat leagues. Its 95% range is the
+   ratio of resampled means. It is shown only when LL_b − LL_a's range is above 0: there is
+   nothing to recover if xG adds nothing.
+
+**What would make (c) a proposal.** The switch-on rule is "use the proxy for matches after the last
+good Understat file". It goes to the owner as a pre-registered proposal only if both hold, pooled
+over the five Understat leagues:
+1. the blend's (c) − (b) log-loss range is below 0 (the proxy improves on goals-only where it
+   would be used);
+2. R's point estimate is at least 0.5 (it recovers most of xG's gain on the model).
+
+For E1–E3, the proxy is proposed separately, and only if their pooled blend (c) − (b) range is
+below 0.
+
+Nothing here is a betting test. Lean's CLV is descriptive. A proposal changes nothing live until the
+owner approves it and it ships as its own change.
+
+**Run.** `tuning.yml` `phase=xg-fallback`: a job per league, then a pool job. It restores
+`raw-data-` and `xg-good-` with the archive fallback, uses no key, and is read once. The code
+(`lab/xg_fallback.py`) is written after this section is committed.
