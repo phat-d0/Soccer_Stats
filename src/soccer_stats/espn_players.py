@@ -568,3 +568,118 @@ def b_espn_compare(rows: pd.DataFrame) -> dict:
             ],
         }
     return out
+
+
+# --- B-espn, frozen for §16 (amendment of 26 Nov 2026; as run at commit 60e0949) ---------
+
+MODEL_SOURCE = "B-espn"
+FEATURE_SOURCE = "espn"
+CHECK_SEASON = "2526"  # the four-league check reads 2025/26 development rows only
+CHECK_MIN_JOIN = 0.5  # under half the rescued rows joined = "not checked" (treated as failed)
+
+
+def b_espn_predict(espn: pd.DataFrame, preds: pd.DataFrame, start, end, holdout=None):
+    """B-espn's walk-forward chances on ESPN appearance rows (`appearances` output):
+    B's mixture (al.CountCandidate on goals) with `B_ESPN_FACTORS`, team xG from the match
+    model's walk-forward `preds`. Returns the feature rows (kickoff < end) with `p_B_espn`,
+    `model_source` and `feature_source`."""
+    from soccer_stats import player_assist_lab as al
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.lab import harness
+
+    fe = goal_rate_features(pg.goal_features(build_features(espn, pb.match_info(preds, espn))))
+    fe = fe[fe["kickoff"] < pd.Timestamp(end)].reset_index(drop=True)
+    pr = harness.walk_forward(
+        fe,
+        lambda **kw: al.CountCandidate(**kw),
+        {"target": "goals", "factors": B_ESPN_FACTORS},
+        start,
+        end,
+        holdout=holdout,
+        time_col="kickoff",
+        refit=al.REFIT,
+        min_train=1,
+    )
+    p = pr["p_1"] if not pr.empty else float("nan")
+    return fe.assign(p_B_espn=p, model_source=MODEL_SOURCE, feature_source=FEATURE_SOURCE)
+
+
+def check_rows(fe: pd.DataFrame, judged: pd.DataFrame, league: str) -> tuple[pd.DataFrame, dict]:
+    """The amendment's check rows: rescued 2025/26 judged rows (`p_B`, `scored`) joined to
+    ESPN's starter in the same Understat match by name within the two clubs."""
+    from soccer_stats.player_data import match_in_fixture
+
+    j = judged.copy()
+    j["match_id"] = j["match_id"].astype(str).str.replace(f"{league}|", "", regex=False)
+    j["player_id"] = j["player_id"].astype(str)
+    j = j[(j["season"].astype(str) == CHECK_SEASON) & j["started"].astype(bool)]
+    st = fe[fe["started"].astype(bool) & fe["p_B_espn"].notna()]
+    st = st.assign(match_id=st["match_id"].astype(str))
+    by = {m: g for m, g in st.groupby("match_id")}
+    out = []
+    for mid, g in j.groupby("match_id"):
+        e = by.get(mid)
+        if e is None:
+            continue
+        clubs = {
+            t: dict(zip(x["player_id"], x["player"], strict=True)) for t, x in g.groupby("team")
+        }
+        found, _ = match_in_fixture(list(e["player"]), clubs, overrides={})
+        pe = {}
+        for r in e.itertuples(index=False):
+            hit = found.get(r.player)
+            if hit and hit[1] == r.team:
+                pe[str(hit[0])] = float(r.p_B_espn)
+        for r in g.itertuples(index=False):
+            if r.player_id in pe:
+                out.append(
+                    {
+                        "match_id": mid,
+                        "player_id": r.player_id,
+                        "scored": int(r.scored),
+                        "p_B": float(r.p_B),
+                        "p_B_espn": pe[r.player_id],
+                    }
+                )
+    rows = pd.DataFrame(out, columns=["match_id", "player_id", "scored", "p_B", "p_B_espn"])
+    counts = {
+        "rescued_rows": len(j),
+        "rescued_matches": int(j["match_id"].nunique()),
+        "joined_rows": len(rows),
+        "join_share": round(len(rows) / len(j), 4) if len(j) else 0.0,
+    }
+    return rows, counts
+
+
+def check_verdict(rows: pd.DataFrame, counts: dict) -> dict:
+    """B-espn minus B log loss with its 95% range (matches resampled, 2,000 draws, seed 0).
+    pass = the range includes 0 or lies below it; fail = it lies above 0; under half the
+    rescued rows joined = "not checked" (treated as failed)."""
+    import numpy as np
+
+    from soccer_stats.lab.metrics import boot_range
+
+    out = dict(counts)
+    if counts.get("join_share", 0) < CHECK_MIN_JOIN or len(rows) < 2:
+        return {**out, "verdict": "not checked"}
+    y = rows["scored"].to_numpy()
+
+    def ll(p):
+        p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
+        return -(y * np.log(p) + (1 - y) * np.log(1 - p))
+
+    lb, le = ll(rows["p_B"]), ll(rows["p_B_espn"])
+    d = le - lb
+    lo, hi = boot_range(d, rows["match_id"].to_numpy(), n_boot=2000, seed=0)
+    return {
+        **out,
+        "matches": int(rows["match_id"].nunique()),
+        "rate": round(float(y.mean()), 4),
+        "ll_B": round(float(lb.mean()), 5),
+        "ll_B_espn": round(float(le.mean()), 5),
+        "B_espn_minus_B": round(float(d.mean()), 5),
+        "range": [round(lo, 5), round(hi, 5)],
+        "verdict": "fail" if lo > 0 else "pass",
+    }
