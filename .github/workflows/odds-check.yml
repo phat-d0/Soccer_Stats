@@ -215,9 +215,9 @@ on:
         description: "team-totals confirmation: only kickoffs after this ISO time (with finalists = the frozen rule)"
         default: ""
       design:
-        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov); understat-wayback: probe (counts), compare (copies vs the files held) or load (complete copies into xg-good-, default branch only) or goals (loaded copies vs football-data's goals); corner-lean-gate: counts (eligible counts only, no fit; any other value runs the gate)"
+        description: "comeback-fetch / comebacks2: which frozen slot list (B, C = C minus B, judged, H = heavy favourites 75%+, X = the cash-out test, H2P/H2U = the cups' pre-match prices, H2 = 75%+ favourites in the cups and extra leagues); goalscorer-backfill: dev (2025/26 development), forward (2026/27 from 10 Oct) or gaps (the snapshots the live log lacks since 1 Nov); understat-wayback: probe (counts), compare (copies vs the files held) or load (complete copies into xg-good-, default branch only) or goals (loaded copies vs football-data's goals); corner-lean-gate: counts (eligible counts only, no fit; any other value runs the gate); market-probe: shots-alt (the shots-alternates follow-up)"
         type: choice
-        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps, probe, compare, load, goals, counts]
+        options: [B, C, H, X, H2P, H2U, H2, dev, forward, gaps, probe, compare, load, goals, counts, shots-alt]
         default: B
       restore_key:
         description: "understat-restore: the run id of an older raw-data cache holding good Understat files (e.g. 41369190298)"
