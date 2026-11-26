@@ -133,7 +133,10 @@ def read_summary(body: dict | None) -> dict:
     ]
     have = {k: any(n in names for n in v) for k, v in WANT.items()}
     goal_col = next((n for n in WANT["goals"] if n in names), None)
-    player_goals = sum((p["stats"].get(goal_col) or 0) for p in players) if goal_col else None
+    # Own goals count for the other side: the score = players' goals + own goals (lead, 26 Nov).
+    own = sum((p["stats"].get("ownGoals") or 0) for p in players)
+    scored = sum((p["stats"].get(goal_col) or 0) for p in players) if goal_col else None
+    player_goals = scored + own if scored is not None else None
     comp = (((body.get("header") or {}).get("competitions") or [{}])[0]) or {}
     score = sum(
         float(c.get("score") or 0) for c in comp.get("competitors", []) if isinstance(c, dict)
@@ -150,6 +153,8 @@ def read_summary(body: dict | None) -> dict:
         "stat_names": sorted(names),
         "have": have,
         "player_goals": player_goals,
+        "goals_without_own": scored,
+        "own_goals": own,
         "score_goals": score,
         "example": players[0] if players else None,
     }
@@ -395,7 +400,14 @@ def pull(
         fx = fd_matches(league, season)
         ids = (understat_ids or _understat_ids)(league, season)
         sea = f"{season % 100:02d}{(season + 1) % 100:02d}"
-        c = {"matches": len(fx), "found": 0, "with_players": 0, "goals_add_up": 0, "stopped": False}
+        c = {
+            "matches": len(fx),
+            "found": 0,
+            "with_players": 0,
+            "goals_add_up": 0,
+            "goals_add_up_without_own": 0,
+            "stopped": False,
+        }
         for m in fx.to_dict("records"):
             if time.monotonic() > end:
                 c["stopped"] = True
@@ -438,6 +450,9 @@ def pull(
                 c["with_players"] += 1
                 info = read_summary(body)
                 c["goals_add_up"] += int(info["player_goals"] == info["score_goals"])
+                c["goals_add_up_without_own"] += int(
+                    info["goals_without_own"] == info["score_goals"]
+                )
             rows += got
         cover[sea] = c
     cover["requests"] = stats
