@@ -1384,6 +1384,27 @@ run after this merges, which also ends its E0-only wait for Understat. Every ent
 `model_source` and `feature_source`; entries opened before the switch are B on Understat by
 definition and are never rewritten. The sections count trades per model.
 
+**Check result, 26 Nov** (odds-check `task=espn-b-check`, runs 45785042944 SP1, 45785049207 D1,
+45785055783 I1, 45785059983 F1, commit 05554b7; both sha256s matched). B-espn minus B log loss on
+the rescued 2025/26 rows, 95% range over matches:
+
+| League | Rescued rows | Joined | Matches | B | B-espn | B-espn − B | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | 4,564 | 4,134 (90.6%) | 317 | 0.2841 | 0.2855 | +0.0014 (−0.0010 to +0.0040) | pass |
+| D1 | 5,387 | 4,660 (86.5%) | 271 | 0.3195 | 0.3198 | +0.0003 (−0.0022 to +0.0027) | pass |
+| I1 | 6,025 | 5,498 (91.3%) | 353 | 0.2716 | 0.2737 | +0.0021 (+0.0002 to +0.0039) | **fail** |
+| F1 | 4,688 | 4,176 (89.1%) | 270 | 0.2919 | 0.2926 | +0.0007 (−0.0017 to +0.0031) | pass |
+
+E0's development result above stands as its check (pass). Under this amendment's rule I1 is read
+on B, and is left out if B can't score it by 31 Jan.
+
+A flaw in the I1 run, recorded as it was found: the check's match model dropped xG for every I1
+season (xG weight 0) because one season, I1 2022/23, has no Understat xG. The frozen B-espn uses
+weight 0.7, and the live model loses only that season's xG. So I1's B-espn here ran on goals-only
+team xG, which differs from the frozen model. The verdict above is the one the written rule gives.
+Whether to rerun I1 with the frozen weight is for the lead and the owner; it is a second look after
+seeing the result.
+
 **Status:** drafted 26 Nov by Player props for the lead's review. Binding only once the owner
 approves and it merges. No judged number had been computed when it was written.
 
