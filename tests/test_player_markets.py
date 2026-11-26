@@ -231,3 +231,66 @@ def test_espn_appearances_minutes_and_team_shots():
     assert rows["E Five"]["minutes"] == ep.DEFAULT_START_OFF and not rows["E Five"]["minutes_known"]
     assert rows["A One"]["team_shots"] == 6 and rows["A One"]["opp_shots"] == 4
     assert rows["E Five"]["team"] == "Chelsea" and rows["E Five"]["home"] is False
+
+
+def test_follow_up_asks_given_markets_without_market_lists(tmp_path):
+    calls = []
+
+    def get(url, params=None, timeout=None):
+        calls.append(url)
+        if url.endswith("/historical/sports/soccer_epl/events"):
+            return _Resp({"data": [{"id": "h1", "commence_time": "2025-11-01T15:00:00Z",
+                                    "home_team": "A", "away_team": "B"}]}, 1)  # fmt: skip
+        if "/historical/" in url:
+            mk = params["markets"].split(",")
+            return _Resp(
+                {"data": _body({m: {"draftkings": [("Over", "X", 0.5, 1.3)]} for m in mk})},
+                10 * len(mk),
+            )
+        if url.endswith("/events"):
+            return _Resp([{"id": "e1", "commence_time": "2026-11-28T15:00:00Z", "home_team": "A",
+                           "away_team": "B"}], 0)  # fmt: skip
+        mk = params["markets"].split(",")
+        return _Resp(_body({m: {"draftkings": [("Over", "X", 0.5, 1.3)]} for m in mk}), len(mk))
+
+    res = mp.run(30, leagues=("E0", "SP1"), api_key="k", now=pd.Timestamp("2026-11-26", tz="UTC"),
+                 get=get, raw_dir=tmp_path, markets=mp.ALT_MARKETS, books=mp.ALT_BOOKS)  # fmt: skip
+    assert not any(u.endswith("/markets") for u in calls)
+    assert res["leagues"]["SP1"]["markets"] == list(mp.ALT_MARKETS)
+    # live 2 + 2, history events 1, then (30 - 5) // 10 = 2 markets at 10 each.
+    assert res["spent"] == 25 and res["history"]["markets"] == list(mp.ALT_MARKETS)
+    assert res["other_regions"] is None
+
+
+def test_line_report_best_book_markup_and_vs_fanduel():
+    def row(book, player, point, odds, market="player_shots_alternate"):
+        return {"event_id": "e", "market": market, "book": book, "player": player,
+                "point": point, "side": "over", "odds": odds, "stamp": "1"}  # fmt: skip
+
+    r = pd.DataFrame(
+        [
+            row("fanduel", "A", 0.5, 1.25, "player_shots"),
+            row("fanduel", "B", 0.5, 2.0, "player_shots"),
+            row("draftkings", "A", 0.5, 1.30),
+            row("draftkings", "B", 0.5, 1.90),
+            row("betmgm", "A", 1.0, 1.35),  # whole line = "at least 1" = over 0.5
+        ]
+    )
+    rep = {(x["book"], x["line"]): x for x in mp.line_report(r, {("player_shots", 0.5): 1.0})}
+    best = rep[("best", 0.5)]
+    assert abs(best["over_sum"] - (1 / 1.35 + 1 / 2.0)) < 1e-3
+    assert abs(best["markup"] - (1 / 1.35 + 1 / 2.0 - 1)) < 1e-3
+    vs = {v["book"]: v for v in mp.vs_fanduel(r)}
+    dk = vs["draftkings"]
+    assert (
+        dk["pairs"] == 2 and abs(dk["implied_vs_fanduel"] - (1.25 / 1.30 + 2.0 / 1.90) / 2) < 1e-4
+    )
+    assert vs["best of others"]["pairs"] == 2
+
+
+def test_shot_rates_per_match():
+    apps = pd.DataFrame({"match_id": ["1", "1", "2"], "shots": [2, 0, 1], "sot": [1, 0, 0],
+                         "started": [True, False, True]})  # fmt: skip
+    r = mp.shot_rates(apps, lines=(0.5, 1.5))
+    assert r[("player_shots", 0.5)] == 1.0 and r[("player_shots", 1.5)] == 0.5
+    assert r[("player_shots_on_target", 0.5, "starters")] == 0.5

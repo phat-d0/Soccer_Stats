@@ -119,12 +119,19 @@ class NBRegression:
 class PlayerShotModel:
     """Shots and shots-on-target distributions per player, conditional on playing."""
 
-    def __init__(self, factors: list[str] | None = None, l2: float = 2.0, sot_method: str = "thin"):
+    def __init__(
+        self,
+        factors: list[str] | None = None,
+        l2: float = 2.0,
+        sot_method: str = "thin",
+        options: dict | None = None,
+    ):
         self.factors = list(ALL_FACTORS if factors is None else factors)
         self.l2 = l2
         self.sot_method = sot_method
-        self.shots = NBRegression(self.factors, l2)
-        self.sot = NBRegression([*self.factors, "log_sot_rate"], l2)
+        # options: L-BFGS-B options (None = scipy's defaults, so the live model is unchanged)
+        self.shots = NBRegression(self.factors, l2, options=options)
+        self.sot = NBRegression([*self.factors, "log_sot_rate"], l2, options=options)
 
     @staticmethod
     def _prep(df: pd.DataFrame) -> pd.DataFrame:

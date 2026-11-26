@@ -1521,3 +1521,137 @@ F1 29 events); not read.
   - §16 asks for the live entry "no earlier than kickoff − 75 min". A run between 30 and 75
     min with no confirmed lineups waits, so the entry is taken at confirmation, or at 30 min
     at the latest.
+
+## 17. Player shots at the best of the books: pre-registration (2026-11-26; binding once merged with the lead's sign-off)
+
+Written before any price for this test is bought. Steps 1–2 buy nothing until this section merges.
+A change after the merge is recorded here as a dated departure, never made silently.
+
+### What is already known (descriptive, read before this section)
+
+- **Market probe** (26 Nov, runs 45782788375 and 45787642567, 82 credits): no book quotes an Under on
+  any player market. On the same player and line, where FanDuel is at 2.0 or shorter, the best other
+  book's implied chance is 0.84–0.94 of FanDuel's. Shots in five leagues live: 0.87–0.94. E0 on 1
+  Nov 2025: 0.84 for shots and on target.
+- **FanDuel's markup** (free, data-log `backtest/E0_player_lines.csv.gz`; Understat starters, Over,
+  odds ≤ 2.0; implied ÷ hit rate − 1, 95% ranges resampling matches):
+
+  | Season | Shots | On target |
+  | --- | --- | --- |
+  | 2024/25 | +23.7% (+21.1% to +26.4%), 8,298 lines | +17.2% (+12.7% to +22.4%), 2,009 |
+  | 2025/26 | +32.9% (+30.0% to +35.9%), 8,305 lines | +32.5% (+27.0% to +38.7%), 1,838 |
+
+  These are at the look snapshot; the close is the same within 0.5 pts.
+- From these, the best book's markup in 2025/26 is expected near (1.33 × 0.84–0.94) − 1 ≈ **+12% to
+  +25%**. **Gate (a) below is therefore expected to stop the test.** It is run because a measured
+  number on the real book mix replaces this estimate.
+
+### Question
+
+Does the best Over price over the US books carry a small enough margin on starters' shot lines
+for a model to beat it? If so, does the frozen shots model carry information beyond that price,
+and do its bets beat the close?
+
+### Data (step 1: the only purchase)
+
+- **League and season:** E0 2025/26 only (development season; 2026/27 stays locked).
+- **Markets:** `player_shots_alternate` and `player_shots_on_target_alternate`.
+- **Books:** DraftKings, BetMGM, Bovada, Caesars, BetOnline, Fanatics and BetRivers: one bookmakers
+  list, one region. FanDuel doesn't list the alternate keys; its cached 2025/26 lines stay
+  descriptive.
+- **Snapshots:** entry at kickoff − 50 min, close at kickoff − 2 min (as §16), from football-data's
+  kickoffs, plus one events list per match day.
+- **Cost:** about 380 matches × 2 snapshots × 2 markets × 10 = 15,200 credits, plus about 100 for
+  events lists.
+  - **Cap: 16,000** (lead, 26 Nov), with the 3,000 reserve.
+  - The run goes from the default branch with the archive job. A call over 20 credits or a
+    network/401/429/5xx error stops it.
+  - Bodies go to the paid `player-odds-history-` cache and are never bought twice.
+
+### Rows
+
+- **Starter:** in ESPN's starting XI for the match (the summary's starter flag). The XI is
+  published about an hour before kickoff, so it is known by the − 50 min entry. Historical
+  lineups weren't logged in 2025/26, so the post-match flag stands in for the XI at entry.
+- **Names:** book names map to ESPN's players by `match_in_fixture` within the match's two clubs.
+  Unmatched names are counted and dropped.
+- **Void:** a priced player who didn't play is void (books void it) and is never a row. Starters
+  always play.
+- **Lines:**
+  - A half line `k + 0.5` wins on count ≥ k + 1.
+  - A whole line `k` means "at least k" (FanDuel's convention) and wins on count ≥ k.
+  - Counts are ESPN's `totalShots` and `shotsOnTarget` for the player.
+- **Best price:** per player, line and snapshot, the longest Over among the seven books.
+  The books' average Over price is computed beside it.
+
+### Gate (a): the price, no model (read once, as soon as step 1's rows exist)
+
+- **Rows:** starter lines at entry whose best Over is 2.0 or shorter.
+- **Markup** = Σ best-book implied chance ÷ Σ won − 1, per market (shots, on target).
+- **Range:** 95%, resampling whole matches, 2,000 draws, seed 0.
+- **Stop:** a market stops when its range's **lower end is above +8%**. A merely uncertain markup
+  doesn't stop it. If both markets stop, the test closes there.
+- **Descriptive beside it:**
+  - the same markup at the books' average price, which shows the max-of-books bias;
+  - per line, per book, and at the close.
+
+### Gate (b): the model (only for a market that passed gate (a))
+
+- **Model:** `player_shots_espn.shots_espn_model()`, frozen at commit 5810210 (tested by
+  `tests/test_shots_espn_frozen.py`).
+  - It is B's shot NB2: start/sub mixture, lineup known, on target by thinning, l2 2.0,
+    `FIT_OPTIONS`.
+  - It uses every shots factor except penalty share (ESPN has no penalty xG), on ESPN appearance
+    rows (`espn_players.appearances`) from 2021/22.
+  - Walk-forward: refit every 28 days on the 730 days before the block; starters with 3+ earlier
+    appearances. The chance is rounded to 6 decimals before the threshold.
+- **T, the edge threshold,** is fixed by volume on development rows, never on the gate's rows.
+  - Development rows: E0 2024/25 at FanDuel's cached prices, starters at entry.
+  - T is the largest of 5%, 8%, 12%, 16% and 20% giving at least 0.3 bets a match there; if none
+    does, T = 5%.
+  - The five price bands for the matched baseline are the odds quintiles of those development bets.
+  - No result or CLV is used to set them.
+- **Rule:** a starter line is a bet when p × best entry Over − 1 ≥ T. One bet per player, market
+  and match (the largest edge), at the best price, $1.
+- **Pass:** both of the following, on at least 300 bets with a final close.
+  1. **c:** in logit P(won) = a + b·logit(best implied) + c·logit(p), c's 95% range (match
+     bootstrap) lies above 0.
+     - Fitted on every starter line at entry with a best Over, across all prices (not only the
+       rule's bets and not only 2.0 or shorter).
+     - One row per player, market, line and match, fitted per market.
+     - The bootstrap resamples whole matches (2,000 draws, seed 0) (lead, 26 Nov, before the merge).
+  2. **CLV:** the rule's best-to-best CLV minus the price-matched no-rule baseline has a 95%
+     range above 0. The baseline is every starter line priced at entry and close, reweighted to
+     the rule's band mix, with one shared match bootstrap (as §16's `matched_excess`).
+- **Inconclusive:** (1) holds but there are fewer than 300 bets.
+- **Fail:** otherwise.
+- The verdict is read once. It is model quality against the market only; nothing goes live from it.
+
+### Building step 1 and gate (a) (2026-11-26, after the merge; no price bought or read yet)
+
+- **Purchase:** `player_goal_backfill` design `shots17`.
+  - E0 2025/26 from football-data's kickoffs: one events list per match day, then the entry
+    (− 50 min) and close (− 2 min) of each event.
+  - Both markets in one call at the seven books (`SHOTS_MARKETS`, `SHOTS_BOOKS`), 20 credits a
+    snapshot, stopping on a call over 20.
+  - Bodies go to `player_odds_history/shots_test/` in the paid cache. The day's events lists
+    the §16 `dev` design already bought (same 3 h lead) are read from `goalscorer_test/`,
+    never bought again.
+  - `odds-check.yml` `task=goalscorer-backfill`, `design=shots17`, from the default branch (the
+    archive job dispatches `caches.yml`), 120-minute budget, resumable.
+- **Gate (a):** `player_shots_priced.py`, CLI `shots-gate-a`, `odds-check.yml` `task=shots-gate-a`
+  (no key).
+  - Prices come from the bought bodies; appearances from ESPN's free E0 2025/26 pull.
+  - It does the join, the void rule, the line rule `count ≥ ceil(point)` and the best and
+    average price, exactly as above.
+  - Log line `SHOTS_GATE_A_JSON`. It is run once, after the purchase completes.
+
+### After E0
+
+The other leagues are considered only if E0 passes both gates, and only with a new estimate and
+the lead's cap.
+
+### Expectations, stated now
+
+Gate (a) most likely stops both markets (above). If shots pass (a), the FanDuel development
+(c 0.44–0.67, look-to-close CLV +0.1 to +2%) suggests some information but a small CLV.

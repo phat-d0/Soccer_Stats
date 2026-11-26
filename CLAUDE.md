@@ -241,6 +241,11 @@ settlement runs after them.
   Bake-off 2's finalist (f) in E0, I1 and F1 has one locked test left (3 Feb 2027).
 - Model 12% filters (favourites only; no long shots): neither passes, pooled CLV −2.7% and
   −3.1% vs −4.6% for the plain rule (`docs/lab.md` "Model 12% filters").
+- xG fallback without Understat (owner via the lead, 26 Nov; `docs/lab.md`, run 45783076386):
+  goals-only costs the raw model +0.0060 log loss (+0.0036 to +0.0084) in the five Understat leagues,
+  but the blend only +0.00005 (−0.0004 to +0.0005); Lean's CLV −2.44% with xG vs −2.54% without.
+  A shots-on-target proxy recovers 12% of xG's gain (−54% to +48%) and doesn't help E1–E3:
+  **no proposal**, nothing live changes.
 - Market-move factor model (owner via the lead, 8 Nov; `docs/lab.md`, run 42538752719): Pinnacle's
   early-to-close move is partly predictable (out-of-sample R² +1.9% on football-data's early price,
   +2.8% at the ten-book 48 h look, ranges above 0; almost all from cross-book disagreement), but
@@ -1251,7 +1256,14 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `wanted_markets` in `WANTED` order plus keys holding `EXTRA_WORDS`, `books_listing`), that
   match's odds at up to ten listing books (one region), then E0's first match on `HISTORY_DAY`
   (2025-11-01) at kickoff − 50 min for as many found markets as the cap leaves (10 each), then
-  uk/eu/au in E0 only when no US book priced a market on both sides. `rows`/`summary`: per
+  uk/eu/au in E0 only when no US book priced a market on both sides. The follow-up (lead, 26 Nov, cap 30;
+  `--shots-alternates`, `task=market-probe` `design=shots-alt`): `run(..., markets=ALT_MARKETS,
+  books=ALT_BOOKS)` asks the first upcoming match for `player_shots_alternate` and
+  `player_shots_on_target_alternate` at six books with no market list, plus E0's history;
+  `line_report` (per line and book, and "best" over every book with FanDuel: Over price, share at
+  2.0 or shorter, Over-sum per event, markup against `shot_rates`, players per match over the line
+  from E0's Understat 2023/24–2025/26; whole lines read as "at least k") and `vs_fanduel` (each
+  book's implied chance over FanDuel's on the same player and line, FanDuel at 2.0 or shorter). `rows`/`summary`: per
   market and book players, lines, two-sided lines and their margin, mean Over/Yes odds and, one
   side only, the Yes chances' sum per event. Bodies in
   `data/raw/player_odds_history/market_probe/` (paid cache); log line `MARKET_PROBE_JSON`.
@@ -1287,6 +1299,16 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   2025/26 apart as seen, 2026/27 never), `base_rates` (assisters, scorers-or-assisters and booked
   players per match). `player_data.parse_match` now also keeps Understat's roster `assists`,
   `xa`, `key_passes`, `yellow`, `red`. Log line `ASSIST_LAB_JSON`.
+- `player_shots_espn.py` (§17, pre-registered 26 Nov): the frozen shots model on ESPN features,
+  `shots_espn_model()` = `PlayerShotModel(SHOTS_ESPN_FACTORS, l2 2.0, thin, FIT_OPTIONS)` (every shots
+  factor but `pen_share`; `PlayerShotModel` now takes `options`, None = unchanged). §17: E0 2025/26
+  shots alternates at seven books, gate (a) best-book markup at 2.0 or shorter (stop when its range's
+  lower end > +8%), gate (b) §16's shape; cap 16,000; nothing bought until it merges.
+- `player_shots_priced.py` (§17 gate (a), 26 Nov; CLI `shots-gate-a`, `odds-check.yml`
+  `task=shots-gate-a`, no key): the best of seven books' markup on E0 2025/26 starters' shot
+  lines at entry, from `player_goal_backfill` design `shots17` (both shots alternate markets,
+  20 credits a snapshot, cache `player_odds_history/shots_test/`, events lists reused from
+  `goalscorer_test/`) and ESPN's appearances; log line `SHOTS_GATE_A_JSON`.
 - `player_goal_odds.py` (goalscorer probe and pilot; `CappedBudget`), `player_lab.py` (shot lines on
   the lab harness, development only), `player_segments.py` (segment search).
 
@@ -1663,6 +1685,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   model beside the UCL closes (`cup_rows`, `cup_card`) and goalscorer B's 2025/26 development
   rows (`goalscorer_card`, T 20% confusion). `tuning.yml` `phase=scorecard2` (a `cup` job reads
   data-log's `UCL_closes.jsonl`; input `goal_run` = a `goalscorer-test.yml` run to score).
+- `lab/xg_fallback.py` (owner via the lead, 26 Nov; `docs/lab.md` "An xG fallback without Understat",
+  pre-registered before any code; development only, no key): the live match model
+  (`dashboard.match_model`, per-league ridge) walk-forward from 2019/20 in four forms on the same
+  rows: (a) Understat xG (`xg.with_xg`, weight 0.7), (b) goals only, (c) a shots proxy
+  α·HST + β·(HS − HST) (`fd_shots`, `fit_proxy` per league on 2017/18–2018/19 by non-negative least squares, `proxy`), (c-sot)
+  α'·HST. Model and blend (`lean_backtest.walk_forward`) log loss with paired ranges, Lean's picks
+  and CLV per form, the recovery share R = (LL_b − LL_c)/(LL_b − LL_a), and `proposal` (the
+  blend's c − b range below 0 and R ≥ 0.5). `tuning.yml` `phase=xg-fallback`, log line
+  `XG_FALLBACK_JSON`.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
