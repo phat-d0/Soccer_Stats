@@ -1451,3 +1451,7 @@
 {"type":"update","id":"E2|2627|Doncaster|Huddersfield","at":"2026-11-26T19:31:04+00:00","pinnacle_live_close_prices":{"home":5.06,"draw":4.44,"away":1.62},"pinnacle_live_fetched_at":"2026-11-26T19:30:26+00:00","pinnacle_live_minutes_before":29.6,"clv_pinnacle_live":-0.25709112173568704}
 {"type":"update","id":"E2|2627|Bromley|Burton","at":"2026-11-26T19:31:04+00:00","pinnacle_live_close_prices":{"home":2.27,"draw":3.69,"away":2.93},"pinnacle_live_fetched_at":"2026-11-26T19:30:26+00:00","pinnacle_live_minutes_before":2609.6,"clv_pinnacle_live":-0.12573272143390124}
 {"type":"update","id":"E2|2627|Leicester|Mansfield","at":"2026-11-26T19:31:04+00:00","pinnacle_live_close_prices":{"home":1.48,"draw":4.65,"away":5.91},"pinnacle_live_fetched_at":"2026-11-26T19:30:26+00:00","pinnacle_live_minutes_before":2609.6,"clv_pinnacle_live":-0.12622886656071164}
+{"type":"update","id":"E2|2627|Bromley|Wycombe|lean","at":"2026-11-26T19:42:24+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":0.12263348701523191}
+{"type":"update","id":"E2|2627|Blackpool|Leicester","at":"2026-11-26T19:42:24+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":-0.19640239565112017}
+{"type":"update","id":"E2|2627|Bromley|Wycombe","at":"2026-11-26T19:42:24+00:00","result_check":"ok","check_score":"1-1","clv_pinnacle":0.12263348701523191}
+{"type":"update","id":"E2|2627|Bradford|Barnsley","at":"2026-11-26T19:42:24+00:00","result_check":"ok","check_score":"3-0","clv_pinnacle":0.16110176686211153}
