@@ -575,7 +575,17 @@ def b_espn_compare(rows: pd.DataFrame) -> dict:
 MODEL_SOURCE = "B-espn"
 FEATURE_SOURCE = "espn"
 CHECK_SEASON = "2526"  # the four-league check reads 2025/26 development rows only
-CHECK_MIN_JOIN = 0.5  # under half the rescued rows joined = "not checked" (treated as failed)
+CHECK_MIN_JOIN = 0.5
+XG_WEIGHT = 0.7  # the frozen match model's xG weight (publish.XG_WEIGHT)
+
+
+def match_xg_weight(matches: pd.DataFrame) -> float:
+    """The live model's rule (publish.league_fixtures): XG_WEIGHT when any match has xG, else 0.
+    Matches in a season without xG fall back to goals inside DixonColes."""
+    has = "home_xg" in matches and matches["home_xg"].notna().any()
+    return (
+        XG_WEIGHT if has else 0.0
+    )  # under half the rescued rows joined = "not checked" (treated as failed)
 
 
 def b_espn_predict(espn: pd.DataFrame, preds: pd.DataFrame, start, end, holdout=None):

@@ -1405,6 +1405,27 @@ team xG, which differs from the frozen model. The verdict above is the one the w
 Whether to rerun I1 with the frozen weight is for the lead and the owner; it is a second look after
 seeing the result.
 
+**I1 rerun (lead's decision, 26 Nov; written and committed before the rerun).** The first I1
+run (+0.0021, +0.0002 to +0.0039, fail) did not test the frozen model. The check dropped xG for
+every I1 season because one season (2022/23) has no Understat xG. Its rule was weight 0.7 only
+when no season failed to load. The frozen B-espn and the live model keep weight 0.7 whenever any
+match has xG, and a season without xG falls back to goals for its own matches only. This fix
+corrects the implementation to the spec written before the result; nothing else changes.
+- The check now uses `espn_players.match_xg_weight` (the live rule, `publish.league_fixtures`) and
+  prints the weight and xG share each run uses.
+- I1 is rerun once with the fix. **Its result is final whichever way it comes out**, and replaces
+  the first I1 result in the table above. There are no further I1 runs.
+- The other checks' weights:
+  - SP1, D1 and F1 each logged `xg_error None` (runs 45785042944, 45785049207, 45785059983). At
+    commit 05554b7 that means weight 0.7.
+  - E0's development comparison (run 45779183561) printed no xG-load line, so its weight can't be
+    confirmed from the log. Its five league files (2021/22 from the Wayback copy, 2022/23–2025/26
+    held) are all in `xg-good-`, so 0.7 is likely but unverified. It is not rerun without the
+    lead's word.
+- ESPN goals check, counting own goals (check runs above): player goals plus own goals add up to
+  the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
+  364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
+
 **Status:** drafted 26 Nov by Player props for the lead's review. Binding only once the owner
 approves and it merges. No judged number had been computed when it was written.
 

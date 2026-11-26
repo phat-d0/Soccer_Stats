@@ -3129,16 +3129,25 @@ def cmd_espn_b_check(args: argparse.Namespace) -> None:
     espn, cover = ep.pull(lg, seasons=tuple(years))
     print(f"ESPN {lg}: {len(espn)} appearance rows")
     matches, err = with_xg(load_matches([lg], years))
+    # xG per season, as the live model loads it (publish.league_fixtures): weight 0.7 when any
+    # match has xG; a season without xG costs only its own matches (lead, 26 Nov: the first I1
+    # run dropped xG for every season because one season had none).
+    weight = ep.match_xg_weight(matches)
+    print(f"Match model xG weight {lg}: {weight} (xG on {matches['home_xg'].notna().mean():.1%} "
+          f"of matches; {err or 'no load errors'})")  # fmt: skip
     preds = backtest.walk_forward(
         matches,
         start="2022-07-01",
-        model_factory=functools.partial(
-            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
-        ),
+        model_factory=functools.partial(DixonColes, xg_weight=weight, options=FIT_OPTIONS),
     )
     fe = ep.b_espn_predict(espn, preds, pd.Timestamp("2025-07-01", tz="UTC"), end, Holdout(end))
     rows, counts = ep.check_rows(fe, judged, lg)
-    res = {"league": lg, **ep.check_verdict(rows, counts), "xg_error": err or None}
+    res = {
+        "league": lg,
+        **ep.check_verdict(rows, counts),
+        "xg_weight": weight,
+        "xg_error": err or None,
+    }
     res["coverage"] = {k: v for k, v in cover.items() if k != "requests"}
     print(f"ESPN-B CHECK {lg}: " + ", ".join(f"{k} {v}" for k, v in res.items() if k != "coverage"))
     print("ESPN_B_CHECK_JSON " + json.dumps(_clean(res), default=str))

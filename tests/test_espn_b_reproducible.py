@@ -102,3 +102,10 @@ def test_check_rows_join_by_name_and_verdict_rule():
     worse = big.assign(p_B_espn=np.where(big["scored"] == 1, 0.05, 0.9))
     assert ep.check_verdict(worse, {"join_share": 1.0})["verdict"] == "fail"
     assert ep.check_verdict(big, {"join_share": 1.0})["verdict"] == "pass"
+
+
+def test_match_xg_weight_keeps_xg_when_one_season_lacks_it():
+    m = pd.DataFrame({"home_xg": [1.2, np.nan, 0.8], "away_xg": [0.9, np.nan, 1.1]})
+    assert ep.match_xg_weight(m) == 0.7
+    assert ep.match_xg_weight(m.assign(home_xg=np.nan)) == 0.0
+    assert ep.match_xg_weight(m.drop(columns=["home_xg", "away_xg"])) == 0.0
