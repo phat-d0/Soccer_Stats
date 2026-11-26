@@ -166,7 +166,7 @@ so B runs only in E0 until Understat returns. The 1 Nov scored rows (all five le
 (sha256 in `archive/extra_assets.json`, checked by caches.yml's verify); the judged read uses them for
 matches through 1 Nov (§16 note of 8 Nov).
 Weekly `players.yml` runs include the window without a reason: the opening is committed in
-`player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked); `PLAYER_PAPER_TRADES =
+`player_goals.FORWARD_OPENED` and each run's holdout log repeats it. Player shots are retired (parked). The §17 check of shots at the best of the books (26 Nov; `docs/player_props.md` §17, purchase run 45792135181, 15,200 credits; read run 45792603508) **closed at gate (a)**: the best US book's markup on E0 2025/26 starters' lines at 2.0 or shorter is +24.5% (+22.0% to +27.4%) for shots and +23.4% (+18.6% to +28.8%) on target, against a +8% stop; only DraftKings, BetMGM and BetOnline priced them. `PLAYER_PAPER_TRADES =
 False`, so no player shot trades open.
 **Goalscorer paper track** (owner-approved 9 Nov; `player_goal_paper.py`; descriptive, never
 feeds §16's 1 Feb read): §16's frozen rule run live on what publish logs. Model B for each
