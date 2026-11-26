@@ -3076,6 +3076,9 @@ def cmd_goalscorer_paper(args: argparse.Namespace) -> None:
             f"chances {r.get('chances')}, features through {r.get('features_through')}"
             + (f", {r['why']}" if r.get("why") else "")
         )
+    if args.audit:
+        for line in pgp.settlement_audit(res["trades"], now):
+            print(line)
     for t in sorted(res["trades"], key=lambda t: t["opened_at"]):
         print(
             f"  {t['strategy']} {t['home']} v {t['away']}: {t['player']} @ {t['odds']} "
@@ -3880,6 +3883,9 @@ def main(argv: list[str] | None = None) -> None:
     gpp = sub.add_parser("goalscorer-paper", help="the goalscorer paper track on a data-log copy")
     gpp.add_argument("--log-dir", required=True, help="data-log checkout (written to)")
     gpp.add_argument("--now", help="ISO time to run as (default: now)")
+    gpp.add_argument(
+        "--audit", action="store_true", help="print ESPN's goal details beside each settled bet"
+    )
     gpp.set_defaults(func=cmd_goalscorer_paper)
     gdv = sub.add_parser("goalscorer-dev", help="priced goalscorer step 3: one league's rows")
     gdv.add_argument("--league", default="E0")

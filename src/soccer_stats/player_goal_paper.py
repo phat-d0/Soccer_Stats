@@ -860,7 +860,49 @@ def espn_match(trade: dict, raw_dir=None, get=None, budget=None, now=None) -> di
     goals = goal_events(raw.get(str(e["id"]), {}))
     if len(goals) != int(e["score90"][0]) + int(e["score90"][1]):
         return None  # the details don't account for the score: don't guess
-    return {"score90": e["score90"], "goals": goals, "event_id": e["id"]}
+    details = (((raw.get(str(e["id"]), {}).get("competitions") or [{}])[0]) or {}).get("details")
+    first = next((d for d in details or [] if isinstance(d, dict) and d.get("scoringPlay")), None)
+    return {"score90": e["score90"], "goals": goals, "event_id": e["id"], "raw_detail": first}
+
+
+def settlement_audit(trades: list[dict], now=None) -> list[str]:
+    """Lines for a dry run: per settled match, ESPN's goal details (name, athlete id, own
+    goal, team id) and each settled bet's ESPN name with whether it matches a scorer."""
+    import json
+
+    by_match: dict[str, list[dict]] = {}
+    for t in trades:
+        if t.get("status") in ("won", "lost") and t.get("bet_type") == "goalscorer":
+            by_match.setdefault(f"{t['home']}|{t['away']}|{t['kickoff']}", []).append(t)
+    out = []
+    for key, ts in sorted(by_match.items(), key=lambda x: x[0].split("|")[2]):
+        t0 = ts[0]
+        try:
+            res = espn_match(t0, now=now)
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"AUDIT {key}: no ESPN result ({type(exc).__name__})")
+            continue
+        if res is None:
+            out.append(f"AUDIT {key}: no ESPN result")
+            continue
+        goals = res["goals"]
+        if res.get("raw_detail") is not None:
+            out.append(
+                f"AUDIT raw detail: {json.dumps(res['raw_detail'], ensure_ascii=False)[:600]}"
+            )
+        out.append(
+            f"AUDIT {t0['home']} v {t0['away']} {t0['kickoff'][:10]} {res['score90']}: goals "
+            + json.dumps(goals, ensure_ascii=False)
+        )
+        names = {norm(g["name"] or "") for g in goals if not g["own_goal"]}
+        for t in ts:
+            if t["id"].endswith("|dk"):
+                continue
+            out.append(
+                f"AUDIT   bet {t['player']} (espn {t.get('espn_name')!r}) {t['status']}, "
+                f"matches a scorer: {norm(t.get('espn_name') or '') in names}"
+            )
+    return out
 
 
 def settle_fields(t: dict, result: dict, lineup: dict | None) -> dict:

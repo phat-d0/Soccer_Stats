@@ -682,7 +682,7 @@ jobs:
             goalscorer-paper)  # the paper track on a copy of data-log; nothing is pushed
               git fetch --depth=1 origin data-log
               git worktree add --detach "$RUNNER_TEMP/log" FETCH_HEAD
-              uv run soccer-stats goalscorer-paper --log-dir "$RUNNER_TEMP/log" ;;
+              uv run soccer-stats goalscorer-paper --log-dir "$RUNNER_TEMP/log" --audit ;;
             goal-lab)
               curl -sSfL -H "Authorization: Bearer ${{ github.token }}" \
                 "https://api.github.com/repos/${{ github.repository }}/actions/jobs/112639640656/logs" \
