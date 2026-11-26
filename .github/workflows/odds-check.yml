@@ -183,12 +183,12 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, market-probe, assist-lab, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, goalscorer-paper, market-probe, assist-lab, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
         default: coverage
       cap:
-        description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
+        description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / market-probe / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
         default: "0"
       hist_dates:
         description: "props: historical dates (comma-separated ISO times)"
@@ -284,62 +284,62 @@ jobs:
       # Understat match files (lead, 8 Nov): five shards, restored together (every file any
       # run kept); goal-league and goal-leagues save the union back when they added files.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         with:
           path: data/raw/understat_matches
           key: understat-E0-none
           restore-keys: understat-E0-
       - uses: ./.github/actions/paid-archive-restore
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: understat-E0
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         with:
           path: data/raw/understat_matches
           key: understat-SP1-none
           restore-keys: understat-SP1-
       - uses: ./.github/actions/paid-archive-restore
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: understat-SP1
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         with:
           path: data/raw/understat_matches
           key: understat-D1-none
           restore-keys: understat-D1-
       - uses: ./.github/actions/paid-archive-restore
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: understat-D1
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         with:
           path: data/raw/understat_matches
           key: understat-I1-none
           restore-keys: understat-I1-
       - uses: ./.github/actions/paid-archive-restore
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: understat-I1
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         with:
           path: data/raw/understat_matches
           key: understat-F1-none
           restore-keys: understat-F1-
       - uses: ./.github/actions/paid-archive-restore
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         continue-on-error: true # free data: a failed rebuild never stops the job
         with:
           name: understat-F1
       - name: Count the Understat match files restored (a save never keeps fewer)
-        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
+        if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         run: echo "UM_BEFORE=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
       # understat-seed (lead, 9 Nov): publish's raw-data- holds E0's match files that no
       # shard does; restored after the count, so the files it adds are new to the shard.
@@ -515,7 +515,7 @@ jobs:
           github-token: ${{ github.token }}
       - name: Run
         env:
-          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0') || inputs.task == 'markets' || (inputs.task == 'corner-markets' && inputs.cap != '0') || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill' || inputs.task == 'market-probe') && inputs.cap != '0') || inputs.task == 'markets' || (inputs.task == 'corner-markets' && inputs.cap != '0') || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
           GH_TOKEN: ${{ (inputs.task == 'understat' || inputs.task == 'residual-map') && github.token || '' }}
           DESIGN: ${{ inputs.design }}
@@ -659,6 +659,10 @@ jobs:
               if [ -d data/raw/corner_history ]; then cp -r data/raw/corner_history out/; fi ;;
             goalscorer) uv run soccer-stats goalscorer-pilot --cap "$CAP" \
                      --json out/goalscorer_pilot.json ;;
+            market-probe)  # player-prop markets (lead, 26 Nov, cap 60): books, lines, margins
+              uv run soccer-stats market-probe --cap "$CAP" --json out/market_probe.json ;;
+            assist-lab)  # assists and score-or-assist vs season baselines (free, no key)
+              uv run soccer-stats assist-lab --league "${LEAGUE:-E0}" --json out/assist_lab.json ;;
             goalscorer-probe)  # priced goalscorer step 0 (lead-approved 1 Nov, cap 250); no results read
               uv run soccer-stats goalscorer-probe --cap "$CAP" --json out/goalscorer_probe.json ;;
             understat-seed)  # lead, 9 Nov: copy raw-data's match files into a league's shard
@@ -861,7 +865,7 @@ jobs:
       # The goalscorer probe and pilot write their bought lines into the restored
       # player-odds-history folder: saved so they outlive the run (paid data).
       - uses: actions/cache/save@v4
-        if: ${{ always() && (inputs.task == 'goalscorer' || inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill') && inputs.cap != '0' }}
+        if: ${{ always() && (inputs.task == 'goalscorer' || inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill' || inputs.task == 'market-probe') && inputs.cap != '0' }}
         with:
           path: data/raw/player_odds_history
           key: player-odds-history-${{ github.run_id }}

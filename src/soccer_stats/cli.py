@@ -2945,6 +2945,75 @@ def cmd_goalscorer_probe(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_market_probe(args: argparse.Namespace) -> None:
+    """Player-prop market probe (lead, 26 Nov): who prices shots, shots on target, assists,
+    cards and any goal-or-assist market, at which lines and margins; within --cap."""
+    import json
+
+    from soccer_stats import player_market_probe as mp
+    from soccer_stats.publish import _clean
+
+    res = mp.run(args.cap)
+    for line in res["log"]:
+        print(f"  {line}")
+    for line in mp.summary_lines(res):
+        print(line)
+    print(f"Credits spent: {res['spent']} of {args.cap}; credits left {res.get('left')}")
+    body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
+    print("MARKET_PROBE_JSON " + body)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def cmd_assist_lab(args: argparse.Namespace) -> None:
+    """Assists and score-or-assist against season baselines (lead, 26 Nov; development
+    2023/24-2024/25, 2025/26 described apart, 2026/27 never touched; no prices, no key)."""
+    import json
+
+    from soccer_stats import player_assist_lab as al
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    apps, missing = load_appearances(lg, years, max_new=0)  # cached files only
+    print(f"{lg}: {len(apps)} appearances ({missing} match files not held)")
+    for s, n in apps.groupby("season")["match_id"].nunique().items():
+        print(f"  season {s}: {n} matches with player files")
+    matches, err = with_xg(load_matches([lg], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(
+            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+        ),
+    )
+    feats = al.assist_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
+    feats = feats[feats["kickoff"] < pg.FORWARD_START].reset_index(drop=True)
+    rows = al.scored_rows(
+        feats, pd.Timestamp("2023-07-01", tz="UTC"), pg.FORWARD_START, al.holdout()
+    )
+    out = {"league": lg, "report": al.report(rows), "base_rates": al.base_rates(apps)}
+    for part, r in out["report"].items():
+        for what in ("assists", "score_or_assist"):
+            c = r.get(what) or {}
+            if c.get("rows"):
+                print(
+                    f"{lg} {part} {what}: {c['rows']} starters, {c['matches']} matches, rate "
+                    f"{c['rate']:.3f}, log loss model {c['ll_model']:.5f} vs season baseline "
+                    f"{c['ll_bench']:.5f}, gain {c['gain']:+.5f} {c['range']} "
+                    f"{'beats' if c['beats'] else 'does not beat'}"
+                )
+    print(f"{lg} base rates: {out['base_rates']}")
+    print("ASSIST_LAB_JSON " + json.dumps(_clean(out), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
     at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
@@ -3910,6 +3979,16 @@ def main(argv: list[str] | None = None) -> None:
     gpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     gpr.add_argument("--json", help="write the results as JSON")
     gpr.set_defaults(func=cmd_goalscorer_probe)
+    mpr = sub.add_parser(
+        "market-probe", help="player-prop markets: books, lines, sides and margins (capped)"
+    )
+    mpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
+    mpr.add_argument("--json", help="write the results as JSON")
+    mpr.set_defaults(func=cmd_market_probe)
+    alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
+    alb.add_argument("--league", default="E0")
+    alb.add_argument("--json", help="write the results as JSON")
+    alb.set_defaults(func=cmd_assist_lab)
 
     pl_ = sub.add_parser("player-lab", help="player shot lines through the lab's metrics")
     pl_.add_argument("--lines", required=True, help="E0_player_lines.csv(.gz) from data-log")
