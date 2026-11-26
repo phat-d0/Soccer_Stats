@@ -3014,6 +3014,26 @@ def cmd_assist_lab(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
 
 
+def cmd_espn_players(args: argparse.Namespace) -> None:
+    """ESPN as a player-data fallback for Understat (lead, 26 Nov; free, no key): which
+    per-player fields ESPN's match summaries hold, by league and season."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.publish import _clean
+
+    res = ep.fields(out_dir=Path(args.out) if args.out else None)
+    for line in ep.summary_lines(res):
+        print(line)
+    for lg, by in res["leagues"].items():
+        for season, r in by.items():
+            ex = next((m["example"] for m in r.get("matches", []) if m.get("example")), None)
+            if ex:
+                print(f"ESPN_PLAYER_EXAMPLE {lg} {season} " + json.dumps(ex, default=str)[:600])
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
     at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
@@ -3985,6 +4005,10 @@ def main(argv: list[str] | None = None) -> None:
     mpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     mpr.add_argument("--json", help="write the results as JSON")
     mpr.set_defaults(func=cmd_market_probe)
+    epl = sub.add_parser("espn-players", help="ESPN summaries as a player-data fallback")
+    epl.add_argument("--out", help="folder for the summaries read (the artifact)")
+    epl.add_argument("--json", help="write the results as JSON")
+    epl.set_defaults(func=cmd_espn_players)
     alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
     alb.add_argument("--league", default="E0")
     alb.add_argument("--json", help="write the results as JSON")
