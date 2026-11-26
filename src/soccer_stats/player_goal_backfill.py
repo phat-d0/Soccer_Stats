@@ -85,13 +85,52 @@ DESIGNS["gaps"] = {
     "since": "2026-11-01",
     "note": "2026/27 from 1 Nov: only the snapshots the live log lacks",
 }
+# §17 (player shots at the best of the books, binding 26 Nov): E0 2025/26, the two shots
+# alternate markets at seven US books in one call (two markets = 20 credits a snapshot).
+# Events lists already bought by `dev` (goalscorer_test/E0/events_*.json, same 3 h lead) are
+# reused, never bought again.
+SHOTS_MARKETS = ("player_shots_alternate", "player_shots_on_target_alternate")
+SHOTS_BOOKS = (
+    "draftkings",
+    "betmgm",
+    "bovada",
+    "williamhill_us",
+    "betonlineag",
+    "fanatics",
+    "betrivers",
+)
+DESIGNS["shots17"] = {
+    "season": 2025,
+    "since": None,
+    "note": "§17: E0 2025/26 shots alternates at seven books",
+    "leagues": ("E0",),
+    "markets": SHOTS_MARKETS,
+    "books": SHOTS_BOOKS,
+    "cache": "shots_test",
+    "hist_cost": 20,
+    "max_call_cost": 20,
+    "lists_from": "goalscorer_test",
+}
 LIVE_FROM = "2026-11-01"  # the live goalscorer log's first day (§16 step 2)
 CACHE = "goalscorer_test"
 SETTLED_AFTER = pd.Timedelta(hours=3)  # forward: only matches kicked off this long ago
 
 
-def cache_dir(raw_dir: Path = RAW_DIR) -> Path:
-    return Path(raw_dir) / "player_odds_history" / CACHE
+def cache_dir(raw_dir: Path = RAW_DIR, design: str = "dev") -> Path:
+    return Path(raw_dir) / "player_odds_history" / DESIGNS[design].get("cache", CACHE)
+
+
+def spec(design: str) -> dict:
+    """A design's leagues, markets, books, snapshot cost and largest allowed call."""
+    d = DESIGNS[design]
+    return {
+        "leagues": d.get("leagues", LEAGUES),
+        "markets": tuple(d.get("markets", (MARKET,))),
+        "books": tuple(d.get("books", BOOKS)),
+        "hist_cost": d.get("hist_cost", HIST_COST),
+        "max_call_cost": d.get("max_call_cost", MAX_CALL_COST),
+        "lists_from": d.get("lists_from"),
+    }
 
 
 def read_calls(base: Path) -> list[dict]:
@@ -157,10 +196,10 @@ def snapshot_at(kickoff: str, kind: str) -> str:
     return iso(pd.Timestamp(kickoff) - SNAPSHOTS[kind])
 
 
-def priced(body: dict | None) -> bool:
+def priced(body: dict | None, markets=(MARKET,)) -> bool:
     ev = (body or {}).get("data", body) if isinstance(body, dict) else {}
     return any(
-        m.get("key") == MARKET and m.get("outcomes")
+        m.get("key") in markets and m.get("outcomes")
         for b in (ev or {}).get("bookmakers", []) or []
         for m in b.get("markets", []) or []
     )
@@ -203,7 +242,7 @@ def run(
     cap: int = 0,
     api_key: str | None = None,
     raw_dir: Path = RAW_DIR,
-    leagues: tuple[str, ...] = LEAGUES,
+    leagues: tuple[str, ...] | None = None,
     get: Callable = requests.get,
     minutes: float | None = None,
     now: pd.Timestamp | None = None,
@@ -211,7 +250,22 @@ def run(
     live_calls: list[dict] | None = None,
 ) -> dict:
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
-    base = cache_dir(raw_dir)
+    sp = spec(design)
+    leagues = tuple(leagues) if leagues is not None else sp["leagues"]
+    hist_cost, max_cost = sp["hist_cost"], sp["max_call_cost"]
+    base = cache_dir(raw_dir, design)
+    lists_base = (
+        Path(raw_dir) / "player_odds_history" / sp["lists_from"] if sp["lists_from"] else None
+    )
+
+    def list_file(lg: str, day: str) -> Path:
+        """The day's events list: this design's copy, else one another design already bought."""
+        stem = f"events_{day.replace('-', '')}.json"
+        own = base / lg / stem
+        if not own.exists() and lists_base is not None and (lists_base / lg / stem).exists():
+            return lists_base / lg / stem
+        return own
+
     now = now or pd.Timestamp.now(tz="UTC")
     until = now - SETTLED_AFTER if design in ("forward", "gaps") else None
     days = plan(design, leagues, now, kickoffs)
@@ -229,7 +283,8 @@ def run(
         "design": design,
         "note": DESIGNS[design]["note"],
         "cap": int(cap),
-        "books": list(BOOKS),
+        "books": list(sp["books"]),
+        "markets": list(sp["markets"]),
         "days": len(days),
         "matches_football_data": sum(d["matches"] for d in days),
         "spent": 0,
@@ -237,17 +292,15 @@ def run(
         "stopped": None,
         "log": budget.log,
     }
-    held_lists = sum(
-        (base / d["league"] / f"events_{d['day'].replace('-', '')}.json").exists() for d in days
-    )
-    res["estimate"] = (len(days) - held_lists) * LIST_COST + 2 * HIST_COST * res[
+    held_lists = sum(list_file(d["league"], d["day"]).exists() for d in days)
+    res["estimate"] = (len(days) - held_lists) * LIST_COST + 2 * hist_cost * res[
         "matches_football_data"
     ]
     if gaps:  # lists only where the live record is short, snapshots only where it lacks them
         est = 0
         for d in days:
             known = live_events.get((d["league"], d["day"]), {})
-            listed = (base / d["league"] / f"events_{d['day'].replace('-', '')}.json").exists()
+            listed = list_file(d["league"], d["day"]).exists()
             est += LIST_COST * int(len(known) < d["matches"] and not listed)
             est += HIST_COST * len(SNAPSHOTS) * max(d["matches"] - len(known), 0)
             est += HIST_COST * sum(len(gap_kinds(eid, live_held)) for eid in known)
@@ -274,8 +327,8 @@ def run(
         if info.get("stop") and info.get("status") not in KEEP_GOING:
             res["stopped"] = info.get("message") or f"HTTP {info.get('status')}"
             return True
-        if (info.get("cost") or 0) > MAX_CALL_COST:
-            res["stopped"] = f"a call cost {info['cost']} credits (> {MAX_CALL_COST}) at {key}"
+        if (info.get("cost") or 0) > max_cost:
+            res["stopped"] = f"a call cost {info['cost']} credits (> {max_cost}) at {key}"
             return True
         return False
 
@@ -328,7 +381,7 @@ def run(
             continue
         stem = d["day"].replace("-", "")
         key = f"{lg}|events|{stem}"
-        list_path = base / lg / f"events_{stem}.json"
+        list_path = list_file(lg, d["day"])
         had_list = list_path.exists()
         known = live_events.get((lg, d["day"]), {})
         if gaps and len(known) >= d["matches"] and not had_list:
@@ -349,7 +402,7 @@ def run(
                 body = list(known.values())
         evs = day_events(body, d["day"])
         if dry and body is None:  # list not held: its events unknown, count them gross
-            res["net_estimate"] += HIST_COST * len(SNAPSHOTS) * d["matches"]
+            res["net_estimate"] += hist_cost * len(SNAPSHOTS) * d["matches"]
         if until is not None:
             evs = [e for e in evs if pd.Timestamp(e["commence_time"]) <= until]
         s["events"] += len(evs)
@@ -374,18 +427,18 @@ def run(
                     key,
                     f"{BASE}/historical/sports/{d['sport']}/events/{e['id']}/odds",
                     {
-                        "bookmakers": ",".join(BOOKS),
-                        "markets": MARKET,
+                        "bookmakers": ",".join(sp["books"]),
+                        "markets": ",".join(sp["markets"]),
                         "oddsFormat": "decimal",
                         "dateFormat": "iso",
                         "date": at,
                     },  # fmt: skip
-                    HIST_COST,
+                    hist_cost,
                     f"{lg} {kind} {e['home_team']} v {e['away_team']} at {at}",
                 )
                 if body is not None:
                     s[kind] += 1
-                    s[f"{kind}_priced"] += int(priced(body))
+                    s[f"{kind}_priced"] += int(priced(body, sp["markets"]))
                     res["bought"]["snapshots"] += int(not had)
             if stopped:
                 break
