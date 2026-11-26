@@ -1418,10 +1418,10 @@ corrects the implementation to the spec written before the result; nothing else 
 - The other checks' weights:
   - SP1, D1 and F1 each logged `xg_error None` (runs 45785042944, 45785049207, 45785059983). At
     commit 05554b7 that means weight 0.7.
-  - E0's development comparison (run 45779183561) printed no xG-load line, so its weight can't be
-    confirmed from the log. Its five league files (2021/22 from the Wayback copy, 2022/23–2025/26
-    held) are all in `xg-good-`, so 0.7 is likely but unverified. It is not rerun without the
-    lead's word.
+  - E0's development comparison (run 45779183561) printed no xG-load line. Its five league files (2021/22 from the Wayback copy, 2022/23–2025/26
+    held) are all in `xg-good-`. **Confirmed by a load-only step** (lead, 26 Nov; `task=xg-weight`,
+    run 45788654308, no scoring): E0 on the checks' seasons loads with no errors and xG on 100% of
+    1,900 matches in every season, so espn-b's rule gave weight 0.7. E0 is not rerun.
 - ESPN goals check, counting own goals (check runs above): player goals plus own goals add up to
   the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
   364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
