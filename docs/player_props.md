@@ -1385,14 +1385,15 @@ run after this merges, which also ends its E0-only wait for Understat. Every ent
 definition and are never rewritten. The sections count trades per model.
 
 **Check result, 26 Nov** (odds-check `task=espn-b-check`, runs 45785042944 SP1, 45785049207 D1,
-45785055783 I1, 45785059983 F1, commit 05554b7; both sha256s matched). B-espn minus B log loss on
+45785059983 F1, commit 05554b7; I1 from its single rerun, run 45788135188, commit d980605; both
+sha256s matched every time). B-espn minus B log loss on
 the rescued 2025/26 rows, 95% range over matches:
 
 | League | Rescued rows | Joined | Matches | B | B-espn | B-espn − B | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | SP1 | 4,564 | 4,134 (90.6%) | 317 | 0.2841 | 0.2855 | +0.0014 (−0.0010 to +0.0040) | pass |
 | D1 | 5,387 | 4,660 (86.5%) | 271 | 0.3195 | 0.3198 | +0.0003 (−0.0022 to +0.0027) | pass |
-| I1 | 6,025 | 5,498 (91.3%) | 353 | 0.2716 | 0.2737 | +0.0021 (+0.0002 to +0.0039) | **fail** |
+| I1 (rerun, final) | 6,025 | 5,498 (91.3%) | 353 | 0.2716 | 0.2738 | +0.0022 (+0.0003 to +0.0040) | **fail** |
 | F1 | 4,688 | 4,176 (89.1%) | 270 | 0.2919 | 0.2926 | +0.0007 (−0.0017 to +0.0031) | pass |
 
 E0's development result above stands as its check (pass). Under this amendment's rule I1 is read
@@ -1422,6 +1423,14 @@ corrects the implementation to the spec written before the result; nothing else 
     held) are all in `xg-good-`. **Confirmed by a load-only step** (lead, 26 Nov; `task=xg-weight`,
     run 45788654308, no scoring): E0 on the checks' seasons loads with no errors and xG on 100% of
     1,900 matches in every season, so espn-b's rule gave weight 0.7. E0 is not rerun.
+- **I1 rerun result (final; run 45788135188, commit d980605):** the match model ran at xG weight
+  0.7 (xG on 79.9% of matches; only I1 2022/23 failed to load). B 0.27162, B-espn 0.27377,
+  B-espn − B +0.00215 (+0.00034 to +0.00399) on the same 5,498 rows and 353 matches: **fail**,
+  as in the first run (+0.0021, +0.0002 to +0.0039, goals-only team xG, kept here as the
+  record). The table's I1 row is the rerun. The team-xG weight barely moves B-espn's player
+  chances; the gap to B is the player features themselves (Understat's xG per shot against ESPN's
+  goal and shot rates). Under this amendment's rule I1 is read on B, and is left out if B can't
+  score it by 31 Jan.
 - ESPN goals check, counting own goals (check runs above): player goals plus own goals add up to
   the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
   364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
