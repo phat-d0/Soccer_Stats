@@ -3160,6 +3160,19 @@ def cmd_espn_b_check(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_xg_weight(args: argparse.Namespace) -> None:
+    """Load-only (lead, 26 Nov): the match model's xG weight and xG share for one league on the
+    B-espn checks' seasons (2021/22-2025/26), as `espn-b`/`espn-b-check` load them. No scoring."""
+    from soccer_stats import espn_players as ep
+
+    matches, err = with_xg(load_matches([args.league], range(2021, 2026)))
+    weight = ep.match_xg_weight(matches)
+    share = matches["home_xg"].notna().groupby(matches["season"]).mean().round(3).to_dict()
+    print(f"XG_WEIGHT {args.league}: weight {weight}, xG on "
+          f"{matches['home_xg'].notna().mean():.1%} of {len(matches)} matches, by season {share}; "
+          f"load errors: {err or 'none'}")  # fmt: skip
+
+
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
     at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
@@ -4146,6 +4159,9 @@ def main(argv: list[str] | None = None) -> None:
     ebc.add_argument("--out", help="folder for the joined check rows (the artifact)")
     ebc.add_argument("--json", help="write the result as JSON")
     ebc.set_defaults(func=cmd_espn_b_check)
+    xgw = sub.add_parser("xg-weight", help="load-only: the match model's xG weight and share")
+    xgw.add_argument("--league", required=True)
+    xgw.set_defaults(func=cmd_xg_weight)
     alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
     alb.add_argument("--league", default="E0")
     alb.add_argument("--json", help="write the results as JSON")
