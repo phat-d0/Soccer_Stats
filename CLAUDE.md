@@ -1619,7 +1619,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   pre-registered before any code; development only, no key): the live match model
   (`dashboard.match_model`, per-league ridge) walk-forward from 2019/20 in four forms on the same
   rows: (a) Understat xG (`xg.with_xg`, weight 0.7), (b) goals only, (c) a shots proxy
-  α·HST + β·(HS − HST) (`fd_shots`, `fit_proxy` per league on 2017/18–2018/19, `proxy`), (c-sot)
+  α·HST + β·(HS − HST) (`fd_shots`, `fit_proxy` per league on 2017/18–2018/19 by non-negative least squares, `proxy`), (c-sot)
   α'·HST. Model and blend (`lean_backtest.walk_forward`) log loss with paired ranges, Lean's picks
   and CLV per form, the recovery share R = (LL_b − LL_c)/(LL_b − LL_a), and `proposal` (the
   blend's c − b range below 0 and R ≥ 0.5). `tuning.yml` `phase=xg-fallback`, log line

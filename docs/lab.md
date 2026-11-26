@@ -5292,6 +5292,12 @@ and its xG weight:
     no look-ahead: the model is fitted on earlier matches only.
   - A match without HS uses α' · HST, with α' fitted the same way on HST alone. A match without
     HST has no proxy, and the model falls back to goals.
+  - *Amended 26 Nov, before any result was scored or read:* α and β are fitted by non-negative
+    least squares (`scipy.optimize.nnls`). In the first run (45778868864, rerun 45779212063 with
+    diagnostics) the plain fit gave E0 a negative β, so a team with few shots on target and many
+    other shots got a proxy below 0 (minimum −0.20). The model can't fit negative goals, and every
+    fit stopped ("ABNORMAL") before any league was scored. A negative weight on shots also
+    makes no sense as an xG idea. Where β would be negative it is 0, and the proxy is α·HST.
 - **Descriptive beside them: (c-sot).** The proxy from shots on target alone (α' · HST), weight 0.7.
 
 **Rows.** Every match each form predicts. The three forms are compared on the same rows: matches

@@ -27,6 +27,15 @@ def test_fit_proxy_recovers_the_conversion_rates():
     assert 0.3 < c["alpha_sot"] < 0.45  # shots on target alone also carry the other shots
 
 
+def test_fit_proxy_never_gives_a_negative_weight():
+    s = _shots()
+    s["home_goals"] = 0.35 * s["home_hst"] - 0.02 * (s["home_hs"] - s["home_hst"]) + 0.1
+    s["away_goals"] = 0.35 * s["away_hst"] - 0.02 * (s["away_hs"] - s["away_hst"]) + 0.1
+    c = xf.fit_proxy(s)
+    assert c["beta"] == 0.0 and c["alpha"] > 0
+    assert (xf.proxy(s, c)[["home_xg", "away_xg"]] >= 0).all().all()
+
+
 def test_proxy_falls_back_to_shots_on_target_then_to_goals():
     m = pd.DataFrame({"home_hst": [5.0, 5.0, np.nan], "away_hst": [2.0, 2.0, 2.0],
                       "home_hs": [10.0, np.nan, 10.0], "away_hs": [4.0, 4.0, 4.0]})  # fmt: skip

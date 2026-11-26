@@ -74,16 +74,18 @@ def _team_rows(m: pd.DataFrame) -> pd.DataFrame:
 
 
 def fit_proxy(m: pd.DataFrame) -> dict:
-    """alpha, beta (goals ~ HST + (HS - HST), no intercept) and alpha' (goals ~ HST) on the
-    matches of `m` (already restricted to before PROXY_TO)."""
+    """alpha, beta >= 0 (goals ~ HST + (HS - HST), no intercept, non-negative least squares)
+    and alpha' (goals ~ HST) on the matches of `m` (already restricted to before PROXY_TO)."""
     t = _team_rows(m)
     both = t.dropna(subset=["goals", "hs", "hst"])
     both = both[both["hs"] >= both["hst"]]
     one = t.dropna(subset=["goals", "hst"])
     out: dict = {"rows_both": int(len(both)), "rows_sot": int(len(one))}
     if len(both) >= 50:
+        from scipy.optimize import nnls
+
         x = np.column_stack([both["hst"], both["hs"] - both["hst"]])
-        coef = np.linalg.lstsq(x, both["goals"].to_numpy(float), rcond=None)[0]
+        coef = nnls(x, both["goals"].to_numpy(float))[0]  # amended 26 Nov: weights >= 0
         out["alpha"], out["beta"] = float(coef[0]), float(coef[1])
     if len(one) >= 50:
         h = one["hst"].to_numpy(float)
