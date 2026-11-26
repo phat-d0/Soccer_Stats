@@ -1615,6 +1615,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   model beside the UCL closes (`cup_rows`, `cup_card`) and goalscorer B's 2025/26 development
   rows (`goalscorer_card`, T 20% confusion). `tuning.yml` `phase=scorecard2` (a `cup` job reads
   data-log's `UCL_closes.jsonl`; input `goal_run` = a `goalscorer-test.yml` run to score).
+- `lab/xg_fallback.py` (owner via the lead, 26 Nov; `docs/lab.md` "An xG fallback without Understat",
+  pre-registered before any code; development only, no key): the live match model
+  (`dashboard.match_model`, per-league ridge) walk-forward from 2019/20 in four forms on the same
+  rows: (a) Understat xG (`xg.with_xg`, weight 0.7), (b) goals only, (c) a shots proxy
+  α·HST + β·(HS − HST) (`fd_shots`, `fit_proxy` per league on 2017/18–2018/19, `proxy`), (c-sot)
+  α'·HST. Model and blend (`lean_backtest.walk_forward`) log loss with paired ranges, Lean's picks
+  and CLV per form, the recovery share R = (LL_b − LL_c)/(LL_b − LL_a), and `proposal` (the
+  blend's c − b range below 0 and R ≥ 0.5). `tuning.yml` `phase=xg-fallback`, log line
+  `XG_FALLBACK_JSON`.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
