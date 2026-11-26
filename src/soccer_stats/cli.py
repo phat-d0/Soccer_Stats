@@ -2953,16 +2953,69 @@ def cmd_market_probe(args: argparse.Namespace) -> None:
     from soccer_stats import player_market_probe as mp
     from soccer_stats.publish import _clean
 
-    res = mp.run(args.cap)
+    follow = getattr(args, "shots_alternates", False)
+    if follow:
+        res = mp.run(args.cap, markets=mp.ALT_MARKETS, books=mp.ALT_BOOKS)
+    else:
+        res = mp.run(args.cap)
     for line in res["log"]:
         print(f"  {line}")
     for line in mp.summary_lines(res):
         print(line)
+    if follow:
+        res["shots_report"] = _shots_alternates_report(mp, res)
     print(f"Credits spent: {res['spent']} of {args.cap}; credits left {res.get('left')}")
     body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
     print("MARKET_PROBE_JSON " + body)
     if args.json:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def _shots_alternates_report(mp, res: dict) -> dict:
+    """The follow-up probe's report: per league and line each book's Over-sum against the
+    players per match who went over (E0's Understat 2023/24-2025/26, starters and all), and
+    each book against FanDuel's price on the same player and line (FanDuel at 2.0 or
+    shorter); the live FanDuel bodies are the first probe's, the same matches."""
+    from soccer_stats.player_data import load_appearances
+
+    actual = {}
+    try:
+        apps, _ = load_appearances("E0", range(2023, 2026), max_new=0)
+        actual = mp.shot_rates(apps)
+    except Exception as exc:  # noqa: BLE001  (no Understat files: no actual rates)
+        print(f"Shot rates: none ({type(exc).__name__})")
+    print("Shot rates, E0 2023/24-2025/26 (players per match over the line, all / starters): "
+          + ", ".join(f"{k[0][7:]} {k[1]}: {v}/{actual.get((k[0], k[1], 'starters'))}"
+                      for k, v in actual.items() if len(k) == 2))  # fmt: skip
+    out = {}
+    base = mp.probe_dir()
+    parts = {lg: (r.get("event_id"), "live_") for lg, r in res.get("leagues", {}).items()}
+    parts["E0 history"] = (None, "")
+    for name, (eid, prefix) in parts.items():
+        lg = name.split()[0]
+        r = mp.load_bodies(base / lg, prefix if prefix else "*_hist_")
+        if r.empty:
+            continue
+        r = r[r["event_id"] == eid] if eid else r[r["stamp"] == "hist"]
+        rep = mp.line_report(r, actual if lg == "E0" else None)
+        vs = mp.vs_fanduel(r)
+        out[name] = {"lines": rep, "vs_fanduel": vs}
+        for x in rep:
+            if x["line"] <= 2.5:
+                mk = "shots" if x["market"] == "player_shots" else "on target"
+                tail = (
+                    f", actual {x['actual_per_match']}, markup {x['markup']:+.0%}"
+                    if x["markup"] is not None
+                    else ""
+                )
+                print(f"  {name} {mk} {x['line']} {x['book']}: {x['players']} players, "
+                      f"avg Over {x['avg_over']}, {x['share_2_or_shorter']:.0%} at 2.0 or shorter, "
+                      f"Over-sum {x['over_sum']}{tail}")  # fmt: skip
+        for v in vs:
+            print(f"  {name} vs FanDuel (FanDuel 2.0 or shorter) {v['market']} {v['book']}: "
+                  f"{v['pairs']} pairs, implied {v['implied_vs_fanduel']:.3f} of FanDuel's, "
+                  f"{v['longer_than_fanduel']:.0%} longer")  # fmt: skip
+    return out
 
 
 def cmd_assist_lab(args: argparse.Namespace) -> None:
@@ -4095,6 +4148,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     mpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     mpr.add_argument("--json", help="write the results as JSON")
+    mpr.add_argument(
+        "--shots-alternates",
+        action="store_true",
+        help="the follow-up: shots and on-target alternates at six books, against FanDuel",
+    )
     mpr.set_defaults(func=cmd_market_probe)
     epl = sub.add_parser("espn-players", help="ESPN summaries as a player-data fallback")
     epl.add_argument("--out", help="folder for the summaries read (the artifact)")
