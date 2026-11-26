@@ -35,3 +35,6 @@
 {"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"a24c89b65c5a30fb9473735049589e64","home":"Lyon","away":"Lillestrom","kickoff":"2026-11-26T20:00:00+00:00","fetched_at":"2026-11-06T17:25:05+00:00"}
 {"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"e836bc70afa19b0db28fb320a97662e4","home":"NEC Nijmegen","away":"Rennes","kickoff":"2026-11-26T20:00:00+00:00","fetched_at":"2026-11-06T17:25:05+00:00"}
 {"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"df4947bbe49057782feacca38c03e790","home":"TSG Hoffenheim","away":"SK Sturm Graz","kickoff":"2026-11-26T20:00:00+00:00","fetched_at":"2026-11-06T17:25:05+00:00"}
+{"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"cdf4b848361b0374c2027326bd54d8eb","home":"Dinamo Zagreb","away":"Bayer Leverkusen","kickoff":"2026-11-26T17:46:00+00:00","fetched_at":"2026-11-26T19:31:00+00:00"}
+{"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"5902b4703e9ddc1f573091e14107834c","home":"Salzburg","away":"FC Ararat-Armenia","kickoff":"2026-11-26T17:46:00+00:00","fetched_at":"2026-11-26T19:31:00+00:00"}
+{"league":"UEL","sport":"soccer_uefa_europa_league","event_id":"3ee2bf8a6fa6add543f64ac3e9813976","home":"Union Saint-Gilloise","away":"Lech Pozna\u0144","kickoff":"2026-11-26T17:46:00+00:00","fetched_at":"2026-11-26T19:31:00+00:00"}
