@@ -1026,3 +1026,4 @@
 {"league":"MEX","kinds":["inplay55"],"kickoffs":["2026-11-26T01:00:00+00:00"],"fetched_at":"2026-11-26T01:58:29+00:00","status":200,"cost":1,"credits_left":4956790,"events":5,"rows":5}
 {"league":"MEX","kinds":["inplay75"],"kickoffs":["2026-11-26T01:00:00+00:00"],"fetched_at":"2026-11-26T02:18:30+00:00","status":200,"cost":1,"credits_left":4956788,"events":5,"rows":5}
 {"league":"MEX","kinds":["inplay55"],"kickoffs":["2026-11-26T03:10:00+00:00"],"fetched_at":"2026-11-26T04:08:25+00:00","status":200,"cost":1,"credits_left":4956782,"events":5,"rows":5}
+{"league":"MEX","kinds":["inplay75"],"kickoffs":["2026-11-26T03:10:00+00:00"],"fetched_at":"2026-11-26T04:28:30+00:00","status":200,"cost":1,"credits_left":4956779,"events":5,"rows":5}
