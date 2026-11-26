@@ -3207,6 +3207,29 @@ def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_shots_gate_a(args: argparse.Namespace) -> None:
+    """§17 gate (a) (docs/player_props.md): the best US book's markup on E0 2025/26 starters'
+    shot lines at entry, from the bought shots17 bodies and ESPN's appearances (free)."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats import player_shots_priced as sp
+    from soccer_stats.publish import _clean
+
+    pr = sp.price_rows()
+    print(f"Shots price rows: {len(pr)} ({pr['event_id'].nunique()} events)")
+    apps, cover = ep.pull("E0", seasons=(2025,), understat_ids=lambda lg, s: {})
+    print(f"ESPN E0 2025/26: {json.dumps(_clean(cover), default=str)}")
+    j, counts = sp.join(apps, pr)
+    res = {"counts": counts, "espn": cover}
+    res["gate"] = sp.gate_a(j) if len(j) else None
+    for line in sp.summary_lines(res):
+        print(line)
+    print("SHOTS_GATE_A_JSON " + json.dumps(_clean(res), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
 def cmd_goalscorer_dev(args: argparse.Namespace) -> None:
     """Priced goalscorer test, step 3 (docs/player_props.md §16): one league's 2025/26
     starters with B's walk-forward chance joined to the cached prices; volume per T only."""
@@ -4127,7 +4150,7 @@ def main(argv: list[str] | None = None) -> None:
         "goalscorer-backfill",
         help="priced goalscorer test: historical prices at the entry and close (dev or forward)",
     )
-    gbf.add_argument("--design", choices=["dev", "forward", "gaps"], default="dev")
+    gbf.add_argument("--design", choices=["dev", "forward", "gaps", "shots17"], default="dev")
     gbf.add_argument(
         "--live-calls", help="gaps: folder holding data-log's goalscorer_calls_*.jsonl"
     )
@@ -4135,6 +4158,10 @@ def main(argv: list[str] | None = None) -> None:
     gbf.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
     gbf.add_argument("--json", help="write the results as JSON")
     gbf.set_defaults(func=cmd_goalscorer_backfill)
+
+    sga = sub.add_parser("shots-gate-a", help="§17 gate (a): best-book markup on shot lines")
+    sga.add_argument("--json", help="write the results as JSON")
+    sga.set_defaults(func=cmd_shots_gate_a)
 
     gpr = sub.add_parser(
         "goalscorer-probe",

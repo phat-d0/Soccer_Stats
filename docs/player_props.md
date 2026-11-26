@@ -1499,6 +1499,25 @@ and do its bets beat the close?
 - **Fail:** otherwise.
 - The verdict is read once. It is model quality against the market only; nothing goes live from it.
 
+### Building step 1 and gate (a) (2026-11-26, after the merge; no price bought or read yet)
+
+- **Purchase:** `player_goal_backfill` design `shots17`.
+  - E0 2025/26 from football-data's kickoffs: one events list per match day, then the entry
+    (− 50 min) and close (− 2 min) of each event.
+  - Both markets in one call at the seven books (`SHOTS_MARKETS`, `SHOTS_BOOKS`), 20 credits a
+    snapshot, stopping on a call over 20.
+  - Bodies go to `player_odds_history/shots_test/` in the paid cache. The day's events lists
+    the §16 `dev` design already bought (same 3 h lead) are read from `goalscorer_test/`,
+    never bought again.
+  - `odds-check.yml` `task=goalscorer-backfill`, `design=shots17`, from the default branch (the
+    archive job dispatches `caches.yml`), 120-minute budget, resumable.
+- **Gate (a):** `player_shots_priced.py`, CLI `shots-gate-a`, `odds-check.yml` `task=shots-gate-a`
+  (no key).
+  - Prices come from the bought bodies; appearances from ESPN's free E0 2025/26 pull.
+  - It does the join, the void rule, the line rule `count ≥ ceil(point)` and the best and
+    average price, exactly as above.
+  - Log line `SHOTS_GATE_A_JSON`. It is run once, after the purchase completes.
+
 ### After E0
 
 The other leagues are considered only if E0 passes both gates, and only with a new estimate and

@@ -1283,6 +1283,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   factor but `pen_share`; `PlayerShotModel` now takes `options`, None = unchanged). §17: E0 2025/26
   shots alternates at seven books, gate (a) best-book markup at 2.0 or shorter (stop when its range's
   lower end > +8%), gate (b) §16's shape; cap 16,000; nothing bought until it merges.
+- `player_shots_priced.py` (§17 gate (a), 26 Nov; CLI `shots-gate-a`, `odds-check.yml`
+  `task=shots-gate-a`, no key): the best of seven books' markup on E0 2025/26 starters' shot
+  lines at entry, from `player_goal_backfill` design `shots17` (both shots alternate markets,
+  20 credits a snapshot, cache `player_odds_history/shots_test/`, events lists reused from
+  `goalscorer_test/`) and ESPN's appearances; log line `SHOTS_GATE_A_JSON`.
 - `player_goal_odds.py` (goalscorer probe and pilot; `CappedBudget`), `player_lab.py` (shot lines on
   the lab harness, development only), `player_segments.py` (segment search).
 
