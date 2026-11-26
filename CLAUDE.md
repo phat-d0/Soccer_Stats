@@ -1245,7 +1245,14 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `wanted_markets` in `WANTED` order plus keys holding `EXTRA_WORDS`, `books_listing`), that
   match's odds at up to ten listing books (one region), then E0's first match on `HISTORY_DAY`
   (2025-11-01) at kickoff − 50 min for as many found markets as the cap leaves (10 each), then
-  uk/eu/au in E0 only when no US book priced a market on both sides. `rows`/`summary`: per
+  uk/eu/au in E0 only when no US book priced a market on both sides. The follow-up (lead, 26 Nov, cap 30;
+  `--shots-alternates`, `task=market-probe` `design=shots-alt`): `run(..., markets=ALT_MARKETS,
+  books=ALT_BOOKS)` asks the first upcoming match for `player_shots_alternate` and
+  `player_shots_on_target_alternate` at six books with no market list, plus E0's history;
+  `line_report` (per line and book, and "best" over every book with FanDuel: Over price, share at
+  2.0 or shorter, Over-sum per event, markup against `shot_rates`, players per match over the line
+  from E0's Understat 2023/24–2025/26; whole lines read as "at least k") and `vs_fanduel` (each
+  book's implied chance over FanDuel's on the same player and line, FanDuel at 2.0 or shorter). `rows`/`summary`: per
   market and book players, lines, two-sided lines and their margin, mean Over/Yes odds and, one
   side only, the Yes chances' sum per event. Bodies in
   `data/raw/player_odds_history/market_probe/` (paid cache); log line `MARKET_PROBE_JSON`.

@@ -31,6 +31,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -201,9 +202,12 @@ def run(
     now: pd.Timestamp | None = None,
     get: Callable = requests.get,
     raw_dir: Path = RAW_DIR,
+    markets: tuple[str, ...] | None = None,
+    books: tuple[str, ...] | None = None,
 ) -> dict:
     """The probe, never past `cap` credits (order: market keys, live prices, E0 history,
-    E0 other regions)."""
+    E0 other regions). With `markets` and `books` given (the follow-up probe, lead 26 Nov)
+    no market list is read: the first upcoming match is asked for exactly those."""
     api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
     now = now or pd.Timestamp.now(tz="UTC")
     budget = CappedBudget(cap)
@@ -224,7 +228,15 @@ def run(
             [e for e in evs or [] if pd.Timestamp(e["commence_time"]) > now],
             key=lambda e: e["commence_time"],
         )
-        for e in upcoming[:LIVE_TRIES]:
+        if markets and books and upcoming:
+            e = upcoming[0]
+            res.update(
+                event=f"{e['home_team']} v {e['away_team']}",
+                kickoff=e["commence_time"],
+                event_id=e["id"],
+                keys={m: list(books) for m in markets},
+            )
+        for e in [] if (markets and books) else upcoming[:LIVE_TRIES]:
             label = f"{lg} markets {e['home_team']} v {e['away_team']}"
             body = _get(
                 get,
@@ -246,21 +258,21 @@ def run(
                     keys={k: v for k, v in keys.items() if k.startswith("player_")},
                 )
                 break
-        markets = wanted_markets(res["keys"])
-        books = books_listing(res["keys"], markets)
-        res.update(markets=markets, books=books)
-        if markets and books:
+        mk_l = list(markets) if markets and books else wanted_markets(res["keys"])
+        bk_l = list(books) if markets and books else books_listing(res["keys"], mk_l)
+        res.update(markets=mk_l, books=bk_l)
+        if mk_l and bk_l and res.get("event_id"):
             body = _get(
                 get,
                 f"{BASE}/sports/{sport}/events/{res['event_id']}/odds",
                 {
                     "apiKey": api_key,
-                    "bookmakers": ",".join(books),
-                    "markets": ",".join(markets),
+                    "bookmakers": ",".join(bk_l),
+                    "markets": ",".join(mk_l),
                     "oddsFormat": "decimal",
                 },
                 budget,
-                len(markets),
+                len(mk_l),
                 f"{lg} live odds {res['event']}",
             )
             if body is not None:
@@ -320,7 +332,7 @@ def run(
 
     # Other regions: E0 only, when no US book priced any market on both sides.
     us_two = any(s["two_sided"] > 0 for r in out["leagues"].values() for s in r.get("summary", []))
-    if live_e0 and live_e0["markets"] and not us_two:
+    if live_e0 and live_e0["markets"] and not us_two and not (markets and books):
         body = _get(
             get,
             f"{BASE}/sports/{SPORTS['E0']}/events/{live_e0['event_id']}/odds",
@@ -381,3 +393,123 @@ def summary_lines(res: dict) -> list[str]:
         lines.append("  E0 other regions (uk, eu, au):")
         lines += [fmt(s) for s in res["other_regions"]] or ["    no book priced them"]
     return lines
+
+
+# --- Follow-up (lead, 26 Nov): shots alternates at five or six books against FanDuel ----
+
+ALT_MARKETS = ("player_shots_alternate", "player_shots_on_target_alternate")
+ALT_BOOKS = ("draftkings", "betmgm", "bovada", "williamhill_us", "betonlineag", "fanatics")
+
+
+def load_bodies(folder: Path, prefix: str = "live_") -> pd.DataFrame:
+    """Every cached body under `folder` (one league), as rows, with the file's stamp."""
+    out = []
+    for f in sorted(Path(folder).glob(f"{prefix}*.json")):
+        try:
+            r = rows(json.loads(f.read_text()))
+        except (OSError, ValueError):
+            continue
+        if len(r):
+            out.append(r.assign(stamp=f.name.split("_")[1]))
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+
+
+def norm_market(m: str) -> str:
+    return m.replace("_alternate", "")
+
+
+def line_report(r: pd.DataFrame, actual: dict | None = None) -> list[dict]:
+    """Per market (shots or on target), line and book (plus "best" = the longest Over per
+    player and line over every book, FanDuel included): players, the mean Over price, the
+    Over chances' sum per event and, with `actual` {(market, line): players per match who
+    went over}, the markup = sum / actual - 1. Over sides only (no book quotes an Under)."""
+    if r.empty:
+        return []
+    x = r[(r["side"] == "over") & r["point"].notna()].copy()
+    x["market"] = x["market"].map(norm_market)
+    x = x[x["market"].isin(["player_shots", "player_shots_on_target"])]
+    # Whole lines mean "at least k" (FanDuel's history): k = line - 0.5 for the same event.
+    x["line"] = np.where(x["point"] % 1 == 0, x["point"] - 0.5, x["point"])
+    x = x.sort_values("stamp").drop_duplicates(
+        ["event_id", "market", "book", "player", "line"], keep="last"
+    )
+    best = x.sort_values("odds").drop_duplicates(
+        ["event_id", "market", "player", "line"], keep="last"
+    )
+    x = pd.concat([x, best.assign(book="best")], ignore_index=True)
+    out = []
+    for (mk, line, book), g in x.groupby(["market", "line", "book"]):
+        s = g.groupby("event_id")["odds"].apply(lambda o: float((1 / o).sum())).mean()
+        a = (actual or {}).get((mk, float(line)))
+        out.append(
+            {
+                "market": mk,
+                "line": float(line),
+                "book": book,
+                "players": int(g["player"].nunique()),
+                "avg_over": round(float(g["odds"].mean()), 3),
+                "share_2_or_shorter": round(float((g["odds"] <= 2.0).mean()), 3),
+                "over_sum": round(float(s), 3),
+                "actual_per_match": a,
+                "markup": round(float(s / a - 1), 3) if a else None,
+            }
+        )
+    return out
+
+
+def vs_fanduel(r: pd.DataFrame) -> list[dict]:
+    """Same player and line at FanDuel priced 2.0 or shorter: each book's (and the best
+    book's) implied chance over FanDuel's, mean and count. A ratio of 0.85 means the book's
+    price implies 15% less than FanDuel's, so its markup is about (1 + FanDuel's) x 0.85 - 1."""
+    if r.empty:
+        return []
+    x = r[(r["side"] == "over") & r["point"].notna()].copy()
+    x["market"] = x["market"].map(norm_market)
+    x["line"] = np.where(x["point"] % 1 == 0, x["point"] - 0.5, x["point"])
+    x = x.sort_values("stamp").drop_duplicates(
+        ["event_id", "market", "book", "player", "line"], keep="last"
+    )
+    key = ["event_id", "market", "player", "line"]
+    fd = x[x["book"] == "fanduel"].set_index(key)["odds"]
+    fd = fd[fd <= 2.0]
+    others = x[x["book"] != "fanduel"]
+    best = (
+        others.sort_values("odds").drop_duplicates(key, keep="last").assign(book="best of others")
+    )
+    out = []
+    for book, g in pd.concat([others, best]).groupby("book"):
+        j = g.set_index(key)["odds"]
+        common = j.index.intersection(fd.index)
+        if not len(common):
+            continue
+        ratio = fd.loc[common] / j.loc[common]  # implied(book) / implied(FanDuel)
+        for mk in ("player_shots", "player_shots_on_target"):
+            rr = ratio[ratio.index.get_level_values("market") == mk]
+            if len(rr):
+                out.append(
+                    {
+                        "market": mk,
+                        "book": book,
+                        "pairs": int(len(rr)),
+                        "implied_vs_fanduel": round(float(rr.mean()), 4),
+                        "longer_than_fanduel": round(float((rr < 1).mean()), 3),
+                    }
+                )
+    return out
+
+
+def shot_rates(apps: pd.DataFrame, lines=(0.5, 1.5, 2.5, 3.5, 4.5, 5.5)) -> dict:
+    """Players per match who went over each line (every player who appeared, and starters),
+    from appearance rows with shots and sot."""
+    out = {}
+    m = apps["match_id"].nunique()
+    if not m:
+        return out
+    for mk, col in (("player_shots", "shots"), ("player_shots_on_target", "sot")):
+        if col not in apps:
+            continue
+        for line in lines:
+            hit = apps[col] > line
+            out[(mk, line)] = round(float(hit.sum() / m), 3)
+            out[(mk, line, "starters")] = round(float((hit & apps["started"]).sum() / m), 3)
+    return out
