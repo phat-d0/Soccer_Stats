@@ -176,3 +176,58 @@ def test_base_rates_count_distinct_players_per_match():
     assert br["assisters_per_match"] == round(4 / 12, 3)  # player 1 assists in 4 of 12
     assert br["booked_per_match"] == round(3 / 12, 3)
     assert br["scorers_or_assisters_per_match"] == round(5 / 12, 3)
+
+
+def test_espn_appearances_minutes_and_team_shots():
+    from soccer_stats import espn_players as ep
+
+    def pl(aid, name, starter, sub_in=False, sub_out=False, shots=0, goals=0, pos="M"):
+        return {
+            "athlete": {"id": aid, "displayName": name},
+            "starter": starter,
+            "subbedIn": sub_in,
+            "subbedOut": sub_out,
+            "position": {"abbreviation": pos},
+            "stats": [
+                {"name": "totalShots", "value": shots},
+                {"name": "totalGoals", "value": goals},
+                {"name": "shotsOnTarget", "value": min(shots, 1)},
+            ],
+        }
+
+    body = {
+        "rosters": [
+            {
+                "homeAway": "home",
+                "team": {"displayName": "Arsenal"},
+                "roster": [
+                    pl("1", "A One", True, sub_out=True, shots=3, goals=1, pos="F"),
+                    pl("2", "B Two", False, sub_in=True, shots=1),
+                    pl("3", "C Three", False),  # unused substitute
+                    pl("4", "D Four", True, shots=2, pos="D"),
+                ],
+            },
+            {
+                "homeAway": "away",
+                "team": {"displayName": "Chelsea"},
+                "roster": [pl("5", "E Five", True, sub_out=True, shots=4)],
+            },
+        ],
+        "keyEvents": [
+            {
+                "type": {"text": "Substitution"},
+                "clock": {"value": 3600, "displayValue": "60'"},
+                "participants": [{"athlete": {"id": "2"}}, {"athlete": {"id": "1"}}],
+            }
+        ],
+    }
+    meta = {"match_id": "9", "season": "2425", "kickoff": pd.Timestamp("2024-09-01", tz="UTC"),
+            "home": "Arsenal", "away": "Chelsea", "espn_home": "Arsenal"}  # fmt: skip
+    rows = {r["player"]: r for r in ep.appearances(body, meta)}
+    assert "C Three" not in rows
+    assert rows["A One"]["minutes"] == 60 and rows["A One"]["position"] == "FWD"
+    assert rows["B Two"]["minutes"] == 30 and not rows["B Two"]["started"]
+    assert rows["D Four"]["minutes"] == 90 and rows["D Four"]["position"] == "DEF"
+    assert rows["E Five"]["minutes"] == ep.DEFAULT_START_OFF and not rows["E Five"]["minutes_known"]
+    assert rows["A One"]["team_shots"] == 6 and rows["A One"]["opp_shots"] == 4
+    assert rows["E Five"]["team"] == "Chelsea" and rows["E Five"]["home"] is False

@@ -253,3 +253,303 @@ def summary_lines(res: dict) -> list[str]:
             )
             lines.append(f"{lg} {season} stat names: {', '.join(names)}")
     return lines
+
+
+# ---------- the full pull and B-espn (lead's part 4; owner approved the E0 pull, 26 Nov) ----------
+
+POSITIONS = {"G": "GK", "D": "DEF", "M": "MID", "F": "FWD"}
+DEFAULT_START_OFF = 70  # minutes for a starter subbed off at an unknown time
+DEFAULT_SUB_ON = 20  # minutes for a substitute with an unknown time
+B_ESPN_FACTORS = [
+    "log_rate",  # his shrunk shots per 90 (ESPN)
+    "sot_rate",  # his shrunk on-target share
+    "log_goal_rate",  # his shrunk goals per 90, in place of xG
+    "pos_def",
+    "pos_fwd",
+    "log_team_xg",
+    "log_opp_conceded",
+    "home",
+    "game_state",
+]
+
+
+def _minute(clock: dict | None) -> int | None:
+    import re
+
+    c = clock or {}
+    if c.get("value") not in (None, ""):
+        try:
+            return int(round(float(c["value"]) / 60))
+        except (TypeError, ValueError):
+            pass
+    m = re.match(r"\s*(\d+)", str(c.get("displayValue") or ""))
+    return int(m.group(1)) if m else None
+
+
+def sub_minutes(body: dict | None) -> dict[str, int]:
+    """Athlete id -> the minute he came on or went off, from the key events'
+    substitutions (every participant of a substitution, by athlete id)."""
+    out: dict[str, int] = {}
+    for e in (body or {}).get("keyEvents") or []:
+        if "substitution" not in str((e.get("type") or {}).get("text", "")).lower():
+            continue
+        minute = _minute(e.get("clock"))
+        if minute is None:
+            continue
+        for p in e.get("participants") or []:
+            aid = str(((p or {}).get("athlete") or {}).get("id") or "")
+            if aid:
+                out.setdefault(aid, minute)
+    return out
+
+
+def appearances(body: dict | None, meta: dict) -> list[dict]:
+    """One row per player who played (Understat apps' columns), from one summary.
+    `meta`: match_id, season, kickoff, home, away (football-data names), espn_home."""
+    body = body if isinstance(body, dict) else {}
+    subs = sub_minutes(body)
+    rows = []
+    for side in body.get("rosters") or []:
+        espn_team = ((side.get("team") or {}).get("displayName")) or ""
+        is_home = (
+            side.get("homeAway") == "home"
+            if side.get("homeAway")
+            else espn_team == meta["espn_home"]
+        )
+        team = meta["home"] if is_home else meta["away"]
+        for p in side.get("roster") or []:
+            a = p.get("athlete") or {}
+            aid = str(a.get("id") or "")
+            st = _stats(p)
+            starter = bool(p.get("starter"))
+            sub_in = bool(p.get("subbedIn"))
+            if not starter and not sub_in:
+                continue  # an unused substitute
+            known = aid in subs
+            if starter:
+                minutes = (
+                    subs[aid]
+                    if (p.get("subbedOut") and known)
+                    else (DEFAULT_START_OFF if p.get("subbedOut") else 90)
+                )
+            else:
+                minutes = max(90 - subs[aid], 1) if known else DEFAULT_SUB_ON
+            rows.append(
+                {
+                    "match_id": meta["match_id"],
+                    "season": meta["season"],
+                    "kickoff": meta["kickoff"],
+                    "team": team,
+                    "opponent": meta["away"] if is_home else meta["home"],
+                    "home": bool(is_home),
+                    "player_id": "e" + aid,
+                    "athlete_id": aid,
+                    "player": a.get("displayName") or "",
+                    "position": POSITIONS.get(
+                        ((p.get("position") or {}).get("abbreviation") or "")[:1], "MID"
+                    ),
+                    "minutes": int(minutes),
+                    "minutes_known": bool(known or (starter and not p.get("subbedOut"))),
+                    "started": starter,
+                    "shots": int(st.get("totalShots") or 0),
+                    "sot": int(st.get("shotsOnTarget") or 0),
+                    "goals": int(st.get("totalGoals") or 0),
+                    "assists": int(st.get("goalAssists") or 0),
+                    "own_goals": int(st.get("ownGoals") or 0),
+                    "yellow": int(st.get("yellowCards") or 0),
+                    "red": int(st.get("redCards") or 0),
+                    "xg": 0.0,
+                    "penalties": 0,
+                    "pen_xg": 0.0,
+                    "sp_xg": 0.0,
+                }
+            )
+    tot = {}
+    for r in rows:
+        tot[r["home"]] = tot.get(r["home"], 0) + r["shots"]
+    for r in rows:
+        r["team_shots"], r["opp_shots"] = tot.get(r["home"], 0), tot.get(not r["home"], 0)
+    return rows
+
+
+def pull(
+    league: str = "E0",
+    seasons=(2021, 2022, 2023, 2024, 2025),
+    get: Callable = requests.get,
+    understat_ids: Callable | None = None,
+    seconds: float = 5400,
+    pause: float = 0.25,
+) -> tuple[pd.DataFrame, dict]:
+    """Every football-data match in `seasons`: the scoreboard per day (once), the event,
+    its summary, the appearance rows. Matches carry Understat's id when its season list
+    holds them (`understat_ids(league, season)` -> {(home, away): id}), else "fd:...".
+    Returns (rows, coverage per season)."""
+    global PAUSE
+    PAUSE = pause
+    slug = SLUGS[league]
+    stats: dict = {}
+    end = time.monotonic() + seconds
+    rows, cover = [], {}
+    boards: dict[str, dict | None] = {}
+    for season in seasons:
+        fx = fd_matches(league, season)
+        ids = (understat_ids or _understat_ids)(league, season)
+        sea = f"{season % 100:02d}{(season + 1) % 100:02d}"
+        c = {"matches": len(fx), "found": 0, "with_players": 0, "goals_add_up": 0, "stopped": False}
+        for m in fx.to_dict("records"):
+            if time.monotonic() > end:
+                c["stopped"] = True
+                break
+            k = pd.Timestamp(m["kickoff"])
+            found = None
+            for day in (f"{k:%Y%m%d}", f"{k - pd.Timedelta(days=1):%Y%m%d}"):
+                if day not in boards:
+                    boards[day] = _get(
+                        get, BASE.format(slug=slug) + "/scoreboard", {"dates": day}, stats
+                    )
+                found = find_event(boards[day], m["home"], m["away"], k)
+                if found:
+                    break
+            if found is None:
+                continue
+            c["found"] += 1
+            body = _get(get, BASE.format(slug=slug) + "/summary", {"event": found["id"]}, stats)
+            comp = ((found.get("competitions") or [{}])[0]) or {}
+            espn_home = next(
+                (
+                    (x.get("team") or {}).get("displayName")
+                    for x in comp.get("competitors", [])
+                    if x.get("homeAway") == "home"
+                ),
+                "",
+            )
+            meta = {
+                "match_id": ids.get(
+                    (m["home"], m["away"]), f"fd:{m['home']}|{m['away']}|{k:%Y%m%d}"
+                ),
+                "season": sea,
+                "kickoff": k,
+                "home": m["home"],
+                "away": m["away"],
+                "espn_home": espn_home,
+            }
+            got = appearances(body, meta)
+            if got:
+                c["with_players"] += 1
+                info = read_summary(body)
+                c["goals_add_up"] += int(info["player_goals"] == info["score_goals"])
+            rows += got
+        cover[sea] = c
+    cover["requests"] = stats
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.sort_values(["kickoff", "match_id", "team"]).reset_index(drop=True)
+    return df, cover
+
+
+def _understat_ids(league: str, season: int) -> dict:
+    from soccer_stats.player_data import season_matches
+
+    try:
+        sm = season_matches(league, season)
+    except Exception:  # noqa: BLE001  (no league file: football-data keys only)
+        return {}
+    return {(r.home, r.away): r.match_id for r in sm.itertuples()}
+
+
+def map_to_understat(espn: pd.DataFrame, us: pd.DataFrame) -> pd.DataFrame:
+    """ESPN rows joined to Understat appearances of the same match by name
+    (player_data.match_in_fixture within the two clubs): adds `us_player_id` and the
+    Understat goals and shots for that row."""
+    from soccer_stats.player_data import match_in_fixture
+
+    out = []
+    us_by = {mid: g for mid, g in us.groupby("match_id")}
+    for mid, g in espn.groupby("match_id"):
+        u = us_by.get(mid)
+        if u is None:
+            continue
+        clubs = {
+            t: dict(zip(x["player_id"], x["player"], strict=True)) for t, x in u.groupby("team")
+        }
+        found, _ = match_in_fixture(list(g["player"]), clubs, overrides={})
+        for r in g.itertuples(index=False):
+            hit = found.get(r.player)
+            if hit and hit[1] == r.team:
+                out.append({"match_id": mid, "player_id": r.player_id, "us_player_id": hit[0]})
+    m = pd.DataFrame(out, columns=["match_id", "player_id", "us_player_id"])
+    u = us[["match_id", "player_id", "goals", "shots", "started"]].rename(
+        columns={
+            "player_id": "us_player_id",
+            "goals": "us_goals",
+            "shots": "us_shots",
+            "started": "us_started",
+        }
+    )
+    return m.merge(u, on=["match_id", "us_player_id"], how="left")
+
+
+def goal_rate_features(df: pd.DataFrame) -> pd.DataFrame:
+    """log_goal_rate: his goals per 90 shrunk toward the position average (earlier
+    kickoffs only), the xG-free stand-in for B's log_xg_rate."""
+    from soccer_stats.factors import PRIOR_90S, before_kickoff, ewsum_prior
+
+    df = df.copy()
+    df["_90s"] = df["minutes"] / 90
+    pos = before_kickoff(df, ["position"], ["goals", "_90s"])
+    default = df["position"].map({"GK": 0.002, "DEF": 0.04, "MID": 0.1, "FWD": 0.3}).fillna(0.1)
+    pos_rate = (pos["goals"] / pos["_90s"].replace(0, float("nan"))).fillna(default)
+    sg, s90 = (
+        ewsum_prior(df["goals"].astype(float), df["player_id"]),
+        ewsum_prior(df["_90s"], df["player_id"]),
+    )
+    import numpy as np
+
+    df["log_goal_rate"] = np.log(
+        ((sg + pos_rate * PRIOR_90S) / (s90 + PRIOR_90S)).clip(lower=0.002)
+    )
+    return df.drop(columns=["_90s"])
+
+
+def b_espn_compare(rows: pd.DataFrame) -> dict:
+    """Log loss of B-espn, B and season goals on the same starter rows (descriptive),
+    pooled over the development seasons and per season, with paired gains."""
+    import numpy as np
+
+    from soccer_stats.lab.metrics import boot_range
+
+    def ll(p, y):
+        p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
+        return -(y * np.log(p) + (1 - y) * np.log(1 - p))
+
+    out = {}
+    parts = (
+        ("development", ("2324", "2425")),
+        ("2324", ("2324",)),
+        ("2425", ("2425",)),
+        ("2526_seen", ("2526",)),
+    )
+    for name, seas in parts:
+        r = rows[rows["season"].isin(seas)]
+        if r.empty:
+            continue
+        y = r["scored"].to_numpy()
+        lb, le, lg = ll(r["p_B"], y), ll(r["p_B_espn"], y), ll(r["bench_goals"], y)
+        g = r["match_id"].to_numpy()
+        out[name] = {
+            "rows": len(r),
+            "matches": int(r["match_id"].nunique()),
+            "rate": round(float(y.mean()), 4),
+            "ll_B": round(float(lb.mean()), 5),
+            "ll_B_espn": round(float(le.mean()), 5),
+            "ll_season_goals": round(float(lg.mean()), 5),
+            "B_minus_B_espn": [
+                round(float((le - lb).mean()), 5),
+                [round(v, 5) for v in (boot_range(le - lb, g) or [])],
+            ],
+            "B_espn_vs_season_goals": [
+                round(float((lg - le).mean()), 5),
+                [round(v, 5) for v in (boot_range(lg - le, g) or [])],
+            ],
+        }
+    return out

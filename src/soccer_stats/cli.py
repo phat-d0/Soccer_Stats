@@ -3034,6 +3034,97 @@ def cmd_espn_players(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_espn_b(args: argparse.Namespace) -> None:
+    """ESPN as an Understat fallback, part 2 (owner-approved full E0 pull, 26 Nov; free):
+    every E0 match 2021/22-2025/26 from ESPN, mapped to Understat by name, and B-espn
+    (shots and goals, no xG) beside B and season goals on the same starter rows."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats import player_assist_lab as al
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.lab import harness
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    espn, cover = ep.pull(lg, seasons=tuple(years))
+    print(f"ESPN {lg}: {len(espn)} appearance rows; coverage {cover}")
+    if args.out:
+        Path(args.out).mkdir(parents=True, exist_ok=True)
+        espn.to_csv(Path(args.out) / f"espn_{lg}.csv.gz", index=False)
+    apps, missing = load_appearances(lg, years, max_new=0)
+    print(f"Understat {lg}: {len(apps)} appearances ({missing} match files not held)")
+    matches, err = with_xg(load_matches([lg], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(
+            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+        ),
+    )
+    lo, hi = pd.Timestamp("2023-07-01", tz="UTC"), pg.FORWARD_START
+    fu = gl.extra_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
+    fu = fu[fu["kickoff"] < hi].reset_index(drop=True)
+    p_b = gl.predict(fu, "B", lo, hi, Holdout(hi))
+    fe = ep.goal_rate_features(pg.goal_features(build_features(espn, pb.match_info(preds, espn))))
+    fe = fe[fe["kickoff"] < hi].reset_index(drop=True)
+    pr = harness.walk_forward(
+        fe,
+        lambda **kw: al.CountCandidate(**kw),
+        {"target": "goals", "factors": ep.B_ESPN_FACTORS},
+        lo,
+        hi,
+        holdout=Holdout(hi),
+        time_col="kickoff",
+        refit=al.REFIT,
+        min_train=1,
+    )
+    fe = fe.assign(p_B_espn=pr["p_1"] if not pr.empty else np.nan)
+    fu = fu.assign(p_B=p_b)
+    mp = ep.map_to_understat(fe, fu)
+    starters_e = fe[fe["started"]]
+    mapped = mp.merge(
+        fe[["match_id", "player_id", "started", "goals", "p_B_espn"]], on=["match_id", "player_id"]
+    )
+    mapped = mapped.merge(
+        fu[["match_id", "player_id", "season", "p_B", "season_avg_goals"]].rename(
+            columns={"player_id": "us_player_id"}
+        ),
+        on=["match_id", "us_player_id"],
+    )
+    agree = float((mapped["goals"] == mapped["us_goals"]).mean()) if len(mapped) else None
+    rows = mapped[mapped["started"] & mapped["us_started"]].dropna(subset=["p_B", "p_B_espn"])
+    rows = rows.assign(
+        scored=(rows["us_goals"] > 0).astype(int),
+        bench_goals=1 - np.exp(-rows["season_avg_goals"].clip(lower=1e-4)),
+    )
+    out = {
+        "league": lg,
+        "coverage": cover,
+        "espn_rows": len(espn),
+        "minutes_known": round(float(espn["minutes_known"].mean()), 4) if len(espn) else None,
+        "understat_matches_joined": int(
+            espn.loc[~espn["match_id"].astype(str).str.startswith("fd:"), "match_id"].nunique()
+        ),
+        "starters_mapped_share": round(len(mapped[mapped["started"]]) / max(len(starters_e), 1), 4),
+        "goals_agree_mapped": round(agree, 4) if agree is not None else None,
+        "compare": ep.b_espn_compare(rows),
+    }
+    for k, v in out.items():
+        if k != "coverage":
+            print(f"ESPN-B {lg} {k}: {v}")
+    print("ESPN_B_JSON " + json.dumps(_clean(out), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
     at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
@@ -4009,6 +4100,11 @@ def main(argv: list[str] | None = None) -> None:
     epl.add_argument("--out", help="folder for the summaries read (the artifact)")
     epl.add_argument("--json", help="write the results as JSON")
     epl.set_defaults(func=cmd_espn_players)
+    ebp = sub.add_parser("espn-b", help="full ESPN pull for one league and B-espn vs B")
+    ebp.add_argument("--league", default="E0")
+    ebp.add_argument("--out", help="folder for the ESPN appearance rows (the artifact)")
+    ebp.add_argument("--json", help="write the results as JSON")
+    ebp.set_defaults(func=cmd_espn_b)
     alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
     alb.add_argument("--league", default="E0")
     alb.add_argument("--json", help="write the results as JSON")
