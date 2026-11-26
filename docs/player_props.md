@@ -1336,6 +1336,10 @@ of 180 sampled matches found, every field present).
   in `xg-good-`; later matches use goals, as the live model does.
 - The code is `espn_players.b_espn_predict`; `tests/test_espn_b_reproducible.py` checks that
   two runs on shuffled copies of the same rows give identical chances.
+  - Caveat (shared with B, whose fit is the same `NBRegression`): the identity holds when
+    the NB2 dispersion α is interior. On counts that look Poisson, α runs to 0 and
+    L-BFGS-B's stopping point moves by about 1e-4 in a chance between row orders. The
+    judged read runs once, on one machine, with its rows in kickoff order.
 
 On E0's development seasons B-espn and B were level on the same 15,209 starter rows:
 log loss 0.2918 vs 0.2917, B-espn minus B +0.0001 (−0.0012 to +0.0013); both beat season
@@ -1355,7 +1359,7 @@ on 99.99% of mapped rows.
 - **Pass, per league: the range includes 0 or lies below it** (B-espn no worse than B).
   **Fail:** the whole range lies above 0.
 - **Not checked:** fewer than half of the league's rescued rows join. That league is then
-  treated as failed.
+  treated as failed. (accepted by the lead, 26 Nov.)
 - Each league's result is reported either way, with rows, matches and the join share.
   E0's development result above stands as its check.
 
