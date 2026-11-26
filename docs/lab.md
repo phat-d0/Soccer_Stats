@@ -5339,3 +5339,60 @@ owner approves it and it ships as its own change.
 **Run.** `tuning.yml` `phase=xg-fallback`: a job per league, then a pool job. It restores
 `raw-data-` and `xg-good-` with the archive fallback, uses no key, and is read once. The code
 (`lab/xg_fallback.py`) is written after this section is committed.
+
+### Result: the outage costs the raw model, not the blend; the shots proxy recovers little (run 45783076386, read once)
+
+`tuning.yml` `phase=xg-fallback`, run 45783076386, code 8bd7d99b (the non-negative amendment above),
+0 credits. Runs 45778868864 and 45779212063 stopped at their first failing fit, before anything was
+scored, and nothing from them was read.
+
+- **The proxy.** With weights held at 0 or above, β (the other shots) came out 0 in every league.
+  The proxy is shots on target alone: α from 0.270 (I1) to 0.319 (D1) goals per shot on target. So
+  (c) and (c-sot) are the same model (they differ only in rounding). Shots and shots on target were
+  present for every scored match. xG was present for every match except I1 2022/23 (none) and a
+  handful in F1 2017/18 and I1 2023/24.
+
+| Pooled, five Understat leagues | Model (8,671 matches) | Blend (7,023 matches) |
+| --- | --- | --- |
+| Log loss (a) Understat xG | 0.98680 | 0.97507 |
+| (b) goals only − (a): the outage's cost | **+0.0060** (+0.0036 to +0.0084) | **+0.00005** (−0.00041 to +0.00054) |
+| (c) proxy − (a) | +0.0053 (+0.0033 to +0.0072) | −0.00001 (−0.00053 to +0.00051) |
+| (c) proxy − (b) goals only | −0.0007 (−0.0035 to +0.0023) | −0.00007 (−0.00050 to +0.00038) |
+| Recovery share R | **0.12** (−0.54 to +0.48) | not shown: xG's gain on the blend isn't above 0 |
+
+- **Per league** (model, (b) − (a); (c) − (b)):
+  - E0 +0.0074 (+0.0016 to +0.0131); −0.0050 (−0.0115 to +0.0014). E0's R is 0.68, the one league
+    where the proxy gets most of the way.
+  - SP1 +0.0092 (+0.0037 to +0.0144); −0.0006.
+  - D1 +0.0051 (+0.0004 to +0.0100); +0.0010.
+  - F1 +0.0049 (−0.0006 to +0.0104); +0.0013.
+  - I1 +0.0031 (−0.0010 to +0.0072); +0.0001.
+  - Per season, xG's gain on the model is above 0 in four of five seasons. The proxy beats goals
+    only in three, never with a range below 0.
+- **E1–E3 (no Understat).** Proxy minus goals only:
+  - model +0.0008 (−0.0014 to +0.0031), with E2 +0.0031 the worst;
+  - blend −0.0004 (−0.0011 to +0.0004).
+- **Lean's picks** (all odds, Pinnacle's early price, $1):
+
+| | Understat leagues: bets / CLV (95%) / ROI | E1–E3: bets / CLV / ROI |
+| --- | --- | --- |
+| (a) Understat xG | 1,385 / −2.44% (−2.88 to −2.02) / −0.8% | = (b) |
+| (b) goals only | 1,258 / −2.54% (−2.98 to −2.10) / −2.4% | 1,172 / −3.67% (−4.13 to −3.20) / +2.4% |
+| (c) proxy | 1,324 / −2.58% (−3.00 to −2.16) / +1.6% | 1,190 / −3.87% (−4.35 to −3.38) / +0.7% |
+
+  - Of (a)'s 1,385 picks, (b) made the same pick on 957 matches and (c) on 969, the same side every
+    time. The rest differ by which matches pass the 1σ cut.
+  - Every CLV range is below 0, and the forms overlap.
+
+**Verdict and what it means.**
+1. **The outage's cost.** Goals-only is clearly worse for the raw model (+0.0060 log loss, range
+   above 0, in every Understat league).
+2. **It barely reaches the live strategy.** The blend leans on the price, and xG's gain there is
+   +0.00005 (−0.00041 to +0.00054). Lean's CLV moves from −2.44% to −2.54%, within the ranges. The
+   outage costs the live Lean track about 0.1 CLV points, not measurably more.
+3. **The shots proxy does not stand in for xG.** It recovers about 12% of xG's gain on the model
+   (−54% to +48%). Its blend gain over goals only is not above 0. In E1–E3 it doesn't help either.
+   Off-target shots add nothing: their weight was 0 in every league.
+4. **Proposal: none.** Both pre-registered conditions fail, in both groups. The switch-on rule ("use
+   the proxy after the last good Understat file") is not proposed. Nothing live changes.
+   - When Understat returns, `odds-check.yml` `task=understat-backfill` restores xG as planned.
