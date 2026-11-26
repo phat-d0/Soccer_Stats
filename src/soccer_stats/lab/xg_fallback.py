@@ -16,7 +16,6 @@ Forms (the only difference is the xG columns the live model is given and its wei
 from __future__ import annotations
 
 import argparse
-import functools
 import json
 import os
 from pathlib import Path
@@ -111,6 +110,48 @@ def proxy(m: pd.DataFrame, coef: dict, sot_only: bool = False) -> pd.DataFrame:
 # --- one league ------------------------------------------------------------------------
 
 
+def describe_train(train: pd.DataFrame) -> dict:
+    """What a failed fit was given: rows, dates, teams, and the goal and xG columns' gaps and
+    ranges (diagnostics only; nothing is changed)."""
+    out = {"rows": int(len(train)), "teams": int(len(set(train["home"]) | set(train["away"])))}
+    if len(train):
+        out["dates"] = [str(pd.Timestamp(train["date"].min()).date()),
+                        str(pd.Timestamp(train["date"].max()).date())]  # fmt: skip
+    for c in ("home_goals", "away_goals", "home_xg", "away_xg"):
+        if c in train:
+            v = pd.to_numeric(train[c], errors="coerce").to_numpy(float)
+            fin = v[np.isfinite(v)]
+            out[c] = {"nan": int(np.isnan(v).sum()), "inf": int(np.isinf(v).sum()),
+                      "min": float(fin.min()) if len(fin) else None,
+                      "max": float(fin.max()) if len(fin) else None}  # fmt: skip
+    dup = train.duplicated(["date", "home", "away"]).sum() if len(train) else 0
+    out["duplicates"] = int(dup)
+    return out
+
+
+def checked_factory(code: str, form: str, weight: float):
+    """dashboard.match_model, unchanged, whose fit prints what it was given if it fails."""
+    from soccer_stats import dashboard
+
+    def make():
+        model = dashboard.match_model(code, xg_weight=weight)
+        fit = model.fit
+
+        def logged(train, as_of=None):
+            try:
+                return fit(train, as_of=as_of)
+            except RuntimeError as exc:
+                info = {"league": code, "form": form, "weight": weight, "as_of": str(as_of),
+                        "error": str(exc), **describe_train(train)}  # fmt: skip
+                print(f"XG_FALLBACK_FIT_FAILED {json.dumps(info, default=str)}", flush=True)
+                raise
+
+        model.fit = logged
+        return model
+
+    return make
+
+
 def _model_cols(preds: pd.DataFrame, form: str) -> pd.DataFrame:
     keep = ["season", "date", "home", "away", "home_goals", "away_goals"]
     out = preds[keep + [f"p_{s}" for s in SIDES]].copy()
@@ -119,7 +160,7 @@ def _model_cols(preds: pd.DataFrame, form: str) -> pd.DataFrame:
 
 
 def run_league(code: str, out_dir: Path, holdout: Holdout | None = None) -> dict:
-    from soccer_stats import backtest, dashboard
+    from soccer_stats import backtest
     from soccer_stats import lean_backtest as lb
     from soccer_stats import match_calibration as mc
     from soccer_stats.data import load_matches, pinnacle_prices
@@ -153,7 +194,7 @@ def run_league(code: str, out_dir: Path, holdout: Holdout | None = None) -> dict
         if form == "a" and not has_xg:
             preds = None  # (a) is the goals-only model: reuse (b)'s
         else:
-            factory = functools.partial(dashboard.match_model, code, xg_weight=w)
+            factory = checked_factory(code, form, w)
             preds = backtest.walk_forward(m, start=str(SCORED_FROM.date()), model_factory=factory)
             holdout.check(preds["date"])
             cache[form] = preds

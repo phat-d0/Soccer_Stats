@@ -84,3 +84,30 @@ def test_same_picks_counts_matching_sides():
     c = b.iloc[:2].assign(form="c", market=["home", "away"])
     s = xf.same_picks(pd.concat([b, c]), "c")
     assert s == {"a_bets": 3, "form_bets": 2, "same_match": 2, "same_side": 1}
+
+
+def _bad_train():
+    return pd.DataFrame({"date": pd.to_datetime(["2020-01-01", "2020-01-01"]),
+                         "home": ["A", "A"], "away": ["B", "B"],
+                         "home_goals": [1, np.nan], "away_goals": [0, 1],
+                         "home_xg": [np.inf, 1.0], "away_xg": [0.5, 0.5]})  # fmt: skip
+
+
+def test_checked_factory_reports_a_failed_fit(capsys, monkeypatch):
+    from soccer_stats import dashboard
+
+    class Failing:
+        def fit(self, train, as_of=None):
+            raise RuntimeError("Dixon-Coles fit failed: ABNORMAL")
+
+    monkeypatch.setattr(dashboard, "match_model", lambda code, xg_weight: Failing())
+    model = xf.checked_factory("E0", "a", 0.7)()
+    with pytest.raises(RuntimeError):
+        model.fit(_bad_train(), as_of=pd.Timestamp("2020-01-02"))
+    out = capsys.readouterr().out
+    assert "XG_FALLBACK_FIT_FAILED" in out and '"form": "a"' in out and '"inf": 1' in out
+
+
+def test_describe_train_counts_gaps():
+    d = xf.describe_train(_bad_train())
+    assert d["duplicates"] == 1 and d["home_goals"]["nan"] == 1 and d["home_xg"]["inf"] == 1
