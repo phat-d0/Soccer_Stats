@@ -1518,6 +1518,35 @@ and do its bets beat the close?
     average price, exactly as above.
   - Log line `SHOTS_GATE_A_JSON`. It is run once, after the purchase completes.
 
+### Gate (a) result (2026-11-26; read once): **closed, both markets stop**
+
+- **Purchase:** run 45792135181, from the default branch. 760 snapshots (entry and close for all
+  380 E0 2025/26 matches, each priced), 15,200 credits (4,956,683 → 4,941,483 left). No events
+  list was bought; all 114 were already held. The archive job ran.
+- **Read:** run 45792603508, `shots-gate-a`. 380 events priced, 368 linked to football-data and
+  ESPN (ESPN found 368 of 380 matches).
+  - 13,495 priced names, 4,550 not on ESPN's played list. Most of these are squad players who
+    didn't play (void by the rule); the rest are name misses.
+  - Starter lines at entry with a best Over of 2.0 or shorter:
+
+| Market | Lines | Best-book markup (95% range) | Gate | Average price | Best at the close |
+| --- | --- | --- | --- | --- | --- |
+| Shots | 7,646 | **+24.5% (+22.0% to +27.4%)** | stop | +27.2% (+24.6% to +30.0%) | +24.9% (+22.3% to +27.8%) |
+| On target | 1,927 | **+23.4% (+18.6% to +28.8%)** | stop | +26.1% (+21.2% to +31.7%) | +23.4% (+18.7% to +29.0%) |
+
+- **Descriptive, beside it:**
+  - Only three of the seven books priced these markets in the 2025/26 history: DraftKings (best
+    price on 79% of shots lines, 81% on target), BetMGM (15%, 13%) and BetOnline (6%, 6%).
+    Bovada, Caesars, Fanatics and BetRivers returned none.
+  - Per book, shots: BetMGM +25.6%, DraftKings +28.4%, BetOnline +37.2%. On target: DraftKings
+    +26.6%, BetOnline +28.4%, BetMGM +29.9%.
+  - Shots per line: 0.5 +18.7% (+16.4% to +21.3%, 4,679 lines), 1.5 +32.1% (2,192), 2.5 +50.6%
+    (660). On target 0.5: +22.6% (1,871).
+- **What it means:** the best US price on a starter's shots line carries about a 24% markup,
+  inside the +12% to +25% expected above. That is close to FanDuel's +33% and far above the +8%
+  a model could plausibly overcome. Gate (b) is not run, the model is not fitted on these
+  prices, and nothing goes live. Per "After E0", no other league is bought.
+
 ### After E0
 
 The other leagues are considered only if E0 passes both gates, and only with a new estimate and
