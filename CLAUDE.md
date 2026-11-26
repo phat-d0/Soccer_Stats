@@ -1278,6 +1278,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   2025/26 apart as seen, 2026/27 never), `base_rates` (assisters, scorers-or-assisters and booked
   players per match). `player_data.parse_match` now also keeps Understat's roster `assists`,
   `xa`, `key_passes`, `yellow`, `red`. Log line `ASSIST_LAB_JSON`.
+- `player_shots_espn.py` (§17, pre-registered 26 Nov): the frozen shots model on ESPN features,
+  `shots_espn_model()` = `PlayerShotModel(SHOTS_ESPN_FACTORS, l2 2.0, thin, FIT_OPTIONS)` (every shots
+  factor but `pen_share`; `PlayerShotModel` now takes `options`, None = unchanged). §17: E0 2025/26
+  shots alternates at seven books, gate (a) best-book markup at 2.0 or shorter (stop when its range's
+  lower end > +8%), gate (b) §16's shape; cap 16,000; nothing bought until it merges.
 - `player_goal_odds.py` (goalscorer probe and pilot; `CappedBudget`), `player_lab.py` (shot lines on
   the lab harness, development only), `player_segments.py` (segment search).
 
