@@ -151,6 +151,12 @@ def parse_match(data: dict, meta: dict) -> list[dict]:
                     "penalties": pens.get(pid, 0),
                     "pen_xg": round(pen_xg.get(pid, 0.0), 3),
                     "sp_xg": round(sp_xg.get(pid, 0.0), 3),
+                    # Understat's own roster columns (assists research, 26 Nov 2026).
+                    "assists": int(float(p.get("assists") or 0)),
+                    "xa": round(float(p.get("xA") or 0), 3),
+                    "key_passes": int(float(p.get("key_passes") or 0)),
+                    "yellow": int(float(p.get("yellow_card") or 0)),
+                    "red": int(float(p.get("red_card") or 0)),
                     "team_shots": team_shots[side],
                     "opp_shots": team_shots["a" if side == "h" else "h"],
                 }
