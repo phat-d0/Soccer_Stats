@@ -1488,6 +1488,10 @@ and do its bets beat the close?
 - **Pass:** both of the following, on at least 300 bets with a final close.
   1. **c:** in logit P(won) = a + b·logit(best implied) + c·logit(p), c's 95% range (match
      bootstrap) lies above 0.
+     - Fitted on every starter line at entry with a best Over, across all prices (not only the
+       rule's bets and not only 2.0 or shorter).
+     - One row per player, market, line and match, fitted per market.
+     - The bootstrap resamples whole matches (2,000 draws, seed 0) (lead, 26 Nov, before the merge).
   2. **CLV:** the rule's best-to-best CLV minus the price-matched no-rule baseline has a 95%
      range above 0. The baseline is every starter line priced at entry and close, reweighted to
      the rule's band mix, with one shared match bootstrap (as §16's `matched_excess`).
