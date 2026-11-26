@@ -1310,6 +1310,79 @@ Settlement uses ESPN's goal details (own goals left out); football-data has no s
 The track is backcast from 1 Nov, the live log's first day, on the logged entry snapshots
 only (never the bought history), and starts at its `defined_at`.
 
+### Amendment, 2026-11-26: B-espn for the whole read, B beside it (drafted for the lead's review and the owner's decision; before any judged number)
+
+**Why.** Understat has been down since 2 Nov. B's player features come from Understat's
+match files, and SP1, D1, I1 and F1's files are in no cache. Without them B can score only
+E0, and only matches before its files stop. ESPN's match summaries have every field B uses
+except xG: starters and substitutes, substitution minutes, goals, shots, shots on target and
+own goals per player, in all five leagues since 2021/22 (fields check, run 45778000789: 167
+of 180 sampled matches found, every field present).
+
+**B-espn** is B with ESPN's player data, frozen exactly as run on 26 Nov (full E0 pull, run
+45779183561, commit 60e0949; unchanged at 68ebc34, which changed only a coverage count):
+- the same NB2 mixture as B (start and substitute minutes, lineup known, `p_zero`), fitted by
+  `models.player_counts.NBRegression` with `FIT_OPTIONS` and a starting α of 2.0;
+- factors `espn_players.B_ESPN_FACTORS`: log_rate, sot_rate, log_goal_rate, pos_def, pos_fwd,
+  log_team_xg, log_opp_conceded, home, game_state. `log_goal_rate` (his goals per 90 shrunk
+  toward the position average, `goal_rate_features`) stands in for B's `log_xg_rate`; the
+  rest are B's own features (`factors.build_features` → `player_goals.goal_features`);
+- walk-forward as B: refit every 28 days on the 730 days before the block, starters with at
+  least 3 earlier appearances, B's chance rounded to 6 decimals before the threshold;
+- minutes from ESPN's substitution events; a starter subbed off at an unknown time counts 70
+  minutes, a substitute with an unknown time 20 (`DEFAULT_START_OFF`, `DEFAULT_SUB_ON`);
+- team expected goals from the live match model (`backtest.walk_forward`, xG weight 0.7,
+  `FIT_OPTIONS`), as for B. Its xG comes from Understat's league files, held through 1 Nov
+  in `xg-good-`; later matches use goals, as the live model does.
+- The code is `espn_players.b_espn_predict`; `tests/test_espn_b_reproducible.py` checks that
+  two runs on shuffled copies of the same rows give identical chances.
+
+On E0's development seasons B-espn and B were level on the same 15,209 starter rows:
+log loss 0.2918 vs 0.2917, B-espn minus B +0.0001 (−0.0012 to +0.0013); both beat season
+goals (0.4367). Mapping: 76.7% of ESPN's starters to an Understat id by name, goals agreeing
+on 99.99% of mapped rows.
+
+**The check in SP1, D1, I1 and F1 (written before it runs).**
+- Rows: the rescued 2025/26 development rows (`judged_<L>.csv.gz` in
+  `goalscorer-1nov-rescued.zip`, the sha256 in `archive/extra_assets.json` checked before
+  use), B's chance `p_B` and Understat's outcome `scored` as saved on 1 Nov. Each is joined to
+  ESPN's starter in the same match (Understat's match id, ESPN's names mapped by
+  `match_in_fixture` within the two clubs). B-espn is fitted on ESPN rows of 2021/22–2025/26
+  only; nothing from 2026/27 is pulled, fitted or scored, and the rescued 2026/27 rows are
+  not opened.
+- Measure: per row, B-espn's log loss minus B's; the mean and its 95% range from 2,000 draws
+  resampling whole matches (seed 0).
+- **Pass, per league: the range includes 0 or lies below it** (B-espn no worse than B).
+  **Fail:** the whole range lies above 0.
+- **Not checked:** fewer than half of the league's rescued rows join. That league is then
+  treated as failed.
+- Each league's result is reported either way, with rows, matches and the join share.
+  E0's development result above stands as its check.
+
+**What changes in the judged read.**
+1. **Primary model: B-espn** in every league that passed (E0 and each of SP1–F1 that
+   passes). The rows are ESPN's starters in the match whose name matches a priced name at the
+   entry snapshot (`match_in_fixture` within the two clubs, the same overrides), with at
+   least 3 earlier appearances in ESPN's rows. The outcome is ESPN's goals for the player,
+   own goals left out.
+2. **B is descriptive beside it**: rescued rows through 1 Nov, rebuilt rows if Understat
+   returns, joined by name. B gets every measure, never the verdict.
+3. **A league that fails the check** is read on B, under the 8 Nov note's rules, and is
+   left out of the judged read if B can't score it by 31 Jan. It is counted and reported.
+4. **Unchanged:** the measures and pass rule, T = 20% (set on B's development volume and not
+   re-chosen), the price bands, the books, the snapshots, the sample (from 10 Oct, 600
+   matches or 31 Jan 2027) and the single read.
+5. **Every judged row records `model_source`** ("B-espn" or "B") **and `feature_source`**
+   ("espn" or "understat"), and every saved file carries them.
+
+**The paper track** (note of 9 Nov) may switch to B-espn in all five leagues from its first
+run after this merges, which also ends its E0-only wait for Understat. Every entry records
+`model_source` and `feature_source`; entries opened before the switch are B on Understat by
+definition and are never rewritten. The sections count trades per model.
+
+**Status:** drafted 26 Nov by Player props for the lead's review. Binding only once the owner
+approves and it merges. No judged number had been computed when it was written.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes
