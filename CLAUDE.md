@@ -235,6 +235,11 @@ settlement runs after them.
   Bake-off 2's finalist (f) in E0, I1 and F1 has one locked test left (3 Feb 2027).
 - Model 12% filters (favourites only; no long shots): neither passes, pooled CLV −2.7% and
   −3.1% vs −4.6% for the plain rule (`docs/lab.md` "Model 12% filters").
+- xG fallback without Understat (owner via the lead, 26 Nov; `docs/lab.md`, run 45783076386):
+  goals-only costs the raw model +0.0060 log loss (+0.0036 to +0.0084) in the five Understat leagues,
+  but the blend only +0.00005 (−0.0004 to +0.0005); Lean's CLV −2.44% with xG vs −2.54% without.
+  A shots-on-target proxy recovers 12% of xG's gain (−54% to +48%) and doesn't help E1–E3:
+  **no proposal**, nothing live changes.
 - Market-move factor model (owner via the lead, 8 Nov; `docs/lab.md`, run 42538752719): Pinnacle's
   early-to-close move is partly predictable (out-of-sample R² +1.9% on football-data's early price,
   +2.8% at the ten-book 48 h look, ranges above 0; almost all from cross-book disagreement), but
@@ -1642,6 +1647,15 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   model beside the UCL closes (`cup_rows`, `cup_card`) and goalscorer B's 2025/26 development
   rows (`goalscorer_card`, T 20% confusion). `tuning.yml` `phase=scorecard2` (a `cup` job reads
   data-log's `UCL_closes.jsonl`; input `goal_run` = a `goalscorer-test.yml` run to score).
+- `lab/xg_fallback.py` (owner via the lead, 26 Nov; `docs/lab.md` "An xG fallback without Understat",
+  pre-registered before any code; development only, no key): the live match model
+  (`dashboard.match_model`, per-league ridge) walk-forward from 2019/20 in four forms on the same
+  rows: (a) Understat xG (`xg.with_xg`, weight 0.7), (b) goals only, (c) a shots proxy
+  α·HST + β·(HS − HST) (`fd_shots`, `fit_proxy` per league on 2017/18–2018/19 by non-negative least squares, `proxy`), (c-sot)
+  α'·HST. Model and blend (`lean_backtest.walk_forward`) log loss with paired ranges, Lean's picks
+  and CLV per form, the recovery share R = (LL_b − LL_c)/(LL_b − LL_a), and `proposal` (the
+  blend's c − b range below 0 and R ≥ 0.5). `tuning.yml` `phase=xg-fallback`, log line
+  `XG_FALLBACK_JSON`.
 - `lab/dk_gap_counts.py` (lead, 5 Nov; prices only, no key): how many matches a DraftKings vs
   Pinnacle price-gap rule would bet at the bought history's 48 h looks (`look_rows`, `counts`,
   `report`; per league, season, T and freshness; no result, close or CLV read).
