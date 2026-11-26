@@ -1,6 +1,6 @@
 {
  "kind": "research_overview",
- "generated": "2026-11-24",
+ "generated": "2026-11-26",
  "note": "Every research study to date, one row each, from the verdicts recorded in docs/lab.md, docs/edge.md, docs/totals.md, docs/leagues.md and docs/player_props.md. CLV and ROI are per $1 against Pinnacle's margin-free close; ranges are 95% and resample matches. Nothing here has beaten Pinnacle's close.",
  "areas": [
   {
@@ -146,6 +146,17 @@
    "sample": "Match model 13,667 matches (2019/20–2023/24); corners 2017/18–2023/24; goalscorer B 2025/26 development",
    "result": "Match model log loss 1.0225 vs Pinnacle early 1.0051, AUC 0.662 vs 0.680. Model 12%'s picks won 27.0% vs 27.7% fair. Corners (f) beats the league mean everywhere. Goalscorer B log loss 0.2913 vs the best price's 0.2953 (margin included).",
    "doc": "docs/lab.md: Model evaluation, stage 2: scorecards"
+  },
+  {
+   "id": "xg_fallback",
+   "area": "model",
+   "name": "An xG fallback without Understat",
+   "when": "2026-11-26",
+   "verdict": "fail",
+   "question": "How much does the Understat outage cost the match model, and can a free shots proxy from football-data stand in for xG?",
+   "sample": "8,671 matches, five Understat leagues, 2019/20–2023/24 (2024/25 locked); E1–E3 beside them; run 45783076386",
+   "result": "No proposal. Goals-only costs the raw model +0.0060 log loss (+0.0036 to +0.0084), but the blend only +0.00005 (−0.0004 to +0.0005); Lean's CLV is −2.44% with xG vs −2.54% without. A shots-on-target proxy recovers 12% of xG's gain (−54% to +48%). Nothing live changes; xG comes back when Understat does.",
+   "doc": "docs/lab.md: An xG fallback without Understat"
   },
   {
    "id": "lean_bt",
@@ -490,6 +501,17 @@
    "due_date": "2026-12-08",
    "result": "Judged on trades from 23 Oct at the 8 Dec review.",
    "doc": "docs/totals.md: Shadow filter"
+  },
+  {
+   "id": "shots_best_books",
+   "area": "markets",
+   "name": "Player shots at the best of the books",
+   "when": "2026-11-26",
+   "verdict": "fail",
+   "question": "Is the best US book's price on a starter's shots line close enough to fair that a model could beat it?",
+   "sample": "E0 2025/26 starters' lines at 2.0 or shorter: 7,646 shots and 1,927 on target (380 matches, 15,200 credits; runs 45792135181 and 45792603508)",
+   "result": "Closed at gate (a), the price check. The best book's markup over the hit rate was +24.5% (+22.0% to +27.4%) on shots and +23.4% (+18.6% to +28.8%) on target. The stop rule was a lower end above +8%, so the model was never tested.",
+   "doc": "docs/player_props.md §17"
   },
   {
    "id": "goalscorer_quality",
