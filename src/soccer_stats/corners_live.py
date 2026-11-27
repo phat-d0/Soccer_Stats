@@ -863,7 +863,12 @@ def _result_index(*frames) -> dict[tuple, list[tuple]]:
             hc, ac = r.get("home_corners"), r.get("away_corners")
             if hc is None or ac is None or pd.isna(hc) or pd.isna(ac):
                 continue
-            d = pd.Timestamp(r.get("kickoff") or r.get("date"))
+            # A frame joined from football-data (date only) and ESPN (kickoff) rows has NaN
+            # kickoffs on the football-data rows: use the first of the two that is set.
+            k = r.get("kickoff")
+            d = pd.Timestamp(k if k is not None and not pd.isna(k) else r.get("date"))
+            if pd.isna(d):
+                continue
             d = (d.tz_convert(None) if d.tzinfo else d).normalize()
             out.setdefault((r.get("league"), r["home"], r["away"]), []).append(
                 (d, int(hc), int(ac))

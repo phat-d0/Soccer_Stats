@@ -202,3 +202,10 @@ def test_entries_from_the_log_count_toward_the_judged_300():
 
     r = pcl.judged(main, pcs.JUDGED_FROM, NOW, None, pcs.VERDICT_FILE)
     assert r["bets"] == 1 and r["final"] == 1 and r["verdict"] is None
+
+
+def test_from_log_note_is_singular_for_one_bet():
+    one = pcs.from_log_note(1, "8 Nov", "25 Nov")
+    assert "the 1 bet opened" in one and " is part of the test" in one and "It was opened" in one
+    many = pcs.from_log_note(8, "8 Nov", "25 Nov")
+    assert "the 8 bets opened" in many and " are part of the test" in many and "They were" in many

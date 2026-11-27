@@ -219,8 +219,7 @@ def look_frame(rows: list[dict], results: list[pd.DataFrame | None]) -> pd.DataF
         for r in results
         if r is not None and not r.empty and "league" in r
     ]
-    merged = pd.concat(frames, ignore_index=True) if frames else None
-    df = lean.attach_counts(df, merged)
+    df = lean.attach_counts(df, *frames)  # each frame on its own (never concatenated)
     unlocked = df["league"].isin(lean.FIT_LEAGUES) & ~df["league"].isin(lean.LOCKED)
     df.loc[~unlocked, ["count", "won"]] = np.nan
     return df.sort_values("look_at", kind="stable").reset_index(drop=True)
