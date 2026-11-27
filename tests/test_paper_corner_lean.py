@@ -296,3 +296,26 @@ def test_a_log_without_look_rows_fits_nothing_and_opens_nothing(tmp_path):
     closes = [r for r in rows if r["snapshot"] == "close"]
     out = run(tmp_path, closes, res)
     assert out["fits"] == [] and out["trades"] == [] and out["new_fits"] == 0
+
+
+def test_football_data_and_espn_results_together_never_break_the_counts(tmp_path):
+    """27 Nov: publish passed ESPN's rows (with `kickoff`) beside football-data's (date only);
+    concatenated, football-data's kickoffs were NaN and _result_index raised on NaT."""
+    from soccer_stats import corners_live as cl
+
+    rows, res = synth()
+    espn = res.iloc[:5].copy()
+    espn["kickoff"] = [
+        pd.Timestamp(d).tz_localize("UTC") + pd.Timedelta(hours=15) for d in espn["date"]
+    ]
+    espn["result_source"] = "espn"
+    fd = res.iloc[5:]
+    joined = pd.concat([fd, espn], ignore_index=True)
+    idx = cl._result_index(joined)
+    assert len(idx) == len(res)
+    write_log(tmp_path, rows)
+    out = pcl.run(tmp_path, list(LEAGUES), NOW, fd, espn)  # the two frames as publish passes them
+    (tmp_path / "ref").mkdir()
+    ref = run(tmp_path / "ref", rows, res)
+    assert [f["fit_at"] for f in out["fits"]] == [f["fit_at"] for f in ref["fits"]]
+    assert out["fits"][0]["c"] == pytest.approx(ref["fits"][0]["c"])

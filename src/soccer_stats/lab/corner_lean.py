@@ -111,11 +111,12 @@ def look_rows(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(out, columns=cols)
 
 
-def attach_counts(df: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
-    """`count` = the quoted team's corners (NaN while unknown) and `won` = count > line."""
+def attach_counts(df: pd.DataFrame, *results: pd.DataFrame | None) -> pd.DataFrame:
+    """`count` = the quoted team's corners (NaN while unknown) and `won` = count > line, from
+    one or more result frames (football-data's, ESPN's), each read on its own."""
     from soccer_stats import corners_live as cl
 
-    index = cl._result_index(results)
+    index = cl._result_index(*results)
     df = df.copy()
     counts = []
     for r in df.to_dict("records"):
