@@ -225,17 +225,44 @@ def fields(
 
 def fd_matches(league: str, season: int) -> pd.DataFrame:
     """football-data's played matches for a season: home, away, kickoff (UTC)."""
-    from soccer_stats.data import load_matches, season_kickoffs
+    from soccer_stats.data import RAW_DIR, download, load_matches
 
     m = load_matches([league], [season]).reset_index(drop=True)
-    k = season_kickoffs(league, season)
-    if len(k) == len(m):
-        m = m.assign(kickoff=k.to_numpy())
-    else:  # no times: 15:00 UK on the match date
-        m = m.assign(
-            kickoff=pd.to_datetime(m["date"]).dt.tz_localize("UTC") + pd.Timedelta(hours=15)
-        )
-    return m[["home", "away", "kickoff"]]
+    raw = pd.read_csv(
+        download(league, season, raw_dir=RAW_DIR), encoding="latin-1", on_bad_lines="skip"
+    )
+    return with_kickoffs(m, raw)
+
+
+def with_kickoffs(m: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
+    """Each match's kickoff from its own row of the football-data file (Time is UK local
+    time), joined on date, home and away. Until 27 Nov the kickoff list was paired with the
+    matches by position, and load_matches' sort reorders matches on the same date, so their
+    times swapped: ESPN's event then sat about 3.5 h off, outside KICKOFF_TOLERANCE, and the
+    match was marked not found (F1's 37 misses in 2025/26–2026/27, run 46076170619). A match
+    with no time, or one the file doesn't hold, keeps 15:00 UK on its date."""
+    day = pd.to_datetime(m["date"]).dt.normalize()
+    fallback = day.dt.tz_localize("Europe/London").dt.tz_convert("UTC") + pd.Timedelta(hours=15)
+    raw = raw.dropna(subset=["Date"])
+    if not {"HomeTeam", "AwayTeam"} <= set(raw.columns):
+        return m.assign(kickoff=fallback.to_numpy())[["home", "away", "kickoff"]]
+    times = raw["Time"].fillna("15:00") if "Time" in raw else pd.Series("15:00", index=raw.index)
+    local = pd.to_datetime(raw["Date"] + " " + times, dayfirst=True, format="mixed")
+    keys = pd.DataFrame(
+        {
+            "home": raw["HomeTeam"].to_numpy(),
+            "away": raw["AwayTeam"].to_numpy(),
+            "day": local.dt.normalize().to_numpy(),
+            "kickoff": local.dt.tz_localize(
+                "Europe/London", ambiguous="NaT", nonexistent="shift_forward"
+            )
+            .dt.tz_convert("UTC")
+            .to_numpy(),
+        }
+    ).drop_duplicates(["home", "away", "day"])
+    out = m.assign(day=day).merge(keys, on=["home", "away", "day"], how="left")
+    out["kickoff"] = out["kickoff"].fillna(pd.Series(fallback.to_numpy(), index=out.index))
+    return out[["home", "away", "kickoff"]]
 
 
 def summary_lines(res: dict) -> list[str]:
@@ -760,7 +787,7 @@ def _due(
         return True
     if rec.get("found"):
         return False
-    if refetch and {rec.get("home"), rec.get("away")} & refetch:
+    if refetch and ("*" in refetch or {rec.get("home"), rec.get("away")} & refetch):
         return True
     tried = pd.Timestamp(rec.get("fetched_at") or "1970-01-01T00:00:00Z")
     return (
@@ -768,6 +795,22 @@ def _due(
         and now - kickoff <= RETRY_WITHIN
         and now - tried >= RETRY_AFTER
     )
+
+
+def _rekick(path: Path, kickoff: pd.Timestamp) -> bool:
+    """A held match whose stored kickoff isn't football-data's (the same-day swap before 27
+    Nov, within KICKOFF_TOLERANCE, so it was found): rewrite the kickoff in place, rows
+    included. No request; True when the file changed."""
+    rec = _record(path)
+    if not rec or not rec.get("found") or not rec.get("kickoff"):
+        return False
+    if pd.Timestamp(rec["kickoff"]) == kickoff:
+        return False
+    rec["kickoff"] = kickoff.isoformat()
+    for r in rec.get("rows") or []:
+        r["kickoff"] = kickoff.isoformat()
+    path.write_text(json.dumps(rec, separators=(",", ":")))
+    return True
 
 
 def fill_cache(
@@ -783,7 +826,9 @@ def fill_cache(
 ) -> dict:
     """Fetch every settled football-data match of `seasons` the cache lacks (oldest first),
     until `seconds` run out. Returns counts: due, fetched, found, not_found, left, requests.
-    `refetch`: football-data clubs whose not-found markers are fetched again (see `_due`)."""
+    `refetch`: football-data clubs whose not-found markers are fetched again (see `_due`;
+    "*" = every marker). A held match whose stored kickoff differs is corrected in place
+    (`_rekick`, counted as `rekicked`)."""
     refetch = frozenset(refetch or ())
     global PAUSE
     if pause is not None:
@@ -807,6 +852,8 @@ def fill_cache(
                 continue
             path = match_file(league, year, m["home"], m["away"], k, raw_dir)
             if not _due(path, k, now, refetch):
+                if _rekick(path, k):
+                    out["rekicked"] = out.get("rekicked", 0) + 1
                 continue
             out["due"] += 1
             if time.monotonic() > end:

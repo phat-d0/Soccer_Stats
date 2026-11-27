@@ -1310,7 +1310,11 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `data/raw/espn_players/<league>/<season>/<date>_<home>_<away>.json`, match ids
   "fd:home|away|date"; a match ESPN doesn't list is retried `RETRY_TRIES` 3 times within 14
   days; its marker keeps that day's `board_names`; `refetch=` clubs fetch their old markers
-  again), `load_cache`, `cached_match`, `not_found_clubs`, `unmapped_board_names`; CLI
+  again, "*" every one; a held file at the wrong kickoff is corrected in place, `_rekick`),
+  `fd_matches` (kickoffs joined to each match's own file row, `with_kickoffs`, 27 Nov: the
+  positional pairing swapped same-day times, F1's misses), `diagnose` (CLI `espn-diagnose`,
+  `task=espn-diagnose`: each marker's scoreboard events within ±3 days and the summary's player
+  rows; free, reads only), `load_cache`, `cached_match`, `not_found_clubs`, `unmapped_board_names`; CLI
   `espn-seed --league --minutes --refetch --seed-dir`, `odds-check.yml` `task=espn-seed`
   (`finalists` = the clubs to refetch). Since 27 Nov each league's seed shard is
   `espn-seed-<league>-` on `data/espn_seed/<league>` (that league's folder only), saved from the

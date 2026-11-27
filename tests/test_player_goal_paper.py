@@ -819,3 +819,56 @@ def test_espn_diagnose_names_each_misses_cause(tmp_path):
     assert by["Lens"]["cause"] == "no_players"
     assert by["Metz"]["cause"] == "not_listed"
     assert res["causes"] == {"rescheduled": 1, "no_players": 1, "not_listed": 1}
+
+
+def test_kickoffs_join_each_match_to_its_own_row_and_held_files_are_corrected(tmp_path):
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    raw = pd.DataFrame({"Date": ["24/08/2025", "24/08/2025"], "Time": ["16:15", "19:45"],
+                        "HomeTeam": ["Lille", "Strasbourg"],
+                        "AwayTeam": ["Monaco", "Nantes"]})  # fmt: skip
+    # load_matches' order: the second file row first (its sort reorders same-day ties).
+    m = pd.DataFrame({"date": pd.to_datetime(["2025-08-24", "2025-08-24"]),
+                      "home": ["Strasbourg", "Lille"], "away": ["Nantes", "Monaco"]})  # fmt: skip
+    got = ep.with_kickoffs(m, raw).set_index("home")["kickoff"]
+    assert got["Lille"] == pd.Timestamp("2025-08-24T15:15Z")  # 16:15 UK summer time
+    assert got["Strasbourg"] == pd.Timestamp("2025-08-24T18:45Z")
+    # A match the file lacks keeps 15:00 UK.
+    m2 = pd.DataFrame({"date": pd.to_datetime(["2025-08-25"]), "home": ["Nice"], "away": ["Brest"]})
+    assert ep.with_kickoffs(m2, raw)["kickoff"].iloc[0] == pd.Timestamp("2025-08-25T14:00Z")
+    # A held match stored at the swapped time is corrected in place, with no request.
+    right, wrong = pd.Timestamp("2025-08-24T15:15Z"), pd.Timestamp("2025-08-24T18:45Z")
+    f = ep.match_file("F1", 2025, "Lille", "Monaco", right, tmp_path)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"home": "Lille", "away": "Monaco", "found": True,
+                             "kickoff": wrong.isoformat(),
+                             "rows": [{"player": "x", "kickoff": wrong.isoformat()}]}))  # fmt: skip
+    fx = pd.DataFrame([{"home": "Lille", "away": "Monaco", "kickoff": right}])
+
+    def get(url, params=None, timeout=None):
+        raise AssertionError("no request for a held match")
+
+    res = ep.fill_cache("F1", [2025], tmp_path, get, 60, pd.Timestamp("2026-11-28T00:00Z"),
+                        pause=0, matches=lambda lg, y: fx)  # fmt: skip
+    assert res["rekicked"] == 1 and res["fetched"] == 0
+    rec = json.loads(f.read_text())
+    assert (
+        pd.Timestamp(rec["kickoff"]) == right and pd.Timestamp(rec["rows"][0]["kickoff"]) == right
+    )
+
+
+def test_refetch_star_retries_every_old_marker(tmp_path):
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    k = pd.Timestamp("2025-08-24T15:15Z")
+    f = ep.match_file("F1", 2025, "Lille", "Monaco", k, tmp_path)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"home": "Lille", "away": "Monaco", "found": False, "tries": 3,
+                             "fetched_at": "2025-09-01T00:00:00+00:00"}))  # fmt: skip
+    now = pd.Timestamp("2026-11-28T00:00Z")
+    assert not ep._due(f, k, now) and not ep._due(f, k, now, frozenset({"Lyon"}))
+    assert ep._due(f, k, now, frozenset({"*"}))
