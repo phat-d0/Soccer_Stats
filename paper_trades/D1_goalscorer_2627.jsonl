@@ -260,3 +260,4 @@
 {"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e261363","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
 {"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
 {"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Werder Bremen|M'gladbach|goal|e323061","at":"2026-11-27T21:29:15+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"3-3","result_source":"espn","settled_at":"2026-11-27T21:29:15+00:00"}

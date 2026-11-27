@@ -317,3 +317,23 @@
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333","at":"2026-11-27T21:25:18+00:00","close_odds":5.75,"close_book":"draftkings","close_best":5.75,"close_same":5.75,"close_fetched_at":"2026-11-27T19:30:36+00:00","close_minutes_before":14.4,"clv_best":-0.0435,"clv_same":-0.0435,"beat_close":false}
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333|dk","at":"2026-11-27T21:25:18+00:00","close_odds":5.75,"close_book":"draftkings","close_best":5.75,"close_same":5.75,"close_fetched_at":"2026-11-27T19:30:36+00:00","close_minutes_before":14.4,"clv_best":-0.0435,"clv_same":-0.0435,"beat_close":false}
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e271137","at":"2026-11-27T21:25:18+00:00","close_odds":3.2,"close_book":"onexbet","close_best":3.2,"close_same":3.2,"close_fetched_at":"2026-11-27T19:30:36+00:00","close_minutes_before":14.4,"clv_best":0.0,"clv_same":0.0,"beat_close":false}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e229524","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e229524|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e403125","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e403125|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e307159","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e307159|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e293347","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Monaco|Auxerre|goal|e293347|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Paris FC|Angers|goal|e287572","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Paris FC|Angers|goal|e218703","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lorient|Rennes|goal|e265099","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"F1|2627|Lorient|Rennes|goal|e265099|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"F1|2627|Lorient|Rennes|goal|e372260","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lorient|Rennes|goal|e372260|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e223117","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e223117|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e393721","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e393721|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e273021","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e331636","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
