@@ -704,3 +704,38 @@ def test_judged_read_guard_needs_every_season_seeded_and_fetched(tmp_path):
     ready, d = ep.judged_ready("SP1", [2025, 2026], tmp_path, now, lambda lg, y: fx[y])
     assert ready, d
     assert ep.not_found_clubs("SP1", [2025], tmp_path) == {"2526": {"Celta": 1, "Getafe": 1}}
+
+
+def test_espn_names_heidenheim_and_st_etienne_and_refetch_old_misses(tmp_path):
+    from soccer_stats import espn_players as ep
+    from soccer_stats.espn_news import team_name
+
+    assert team_name("1. FC Heidenheim 1846", {"Heidenheim", "Bayern Munich"}) == "Heidenheim"
+    assert team_name("1. FC Heidenheim", {"Heidenheim", "Bayern Munich"}) == "Heidenheim"
+    for n in ("Saint-Étienne", "AS Saint-Étienne", "Saint Etienne"):
+        assert team_name(n, {"St Etienne", "Lyon"}) == "St Etienne"
+    k = pd.Timestamp("2024-09-01T15:00:00Z")
+    fx = pd.DataFrame([{"home": "St Etienne", "away": "Lyon", "kickoff": k}])
+    board = {"v": _espn_board("Unknown Saint FC", "Lyon", k)}
+
+    def get(url, params=None, timeout=None):
+        if url.endswith("/scoreboard"):
+            return _Resp(board["v"])
+        return _Resp(_espn_summary("AS Saint-Étienne", "Lyon"))
+
+    now = pd.Timestamp("2026-11-28T12:00:00Z")
+    kw = {"pause": 0, "matches": lambda lg, y: fx}
+    res = ep.fill_cache("F1", [2024], tmp_path, get, 60, now, **kw)
+    assert res["not_found"] == 1
+    rec = ep.cached_match("F1", "St Etienne", "Lyon", k, tmp_path)
+    assert rec["board_names"] == ["Lyon", "Unknown Saint FC"]
+    assert ep.unmapped_board_names("F1", [2024], tmp_path) == {"Unknown Saint FC": 1}
+    # Two years old: no plain retry, but a refetch of the club fetches it again.
+    board["v"] = _espn_board("AS Saint-Étienne", "Lyon", k)
+    assert ep.fill_cache("F1", [2024], tmp_path, get, 60, now, **kw)["fetched"] == 0
+    again = ep.fill_cache("F1", [2024], tmp_path, get, 60, now, refetch=["St Etienne"], **kw)
+    assert again["found"] == 1
+    assert ep.cached_match("F1", "St Etienne", "Lyon", k, tmp_path)["found"] is True
+    # A found match is never refetched.
+    assert ep.fill_cache("F1", [2024], tmp_path, get, 60, now, refetch=["St Etienne"],
+                         **kw)["fetched"] == 0  # fmt: skip

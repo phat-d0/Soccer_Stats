@@ -1505,6 +1505,18 @@ top-up ran out of time before this season was complete. The reason is in the cou
     the check did.
 - **Name gaps:** `espn-seed` now prints the clubs behind each season's not-found matches
   (`not_found_clubs`), for the D1 and F1 name fixes.
+- **The name fix (27 Nov, seed runs 46070541955 and 46070545213):** every D1 Heidenheim match
+  of 2023/24–2025/26 (34 a season) and every F1 St Etienne match of 2021/22 (38) and 2024/25
+  (34) came back not found: a name gap, not missing data.
+  - `espn_news.ESPN_NAMES` adds ESPN's likely spellings ("1. FC Heidenheim 1846", whose year
+    defeats the prefix match; "Saint-Étienne", "AS Saint-Étienne").
+  - A not-found marker now keeps ESPN's names on that day's scoreboards (`board_names`), and
+    `espn-seed` prints those that land on no club (`unmapped_board_names`), so a spelling still
+    missing shows in the log.
+  - `espn-seed --refetch <clubs>` (`odds-check.yml` `finalists`) fetches those clubs' old
+    not-found matches again, whatever their age or tries. A found match is never refetched.
+  - Scattered misses remain (F1 2021/22: Reims 12, Marseille 11, Paris SG 10, Lyon 9, Lorient
+    8); the logged board names will say whether they are names or dates.
 
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 

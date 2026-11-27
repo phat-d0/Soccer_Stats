@@ -3265,7 +3265,10 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
     from soccer_stats.publish import _clean
 
     years = range(2021, current_season() + 1)
-    res = ep.fill_cache(args.league, years, seconds=args.minutes * 60)
+    refetch = [c.strip() for c in (args.refetch or "").split(",") if c.strip()]
+    if refetch:
+        print(f"ESPN seed {args.league}: refetching not-found matches of {refetch}")
+    res = ep.fill_cache(args.league, years, seconds=args.minutes * 60, refetch=refetch)
     _rows, counts = ep.load_cache(args.league, years)
     print(f"ESPN seed {args.league}: {json.dumps(_clean(res), default=str)}")
     for season, c in sorted(counts.items()):
@@ -3274,6 +3277,9 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
         print(f"  {res['left']} matches left for the next run (time budget)")
     for season, clubs in ep.not_found_clubs(args.league, years).items():
         print(f"  {args.league} {season} not found, by club: {clubs}")
+    unmapped = ep.unmapped_board_names(args.league, years)
+    if unmapped:
+        print(f"  {args.league} ESPN names on not-found days that map to no club: {unmapped}")
 
 
 def cmd_shots_gate_a(args: argparse.Namespace) -> None:
@@ -4231,6 +4237,9 @@ def main(argv: list[str] | None = None) -> None:
     ese = sub.add_parser("espn-seed", help="the ESPN appearance cache for B-espn (free)")
     ese.add_argument("--league", default="E0")
     ese.add_argument("--minutes", type=float, default=110)
+    ese.add_argument(
+        "--refetch", default="", help="comma-separated clubs whose not-found matches to refetch"
+    )
     ese.set_defaults(func=cmd_espn_seed)
 
     sga = sub.add_parser("shots-gate-a", help="§17 gate (a): best-book markup on shot lines")

@@ -95,6 +95,19 @@ def find_event(board: dict | None, home: str, away: str, kickoff: pd.Timestamp) 
     return None
 
 
+def board_names(board: dict | None) -> list[str]:
+    """Every club name on a scoreboard (ESPN's displayName)."""
+    out = []
+    for e in (board or {}).get("events", []) or []:
+        comp = ((e.get("competitions") or [{}])[0]) or {}
+        out += [
+            (c.get("team") or {}).get("displayName")
+            for c in comp.get("competitors", [])
+            if (c.get("team") or {}).get("displayName")
+        ]
+    return out
+
+
 def _stats(p: dict) -> dict[str, float]:
     out = {}
     for s in p.get("stats") or []:
@@ -731,8 +744,12 @@ def match_file(league: str, year: int, home: str, away: str, kickoff, raw_dir=No
     return cache_dir(league, raw_dir) / season_code(year) / f"{match_key(home, away, kickoff)}.json"
 
 
-def _due(path: Path, kickoff: pd.Timestamp, now: pd.Timestamp) -> bool:
-    """A match to fetch: never held, or a not-found marker worth another try."""
+def _due(
+    path: Path, kickoff: pd.Timestamp, now: pd.Timestamp, refetch: frozenset = frozenset()
+) -> bool:
+    """A match to fetch: never held, or a not-found marker worth another try. A marker for
+    a club in `refetch` (a name the mapping has just learned) is fetched again whatever its
+    age or tries."""
     if not path.exists():
         return True
     try:
@@ -741,6 +758,8 @@ def _due(path: Path, kickoff: pd.Timestamp, now: pd.Timestamp) -> bool:
         return True
     if rec.get("found"):
         return False
+    if refetch and {rec.get("home"), rec.get("away")} & refetch:
+        return True
     tried = pd.Timestamp(rec.get("fetched_at") or "1970-01-01T00:00:00Z")
     return (
         int(rec.get("tries", 1)) < RETRY_TRIES
@@ -758,9 +777,12 @@ def fill_cache(
     now: pd.Timestamp | None = None,
     pause: float | None = None,
     matches: Callable[[str, int], pd.DataFrame] | None = None,
+    refetch=(),
 ) -> dict:
     """Fetch every settled football-data match of `seasons` the cache lacks (oldest first),
-    until `seconds` run out. Returns counts: due, fetched, found, not_found, left, requests."""
+    until `seconds` run out. Returns counts: due, fetched, found, not_found, left, requests.
+    `refetch`: football-data clubs whose not-found markers are fetched again (see `_due`)."""
+    refetch = frozenset(refetch or ())
     global PAUSE
     if pause is not None:
         PAUSE = pause
@@ -782,7 +804,7 @@ def fill_cache(
             if k > now - SETTLED:
                 continue
             path = match_file(league, year, m["home"], m["away"], k, raw_dir)
-            if not _due(path, k, now):
+            if not _due(path, k, now, refetch):
                 continue
             out["due"] += 1
             if time.monotonic() > end:
@@ -798,7 +820,10 @@ def fill_cache(
                 found = find_event(boards[day], m["home"], m["away"], k)
                 if found:
                     break
-            rows, event_id = [], None
+            rows, event_id, seen = [], None, []
+            if found is None:  # ESPN's names that day, so a missing spelling shows
+                for day in (f"{k:%Y%m%d}", f"{k - pd.Timedelta(days=1):%Y%m%d}"):
+                    seen += board_names(boards.get(day))
             if found is not None:
                 event_id = str(found.get("id"))
                 body = _get(get, BASE.format(slug=slug) + "/summary", {"event": event_id}, stats)
@@ -838,6 +863,8 @@ def fill_cache(
                 "fetched_at": now.isoformat(),
                 "rows": [{**r, "kickoff": pd.Timestamp(r["kickoff"]).isoformat()} for r in rows],
             }
+            if not rows:
+                rec["board_names"] = sorted(set(seen))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(rec, separators=(",", ":")))
             out["fetched"] += 1
@@ -951,3 +978,27 @@ def not_found_clubs(league: str, seasons=None, raw_dir=None) -> dict[str, dict[s
         if c:
             out[d.name] = dict(c.most_common(6))
     return out
+
+
+def unmapped_board_names(league: str, seasons=None, raw_dir=None) -> dict[str, int]:
+    """ESPN names seen on the scoreboards of not-found matches that land on no club of that
+    league-season's football-data matches: the spellings `espn_news.ESPN_NAMES` lacks."""
+    from soccer_stats.espn_news import team_name
+
+    base = cache_dir(league, raw_dir)
+    want = None if seasons is None else {season_code(y) for y in seasons}
+    c: Counter = Counter()
+    for d in sorted(base.iterdir()) if base.exists() else []:
+        if not d.is_dir() or (want is not None and d.name not in want):
+            continue
+        recs = []
+        for f in d.glob("*.json"):
+            try:
+                recs.append(json.loads(f.read_text()))
+            except (OSError, ValueError):
+                continue
+        known = {r.get(s) for r in recs for s in ("home", "away")} - {None}
+        for r in recs:
+            if not r.get("found"):
+                c.update(n for n in r.get("board_names") or [] if team_name(n, known) not in known)
+    return dict(c.most_common(12))

@@ -1309,8 +1309,10 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   seasons, raw_dir, get, seconds, now)` (each settled football-data match once into
   `data/raw/espn_players/<league>/<season>/<date>_<home>_<away>.json`, match ids
   "fd:home|away|date"; a match ESPN doesn't list is retried `RETRY_TRIES` 3 times within 14
-  days), `load_cache`, `cached_match`; CLI `espn-seed --league --minutes`, `odds-check.yml`
-  `task=espn-seed` (saves shard `espn-players-<league>-` on `data/raw/espn_players` from the
+  days; its marker keeps that day's `board_names`; `refetch=` clubs fetch their old markers
+  again), `load_cache`, `cached_match`, `not_found_clubs`, `unmapped_board_names`; CLI
+  `espn-seed --league --minutes --refetch`, `odds-check.yml` `task=espn-seed` (`finalists` = the
+  clubs to refetch; saves shard `espn-players-<league>-` on `data/raw/espn_players` from the
   default branch when it added files; publish restores the four shards, keep-alive rows in
   caches.yml, `cache_archive.FREE`).
 - `player_assist_lab.py` (lead, 26 Nov; free development look, CLI `assist-lab --league`,
