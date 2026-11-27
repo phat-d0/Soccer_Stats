@@ -3094,12 +3094,10 @@ def cmd_espn_b(args: argparse.Namespace) -> None:
     import json
 
     from soccer_stats import espn_players as ep
-    from soccer_stats import player_assist_lab as al
     from soccer_stats import player_backtest as pb
     from soccer_stats import player_goal_lab as gl
     from soccer_stats import player_goals as pg
     from soccer_stats.factors import build_features
-    from soccer_stats.lab import harness
     from soccer_stats.lab.harness import Holdout
     from soccer_stats.models.player_goals import FIT_OPTIONS
     from soccer_stats.player_data import load_appearances
@@ -3126,20 +3124,7 @@ def cmd_espn_b(args: argparse.Namespace) -> None:
     fu = gl.extra_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
     fu = fu[fu["kickoff"] < hi].reset_index(drop=True)
     p_b = gl.predict(fu, "B", lo, hi, Holdout(hi))
-    fe = ep.goal_rate_features(pg.goal_features(build_features(espn, pb.match_info(preds, espn))))
-    fe = fe[fe["kickoff"] < hi].reset_index(drop=True)
-    pr = harness.walk_forward(
-        fe,
-        lambda **kw: al.CountCandidate(**kw),
-        {"target": "goals", "factors": ep.B_ESPN_FACTORS},
-        lo,
-        hi,
-        holdout=Holdout(hi),
-        time_col="kickoff",
-        refit=al.REFIT,
-        min_train=1,
-    )
-    fe = fe.assign(p_B_espn=pr["p_1"] if not pr.empty else np.nan)
+    fe = ep.b_espn_predict(espn, preds, lo, hi, Holdout(hi))
     fu = fu.assign(p_B=p_b)
     mp = ep.map_to_understat(fe, fu)
     starters_e = fe[fe["started"]]
@@ -3176,6 +3161,69 @@ def cmd_espn_b(args: argparse.Namespace) -> None:
     print("ESPN_B_JSON " + json.dumps(_clean(out), default=str))
     if args.json:
         Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
+def cmd_espn_b_check(args: argparse.Namespace) -> None:
+    """The §16 amendment's check (26 Nov): B-espn vs B on one league's rescued 2025/26
+    development rows (`--judged`, judged_<L>.csv.gz). ESPN and the match model use
+    2021/22-2025/26 only; nothing from 2026/27 is pulled, fitted or scored."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    end = pd.Timestamp("2026-07-01", tz="UTC")  # 2025/26 ends; 2026/27 never enters
+    judged = pd.read_csv(args.judged, dtype={"match_id": str, "player_id": str})
+    print(f"Rescued {lg}: {len(judged)} rows in {args.judged}")
+    espn, cover = ep.pull(lg, seasons=tuple(years))
+    print(f"ESPN {lg}: {len(espn)} appearance rows")
+    matches, err = with_xg(load_matches([lg], years))
+    # xG per season, as the live model loads it (publish.league_fixtures): weight 0.7 when any
+    # match has xG; a season without xG costs only its own matches (lead, 26 Nov: the first I1
+    # run dropped xG for every season because one season had none).
+    weight = ep.match_xg_weight(matches)
+    print(f"Match model xG weight {lg}: {weight} (xG on {matches['home_xg'].notna().mean():.1%} "
+          f"of matches; {err or 'no load errors'})")  # fmt: skip
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=weight, options=FIT_OPTIONS),
+    )
+    fe = ep.b_espn_predict(espn, preds, pd.Timestamp("2025-07-01", tz="UTC"), end, Holdout(end))
+    rows, counts = ep.check_rows(fe, judged, lg)
+    res = {
+        "league": lg,
+        **ep.check_verdict(rows, counts),
+        "xg_weight": weight,
+        "xg_error": err or None,
+    }
+    res["coverage"] = {k: v for k, v in cover.items() if k != "requests"}
+    print(f"ESPN-B CHECK {lg}: " + ", ".join(f"{k} {v}" for k, v in res.items() if k != "coverage"))
+    print("ESPN_B_CHECK_JSON " + json.dumps(_clean(res), default=str))
+    if args.out:
+        Path(args.out).mkdir(parents=True, exist_ok=True)
+        rows.assign(model_source=ep.MODEL_SOURCE, feature_source=ep.FEATURE_SOURCE).to_csv(
+            Path(args.out) / f"check_{lg}.csv.gz", index=False
+        )
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def cmd_xg_weight(args: argparse.Namespace) -> None:
+    """Load-only (lead, 26 Nov): the match model's xG weight and xG share for one league on the
+    B-espn checks' seasons (2021/22-2025/26), as `espn-b`/`espn-b-check` load them. No scoring."""
+    from soccer_stats import espn_players as ep
+
+    matches, err = with_xg(load_matches([args.league], range(2021, 2026)))
+    weight = ep.match_xg_weight(matches)
+    share = matches["home_xg"].notna().groupby(matches["season"]).mean().round(3).to_dict()
+    print(f"XG_WEIGHT {args.league}: weight {weight}, xG on "
+          f"{matches['home_xg'].notna().mean():.1%} of {len(matches)} matches, by season {share}; "
+          f"load errors: {err or 'none'}")  # fmt: skip
 
 
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
@@ -4190,6 +4238,15 @@ def main(argv: list[str] | None = None) -> None:
     ebp.add_argument("--out", help="folder for the ESPN appearance rows (the artifact)")
     ebp.add_argument("--json", help="write the results as JSON")
     ebp.set_defaults(func=cmd_espn_b)
+    ebc = sub.add_parser("espn-b-check", help="the §16 amendment's check: B-espn vs B, 2025/26")
+    ebc.add_argument("--league", required=True)
+    ebc.add_argument("--judged", required=True, help="the rescued judged_<league>.csv.gz")
+    ebc.add_argument("--out", help="folder for the joined check rows (the artifact)")
+    ebc.add_argument("--json", help="write the result as JSON")
+    ebc.set_defaults(func=cmd_espn_b_check)
+    xgw = sub.add_parser("xg-weight", help="load-only: the match model's xG weight and share")
+    xgw.add_argument("--league", required=True)
+    xgw.set_defaults(func=cmd_xg_weight)
     alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
     alb.add_argument("--league", default="E0")
     alb.add_argument("--json", help="write the results as JSON")

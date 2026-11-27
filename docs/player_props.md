@@ -1310,6 +1310,134 @@ Settlement uses ESPN's goal details (own goals left out); football-data has no s
 The track is backcast from 1 Nov, the live log's first day, on the logged entry snapshots
 only (never the bought history), and starts at its `defined_at`.
 
+### Amendment, 2026-11-26: B-espn for the whole read, B beside it (owner-approved 27 Nov; written before any judged number)
+
+**Why.** Understat has been down since 2 Nov. B's player features come from Understat's
+match files, and SP1, D1, I1 and F1's files are in no cache. Without them B can score only
+E0, and only matches before its files stop. ESPN's match summaries have every field B uses
+except xG: starters and substitutes, substitution minutes, goals, shots, shots on target and
+own goals per player, in all five leagues since 2021/22 (fields check, run 45778000789: 167
+of 180 sampled matches found, every field present).
+
+**B-espn** is B with ESPN's player data, frozen exactly as run on 26 Nov (full E0 pull, run
+45779183561, commit 60e0949; unchanged at 68ebc34, which changed only a coverage count):
+- the same NB2 mixture as B (start and substitute minutes, lineup known, `p_zero`), fitted by
+  `models.player_counts.NBRegression` with `FIT_OPTIONS` and a starting α of 2.0;
+- factors `espn_players.B_ESPN_FACTORS`: log_rate, sot_rate, log_goal_rate, pos_def, pos_fwd,
+  log_team_xg, log_opp_conceded, home, game_state. `log_goal_rate` (his goals per 90 shrunk
+  toward the position average, `goal_rate_features`) stands in for B's `log_xg_rate`; the
+  rest are B's own features (`factors.build_features` → `player_goals.goal_features`);
+- walk-forward as B: refit every 28 days on the 730 days before the block, starters with at
+  least 3 earlier appearances, B's chance rounded to 6 decimals before the threshold;
+- minutes from ESPN's substitution events; a starter subbed off at an unknown time counts 70
+  minutes, a substitute with an unknown time 20 (`DEFAULT_START_OFF`, `DEFAULT_SUB_ON`);
+- team expected goals from the live match model (`backtest.walk_forward`, xG weight 0.7,
+  `FIT_OPTIONS`), as for B. Its xG comes from Understat's league files, held through 1 Nov
+  in `xg-good-`; later matches use goals, as the live model does.
+- The code is `espn_players.b_espn_predict`; `tests/test_espn_b_reproducible.py` checks that
+  two runs on shuffled copies of the same rows give identical chances.
+  - Caveat (shared with B, whose fit is the same `NBRegression`): the identity holds when
+    the NB2 dispersion α is interior. On counts that look Poisson, α runs to 0 and
+    L-BFGS-B's stopping point moves by about 1e-4 in a chance between row orders. The
+    judged read runs once, on one machine, with its rows in kickoff order.
+
+On E0's development seasons B-espn and B were level on the same 15,209 starter rows:
+log loss 0.2918 vs 0.2917, B-espn minus B +0.0001 (−0.0012 to +0.0013); both beat season
+goals (0.4367). Mapping: 76.7% of ESPN's starters to an Understat id by name, goals agreeing
+on 99.99% of mapped rows.
+
+**The check in SP1, D1, I1 and F1 (written before it runs).**
+- Rows: the rescued 2025/26 development rows (`judged_<L>.csv.gz` in
+  `goalscorer-1nov-rescued.zip`, the sha256 in `archive/extra_assets.json` checked before
+  use), B's chance `p_B` and Understat's outcome `scored` as saved on 1 Nov. Each is joined to
+  ESPN's starter in the same match (Understat's match id, ESPN's names mapped by
+  `match_in_fixture` within the two clubs). B-espn is fitted on ESPN rows of 2021/22–2025/26
+  only; nothing from 2026/27 is pulled, fitted or scored, and the rescued 2026/27 rows are
+  not opened.
+- Measure: per row, B-espn's log loss minus B's; the mean and its 95% range from 2,000 draws
+  resampling whole matches (seed 0).
+- **Pass, per league: the range includes 0 or lies below it** (B-espn no worse than B).
+  **Fail:** the whole range lies above 0.
+- **Not checked:** fewer than half of the league's rescued rows join. That league is then
+  treated as failed. (accepted by the lead, 26 Nov.)
+- Each league's result is reported either way, with rows, matches and the join share.
+  E0's development result above stands as its check.
+
+**What changes in the judged read.**
+1. **Primary model: B-espn** in every league that passed (E0 and each of SP1–F1 that
+   passes). The rows are ESPN's starters in the match whose name matches a priced name at the
+   entry snapshot (`match_in_fixture` within the two clubs, the same overrides), with at
+   least 3 earlier appearances in ESPN's rows. The outcome is ESPN's goals for the player,
+   own goals left out.
+2. **B is descriptive beside it**: rescued rows through 1 Nov, rebuilt rows if Understat
+   returns, joined by name. B gets every measure, never the verdict.
+3. **A league that fails the check** is read on B, under the 8 Nov note's rules, and is
+   left out of the judged read if B can't score it by 31 Jan. It is counted and reported.
+4. **Unchanged:** the measures and pass rule, T = 20% (set on B's development volume and not
+   re-chosen), the price bands, the books, the snapshots, the sample (from 10 Oct, 600
+   matches or 31 Jan 2027) and the single read.
+5. **Every judged row records `model_source`** ("B-espn" or "B") **and `feature_source`**
+   ("espn" or "understat"), and every saved file carries them.
+
+**The paper track** (note of 9 Nov) may switch to B-espn in all five leagues from its first
+run after this merges, which also ends its E0-only wait for Understat. Every entry records
+`model_source` and `feature_source`; entries opened before the switch are B on Understat by
+definition and are never rewritten. The sections count trades per model.
+
+**Check result, 26 Nov** (odds-check `task=espn-b-check`, runs 45785042944 SP1, 45785049207 D1,
+45785059983 F1, commit 05554b7; I1 from its single rerun, run 45788135188, commit d980605; both
+sha256s matched every time). B-espn minus B log loss on
+the rescued 2025/26 rows, 95% range over matches:
+
+| League | Rescued rows | Joined | Matches | B | B-espn | B-espn − B | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | 4,564 | 4,134 (90.6%) | 317 | 0.2841 | 0.2855 | +0.0014 (−0.0010 to +0.0040) | pass |
+| D1 | 5,387 | 4,660 (86.5%) | 271 | 0.3195 | 0.3198 | +0.0003 (−0.0022 to +0.0027) | pass |
+| I1 (rerun, final) | 6,025 | 5,498 (91.3%) | 353 | 0.2716 | 0.2738 | +0.0022 (+0.0003 to +0.0040) | **fail** |
+| F1 | 4,688 | 4,176 (89.1%) | 270 | 0.2919 | 0.2926 | +0.0007 (−0.0017 to +0.0031) | pass |
+
+E0's development result above stands as its check (pass). Under this amendment's rule I1 is read
+on B, and is left out if B can't score it by 31 Jan.
+
+A flaw in the I1 run, recorded as it was found: the check's match model dropped xG for every I1
+season (xG weight 0) because one season, I1 2022/23, has no Understat xG. The frozen B-espn uses
+weight 0.7, and the live model loses only that season's xG. So I1's B-espn here ran on goals-only
+team xG, which differs from the frozen model. The verdict above is the one the written rule gives.
+Whether to rerun I1 with the frozen weight is for the lead and the owner; it is a second look after
+seeing the result.
+
+**I1 rerun (lead's decision, 26 Nov; written and committed before the rerun).** The first I1
+run (+0.0021, +0.0002 to +0.0039, fail) did not test the frozen model. The check dropped xG for
+every I1 season because one season (2022/23) has no Understat xG. Its rule was weight 0.7 only
+when no season failed to load. The frozen B-espn and the live model keep weight 0.7 whenever any
+match has xG, and a season without xG falls back to goals for its own matches only. This fix
+corrects the implementation to the spec written before the result; nothing else changes.
+- The check now uses `espn_players.match_xg_weight` (the live rule, `publish.league_fixtures`) and
+  prints the weight and xG share each run uses.
+- I1 is rerun once with the fix. **Its result is final whichever way it comes out**, and replaces
+  the first I1 result in the table above. There are no further I1 runs.
+- The other checks' weights:
+  - SP1, D1 and F1 each logged `xg_error None` (runs 45785042944, 45785049207, 45785059983). At
+    commit 05554b7 that means weight 0.7.
+  - E0's development comparison (run 45779183561) printed no xG-load line. Its five league files (2021/22 from the Wayback copy, 2022/23–2025/26
+    held) are all in `xg-good-`. **Confirmed by a load-only step** (lead, 26 Nov; `task=xg-weight`,
+    run 45788654308, no scoring): E0 on the checks' seasons loads with no errors and xG on 100% of
+    1,900 matches in every season, so espn-b's rule gave weight 0.7. E0 is not rerun.
+- **I1 rerun result (final; run 45788135188, commit d980605):** the match model ran at xG weight
+  0.7 (xG on 79.9% of matches; only I1 2022/23 failed to load). B 0.27162, B-espn 0.27377,
+  B-espn − B +0.00215 (+0.00034 to +0.00399) on the same 5,498 rows and 353 matches: **fail**,
+  as in the first run (+0.0021, +0.0002 to +0.0039, goals-only team xG, kept here as the
+  record). The table's I1 row is the rerun. The team-xG weight barely moves B-espn's player
+  chances; the gap to B is the player features themselves (Understat's xG per shot against ESPN's
+  goal and shot rates). Under this amendment's rule I1 is read on B, and is left out if B can't
+  score it by 31 Jan.
+- ESPN goals check, counting own goals (check runs above): player goals plus own goals add up to
+  the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
+  364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
+
+**Status:** drafted 26 Nov by Player props, reviewed by the lead, **approved by the owner on 27 Nov
+and binding from its merge (PR #268).** No judged number had been computed when it was written.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes

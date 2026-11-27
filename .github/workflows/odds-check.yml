@@ -187,9 +187,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / market-probe / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -521,7 +521,7 @@ jobs:
         env:
           ODDS_API_KEY: ${{ (inputs.task == 'coverage' || inputs.task == 'props' || inputs.task == 'goalscorer' || ((inputs.task == 'goalscorer-probe' || inputs.task == 'goalscorer-backfill' || inputs.task == 'market-probe') && inputs.cap != '0') || inputs.task == 'markets' || (inputs.task == 'corner-markets' && inputs.cap != '0') || inputs.task == 'corner-history' || inputs.task == 'inplay-probe' || inputs.task == 'comeback-fetch' || inputs.task == 'archive-probe' || (inputs.task == 'dk-history' && inputs.cap != '0')) && secrets.ODDS_API_KEY || '' }}
           TASK: ${{ inputs.task }}
-          GH_TOKEN: ${{ (inputs.task == 'understat' || inputs.task == 'residual-map') && github.token || '' }}
+          GH_TOKEN: ${{ (inputs.task == 'understat' || inputs.task == 'residual-map' || inputs.task == 'espn-b-check') && github.token || '' }}
           DESIGN: ${{ inputs.design }}
           CAP: ${{ inputs.cap }}
           HIST_DATES: ${{ inputs.hist_dates }}
@@ -671,6 +671,28 @@ jobs:
               uv run soccer-stats espn-players --out out/espn_players --json out/espn_players.json ;;
             espn-b)  # full ESPN pull for one league, mapped to Understat; B-espn vs B (free)
               uv run soccer-stats espn-b --league "${LEAGUE:-E0}" --out out/espn_b --json out/espn_b.json ;;
+            espn-b-check)  # §16 amendment (26 Nov): B-espn vs B on the rescued 2025/26 rows (free)
+              L="${LEAGUE:?league}"
+              mkdir -p rescued
+              gh release download paid-odds-archive -R "$GITHUB_REPOSITORY" \
+                -p goalscorer-1nov-rescued.zip -D rescued --clobber
+              F="goalscorer-dev-$L/judged_$L.csv.gz"
+              unzip -o -q rescued/goalscorer-1nov-rescued.zip "*$F" -d rescued
+              GOT=$(find rescued -path "*$F" | head -1)
+              python3 - "$GOT" "$F" <<'PY'
+          import hashlib, json, sys, zipfile
+          a = json.load(open("archive/extra_assets.json"))["assets"]
+          e = next(x for x in a if x["asset"] == "goalscorer-1nov-rescued.zip")
+          z = hashlib.sha256(open("rescued/goalscorer-1nov-rescued.zip", "rb").read()).hexdigest()
+          f = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+          assert z == e["sha256"], f"zip sha256 {z} != {e['sha256']}"
+          assert f == e["files"][sys.argv[2]], f"{sys.argv[2]} sha256 {f} differs"
+          print(f"sha256 ok: zip {z}, {sys.argv[2]} {f}")
+          PY
+              uv run soccer-stats espn-b-check --league "$L" --judged "$GOT" \
+                --out out/espn_b_check --json "out/espn_b_check_$L.json" ;;
+            xg-weight)  # load-only: the match model's xG weight on the B-espn checks' seasons (free)
+              uv run soccer-stats xg-weight --league "${LEAGUE:-E0}" ;;
             assist-lab)  # assists and score-or-assist vs season baselines (free, no key)
               uv run soccer-stats assist-lab --league "${LEAGUE:-E0}" --json out/assist_lab.json ;;
             goalscorer-probe)  # priced goalscorer step 0 (lead-approved 1 Nov, cap 250); no results read
