@@ -893,3 +893,37 @@ def test_a_corrected_kickoff_outranks_the_old_copy_in_the_merge(tmp_path):
     (cache / rel).write_text(json.dumps(old))  # a stale copy elsewhere loses to the shard
     assert ep.merge_dirs(seed, cache) == {"copied": 1, "kept": 0}
     assert pd.Timestamp(json.loads((cache / rel).read_text())["kickoff"]) == right
+
+
+def test_a_redecided_match_is_decided_once_and_later_decisions_are_voided(tmp_path):
+    import json
+
+    d = tmp_path / "paper_trades"
+    d.mkdir()
+    base = {"league": "SP1", "event_id": "ev1", "home": "A", "away": "B"}
+    rows = [
+        {**base, "attempt": 1, "decided_at": "2026-11-27T19:49:00+00:00"},
+        {**base, "attempt": 2, "redecide": True, "superseded_at": "2026-11-27T21:29:00+00:00"},
+        {**base, "attempt": 2, "decided_at": "2026-11-27T21:29:15+00:00"},  # the decision
+        {**base, "attempt": 2, "decided_at": "2026-11-27T22:43:25+00:00"},  # decided again
+    ]
+    (d / pgp.CHECKED_FILE).write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    checked = pgp.load_checked(tmp_path)
+    kept = checked["SP1|ev1"]
+    assert kept["decided_at"] == "2026-11-27T21:29:15+00:00" and not kept.get("redecide")
+    t = {"league": "SP1", "event_id": "ev1", "attempt": 2, "status": "lost", "profit": -10.0,
+         "stake": 10.0, "kickoff": "2026-11-08T15:00:00+00:00"}  # fmt: skip
+    ledger = {
+        "SP1|x|goal|1|r2": {**t, "id": "SP1|x|goal|1|r2",
+                            "decided_at": "2026-11-27T21:29:15+00:00"},
+        "SP1|x|goal|2|r2": {**t, "id": "SP1|x|goal|2|r2",
+                            "decided_at": "2026-11-27T22:43:25+00:00"},
+        "SP1|x|goal|3": {**t, "id": "SP1|x|goal|3", "attempt": 1,
+                         "decided_at": "2026-11-27T19:49:00+00:00"},
+    }  # fmt: skip
+    now = pd.Timestamp("2026-11-27T23:50:00Z")
+    ev = pgp.twice_sweep(ledger, checked, "SP1", now)
+    assert [e["id"] for e in ev] == ["SP1|x|goal|2|r2"]
+    assert ledger["SP1|x|goal|2|r2"]["void_reason"] == pgp.TWICE_REASON
+    assert pgp.is_bug_void(ledger["SP1|x|goal|2|r2"])
+    assert pgp.twice_sweep(ledger, checked, "SP1", now) == []  # idempotent

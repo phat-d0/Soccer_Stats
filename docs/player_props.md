@@ -1455,6 +1455,18 @@ until PR #278), so their matches were missing from every ESPN pull:
   settled football-data match may lack a cache file, and the seasons must reach `SEEDED_MIN`.
 - The paper track rewrites nothing; its next D1 and F1 decisions refit on the fuller cache.
 
+**Note, 2026-11-27 (late): the 22 re-decided SP1 matches were decided again on later runs.**
+- `load_checked` kept the first record of an attempt, the `redecide` marker, over the decision
+  made on that attempt, so every paper run from 21:29 decided the 22 matches again (one
+  `goalscorer_checked.jsonl` record each, a run). Most re-decisions matched held ids and opened
+  nothing, but two runs whose ESPN cache had just changed opened 11 more trades (22:43 and
+  23:04 UTC). No trade was opened twice.
+- The fix: a decision now replaces its attempt's `redecide` marker and nothing after it does,
+  so the 21:29 decisions stand; `twice_sweep` voids (update events, `void_reason`
+  `TWICE_REASON`) every trade whose `decided_at` isn't its match's kept decision, the 11, and the
+  sections leave them out with the bug voids (`is_bug_void`, counted in `voided_bug`).
+  Descriptive track only; nothing here touches §16's read.
+
 **Note, 2026-11-27 (later): the cache's coverage before the read, and why F1's matches were missing.**
 - `judged_ready` treats a not-found marker as tried: it requires a cache file for every settled
   football-data match, and a marker counts as one. So the read can pass with matches missing,

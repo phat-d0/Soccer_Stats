@@ -256,8 +256,14 @@ def load_checked(log_dir: Path) -> dict[str, dict]:
         if line.strip():
             r = json.loads(line)
             key = f"{r['league']}|{r['event_id']}"
-            if key not in out or int(r.get("attempt", 1)) > int(out[key].get("attempt", 1)):
-                out[key] = r  # a superseding record (the bug void) replaces the first
+            a, kept = int(r.get("attempt", 1)), out.get(key)
+            b = int(kept.get("attempt", 1)) if kept else 0
+            # A superseding record (the bug void) replaces the first; the decision made on
+            # that attempt then replaces its `redecide` marker, and nothing after it does
+            # (until 27 Nov 23:40 an equal attempt kept the marker, so the 22 SP1 matches
+            # were decided again on every run).
+            if kept is None or a > b or (a == b and kept.get("redecide")):
+                out[key] = r
     return out
 
 
@@ -1269,8 +1275,31 @@ def bug_sweep(ledger: dict, checked: dict, league: str, now) -> tuple[list[dict]
     return events, recs
 
 
+TWICE_REASON = "decided again after its match's decision (bug, 27 Nov)"
+
+
+def twice_sweep(ledger: dict, checked: dict, league: str, now) -> list[dict]:
+    """Void (update events, the opens untouched) every trade whose decision isn't its match's
+    kept one: on 27 Nov the 22 re-decided SP1 matches were decided again on later runs, and
+    those runs opened 11 more trades. Idempotent."""
+    from soccer_stats import paper
+
+    events = []
+    for t in list(ledger.values()):
+        if int(t.get("attempt", 1)) < 2 or t.get("void_reason") in (BUG_REASON, TWICE_REASON):
+            continue
+        rec = checked.get(f"{league}|{t.get('event_id')}")
+        if not rec or rec.get("redecide") or not rec.get("decided_at") or not t.get("decided_at"):
+            continue
+        if _utc(t["decided_at"]) != _utc(rec["decided_at"]):
+            ev = paper._update(t, now, status="void", profit=0.0, void_reason=TWICE_REASON,
+                               settled_at=_iso(now))  # fmt: skip
+            events.append(ev)
+    return events
+
+
 def is_bug_void(t: dict) -> bool:
-    return t.get("void_reason") == BUG_REASON
+    return t.get("void_reason") in (BUG_REASON, TWICE_REASON)
 
 
 # ---------- one league ----------
@@ -1479,6 +1508,10 @@ def run(
                   "to decide again")  # fmt: skip
             events += bev
             recs += brc
+        tev = twice_sweep(ledger, checked, lg, now)
+        if tev:
+            print(f"Goalscorer decided-twice void {lg}: {len(tev)} trades voided")
+            events += tev
         try:  # one league's failure costs only that league this run
             ev, rc, c = update_league(
                 ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src,
