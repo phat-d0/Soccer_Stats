@@ -1467,6 +1467,19 @@ and binding from its merge (PR #268).** No judged number had been computed when 
 - **Settlement:** unchanged (ESPN's scoreboard goals). A B-espn trade's check is against ESPN's
   own match summary (`espn_check`, `espn_goals`), never Understat's, whose ids differ.
 
+### Note, 2026-11-27 (later): a league is decided only on a seeded ESPN cache
+
+The first publish after the switch (19:49 UTC, before any `espn-seed` had finished) decided La
+Liga's 22 waiting matches. Its own top-up had filled 2026/27 through 18 Sep only, with no earlier
+season, and the check accepted "any current-season rows". Those 161 trades (92 best-book, 69
+DraftKings) were made on that partial history (`features_through` 18 Sep). The Bundesliga and
+Ligue 1 were decided at 21:09, after their seeds finished, on full history.
+
+The fix: `EspnSource.load` decides nothing unless every earlier season from 2021/22 holds at
+least `SEEDED_MIN` 200 matches. It makes no top-up on an unseeded cache, and waits when the run's
+top-up ran out of time before this season was complete. The reason is in the counts as
+`no_data_why`. The La Liga trades are left as they are for the lead's decision.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes
