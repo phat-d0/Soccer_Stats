@@ -1311,10 +1311,16 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   "fd:home|away|date"; a match ESPN doesn't list is retried `RETRY_TRIES` 3 times within 14
   days; its marker keeps that day's `board_names`; `refetch=` clubs fetch their old markers
   again), `load_cache`, `cached_match`, `not_found_clubs`, `unmapped_board_names`; CLI
-  `espn-seed --league --minutes --refetch`, `odds-check.yml` `task=espn-seed` (`finalists` = the
-  clubs to refetch; saves shard `espn-players-<league>-` on `data/raw/espn_players` from the
-  default branch when it added files; publish restores the four shards, keep-alive rows in
-  caches.yml, `cache_archive.FREE`).
+  `espn-seed --league --minutes --refetch --seed-dir`, `odds-check.yml` `task=espn-seed`
+  (`finalists` = the clubs to refetch). Since 27 Nov each league's seed shard is
+  `espn-seed-<league>-` on `data/espn_seed/<league>` (that league's folder only), saved from the
+  default branch when a file changed (a digest, so an in-place refetch counts); `merge_dirs`
+  (`_rank`: found beats not found, then the later fetch, then more tries; CLI `espn-merge`)
+  folds it in and out file by file. Publish restores the four seed shards and merges them into
+  raw-data's copy (the old `espn-players-<league>-` shards each held every league's folder, so the
+  last one restored overwrote newer copies: the 27 Nov D1/F1 refetch was lost that way; they are
+  still kept alive, no longer restored by publish). Keep-alive rows in caches.yml,
+  `cache_archive.FREE`.
 - `player_assist_lab.py` (lead, 26 Nov; free development look, CLI `assist-lab --league`,
   `odds-check.yml` `task=assist-lab`): B's NB2 mixture (`CountCandidate`) on assists
   (`ASSIST_FACTORS`: shrunk xA and key passes per 90, assists per xA) and on goals + assists

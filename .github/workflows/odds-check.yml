@@ -130,8 +130,8 @@
 #   espn-seed: the ESPN appearance cache for the goalscorer paper track's B-espn (§16
 #             amendment, 27 Nov): every settled football-data match of `league` from
 #             2021/22, one file per match in data/raw/espn_players/<league>/ (resumable,
-#             110 min); saved as espn-players-<league>- from the default branch only,
-#             when it added files. `finalists` = clubs whose not-found matches are
+#             110 min); saved as espn-seed-<league>- (data/espn_seed/<league> only) from
+#             the default branch, when it changed a file. `finalists` = clubs whose not-found matches are
 #             fetched again (a name the mapping has just learned). Free, no key.
 #   shots-gate-a: §17 gate (a), read once: the best book's markup on E0 2025/26 starters'
 #             shot lines at entry (bought shots17 bodies, ESPN's appearances). No key.
@@ -374,9 +374,22 @@ jobs:
           path: data/raw/espn_players
           key: espn-players-F1-none
           restore-keys: espn-players-F1-
+      # The league's seed shard (27 Nov): its own folder only, merged into the cache file
+      # by file (the better copy wins), so no shard restored after it can overwrite it.
+      - uses: actions/cache/restore@v4
+        if: ${{ inputs.task == 'espn-seed' }}
+        with:
+          path: data/espn_seed/${{ inputs.league }}
+          key: espn-seed-${{ inputs.league }}-none
+          restore-keys: espn-seed-${{ inputs.league }}-
       - name: Count the ESPN appearance files restored
         if: ${{ inputs.task == 'espn-seed' }}
-        run: echo "EP_BEFORE=$(find data/raw/espn_players -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
+        # A digest of every file, not a count: a refetch (`finalists`) rewrites old
+        # not-found markers in place, which a file count can't see (27 Nov).
+        run: |
+          d="data/espn_seed/${{ inputs.league }}"
+          echo "EP_BEFORE=$(find "$d" -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
+          echo "EP_DIGEST=$(find "$d" -type f -name '*.json' -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sha256sum | cut -c1-16)" >> "$GITHUB_ENV"
       - name: Count the Understat match files restored (a save never keeps fewer)
         if: ${{ inputs.task == 'goal-league' || inputs.task == 'goal-leagues' || inputs.task == 'assist-lab' || inputs.task == 'espn-b' || inputs.task == 'market-probe' || inputs.task == 'comebacks-fetch' || inputs.task == 'strategy-search' || inputs.task == 'residual-map' || inputs.task == 'auc' || inputs.task == 'lasso-residual' || inputs.task == 'market-moves' || inputs.task == 'lasso-coverage' || inputs.task == 'tuning-bias' || inputs.task == 'model-assumptions' || inputs.task == 'understat-seed' }}
         run: echo "UM_BEFORE=$(find data/raw/understat_matches -type f -name '*.json' 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
@@ -754,7 +767,7 @@ jobs:
               uv run soccer-stats shots-gate-a --json out/shots_gate_a.json ;;
             espn-seed)  # the ESPN appearance cache for B-espn (free, resumable)
               uv run soccer-stats espn-seed --league "${LEAGUE:-E0}" --minutes 110 \
-                --refetch "$FINALISTS" ;;
+                --refetch "$FINALISTS" --seed-dir data/espn_seed ;;
             goalscorer-paper)  # the paper track on a copy of data-log; nothing is pushed
               git fetch --depth=1 origin data-log
               git worktree add --detach "$RUNNER_TEMP/log" FETCH_HEAD
@@ -975,18 +988,20 @@ jobs:
         with:
           path: data/raw/understat_matches
           key: understat-${{ inputs.league }}-${{ github.run_id }}
-      - name: Keep the ESPN appearance files only if this run added some
+      - name: Keep the ESPN appearance files only if this run changed some
         id: ep
         if: ${{ always() && inputs.task == 'espn-seed' }}
         run: |
-          after=$(find data/raw/espn_players -type f -name '*.json' 2>/dev/null | wc -l)
-          echo "ESPN appearance files: ${EP_BEFORE:-0} restored, $after now"
-          if [ "$after" -gt "${EP_BEFORE:-0}" ]; then echo "save=true" >> "$GITHUB_OUTPUT"; else echo "save=false" >> "$GITHUB_OUTPUT"; fi
+          d="data/espn_seed/${{ inputs.league }}"
+          after=$(find "$d" -type f -name '*.json' 2>/dev/null | wc -l)
+          digest=$(find "$d" -type f -name '*.json' -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sha256sum | cut -c1-16)
+          echo "ESPN appearance files: ${EP_BEFORE:-0} restored, $after now (digest ${EP_DIGEST:-none} -> $digest)"
+          if [ "$digest" != "${EP_DIGEST:-}" ]; then echo "save=true" >> "$GITHUB_OUTPUT"; else echo "save=false" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache/save@v4
         if: ${{ always() && steps.ep.outputs.save == 'true' && github.ref == 'refs/heads/claude/soccer-stats-scaffold' }}
         with:
-          path: data/raw/espn_players
-          key: espn-players-${{ inputs.league }}-${{ github.run_id }}
+          path: data/espn_seed/${{ inputs.league }}
+          key: espn-seed-${{ inputs.league }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

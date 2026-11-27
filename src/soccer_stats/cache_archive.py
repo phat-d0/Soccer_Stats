@@ -117,6 +117,8 @@ FREE = {
     },
     "espn-players-*-": "ESPN match summaries' appearance rows for B-espn, one shard per "
     "league (free)",
+    "espn-seed-*-": "ESPN match summaries' appearance rows for B-espn, one league's folder "
+    "per shard (free)",
     "comebacks-*-": "Understat match files for the comeback research (free)",
     "heavy-espn-": "ESPN cup and extra-league days for the 75%+ counting (free)",
 }

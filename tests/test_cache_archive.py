@@ -230,7 +230,10 @@ def test_every_cache_the_workflows_use_is_kept_alive_with_its_exact_paths():
         matches = [e for e in kept if fnmatch.fnmatchcase(e["prefix"], prefix)]
         assert matches, f"{wf} {job}: cache {prefix} isn't in caches.yml's keep-alive"
         for e in matches:
-            assert _paths(e["path"]) == _paths(w["path"]), f"{prefix}: paths differ"
+            # A per-league path (espn-seed-: data/espn_seed/<league>) is the league's own.
+            lg = e["prefix"][len(prefix.split("*")[0]) : -1] if "*" in prefix else ""
+            want = str(w["path"]).replace("${{ inputs.league }}", lg)
+            assert _paths(e["path"]) == _paths(want), f"{prefix}: paths differ"
         seen += 1
     assert seen > 20
 

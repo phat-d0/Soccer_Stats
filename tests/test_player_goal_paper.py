@@ -739,3 +739,48 @@ def test_espn_names_heidenheim_and_st_etienne_and_refetch_old_misses(tmp_path):
     # A found match is never refetched.
     assert ep.fill_cache("F1", [2024], tmp_path, get, 60, now, refetch=["St Etienne"],
                          **kw)["fetched"] == 0  # fmt: skip
+
+
+def test_espn_merge_keeps_the_better_copy_of_each_match_file(tmp_path):
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    def put(root, name, **rec):
+        f = root / "D1" / "2526" / name
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(rec))
+        return f
+
+    seed, cache = tmp_path / "seed", tmp_path / "cache"
+    put(seed, "a.json", found=True, fetched_at="2026-11-27T21:50:00+00:00")  # fixed by a refetch
+    put(cache, "a.json", found=False, tries=3, fetched_at="2026-11-27T09:00:00+00:00")
+    put(seed, "b.json", found=False, tries=1, fetched_at="2026-11-20T09:00:00+00:00")
+    put(cache, "b.json", found=True, fetched_at="2026-11-21T09:00:00+00:00")  # a top-up's find
+    put(seed, "c.json", found=True, fetched_at="2026-11-01T09:00:00+00:00")  # only in the shard
+    got = ep.merge_dirs(seed, cache)
+    assert got == {"copied": 2, "kept": 1}
+    read = {n: json.loads((cache / "D1" / "2526" / n).read_text()) for n in ("a.json", "b.json")}
+    assert read["a.json"]["found"] and read["b.json"]["found"]
+    assert (cache / "D1" / "2526" / "c.json").exists()
+    assert ep.merge_dirs(seed, cache) == {"copied": 0, "kept": 3}  # nothing changes twice
+    assert ep.merge_dirs(tmp_path / "missing", cache) == {"copied": 0, "kept": 0}
+
+
+def test_a_later_shard_restore_cannot_overwrite_a_newer_raw_data_file(tmp_path):
+    """Publish: raw-data's copy holds the paper run's newer top-up; the seed shard, merged
+    after it, holds an older copy of the same match. The newer copy stays."""
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    rel = "F1/2627/20261122_Lyon_Nice.json"
+    raw, seed = tmp_path / "raw" / "espn_players", tmp_path / "espn_seed"
+    for root, rec in (
+        (raw, {"found": True, "fetched_at": "2026-11-23T10:00:00+00:00", "rows": [1, 2]}),
+        (seed, {"found": True, "fetched_at": "2026-11-22T20:00:00+00:00", "rows": [1]}),
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(json.dumps(rec))
+    assert ep.merge_dirs(seed, raw) == {"copied": 0, "kept": 1}
+    assert json.loads((raw / rel).read_text())["rows"] == [1, 2]
