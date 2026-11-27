@@ -46,3 +46,4 @@
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"6200a255f9b0b27486372bbcb54a7fa6","home":"Guadalajara","away":"Pachuca","kickoff":"2026-11-30T01:07:00+00:00","fetched_at":"2026-11-23T18:31:03+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"a12dfb65a14c07d6d92c68a4843e358d","home":"Cruz Azul","away":"Le\u00f3n","kickoff":"2026-11-30T03:00:00+00:00","fetched_at":"2026-11-23T18:31:03+00:00"}
 {"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"3f1a108d2920eabe5fe9bfc2531db019","home":"Am\u00e9rica","away":"Monterrey","kickoff":"2026-11-29T03:10:00+00:00","fetched_at":"2026-11-26T06:14:17+00:00"}
+{"league":"MEX","sport":"soccer_mexico_ligamx","event_id":"6a6e4753173f8db212cb4b448a892c6f","home":"Le\u00f3n","away":"Cruz Azul","kickoff":"2026-11-27T03:11:00+00:00","fetched_at":"2026-11-27T03:44:44+00:00"}
