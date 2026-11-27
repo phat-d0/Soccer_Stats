@@ -3255,6 +3255,25 @@ def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_espn_seed(args: argparse.Namespace) -> None:
+    """The ESPN appearance cache for the goalscorer paper track's B-espn (§16 amendment,
+    27 Nov): every settled football-data match of one league from 2021/22 (free, resumable)."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.data import current_season
+    from soccer_stats.publish import _clean
+
+    years = range(2021, current_season() + 1)
+    res = ep.fill_cache(args.league, years, seconds=args.minutes * 60)
+    _rows, counts = ep.load_cache(args.league, years)
+    print(f"ESPN seed {args.league}: {json.dumps(_clean(res), default=str)}")
+    for season, c in sorted(counts.items()):
+        print(f"  {args.league} {season}: {c['matches']} matches held, {c['not_found']} not found")
+    if res.get("left"):
+        print(f"  {res['left']} matches left for the next run (time budget)")
+
+
 def cmd_shots_gate_a(args: argparse.Namespace) -> None:
     """§17 gate (a) (docs/player_props.md): the best US book's markup on E0 2025/26 starters'
     shot lines at entry, from the bought shots17 bodies and ESPN's appearances (free)."""
@@ -4206,6 +4225,11 @@ def main(argv: list[str] | None = None) -> None:
     gbf.add_argument("--minutes", type=float, default=0, help="time budget (0 = none); resumable")
     gbf.add_argument("--json", help="write the results as JSON")
     gbf.set_defaults(func=cmd_goalscorer_backfill)
+
+    ese = sub.add_parser("espn-seed", help="the ESPN appearance cache for B-espn (free)")
+    ese.add_argument("--league", default="E0")
+    ese.add_argument("--minutes", type=float, default=110)
+    ese.set_defaults(func=cmd_espn_seed)
 
     sga = sub.add_parser("shots-gate-a", help="§17 gate (a): best-book markup on shot lines")
     sga.add_argument("--json", help="write the results as JSON")

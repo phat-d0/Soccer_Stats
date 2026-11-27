@@ -83,6 +83,30 @@ jobs:
         with:
           name: understat-E0
 
+      # The ESPN appearance cache for the goalscorer paper track's B-espn (§16 amendment,
+      # 27 Nov): seeded by odds-check.yml task=espn-seed, restore only; the paper run's
+      # top-ups ride on raw-data (saved above).
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/espn_players
+          key: espn-players-E0-none
+          restore-keys: espn-players-E0-
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/espn_players
+          key: espn-players-SP1-none
+          restore-keys: espn-players-SP1-
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/espn_players
+          key: espn-players-D1-none
+          restore-keys: espn-players-D1-
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/espn_players
+          key: espn-players-F1-none
+          restore-keys: espn-players-F1-
+
       # The last good copy of each Understat league file (xg.GOOD_DIR): only files that
       # passed the JSON check are ever written there, so a stale raw-data cache holding
       # Understat's maintenance page can't cost the season's xG. Saved below, under a key

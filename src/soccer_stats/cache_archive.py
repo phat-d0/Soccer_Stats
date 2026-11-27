@@ -115,6 +115,8 @@ FREE = {
         f"understat-{lg}-": f"Understat match files, the {lg} shard (free)"
         for lg in ("E0", "SP1", "D1", "I1", "F1")
     },
+    "espn-players-*-": "ESPN match summaries' appearance rows for B-espn, one shard per "
+    "league (free)",
     "comebacks-*-": "Understat match files for the comeback research (free)",
     "heavy-espn-": "ESPN cup and extra-league days for the 75%+ counting (free)",
 }

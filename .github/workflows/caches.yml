@@ -97,6 +97,10 @@ jobs:
           - { name: understat-I1, prefix: understat-I1-, paid: false, archive: true, path: "data/raw/understat_matches" }
           - { name: understat-F1, prefix: understat-F1-, paid: false, archive: true, path: "data/raw/understat_matches" }
           # Free (rebuilt from public sources, but slowly).
+          - { name: espn-players-E0, prefix: espn-players-E0-, paid: false, path: "data/raw/espn_players" }
+          - { name: espn-players-SP1, prefix: espn-players-SP1-, paid: false, path: "data/raw/espn_players" }
+          - { name: espn-players-D1, prefix: espn-players-D1-, paid: false, path: "data/raw/espn_players" }
+          - { name: espn-players-F1, prefix: espn-players-F1-, paid: false, path: "data/raw/espn_players" }
           - { name: raw-data, prefix: raw-data-, paid: false, path: "data/raw" }
           - { name: cup-espn, prefix: cup-espn-, paid: false, path: "data/raw/cups/espn" }
           - { name: cup-corners, prefix: cup-corners-, paid: false, path: "data/raw/cups/corners\ndata/raw/cups/espn" }

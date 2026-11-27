@@ -693,3 +693,195 @@ def check_verdict(rows: pd.DataFrame, counts: dict) -> dict:
         "range": [round(lo, 5), round(hi, 5)],
         "verdict": "fail" if lo > 0 else "pass",
     }
+
+
+# --- The ESPN appearance cache (the goalscorer paper track on B-espn, §16 amendment) ------
+#
+# One file per football-data match: data/raw/espn_players/<league>/<season>/<key>.json with
+# the match's appearance rows (`appearances`), or a not-found marker retried a few times.
+# Seeded per league by odds-check.yml `task=espn-seed` (cache espn-players-<league>-);
+# publish's paper run tops it up with the matches played since, within its time budget, and
+# its raw-data cache carries the files on. Match ids are football-data's ("fd:home|away|date"),
+# so the cache never depends on Understat.
+
+CACHE_ROOT = "espn_players"
+SETTLED = pd.Timedelta(hours=3)  # a match is fetched once it kicked off this long ago
+RETRY_TRIES = 3  # a match ESPN didn't list (or listed without players) is tried this often
+RETRY_AFTER = pd.Timedelta(hours=6)
+RETRY_WITHIN = pd.Timedelta(days=14)  # only recent matches are retried
+
+
+def cache_dir(league: str, raw_dir=None) -> Path:
+    from soccer_stats.data import RAW_DIR
+
+    return Path(raw_dir or RAW_DIR) / CACHE_ROOT / league
+
+
+def season_code(year: int) -> str:
+    return f"{year % 100:02d}{(year + 1) % 100:02d}"
+
+
+def match_key(home: str, away: str, kickoff) -> str:
+    k = pd.Timestamp(kickoff)
+    k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+    return f"{k:%Y%m%d}_{home}_{away}".replace("/", "-")
+
+
+def match_file(league: str, year: int, home: str, away: str, kickoff, raw_dir=None) -> Path:
+    return cache_dir(league, raw_dir) / season_code(year) / f"{match_key(home, away, kickoff)}.json"
+
+
+def _due(path: Path, kickoff: pd.Timestamp, now: pd.Timestamp) -> bool:
+    """A match to fetch: never held, or a not-found marker worth another try."""
+    if not path.exists():
+        return True
+    try:
+        rec = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return True
+    if rec.get("found"):
+        return False
+    tried = pd.Timestamp(rec.get("fetched_at") or "1970-01-01T00:00:00Z")
+    return (
+        int(rec.get("tries", 1)) < RETRY_TRIES
+        and now - kickoff <= RETRY_WITHIN
+        and now - tried >= RETRY_AFTER
+    )
+
+
+def fill_cache(
+    league: str,
+    seasons,
+    raw_dir=None,
+    get: Callable = requests.get,
+    seconds: float = 60.0,
+    now: pd.Timestamp | None = None,
+    pause: float | None = None,
+    matches: Callable[[str, int], pd.DataFrame] | None = None,
+) -> dict:
+    """Fetch every settled football-data match of `seasons` the cache lacks (oldest first),
+    until `seconds` run out. Returns counts: due, fetched, found, not_found, left, requests."""
+    global PAUSE
+    if pause is not None:
+        PAUSE = pause
+    now = now or pd.Timestamp.now(tz="UTC")
+    end = time.monotonic() + seconds
+    slug = SLUGS[league]
+    stats: dict = {}
+    boards: dict[str, dict | None] = {}
+    out = {"due": 0, "fetched": 0, "found": 0, "not_found": 0, "left": 0, "stopped": False}
+    for year in seasons:
+        try:
+            fx = (matches or fd_matches)(league, year)
+        except Exception as exc:  # noqa: BLE001  no football-data file for that season
+            out.setdefault("errors", []).append(f"{year}: {type(exc).__name__}")
+            continue
+        for m in fx.sort_values("kickoff").to_dict("records"):
+            k = pd.Timestamp(m["kickoff"])
+            k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+            if k > now - SETTLED:
+                continue
+            path = match_file(league, year, m["home"], m["away"], k, raw_dir)
+            if not _due(path, k, now):
+                continue
+            out["due"] += 1
+            if time.monotonic() > end:
+                out["left"] += 1
+                out["stopped"] = True
+                continue
+            found = None
+            for day in (f"{k:%Y%m%d}", f"{k - pd.Timedelta(days=1):%Y%m%d}"):
+                if day not in boards:
+                    boards[day] = _get(
+                        get, BASE.format(slug=slug) + "/scoreboard", {"dates": day}, stats
+                    )
+                found = find_event(boards[day], m["home"], m["away"], k)
+                if found:
+                    break
+            rows, event_id = [], None
+            if found is not None:
+                event_id = str(found.get("id"))
+                body = _get(get, BASE.format(slug=slug) + "/summary", {"event": event_id}, stats)
+                comp = ((found.get("competitions") or [{}])[0]) or {}
+                espn_home = next(
+                    (
+                        (x.get("team") or {}).get("displayName")
+                        for x in comp.get("competitors", [])
+                        if x.get("homeAway") == "home"
+                    ),
+                    "",
+                )
+                meta = {
+                    "match_id": f"fd:{m['home']}|{m['away']}|{k:%Y%m%d}",
+                    "season": season_code(year),
+                    "kickoff": k,
+                    "home": m["home"],
+                    "away": m["away"],
+                    "espn_home": espn_home,
+                }
+                rows = appearances(body, meta)
+            prev = {}
+            if path.exists():
+                try:
+                    prev = json.loads(path.read_text())
+                except (OSError, ValueError):
+                    prev = {}
+            rec = {
+                "league": league,
+                "season": season_code(year),
+                "home": m["home"],
+                "away": m["away"],
+                "kickoff": k.isoformat(),
+                "event_id": event_id,
+                "found": bool(rows),
+                "tries": int(prev.get("tries", 0)) + 1,
+                "fetched_at": now.isoformat(),
+                "rows": [{**r, "kickoff": pd.Timestamp(r["kickoff"]).isoformat()} for r in rows],
+            }
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(rec, separators=(",", ":")))
+            out["fetched"] += 1
+            out["found" if rows else "not_found"] += 1
+    out["requests"] = stats
+    return out
+
+
+def load_cache(league: str, seasons=None, raw_dir=None) -> tuple[pd.DataFrame, dict]:
+    """Every cached appearance row for `league` (all seasons held, or `seasons` as years),
+    in kickoff order, and per season {matches, not_found}."""
+    base = cache_dir(league, raw_dir)
+    want = None if seasons is None else {season_code(y) for y in seasons}
+    rows, counts = [], {}
+    for d in sorted(base.iterdir()) if base.exists() else []:
+        if not d.is_dir() or (want is not None and d.name not in want):
+            continue
+        c = counts.setdefault(d.name, {"matches": 0, "not_found": 0})
+        for f in sorted(d.glob("*.json")):
+            try:
+                rec = json.loads(f.read_text())
+            except (OSError, ValueError):
+                continue
+            if rec.get("found"):
+                c["matches"] += 1
+                rows += rec.get("rows") or []
+            else:
+                c["not_found"] += 1
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df["kickoff"] = pd.to_datetime(df["kickoff"], utc=True)
+        df = df.sort_values(["kickoff", "match_id", "team"]).reset_index(drop=True)
+    return df, counts
+
+
+def cached_match(league: str, home: str, away: str, kickoff, raw_dir=None) -> dict | None:
+    """One match's cache record (any season folder), or None."""
+    k = pd.Timestamp(kickoff)
+    k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+    year = k.year if k.month >= 7 else k.year - 1
+    path = match_file(league, year, home, away, k, raw_dir)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None

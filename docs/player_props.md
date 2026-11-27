@@ -1438,6 +1438,35 @@ corrects the implementation to the spec written before the result; nothing else 
 **Status:** drafted 26 Nov by Player props, reviewed by the lead, **approved by the owner on 27 Nov
 and binding from its merge (PR #268).** No judged number had been computed when it was written.
 
+### Note, 2026-11-27: the paper track switches to B-espn (under the amendment; descriptive)
+
+- **Which model where:**
+  - The paper track (note of 9 Nov) uses B-espn in E0, SP1, D1 and F1 from its first run after
+    this merges (`player_goal_paper.ESPN_LEAGUES`, `EspnSource`).
+  - I1 failed the check, so it stays on B (`BSource`) and waits for Understat.
+- **The B-espn path:** the same placeholder rows as B, `espn_players.goal_rate_features`, a fit
+  per 28-day block (`fit_block_espn`) and `predict_espn`.
+  - The fit is the judged read's: `CountCandidate` through `lab.harness`.
+  - `tests/test_player_goal_paper.py` checks that the live chance equals the judged walk-forward
+    to 1e-9.
+  - Team xG uses the frozen rule's weight (`match_xg_weight`).
+- **ESPN's data:** one file per football-data match under `data/raw/espn_players/<league>/`
+  (`espn_players.fill_cache` / `load_cache`).
+  - Each league is seeded once by `odds-check.yml` `task=espn-seed` (cache
+    `espn-players-<league>-`, restored by publish).
+  - Each paper run tops it up within the 120 s budget (at most `ESPN_TOPUP_SECONDS` 45 a
+    league). Publish's raw-data cache carries the files on.
+  - Until a league is seeded, its matches wait (`no_data`), as B's did.
+- **What the trades record:** every new trade records `model_source` and `feature_source`, and
+  `model_ref` holds the model and its `xg_weight`.
+  - Trades opened before the switch carry neither. They are B on Understat (`model_of`) and are
+    never rewritten.
+  - Each section counts trades per model (`models`).
+- **Matches already waiting:** SP1, D1 and F1 matches since 1 Nov that waited for Understat
+  are decided on the first runs after the switch, as backcasts (decided after kickoff).
+- **Settlement:** unchanged (ESPN's scoreboard goals). A B-espn trade's check is against ESPN's
+  own match summary (`espn_check`, `espn_goals`), never Understat's, whose ids differ.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes
