@@ -86,6 +86,10 @@ CACHE_DIR = Path("data/raw/goalscorer_paper")  # B per block; saved with publish
 # passed its check; I1 failed it, so it stays on B (Understat) and waits for Understat.
 ESPN_LEAGUES = ("E0", "SP1", "D1", "F1")
 ESPN_TOPUP_SECONDS = 45.0  # ESPN match summaries fetched per league per run, within the budget
+# A league's ESPN cache counts as seeded when every earlier season from FIRST_YEAR holds this
+# many matches (27 Nov: a publish top-up alone, holding only this season's first weeks, once
+# decided La Liga's matches with no earlier-season history).
+SEEDED_MIN = 200
 MODEL_B = {"model_source": "B", "feature_source": "understat"}
 TIME_BUDGET = 120.0  # seconds of model work per paper run (lead, 9 Nov)
 CHECKED_FILE = "goalscorer_checked.jsonl"
@@ -729,6 +733,7 @@ class EspnSource(BSource):
         self.weight = None
         self.topup: dict | None = None
         self.cache_counts: dict = {}
+        self.why: str | None = None  # why load() said no
 
     def load(self) -> bool:
         if self._loaded:
@@ -741,6 +746,15 @@ class EspnSource(BSource):
         from soccer_stats.xg import with_xg
 
         years = range(FIRST_YEAR, current_season() + 1)
+        _rows, held = ep.load_cache(self.league, years, self.raw_dir)
+        self.seasons_missing = [
+            f"{y}/{(y + 1) % 100:02d} (ESPN cache not seeded)"
+            for y in years[:-1]
+            if held.get(ep.season_code(y), {}).get("matches", 0) < SEEDED_MIN
+        ]
+        if self.seasons_missing:
+            self.why = "the league's ESPN cache isn't seeded (odds-check.yml task=espn-seed)"
+            return False  # decided once the seed holds every earlier season
         if self.fetch:
             left = ESPN_TOPUP_SECONDS
             if self.deadline is not None:
@@ -752,16 +766,15 @@ class EspnSource(BSource):
                     )
                 except Exception as exc:  # noqa: BLE001  ESPN down: decide on what is held
                     self.topup = {"error": type(exc).__name__}
+            if (self.topup or {}).get("left") or left <= 0:
+                self.why = "this season's ESPN matches not all fetched yet (time budget)"
+                return False  # decided on a later run, once the season is complete
         apps, counts = ep.load_cache(self.league, years, self.raw_dir)
         self.cache_counts = counts
-        self.seasons_missing = [
-            f"{y}/{(y + 1) % 100:02d} (no ESPN cache)"
-            for y in years
-            if not counts.get(ep.season_code(y), {}).get("matches")
-        ]
         self.missing = sum(c.get("not_found", 0) for c in counts.values())
         if apps.empty or not (apps["season"].astype(str) == ep.season_code(current_season())).any():
-            return False  # the league's ESPN cache isn't seeded: decided once it is
+            self.why = "no ESPN rows for this season"
+            return False
         self.apps = apps
         self.matches, self.err = with_xg(load_matches([self.league], years))
         self.weight = ep.match_xg_weight(self.matches)
@@ -1238,6 +1251,8 @@ def update_league(
         else:
             if not source.load():
                 counts["no_data"] += 1
+                if getattr(source, "why", None):
+                    counts["no_data_why"] = source.why
                 continue  # no Understat match files: decided when they come back
             new, rec = decide(e, lineup, source, league, defined, now, known)
             for t in new:

@@ -607,3 +607,36 @@ def test_sections_count_trades_per_model_and_old_trades_stay_b(chances):
     main = next(s for s in secs if s["key"] == pgp.KEY)
     assert {m: v["trades"] for m, v in main["models"].items()} == {"B": 1, "B-espn": 1}
     assert pgp.model_of(old) == "B" and "model_source" not in old
+
+
+def _seed(tmp_path, years, n):
+    from soccer_stats import espn_players as ep
+
+    for y in years:
+        for i in range(n):
+            k = pd.Timestamp(f"{y}-09-01T15:00Z") + pd.Timedelta(days=i)
+            f = ep.match_file("SP1", y, "Alaves", "Betis", k, tmp_path)
+            f.parent.mkdir(parents=True, exist_ok=True)
+            row = {"match_id": f"fd:{i}", "season": ep.season_code(y), "kickoff": k.isoformat(),
+                   "team": "Alaves", "player_id": "e1", "player": "A", "goals": 0}  # fmt: skip
+            f.write_text(json.dumps({"found": True, "rows": [row]}))
+
+
+def test_espn_source_never_decides_on_a_current_season_only_cache(tmp_path, monkeypatch):
+    """27 Nov: a publish top-up alone (this season's first weeks, no history) once decided
+    La Liga's matches. A league is decided only once every earlier season is seeded."""
+    from soccer_stats import espn_players as ep
+    from soccer_stats.data import current_season
+
+    cur = current_season()
+    _seed(tmp_path, [cur], 5)
+    calls = []
+    monkeypatch.setattr(ep, "fill_cache", lambda *a, **k: calls.append(1) or {"left": 0})
+    now = pd.Timestamp("2026-11-28T12:00:00Z")
+    src = pgp.EspnSource("SP1", now, fetch=True, raw_dir=tmp_path)
+    assert src.load() is False and "seeded" in src.why and not calls  # no top-up either
+    # Seeded history, but this run's top-up ran out of time: wait for a complete season.
+    _seed(tmp_path, range(pgp.FIRST_YEAR, cur), pgp.SEEDED_MIN)
+    monkeypatch.setattr(ep, "fill_cache", lambda *a, **k: {"left": 3, "fetched": 9})
+    src = pgp.EspnSource("SP1", now, fetch=True, raw_dir=tmp_path)
+    assert src.load() is False and "time budget" in src.why
