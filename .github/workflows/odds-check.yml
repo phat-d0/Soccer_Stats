@@ -133,6 +133,9 @@
 #             110 min); saved as espn-seed-<league>- (data/espn_seed/<league> only) from
 #             the default branch, when it changed a file. `finalists` = clubs whose not-found matches are
 #             fetched again (a name the mapping has just learned). Free, no key.
+#   espn-diagnose: why `league`'s ESPN cache misses matches (2026/27 and 2025/26): each
+#             not-found marker's scoreboard events within ±3 days and whether the
+#             summary has player rows; reads the seed shard, writes nothing. Free.
 #   shots-gate-a: §17 gate (a), read once: the best book's markup on E0 2025/26 starters'
 #             shot lines at entry (bought shots17 bodies, ESPN's appearances). No key.
 #   goal-lab: the goalscorer model improvements (docs/player_props.md section 8),
@@ -193,9 +196,9 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, espn-seed, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
+        description: "coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, espn-seed, espn-diagnose, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed or understat-wayback"
         type: choice
-        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, espn-seed, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
+        options: [coverage, props, match, shots, signals, lab, lab-holdout, lab-coverage, lab-edge, lineups, totals, corners, corners2, corner-markets, corner-moves, corner-lean-gate, corner-coverage, corner-recal, cup-corner-coverage, cup-corners, corner-history, comebacks-fetch, comebacks, comeback-plan, comeback-fetch, comebacks2, comeback-research, cashout, cashout-plan, cashout-test, cashout-research, cashout-check, prematch-coverage, h2-slots, heavy-analysis, heavy-favourites, heavy-slots, heavy-more, archive-probe, timelines-fetch, timelines, markets, goalscorer, goalscorer-probe, goalscorer-backfill, shots-gate-a, goalscorer-paper, market-probe, assist-lab, espn-players, espn-b, espn-b-check, xg-weight, espn-seed, espn-diagnose, player-lab, goal-lab, goal-league, goal-leagues, team-totals, band-edges, strategy-search, dk-gap-counts, residual-map, auc, lasso-residual, market-moves, lasso-coverage, tuning-bias, model-assumptions, inplay-probe, dk-history, espn, understat, understat-restore, understat-backfill, understat-seed, understat-wayback]
         default: coverage
       cap:
         description: "props / goalscorer / goalscorer-probe / goalscorer-backfill / market-probe / markets / corner-markets / corner-history / inplay-probe / comeback-fetch / archive-probe / dk-history: most credits to spend (0 = dry run)"
@@ -377,7 +380,7 @@ jobs:
       # The league's seed shard (27 Nov): its own folder only, merged into the cache file
       # by file (the better copy wins), so no shard restored after it can overwrite it.
       - uses: actions/cache/restore@v4
-        if: ${{ inputs.task == 'espn-seed' }}
+        if: ${{ inputs.task == 'espn-seed' || inputs.task == 'espn-diagnose' }}
         with:
           path: data/espn_seed/${{ inputs.league }}
           key: espn-seed-${{ inputs.league }}-none
@@ -768,6 +771,10 @@ jobs:
             espn-seed)  # the ESPN appearance cache for B-espn (free, resumable)
               uv run soccer-stats espn-seed --league "${LEAGUE:-E0}" --minutes 110 \
                 --refetch "$FINALISTS" --seed-dir data/espn_seed ;;
+            espn-diagnose)  # why the league's ESPN cache misses matches (free, reads only)
+              uv run soccer-stats espn-merge --src data/espn_seed --dst data/raw/espn_players
+              uv run soccer-stats espn-diagnose --league "${LEAGUE:-F1}" --seasons 2026,2025 \
+                --minutes 40 ;;
             goalscorer-paper)  # the paper track on a copy of data-log; nothing is pushed
               git fetch --depth=1 origin data-log
               git worktree add --detach "$RUNNER_TEMP/log" FETCH_HEAD

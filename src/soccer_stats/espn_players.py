@@ -1040,3 +1040,107 @@ def unmapped_board_names(league: str, seasons=None, raw_dir=None) -> dict[str, i
             if not r.get("found"):
                 c.update(n for n in r.get("board_names") or [] if team_name(n, known) not in known)
     return dict(c.most_common(12))
+
+
+DIAGNOSE_DAYS = 3  # how far either side of football-data's date the diagnostic looks
+
+
+def _board_events(board: dict | None, known: set[str]) -> list[dict]:
+    from soccer_stats.espn_news import team_name
+
+    out = []
+    for e in (board or {}).get("events", []) or []:
+        comp = ((e.get("competitions") or [{}])[0]) or {}
+        names = {
+            c.get("homeAway"): (c.get("team") or {}).get("displayName") or ""
+            for c in comp.get("competitors", [])
+        }
+        out.append(
+            {
+                "id": str(e.get("id")),
+                "date": e.get("date"),
+                "status": ((e.get("status") or {}).get("type") or {}).get("name"),
+                "home": team_name(names.get("home", ""), known),
+                "away": team_name(names.get("away", ""), known),
+                "espn_home": names.get("home"),
+                "espn_away": names.get("away"),
+            }
+        )
+    return out
+
+
+def diagnose(
+    league: str,
+    seasons,
+    raw_dir=None,
+    get: Callable = requests.get,
+    seconds: float = 600.0,
+    pause: float | None = None,
+) -> dict:
+    """For each not-found marker in `seasons` (free, reads only, writes nothing): ESPN's
+    scoreboards from DIAGNOSE_DAYS before to after football-data's date, every event with
+    either club (id, date, offset in days, status, both names as ESPN and as mapped), and
+    for an event with both clubs whether its summary has player rows. Each marker gets a
+    `cause`: "rescheduled" (both clubs on another day), "no_players" (found on the day but
+    the summary has no player rows), "not_listed" (neither found), or "unchecked" (out of
+    time)."""
+    global PAUSE
+    if pause is not None:
+        PAUSE = pause
+    end = time.monotonic() + seconds
+    slug = SLUGS[league]
+    stats: dict = {}
+    boards: dict[str, dict | None] = {}
+    base = cache_dir(league, raw_dir)
+    want = {season_code(y) for y in seasons}
+    rows = []
+    for d in sorted(base.iterdir()) if base.exists() else []:
+        if not d.is_dir() or d.name not in want:
+            continue
+        for f in sorted(d.glob("*.json")):
+            rec = _record(f)
+            if not rec or rec.get("found"):
+                continue
+            home, away = rec.get("home"), rec.get("away")
+            k = pd.Timestamp(rec.get("kickoff"))
+            k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+            row = {"season": d.name, "home": home, "away": away, "kickoff": k.isoformat()}
+            if time.monotonic() > end:
+                rows.append({**row, "cause": "unchecked"})
+                continue
+            seen = []
+            for off in range(-DIAGNOSE_DAYS, DIAGNOSE_DAYS + 1):
+                day = f"{k + pd.Timedelta(days=off):%Y%m%d}"
+                if day not in boards:
+                    boards[day] = _get(
+                        get, BASE.format(slug=slug) + "/scoreboard", {"dates": day}, stats
+                    )
+                for e in _board_events(boards[day], {home, away}):
+                    if {e["home"], e["away"]} & {home, away}:
+                        when = pd.Timestamp(e["date"]).tz_convert("UTC") if e["date"] else None
+                        e["offset_days"] = (
+                            round((when - k).total_seconds() / 86400, 2) if when else None
+                        )
+                        if all(x["id"] != e["id"] for x in seen):
+                            seen.append(e)
+            both = [e for e in seen if (e["home"], e["away"]) == (home, away)]
+            row["events"] = seen
+            if not both:
+                row["cause"] = "not_listed"
+            else:
+                e = min(both, key=lambda x: abs(x["offset_days"] or 99))
+                body = _get(get, BASE.format(slug=slug) + "/summary", {"event": e["id"]}, stats)
+                players = sum(len(s.get("roster") or []) for s in (body or {}).get("rosters") or [])
+                row.update(event_id=e["id"], offset_days=e["offset_days"], summary_players=players)
+                near = e["offset_days"] is not None and abs(e["offset_days"]) <= 1.2
+                row["cause"] = (
+                    "no_players" if near and not players else "rescheduled" if not near else "ok"
+                )
+            rows.append(row)
+    causes = Counter(r["cause"] for r in rows)
+    by_season = {
+        s: dict(Counter(r["cause"] for r in rows if r["season"] == s))
+        for s in sorted({r["season"] for r in rows})
+    }
+    return {"league": league, "markers": len(rows), "causes": dict(causes),
+            "by_season": by_season, "requests": stats, "rows": rows}  # fmt: skip

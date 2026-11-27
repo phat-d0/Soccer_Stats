@@ -784,3 +784,38 @@ def test_a_later_shard_restore_cannot_overwrite_a_newer_raw_data_file(tmp_path):
         (root / rel).write_text(json.dumps(rec))
     assert ep.merge_dirs(seed, raw) == {"copied": 0, "kept": 1}
     assert json.loads((raw / rel).read_text())["rows"] == [1, 2]
+
+
+def test_espn_diagnose_names_each_misses_cause(tmp_path):
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    k = pd.Timestamp("2026-11-01T20:00:00Z")
+    for home, away in (("Lyon", "Nice"), ("Lens", "Brest"), ("Metz", "Nantes")):
+        f = ep.match_file("F1", 2026, home, away, k, tmp_path)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({"home": home, "away": away, "kickoff": k.isoformat(),
+                                 "found": False, "tries": 3}))  # fmt: skip
+    moved = k + pd.Timedelta(days=2)
+
+    def get(url, params=None, timeout=None):
+        if url.endswith("/scoreboard"):
+            day = params["dates"]
+            events = []
+            if day == f"{moved:%Y%m%d}":  # Lyon v Nice played two days later
+                events += _espn_board("Lyon", "Nice", moved, eid="1")["events"]
+            if day == f"{k:%Y%m%d}":  # Lens v Brest listed on the day, no players
+                events += _espn_board("Lens", "Brest", k, eid="2")["events"]
+            return _Resp({"events": events})
+        if params["event"] == "2":
+            return _Resp({"rosters": []})
+        return _Resp(_espn_summary("Lyon", "Nice"))
+
+    res = ep.diagnose("F1", [2026], tmp_path, get, 60, pause=0)
+    by = {r["home"]: r for r in res["rows"]}
+    assert by["Lyon"]["cause"] == "rescheduled" and by["Lyon"]["offset_days"] == 2.0
+    assert by["Lyon"]["summary_players"] == 3
+    assert by["Lens"]["cause"] == "no_players"
+    assert by["Metz"]["cause"] == "not_listed"
+    assert res["causes"] == {"rescheduled": 1, "no_players": 1, "not_listed": 1}
