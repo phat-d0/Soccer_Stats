@@ -1478,7 +1478,33 @@ Ligue 1 were decided at 21:09, after their seeds finished, on full history.
 The fix: `EspnSource.load` decides nothing unless every earlier season from 2021/22 holds at
 least `SEEDED_MIN` 200 matches. It makes no top-up on an unseeded cache, and waits when the run's
 top-up ran out of time before this season was complete. The reason is in the counts as
-`no_data_why`. The La Liga trades are left as they are for the lead's decision.
+`no_data_why`.
+
+**The La Liga trades (lead's decision, 27 Nov: void and decide again).**
+- **The void:** `player_goal_paper.bug_sweep` runs once at the next paper run. It covers the
+  B-espn decisions in SP1 between 19:00 and 20:14 UTC on 27 Nov (`BUG_VOID`).
+  - Each of their trades gets an update event: status void, profit 0, `void_reason` "decided on
+    an incomplete ESPN cache (bug, 27 Nov)". The open entries stay untouched and nothing is
+    deleted.
+  - Each of the 22 matches gets a superseding record in `goalscorer_checked.jsonl`
+    (`attempt` 2, `redecide`, `supersedes`). The first records stay; `load_checked` takes the
+    highest attempt.
+- **The re-decision:** the matches are decided again on the seeded cache, as backcasts.
+  - The new trades' ids end "|r2" (before DraftKings' "|dk"), with `redecided_of` (the voided
+    id) and `attempt`.
+  - The voided trades are never closed or settled again.
+- **The counts:** sections leave the voids out of every figure. Each line carries a `voided_bug`
+  count and note, so the app can show they existed.
+- **The 1 Feb judged read:** it may build B-espn's rows from the ESPN cache only after
+  `espn_players.judged_ready` passes for the league. That guard is stricter than the paper
+  track's:
+  - every season but the current one holds at least `SEEDED_MIN` (200) matches;
+  - no settled football-data match of any season lacks a cache file (a not-found marker counts
+    as tried).
+  - Otherwise it refills the cache (`espn-seed`) or pulls fresh with `espn_players.pull`, as
+    the check did.
+- **Name gaps:** `espn-seed` now prints the clubs behind each season's not-found matches
+  (`not_found_clubs`), for the D1 and F1 name fixes.
 
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 

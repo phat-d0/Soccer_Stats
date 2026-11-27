@@ -3272,6 +3272,8 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
         print(f"  {args.league} {season}: {c['matches']} matches held, {c['not_found']} not found")
     if res.get("left"):
         print(f"  {res['left']} matches left for the next run (time budget)")
+    for season, clubs in ep.not_found_clubs(args.league, years).items():
+        print(f"  {args.league} {season} not found, by club: {clubs}")
 
 
 def cmd_shots_gate_a(args: argparse.Namespace) -> None:

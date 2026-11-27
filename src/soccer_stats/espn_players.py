@@ -885,3 +885,69 @@ def cached_match(league: str, home: str, away: str, kickoff, raw_dir=None) -> di
         return json.loads(path.read_text())
     except (OSError, ValueError):
         return None
+
+
+SEEDED_MIN = 200  # a season counts as seeded with this many matches held
+
+
+def judged_ready(
+    league: str,
+    seasons,
+    raw_dir=None,
+    now: pd.Timestamp | None = None,
+    matches: Callable[[str, int], pd.DataFrame] | None = None,
+) -> tuple[bool, dict]:
+    """The guard for §16's 1 Feb judged read on B-espn (lead, 27 Nov), stricter than the paper
+    track's: every season but the last holds at least SEEDED_MIN matches, and no settled
+    football-data match of any season lacks a cache file (a not-found marker counts as tried).
+    Returns (ready, {short: [seasons under SEEDED_MIN], unfetched: {season: n}})."""
+    now = now or pd.Timestamp.now(tz="UTC")
+    seasons = list(seasons)
+    _rows, counts = load_cache(league, seasons, raw_dir)
+    short = [
+        season_code(y)
+        for y in seasons[:-1]
+        if counts.get(season_code(y), {}).get("matches", 0) < SEEDED_MIN
+    ]
+    unfetched: dict[str, int] = {}
+    for y in seasons:
+        try:
+            fx = (matches or fd_matches)(league, y)
+        except Exception:  # noqa: BLE001  no football-data file: the season can't be checked
+            unfetched[season_code(y)] = -1
+            continue
+        n = 0
+        for m in fx.to_dict("records"):
+            k = pd.Timestamp(m["kickoff"])
+            k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+            if (
+                k <= now - SETTLED
+                and not match_file(league, y, m["home"], m["away"], k, raw_dir).exists()
+            ):
+                n += 1
+        if n:
+            unfetched[season_code(y)] = n
+    return not short and not unfetched, {"short": short, "unfetched": unfetched}
+
+
+def not_found_clubs(league: str, seasons=None, raw_dir=None) -> dict[str, dict[str, int]]:
+    """Per season, the football-data clubs in matches ESPN's scoreboard didn't list (the
+    not-found markers): a club missing all its matches is a name the mapping lacks."""
+    base = cache_dir(league, raw_dir)
+    want = None if seasons is None else {season_code(y) for y in seasons}
+    out: dict[str, dict[str, int]] = {}
+    for d in sorted(base.iterdir()) if base.exists() else []:
+        if not d.is_dir() or (want is not None and d.name not in want):
+            continue
+        c: Counter = Counter()
+        for f in d.glob("*.json"):
+            try:
+                rec = json.loads(f.read_text())
+            except (OSError, ValueError):
+                continue
+            if not rec.get("found"):
+                c[rec.get("home")] += 1
+                c[rec.get("away")] += 1
+        if c:
+            out[d.name] = dict(c.most_common(6))
+    return out
