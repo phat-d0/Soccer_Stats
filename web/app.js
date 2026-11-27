@@ -47,7 +47,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // The app's version, kept in step with sw.js's cache name (soccer-model-vNN); shown in the
 // header and compared with the deployed sw.js on ↻.
-const APP_VERSION = "v87";
+const APP_VERSION = "v88";
 const pct = (x, d = 0) => (x == null ? "–" : `${(x * 100).toFixed(d)}%`);
 const signedPct = (x, d = 1) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`);
 const odds = (x) => (x == null ? "–" : x.toFixed(2));
@@ -2681,7 +2681,7 @@ const pfById = (id) => portfolios().find((p) => p.id === id);
 // The portfolio on screen: the remembered one, else the first that isn't retired.
 function pfCurrent() {
   const all = portfolios();
-  return all.find((p) => p.id === state.pfId) || all.find((p) => p.status !== "retired") || all[0];
+  return all.find((p) => p.id === state.pfId) || all.find((p) => p.status !== "retired" && !pfShelved(p)) || all[0];
 }
 function pfSet() {
   const p = pfCurrent();
@@ -3412,7 +3412,7 @@ function pfClassic(topIn) {
   const rule = pf.rule || { threshold: PAPER_EDGE, stake: 10 };
   const all = portfolios();
   const cur = pfCurrent();
-  const active = all.filter((p) => p.status !== "retired");
+  const active = all.filter((p) => p.status !== "retired" && !pfShelved(p));
   const retired = all.filter((p) => p.status === "retired" && p.id !== cur.id);
   const switcher = active.length > 1 || cur.status === "retired" ? `
     <div class="segmented" role="group" aria-label="Portfolio">
@@ -5046,6 +5046,16 @@ function liveStrategyHtml(cur, x, lg, strats = []) {
 // Portfolios kept off the top level. Anytime goalscorer was hidden from 24 Oct and shows again
 // since its paper track went live (owner, 9 Nov); none is hidden today.
 const PF_HIDDEN = new Set();
+// Archived portfolios (owner, 27 Nov: Anytime goalscorer), display only: off the top level's
+// list, behind a link like the retired ones, each page headed by the note. The ledgers, the
+// paper step and trades.PORTFOLIOS are unchanged; the portfolio keeps logging and settling.
+const PF_SHELVED = { goalscorer: { since: "2026-11-27", text: "still logs and settles; the priced test is read once on 1 Feb 2027" } };
+const pfShelved = (p) => (p && PF_SHELVED[p.id]) || null;
+const shelvedLabel = (p) => { const a = pfShelved(p); return a ? `Archived ${monthDay(`${a.since}T12:00:00Z`)} · ${a.text}` : ""; };
+function shelvedNote(cur) {
+  const a = pfShelved(cur);
+  return a ? `<p class="note pf-archived-note"><b>Archived ${esc(monthDay(`${a.since}T12:00:00Z`))}.</b> This portfolio is off Portfolio's main list but ${esc(a.text)}. Shown for the record; nothing here places a bet.</p>` : "";
+}
 const CHEV = `<span class="chev" aria-hidden="true">›</span>`;
 // Comeback bets keeps its one-row list (the lead's brief), like the multi-strategy portfolios.
 const pfMulti = (cur) => cur.id === CB_ID || pfStrategies(cur).length > 1;
@@ -5064,7 +5074,7 @@ function pfCrumbs(cur, toPortfolio) {
   if (toPortfolio) steps.push(`<button class="crumb" data-pfnav="portfolio">${esc(cur.name)}</button>`);
   return `<nav class="crumbs" aria-label="Back to">${toPortfolio ? '<span class="crumb-back" aria-hidden="true">‹</span>' : ""}${steps.join('<span class="crumb-sep" aria-hidden="true">›</span>')}</nav>`;
 }
-const pfPill = (cur) => (cur.id === CB_ID ? researchPill() : `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`);
+const pfPill = (cur) => (cur.id === CB_ID ? researchPill() : pfShelved(cur) ? `<span class="pill st-retired">Archived</span>` : `<span class="pill st-${esc(cur.status)}">${esc(PF_STATUS[cur.status] || cur.status)}</span>`);
 // A portfolio's headline is its lead strategy's trades (owner, 5 Nov: Moneyline = Blend Lean,
 // Team corners = DraftKings under 60%); without strategy sections, every trade.
 function leadTrades(p, st) {
@@ -5073,8 +5083,9 @@ function leadTrades(p, st) {
 }
 function pfHomeHtml() {
   const all = portfolios();
-  const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id));
+  const shown = all.filter((p) => p.status !== "retired" && !PF_HIDDEN.has(p.id) && !pfShelved(p));
   const retired = all.filter((p) => p.status === "retired");
+  const shelved = all.filter((p) => pfShelved(p) && p.status !== "retired" && !PF_HIDDEN.has(p.id));
   const rows = shown.map((p) => {
     const st = pfStrategies(p);
     const names = p.id === CB_ID ? [] : st.filter((x) => !archivedStrat(x) && !isDnbStrat(x) && !isStudy(x)).map((x) => x.label);
@@ -5104,6 +5115,7 @@ function pfHomeHtml() {
     <div class="section-title">Portfolios</div>
     <div class="card list folders">${rows}</div>
     <p class="note">Each portfolio holds that market's paper strategies. Profit is each portfolio's lead strategy only (the first in its list), in every competition, ${kellyOn() ? "at ¼ Kelly on its own $1,000 paper bankroll" : "$10 a trade"}; open a portfolio for its other strategies, draw no bet tracks and archive. Paper trades: no money is staked.${shown.some((p) => p.status === "closed") ? " A closed portfolio is research that finished without ever trading: its figure is the test's return per $1, not live profit." : ""}</p>
+    ${shelved.map((p) => `<div class="pf-retired pf-archived">Archived: <button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button> <span class="pf-archived-why">· ${esc(shelvedLabel(p))}</span></div>`).join("")}
     ${retired.length ? `<div class="pf-retired">Retired: ${retired.map((p) => `<button class="linkish" data-pfid="${esc(p.id)}">${esc(p.name)}</button>`).join(", ")}</div>` : ""}
     ${alertsHtml()}`;
 }
@@ -5316,6 +5328,7 @@ function pfFolderHtml(cur, strats) {
   return `
     ${pfCrumbs(cur, false)}
     <h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2>
+    ${shelvedNote(cur)}
     <div class="pf-head"><span>${esc(cur.note || "")}</span></div>
     ${leagueFilter()}
     <div class="section-title">Strategies</div>
@@ -5372,7 +5385,7 @@ function pfStrategyHtml(cur, allStrats) {
     ? `Shadow test of ${esc(parent.label)}: places no bets${x.st?.defined_at ? ` · judged from ${monthDay(x.st.defined_at)}` : ""}`
     : multi ? `${cur.status === "testing" && !m.open && !m.n ? "In testing" : `Live${m.since ? ` since ${monthDay(m.since)}` : ""}`}${rule ? ` · ${rule}` : ""}` : "";
   const head = multi
-    ? `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(x.label)}</h2>${sub ? `<div class="pf-sub">${sub}</div>` : ""}`
+    ? `${pfCrumbs(cur, true)}<h2 class="pf-title">${esc(x.label)}</h2>${sub ? `<div class="pf-sub">${sub}</div>` : ""}${shelvedNote(cur)}`
     : `${pfCrumbs(cur, false)}<h2 class="pf-title">${esc(cur.name)} ${pfPill(cur)}</h2><div class="pf-head"><span>${cur.status === "retired" ? `<b>${esc(cur.name)}</b>, read-only history. ` : ""}${esc(cur.note || "")}</span></div>`;
   // Lean's replay is the old rule (every price); the new rule's own figure is its range's bands.
   const leanBt = view === "backtest" && parent.key === "lean" ? btPart(btSourceOn("lean", lg).bt, "lean", lg) : null;

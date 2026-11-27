@@ -644,10 +644,11 @@ const STEPS = [
   }],
   ["portfolio-live", async (p) => {
     await closeSheet(p); await tab("portfolio")(p);
-    // The top level: one folder per portfolio (Anytime goalscorer shown again since 9 Nov).
+    // The top level: one folder per portfolio; Anytime goalscorer is archived (27 Nov) behind a link.
     const folders = await p.locator("#view button[data-pfid]:not(.linkish)").evaluateAll((els) => els.map((e) => e.dataset.pfid));
-    if (folders.join(",") !== "moneyline,goalscorer,corners,comebacks") throw new Error(`portfolio folders: ${folders.join(",")}`);
+    if (folders.join(",") !== "moneyline,corners,comebacks") throw new Error(`portfolio folders: ${folders.join(",")}`);
     if (!(await p.locator('#view button.linkish[data-pfid="player_shots"]').count())) throw new Error("retired link missing");
+    if (!(await p.locator('#view .pf-archived button.linkish[data-pfid="goalscorer"]').count())) throw new Error("archived goalscorer link missing");
     await p.click('button[data-pfid="moneyline"]');
     // Moneyline's folders: one per strategy, the old rule filed under Lean.
     const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
@@ -1238,15 +1239,17 @@ const STEPS = [
   // The DraftKings backtest's own trades: Model 12% under the Premier League.
   ["portfolio-backtest", async (p) => { await closeSheet(p); await p.click('button[data-pf="backtest"]'); await p.click('.chip[data-league="E0"]'); await pfOpenStrat(p, "edge12"); await p.click("details.fold > summary"); }],
   ["portfolio-backtest-trade", async (p) => { await p.click("button[data-trade] >> nth=0"); await sheet(p); }, true],
-  // Anytime goalscorer shows again (owner, 9 Nov): its folder leads with the main line.
+  // Anytime goalscorer is archived (owner, 27 Nov; display only): off the main list, behind
+  // a link like the retired portfolios, with its label.
   ["portfolio-top", async (p) => {
     // Tapping the Portfolio tab again goes back to the top level.
     await closeSheet(p); await tab("portfolio")(p);
     if (await p.locator(".crumbs").count()) throw new Error("the Portfolio tab didn't go back to the top");
-    const gRow = (await p.locator('#view button[data-pfid="goalscorer"]').innerText()).replace(/\s+/g, " ");
-    for (const w of ["Anytime goalscorer", "In testing", "Lead: Anytime goalscorer, model B at 20%", "1 more"]) if (!gRow.includes(w)) throw new Error(`goalscorer folder lacks "${w}": ${gRow}`);
+    if (await p.locator('#view .folders button[data-pfid="goalscorer"]').count()) throw new Error("the archived goalscorer portfolio is still in the main list");
+    const gLink = (await p.locator(".pf-archived").innerText()).replace(/\s+/g, " ");
+    if (!gLink.includes("Archived: Anytime goalscorer · Archived Nov 27 · still logs and settles; the priced test is read once on 1 Feb 2027")) throw new Error(`goalscorer archive link: ${gLink}`);
     const text = await p.textContent("#view");
-    for (const w of ["Moneyline", "Team corners", "Lead: Model (f) vs DraftKings", "1 more", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
+    for (const w of ["Moneyline", "Team corners", "Lead: Model (f) vs DraftKings", "Archived:", "Retired:", "Each portfolio holds"]) if (!text.includes(w)) throw new Error(`portfolio top lacks "${w}"`);
   }],
   // A retired portfolio, reached from the "Retired" link: its history, read-only. It has one
   // strategy, so it opens straight on its views.
@@ -1606,6 +1609,10 @@ const STEPS = [
   // test is read once on 1 Feb 2027), linked both ways with its Research card.
   ["portfolio-goalscorer", async (p) => {
     await closeSheet(p); await pfOpenPf(p, "goalscorer"); await p.click('.chip[data-league=""]');
+    // Its folder opens from the link, headed by the archived note and pill.
+    const head = (await p.textContent("#view")).replace(/\s+/g, " ");
+    for (const w of ["Archived Nov 27.", "still logs and settles; the priced test is read once on 1 Feb 2027"]) if (!head.includes(w)) throw new Error(`archived goalscorer folder lacks "${w}"`);
+    if ((await p.locator(".pf-title .pill").innerText()).trim() !== "Archived") throw new Error("archived goalscorer pill");
     const strats = await p.locator("#view button[data-pfstrat]").evaluateAll((els) => els.map((e) => e.dataset.pfstrat));
     if (strats.join(",") !== "goalscorer,goalscorer_dk") throw new Error(`goalscorer lines: ${strats.join(",")}`);
     const row = (await p.locator('button[data-pfstrat="goalscorer"]').innerText()).replace(/\s+/g, " ");
@@ -1676,6 +1683,7 @@ const STEPS = [
     await p.click('.rs-card[data-rsid="goalscorer_priced"] [data-rsgo]');
     if (!(await p.locator('.tabbar button[data-tab="portfolio"].active').count())) throw new Error("the card should open Portfolio");
     if (!(await p.locator(".pf-title").innerText()).includes("Anytime goalscorer, model B at 20%")) throw new Error("the card should open the main line");
+    if (!(await p.locator(".pf-archived-note").count())) throw new Error("the main line's page lacks the archived note");
   }],
   // Bet alerts (owner, 5 Nov): the control at the foot of Portfolio's top level, in each
   // state (push itself can't run headless), and a tapped alert's link opening its trade.
