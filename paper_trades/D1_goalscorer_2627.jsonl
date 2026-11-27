@@ -195,3 +195,68 @@
 {"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835|dk","at":"2026-11-27T21:09:43+00:00","close_odds":17.0,"close_book":"draftkings","close_best":17.0,"close_same":17.0,"close_fetched_at":"2026-11-22T16:15:52+00:00","close_minutes_before":14.1,"clv_best":0.0,"clv_same":0.0,"beat_close":false}
 {"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835|dk","at":"2026-11-27T21:09:43+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"4-0","result_source":"espn","settled_at":"2026-11-27T21:09:43+00:00"}
 {"type":"update","id":"D1|2627|Werder Bremen|M'gladbach|goal|e323061","at":"2026-11-27T21:09:43+00:00","close_odds":26.0,"close_book":"draftkings","close_best":26.0,"close_same":26.0,"close_fetched_at":"2026-11-27T19:15:55+00:00","close_minutes_before":14.1,"clv_best":0.0769,"clv_same":0.0769,"beat_close":true}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e286828","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e286828|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e341826","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e341826|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e321061","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e321061|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e340739","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Dortmund|Elversberg|goal|e340739|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|RB Leipzig|Augsburg|goal|e366911","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|RB Leipzig|Augsburg|goal|e333837","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|goal|e375371","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|goal|e375371|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|goal|e241297","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|goal|e241297|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Mainz|Bayern Munich|goal|e286831","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|goal|e258909","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|goal|e258909|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Stuttgart|Werder Bremen|goal|e261363","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|FC Koln|Leverkusen|goal|e228319","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|FC Koln|Leverkusen|goal|e228319|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|FC Koln|Leverkusen|goal|e380795","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"D1|2627|FC Koln|Leverkusen|goal|e380795|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"D1|2627|FC Koln|Leverkusen|goal|e361212","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e314184","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e314184|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e170604","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e170604|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e263202","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Freiburg|Union Berlin|goal|e263202|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Hoffenheim|Schalke 04|goal|e266565","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Hoffenheim|Schalke 04|goal|e266565|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Hoffenheim|Schalke 04|goal|e403400","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Hoffenheim|Schalke 04|goal|e403400|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Bayern Munich|FC Koln|goal|e222477","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Bayern Munich|FC Koln|goal|e222477|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Bayern Munich|FC Koln|goal|e380795","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Bayern Munich|FC Koln|goal|e380795|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Leverkusen|Paderborn|goal|e338837","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Leverkusen|Paderborn|goal|e338837|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Elversberg|Freiburg|goal|e341826","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Elversberg|Freiburg|goal|e341826|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Elversberg|Freiburg|goal|e340739","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Elversberg|Freiburg|goal|e340739|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e314184","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e314184|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e263202","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e263202|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e341441","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Union Berlin|RB Leipzig|goal|e341441|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e323061","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e323061|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e238527","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e238527|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e304793","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e304793|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|M'gladbach|Dortmund|goal|e286828","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Schalke 04|Stuttgart|goal|e258909","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Schalke 04|Stuttgart|goal|e258909|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Augsburg|Mainz|goal|e333837","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Augsburg|Mainz|goal|e333837|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Augsburg|Mainz|goal|e375371","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Augsburg|Mainz|goal|e375371|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e261363","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"D1|2627|Werder Bremen|Hamburg|goal|e284835|dk","at":"2026-11-27T21:25:18+00:00","result_check":"ok","espn_goals":0}
