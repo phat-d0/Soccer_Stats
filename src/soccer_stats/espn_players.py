@@ -225,17 +225,44 @@ def fields(
 
 def fd_matches(league: str, season: int) -> pd.DataFrame:
     """football-data's played matches for a season: home, away, kickoff (UTC)."""
-    from soccer_stats.data import load_matches, season_kickoffs
+    from soccer_stats.data import RAW_DIR, download, load_matches
 
     m = load_matches([league], [season]).reset_index(drop=True)
-    k = season_kickoffs(league, season)
-    if len(k) == len(m):
-        m = m.assign(kickoff=k.to_numpy())
-    else:  # no times: 15:00 UK on the match date
-        m = m.assign(
-            kickoff=pd.to_datetime(m["date"]).dt.tz_localize("UTC") + pd.Timedelta(hours=15)
-        )
-    return m[["home", "away", "kickoff"]]
+    raw = pd.read_csv(
+        download(league, season, raw_dir=RAW_DIR), encoding="latin-1", on_bad_lines="skip"
+    )
+    return with_kickoffs(m, raw)
+
+
+def with_kickoffs(m: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
+    """Each match's kickoff from its own row of the football-data file (Time is UK local
+    time), joined on date, home and away. Until 27 Nov the kickoff list was paired with the
+    matches by position, and load_matches' sort reorders matches on the same date, so their
+    times swapped: ESPN's event then sat about 3.5 h off, outside KICKOFF_TOLERANCE, and the
+    match was marked not found (F1's 37 misses in 2025/26–2026/27, run 46076170619). A match
+    with no time, or one the file doesn't hold, keeps 15:00 UK on its date."""
+    day = pd.to_datetime(m["date"]).dt.normalize()
+    fallback = day.dt.tz_localize("Europe/London").dt.tz_convert("UTC") + pd.Timedelta(hours=15)
+    raw = raw.dropna(subset=["Date"])
+    if not {"HomeTeam", "AwayTeam"} <= set(raw.columns):
+        return m.assign(kickoff=fallback.to_numpy())[["home", "away", "kickoff"]]
+    times = raw["Time"].fillna("15:00") if "Time" in raw else pd.Series("15:00", index=raw.index)
+    local = pd.to_datetime(raw["Date"] + " " + times, dayfirst=True, format="mixed")
+    keys = pd.DataFrame(
+        {
+            "home": raw["HomeTeam"].to_numpy(),
+            "away": raw["AwayTeam"].to_numpy(),
+            "day": local.dt.normalize().to_numpy(),
+            "kickoff": local.dt.tz_localize(
+                "Europe/London", ambiguous="NaT", nonexistent="shift_forward"
+            )
+            .dt.tz_convert("UTC")
+            .to_numpy(),
+        }
+    ).drop_duplicates(["home", "away", "day"])
+    out = m.assign(day=day).merge(keys, on=["home", "away", "day"], how="left")
+    out["kickoff"] = out["kickoff"].fillna(pd.Series(fallback.to_numpy(), index=out.index))
+    return out[["home", "away", "kickoff"]]
 
 
 def summary_lines(res: dict) -> list[str]:
@@ -760,7 +787,7 @@ def _due(
         return True
     if rec.get("found"):
         return False
-    if refetch and {rec.get("home"), rec.get("away")} & refetch:
+    if refetch and ("*" in refetch or {rec.get("home"), rec.get("away")} & refetch):
         return True
     tried = pd.Timestamp(rec.get("fetched_at") or "1970-01-01T00:00:00Z")
     return (
@@ -768,6 +795,22 @@ def _due(
         and now - kickoff <= RETRY_WITHIN
         and now - tried >= RETRY_AFTER
     )
+
+
+def _rekick(path: Path, kickoff: pd.Timestamp) -> bool:
+    """A held match whose stored kickoff isn't football-data's (the same-day swap before 27
+    Nov, within KICKOFF_TOLERANCE, so it was found): rewrite the kickoff in place, rows
+    included. No request; True when the file changed."""
+    rec = _record(path)
+    if not rec or not rec.get("found") or not rec.get("kickoff"):
+        return False
+    if pd.Timestamp(rec["kickoff"]) == kickoff:
+        return False
+    rec["kickoff"] = kickoff.isoformat()
+    for r in rec.get("rows") or []:
+        r["kickoff"] = kickoff.isoformat()
+    path.write_text(json.dumps(rec, separators=(",", ":")))
+    return True
 
 
 def fill_cache(
@@ -783,7 +826,9 @@ def fill_cache(
 ) -> dict:
     """Fetch every settled football-data match of `seasons` the cache lacks (oldest first),
     until `seconds` run out. Returns counts: due, fetched, found, not_found, left, requests.
-    `refetch`: football-data clubs whose not-found markers are fetched again (see `_due`)."""
+    `refetch`: football-data clubs whose not-found markers are fetched again (see `_due`;
+    "*" = every marker). A held match whose stored kickoff differs is corrected in place
+    (`_rekick`, counted as `rekicked`)."""
     refetch = frozenset(refetch or ())
     global PAUSE
     if pause is not None:
@@ -807,6 +852,8 @@ def fill_cache(
                 continue
             path = match_file(league, year, m["home"], m["away"], k, raw_dir)
             if not _due(path, k, now, refetch):
+                if _rekick(path, k):
+                    out["rekicked"] = out.get("rekicked", 0) + 1
                 continue
             out["due"] += 1
             if time.monotonic() > end:
@@ -1040,3 +1087,107 @@ def unmapped_board_names(league: str, seasons=None, raw_dir=None) -> dict[str, i
             if not r.get("found"):
                 c.update(n for n in r.get("board_names") or [] if team_name(n, known) not in known)
     return dict(c.most_common(12))
+
+
+DIAGNOSE_DAYS = 3  # how far either side of football-data's date the diagnostic looks
+
+
+def _board_events(board: dict | None, known: set[str]) -> list[dict]:
+    from soccer_stats.espn_news import team_name
+
+    out = []
+    for e in (board or {}).get("events", []) or []:
+        comp = ((e.get("competitions") or [{}])[0]) or {}
+        names = {
+            c.get("homeAway"): (c.get("team") or {}).get("displayName") or ""
+            for c in comp.get("competitors", [])
+        }
+        out.append(
+            {
+                "id": str(e.get("id")),
+                "date": e.get("date"),
+                "status": ((e.get("status") or {}).get("type") or {}).get("name"),
+                "home": team_name(names.get("home", ""), known),
+                "away": team_name(names.get("away", ""), known),
+                "espn_home": names.get("home"),
+                "espn_away": names.get("away"),
+            }
+        )
+    return out
+
+
+def diagnose(
+    league: str,
+    seasons,
+    raw_dir=None,
+    get: Callable = requests.get,
+    seconds: float = 600.0,
+    pause: float | None = None,
+) -> dict:
+    """For each not-found marker in `seasons` (free, reads only, writes nothing): ESPN's
+    scoreboards from DIAGNOSE_DAYS before to after football-data's date, every event with
+    either club (id, date, offset in days, status, both names as ESPN and as mapped), and
+    for an event with both clubs whether its summary has player rows. Each marker gets a
+    `cause`: "rescheduled" (both clubs on another day), "no_players" (found on the day but
+    the summary has no player rows), "not_listed" (neither found), or "unchecked" (out of
+    time)."""
+    global PAUSE
+    if pause is not None:
+        PAUSE = pause
+    end = time.monotonic() + seconds
+    slug = SLUGS[league]
+    stats: dict = {}
+    boards: dict[str, dict | None] = {}
+    base = cache_dir(league, raw_dir)
+    want = {season_code(y) for y in seasons}
+    rows = []
+    for d in sorted(base.iterdir()) if base.exists() else []:
+        if not d.is_dir() or d.name not in want:
+            continue
+        for f in sorted(d.glob("*.json")):
+            rec = _record(f)
+            if not rec or rec.get("found"):
+                continue
+            home, away = rec.get("home"), rec.get("away")
+            k = pd.Timestamp(rec.get("kickoff"))
+            k = k.tz_localize("UTC") if k.tz is None else k.tz_convert("UTC")
+            row = {"season": d.name, "home": home, "away": away, "kickoff": k.isoformat()}
+            if time.monotonic() > end:
+                rows.append({**row, "cause": "unchecked"})
+                continue
+            seen = []
+            for off in range(-DIAGNOSE_DAYS, DIAGNOSE_DAYS + 1):
+                day = f"{k + pd.Timedelta(days=off):%Y%m%d}"
+                if day not in boards:
+                    boards[day] = _get(
+                        get, BASE.format(slug=slug) + "/scoreboard", {"dates": day}, stats
+                    )
+                for e in _board_events(boards[day], {home, away}):
+                    if {e["home"], e["away"]} & {home, away}:
+                        when = pd.Timestamp(e["date"]).tz_convert("UTC") if e["date"] else None
+                        e["offset_days"] = (
+                            round((when - k).total_seconds() / 86400, 2) if when else None
+                        )
+                        if all(x["id"] != e["id"] for x in seen):
+                            seen.append(e)
+            both = [e for e in seen if (e["home"], e["away"]) == (home, away)]
+            row["events"] = seen
+            if not both:
+                row["cause"] = "not_listed"
+            else:
+                e = min(both, key=lambda x: abs(x["offset_days"] or 99))
+                body = _get(get, BASE.format(slug=slug) + "/summary", {"event": e["id"]}, stats)
+                players = sum(len(s.get("roster") or []) for s in (body or {}).get("rosters") or [])
+                row.update(event_id=e["id"], offset_days=e["offset_days"], summary_players=players)
+                near = e["offset_days"] is not None and abs(e["offset_days"]) <= 1.2
+                row["cause"] = (
+                    "no_players" if near and not players else "rescheduled" if not near else "ok"
+                )
+            rows.append(row)
+    causes = Counter(r["cause"] for r in rows)
+    by_season = {
+        s: dict(Counter(r["cause"] for r in rows if r["season"] == s))
+        for s in sorted({r["season"] for r in rows})
+    }
+    return {"league": league, "markers": len(rows), "causes": dict(causes),
+            "by_season": by_season, "requests": stats, "rows": rows}  # fmt: skip

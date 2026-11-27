@@ -3288,6 +3288,34 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
         print(f"ESPN seed {args.league}: to the seed shard {json.dumps(got)}")
 
 
+def cmd_espn_diagnose(args: argparse.Namespace) -> None:
+    """Why the ESPN cache's not-found matches are missing (free, reads only): each marker's
+    nearby scoreboard events and whether the summary had player rows."""
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    years = [int(y) for y in args.seasons.split(",") if y.strip()]
+    res = ep.diagnose(args.league, years, seconds=args.minutes * 60)
+    print(
+        f"ESPN diagnose {args.league}: {res['markers']} not-found markers, causes {res['causes']}"
+    )
+    for s, c in res["by_season"].items():
+        print(f"  {args.league} {s}: {c}")
+    for r in res["rows"]:
+        ev = "; ".join(
+            f"{e['id']} {e['espn_home']} v {e['espn_away']} ({e['offset_days']:+} d, {e['status']})"
+            for e in r.get("events", [])
+            if e.get("offset_days") is not None
+        )
+        print(
+            f"  {r['season']} {r['kickoff'][:16]} {r['home']} v {r['away']}: {r['cause']}"
+            + (f", players {r.get('summary_players')}" if "summary_players" in r else "")
+            + (f" | {ev}" if ev else "")
+        )
+    print("ESPN_DIAGNOSE_JSON " + json.dumps({k: v for k, v in res.items() if k != "rows"}))
+
+
 def cmd_espn_merge(args: argparse.Namespace) -> None:
     """Fold the ESPN seed shards into the appearance cache, file by file (the better copy of
     each match file wins; publish.yml, after raw-data)."""
@@ -4257,6 +4285,11 @@ def main(argv: list[str] | None = None) -> None:
         "--refetch", default="", help="comma-separated clubs whose not-found matches to refetch"
     )
     ese.add_argument("--seed-dir", default="", help="the seed shards' folder (merged in and out)")
+    edg = sub.add_parser("espn-diagnose", help="why ESPN cache matches are missing (free)")
+    edg.add_argument("--league", default="F1")
+    edg.add_argument("--seasons", default="2026,2025", help="start years, comma-separated")
+    edg.add_argument("--minutes", type=float, default=20)
+    edg.set_defaults(func=cmd_espn_diagnose)
     eme = sub.add_parser("espn-merge", help="fold the ESPN seed shards into the cache (free)")
     eme.add_argument("--src", default="data/espn_seed")
     eme.add_argument("--dst", default="data/raw/espn_players")

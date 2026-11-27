@@ -1455,6 +1455,35 @@ until PR #278), so their matches were missing from every ESPN pull:
   settled football-data match may lack a cache file, and the seasons must reach `SEEDED_MIN`.
 - The paper track rewrites nothing; its next D1 and F1 decisions refit on the fuller cache.
 
+**Note, 2026-11-27 (later): the cache's coverage before the read, and why F1's matches were missing.**
+- `judged_ready` treats a not-found marker as tried: it requires a cache file for every settled
+  football-data match, and a marker counts as one. So the read can pass with matches missing,
+  and its coverage goes on the record here. Not found per season after the fixes of 27 Nov
+  (seed runs 46075085394 D1, 46075088166 F1, 46075090965 E0, 46075094061 SP1), of matches played:
+
+  | Season | E0 | SP1 | D1 | F1 |
+  | --- | --- | --- | --- | --- |
+  | 2021/22 | 7 | 15 | 0 | 38 |
+  | 2022/23 | 7 | 22 | 1 | 40 |
+  | 2023/24 | 10 | 8 | 3 | 30 |
+  | 2024/25 | 7 | 19 | 2 | 27 |
+  | 2025/26 | 12 | 26 | 1 | 27 |
+  | 2026/27 (to 27 Nov) | 2 | 8 | 0 | 10 |
+
+- The F1 diagnostic (`espn-diagnose`, run 46076170619, free): all 37 markers of 2025/26 and
+  2026/27 are real ESPN matches with full player lists (38–40 players each), listed on the right
+  day about 3.5 h from the kickoff the cache looked for. The cache paired football-data's kickoff
+  times with its matches by position, and `load_matches`' sort reorders matches on the same date,
+  so two same-day matches swapped times; beyond `KICKOFF_TOLERANCE` (3 h) the match was missed,
+  within it the match was found but stored at the other match's time. Not a missing summary: no
+  2026/27 F1 match is lost to ESPN. The same pairing fed `espn_players.pull`, so the amendment's
+  check rows (and the swaps' stored kickoffs) carry it too; the verdicts stand as read (lead's
+  ruling above).
+- The fix: `espn_players.with_kickoffs` joins each match to its own file row on date, home and
+  away; a held match stored at the wrong time is corrected in place (`_rekick`, no request); and
+  `espn-seed` with `finalists=*` refetches every old marker. The seed reruns in all four leagues
+  follow the merge, and the counts above are updated then.
+
 ### Note, 2026-11-27: the paper track switches to B-espn (under the amendment; descriptive)
 
 - **Which model where:**
