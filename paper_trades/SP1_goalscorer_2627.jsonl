@@ -1052,3 +1052,73 @@
 {"type":"update","id":"SP1|2627|Levante|Santander|goal|e362752|r2","at":"2026-11-27T21:29:15+00:00","close_odds":7.7,"close_book":"onexbet","close_best":7.7,"close_same":7.7,"close_fetched_at":"2026-11-27T19:45:51+00:00","close_minutes_before":14.2,"clv_best":0.039,"clv_same":0.039,"beat_close":true}
 {"type":"update","id":"SP1|2627|Levante|Santander|goal|e333927|r2","at":"2026-11-27T21:29:15+00:00","close_odds":19.0,"close_book":"fanduel","close_best":19.0,"close_same":19.0,"close_fetched_at":"2026-11-27T19:45:51+00:00","close_minutes_before":14.2,"clv_best":-0.0526,"clv_same":-0.0526,"beat_close":false}
 {"type":"update","id":"SP1|2627|Levante|Santander|goal|e333927|r2|dk","at":"2026-11-27T21:29:15+00:00","close_odds":18.0,"close_book":"draftkings","close_best":18.0,"close_same":18.0,"close_fetched_at":"2026-11-27T19:45:51+00:00","close_minutes_before":14.2,"clv_best":-0.0556,"clv_same":-0.0556,"beat_close":false}
+{"type":"update","id":"SP1|2627|La Coruna|Osasuna|goal|e238252|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|La Coruna|Osasuna|goal|e238252|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Alaves|goal|e149306|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Alaves|goal|e318084|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Alaves|goal|e318084|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Alaves|goal|e265997|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e373542|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e373542|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e178237|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e178237|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e333927|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Malaga|Santander|goal|e333927|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Espanol|La Coruna|goal|e346210|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Espanol|La Coruna|goal|e346210|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Espanol|La Coruna|goal|e133259|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Espanol|La Coruna|goal|e133259|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e238252|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e238252|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e170154|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e170154|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e133768|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Osasuna|Ath Bilbao|goal|e133768|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Valencia|Real Madrid|goal|e419048|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Valencia|Real Madrid|goal|e419048|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Elche|Betis|goal|e318181|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Elche|Betis|goal|e318181|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e283891|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e283891|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e287224|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e287224|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e265996|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e265996|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e277292|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e140754|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e140754|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e203711|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sociedad|Vallecano|goal|e203711|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Celta|Levante|goal|e409383|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Celta|Levante|goal|e267591|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Villarreal|Getafe|goal|e271904|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"SP1|2627|Villarreal|Getafe|goal|e271904|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"SP1|2627|Villarreal|Getafe|goal|e359826|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Villarreal|Getafe|goal|e359826|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Madrid|Barcelona|goal|e362150|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Madrid|Barcelona|goal|e362150|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e133768|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e133768|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e133259|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e133259|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e346210|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Ath Bilbao|Espanol|goal|e346210|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Alaves|La Coruna|goal|e265997|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Alaves|La Coruna|goal|e265997|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e265996|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e265996|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e140754|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e140754|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e287224|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e287224|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e264197|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Vallecano|Valencia|goal|e264197|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|goal|e145078|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|goal|e227714|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|goal|e227714|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|goal|e300912|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Sevilla|Betis|goal|e300912|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Real Madrid|Celta|goal|e138448|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"SP1|2627|Real Madrid|Celta|goal|e138448|r2|dk","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"SP1|2627|Levante|Elche|goal|e300985|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"SP1|2627|Levante|Elche|goal|e362752|r2","at":"2026-11-27T21:47:11+00:00","result_check":"ok","espn_goals":1}

@@ -337,3 +337,10 @@
 {"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e393721|dk","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
 {"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e273021","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
 {"type":"update","id":"F1|2627|Marseille|Le Mans|goal|e331636","at":"2026-11-27T21:29:15+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e363150","at":"2026-11-27T21:47:11+00:00","status":"won","profit":170.0,"started":true,"scored":1,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e367360","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e287572","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e287572|dk","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333|dk","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Brest|Paris FC|goal|e271137","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
