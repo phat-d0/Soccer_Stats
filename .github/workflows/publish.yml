@@ -84,28 +84,32 @@ jobs:
           name: understat-E0
 
       # The ESPN appearance cache for the goalscorer paper track's B-espn (§16 amendment,
-      # 27 Nov): seeded by odds-check.yml task=espn-seed, restore only; the paper run's
-      # top-ups ride on raw-data (saved above).
+      # 27 Nov): seeded by odds-check.yml task=espn-seed, one folder per league
+      # (espn-seed-<league>-, restore only), then merged into raw-data's copy file by file
+      # (`espn-merge`: the better copy wins), so a shard never overwrites a newer top-up.
+      # The paper run's top-ups ride on raw-data (saved above).
       - uses: actions/cache/restore@v4
         with:
-          path: data/raw/espn_players
-          key: espn-players-E0-none
-          restore-keys: espn-players-E0-
+          path: data/espn_seed/E0
+          key: espn-seed-E0-none
+          restore-keys: espn-seed-E0-
       - uses: actions/cache/restore@v4
         with:
-          path: data/raw/espn_players
-          key: espn-players-SP1-none
-          restore-keys: espn-players-SP1-
+          path: data/espn_seed/SP1
+          key: espn-seed-SP1-none
+          restore-keys: espn-seed-SP1-
       - uses: actions/cache/restore@v4
         with:
-          path: data/raw/espn_players
-          key: espn-players-D1-none
-          restore-keys: espn-players-D1-
+          path: data/espn_seed/D1
+          key: espn-seed-D1-none
+          restore-keys: espn-seed-D1-
       - uses: actions/cache/restore@v4
         with:
-          path: data/raw/espn_players
-          key: espn-players-F1-none
-          restore-keys: espn-players-F1-
+          path: data/espn_seed/F1
+          key: espn-seed-F1-none
+          restore-keys: espn-seed-F1-
+      - name: Merge the ESPN seed shards into the appearance cache
+        run: uv run soccer-stats espn-merge --src data/espn_seed --dst data/raw/espn_players || echo "ESPN merge failed; the cache stays as restored"
 
       # The last good copy of each Understat league file (xg.GOOD_DIR): only files that
       # passed the JSON check are ever written there, so a stale raw-data cache holding

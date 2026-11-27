@@ -18,6 +18,7 @@ player stats add up to the match's goals. Nothing is cached or saved beyond the 
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -712,7 +713,8 @@ def check_verdict(rows: pd.DataFrame, counts: dict) -> dict:
 #
 # One file per football-data match: data/raw/espn_players/<league>/<season>/<key>.json with
 # the match's appearance rows (`appearances`), or a not-found marker retried a few times.
-# Seeded per league by odds-check.yml `task=espn-seed` (cache espn-players-<league>-);
+# Seeded per league by odds-check.yml `task=espn-seed` (cache espn-seed-<league>-, the
+# league's folder only, merged file by file: `merge_dirs`; espn-players-<league>- before);
 # publish's paper run tops it up with the matches played since, within its time budget, and
 # its raw-data cache carries the files on. Match ids are football-data's ("fd:home|away|date"),
 # so the cache never depends on Understat.
@@ -870,6 +872,42 @@ def fill_cache(
             out["fetched"] += 1
             out["found" if rows else "not_found"] += 1
     out["requests"] = stats
+    return out
+
+
+def _record(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def _rank(rec: dict | None) -> tuple:
+    """Which copy of a match file to keep: a found match beats a not-found marker, then the
+    later fetch, then (markers) more tries. An unreadable file ranks last."""
+    if rec is None:
+        return (-1,)
+    return (bool(rec.get("found")), str(rec.get("fetched_at") or ""), int(rec.get("tries", 0)))
+
+
+def merge_dirs(src, dst, leagues=None) -> dict:
+    """Fold the match files under `src` into `dst` (both laid out <league>/<season>/<file>),
+    copying a file only where `src`'s copy ranks above `dst`'s (`_rank`). The seed shards
+    (one league each) and raw-data's copy both hold match files; restoring one over the other
+    let an older copy win (27 Nov), so they are merged file by file instead."""
+    src, dst = Path(src), Path(dst)
+    out = {"copied": 0, "kept": 0}
+    if not src.exists():
+        return out
+    for lg in sorted(leagues or [d.name for d in src.iterdir() if d.is_dir()]):
+        for f in sorted((src / lg).rglob("*.json")) if (src / lg).exists() else []:
+            target = dst / f.relative_to(src)
+            if _rank(_record(f)) > _rank(_record(target)) if target.exists() else True:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, target)
+                out["copied"] += 1
+            else:
+                out["kept"] += 1
     return out
 
 

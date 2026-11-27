@@ -3265,6 +3265,9 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
     from soccer_stats.publish import _clean
 
     years = range(2021, current_season() + 1)
+    if args.seed_dir:  # the league's seed shard in, best copy of each file wins
+        got = ep.merge_dirs(args.seed_dir, ep.cache_dir(args.league).parent, [args.league])
+        print(f"ESPN seed {args.league}: from the seed shard {json.dumps(got)}")
     refetch = [c.strip() for c in (args.refetch or "").split(",") if c.strip()]
     if refetch:
         print(f"ESPN seed {args.league}: refetching not-found matches of {refetch}")
@@ -3280,6 +3283,19 @@ def cmd_espn_seed(args: argparse.Namespace) -> None:
     unmapped = ep.unmapped_board_names(args.league, years)
     if unmapped:
         print(f"  {args.league} ESPN names on not-found days that map to no club: {unmapped}")
+    if args.seed_dir:  # and back out, for the shard's save
+        got = ep.merge_dirs(ep.cache_dir(args.league).parent, args.seed_dir, [args.league])
+        print(f"ESPN seed {args.league}: to the seed shard {json.dumps(got)}")
+
+
+def cmd_espn_merge(args: argparse.Namespace) -> None:
+    """Fold the ESPN seed shards into the appearance cache, file by file (the better copy of
+    each match file wins; publish.yml, after raw-data)."""
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    print(f"ESPN merge {args.src} -> {args.dst}: {json.dumps(ep.merge_dirs(args.src, args.dst))}")
 
 
 def cmd_shots_gate_a(args: argparse.Namespace) -> None:
@@ -4240,6 +4256,11 @@ def main(argv: list[str] | None = None) -> None:
     ese.add_argument(
         "--refetch", default="", help="comma-separated clubs whose not-found matches to refetch"
     )
+    ese.add_argument("--seed-dir", default="", help="the seed shards' folder (merged in and out)")
+    eme = sub.add_parser("espn-merge", help="fold the ESPN seed shards into the cache (free)")
+    eme.add_argument("--src", default="data/espn_seed")
+    eme.add_argument("--dst", default="data/raw/espn_players")
+    eme.set_defaults(func=cmd_espn_merge)
     ese.set_defaults(func=cmd_espn_seed)
 
     sga = sub.add_parser("shots-gate-a", help="§17 gate (a): best-book markup on shot lines")

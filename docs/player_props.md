@@ -1517,6 +1517,14 @@ top-up ran out of time before this season was complete. The reason is in the cou
     not-found matches again, whatever their age or tries. A found match is never refetched.
   - Scattered misses remain (F1 2021/22: Reims 12, Marseille 11, Paris SG 10, Lyon 9, Lorient
     8); the logged board names will say whether they are names or dates.
+  - The reruns (27 Nov, runs 46072721756 D1 and 46072725320 F1) found the matches: D1 not found
+    2023/24 36 → 3, 2024/25 36 → 2, 2025/26 35 → 1; F1 2021/22 81 → 45, 2024/25 56 → 27. None of the
+    eight new misses' scoreboard names was unmapped, so they are not name gaps. But the cache
+    was not saved: the save step compared file counts, and a refetch rewrites files in place.
+    Behind it, every old shard held all leagues' folders, so the shard restored last overwrote
+    newer copies. Since then each seed shard holds one league's folder (`espn-seed-<league>-`)
+    and is merged file by file (`merge_dirs`), and the save compares a digest; the reruns
+    went again on that.
 
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
