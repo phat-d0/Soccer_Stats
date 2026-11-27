@@ -797,16 +797,18 @@ def _due(
     )
 
 
-def _rekick(path: Path, kickoff: pd.Timestamp) -> bool:
+def _rekick(path: Path, kickoff: pd.Timestamp, now: pd.Timestamp | None = None) -> bool:
     """A held match whose stored kickoff isn't football-data's (the same-day swap before 27
     Nov, within KICKOFF_TOLERANCE, so it was found): rewrite the kickoff in place, rows
-    included. No request; True when the file changed."""
+    included, and stamp `rekicked_at` so the corrected copy outranks the old one in
+    `merge_dirs`. No request; True when the file changed."""
     rec = _record(path)
     if not rec or not rec.get("found") or not rec.get("kickoff"):
         return False
     if pd.Timestamp(rec["kickoff"]) == kickoff:
         return False
     rec["kickoff"] = kickoff.isoformat()
+    rec["rekicked_at"] = (now or pd.Timestamp.now(tz="UTC")).isoformat()
     for r in rec.get("rows") or []:
         r["kickoff"] = kickoff.isoformat()
     path.write_text(json.dumps(rec, separators=(",", ":")))
@@ -852,7 +854,7 @@ def fill_cache(
                 continue
             path = match_file(league, year, m["home"], m["away"], k, raw_dir)
             if not _due(path, k, now, refetch):
-                if _rekick(path, k):
+                if _rekick(path, k, now):
                     out["rekicked"] = out.get("rekicked", 0) + 1
                 continue
             out["due"] += 1
@@ -931,10 +933,12 @@ def _record(path: Path) -> dict | None:
 
 def _rank(rec: dict | None) -> tuple:
     """Which copy of a match file to keep: a found match beats a not-found marker, then the
-    later fetch, then (markers) more tries. An unreadable file ranks last."""
+    later fetch or kickoff correction (`rekicked_at`), then (markers) more tries. An
+    unreadable file ranks last."""
     if rec is None:
         return (-1,)
-    return (bool(rec.get("found")), str(rec.get("fetched_at") or ""), int(rec.get("tries", 0)))
+    when = max(str(rec.get("fetched_at") or ""), str(rec.get("rekicked_at") or ""))
+    return (bool(rec.get("found")), when, int(rec.get("tries", 0)))
 
 
 def merge_dirs(src, dst, leagues=None) -> dict:
