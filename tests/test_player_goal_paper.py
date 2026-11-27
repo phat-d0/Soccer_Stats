@@ -765,3 +765,22 @@ def test_espn_merge_keeps_the_better_copy_of_each_match_file(tmp_path):
     assert (cache / "D1" / "2526" / "c.json").exists()
     assert ep.merge_dirs(seed, cache) == {"copied": 0, "kept": 3}  # nothing changes twice
     assert ep.merge_dirs(tmp_path / "missing", cache) == {"copied": 0, "kept": 0}
+
+
+def test_a_later_shard_restore_cannot_overwrite_a_newer_raw_data_file(tmp_path):
+    """Publish: raw-data's copy holds the paper run's newer top-up; the seed shard, merged
+    after it, holds an older copy of the same match. The newer copy stays."""
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    rel = "F1/2627/20261122_Lyon_Nice.json"
+    raw, seed = tmp_path / "raw" / "espn_players", tmp_path / "espn_seed"
+    for root, rec in (
+        (raw, {"found": True, "fetched_at": "2026-11-23T10:00:00+00:00", "rows": [1, 2]}),
+        (seed, {"found": True, "fetched_at": "2026-11-22T20:00:00+00:00", "rows": [1]}),
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(json.dumps(rec))
+    assert ep.merge_dirs(seed, raw) == {"copied": 0, "kept": 1}
+    assert json.loads((raw / rel).read_text())["rows"] == [1, 2]

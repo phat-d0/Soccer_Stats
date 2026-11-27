@@ -1438,6 +1438,23 @@ corrects the implementation to the spec written before the result; nothing else 
 **Status:** drafted 26 Nov by Player props, reviewed by the lead, **approved by the owner on 27 Nov
 and binding from its merge (PR #268).** No judged number had been computed when it was written.
 
+**Note, 2026-11-27: a name gap in the checks' ESPN data (the lead's ruling: the verdicts stand).**
+ESPN's spellings of two clubs never matched football-data's (`espn_news.ESPN_NAMES` lacked them
+until PR #278), so their matches were missing from every ESPN pull:
+- D1: Heidenheim's matches in 2023/24, 2024/25 and 2025/26. The cache's seed found 36, 36 and 35
+  not found in those seasons, against 3, 2 and 1 after the fix (runs 46070541955, 46072721756).
+  So the D1 check's B-espn rows and histories lacked Heidenheim's 2024/25–2025/26 matches (its
+  join rate, 86.5%, is the lowest of the four), and so did the paper track's D1 fits.
+- F1: St Etienne's matches in 2021/22 (38) and 2024/25 (34); not found went 81 → 45 and 56 → 27
+  (runs 46070545213, 46072725320). The F1 check's history lacked the 2024/25 matches.
+- **The verdicts stand as read** (lead, 27 Nov). The written rule was followed: the joined rows
+  were well above half and the model ran as frozen. The gap is in data coverage, not a departure
+  from the spec (I1's rerun was allowed only because its run didn't match the frozen model). No
+  check is rerun.
+- The judged read's `espn_players.judged_ready` guard requires these matches to be held: no
+  settled football-data match may lack a cache file, and the seasons must reach `SEEDED_MIN`.
+- The paper track rewrites nothing; its next D1 and F1 decisions refit on the fuller cache.
+
 ### Note, 2026-11-27: the paper track switches to B-espn (under the amendment; descriptive)
 
 - **Which model where:**
