@@ -131,7 +131,8 @@
 #             amendment, 27 Nov): every settled football-data match of `league` from
 #             2021/22, one file per match in data/raw/espn_players/<league>/ (resumable,
 #             110 min); saved as espn-players-<league>- from the default branch only,
-#             when it added files. Free, no key.
+#             when it added files. `finalists` = clubs whose not-found matches are
+#             fetched again (a name the mapping has just learned). Free, no key.
 #   shots-gate-a: §17 gate (a), read once: the best book's markup on E0 2025/26 starters'
 #             shot lines at entry (bought shots17 bodies, ESPN's appearances). No key.
 #   goal-lab: the goalscorer model improvements (docs/player_props.md section 8),
@@ -215,7 +216,7 @@ on:
         description: "lab-holdout / corners / corner-recal / goal-lab: why the holdout (goal-lab: the forward window) is opened (logged)"
         default: ""
       finalists:
-        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>; team-totals: the frozen rule, e.g. fanduel_anchor:0.05"
+        description: "lab-holdout: comma-separated candidates, e.g. a_dixon_coles,c_gbm,e_stack; corners: total=<x>,team=<y>; team-totals: the frozen rule, e.g. fanduel_anchor:0.05; espn-seed: football-data clubs whose not-found matches are fetched again, e.g. Heidenheim"
         default: ""
       stack_base:
         description: "lab-holdout: the stack's base candidate (one of the finalists)"
@@ -752,7 +753,8 @@ jobs:
             shots-gate-a)  # §17 gate (a), read once (no key, no credits)
               uv run soccer-stats shots-gate-a --json out/shots_gate_a.json ;;
             espn-seed)  # the ESPN appearance cache for B-espn (free, resumable)
-              uv run soccer-stats espn-seed --league "${LEAGUE:-E0}" --minutes 110 ;;
+              uv run soccer-stats espn-seed --league "${LEAGUE:-E0}" --minutes 110 \
+                --refetch "$FINALISTS" ;;
             goalscorer-paper)  # the paper track on a copy of data-log; nothing is pushed
               git fetch --depth=1 origin data-log
               git worktree add --detach "$RUNNER_TEMP/log" FETCH_HEAD

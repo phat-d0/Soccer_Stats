@@ -64,6 +64,16 @@ ESPN_NAMES: dict[str, str] = {
     "Internazionale": "Inter",
     "Paris Saint-Germain": "Paris SG",
     "Stade Rennais": "Rennes",
+    # The ESPN appearance cache (27 Nov): every D1 Heidenheim and F1 St Etienne match came
+    # back not found, so ESPN's spellings of these two never landed (the club's founding year
+    # defeats the prefix match; the accented "Saint-Étienne" isn't in the shared map).
+    "1. FC Heidenheim 1846": "Heidenheim",
+    "FC Heidenheim 1846": "Heidenheim",
+    "Heidenheim 1846": "Heidenheim",
+    "Saint-Étienne": "St Etienne",
+    "AS Saint-Étienne": "St Etienne",
+    "AS Saint-Etienne": "St Etienne",
+    "AS St-Étienne": "St Etienne",
 }
 INJURY_HOURS = 36
 LINEUP_MINUTES = 90
