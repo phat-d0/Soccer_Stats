@@ -183,12 +183,14 @@ then gets a `result_check` against Understat's goals. B is fitted once per 28-da
 (cached in `data/raw/goalscorer_paper/`, carried by raw-data) and the model work has a 120 s
 budget per paper run (lead, 9 Nov).
 Shown under Portfolio → Anytime goalscorer once UI Design unhides it.
-**§16 amendment, drafted 26 Nov (not yet binding; the lead reviews, the owner decides):**
-the whole priced read on **B-espn** (B's model on ESPN's player data, no Understat; level with B
-on E0's development rows), B beside it as descriptive; a pre-registered check in SP1, D1, I1
-and F1 on the rescued 2025/26 rows (pass = B-espn minus B log loss's range includes 0 or is
-below it); every row records `model_source` and `feature_source`; the paper track may switch
-to B-espn in all five leagues (`docs/player_props.md` §16 "Amendment, 2026-11-26").
+**§16 amendment (owner-approved 27 Nov, binding; PR #268):** the whole priced read on **B-espn**
+(B's model on ESPN's player data, no Understat; level with B on E0's development rows), B beside
+it as descriptive. The four-league check on the rescued 2025/26 rows (pass = B-espn minus B log
+loss's range includes 0 or is below it) passed in SP1 (+0.0014), D1 (+0.0003) and F1 (+0.0007)
+and **failed in I1** (+0.0022, +0.0003 to +0.0040, single rerun final), so I1 is read on B, or
+left out if B can't score it by 31 Jan. Every row records `model_source` and `feature_source`;
+the paper track may switch to B-espn (a separate PR; `docs/player_props.md` §16 "Amendment,
+2026-11-26").
 
 **Bet alerts** (owner, 5 Nov; `push/README.md`): a phone alert, once per trade, when Blend
 Lean (rule_version 2) or Model (f) vs DraftKings corners under 60% opens a paper trade. Web

@@ -1310,7 +1310,7 @@ Settlement uses ESPN's goal details (own goals left out); football-data has no s
 The track is backcast from 1 Nov, the live log's first day, on the logged entry snapshots
 only (never the bought history), and starts at its `defined_at`.
 
-### Amendment, 2026-11-26: B-espn for the whole read, B beside it (drafted for the lead's review and the owner's decision; before any judged number)
+### Amendment, 2026-11-26: B-espn for the whole read, B beside it (owner-approved 27 Nov; written before any judged number)
 
 **Why.** Understat has been down since 2 Nov. B's player features come from Understat's
 match files, and SP1, D1, I1 and F1's files are in no cache. Without them B can score only
@@ -1435,8 +1435,8 @@ corrects the implementation to the spec written before the result; nothing else 
   the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
   364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
 
-**Status:** drafted 26 Nov by Player props for the lead's review. Binding only once the owner
-approves and it merges. No judged number had been computed when it was written.
+**Status:** drafted 26 Nov by Player props, reviewed by the lead, **approved by the owner on 27 Nov
+and binding from its merge (PR #268).** No judged number had been computed when it was written.
 
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
