@@ -177,7 +177,7 @@ goals out; not in the XI = void). Backcast from 1 Nov (the live log's start), `d
 first paper run after the merge. Since the §16 amendment (27 Nov) the track runs B-espn in E0, SP1, D1 and F1 on an ESPN
 appearance cache (`espn_players.fill_cache`, seeded per league by `odds-check.yml`
 `task=espn-seed`, cache `espn-players-<league>-`, topped up by each paper run within its budget);
-I1 stays on B and waits for Understat. New trades record `model_source`/`feature_source`, older
+I1 stays on B and waits for Understat. A league is decided only on a seeded cache (every earlier season ≥ `SEEDED_MIN` 200 matches); the 161 SP1 trades decided at 19:49 on 27 Nov on a partial cache are voided by update events (`bug_sweep`, `voided_bug`) and decided again under "|r2" ids; the 1 Feb read needs `espn_players.judged_ready`. New trades record `model_source`/`feature_source`, older
 ones are B and never rewritten, sections count `models` (§16 note of 27 Nov). For B in I1:
 B needs the match files, and
 E0's sit in publish's `raw-data-` cache (the `understat-E0-` shard missed on 9 Nov; publish now

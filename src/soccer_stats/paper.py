@@ -1999,7 +1999,7 @@ def portfolios_section(
             section["corner_shop_trades"] = portfolio_section(corner_shop["trades"])["trades"]
         if p["id"] == "goalscorer" and goalscorer is not None:
             section["strategies"] = pgp.safe_sections(
-                goalscorer["trades"], goalscorer["defined_at"], now
+                goalscorer["trades"], goalscorer["defined_at"], now, goalscorer.get("voided_bug")
             )
             section["note"] = pgp.RULE_NOTE
             section["features_note"] = pgp.FEATURES_NOTE

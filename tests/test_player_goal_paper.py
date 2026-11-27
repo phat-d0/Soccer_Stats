@@ -640,3 +640,67 @@ def test_espn_source_never_decides_on_a_current_season_only_cache(tmp_path, monk
     monkeypatch.setattr(ep, "fill_cache", lambda *a, **k: {"left": 3, "fetched": 9})
     src = pgp.EspnSource("SP1", now, fetch=True, raw_dir=tmp_path)
     assert src.load() is False and "time budget" in src.why
+
+
+def test_bug_sweep_voids_by_update_and_redecides_under_new_ids(tmp_path):
+    """Lead, 27 Nov: the La Liga decisions made at 19:49 on a partial ESPN cache are voided by
+    update events (the opens stay), their matches decided again under "|r2" ids."""
+    bad = {"id": "SP1|2627|Alaves|Betis|goal|e1", "league": "SP1", "strategy": pgp.KEY,
+           "status": "lost", "profit": -10.0, "model_source": "B-espn", "event_id": "ev1",
+           "decided_at": "2026-11-27T19:49:30+00:00", "stake": 10.0}  # fmt: skip
+    ok = {**bad, "id": "D1|2627|A|B|goal|e2", "league": "D1", "event_id": "ev2"}
+    ledger = {bad["id"]: dict(bad)}
+    checked = {"SP1|ev1": {"league": "SP1", "event_id": "ev1", "home": "Alaves",
+                           "away": "Betis", "model_source": "B-espn",
+                           "decided_at": "2026-11-27T19:49:30+00:00"},  # fmt: skip
+               "SP1|ev9": {"league": "SP1", "event_id": "ev9", "model_source": "B",
+                           "decided_at": "2026-11-05T10:00:00+00:00"}}  # fmt: skip
+    now = pd.Timestamp("2026-11-28T09:00:00Z")
+    ev, recs = pgp.bug_sweep(ledger, checked, "SP1", now)
+    assert [e["type"] for e in ev] == ["update"] and ev[0]["void_reason"] == pgp.BUG_REASON
+    assert ledger[bad["id"]]["status"] == "void" and ledger[bad["id"]]["profit"] == 0.0
+    assert len(recs) == 1 and checked["SP1|ev1"]["redecide"] and checked["SP1|ev1"]["attempt"] == 2
+    assert pgp.bug_sweep(ledger, checked, "SP1", now) == ([], [])  # idempotent
+    assert pgp.bug_sweep({ok["id"]: dict(ok)}, {}, "D1", now) == ([], [])  # other leagues
+    # The checked file keeps both records; the superseding one wins on load.
+    pgp.append_checked(tmp_path, [{"league": "SP1", "event_id": "ev1", "decided_at": "x"}])
+    pgp.append_checked(tmp_path, recs)
+    assert pgp.load_checked(tmp_path)["SP1|ev1"]["redecide"] is True
+    # Sections leave the void out of every figure but voided_bug.
+    secs = pgp.sections([ledger[bad["id"]]], "2026-11-09T00:00:00+00:00", KICKOFF,
+                        voided=[ledger[bad["id"]]])  # fmt: skip
+    main = next(s for s in secs if s["key"] == pgp.KEY)
+    assert main["goalscorer_trades"] == 0 and main["voided_bug"]["trades"] == 1
+
+
+def test_redecided_trade_gets_a_new_id_pointing_at_the_old_one(chances):
+    entry = {"home": "Arsenal", "away": "Chelsea", "kickoff": KICKOFF, "event_id": "ev",
+             "fetched_at": KICKOFF - pd.Timedelta(minutes=50), "prices": None}  # fmt: skip
+    name = {"model": "X", "espn": "X", "odds": "X"}
+    t = pgp._new_trade(pgp.DK_KEY, "SP1", entry, "e7", name, "Arsenal", 0.3, 5.0, "draftkings",
+                       {}, {}, KICKOFF, KICKOFF + pd.Timedelta(hours=9), attempt=2)  # fmt: skip
+    assert t["id"].endswith("|goal|e7|r2|dk") and t["redecided_of"].endswith("|goal|e7|dk")
+    assert t["backcast"] is True and t["attempt"] == 2
+
+
+def test_judged_read_guard_needs_every_season_seeded_and_fetched(tmp_path):
+    from soccer_stats import espn_players as ep
+
+    assert pgp.SEEDED_MIN == ep.SEEDED_MIN
+    now = pd.Timestamp("2026-11-28T12:00:00Z")
+    fx = {2025: pd.DataFrame([{"home": "Celta", "away": "Getafe",
+                               "kickoff": pd.Timestamp("2025-09-01T15:00Z")}]),  # fmt: skip
+          2026: pd.DataFrame([{"home": "Celta", "away": "Getafe",
+                               "kickoff": pd.Timestamp("2026-09-01T15:00Z")}])}  # fmt: skip
+    ready, d = ep.judged_ready("SP1", [2025, 2026], tmp_path, now, lambda lg, y: fx[y])
+    assert not ready and d["short"] == ["2526"] and d["unfetched"] == {"2526": 1, "2627": 1}
+    _seed(tmp_path, [2025], ep.SEEDED_MIN)  # 2025/26 seeded; this season's match not fetched
+    ready, d = ep.judged_ready("SP1", [2025, 2026], tmp_path, now, lambda lg, y: fx[y])
+    assert not ready and d["short"] == [] and d["unfetched"] == {"2526": 1, "2627": 1}
+    for y in (2025, 2026):  # both tried (a not-found marker counts)
+        f = ep.match_file("SP1", y, "Celta", "Getafe", fx[y]["kickoff"][0], tmp_path)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({"found": False, "home": "Celta", "away": "Getafe"}))
+    ready, d = ep.judged_ready("SP1", [2025, 2026], tmp_path, now, lambda lg, y: fx[y])
+    assert ready, d
+    assert ep.not_found_clubs("SP1", [2025], tmp_path) == {"2526": {"Celta": 1, "Getafe": 1}}

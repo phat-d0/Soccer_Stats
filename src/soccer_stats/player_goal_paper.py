@@ -88,8 +88,19 @@ ESPN_LEAGUES = ("E0", "SP1", "D1", "F1")
 ESPN_TOPUP_SECONDS = 45.0  # ESPN match summaries fetched per league per run, within the budget
 # A league's ESPN cache counts as seeded when every earlier season from FIRST_YEAR holds this
 # many matches (27 Nov: a publish top-up alone, holding only this season's first weeks, once
-# decided La Liga's matches with no earlier-season history).
+# decided La Liga's matches with no earlier-season history). espn_players.SEEDED_MIN.
 SEEDED_MIN = 200
+# The one-off bug void (lead's decision, 27 Nov): the B-espn decisions made at 19:49 UTC on
+# 27 Nov in La Liga, before the seed, on a cache holding only 2026/27 through 18 Sep. Their
+# trades are voided by update events (the opens stay), the matches get a superseding decision
+# record, and they are decided again under ids ending "|r2" (`redecided_of`), as backcasts.
+BUG_REASON = "decided on an incomplete ESPN cache (bug, 27 Nov)"
+BUG_VOID = {
+    "league": "SP1",
+    "model_source": "B-espn",
+    "from": "2026-11-27T19:00:00+00:00",
+    "before": "2026-11-27T20:14:00+00:00",
+}
 MODEL_B = {"model_source": "B", "feature_source": "understat"}
 TIME_BUDGET = 120.0  # seconds of model work per paper run (lead, 9 Nov)
 CHECKED_FILE = "goalscorer_checked.jsonl"
@@ -244,7 +255,9 @@ def load_checked(log_dir: Path) -> dict[str, dict]:
     for line in path.read_text().splitlines():
         if line.strip():
             r = json.loads(line)
-            out.setdefault(f"{r['league']}|{r['event_id']}", r)
+            key = f"{r['league']}|{r['event_id']}"
+            if key not in out or int(r.get("attempt", 1)) > int(out[key].get("attempt", 1)):
+                out[key] = r  # a superseding record (the bug void) replaces the first
     return out
 
 
@@ -846,7 +859,9 @@ def source_for(league: str, now: pd.Timestamp, deadline: float | None = None):
 # ---------- deciding a match ----------
 
 
-def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineup, defined, now):
+def _new_trade(
+    key, league, entry, pid, name, team, p, odds, book, detail, lineup, defined, now, attempt=1
+):
     k = entry["kickoff"]
     pick = {"market": MARKET, "odds": odds, "model_p": p, "edge": round(p, P_DECIMALS) * odds - 1}
     t = tr.new_trade(
@@ -870,6 +885,7 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
     )
     t.update(
         id=tr.trade_id(league, t["season"], entry["home"], entry["away"], "goal", pid)
+        + (f"|r{attempt}" if attempt > 1 else "")
         + ID_SUFFIX[key],
         bet_type="goalscorer",
         portfolio="goalscorer",
@@ -892,6 +908,9 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
     )
     if key == DK_KEY:
         t.update(variant_of=KEY, descriptive=True)
+    if attempt > 1:
+        first = tr.trade_id(league, t["season"], entry["home"], entry["away"], "goal", pid)
+        t.update(redecided_of=first + ID_SUFFIX[key], attempt=attempt)
     if entry["fetched_at"] < defined or now >= k:
         bc.mark(t)
         t["backcast_from"] = BACKCAST_FROM
@@ -899,7 +918,7 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
 
 
 def decide(
-    entry: dict, lineup: dict, source: BSource, league: str, defined, now, known=()
+    entry: dict, lineup: dict, source: BSource, league: str, defined, now, known=(), attempt=1
 ) -> tuple[list[dict], dict]:
     """The trades the rule opens on one match at its entry snapshot, and the decision record
     (written to goalscorer_checked.jsonl whether or not anything opened)."""
@@ -907,6 +926,8 @@ def decide(
     rec = {"league": league, "event_id": entry["event_id"], "home": home, "away": away,
            "kickoff": _iso(k), "entry_at": _iso(entry["fetched_at"]),
            "decided_at": _iso(now)}  # fmt: skip
+    if attempt > 1:
+        rec["attempt"] = attempt
     rosters = {home: source.rosters(home, k), away: source.rosters(away, k)}
     ids: dict[str, list[str]] = {}
     espn_of: dict[str, str] = {}
@@ -962,6 +983,7 @@ def decide(
                             lineup,
                             defined,
                             now,
+                            attempt,
                         )  # fmt: skip
                     )
     rec.update(
@@ -1169,6 +1191,8 @@ def update_trades(
     events = []
     results: dict[str, dict | None] = {}
     for t in ledger.values():
+        if t.get("void_reason") == BUG_REASON:
+            continue  # voided by the bug sweep: never closed or settled
         f = close_fields(t, closes.get(t.get("event_id")))
         if f:
             events.append(paper._update(t, now, **f))
@@ -1204,6 +1228,51 @@ def update_trades(
     return events
 
 
+# ---------- the one-off bug void (lead, 27 Nov) ----------
+
+
+def _in_bug(league: str, model: str | None, decided_at: str | None) -> bool:
+    b = BUG_VOID
+    return (
+        league == b["league"]
+        and model == b["model_source"]
+        and decided_at is not None
+        and _utc(b["from"]) <= _utc(decided_at) < _utc(b["before"])
+    )
+
+
+def bug_sweep(ledger: dict, checked: dict, league: str, now) -> tuple[list[dict], list[dict]]:
+    """Void (update events, the opens untouched) every first-attempt trade the bug decided, and
+    give each affected match a superseding decision record (`redecide`, attempt 2), so it is
+    decided again under new ids. Idempotent: a voided trade or a superseded match is skipped."""
+    from soccer_stats import paper
+
+    events = []
+    for t in list(ledger.values()):
+        if t.get("attempt", 1) > 1 or t.get("void_reason") == BUG_REASON:
+            continue
+        if _in_bug(league, t.get("model_source"), t.get("decided_at")):
+            ev = paper._update(t, now, status="void", profit=0.0, void_reason=BUG_REASON,
+                               settled_at=_iso(now))  # fmt: skip
+            events.append(ev)
+    recs = []
+    for key, r in list(checked.items()):
+        if r.get("league") != league or int(r.get("attempt", 1)) > 1:
+            continue
+        if _in_bug(league, r.get("model_source"), r.get("decided_at")):
+            rec = {k: r[k] for k in ("league", "event_id", "home", "away", "kickoff", "entry_at")
+                   if k in r}  # fmt: skip
+            rec.update(attempt=2, redecide=True, superseded_at=_iso(now), why=BUG_REASON,
+                       supersedes=r.get("decided_at"))  # fmt: skip
+            checked[key] = rec
+            recs.append(rec)
+    return events, recs
+
+
+def is_bug_void(t: dict) -> bool:
+    return t.get("void_reason") == BUG_REASON
+
+
 # ---------- one league ----------
 
 
@@ -1235,8 +1304,10 @@ def update_league(
     events, recs = [], []
     counts = {"pending": 0, "decided": 0, "no_lineup": 0, "no_data": 0, "over_budget": 0}
     for eid, e in sorted(entries.items(), key=lambda x: x[1]["fetched_at"]):
-        if e["kickoff"] < lo or e["fetched_at"] > now or f"{league}|{eid}" in checked:
+        prev = checked.get(f"{league}|{eid}")
+        if e["kickoff"] < lo or e["fetched_at"] > now or (prev and not prev.get("redecide")):
             continue
+        attempt = int(prev.get("attempt", 1)) if prev else 1
         counts["pending"] += 1
         if deadline is not None and time.monotonic() > deadline:
             counts["over_budget"] += 1
@@ -1247,6 +1318,8 @@ def update_league(
                    "kickoff": _iso(e["kickoff"]), "entry_at": _iso(e["fetched_at"]),
                    "decided_at": _iso(now), "why": "no confirmed ESPN lineup at entry",
                    "bets": {KEY: 0, DK_KEY: 0}}  # fmt: skip
+            if attempt > 1:
+                rec["attempt"] = attempt
             counts["no_lineup"] += 1
         else:
             if not source.load():
@@ -1254,7 +1327,9 @@ def update_league(
                 if getattr(source, "why", None):
                     counts["no_data_why"] = source.why
                 continue  # no Understat match files: decided when they come back
-            new, rec = decide(e, lineup, source, league, defined, now, known)
+            new, rec = decide(e, lineup, source, league, defined, now, known, attempt)
+            if attempt > 1:
+                counts["redecided"] = counts.get("redecided", 0) + 1
             for t in new:
                 if tr.holds(ledger, t["id"]):
                     continue
@@ -1284,7 +1359,9 @@ def _clv(trades: list[dict], field: str) -> dict:
     return {"trades": len(vals), "mean": float(np.mean(vals)) if vals else None}
 
 
-def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) -> list[dict]:
+def sections(
+    trades: list[dict], defined: str, now: pd.Timestamp | None = None, voided=None
+) -> list[dict]:
     """The main line (key "goalscorer") and the DraftKings line (variant_of "goalscorer",
     adds "book") for Anytime goalscorer -> live -> strategies: paper.strategy_section plus
     defined_at, note, features_note, clv (best-to-best and same-book means), the backcast
@@ -1295,8 +1372,11 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
         defined=_utc(defined).strftime("%-d %b"), started=_utc(BACKCAST_START).strftime("%-d %b")
     )
     out = []
+    trades = [t for t in trades if not is_bug_void(t)]  # counted only in voided_bug
+    voided = [t for t in (voided or []) if is_bug_void(t)]
     for key, label in ((KEY, LABEL), (DK_KEY, DK_LABEL)):
         mine = [t for t in trades if t.get("strategy") == key]
+        gone = [t for t in voided if t.get("strategy") == key]
         r = rule(key)
         sec = paper.strategy_section(mine, key, label, r, of=lambda t: t.get("strategy"), now=now)
         sec.update(
@@ -1312,6 +1392,12 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
                 "(Understat down): their live chance can differ from the judged one.",
             },
             goalscorer_trades=len(mine),
+            voided_bug={
+                "trades": len(gone),
+                "note": "Voided (bug): La Liga trades decided on 27 Nov on an ESPN cache that "
+                "held only this season's first weeks. They stay in the ledger as void and are "
+                "left out of every figure here; their matches were decided again.",
+            },
             models={
                 m: {"label": MODEL_NAMES.get(m, m), "trades": n}
                 for m, n in sorted(
@@ -1353,10 +1439,10 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
     return out
 
 
-def safe_sections(trades: list[dict], defined: str, now=None) -> list[dict]:
+def safe_sections(trades: list[dict], defined: str, now=None, voided=None) -> list[dict]:
     """sections() for display only: a failure costs only this track."""
     try:
-        return sections(trades, defined, now)
+        return sections(trades, defined, now, voided)
     except Exception as exc:  # noqa: BLE001
         return [{"key": KEY, "label": LABEL, "defined_at": defined, "error": type(exc).__name__}]
 
@@ -1387,6 +1473,12 @@ def run(
     for lg in leagues:
         ledger = load_ledger(log_dir, lg)
         src = (sources or {}).get(lg)
+        bev, brc = bug_sweep(ledger, checked, lg, now)
+        if bev or brc:
+            print(f"Goalscorer bug void {lg}: {len(bev)} trades voided, {len(brc)} matches "
+                  "to decide again")  # fmt: skip
+            events += bev
+            recs += brc
         try:  # one league's failure costs only that league this run
             ev, rc, c = update_league(
                 ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src,
@@ -1401,7 +1493,9 @@ def run(
         trades += list(ledger.values())
     n = append_events(log_dir, events)
     append_checked(log_dir, recs)
-    return {"trades": trades, "defined_at": defined, "events": n, "counts": counts,
+    voided = [t for t in trades if is_bug_void(t)]
+    return {"trades": [t for t in trades if not is_bug_void(t)], "voided_bug": voided,
+            "defined_at": defined, "events": n, "counts": counts,
             "opened": [e for e in events if e.get("type") == "open"]}  # fmt: skip
 
 
