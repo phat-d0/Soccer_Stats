@@ -1481,8 +1481,25 @@ until PR #278), so their matches were missing from every ESPN pull:
   ruling above).
 - The fix: `espn_players.with_kickoffs` joins each match to its own file row on date, home and
   away; a held match stored at the wrong time is corrected in place (`_rekick`, no request); and
-  `espn-seed` with `finalists=*` refetches every old marker. The seed reruns in all four leagues
-  follow the merge, and the counts above are updated then.
+  `espn-seed` with `finalists=*` refetches every old marker.
+- **After the fix (27 Nov, seed runs 46078340821 D1, 46078343465 F1, 46078345655 E0,
+  46078348123 SP1, `finalists=*`): no not-found marker is left in any league or season.** Every
+  old miss was found (D1 7, F1 172, E0 45, SP1 98), and 992 held files stored at a swapped
+  kickoff were corrected in place (D1 194, F1 172, E0 344, SP1 282). Matches held:
+
+  | Season | E0 | SP1 | D1 | F1 |
+  | --- | --- | --- | --- | --- |
+  | 2021/22 | 380 | 380 | 306 | 380 |
+  | 2022/23 | 380 | 380 | 306 | 380 |
+  | 2023/24 | 380 | 380 | 306 | 306 |
+  | 2024/25 | 380 | 380 | 306 | 306 |
+  | 2025/26 | 380 | 380 | 306 | 306 |
+  | 2026/27 (to 27 Nov) | 110 | 129 | 90 | 99 |
+
+  So the table above is the coverage before the fix, and the 1 Feb read's ESPN data is now
+  complete, with no marker standing in for a match. The corrected kickoffs carry a `rekicked_at`
+  stamp so `merge_dirs` keeps them over older copies (the first reruns' corrections stayed in
+  the working copy only, because the old and corrected files ranked level).
 
 ### Note, 2026-11-27: the paper track switches to B-espn (under the amendment; descriptive)
 

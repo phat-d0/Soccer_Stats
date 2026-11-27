@@ -872,3 +872,24 @@ def test_refetch_star_retries_every_old_marker(tmp_path):
     now = pd.Timestamp("2026-11-28T00:00Z")
     assert not ep._due(f, k, now) and not ep._due(f, k, now, frozenset({"Lyon"}))
     assert ep._due(f, k, now, frozenset({"*"}))
+
+
+def test_a_corrected_kickoff_outranks_the_old_copy_in_the_merge(tmp_path):
+    import json
+
+    from soccer_stats import espn_players as ep
+
+    rel = "F1/2526/20250824_Lille_Monaco.json"
+    right, wrong = pd.Timestamp("2025-08-24T15:15Z"), pd.Timestamp("2025-08-24T18:45Z")
+    old = {"home": "Lille", "away": "Monaco", "found": True, "kickoff": wrong.isoformat(),
+           "fetched_at": "2026-11-27T21:00:00+00:00", "rows": []}  # fmt: skip
+    cache, seed = tmp_path / "cache", tmp_path / "seed"
+    for root in (cache, seed):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(json.dumps(old))
+    assert ep._rekick(cache / rel, right, pd.Timestamp("2026-11-27T23:00Z"))
+    assert ep.merge_dirs(cache, seed) == {"copied": 1, "kept": 0}  # out to the shard
+    assert pd.Timestamp(json.loads((seed / rel).read_text())["kickoff"]) == right
+    (cache / rel).write_text(json.dumps(old))  # a stale copy elsewhere loses to the shard
+    assert ep.merge_dirs(seed, cache) == {"copied": 1, "kept": 0}
+    assert pd.Timestamp(json.loads((cache / rel).read_text())["kickoff"]) == right
