@@ -1868,7 +1868,7 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
 
 - One vanilla JS file (`app.js`), plus `style.css`, `index.html`, `sw.js`. Name "Soccer Model";
   the header subtitle names the league, or "N leagues".
-- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v87) on every web change, and
+- Bump the cache name in `sw.js` (`soccer-model-vNN`, now v88) on every web change, and
   `APP_VERSION` in `app.js` with it (the smoke test checks they match), or phones keep the old
   app. Updates reach a home-screen app without killing it: `sw.js` skips waiting and claims
   the page; `app.js` reloads once on `controllerchange` (not on the first install; `reloadOnce`
@@ -2376,8 +2376,16 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `research-map-both`). The fixture's copy is trimmed to what the app reads (`add_residual_map`: no
   empty cells, slice totals, `league_reports`, `model_resid` or `thin`; 4 decimals), and the
   goals-only replay keeps only its bets at the 12% edge it is read at: about 1.47 MB in all, 9 Nov.
+- **Anytime goalscorer archived** (owner, 27 Nov; v88; display only): `PF_SHELVED` {goalscorer:
+  {since, text}} (`pfShelved`, `shelvedLabel`, `shelvedNote`) takes it off the top level's list
+  and puts it behind a link under it like the retired ones (`.pf-archived`: "Archived: Anytime
+  goalscorer · Archived Nov 27 · still logs and settles; the priced test is read once on 1 Feb
+  2027"); its pill reads "Archived"; its folder and strategy pages (from the link, or the
+  Research card `goalscorer_priced`) open with that note (`.pf-archived-note`); `pfCurrent`'s
+  fallback and the classic switcher skip it. Ledgers, the paper step and `trades.PORTFOLIOS`
+  are unchanged; it still logs and settles.
 - **Anytime goalscorer** (owner-approved 9 Nov; v80; `player_goal_paper`): the portfolio shows
-  again (`PF_HIDDEN` empty). `live.strategies` = `goalscorer` (main line, model B 20%+ over the
+  again (`PF_HIDDEN` empty; archived since v88, above). `live.strategies` = `goalscorer` (main line, model B 20%+ over the
   best of nine books, the lead) and `goalscorer_dk` (`variant_of`, DraftKings' price only, right
   after it); their trades are the portfolio's own `trades` (`isGoal`: `bet_type` "goalscorer";
   `isGoalStrat`: rule `goalscorer_b`); selection `state.pfStratGoal`. Live paper only, with the
