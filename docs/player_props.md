@@ -1310,6 +1310,202 @@ Settlement uses ESPN's goal details (own goals left out); football-data has no s
 The track is backcast from 1 Nov, the live log's first day, on the logged entry snapshots
 only (never the bought history), and starts at its `defined_at`.
 
+### Amendment, 2026-11-26: B-espn for the whole read, B beside it (owner-approved 27 Nov; written before any judged number)
+
+**Why.** Understat has been down since 2 Nov. B's player features come from Understat's
+match files, and SP1, D1, I1 and F1's files are in no cache. Without them B can score only
+E0, and only matches before its files stop. ESPN's match summaries have every field B uses
+except xG: starters and substitutes, substitution minutes, goals, shots, shots on target and
+own goals per player, in all five leagues since 2021/22 (fields check, run 45778000789: 167
+of 180 sampled matches found, every field present).
+
+**B-espn** is B with ESPN's player data, frozen exactly as run on 26 Nov (full E0 pull, run
+45779183561, commit 60e0949; unchanged at 68ebc34, which changed only a coverage count):
+- the same NB2 mixture as B (start and substitute minutes, lineup known, `p_zero`), fitted by
+  `models.player_counts.NBRegression` with `FIT_OPTIONS` and a starting α of 2.0;
+- factors `espn_players.B_ESPN_FACTORS`: log_rate, sot_rate, log_goal_rate, pos_def, pos_fwd,
+  log_team_xg, log_opp_conceded, home, game_state. `log_goal_rate` (his goals per 90 shrunk
+  toward the position average, `goal_rate_features`) stands in for B's `log_xg_rate`; the
+  rest are B's own features (`factors.build_features` → `player_goals.goal_features`);
+- walk-forward as B: refit every 28 days on the 730 days before the block, starters with at
+  least 3 earlier appearances, B's chance rounded to 6 decimals before the threshold;
+- minutes from ESPN's substitution events; a starter subbed off at an unknown time counts 70
+  minutes, a substitute with an unknown time 20 (`DEFAULT_START_OFF`, `DEFAULT_SUB_ON`);
+- team expected goals from the live match model (`backtest.walk_forward`, xG weight 0.7,
+  `FIT_OPTIONS`), as for B. Its xG comes from Understat's league files, held through 1 Nov
+  in `xg-good-`; later matches use goals, as the live model does.
+- The code is `espn_players.b_espn_predict`; `tests/test_espn_b_reproducible.py` checks that
+  two runs on shuffled copies of the same rows give identical chances.
+  - Caveat (shared with B, whose fit is the same `NBRegression`): the identity holds when
+    the NB2 dispersion α is interior. On counts that look Poisson, α runs to 0 and
+    L-BFGS-B's stopping point moves by about 1e-4 in a chance between row orders. The
+    judged read runs once, on one machine, with its rows in kickoff order.
+
+On E0's development seasons B-espn and B were level on the same 15,209 starter rows:
+log loss 0.2918 vs 0.2917, B-espn minus B +0.0001 (−0.0012 to +0.0013); both beat season
+goals (0.4367). Mapping: 76.7% of ESPN's starters to an Understat id by name, goals agreeing
+on 99.99% of mapped rows.
+
+**The check in SP1, D1, I1 and F1 (written before it runs).**
+- Rows: the rescued 2025/26 development rows (`judged_<L>.csv.gz` in
+  `goalscorer-1nov-rescued.zip`, the sha256 in `archive/extra_assets.json` checked before
+  use), B's chance `p_B` and Understat's outcome `scored` as saved on 1 Nov. Each is joined to
+  ESPN's starter in the same match (Understat's match id, ESPN's names mapped by
+  `match_in_fixture` within the two clubs). B-espn is fitted on ESPN rows of 2021/22–2025/26
+  only; nothing from 2026/27 is pulled, fitted or scored, and the rescued 2026/27 rows are
+  not opened.
+- Measure: per row, B-espn's log loss minus B's; the mean and its 95% range from 2,000 draws
+  resampling whole matches (seed 0).
+- **Pass, per league: the range includes 0 or lies below it** (B-espn no worse than B).
+  **Fail:** the whole range lies above 0.
+- **Not checked:** fewer than half of the league's rescued rows join. That league is then
+  treated as failed. (accepted by the lead, 26 Nov.)
+- Each league's result is reported either way, with rows, matches and the join share.
+  E0's development result above stands as its check.
+
+**What changes in the judged read.**
+1. **Primary model: B-espn** in every league that passed (E0 and each of SP1–F1 that
+   passes). The rows are ESPN's starters in the match whose name matches a priced name at the
+   entry snapshot (`match_in_fixture` within the two clubs, the same overrides), with at
+   least 3 earlier appearances in ESPN's rows. The outcome is ESPN's goals for the player,
+   own goals left out.
+2. **B is descriptive beside it**: rescued rows through 1 Nov, rebuilt rows if Understat
+   returns, joined by name. B gets every measure, never the verdict.
+3. **A league that fails the check** is read on B, under the 8 Nov note's rules, and is
+   left out of the judged read if B can't score it by 31 Jan. It is counted and reported.
+4. **Unchanged:** the measures and pass rule, T = 20% (set on B's development volume and not
+   re-chosen), the price bands, the books, the snapshots, the sample (from 10 Oct, 600
+   matches or 31 Jan 2027) and the single read.
+5. **Every judged row records `model_source`** ("B-espn" or "B") **and `feature_source`**
+   ("espn" or "understat"), and every saved file carries them.
+
+**The paper track** (note of 9 Nov) may switch to B-espn in all five leagues from its first
+run after this merges, which also ends its E0-only wait for Understat. Every entry records
+`model_source` and `feature_source`; entries opened before the switch are B on Understat by
+definition and are never rewritten. The sections count trades per model.
+
+**Check result, 26 Nov** (odds-check `task=espn-b-check`, runs 45785042944 SP1, 45785049207 D1,
+45785059983 F1, commit 05554b7; I1 from its single rerun, run 45788135188, commit d980605; both
+sha256s matched every time). B-espn minus B log loss on
+the rescued 2025/26 rows, 95% range over matches:
+
+| League | Rescued rows | Joined | Matches | B | B-espn | B-espn − B | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SP1 | 4,564 | 4,134 (90.6%) | 317 | 0.2841 | 0.2855 | +0.0014 (−0.0010 to +0.0040) | pass |
+| D1 | 5,387 | 4,660 (86.5%) | 271 | 0.3195 | 0.3198 | +0.0003 (−0.0022 to +0.0027) | pass |
+| I1 (rerun, final) | 6,025 | 5,498 (91.3%) | 353 | 0.2716 | 0.2738 | +0.0022 (+0.0003 to +0.0040) | **fail** |
+| F1 | 4,688 | 4,176 (89.1%) | 270 | 0.2919 | 0.2926 | +0.0007 (−0.0017 to +0.0031) | pass |
+
+E0's development result above stands as its check (pass). Under this amendment's rule I1 is read
+on B, and is left out if B can't score it by 31 Jan.
+
+A flaw in the I1 run, recorded as it was found: the check's match model dropped xG for every I1
+season (xG weight 0) because one season, I1 2022/23, has no Understat xG. The frozen B-espn uses
+weight 0.7, and the live model loses only that season's xG. So I1's B-espn here ran on goals-only
+team xG, which differs from the frozen model. The verdict above is the one the written rule gives.
+Whether to rerun I1 with the frozen weight is for the lead and the owner; it is a second look after
+seeing the result.
+
+**I1 rerun (lead's decision, 26 Nov; written and committed before the rerun).** The first I1
+run (+0.0021, +0.0002 to +0.0039, fail) did not test the frozen model. The check dropped xG for
+every I1 season because one season (2022/23) has no Understat xG. Its rule was weight 0.7 only
+when no season failed to load. The frozen B-espn and the live model keep weight 0.7 whenever any
+match has xG, and a season without xG falls back to goals for its own matches only. This fix
+corrects the implementation to the spec written before the result; nothing else changes.
+- The check now uses `espn_players.match_xg_weight` (the live rule, `publish.league_fixtures`) and
+  prints the weight and xG share each run uses.
+- I1 is rerun once with the fix. **Its result is final whichever way it comes out**, and replaces
+  the first I1 result in the table above. There are no further I1 runs.
+- The other checks' weights:
+  - SP1, D1 and F1 each logged `xg_error None` (runs 45785042944, 45785049207, 45785059983). At
+    commit 05554b7 that means weight 0.7.
+  - E0's development comparison (run 45779183561) printed no xG-load line. Its five league files (2021/22 from the Wayback copy, 2022/23–2025/26
+    held) are all in `xg-good-`. **Confirmed by a load-only step** (lead, 26 Nov; `task=xg-weight`,
+    run 45788654308, no scoring): E0 on the checks' seasons loads with no errors and xG on 100% of
+    1,900 matches in every season, so espn-b's rule gave weight 0.7. E0 is not rerun.
+- **I1 rerun result (final; run 45788135188, commit d980605):** the match model ran at xG weight
+  0.7 (xG on 79.9% of matches; only I1 2022/23 failed to load). B 0.27162, B-espn 0.27377,
+  B-espn − B +0.00215 (+0.00034 to +0.00399) on the same 5,498 rows and 353 matches: **fail**,
+  as in the first run (+0.0021, +0.0002 to +0.0039, goals-only team xG, kept here as the
+  record). The table's I1 row is the rerun. The team-xG weight barely moves B-espn's player
+  chances; the gap to B is the player features themselves (Understat's xG per shot against ESPN's
+  goal and shot rates). Under this amendment's rule I1 is read on B, and is left out if B can't
+  score it by 31 Jan.
+- ESPN goals check, counting own goals (check runs above): player goals plus own goals add up to
+  the score in 99.7–100% of the matches found in every league and season. Examples: SP1 2021/22
+  364 of 365; every D1 match; I1 every match; F1 one miss. Without own goals the figure is about 92%.
+
+**Status:** drafted 26 Nov by Player props, reviewed by the lead, **approved by the owner on 27 Nov
+and binding from its merge (PR #268).** No judged number had been computed when it was written.
+
+### Note, 2026-11-27: the paper track switches to B-espn (under the amendment; descriptive)
+
+- **Which model where:**
+  - The paper track (note of 9 Nov) uses B-espn in E0, SP1, D1 and F1 from its first run after
+    this merges (`player_goal_paper.ESPN_LEAGUES`, `EspnSource`).
+  - I1 failed the check, so it stays on B (`BSource`) and waits for Understat.
+- **The B-espn path:** the same placeholder rows as B, `espn_players.goal_rate_features`, a fit
+  per 28-day block (`fit_block_espn`) and `predict_espn`.
+  - The fit is the judged read's: `CountCandidate` through `lab.harness`.
+  - `tests/test_player_goal_paper.py` checks that the live chance equals the judged walk-forward
+    to 1e-9.
+  - Team xG uses the frozen rule's weight (`match_xg_weight`).
+- **ESPN's data:** one file per football-data match under `data/raw/espn_players/<league>/`
+  (`espn_players.fill_cache` / `load_cache`).
+  - Each league is seeded once by `odds-check.yml` `task=espn-seed` (cache
+    `espn-players-<league>-`, restored by publish).
+  - Each paper run tops it up within the 120 s budget (at most `ESPN_TOPUP_SECONDS` 45 a
+    league). Publish's raw-data cache carries the files on.
+  - Until a league is seeded, its matches wait (`no_data`), as B's did.
+- **What the trades record:** every new trade records `model_source` and `feature_source`, and
+  `model_ref` holds the model and its `xg_weight`.
+  - Trades opened before the switch carry neither. They are B on Understat (`model_of`) and are
+    never rewritten.
+  - Each section counts trades per model (`models`).
+- **Matches already waiting:** SP1, D1 and F1 matches since 1 Nov that waited for Understat
+  are decided on the first runs after the switch, as backcasts (decided after kickoff).
+- **Settlement:** unchanged (ESPN's scoreboard goals). A B-espn trade's check is against ESPN's
+  own match summary (`espn_check`, `espn_goals`), never Understat's, whose ids differ.
+
+### Note, 2026-11-27 (later): a league is decided only on a seeded ESPN cache
+
+The first publish after the switch (19:49 UTC, before any `espn-seed` had finished) decided La
+Liga's 22 waiting matches. Its own top-up had filled 2026/27 through 18 Sep only, with no earlier
+season, and the check accepted "any current-season rows". Those 161 trades (92 best-book, 69
+DraftKings) were made on that partial history (`features_through` 18 Sep). The Bundesliga and
+Ligue 1 were decided at 21:09, after their seeds finished, on full history.
+
+The fix: `EspnSource.load` decides nothing unless every earlier season from 2021/22 holds at
+least `SEEDED_MIN` 200 matches. It makes no top-up on an unseeded cache, and waits when the run's
+top-up ran out of time before this season was complete. The reason is in the counts as
+`no_data_why`.
+
+**The La Liga trades (lead's decision, 27 Nov: void and decide again).**
+- **The void:** `player_goal_paper.bug_sweep` runs once at the next paper run. It covers the
+  B-espn decisions in SP1 between 19:00 and 20:14 UTC on 27 Nov (`BUG_VOID`).
+  - Each of their trades gets an update event: status void, profit 0, `void_reason` "decided on
+    an incomplete ESPN cache (bug, 27 Nov)". The open entries stay untouched and nothing is
+    deleted.
+  - Each of the 22 matches gets a superseding record in `goalscorer_checked.jsonl`
+    (`attempt` 2, `redecide`, `supersedes`). The first records stay; `load_checked` takes the
+    highest attempt.
+- **The re-decision:** the matches are decided again on the seeded cache, as backcasts.
+  - The new trades' ids end "|r2" (before DraftKings' "|dk"), with `redecided_of` (the voided
+    id) and `attempt`.
+  - The voided trades are never closed or settled again.
+- **The counts:** sections leave the voids out of every figure. Each line carries a `voided_bug`
+  count and note, so the app can show they existed.
+- **The 1 Feb judged read:** it may build B-espn's rows from the ESPN cache only after
+  `espn_players.judged_ready` passes for the league. That guard is stricter than the paper
+  track's:
+  - every season but the current one holds at least `SEEDED_MIN` (200) matches;
+  - no settled football-data match of any season lacks a cache file (a not-found marker counts
+    as tried).
+  - Otherwise it refills the cache (`espn-seed`) or pulls fresh with `espn_players.pull`, as
+    the check did.
+- **Name gaps:** `espn-seed` now prints the clubs behind each season's not-found matches
+  (`not_found_clubs`), for the D1 and F1 name fixes.
+
 ### Development result (2025/26, run 41346853368; development only, descriptive)
 
 **T = 20%**, by the volume rule. Every candidate clears 0.3 bets a match, so the rule takes
@@ -1393,3 +1589,166 @@ F1 29 events); not read.
   - §16 asks for the live entry "no earlier than kickoff − 75 min". A run between 30 and 75
     min with no confirmed lineups waits, so the entry is taken at confirmation, or at 30 min
     at the latest.
+
+## 17. Player shots at the best of the books: pre-registration (2026-11-26; binding once merged with the lead's sign-off)
+
+Written before any price for this test is bought. Steps 1–2 buy nothing until this section merges.
+A change after the merge is recorded here as a dated departure, never made silently.
+
+### What is already known (descriptive, read before this section)
+
+- **Market probe** (26 Nov, runs 45782788375 and 45787642567, 82 credits): no book quotes an Under on
+  any player market. On the same player and line, where FanDuel is at 2.0 or shorter, the best other
+  book's implied chance is 0.84–0.94 of FanDuel's. Shots in five leagues live: 0.87–0.94. E0 on 1
+  Nov 2025: 0.84 for shots and on target.
+- **FanDuel's markup** (free, data-log `backtest/E0_player_lines.csv.gz`; Understat starters, Over,
+  odds ≤ 2.0; implied ÷ hit rate − 1, 95% ranges resampling matches):
+
+  | Season | Shots | On target |
+  | --- | --- | --- |
+  | 2024/25 | +23.7% (+21.1% to +26.4%), 8,298 lines | +17.2% (+12.7% to +22.4%), 2,009 |
+  | 2025/26 | +32.9% (+30.0% to +35.9%), 8,305 lines | +32.5% (+27.0% to +38.7%), 1,838 |
+
+  These are at the look snapshot; the close is the same within 0.5 pts.
+- From these, the best book's markup in 2025/26 is expected near (1.33 × 0.84–0.94) − 1 ≈ **+12% to
+  +25%**. **Gate (a) below is therefore expected to stop the test.** It is run because a measured
+  number on the real book mix replaces this estimate.
+
+### Question
+
+Does the best Over price over the US books carry a small enough margin on starters' shot lines
+for a model to beat it? If so, does the frozen shots model carry information beyond that price,
+and do its bets beat the close?
+
+### Data (step 1: the only purchase)
+
+- **League and season:** E0 2025/26 only (development season; 2026/27 stays locked).
+- **Markets:** `player_shots_alternate` and `player_shots_on_target_alternate`.
+- **Books:** DraftKings, BetMGM, Bovada, Caesars, BetOnline, Fanatics and BetRivers: one bookmakers
+  list, one region. FanDuel doesn't list the alternate keys; its cached 2025/26 lines stay
+  descriptive.
+- **Snapshots:** entry at kickoff − 50 min, close at kickoff − 2 min (as §16), from football-data's
+  kickoffs, plus one events list per match day.
+- **Cost:** about 380 matches × 2 snapshots × 2 markets × 10 = 15,200 credits, plus about 100 for
+  events lists.
+  - **Cap: 16,000** (lead, 26 Nov), with the 3,000 reserve.
+  - The run goes from the default branch with the archive job. A call over 20 credits or a
+    network/401/429/5xx error stops it.
+  - Bodies go to the paid `player-odds-history-` cache and are never bought twice.
+
+### Rows
+
+- **Starter:** in ESPN's starting XI for the match (the summary's starter flag). The XI is
+  published about an hour before kickoff, so it is known by the − 50 min entry. Historical
+  lineups weren't logged in 2025/26, so the post-match flag stands in for the XI at entry.
+- **Names:** book names map to ESPN's players by `match_in_fixture` within the match's two clubs.
+  Unmatched names are counted and dropped.
+- **Void:** a priced player who didn't play is void (books void it) and is never a row. Starters
+  always play.
+- **Lines:**
+  - A half line `k + 0.5` wins on count ≥ k + 1.
+  - A whole line `k` means "at least k" (FanDuel's convention) and wins on count ≥ k.
+  - Counts are ESPN's `totalShots` and `shotsOnTarget` for the player.
+- **Best price:** per player, line and snapshot, the longest Over among the seven books.
+  The books' average Over price is computed beside it.
+
+### Gate (a): the price, no model (read once, as soon as step 1's rows exist)
+
+- **Rows:** starter lines at entry whose best Over is 2.0 or shorter.
+- **Markup** = Σ best-book implied chance ÷ Σ won − 1, per market (shots, on target).
+- **Range:** 95%, resampling whole matches, 2,000 draws, seed 0.
+- **Stop:** a market stops when its range's **lower end is above +8%**. A merely uncertain markup
+  doesn't stop it. If both markets stop, the test closes there.
+- **Descriptive beside it:**
+  - the same markup at the books' average price, which shows the max-of-books bias;
+  - per line, per book, and at the close.
+
+### Gate (b): the model (only for a market that passed gate (a))
+
+- **Model:** `player_shots_espn.shots_espn_model()`, frozen at commit 5810210 (tested by
+  `tests/test_shots_espn_frozen.py`).
+  - It is B's shot NB2: start/sub mixture, lineup known, on target by thinning, l2 2.0,
+    `FIT_OPTIONS`.
+  - It uses every shots factor except penalty share (ESPN has no penalty xG), on ESPN appearance
+    rows (`espn_players.appearances`) from 2021/22.
+  - Walk-forward: refit every 28 days on the 730 days before the block; starters with 3+ earlier
+    appearances. The chance is rounded to 6 decimals before the threshold.
+- **T, the edge threshold,** is fixed by volume on development rows, never on the gate's rows.
+  - Development rows: E0 2024/25 at FanDuel's cached prices, starters at entry.
+  - T is the largest of 5%, 8%, 12%, 16% and 20% giving at least 0.3 bets a match there; if none
+    does, T = 5%.
+  - The five price bands for the matched baseline are the odds quintiles of those development bets.
+  - No result or CLV is used to set them.
+- **Rule:** a starter line is a bet when p × best entry Over − 1 ≥ T. One bet per player, market
+  and match (the largest edge), at the best price, $1.
+- **Pass:** both of the following, on at least 300 bets with a final close.
+  1. **c:** in logit P(won) = a + b·logit(best implied) + c·logit(p), c's 95% range (match
+     bootstrap) lies above 0.
+     - Fitted on every starter line at entry with a best Over, across all prices (not only the
+       rule's bets and not only 2.0 or shorter).
+     - One row per player, market, line and match, fitted per market.
+     - The bootstrap resamples whole matches (2,000 draws, seed 0) (lead, 26 Nov, before the merge).
+  2. **CLV:** the rule's best-to-best CLV minus the price-matched no-rule baseline has a 95%
+     range above 0. The baseline is every starter line priced at entry and close, reweighted to
+     the rule's band mix, with one shared match bootstrap (as §16's `matched_excess`).
+- **Inconclusive:** (1) holds but there are fewer than 300 bets.
+- **Fail:** otherwise.
+- The verdict is read once. It is model quality against the market only; nothing goes live from it.
+
+### Building step 1 and gate (a) (2026-11-26, after the merge; no price bought or read yet)
+
+- **Purchase:** `player_goal_backfill` design `shots17`.
+  - E0 2025/26 from football-data's kickoffs: one events list per match day, then the entry
+    (− 50 min) and close (− 2 min) of each event.
+  - Both markets in one call at the seven books (`SHOTS_MARKETS`, `SHOTS_BOOKS`), 20 credits a
+    snapshot, stopping on a call over 20.
+  - Bodies go to `player_odds_history/shots_test/` in the paid cache. The day's events lists
+    the §16 `dev` design already bought (same 3 h lead) are read from `goalscorer_test/`,
+    never bought again.
+  - `odds-check.yml` `task=goalscorer-backfill`, `design=shots17`, from the default branch (the
+    archive job dispatches `caches.yml`), 120-minute budget, resumable.
+- **Gate (a):** `player_shots_priced.py`, CLI `shots-gate-a`, `odds-check.yml` `task=shots-gate-a`
+  (no key).
+  - Prices come from the bought bodies; appearances from ESPN's free E0 2025/26 pull.
+  - It does the join, the void rule, the line rule `count ≥ ceil(point)` and the best and
+    average price, exactly as above.
+  - Log line `SHOTS_GATE_A_JSON`. It is run once, after the purchase completes.
+
+### Gate (a) result (2026-11-26; read once): **closed, both markets stop**
+
+- **Purchase:** run 45792135181, from the default branch. 760 snapshots (entry and close for all
+  380 E0 2025/26 matches, each priced), 15,200 credits (4,956,683 → 4,941,483 left). No events
+  list was bought; all 114 were already held. The archive job ran.
+- **Read:** run 45792603508, `shots-gate-a`. 380 events priced, 368 linked to football-data and
+  ESPN (ESPN found 368 of 380 matches).
+  - 13,495 priced names, 4,550 not on ESPN's played list. Most of these are squad players who
+    didn't play (void by the rule); the rest are name misses.
+  - Starter lines at entry with a best Over of 2.0 or shorter:
+
+| Market | Lines | Best-book markup (95% range) | Gate | Average price | Best at the close |
+| --- | --- | --- | --- | --- | --- |
+| Shots | 7,646 | **+24.5% (+22.0% to +27.4%)** | stop | +27.2% (+24.6% to +30.0%) | +24.9% (+22.3% to +27.8%) |
+| On target | 1,927 | **+23.4% (+18.6% to +28.8%)** | stop | +26.1% (+21.2% to +31.7%) | +23.4% (+18.7% to +29.0%) |
+
+- **Descriptive, beside it:**
+  - Only three of the seven books priced these markets in the 2025/26 history: DraftKings (best
+    price on 79% of shots lines, 81% on target), BetMGM (15%, 13%) and BetOnline (6%, 6%).
+    Bovada, Caesars, Fanatics and BetRivers returned none.
+  - Per book, shots: BetMGM +25.6%, DraftKings +28.4%, BetOnline +37.2%. On target: DraftKings
+    +26.6%, BetOnline +28.4%, BetMGM +29.9%.
+  - Shots per line: 0.5 +18.7% (+16.4% to +21.3%, 4,679 lines), 1.5 +32.1% (2,192), 2.5 +50.6%
+    (660). On target 0.5: +22.6% (1,871).
+- **What it means:** the best US price on a starter's shots line carries about a 24% markup,
+  inside the +12% to +25% expected above. That is close to FanDuel's +33% and far above the +8%
+  a model could plausibly overcome. Gate (b) is not run, the model is not fitted on these
+  prices, and nothing goes live. Per "After E0", no other league is bought.
+
+### After E0
+
+The other leagues are considered only if E0 passes both gates, and only with a new estimate and
+the lead's cap.
+
+### Expectations, stated now
+
+Gate (a) most likely stops both markets (above). If shots pass (a), the FanDuel development
+(c 0.44–0.67, look-to-close CLV +0.1 to +2%) suggests some information but a small CLV.

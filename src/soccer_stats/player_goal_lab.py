@@ -469,6 +469,9 @@ def scored_rows(feats, league, start, end, holdout=None, seasons=None) -> pd.Dat
             "p_B": pb_.loc[idx].to_numpy(),
             "bench_goals": 1 - np.exp(-r["season_avg_goals"].clip(lower=1e-4).to_numpy()),
             "bench_xg": 1 - np.exp(-r["season_avg_xg"].clip(lower=1e-4).to_numpy()),
+            # §16 amendment of 26 Nov: every row says which model and which player data.
+            "model_source": "B",
+            "feature_source": "understat",
         }
     )
     # Who and where (for joining prices by name, docs/player_props.md §16); extra columns only.

@@ -594,6 +594,29 @@ def cmd_close_watchdog(args: argparse.Namespace) -> None:
     print("redispatch" if due else "ok")
 
 
+def cmd_lineup_check(args: argparse.Namespace) -> None:
+    """Print "send" or "skip", a tab and the reason, for a lineup run (close_runs.lineup_decision;
+    lead, 25 Nov). --busy: publish runs running or waiting on the branch, or "?" when the runs
+    list was unreadable after the retry; --plan: the planner's JSON (its `dispatch` list)."""
+    import json
+
+    from soccer_stats import close_runs
+
+    busy = None if args.busy.strip() in ("", "?") else int(args.busy)
+    try:
+        plan = json.loads(Path(args.plan).read_text()) if args.plan else {}
+    except (OSError, ValueError):
+        plan = {}
+    planned = [
+        (pd.Timestamp(d["epoch"], unit="s", tz="UTC"), d.get("kind", "close"))
+        for d in plan.get("dispatch", [])
+        if isinstance(d, dict) and d.get("epoch") is not None
+    ]
+    at = pd.Timestamp(int(args.at), unit="s", tz="UTC") if args.at.isdigit() else args.at
+    send, reason = close_runs.lineup_decision(busy, at, planned)
+    print(("send" if send else "skip") + "\t" + reason)
+
+
 def cmd_estimate_team_totals(args: argparse.Namespace) -> None:
     """Credits to log team-total prices per match under each snapshot plan (estimate only:
     no key, no calls). Replays each league's real fixture calendar (Understat)."""
@@ -2922,6 +2945,287 @@ def cmd_goalscorer_probe(args: argparse.Namespace) -> None:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
 
+def cmd_market_probe(args: argparse.Namespace) -> None:
+    """Player-prop market probe (lead, 26 Nov): who prices shots, shots on target, assists,
+    cards and any goal-or-assist market, at which lines and margins; within --cap."""
+    import json
+
+    from soccer_stats import player_market_probe as mp
+    from soccer_stats.publish import _clean
+
+    follow = getattr(args, "shots_alternates", False)
+    if follow:
+        res = mp.run(args.cap, markets=mp.ALT_MARKETS, books=mp.ALT_BOOKS)
+    else:
+        res = mp.run(args.cap)
+    for line in res["log"]:
+        print(f"  {line}")
+    for line in mp.summary_lines(res):
+        print(line)
+    if follow:
+        res["shots_report"] = _shots_alternates_report(mp, res)
+    print(f"Credits spent: {res['spent']} of {args.cap}; credits left {res.get('left')}")
+    body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
+    print("MARKET_PROBE_JSON " + body)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def _shots_alternates_report(mp, res: dict) -> dict:
+    """The follow-up probe's report: per league and line each book's Over-sum against the
+    players per match who went over (E0's Understat 2023/24-2025/26, starters and all), and
+    each book against FanDuel's price on the same player and line (FanDuel at 2.0 or
+    shorter); the live FanDuel bodies are the first probe's, the same matches."""
+    from soccer_stats.player_data import load_appearances
+
+    actual = {}
+    try:
+        apps, _ = load_appearances("E0", range(2023, 2026), max_new=0)
+        actual = mp.shot_rates(apps)
+    except Exception as exc:  # noqa: BLE001  (no Understat files: no actual rates)
+        print(f"Shot rates: none ({type(exc).__name__})")
+    print("Shot rates, E0 2023/24-2025/26 (players per match over the line, all / starters): "
+          + ", ".join(f"{k[0][7:]} {k[1]}: {v}/{actual.get((k[0], k[1], 'starters'))}"
+                      for k, v in actual.items() if len(k) == 2))  # fmt: skip
+    out = {}
+    base = mp.probe_dir()
+    parts = {lg: (r.get("event_id"), "live_") for lg, r in res.get("leagues", {}).items()}
+    parts["E0 history"] = (None, "")
+    for name, (eid, prefix) in parts.items():
+        lg = name.split()[0]
+        r = mp.load_bodies(base / lg, prefix if prefix else "*_hist_")
+        if r.empty:
+            continue
+        r = r[r["event_id"] == eid] if eid else r[r["stamp"] == "hist"]
+        rep = mp.line_report(r, actual if lg == "E0" else None)
+        vs = mp.vs_fanduel(r)
+        out[name] = {"lines": rep, "vs_fanduel": vs}
+        for x in rep:
+            if x["line"] <= 2.5:
+                mk = "shots" if x["market"] == "player_shots" else "on target"
+                tail = (
+                    f", actual {x['actual_per_match']}, markup {x['markup']:+.0%}"
+                    if x["markup"] is not None
+                    else ""
+                )
+                print(f"  {name} {mk} {x['line']} {x['book']}: {x['players']} players, "
+                      f"avg Over {x['avg_over']}, {x['share_2_or_shorter']:.0%} at 2.0 or shorter, "
+                      f"Over-sum {x['over_sum']}{tail}")  # fmt: skip
+        for v in vs:
+            print(f"  {name} vs FanDuel (FanDuel 2.0 or shorter) {v['market']} {v['book']}: "
+                  f"{v['pairs']} pairs, implied {v['implied_vs_fanduel']:.3f} of FanDuel's, "
+                  f"{v['longer_than_fanduel']:.0%} longer")  # fmt: skip
+    return out
+
+
+def cmd_assist_lab(args: argparse.Namespace) -> None:
+    """Assists and score-or-assist against season baselines (lead, 26 Nov; development
+    2023/24-2024/25, 2025/26 described apart, 2026/27 never touched; no prices, no key)."""
+    import json
+
+    from soccer_stats import player_assist_lab as al
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    apps, missing = load_appearances(lg, years, max_new=0)  # cached files only
+    print(f"{lg}: {len(apps)} appearances ({missing} match files not held)")
+    for s, n in apps.groupby("season")["match_id"].nunique().items():
+        print(f"  season {s}: {n} matches with player files")
+    matches, err = with_xg(load_matches([lg], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(
+            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+        ),
+    )
+    feats = al.assist_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
+    feats = feats[feats["kickoff"] < pg.FORWARD_START].reset_index(drop=True)
+    rows = al.scored_rows(
+        feats, pd.Timestamp("2023-07-01", tz="UTC"), pg.FORWARD_START, al.holdout()
+    )
+    out = {"league": lg, "report": al.report(rows), "base_rates": al.base_rates(apps)}
+    for part, r in out["report"].items():
+        for what in ("assists", "score_or_assist"):
+            c = r.get(what) or {}
+            if c.get("rows"):
+                print(
+                    f"{lg} {part} {what}: {c['rows']} starters, {c['matches']} matches, rate "
+                    f"{c['rate']:.3f}, log loss model {c['ll_model']:.5f} vs season baseline "
+                    f"{c['ll_bench']:.5f}, gain {c['gain']:+.5f} {c['range']} "
+                    f"{'beats' if c['beats'] else 'does not beat'}"
+                )
+    print(f"{lg} base rates: {out['base_rates']}")
+    print("ASSIST_LAB_JSON " + json.dumps(_clean(out), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
+def cmd_espn_players(args: argparse.Namespace) -> None:
+    """ESPN as a player-data fallback for Understat (lead, 26 Nov; free, no key): which
+    per-player fields ESPN's match summaries hold, by league and season."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.publish import _clean
+
+    res = ep.fields(out_dir=Path(args.out) if args.out else None)
+    for line in ep.summary_lines(res):
+        print(line)
+    for lg, by in res["leagues"].items():
+        for season, r in by.items():
+            ex = next((m["example"] for m in r.get("matches", []) if m.get("example")), None)
+            if ex:
+                print(f"ESPN_PLAYER_EXAMPLE {lg} {season} " + json.dumps(ex, default=str)[:600])
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def cmd_espn_b(args: argparse.Namespace) -> None:
+    """ESPN as an Understat fallback, part 2 (owner-approved full E0 pull, 26 Nov; free):
+    every E0 match 2021/22-2025/26 from ESPN, mapped to Understat by name, and B-espn
+    (shots and goals, no xG) beside B and season goals on the same starter rows."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats import player_backtest as pb
+    from soccer_stats import player_goal_lab as gl
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.player_data import load_appearances
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    espn, cover = ep.pull(lg, seasons=tuple(years))
+    print(f"ESPN {lg}: {len(espn)} appearance rows; coverage {cover}")
+    if args.out:
+        Path(args.out).mkdir(parents=True, exist_ok=True)
+        espn.to_csv(Path(args.out) / f"espn_{lg}.csv.gz", index=False)
+    apps, missing = load_appearances(lg, years, max_new=0)
+    print(f"Understat {lg}: {len(apps)} appearances ({missing} match files not held)")
+    matches, err = with_xg(load_matches([lg], years))
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(
+            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+        ),
+    )
+    lo, hi = pd.Timestamp("2023-07-01", tz="UTC"), pg.FORWARD_START
+    fu = gl.extra_features(pg.goal_features(build_features(apps, pb.match_info(preds, apps))))
+    fu = fu[fu["kickoff"] < hi].reset_index(drop=True)
+    p_b = gl.predict(fu, "B", lo, hi, Holdout(hi))
+    fe = ep.b_espn_predict(espn, preds, lo, hi, Holdout(hi))
+    fu = fu.assign(p_B=p_b)
+    mp = ep.map_to_understat(fe, fu)
+    starters_e = fe[fe["started"]]
+    mapped = mp.merge(
+        fe[["match_id", "player_id", "started", "goals", "p_B_espn"]], on=["match_id", "player_id"]
+    )
+    mapped = mapped.merge(
+        fu[["match_id", "player_id", "season", "p_B", "season_avg_goals"]].rename(
+            columns={"player_id": "us_player_id"}
+        ),
+        on=["match_id", "us_player_id"],
+    )
+    agree = float((mapped["goals"] == mapped["us_goals"]).mean()) if len(mapped) else None
+    rows = mapped[mapped["started"] & mapped["us_started"]].dropna(subset=["p_B", "p_B_espn"])
+    rows = rows.assign(
+        scored=(rows["us_goals"] > 0).astype(int),
+        bench_goals=1 - np.exp(-rows["season_avg_goals"].clip(lower=1e-4)),
+    )
+    out = {
+        "league": lg,
+        "coverage": cover,
+        "espn_rows": len(espn),
+        "minutes_known": round(float(espn["minutes_known"].mean()), 4) if len(espn) else None,
+        "understat_matches_joined": int(
+            espn.loc[~espn["match_id"].astype(str).str.startswith("fd:"), "match_id"].nunique()
+        ),
+        "starters_mapped_share": round(len(mapped[mapped["started"]]) / max(len(starters_e), 1), 4),
+        "goals_agree_mapped": round(agree, 4) if agree is not None else None,
+        "compare": ep.b_espn_compare(rows),
+    }
+    for k, v in out.items():
+        if k != "coverage":
+            print(f"ESPN-B {lg} {k}: {v}")
+    print("ESPN_B_JSON " + json.dumps(_clean(out), default=str))
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(out), indent=1, default=str))
+
+
+def cmd_espn_b_check(args: argparse.Namespace) -> None:
+    """The §16 amendment's check (26 Nov): B-espn vs B on one league's rescued 2025/26
+    development rows (`--judged`, judged_<L>.csv.gz). ESPN and the match model use
+    2021/22-2025/26 only; nothing from 2026/27 is pulled, fitted or scored."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.lab.harness import Holdout
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.publish import _clean
+
+    lg = args.league
+    years = range(2021, 2026)
+    end = pd.Timestamp("2026-07-01", tz="UTC")  # 2025/26 ends; 2026/27 never enters
+    judged = pd.read_csv(args.judged, dtype={"match_id": str, "player_id": str})
+    print(f"Rescued {lg}: {len(judged)} rows in {args.judged}")
+    espn, cover = ep.pull(lg, seasons=tuple(years))
+    print(f"ESPN {lg}: {len(espn)} appearance rows")
+    matches, err = with_xg(load_matches([lg], years))
+    # xG per season, as the live model loads it (publish.league_fixtures): weight 0.7 when any
+    # match has xG; a season without xG costs only its own matches (lead, 26 Nov: the first I1
+    # run dropped xG for every season because one season had none).
+    weight = ep.match_xg_weight(matches)
+    print(f"Match model xG weight {lg}: {weight} (xG on {matches['home_xg'].notna().mean():.1%} "
+          f"of matches; {err or 'no load errors'})")  # fmt: skip
+    preds = backtest.walk_forward(
+        matches,
+        start="2022-07-01",
+        model_factory=functools.partial(DixonColes, xg_weight=weight, options=FIT_OPTIONS),
+    )
+    fe = ep.b_espn_predict(espn, preds, pd.Timestamp("2025-07-01", tz="UTC"), end, Holdout(end))
+    rows, counts = ep.check_rows(fe, judged, lg)
+    res = {
+        "league": lg,
+        **ep.check_verdict(rows, counts),
+        "xg_weight": weight,
+        "xg_error": err or None,
+    }
+    res["coverage"] = {k: v for k, v in cover.items() if k != "requests"}
+    print(f"ESPN-B CHECK {lg}: " + ", ".join(f"{k} {v}" for k, v in res.items() if k != "coverage"))
+    print("ESPN_B_CHECK_JSON " + json.dumps(_clean(res), default=str))
+    if args.out:
+        Path(args.out).mkdir(parents=True, exist_ok=True)
+        rows.assign(model_source=ep.MODEL_SOURCE, feature_source=ep.FEATURE_SOURCE).to_csv(
+            Path(args.out) / f"check_{lg}.csv.gz", index=False
+        )
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def cmd_xg_weight(args: argparse.Namespace) -> None:
+    """Load-only (lead, 26 Nov): the match model's xG weight and xG share for one league on the
+    B-espn checks' seasons (2021/22-2025/26), as `espn-b`/`espn-b-check` load them. No scoring."""
+    from soccer_stats import espn_players as ep
+
+    matches, err = with_xg(load_matches([args.league], range(2021, 2026)))
+    weight = ep.match_xg_weight(matches)
+    share = matches["home_xg"].notna().groupby(matches["season"]).mean().round(3).to_dict()
+    print(f"XG_WEIGHT {args.league}: weight {weight}, xG on "
+          f"{matches['home_xg'].notna().mean():.1%} of {len(matches)} matches, by season {share}; "
+          f"load errors: {err or 'none'}")  # fmt: skip
+
+
 def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
     """Priced goalscorer test (docs/player_props.md §16): historical anytime-goalscorer prices
     at the entry and close for the dev (2025/26), forward (2026/27 from 10 Oct) or gaps (what
@@ -2947,6 +3251,50 @@ def cmd_goalscorer_backfill(args: argparse.Namespace) -> None:
         print(line)
     body = json.dumps(_clean({k: v for k, v in res.items() if k != "log"}), default=str)
     print("GOALSCORER_BACKFILL_JSON " + body)
+    if args.json:
+        Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
+
+
+def cmd_espn_seed(args: argparse.Namespace) -> None:
+    """The ESPN appearance cache for the goalscorer paper track's B-espn (§16 amendment,
+    27 Nov): every settled football-data match of one league from 2021/22 (free, resumable)."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats.data import current_season
+    from soccer_stats.publish import _clean
+
+    years = range(2021, current_season() + 1)
+    res = ep.fill_cache(args.league, years, seconds=args.minutes * 60)
+    _rows, counts = ep.load_cache(args.league, years)
+    print(f"ESPN seed {args.league}: {json.dumps(_clean(res), default=str)}")
+    for season, c in sorted(counts.items()):
+        print(f"  {args.league} {season}: {c['matches']} matches held, {c['not_found']} not found")
+    if res.get("left"):
+        print(f"  {res['left']} matches left for the next run (time budget)")
+    for season, clubs in ep.not_found_clubs(args.league, years).items():
+        print(f"  {args.league} {season} not found, by club: {clubs}")
+
+
+def cmd_shots_gate_a(args: argparse.Namespace) -> None:
+    """§17 gate (a) (docs/player_props.md): the best US book's markup on E0 2025/26 starters'
+    shot lines at entry, from the bought shots17 bodies and ESPN's appearances (free)."""
+    import json
+
+    from soccer_stats import espn_players as ep
+    from soccer_stats import player_shots_priced as sp
+    from soccer_stats.publish import _clean
+
+    pr = sp.price_rows()
+    print(f"Shots price rows: {len(pr)} ({pr['event_id'].nunique()} events)")
+    apps, cover = ep.pull("E0", seasons=(2025,), understat_ids=lambda lg, s: {})
+    print(f"ESPN E0 2025/26: {json.dumps(_clean(cover), default=str)}")
+    j, counts = sp.join(apps, pr)
+    res = {"counts": counts, "espn": cover}
+    res["gate"] = sp.gate_a(j) if len(j) else None
+    for line in sp.summary_lines(res):
+        print(line)
+    print("SHOTS_GATE_A_JSON " + json.dumps(_clean(res), default=str))
     if args.json:
         Path(args.json).write_text(json.dumps(_clean(res), indent=1, default=str))
 
@@ -3589,6 +3937,12 @@ def main(argv: list[str] | None = None) -> None:
     wd.add_argument("--now", help="check at this time (default: now)")
     wd.set_defaults(func=cmd_close_watchdog)
 
+    lc = sub.add_parser("lineup-check", help="send or skip a lineup-window run? (closes.yml)")
+    lc.add_argument("--busy", required=True, help='publish runs running or waiting, or "?"')
+    lc.add_argument("--at", required=True, help="when the lineup run is due (epoch or UTC)")
+    lc.add_argument("--plan", default="", help="the planner's JSON plan")
+    lc.set_defaults(func=cmd_lineup_check)
+
     pap = sub.add_parser("paper", help="update the paper-trade ledger and the app's portfolio")
     pap.add_argument("--site", default="_site", help="folder written by publish")
     pap.add_argument("--log-dir", help="data-log checkout holding paper_trades/")
@@ -3865,7 +4219,7 @@ def main(argv: list[str] | None = None) -> None:
         "goalscorer-backfill",
         help="priced goalscorer test: historical prices at the entry and close (dev or forward)",
     )
-    gbf.add_argument("--design", choices=["dev", "forward", "gaps"], default="dev")
+    gbf.add_argument("--design", choices=["dev", "forward", "gaps", "shots17"], default="dev")
     gbf.add_argument(
         "--live-calls", help="gaps: folder holding data-log's goalscorer_calls_*.jsonl"
     )
@@ -3874,6 +4228,15 @@ def main(argv: list[str] | None = None) -> None:
     gbf.add_argument("--json", help="write the results as JSON")
     gbf.set_defaults(func=cmd_goalscorer_backfill)
 
+    ese = sub.add_parser("espn-seed", help="the ESPN appearance cache for B-espn (free)")
+    ese.add_argument("--league", default="E0")
+    ese.add_argument("--minutes", type=float, default=110)
+    ese.set_defaults(func=cmd_espn_seed)
+
+    sga = sub.add_parser("shots-gate-a", help="§17 gate (a): best-book markup on shot lines")
+    sga.add_argument("--json", help="write the results as JSON")
+    sga.set_defaults(func=cmd_shots_gate_a)
+
     gpr = sub.add_parser(
         "goalscorer-probe",
         help="priced goalscorer step 0: books and names in five leagues, live and history",
@@ -3881,6 +4244,39 @@ def main(argv: list[str] | None = None) -> None:
     gpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
     gpr.add_argument("--json", help="write the results as JSON")
     gpr.set_defaults(func=cmd_goalscorer_probe)
+    mpr = sub.add_parser(
+        "market-probe", help="player-prop markets: books, lines, sides and margins (capped)"
+    )
+    mpr.add_argument("--cap", type=int, default=0, help="most credits to spend (0 = none)")
+    mpr.add_argument("--json", help="write the results as JSON")
+    mpr.add_argument(
+        "--shots-alternates",
+        action="store_true",
+        help="the follow-up: shots and on-target alternates at six books, against FanDuel",
+    )
+    mpr.set_defaults(func=cmd_market_probe)
+    epl = sub.add_parser("espn-players", help="ESPN summaries as a player-data fallback")
+    epl.add_argument("--out", help="folder for the summaries read (the artifact)")
+    epl.add_argument("--json", help="write the results as JSON")
+    epl.set_defaults(func=cmd_espn_players)
+    ebp = sub.add_parser("espn-b", help="full ESPN pull for one league and B-espn vs B")
+    ebp.add_argument("--league", default="E0")
+    ebp.add_argument("--out", help="folder for the ESPN appearance rows (the artifact)")
+    ebp.add_argument("--json", help="write the results as JSON")
+    ebp.set_defaults(func=cmd_espn_b)
+    ebc = sub.add_parser("espn-b-check", help="the §16 amendment's check: B-espn vs B, 2025/26")
+    ebc.add_argument("--league", required=True)
+    ebc.add_argument("--judged", required=True, help="the rescued judged_<league>.csv.gz")
+    ebc.add_argument("--out", help="folder for the joined check rows (the artifact)")
+    ebc.add_argument("--json", help="write the result as JSON")
+    ebc.set_defaults(func=cmd_espn_b_check)
+    xgw = sub.add_parser("xg-weight", help="load-only: the match model's xG weight and share")
+    xgw.add_argument("--league", required=True)
+    xgw.set_defaults(func=cmd_xg_weight)
+    alb = sub.add_parser("assist-lab", help="assists and score-or-assist vs season baselines")
+    alb.add_argument("--league", default="E0")
+    alb.add_argument("--json", help="write the results as JSON")
+    alb.set_defaults(func=cmd_assist_lab)
 
     pl_ = sub.add_parser("player-lab", help="player shot lines through the lab's metrics")
     pl_.add_argument("--lines", required=True, help="E0_player_lines.csv(.gz) from data-log")

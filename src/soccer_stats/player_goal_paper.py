@@ -82,6 +82,26 @@ BACKCAST_START = "2026-11-01T00:00:00+00:00"  # the live goalscorer log's first 
 BACKCAST_FROM = "goalscorer_log"
 DEFINED_FILE = "goalscorer_defined.json"
 CACHE_DIR = Path("data/raw/goalscorer_paper")  # B per block; saved with publish's raw-data
+# §16 amendment (owner-approved 27 Nov): B-espn (B on ESPN's player data) in the leagues that
+# passed its check; I1 failed it, so it stays on B (Understat) and waits for Understat.
+ESPN_LEAGUES = ("E0", "SP1", "D1", "F1")
+ESPN_TOPUP_SECONDS = 45.0  # ESPN match summaries fetched per league per run, within the budget
+# A league's ESPN cache counts as seeded when every earlier season from FIRST_YEAR holds this
+# many matches (27 Nov: a publish top-up alone, holding only this season's first weeks, once
+# decided La Liga's matches with no earlier-season history). espn_players.SEEDED_MIN.
+SEEDED_MIN = 200
+# The one-off bug void (lead's decision, 27 Nov): the B-espn decisions made at 19:49 UTC on
+# 27 Nov in La Liga, before the seed, on a cache holding only 2026/27 through 18 Sep. Their
+# trades are voided by update events (the opens stay), the matches get a superseding decision
+# record, and they are decided again under ids ending "|r2" (`redecided_of`), as backcasts.
+BUG_REASON = "decided on an incomplete ESPN cache (bug, 27 Nov)"
+BUG_VOID = {
+    "league": "SP1",
+    "model_source": "B-espn",
+    "from": "2026-11-27T19:00:00+00:00",
+    "before": "2026-11-27T20:14:00+00:00",
+}
+MODEL_B = {"model_source": "B", "feature_source": "understat"}
 TIME_BUDGET = 120.0  # seconds of model work per paper run (lead, 9 Nov)
 CHECKED_FILE = "goalscorer_checked.jsonl"
 FIRST_YEAR = 2021  # cli._goal_league_feats: Understat appearances from 2021/22
@@ -115,10 +135,22 @@ DK_NOTE = (
     "entries, never judged; DraftKings doesn't price the market in the Bundesliga."
 )
 FEATURES_NOTE = (
-    "Understat has been down since 2 Nov, so B's features for later matches end at the last "
-    "match file held (features_through on each trade). The judged read recomputes them when "
-    "Understat returns, so a live trade can differ from the judged rule's bet."
+    "Since the §16 amendment (owner-approved 27 Nov) the Premier League, La Liga, Bundesliga "
+    "and Ligue 1 use B-espn, B's model on ESPN's player data, which doesn't need Understat. "
+    "Serie A failed B-espn's check, so it stays on B and waits for Understat, down since 2 Nov. "
+    "Each trade records its model (model_source, feature_source); trades opened before the "
+    "switch are B on Understat and are never rewritten. A trade's features end at the last "
+    "match its data source holds (features_through), so a live trade can differ from the "
+    "judged rule's bet."
 )
+MODEL_NAMES = {"B-espn": "B-espn (ESPN player data)", "B": "B (Understat player data)"}
+
+
+def model_of(t: dict) -> str:
+    """A trade's model: its model_source, or B for trades opened before the switch."""
+    return t.get("model_source") or MODEL_B["model_source"]
+
+
 BACKCAST_NOTE = (
     "Backcast: before {defined} this line replays the rule from {started} on the entry "
     "prices the live goalscorer log recorded and ESPN's lineups at the time "
@@ -145,6 +177,7 @@ UPDATE_FIELDS = {
     "void_reason",
     "result_check",
     "understat_goals",
+    "espn_goals",
 }
 
 
@@ -222,7 +255,9 @@ def load_checked(log_dir: Path) -> dict[str, dict]:
     for line in path.read_text().splitlines():
         if line.strip():
             r = json.loads(line)
-            out.setdefault(f"{r['league']}|{r['event_id']}", r)
+            key = f"{r['league']}|{r['event_id']}"
+            if key not in out or int(r.get("attempt", 1)) > int(out[key].get("attempt", 1)):
+                out[key] = r  # a superseding record (the bug void) replaces the first
     return out
 
 
@@ -358,7 +393,7 @@ def b_block(kickoff) -> pd.Timestamp:
     return FORWARD_START + B_REFIT * int((k - FORWARD_START) // B_REFIT)
 
 
-def match_model(matches: pd.DataFrame, err, home: str, away: str, date) -> dict:
+def match_model(matches: pd.DataFrame, err, home: str, away: str, date, weight=None) -> dict:
     """{home: (team_xg, game_state), away: (...)} for one fixture from the match model refit
     at its walk-forward window (as backtest.walk_forward would predict it); NaNs when a team
     has fewer than MM_MIN_TEAM matches in the window (walk_forward skips those)."""
@@ -372,14 +407,17 @@ def match_model(matches: pd.DataFrame, err, home: str, away: str, date) -> dict:
     counts = pd.concat([train["home"], train["away"]]).value_counts()
     if min(counts.get(home, 0), counts.get(away, 0)) < MM_MIN_TEAM:
         return {home: (np.nan, np.nan), away: (np.nan, np.nan)}
-    model = DixonColes(xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS).fit(train, as_of=lo)
+    w = (0.7 if not err else 0.0) if weight is None else weight
+    model = DixonColes(xg_weight=w, options=FIT_OPTIONS).fit(train, as_of=lo)
     eh, ea = model.expected_goals(home, away)
     p = match_odds(model.score_matrix(home, away))
     gs = float(p[0] - p[2])  # [home, draw, away], as walk_forward's p_home - p_away
     return {home: (float(eh), gs), away: (float(ea), -gs)}
 
 
-def history_info(matches: pd.DataFrame, err, apps: pd.DataFrame, since) -> pd.DataFrame:
+def history_info(
+    matches: pd.DataFrame, err, apps: pd.DataFrame, since, weight=None
+) -> pd.DataFrame:
     """pb.match_info over backtest.walk_forward from the weekly window holding `since` (each
     window's fit depends only on its own start, so these equal the judged read's from
     2022-07-01)."""
@@ -393,7 +431,9 @@ def history_info(matches: pd.DataFrame, err, apps: pd.DataFrame, since) -> pd.Da
         matches,
         start=start,
         model_factory=functools.partial(
-            DixonColes, xg_weight=0.7 if not err else 0.0, options=FIT_OPTIONS
+            DixonColes,
+            xg_weight=(0.7 if not err else 0.0) if weight is None else weight,
+            options=FIT_OPTIONS,
         ),
     )
     return pb.match_info(preds, apps)
@@ -409,7 +449,11 @@ def _position(hist: pd.DataFrame, pid: str) -> str:
 
 
 def target_features(
-    apps: pd.DataFrame, info: pd.DataFrame, target: dict, starters: dict[str, list[str]]
+    apps: pd.DataFrame,
+    info: pd.DataFrame,
+    target: dict,
+    starters: dict[str, list[str]],
+    extra: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """Goal features for one match's starters (placeholder rows after every earlier
     appearance) and for every earlier appearance: (starter rows, earlier rows, detail).
@@ -468,6 +512,8 @@ def target_features(
     info_all = pd.concat([info, pd.DataFrame(mi)], ignore_index=True)
     info_all = info_all.astype({"team_xg": float, "game_state": float})
     feats = goal_features(build_features(allr, info_all))
+    if extra is not None:  # B-espn: espn_players.goal_rate_features
+        feats = extra(feats)
     flag = feats["_placeholder"].astype(bool)
     return feats[flag], feats[~flag], detail
 
@@ -529,6 +575,8 @@ def starter_chances(
 class BSource:
     """Loads a league's Understat appearances, football-data matches and walk-forward match
     info once per run (only when a match needs deciding) and gives B's chances."""
+
+    model_tags = MODEL_B
 
     def __init__(self, league: str, now: pd.Timestamp):
         self.league, self.now = league, now
@@ -607,7 +655,7 @@ class BSource:
         if live.empty:
             return {}, detail
         out = predict(model, live)
-        detail.update(train_rows=n, starters=len(live), eligible=len(out))
+        detail.update(train_rows=n, starters=len(live), eligible=len(out), **MODEL_B)
         if not out:
             detail["why"] = "too little training data or no eligible starter"
         return out, detail
@@ -640,10 +688,180 @@ class BSource:
         return dict(x.drop_duplicates("player_id", keep="last")[["player_id", "player"]].values)
 
 
+# ---------- B-espn (§16 amendment, owner-approved 27 Nov) ----------
+
+
+def fit_block_espn(past: pd.DataFrame, kickoff, first=None):
+    """B-espn fitted as the judged read fits the block holding `kickoff`
+    (espn_players.b_espn_predict through lab.harness and player_assist_lab.CountCandidate):
+    every earlier appearance before the block start, within LOOKBACK_DAYS of the block's
+    first kickoff, NB2 on goals with B_ESPN_FACTORS, a starting alpha of 2.0 and FIT_OPTIONS.
+    Returns (model or None, training rows)."""
+    from soccer_stats.espn_players import B_ESPN_FACTORS
+    from soccer_stats.models.player_counts import NBRegression
+    from soccer_stats.models.player_goals import FIT_OPTIONS
+    from soccer_stats.player_assist_lab import LOOKBACK_DAYS
+
+    bs = b_block(kickoff)
+    t = pd.to_datetime(past["kickoff"], utc=True)
+    first = _utc(first) if first is not None else block_first(t, kickoff)
+    train = past[(t < bs) & (t >= first - pd.Timedelta(days=LOOKBACK_DAYS))]
+    if len(train) < 200 or train["goals"].sum() < 10:
+        return None, len(train)
+    m = NBRegression(list(B_ESPN_FACTORS), 2.0, options=FIT_OPTIONS)
+    m.fit(train, train["goals"].to_numpy(), train["minutes"].to_numpy() / 90)
+    return m, len(train)
+
+
+def predict_espn(model, live: pd.DataFrame) -> dict[str, float]:
+    """B-espn's chance (CountCandidate's mixture, lineup known) for the starters with
+    MIN_PREV_APPS earlier appearances."""
+    from soccer_stats.models.player_goals import p_zero
+    from soccer_stats.player_assist_lab import MIN_PREV_APPS
+
+    ok = live[live["prev_apps"] >= MIN_PREV_APPS]
+    if model is None or ok.empty:
+        return {}
+    rate = model.rate(ok)
+    ps = ok["started"].astype(float).to_numpy()
+    st = rate * ok["start_minutes"].to_numpy() / 90
+    sb = rate * ok["sub_minutes"].to_numpy() / 90
+    p = ps * (1 - p_zero(st, model.alpha_)) + (1 - ps) * (1 - p_zero(sb, model.alpha_))
+    return {str(pid): float(v) for pid, v in zip(ok["player_id"], p, strict=True)}
+
+
+class EspnSource(BSource):
+    """B-espn's source for one league: ESPN's appearance rows from the cache
+    (espn_players.load_cache, topped up with the matches played since, within
+    ESPN_TOPUP_SECONDS and the run's deadline), football-data with Understat's xG for the
+    match model at the frozen rule's weight (espn_players.match_xg_weight), and B-espn fitted
+    once per 28-day block (kept in CACHE_DIR as "<league>_espn_<block>.pkl")."""
+
+    model_tags = {"model_source": "B-espn", "feature_source": "espn"}
+
+    def __init__(self, league: str, now: pd.Timestamp, fetch: bool = True, raw_dir=None,
+                 deadline: float | None = None):  # fmt: skip
+        super().__init__(league, now)
+        self.fetch, self.raw_dir, self.deadline = fetch, raw_dir, deadline
+        self.weight = None
+        self.topup: dict | None = None
+        self.cache_counts: dict = {}
+        self.why: str | None = None  # why load() said no
+
+    def load(self) -> bool:
+        if self._loaded:
+            return self.apps is not None and not self.apps.empty
+        self._loaded = True
+        import time
+
+        from soccer_stats import espn_players as ep
+        from soccer_stats.data import current_season, load_matches
+        from soccer_stats.xg import with_xg
+
+        years = range(FIRST_YEAR, current_season() + 1)
+        _rows, held = ep.load_cache(self.league, years, self.raw_dir)
+        self.seasons_missing = [
+            f"{y}/{(y + 1) % 100:02d} (ESPN cache not seeded)"
+            for y in years[:-1]
+            if held.get(ep.season_code(y), {}).get("matches", 0) < SEEDED_MIN
+        ]
+        if self.seasons_missing:
+            self.why = "the league's ESPN cache isn't seeded (odds-check.yml task=espn-seed)"
+            return False  # decided once the seed holds every earlier season
+        if self.fetch:
+            left = ESPN_TOPUP_SECONDS
+            if self.deadline is not None:
+                left = min(left, self.deadline - time.monotonic())
+            if left > 0:
+                try:
+                    self.topup = ep.fill_cache(
+                        self.league, [current_season()], self.raw_dir, seconds=left, now=self.now
+                    )
+                except Exception as exc:  # noqa: BLE001  ESPN down: decide on what is held
+                    self.topup = {"error": type(exc).__name__}
+            if (self.topup or {}).get("left") or left <= 0:
+                self.why = "this season's ESPN matches not all fetched yet (time budget)"
+                return False  # decided on a later run, once the season is complete
+        apps, counts = ep.load_cache(self.league, years, self.raw_dir)
+        self.cache_counts = counts
+        self.missing = sum(c.get("not_found", 0) for c in counts.values())
+        if apps.empty or not (apps["season"].astype(str) == ep.season_code(current_season())).any():
+            self.why = "no ESPN rows for this season"
+            return False
+        self.apps = apps
+        self.matches, self.err = with_xg(load_matches([self.league], years))
+        self.weight = ep.match_xg_weight(self.matches)
+        return True
+
+    def history(self, since) -> pd.DataFrame:
+        if self.info is None:
+            self.info = history_info(self.matches, self.err, self.apps, since, self.weight)
+        return self.info
+
+    def match_model(self, home: str, away: str, kickoff) -> dict:
+        return match_model(self.matches, self.err, home, away, kickoff, self.weight)
+
+    def chances(self, target: dict, starters: dict[str, list[str]], known=()):
+        """B-espn's chances for one match, fitted once per block (as BSource.chances)."""
+        import pickle
+
+        from soccer_stats.espn_players import goal_rate_features
+
+        k = _utc(target["kickoff"])
+        bs = b_block(k)
+        kicks = pd.to_datetime(self.apps["kickoff"], utc=True)
+        first = block_first([*known, *kicks], k)
+        key = {"block": _iso(bs), "first": _iso(first), "apps": int((kicks < bs).sum()),
+               "matches": int((self.matches["date"] < bs.tz_convert(None)).sum()),
+               "weight": self.weight, "model": "B-espn"}  # fmt: skip
+        path = Path(self.cache_dir) / f"{self.league}_espn_{bs:%Y%m%d}.pkl"
+        cached = None
+        if path.exists():
+            try:
+                cached = pickle.loads(path.read_bytes())
+            except Exception:  # noqa: BLE001  a bad file is refitted
+                cached = None
+        if cached is not None and cached.get("key") == key:
+            empty = pd.DataFrame(columns=["match_id", "team", "team_xg", "game_state"])
+            live, _past, detail = target_features(
+                self.apps, empty, target, starters, goal_rate_features
+            )
+            model, n = cached["model"], cached["train_rows"]
+            self.cache_hits += 1
+        else:
+            info = self.history(bs - pd.Timedelta(days=760))
+            live, past, detail = target_features(
+                self.apps, info, target, starters, goal_rate_features
+            )
+            if live.empty:
+                return {}, {**detail, **self.model_tags}
+            model, n = fit_block_espn(past, k, first)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(pickle.dumps({"key": key, "model": model, "train_rows": n}))
+            self.refits += 1
+        detail.update(self.model_tags, xg_weight=self.weight)
+        if live.empty:
+            return {}, detail
+        out = predict_espn(model, live)
+        detail.update(train_rows=n, starters=len(live), eligible=len(out))
+        if not out:
+            detail["why"] = "too little training data or no eligible starter"
+        return out, detail
+
+
+def source_for(league: str, now: pd.Timestamp, deadline: float | None = None):
+    """The league's model source: B-espn in ESPN_LEAGUES, else B (Understat)."""
+    if league in ESPN_LEAGUES:
+        return EspnSource(league, now, deadline=deadline)
+    return BSource(league, now)
+
+
 # ---------- deciding a match ----------
 
 
-def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineup, defined, now):
+def _new_trade(
+    key, league, entry, pid, name, team, p, odds, book, detail, lineup, defined, now, attempt=1
+):
     k = entry["kickoff"]
     pick = {"market": MARKET, "odds": odds, "model_p": p, "edge": round(p, P_DECIMALS) * odds - 1}
     t = tr.new_trade(
@@ -656,7 +874,10 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
         opened_at=entry["fetched_at"],
         odds_fetched_at=_iso(entry["fetched_at"]),
         threshold=T_JUDGED,
-        model_ref={"model": "B", **{x: detail.get(x) for x in ("block_start", "train_rows")}},
+        model_ref={
+            "model": detail.get("model_source", "B"),
+            **{x: detail.get(x) for x in ("block_start", "train_rows", "xg_weight")},
+        },
         stake=STAKE,
         rule="goalscorer_b",
         p_source="model_b",
@@ -664,11 +885,12 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
     )
     t.update(
         id=tr.trade_id(league, t["season"], entry["home"], entry["away"], "goal", pid)
+        + (f"|r{attempt}" if attempt > 1 else "")
         + ID_SUFFIX[key],
         bet_type="goalscorer",
         portfolio="goalscorer",
         side="yes",
-        player=name["understat"],
+        player=name.get("model", name.get("understat")),
         player_id=pid,
         team=team,
         espn_name=name["espn"],
@@ -679,11 +901,16 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
         p_B=_r(p, P_DECIMALS),
         features_through=detail.get("features_through"),
         features_stale=detail.get("features_stale"),
+        model_source=detail.get("model_source", MODEL_B["model_source"]),
+        feature_source=detail.get("feature_source", MODEL_B["feature_source"]),
         lineup_fetched_at={s: lineup.get(f"{s}_at") for s in ("home", "away")},
         decided_at=_iso(now),
     )
     if key == DK_KEY:
         t.update(variant_of=KEY, descriptive=True)
+    if attempt > 1:
+        first = tr.trade_id(league, t["season"], entry["home"], entry["away"], "goal", pid)
+        t.update(redecided_of=first + ID_SUFFIX[key], attempt=attempt)
     if entry["fetched_at"] < defined or now >= k:
         bc.mark(t)
         t["backcast_from"] = BACKCAST_FROM
@@ -691,7 +918,7 @@ def _new_trade(key, league, entry, pid, name, team, p, odds, book, detail, lineu
 
 
 def decide(
-    entry: dict, lineup: dict, source: BSource, league: str, defined, now, known=()
+    entry: dict, lineup: dict, source: BSource, league: str, defined, now, known=(), attempt=1
 ) -> tuple[list[dict], dict]:
     """The trades the rule opens on one match at its entry snapshot, and the decision record
     (written to goalscorer_checked.jsonl whether or not anything opened)."""
@@ -699,6 +926,8 @@ def decide(
     rec = {"league": league, "event_id": entry["event_id"], "home": home, "away": away,
            "kickoff": _iso(k), "entry_at": _iso(entry["fetched_at"]),
            "decided_at": _iso(now)}  # fmt: skip
+    if attempt > 1:
+        rec["attempt"] = attempt
     rosters = {home: source.rosters(home, k), away: source.rosters(away, k)}
     ids: dict[str, list[str]] = {}
     espn_of: dict[str, str] = {}
@@ -730,7 +959,7 @@ def decide(
             if p is None or oname is None:
                 continue
             name = {
-                "understat": html.unescape(rosters[team].get(pid) or ""),  # "O&#039;Nien"
+                "model": html.unescape(rosters[team].get(pid) or ""),  # "O&#039;Nien"
                 "espn": espn_of.get(pid),
                 "odds": oname,
             }
@@ -754,6 +983,7 @@ def decide(
                             lineup,
                             defined,
                             now,
+                            attempt,
                         )  # fmt: skip
                     )
     rec.update(
@@ -775,6 +1005,8 @@ def decide(
                 "block_start",
                 "train_rows",
                 "why",
+                "model_source",
+                "feature_source",
             )
         },  # fmt: skip
         match_files_missing=getattr(source, "missing", None),
@@ -893,6 +1125,8 @@ def understat_check(t: dict, raw_dir=None) -> dict | None:
     from soccer_stats.data import RAW_DIR
     from soccer_stats.player_data import match_path, parse_match, season_matches
 
+    if t.get("feature_source") == "espn":
+        return None  # ESPN ids: checked against ESPN's own match summary (espn_check)
     raw = Path(raw_dir or RAW_DIR)
     k = _utc(t["kickoff"])
     year = k.year if k.month >= 7 else k.year - 1
@@ -918,6 +1152,28 @@ def understat_check(t: dict, raw_dir=None) -> dict | None:
     return {"result_check": "ok" if ok else "mismatch", "understat_goals": goals}
 
 
+def espn_check(t: dict, raw_dir=None) -> dict | None:
+    """For a settled B-espn trade, once ESPN's summary for its match is in the cache: {result_check
+    "ok" or "mismatch", espn_goals} from his goals in that summary (the settlement, from the
+    scoreboard's goal details, stands). None while the match isn't cached."""
+    from soccer_stats.espn_players import cached_match
+
+    rec = cached_match(t["league"], t["home"], t["away"], t["kickoff"], raw_dir)
+    if not rec or not rec.get("found"):
+        return None
+    mine = [r for r in rec.get("rows") or [] if str(r.get("player_id")) == str(t["player_id"])]
+    goals = int(mine[0]["goals"]) if mine else None
+    ok = goals is not None and (goals > 0) == (t["status"] == "won")
+    return {"result_check": "ok" if ok else "mismatch", "espn_goals": goals}
+
+
+def result_check(t: dict, raw_dir=None) -> dict | None:
+    """The settlement check for a trade's model: ESPN's summary for B-espn, Understat for B."""
+    if t.get("feature_source") == "espn":
+        return espn_check(t, raw_dir)
+    return understat_check(t, raw_dir)
+
+
 def update_trades(
     ledger: dict[str, dict],
     closes: dict[str, dict],
@@ -935,6 +1191,8 @@ def update_trades(
     events = []
     results: dict[str, dict | None] = {}
     for t in ledger.values():
+        if t.get("void_reason") == BUG_REASON:
+            continue  # voided by the bug sweep: never closed or settled
         f = close_fields(t, closes.get(t.get("event_id")))
         if f:
             events.append(paper._update(t, now, **f))
@@ -970,6 +1228,51 @@ def update_trades(
     return events
 
 
+# ---------- the one-off bug void (lead, 27 Nov) ----------
+
+
+def _in_bug(league: str, model: str | None, decided_at: str | None) -> bool:
+    b = BUG_VOID
+    return (
+        league == b["league"]
+        and model == b["model_source"]
+        and decided_at is not None
+        and _utc(b["from"]) <= _utc(decided_at) < _utc(b["before"])
+    )
+
+
+def bug_sweep(ledger: dict, checked: dict, league: str, now) -> tuple[list[dict], list[dict]]:
+    """Void (update events, the opens untouched) every first-attempt trade the bug decided, and
+    give each affected match a superseding decision record (`redecide`, attempt 2), so it is
+    decided again under new ids. Idempotent: a voided trade or a superseded match is skipped."""
+    from soccer_stats import paper
+
+    events = []
+    for t in list(ledger.values()):
+        if t.get("attempt", 1) > 1 or t.get("void_reason") == BUG_REASON:
+            continue
+        if _in_bug(league, t.get("model_source"), t.get("decided_at")):
+            ev = paper._update(t, now, status="void", profit=0.0, void_reason=BUG_REASON,
+                               settled_at=_iso(now))  # fmt: skip
+            events.append(ev)
+    recs = []
+    for key, r in list(checked.items()):
+        if r.get("league") != league or int(r.get("attempt", 1)) > 1:
+            continue
+        if _in_bug(league, r.get("model_source"), r.get("decided_at")):
+            rec = {k: r[k] for k in ("league", "event_id", "home", "away", "kickoff", "entry_at")
+                   if k in r}  # fmt: skip
+            rec.update(attempt=2, redecide=True, superseded_at=_iso(now), why=BUG_REASON,
+                       supersedes=r.get("decided_at"))  # fmt: skip
+            checked[key] = rec
+            recs.append(rec)
+    return events, recs
+
+
+def is_bug_void(t: dict) -> bool:
+    return t.get("void_reason") == BUG_REASON
+
+
 # ---------- one league ----------
 
 
@@ -992,7 +1295,7 @@ def update_league(
     `ledger` and `checked`; returns (ledger events, new decision records, counts)."""
     import time
 
-    source = source or BSource(league, now)
+    source = source or source_for(league, now, deadline)
     result_fn = result_fn or (lambda t: espn_match(t, now=now))
     entries = snapshots(live_rows, league, "entry")
     closes = snapshots(live_rows, league, "close")
@@ -1001,8 +1304,10 @@ def update_league(
     events, recs = [], []
     counts = {"pending": 0, "decided": 0, "no_lineup": 0, "no_data": 0, "over_budget": 0}
     for eid, e in sorted(entries.items(), key=lambda x: x[1]["fetched_at"]):
-        if e["kickoff"] < lo or e["fetched_at"] > now or f"{league}|{eid}" in checked:
+        prev = checked.get(f"{league}|{eid}")
+        if e["kickoff"] < lo or e["fetched_at"] > now or (prev and not prev.get("redecide")):
             continue
+        attempt = int(prev.get("attempt", 1)) if prev else 1
         counts["pending"] += 1
         if deadline is not None and time.monotonic() > deadline:
             counts["over_budget"] += 1
@@ -1013,12 +1318,18 @@ def update_league(
                    "kickoff": _iso(e["kickoff"]), "entry_at": _iso(e["fetched_at"]),
                    "decided_at": _iso(now), "why": "no confirmed ESPN lineup at entry",
                    "bets": {KEY: 0, DK_KEY: 0}}  # fmt: skip
+            if attempt > 1:
+                rec["attempt"] = attempt
             counts["no_lineup"] += 1
         else:
             if not source.load():
                 counts["no_data"] += 1
+                if getattr(source, "why", None):
+                    counts["no_data_why"] = source.why
                 continue  # no Understat match files: decided when they come back
-            new, rec = decide(e, lineup, source, league, defined, now, known)
+            new, rec = decide(e, lineup, source, league, defined, now, known, attempt)
+            if attempt > 1:
+                counts["redecided"] = counts.get("redecided", 0) + 1
             for t in new:
                 if tr.holds(ledger, t["id"]):
                     continue
@@ -1027,8 +1338,16 @@ def update_league(
             counts["decided"] += 1
         checked[f"{league}|{eid}"] = rec
         recs.append(rec)
-    events += update_trades(ledger, closes, news, now, result_fn, check_fn or understat_check)
-    counts.update(cache_hits=getattr(source, "cache_hits", 0), refits=getattr(source, "refits", 0))
+    events += update_trades(ledger, closes, news, now, result_fn, check_fn or result_check)
+    counts.update(
+        cache_hits=getattr(source, "cache_hits", 0),
+        refits=getattr(source, "refits", 0),
+        model_source=getattr(source, "model_tags", MODEL_B)["model_source"],
+    )
+    if getattr(source, "topup", None):
+        counts["espn_topup"] = {
+            k: v for k, v in source.topup.items() if k in ("fetched", "found", "left", "error")
+        }
     return events, recs, counts
 
 
@@ -1040,7 +1359,9 @@ def _clv(trades: list[dict], field: str) -> dict:
     return {"trades": len(vals), "mean": float(np.mean(vals)) if vals else None}
 
 
-def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) -> list[dict]:
+def sections(
+    trades: list[dict], defined: str, now: pd.Timestamp | None = None, voided=None
+) -> list[dict]:
     """The main line (key "goalscorer") and the DraftKings line (variant_of "goalscorer",
     adds "book") for Anytime goalscorer -> live -> strategies: paper.strategy_section plus
     defined_at, note, features_note, clv (best-to-best and same-book means), the backcast
@@ -1051,8 +1372,11 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
         defined=_utc(defined).strftime("%-d %b"), started=_utc(BACKCAST_START).strftime("%-d %b")
     )
     out = []
+    trades = [t for t in trades if not is_bug_void(t)]  # counted only in voided_bug
+    voided = [t for t in (voided or []) if is_bug_void(t)]
     for key, label in ((KEY, LABEL), (DK_KEY, DK_LABEL)):
         mine = [t for t in trades if t.get("strategy") == key]
+        gone = [t for t in voided if t.get("strategy") == key]
         r = rule(key)
         sec = paper.strategy_section(mine, key, label, r, of=lambda t: t.get("strategy"), now=now)
         sec.update(
@@ -1068,6 +1392,18 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
                 "(Understat down): their live chance can differ from the judged one.",
             },
             goalscorer_trades=len(mine),
+            voided_bug={
+                "trades": len(gone),
+                "note": "Voided (bug): La Liga trades decided on 27 Nov on an ESPN cache that "
+                "held only this season's first weeks. They stay in the ledger as void and are "
+                "left out of every figure here; their matches were decided again.",
+            },
+            models={
+                m: {"label": MODEL_NAMES.get(m, m), "trades": n}
+                for m, n in sorted(
+                    pd.Series([model_of(t) for t in mine], dtype=object).value_counts().items()
+                )
+            },  # fmt: skip
             backcast=bc.block(
                 mine,
                 defined,
@@ -1103,10 +1439,10 @@ def sections(trades: list[dict], defined: str, now: pd.Timestamp | None = None) 
     return out
 
 
-def safe_sections(trades: list[dict], defined: str, now=None) -> list[dict]:
+def safe_sections(trades: list[dict], defined: str, now=None, voided=None) -> list[dict]:
     """sections() for display only: a failure costs only this track."""
     try:
-        return sections(trades, defined, now)
+        return sections(trades, defined, now, voided)
     except Exception as exc:  # noqa: BLE001
         return [{"key": KEY, "label": LABEL, "defined_at": defined, "error": type(exc).__name__}]
 
@@ -1137,6 +1473,12 @@ def run(
     for lg in leagues:
         ledger = load_ledger(log_dir, lg)
         src = (sources or {}).get(lg)
+        bev, brc = bug_sweep(ledger, checked, lg, now)
+        if bev or brc:
+            print(f"Goalscorer bug void {lg}: {len(bev)} trades voided, {len(brc)} matches "
+                  "to decide again")  # fmt: skip
+            events += bev
+            recs += brc
         try:  # one league's failure costs only that league this run
             ev, rc, c = update_league(
                 ledger, checked, rows, load_team_news(log_dir, lg), lg, defined, now, src,
@@ -1151,7 +1493,9 @@ def run(
         trades += list(ledger.values())
     n = append_events(log_dir, events)
     append_checked(log_dir, recs)
-    return {"trades": trades, "defined_at": defined, "events": n, "counts": counts,
+    voided = [t for t in trades if is_bug_void(t)]
+    return {"trades": [t for t in trades if not is_bug_void(t)], "voided_bug": voided,
+            "defined_at": defined, "events": n, "counts": counts,
             "opened": [e for e in events if e.get("type") == "open"]}  # fmt: skip
 
 
@@ -1165,14 +1509,26 @@ def summary_line(res: dict) -> str:
             f"{name} {len(mine)} trades ({sum(map(bc.is_backcast, mine))} backcast), "
             f"{sum(not e.get('backcast') for e in new)} opened this update"
         )
-    waits = sum(c.get("no_data", 0) for c in res["counts"].values())
+    waits = sum(
+        c.get("no_data", 0) for c in res["counts"].values() if c.get("model_source") != "B-espn"
+    )
+    espn_waits = sum(
+        c.get("no_data", 0) for c in res["counts"].values() if c.get("model_source") == "B-espn"
+    )
+    by_model = pd.Series([model_of(t) for t in res["trades"]], dtype=object).value_counts()
     late = sum(c.get("over_budget", 0) for c in res["counts"].values())
     refits = sum(c.get("refits", 0) for c in res["counts"].values())
     return (
         "Goalscorer paper track: "
         + "; ".join(parts)
         + f"; defined_at {res['defined_at']}"
+        + (
+            "; by model " + ", ".join(f"{m} {n}" for m, n in sorted(by_model.items()))
+            if len(by_model)
+            else ""
+        )
         + (f"; {waits} matches wait for Understat match files" if waits else "")
+        + (f"; {espn_waits} matches wait for the ESPN player cache" if espn_waits else "")
         + (f"; {late} left for the next run (time budget)" if late else "")
         + (f"; B refitted {refits} times" if refits else "")
     )

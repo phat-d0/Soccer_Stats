@@ -1079,3 +1079,7 @@ details.drv-fold { margin-top: 10px; }
 .mm-findings li.pos { border-left-color: var(--pos); }
 .mm-findings li.neg { border-left-color: var(--neg); }
 @media (max-width: 480px) { .mm-cell { width: 31px; height: 30px; font-size: 10px; } .mm-slice .mm-cell { width: 46px; } .mm-grid { border-spacing: 2px; font-size: 10px; } }
+/* Corner Blend Lean's fits (v87): one wrapped line per fit. */
+.cl-fit-list { margin: 0 0 8px; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.5; }
+.cl-fit-list li + li { margin-top: 6px; padding-top: 6px; border-top: 0.5px solid var(--border); }
+.ls-book-line.cs-seen { font-weight: 400; font-size: 14px; }
