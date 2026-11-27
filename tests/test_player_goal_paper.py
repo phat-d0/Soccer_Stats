@@ -456,3 +456,154 @@ def test_understat_check(monkeypatch, tmp_path):
     assert pgp.understat_check(t, tmp_path) == {"result_check": "ok", "understat_goals": 1}
     assert pgp.understat_check({**t, "status": "lost"}, tmp_path)["result_check"] == "mismatch"
     assert pgp.understat_check({**t, "player_id": "8"}, tmp_path)["understat_goals"] is None
+
+
+# ---------- B-espn (§16 amendment, owner-approved 27 Nov) ----------
+
+
+def _info(apps):
+    keys = apps.drop_duplicates(["match_id", "team"])[["match_id", "team"]]
+    n = keys["match_id"].astype(int)
+    return keys.assign(
+        team_xg=1.1 + (n % 7) / 10 + keys["team"].str.len() / 50, game_state=(n % 5 - 2) / 10
+    ).reset_index(drop=True)
+
+
+def test_b_espn_live_chance_equals_the_judged_read():
+    from soccer_stats import espn_players as ep
+    from soccer_stats import player_assist_lab as al
+    from soccer_stats import player_goals as pg
+    from soccer_stats.factors import build_features
+    from soccer_stats.lab import harness
+
+    apps = APPS.copy()
+    info = _info(apps)
+    last = apps[apps["kickoff"] == apps["kickoff"].max()]
+    mid, k = last["match_id"].iloc[0], last["kickoff"].iloc[0]
+    home = last[last["home"]]["team"].iloc[0]
+    away = last[~last["home"]]["team"].iloc[0]
+    # The judged read: espn_players.b_espn_predict's steps through lab.harness.
+    fe = ep.goal_rate_features(pg.goal_features(build_features(apps, info)))
+    pr = harness.walk_forward(
+        fe, lambda **kw: al.CountCandidate(**kw),
+        {"target": "goals", "factors": ep.B_ESPN_FACTORS}, pg.FORWARD_START,
+        k + pd.Timedelta(days=1), time_col="kickoff", refit=al.REFIT, min_train=1,
+    )  # fmt: skip
+    judged = fe.assign(p=pr["p_1"])
+    judged = judged[(judged["match_id"] == mid) & judged["p"].notna()]
+    # The paper track's path: placeholder rows, the block's fit, the prediction.
+    mi = info[info["match_id"] == mid].set_index("team")
+    target = {"home": home, "away": away, "kickoff": k, "season": "2627",
+              "match_model": {t: (mi.loc[t, "team_xg"], mi.loc[t, "game_state"])
+                              for t in (home, away)}}  # fmt: skip
+    starters = {t: list(last[last["team"] == t]["player_id"]) for t in (home, away)}
+    before = apps[apps["kickoff"] < k]
+    live, past, _ = pgp.target_features(
+        before, info[info["match_id"].isin(before["match_id"])], target, starters,
+        ep.goal_rate_features,
+    )  # fmt: skip
+    bs = pgp.b_block(k)
+    first = apps.loc[apps["kickoff"] >= bs, "kickoff"].min()
+    model, _n = pgp.fit_block_espn(past, k, first)
+    got = pgp.predict_espn(model, live)
+    want = dict(zip(judged["player_id"], judged["p"], strict=True))
+    assert len(want) == 22 and set(got) == set(want)
+    for pid, p in want.items():
+        assert got[pid] == pytest.approx(p, rel=1e-9)
+
+
+def _espn_board(home, away, k, eid="77"):
+    return {"events": [{"id": eid, "date": k.isoformat(), "competitions": [{"competitors": [
+        {"homeAway": "home", "team": {"displayName": home}},
+        {"homeAway": "away", "team": {"displayName": away}}]}]}]}  # fmt: skip
+
+
+def _espn_summary(home, away, scorer="Bukayo Saka"):
+    def side(team, ha, names):
+        return {"homeAway": ha, "team": {"displayName": team}, "roster": [
+            {"athlete": {"id": str(100 + i if ha == "home" else 200 + i), "displayName": n},
+             "starter": True, "position": {"abbreviation": "F"},
+             "stats": [{"name": "totalGoals", "value": 1 if n == scorer else 0},
+                       {"name": "totalShots", "value": 2}]}
+            for i, n in enumerate(names)]}  # fmt: skip
+
+    return {"rosters": [side(home, "home", ["Bukayo Saka", "Declan Rice"]),
+                        side(away, "away", ["Cole Palmer"])]}  # fmt: skip
+
+
+class _Resp:
+    def __init__(self, body, status=200):
+        self.body, self.status_code = body, status
+
+    def json(self):
+        return self.body
+
+
+def test_espn_cache_fills_once_retries_recent_misses_and_loads(tmp_path):
+    from soccer_stats import espn_players as ep
+
+    k = pd.Timestamp("2026-11-01T15:00:00Z")
+    fx = pd.DataFrame([
+        {"home": "Arsenal", "away": "Chelsea", "kickoff": k},
+        {"home": "Everton", "away": "Fulham", "kickoff": k + pd.Timedelta(hours=2)},
+        {"home": "Leeds", "away": "Wolves", "kickoff": pd.Timestamp("2026-11-30T15:00Z")},
+    ])  # fmt: skip
+    calls = []
+
+    def get(url, params=None, timeout=None):
+        calls.append(url.rsplit("/", 1)[-1])
+        if url.endswith("/scoreboard"):
+            return _Resp(_espn_board("Arsenal", "Chelsea", k))  # Everton v Fulham not listed
+        return _Resp(_espn_summary("Arsenal", "Chelsea"))
+
+    now = pd.Timestamp("2026-11-02T12:00:00Z")
+    res = ep.fill_cache("E0", [2026], tmp_path, get, 60, now, pause=0,
+                        matches=lambda lg, y: fx)  # fmt: skip
+    assert res["fetched"] == 2 and res["found"] == 1 and res["not_found"] == 1  # Nov 30 not played
+    rows, counts = ep.load_cache("E0", [2026], tmp_path)
+    assert counts == {"2627": {"matches": 1, "not_found": 1}}
+    assert set(rows["player"]) == {"Bukayo Saka", "Declan Rice", "Cole Palmer"}
+    assert rows["match_id"].iloc[0] == "fd:Arsenal|Chelsea|20261101"
+    assert int(rows.loc[rows["player"] == "Bukayo Saka", "goals"].iloc[0]) == 1
+    # A held match is never fetched again; a miss is retried only after RETRY_AFTER.
+    n = len(calls)
+    again = ep.fill_cache("E0", [2026], tmp_path, get, 60, now + pd.Timedelta(hours=1),
+                          pause=0, matches=lambda lg, y: fx)  # fmt: skip
+    assert again["fetched"] == 0 and len(calls) == n
+    later = ep.fill_cache("E0", [2026], tmp_path, get, 60, now + pd.Timedelta(hours=7),
+                          pause=0, matches=lambda lg, y: fx)  # fmt: skip
+    assert later["fetched"] == 1 and later["not_found"] == 1
+    # The ESPN check on a settled B-espn trade.
+    t = {"league": "E0", "home": "Arsenal", "away": "Chelsea", "kickoff": k.isoformat(),
+         "player_id": "e100", "status": "won", "feature_source": "espn"}  # fmt: skip
+    assert pgp.result_check(t, tmp_path) == {"result_check": "ok", "espn_goals": 1}
+    assert pgp.result_check({**t, "player_id": "e101"}, tmp_path)["result_check"] == "mismatch"
+    assert pgp.understat_check(t, tmp_path) is None  # ESPN ids never go to Understat
+
+
+def test_espn_leagues_and_b_stays_in_serie_a():
+    now = pd.Timestamp("2026-11-28T12:00:00Z")
+    for lg in ("E0", "SP1", "D1", "F1"):
+        src = pgp.source_for(lg, now)
+        assert isinstance(src, pgp.EspnSource) and src.model_tags["model_source"] == "B-espn"
+    i1 = pgp.source_for("I1", now)
+    assert type(i1) is pgp.BSource and i1.model_tags == pgp.MODEL_B
+
+
+def test_espn_source_waits_without_a_seeded_cache(tmp_path):
+    src = pgp.EspnSource("SP1", pd.Timestamp("2026-11-28T12:00:00Z"), fetch=False,
+                         raw_dir=tmp_path)  # fmt: skip
+    assert src.load() is False and src.seasons_missing
+
+
+def test_sections_count_trades_per_model_and_old_trades_stay_b(chances):
+    old = {"id": "E0|2627|A|B|goal|1", "strategy": pgp.KEY, "status": "open",
+           "opened_at": "2026-11-05T14:00:00+00:00", "kickoff": "2026-11-05T15:00:00+00:00",
+           "league": "E0", "stake": 10.0, "odds": 3.0, "model_p": 0.4, "edge": 0.2,
+           "market": "player_goal_scorer_anytime", "home": "A", "away": "B"}  # fmt: skip
+    new = {**old, "id": "E0|2627|C|D|goal|e5", "model_source": "B-espn", "feature_source": "espn",
+           "home": "C", "away": "D"}  # fmt: skip
+    secs = pgp.sections([old, new], "2026-11-09T00:00:00+00:00", KICKOFF)
+    main = next(s for s in secs if s["key"] == pgp.KEY)
+    assert {m: v["trades"] for m, v in main["models"].items()} == {"B": 1, "B-espn": 1}
+    assert pgp.model_of(old) == "B" and "model_source" not in old

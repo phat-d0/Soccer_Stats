@@ -174,7 +174,12 @@ starter ESPN confirmed by the entry snapshot, best Yes over the nine bookmakers 
 $10, one trade per player per match; a DraftKings-only line beside it (`goalscorer_dk`). Closes
 on the close snapshot (CLV best-to-best and same-book), settles on ESPN's goal details (own
 goals out; not in the XI = void). Backcast from 1 Nov (the live log's start), `defined_at` = the
-first paper run after the merge. E0 only until Understat returns: B needs the match files, and
+first paper run after the merge. Since the §16 amendment (27 Nov) the track runs B-espn in E0, SP1, D1 and F1 on an ESPN
+appearance cache (`espn_players.fill_cache`, seeded per league by `odds-check.yml`
+`task=espn-seed`, cache `espn-players-<league>-`, topped up by each paper run within its budget);
+I1 stays on B and waits for Understat. New trades record `model_source`/`feature_source`, older
+ones are B and never rewritten, sections count `models` (§16 note of 27 Nov). For B in I1:
+B needs the match files, and
 E0's sit in publish's `raw-data-` cache (the `understat-E0-` shard missed on 9 Nov; publish now
 restores it, restore only). While Understat is down, B's features stop at the last match file:
 each trade records `features_through` and `features_stale`, and the sections count them
@@ -1235,6 +1240,13 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
     files refit it; only a refit runs the walk-forward. `TIME_BUDGET` 120 s: matches left
     over wait for the next run (`over_budget`). `features_stale` = the features end before
     the league's last match (`last_kickoff`: football-data dates and the live log).
+  - B-espn (§16 amendment, 27 Nov): `ESPN_LEAGUES` (E0, SP1, D1, F1; I1 stays on `BSource`),
+    `source_for`, `EspnSource` (`espn_players.load_cache` after a top-up of at most
+    `ESPN_TOPUP_SECONDS` 45 within the deadline; the match model at `match_xg_weight`;
+    `fit_block_espn` / `predict_espn` per block, pickled as `<league>_espn_<block>.pkl`),
+    `target_features(..., extra=goal_rate_features)`, `MODEL_B`, `model_of`, `result_check`
+    (`espn_check` against the cached ESPN summary for B-espn, `understat_check` for B), and
+    sections' `models` (trades per model).
   - `decide`: names → Understat ids through each club's earlier appearances
     (`match_in_fixture`), the rule, one record per match in data-log
     `paper_trades/goalscorer_checked.jsonl` (bets or not; never decided twice).
@@ -1293,6 +1305,14 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   `task=espn-b-check` (downloads `goalscorer-1nov-rescued.zip` from the release and checks both
   sha256s against `archive/extra_assets.json`; nothing from 2026/27 pulled or scored).
   `player_goal_lab.scored_rows` rows carry `model_source` "B" and `feature_source` "understat".
+- `espn_players` appearance cache (27 Nov; the paper track's B-espn): `fill_cache(league,
+  seasons, raw_dir, get, seconds, now)` (each settled football-data match once into
+  `data/raw/espn_players/<league>/<season>/<date>_<home>_<away>.json`, match ids
+  "fd:home|away|date"; a match ESPN doesn't list is retried `RETRY_TRIES` 3 times within 14
+  days), `load_cache`, `cached_match`; CLI `espn-seed --league --minutes`, `odds-check.yml`
+  `task=espn-seed` (saves shard `espn-players-<league>-` on `data/raw/espn_players` from the
+  default branch when it added files; publish restores the four shards, keep-alive rows in
+  caches.yml, `cache_archive.FREE`).
 - `player_assist_lab.py` (lead, 26 Nov; free development look, CLI `assist-lab --league`,
   `odds-check.yml` `task=assist-lab`): B's NB2 mixture (`CountCandidate`) on assists
   (`ASSIST_FACTORS`: shrunk xA and key passes per 90, assists per xA) and on goals + assists
