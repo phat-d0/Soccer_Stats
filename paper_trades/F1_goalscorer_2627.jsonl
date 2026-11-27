@@ -344,3 +344,30 @@
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e341333|dk","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
 {"type":"update","id":"F1|2627|Brest|Paris FC|goal|e271137","at":"2026-11-27T21:47:11+00:00","status":"lost","profit":-10.0,"started":true,"scored":0,"score":"1-0","result_source":"espn","settled_at":"2026-11-27T21:47:11+00:00"}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e243514","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e243514|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e3132216","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e3132216|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e401045","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e401045|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e246847","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e246847|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e306535","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":1}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e265099","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Le Havre|Lorient|goal|e265099|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lens|Marseille|goal|e158066","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lens|Marseille|goal|e233199","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lens|Marseille|goal|e233199|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Nice|Paris SG|goal|e232089","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Nice|Paris SG|goal|e240233","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Nice|Paris SG|goal|e240233|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e250853","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e318577","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e370758","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e370758|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e320945","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e320945|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e192060","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e192060|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e333310","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
+{"type":"update","id":"F1|2627|Lille|Lyon|goal|e333310|dk","at":"2026-11-27T23:04:05+00:00","result_check":"ok","espn_goals":0}
