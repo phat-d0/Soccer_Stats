@@ -1040,3 +1040,4 @@
 {"league":"UEL","kinds":["inplay75"],"kickoffs":["2026-11-26T20:00:00+00:00"],"fetched_at":"2026-11-26T21:18:20+00:00","status":200,"cost":1,"credits_left":4941423,"events":10,"rows":80}
 {"league":"E2","kinds":["inplay75"],"kickoffs":["2026-11-26T20:00:00+00:00"],"fetched_at":"2026-11-26T21:18:20+00:00","status":200,"cost":1,"credits_left":4941422,"events":24,"rows":7}
 {"league":"BRA","kinds":["inplay55"],"kickoffs":["2026-11-26T23:00:00+00:00"],"fetched_at":"2026-11-26T23:58:19+00:00","status":200,"cost":1,"credits_left":4941411,"events":9,"rows":5}
+{"league":"BRA","kinds":["inplay75"],"kickoffs":["2026-11-26T23:00:00+00:00"],"fetched_at":"2026-11-27T00:18:20+00:00","status":200,"cost":1,"credits_left":4941410,"events":9,"rows":5}
