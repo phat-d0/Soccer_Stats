@@ -1574,7 +1574,10 @@ since 2021/22 have any capture, 25 the JSON the fetcher reads; run 42477795332).
   - Ids: `<code>|<season>|<home>|<away>|cornerlean|<home/away>` (+ "|dk").
   - Ledger: `paper_trades/<code>_cornerlean_<season>.jsonl` (`paper._is_match_ledger` skips it).
   - `look_frame(rows, results)`: `look_rows` over every league, with counts attached for the fit
-    leagues only.
+    leagues only. Each result frame (football-data's, ESPN's) is read on its own
+    (`attach_counts(df, *frames)`). On 25–27 Nov, three publish runs that settled a match
+    through ESPN joined the two, and the NaN kickoffs crashed `_result_index`, which now uses
+    the date when the kickoff is empty. Nothing was missed (corners team, 27 Nov).
   - `update_fits`: stored fits plus, once, the backcast's at look times before `defined_at`, then
     a live one at `now` when due.
   - `fit_for` (the latest fit at or before a look), `candidates`, `best_per_team`, `new_trade`
