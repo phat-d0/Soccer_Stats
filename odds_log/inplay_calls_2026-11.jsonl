@@ -1085,3 +1085,4 @@
 {"league":"USA","kinds":["inplay75"],"kickoffs":["2026-11-28T03:00:00+00:00"],"fetched_at":"2026-11-28T04:18:26+00:00","status":200,"cost":1,"credits_left":4941137,"events":7,"rows":8}
 {"league":"JPN","kinds":["inplay55"],"kickoffs":["2026-11-28T05:00:00+00:00"],"fetched_at":"2026-11-28T05:58:25+00:00","status":200,"cost":1,"credits_left":4941127,"events":10,"rows":12}
 {"league":"JPN","kinds":["inplay75"],"kickoffs":["2026-11-28T05:00:00+00:00"],"fetched_at":"2026-11-28T06:18:25+00:00","status":200,"cost":1,"credits_left":4941113,"events":11,"rows":24}
+{"league":"JPN","kinds":["inplay55"],"kickoffs":["2026-11-28T06:00:00+00:00"],"fetched_at":"2026-11-28T06:58:19+00:00","status":200,"cost":1,"credits_left":4941112,"events":11,"rows":18}
