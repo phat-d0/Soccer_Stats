@@ -927,3 +927,73 @@ def test_a_redecided_match_is_decided_once_and_later_decisions_are_voided(tmp_pa
     assert ledger["SP1|x|goal|2|r2"]["void_reason"] == pgp.TWICE_REASON
     assert pgp.is_bug_void(ledger["SP1|x|goal|2|r2"])
     assert pgp.twice_sweep(ledger, checked, "SP1", now) == []  # idempotent
+
+
+def _paper_log(tmp_path, chances, checked_rows=()):
+    """A data-log copy holding one E0 match's live goalscorer log and ESPN team news."""
+    import json
+
+    for sub in ("odds_log", "team_news", "paper_trades"):
+        (tmp_path / sub).mkdir(exist_ok=True)
+    pid, name = _pid("Arsenal", 10), _name("Arsenal", 10)
+    close = {("fanduel", name): 1.0 / chances[pid], ("draftkings", name): 1.1 / chances[pid]}
+    rows = _live_rows(_prices(chances), close).assign(league="E0")
+    (tmp_path / "odds_log" / "E0_goalscorer_2026-11.jsonl").write_text(
+        "\n".join(json.dumps(r, default=str) for r in rows.to_dict("records")) + "\n"
+    )
+    news = _news()
+    (tmp_path / "team_news" / "E0_2026-11.jsonl").write_text(
+        "\n".join(json.dumps(r, default=str) for r in news.to_dict("records")) + "\n"
+    )
+    if checked_rows:
+        (tmp_path / "paper_trades" / pgp.CHECKED_FILE).write_text(
+            "\n".join(json.dumps(r) for r in checked_rows) + "\n"
+        )
+    return tmp_path
+
+
+def _snapshot(log_dir):
+    d = log_dir / "paper_trades"
+    return {p.name: p.read_text() for p in sorted(d.glob("*.jsonl"))}
+
+
+@pytest.mark.parametrize("marker", [False, True])
+def test_the_paper_step_run_twice_decides_and_opens_nothing_new(tmp_path, chances, marker):
+    """End to end (lead, 27 Nov, after three decide/void bugs in a day): `run` twice on the
+    same data. The second run decides nothing, opens nothing and voids nothing; the decision
+    record and the ledgers are byte for byte what the first run left. With `marker`, the match
+    starts with a first decision and a `redecide` marker (as the 27 Nov bug void left SP1)."""
+    import json
+
+    rows = []
+    if marker:
+        base = {"league": "E0", "event_id": "ev1", "home": "Arsenal", "away": "Chelsea",
+                "kickoff": KICKOFF.isoformat()}  # fmt: skip
+        rows = [{**base, "attempt": 1, "decided_at": "2026-11-09T14:00:00+00:00"},
+                {**base, "attempt": 2, "redecide": True,
+                 "superseded_at": "2026-11-09T16:00:00+00:00"}]  # fmt: skip
+    log = _paper_log(tmp_path, chances, rows)
+    now = KICKOFF + pd.Timedelta(hours=3)
+    goal = {"score90": [1, 0], "goals": [
+        {"name": _name("Arsenal", 10), "own_goal": False, "team_id": "1"}]}  # fmt: skip
+
+    def go():
+        return pgp.run(log, now, leagues=("E0",), sources={"E0": FakeSource()},
+                       result_fn=lambda t: goal)  # fmt: skip
+
+    first = go()
+    opened = {e["id"] for e in first["opened"]}
+    suffix = "|r2" if marker else ""
+    pid = _pid("Arsenal", 10)
+    assert opened == {f"E0|2627|Arsenal|Chelsea|goal|{pid}{suffix}",
+                      f"E0|2627|Arsenal|Chelsea|goal|{pid}{suffix}|dk"}  # fmt: skip
+    after_first = _snapshot(log)
+    second = go()
+    assert second["opened"] == [] and second["events"] == 0
+    assert _snapshot(log) == after_first
+    kept = pgp.load_checked(log)["E0|ev1"]
+    assert not kept.get("redecide") and kept.get("attempt", 1) == (2 if marker else 1)
+    lines = [json.loads(x) for x in after_first[pgp.CHECKED_FILE].splitlines()]
+    assert sum(1 for r in lines if not r.get("redecide") and r.get("decided_at")) == (
+        2 if marker else 1
+    )
