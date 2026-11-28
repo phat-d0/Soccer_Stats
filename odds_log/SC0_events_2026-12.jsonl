@@ -4,3 +4,7 @@
 {"league":"SC0","sport":"soccer_spl","event_id":"cbb3c0c95270a50d3d52f67257c45ca1","home":"Hearts","away":"Aberdeen","kickoff":"2026-12-02T19:45:00+00:00","fetched_at":"2026-11-25T10:10:15+00:00"}
 {"league":"SC0","sport":"soccer_spl","event_id":"2c868cbc5ef5fabd6638a2dc7a6793ad","home":"Rangers","away":"Dundee United","kickoff":"2026-12-02T19:45:00+00:00","fetched_at":"2026-11-25T10:10:15+00:00"}
 {"league":"SC0","sport":"soccer_spl","event_id":"c73d88d24c0f7e5dd9cae7ab6ec9867a","home":"Kilmarnock","away":"Hibernian","kickoff":"2026-12-02T19:45:00+00:00","fetched_at":"2026-11-25T10:10:15+00:00"}
+{"league":"SC0","sport":"soccer_spl","event_id":"162ee4e30427ab91ddbba7b08b7e62b5","home":"Aberdeen","away":"Dundee United","kickoff":"2026-12-05T15:00:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
+{"league":"SC0","sport":"soccer_spl","event_id":"90b74c6fad8fa1ff1db65faf1a82a7e4","home":"Celtic","away":"St Johnstone","kickoff":"2026-12-05T15:00:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
+{"league":"SC0","sport":"soccer_spl","event_id":"70cf325312c7be5a9fa76db2ed6a2bb2","home":"Dundee FC","away":"Falkirk F.C.","kickoff":"2026-12-05T15:00:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
+{"league":"SC0","sport":"soccer_spl","event_id":"fe6fe189e1932bd36e6a5cc475ccb577","home":"Motherwell","away":"Kilmarnock","kickoff":"2026-12-05T15:00:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}

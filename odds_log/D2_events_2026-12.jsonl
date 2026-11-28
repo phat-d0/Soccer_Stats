@@ -4,3 +4,6 @@
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"16d332f63d847ac022b810359622dd2d","home":"Karlsruher SC","away":"Holstein Kiel","kickoff":"2026-12-05T12:00:00+00:00","fetched_at":"2026-11-27T14:30:20+00:00"}
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"786d9976fcd7fbf2b68f66b4e252766d","home":"FC Energie Cottbus","away":"VfL Osnabr\u00fcck","kickoff":"2026-12-04T17:30:00+00:00","fetched_at":"2026-11-27T18:16:21+00:00"}
 {"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"c6b6807a24615bd43e74a328d9fd8789","home":"Hannover 96","away":"Hertha Berlin","kickoff":"2026-12-05T19:30:00+00:00","fetched_at":"2026-11-27T21:25:12+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"d2b26457ffe03f6a56fa317991c9b7cb","home":"FC St. Pauli","away":"1. FC Heidenheim","kickoff":"2026-12-06T12:30:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"d031199c52a485591fd4607c42c8ac62","home":"VfL Wolfsburg","away":"1. FC Magdeburg","kickoff":"2026-12-06T12:30:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
+{"league":"D2","sport":"soccer_germany_bundesliga2","event_id":"0528bef5978f055f8a34e695a6dba854","home":"SV Darmstadt 98","away":"Eintracht Braunschweig","kickoff":"2026-12-06T12:30:00+00:00","fetched_at":"2026-11-28T15:20:25+00:00"}
